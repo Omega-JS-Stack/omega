@@ -16,6 +16,7 @@ const {
   languageEntries,
   languageLabel,
   switcherHtml,
+  wireFlagFallback,
   mountLanguageSwitcher,
 } = require('../core/js/core/language-switcher.js');
 const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
@@ -29,9 +30,26 @@ function makeLinks(alternates) {
   }));
 }
 
+/** The minimum <img> the flag fallback touches: a listener and a removal. */
+function makeFlag() {
+  const flag = {
+    removed: false,
+    handlers: {},
+    addEventListener: (event, handler) => { flag.handlers[event] = handler; },
+    remove: () => { flag.removed = true; },
+  };
+
+  return flag;
+}
+
+/** The minimum list the module fills: an innerHTML sink over some flags. */
+function makeList(flags = []) {
+  return { innerHTML: '', querySelectorAll: () => flags };
+}
+
 /** The minimum document the module reads: a lang, some alternates, a mount. */
-function makeDocument({ lang = 'en', alternates = [], mount = true } = {}) {
-  const list = { innerHTML: '' };
+function makeDocument({ lang = 'en', alternates = [], mount = true, flags = [] } = {}) {
+  const list = makeList(flags);
   const mountEl = {
     hidden: true,
     querySelector: (selector) => (selector === '[data-omega-language-list]' ? list : null),
@@ -86,12 +104,40 @@ test('html: hrefs and labels are escaped — a query-string permalink stays vali
   assert.equal(html.match(/<li>/g).length, 2, 'one row per language');
 });
 
+// ─── The flags (#129) ────────────────────────────────────────────────────────
+
+test('html: every row carries its flag BEFORE the name, fetched by its own code', () => {
+  const html = switcherHtml(languageEntries(makeLinks(EN_ES_FR), 'en'));
+
+  assert.equal(html.match(/<img class="uj-language-flag"/g).length, 3, 'one flag per language row');
+  assert.match(
+    html,
+    /<img class="uj-language-flag" data-omega-language-flag src="\/assets\/fa\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
+    'the flag precedes the label, from the emitted core set, at the row\'s own hreflang code',
+  );
+  assert.ok(!html.includes('alt="Español"'), 'the flag is decorative — the label beside it already names the language');
+});
+
+test('flags: a language the emitted set has no file for removes its own image', () => {
+  const [present, missing] = [makeFlag(), makeFlag()];
+
+  assert.equal(wireFlagFallback(makeList([present, missing])), 2, 'every rendered flag is wired');
+
+  missing.handlers.error();
+
+  assert.equal(missing.removed, true, 'a 404 leaves no broken-image glyph in the row');
+  assert.equal(present.removed, false, 'a flag that loads is untouched');
+});
+
 // ─── The mount ───────────────────────────────────────────────────────────────
 
 test('mount: a translated page renders one row per produced language and unhides the menu', () => {
-  const doc = makeDocument({ lang: 'es', alternates: EN_ES_FR });
+  const flag = makeFlag();
+  const doc = makeDocument({ lang: 'es', alternates: EN_ES_FR, flags: [flag] });
 
   assert.equal(mountLanguageSwitcher(doc), 3, 'en + es + fr — x-default is not a language');
+  assert.ok(doc.list.innerHTML.includes('src="/assets/fa/flags/lang/en.svg"'), 'each row ships its flag');
+  assert.ok(typeof flag.handlers.error === 'function', 'the mount wires the missing-flag fallback');
   assert.equal(doc.mount.hidden, false, 'a real choice shows the control');
   assert.ok(doc.list.innerHTML.includes('href="https://example.com/fr/about"'), 'each produced copy is reachable');
   assert.ok(doc.list.innerHTML.includes('lang="es" dir="auto" hreflang="es" class="dropdown-item active"'), 'the current language row is the active one, bidi-isolated');

@@ -478,4 +478,4 @@ function layeredFileImporter(layers) {
   };
 }
 
-module.exports = { buildAssets, purgeCss, resolvePageAsset, layeredFileImporter, sectionsImporter };
+module.exports = { buildAssets, purgeCss, resolvePageAsset, isPageEntry, layeredFileImporter, sectionsImporter };

@@ -61,7 +61,6 @@ Manager.getBuildErrorNotificationArgs = function (plugin, message) {
   return [
     '--title', `Build Error: ${plugin}`,
     '--message', message,
-    '--appIcon', '/Users/ian/claude-ai-icon.png',
     '--timeout', '3',
     '--sound', 'Sosumi',
   ];

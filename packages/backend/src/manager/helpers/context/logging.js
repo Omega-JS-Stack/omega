@@ -7,10 +7,15 @@
  *
  * Every line opens with the ONE identity tag, `[@omega.js/backend:<module>]`
  * ([#121](https://github.com/Omega-JS-Stack/omega/issues/121)) — the module
- * segment is the invocation's function name, which the ctx already knows.
- * Backend is server-side: Cloud Logging (and the emulator) stamps every entry,
- * so the tag stands alone with no timestamp bracket. The invocation id and any
- * log prefix follow the tag.
+ * segment is the invocation's function name, which the ctx already knows. The
+ * invocation id and any log prefix follow the tag.
+ *
+ * In PRODUCTION the tag stands alone: Cloud Logging stamps every entry, so a
+ * hand-written time would be a second one. Outside production nothing stamps a
+ * plain local run (dist scripts, node CLIs), so the line opens with a short local
+ * time bracket instead — `[HH:MM:SS] [@omega.js/backend:<module>] ...`, the same
+ * shape the devkit's build-time logger prints
+ * ([#130](https://github.com/Omega-JS-Stack/omega/issues/130)).
  */
 
 const LOG_LEVELS = {
@@ -30,14 +35,36 @@ function identityTag(ctx) {
   return `[@omega.js/backend:${ctx.meta?.name || 'unnamed'}]`;
 }
 
+// The local time bracket that opens a line outside production, or '' in production
+// where Cloud Logging stamps the entry. The emulator is NOT carved out: its `>`
+// functions prefix carries no time (verified against live emulator output), so
+// emulator lines want the stamp like any other local run. This is the ONE place ctx
+// console output is built (wonderful-log writes to file only), so stamping here
+// covers every level.
+function localTimestamp(ctx) {
+  if (ctx.isProduction()) {
+    return '';
+  }
+
+  const time = new Date().toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  return `[${time}] `;
+}
+
 const methods = {
   _log() {
     const self = this;
     const logs = [...arguments];
     const prefix = self.logPrefix ? ` ${self.logPrefix}:` : ':';
 
-    // Prepend the identity tag, the invocation id, and the log prefix
-    logs.unshift(`${identityTag(self)} ${self.id}${prefix}`);
+    // Prepend the local time bracket (outside production only), the identity tag,
+    // the invocation id, and the log prefix
+    logs.unshift(`${localTimestamp(self)}${identityTag(self)} ${self.id}${prefix}`);
 
     // Get the log level
     const level = logs[1];

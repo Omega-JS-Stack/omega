@@ -8,6 +8,27 @@
  */
 const prepare = require('../../../libraries/email/prepare.js');
 
+/**
+ * How many recipients a send carries, across to/cc/bcc.
+ *
+ * Each field is a string, an object, or an array of either — the count is all the log
+ * needs, so no address is ever read out of them.
+ *
+ * @param {object} settings - Caller-supplied send settings
+ * @returns {number} Total recipient entries
+ */
+function recipientCount(settings) {
+  return ['to', 'cc', 'bcc'].reduce((total, field) => {
+    const value = settings[field];
+
+    if (!value) {
+      return total;
+    }
+
+    return total + (Array.isArray(value) ? value.length : 1);
+  }, 0);
+}
+
 module.exports = async ({ ctx, user, settings }) => {
   // Require authentication
   if (!user.authenticated) {
@@ -36,7 +57,10 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond('SendGrid API key not configured.', { code: 500 });
   }
 
-  ctx.log('Request:', settings);
+  // Metadata only — never the payload. The full settings object carries every
+  // recipient address and the body itself, and this line lands in Cloud Logging where
+  // it outlives the send ([#127](https://github.com/Omega-JS-Stack/omega/issues/127)).
+  ctx.log(`Request: recipients=${recipientCount(settings)}, template=${settings.template}, subject=${settings.subject}`);
 
   const email = ctx.Manager.Email(ctx);
   const result = await email.send(settings).catch(e => e);

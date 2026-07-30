@@ -1,8 +1,10 @@
 /**
- * Internal-only send-field policy test — three fields hand the renderer raw HTML (or
+ * Internal-only send-field policy test — four fields hand the renderer raw HTML (or
  * the trust to render it), and none of them may arrive over the API.
  *
  * - `data.content.html` skips markdown entirely (the transactional/campaign body).
+ * - `html` is the top-level override that replaces the rendered MJML document outright
+ *   — a documented MCP `send_email` parameter until Ian's #125 ruling closed it.
  * - `contentHtml` is the pre-rendered campaign HTML the newsletter generator hands to
  *   `sendCampaign()` — read AHEAD of the escaped renderer, and it persists into the
  *   stored campaign doc that cron sends later.
@@ -48,7 +50,7 @@ function transactionalBuild(settings) {
 }
 
 module.exports = {
-  description: 'Email internal-only send fields (content.html, contentHtml, trustedContent)',
+  description: 'Email internal-only send fields (content.html, html, contentHtml, trustedContent)',
   type: 'group',
   tests: [
     // ---------- The external lanes reject it ----------
@@ -93,12 +95,40 @@ module.exports = {
     },
 
     {
-      name: 'external lane is not fooled by a top-level html field name',
+      name: 'external lane rejects the top-level html override with a coded 400',
 
       run() {
-        // `settings.html` is the separate DOCUMENTED raw-HTML override on the route
-        // schema (its own call, #125) — this guard is not silently taking it away.
-        assert.equal(prepare.internalOnlyFieldFault({ html: '<p>x</p>' }), null);
+        // `settings.html` replaces the rendered MJML body outright (transactional
+        // build()) — the same bypass as data.content.html, one level up. Ian's #125
+        // ruling put it on the internal-only list: the admin/MCP lane now matches the
+        // API lane exactly, and the MCP send_email tool no longer advertises it.
+        const fault = prepare.internalOnlyFieldFault({
+          to: 'user@test.dev',
+          subject: 'Probe',
+          html: '<img src=x onerror="alert(1)">',
+        });
+
+        assert.ok(fault instanceof Error, 'no fault returned for top-level html');
+        assert.equal(fault.code, 400, `fault must be a permanent 400, got ${fault.code}`);
+        assert.ok(fault.message.includes('html'), `message must name the field: ${fault.message}`);
+        assert.ok(/internal-caller only/.test(fault.message), `message must state the rule: ${fault.message}`);
+
+        // Presence is the fault, same as every other field on the list.
+        assert.ok(prepare.internalOnlyFieldFault({ html: '' }) instanceof Error, 'empty html passed');
+      },
+    },
+
+    {
+      name: 'the MCP send_email tool no longer advertises an html parameter',
+
+      run() {
+        // The tool schema is what an admin-authenticated AI reads. #125 removed the
+        // 'Raw HTML body (alternative to template)' parameter; if it ever comes back,
+        // the lane is advertising the bypass again.
+        const sendEmail = require('../../src/mcp/tools.js').find((tool) => tool.name === 'send_email');
+
+        assert.ok(sendEmail, 'send_email tool not found — update this test');
+        assert.equal(sendEmail.inputSchema.properties.html, undefined, 'send_email re-advertises the html parameter');
       },
     },
 
@@ -168,11 +198,12 @@ module.exports = {
     // ---------- Belt: the route schemas do not admit the two top-level fields ----------
 
     {
-      name: 'the admin/email + campaign schemas strip contentHtml and trustedContent',
+      name: 'the admin/email + campaign schemas strip html, contentHtml and trustedContent',
 
       run() {
-        // These two never reach the handler over HTTP today, because a zod object
-        // strips unknown keys and neither field is declared. That strip is the BELT;
+        // These three never reach the handler over HTTP today, because a zod object
+        // strips unknown keys and none of them is declared (#125 removed the last one,
+        // `html`, from the admin/email schema). That strip is the BELT;
         // internalOnlyFieldFault() in the handler is the BRACES — the moment either
         // field is declared on a schema (or a consumer route forwards raw settings),
         // the guard is what stops it. If this test ever fails, the guard is live.
@@ -180,11 +211,13 @@ module.exports = {
         const email = emailSchema.parse({
           to: 'a@b.co',
           subject: 's',
+          html: '<img src=x onerror=alert(1)>',
           contentHtml: '<img src=x>',
           trustedContent: true,
           data: { content: { html: '<img src=x onerror=alert(1)>' } },
         });
 
+        assert.equal(email.html, undefined, 'admin/email schema admitted the top-level html override');
         assert.equal(email.contentHtml, undefined, 'admin/email schema admitted contentHtml');
         assert.equal(email.trustedContent, undefined, 'admin/email schema admitted trustedContent');
 
@@ -213,6 +246,21 @@ module.exports = {
 
         assert.ok(html.includes('id="prerendered"'), `pre-rendered html did not reach the payload: ${html}`);
         assert.ok(/<b>html<\/b>/.test(html), 'pre-rendered markup was escaped for an internal caller');
+      },
+    },
+
+    {
+      name: 'internal caller still gets the top-level html override into the payload',
+
+      async run() {
+        // #125 closed the override to the API lane only — build() still honors it for
+        // a first-party caller that hands over a complete document.
+        const html = await transactionalBuild({
+          subject: 'Internal',
+          html: '<html><body id="whole-document">first-party</body></html>',
+        });
+
+        assert.equal(html, '<html><body id="whole-document">first-party</body></html>', `the override did not replace the body: ${html}`);
       },
     },
   ],

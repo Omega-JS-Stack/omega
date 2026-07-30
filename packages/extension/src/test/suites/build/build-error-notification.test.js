@@ -44,7 +44,8 @@ module.exports = {
       run: (ctx) => {
         const args = Manager.getBuildErrorNotificationArgs('Webpack', 'boom');
         ctx.expect(args[args.indexOf('--title') + 1]).toBe('Build Error: Webpack');
-        ctx.expect(args.includes('--appIcon')).toBe(true);
+        // No --appIcon: the old value was a machine-specific absolute path (#126)
+        ctx.expect(args.includes('--appIcon')).toBe(false);
         ctx.expect(args.includes('--timeout')).toBe(true);
         ctx.expect(args.includes('--sound')).toBe(true);
       },

@@ -106,7 +106,6 @@ module.exports = [
         bcc: { description: 'BCC recipient(s): same formats as "to"' },
         subject: { type: 'string', description: 'Email subject line' },
         template: { type: 'string', description: 'SendGrid template ID or name' },
-        html: { type: 'string', description: 'Raw HTML body (alternative to template)' },
         data: { type: 'object', description: 'Template variables / dynamic data' },
         sender: { type: 'string', description: 'Sender preset name (e.g. "marketing", "support")' },
         group: { description: 'Unsubscribe group ID (number or string)' },

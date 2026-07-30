@@ -71,7 +71,7 @@ Long-form detail (packaged content, URL shape, service worker, design tokens, th
 | [firebase-auth-helpers.js](../../packages/web/src/firebase-auth-helpers.js) | Self-hosted `/__/auth/*` helper files (authDomain = the brand host) |
 | [translate/](../../packages/web/src/translate) | The AI translation pass over `dist/` with the committed cache ([docs/shared/translation.md](../shared/translation.md)) |
 | [purge.js](../../packages/web/src/purge.js) | Cloudflare cache purge (`omega purge`, auto after a direct deploy) |
-| [customize.js](../../packages/web/src/customize.js) | `omega customize <url>` — materialize a default page into `src/pages/` |
+| [customize.js](../../packages/web/src/customize.js) / [overrides.js](../../packages/web/src/overrides.js) | `omega customize <url>` — materialize a default page into `src/pages/`; the layered override map + single-file materialize (`--list`, `omega customize <path>`), built from the same layer chains the build resolves through |
 | [scaffold.js](../../packages/web/src/scaffold.js) | `scaffoldDefaults()` — the devkit defaults engine over `scaffold/` + the web FILE_MAP |
 | [migrate/](../../packages/web/src/migrate) | `runMigration()` — config conversion, the codemod rule table over `src/**`, liquid-lint, consumer-asset fixes, legacy-file removal |
 | [cli.js](../../packages/web/src/cli.js) + [commands/](../../packages/web/src/commands) | The CLI: `bin/omega` → the devkit `omega-bin` dispatcher → `cli-run.js` → `cli.js` → `commands/<name>.js` (`bin/omega-web` skips the dispatch and runs `cli-run.js` directly) |
@@ -109,7 +109,7 @@ Long-form detail (packaged content, URL shape, service worker, design tokens, th
 | `deploy` | Sync + dispatch the CI build workflow; `--dry-run` prints the POST, `--local` builds only (alias `-d`) |
 | `update` | Dependency freshness report; `--apply` installs the safe set, `--major` explicit (aliases `outdated`, `out`) |
 | `migrate` | UJM consumer → `@omega.js/web`, in place; `--check` for a zero-write report (alias `migration`) |
-| `customize` | Materialize a default page into `src/pages/`; no URL lists every customizable URL + lane |
+| `customize` | Materialize a default page into `src/pages/`; `<path>` materializes ONE shadowable file (section/include/css) at its shadowing path with a provenance header; `--list` prints the layered override map (every shadowable file, its owning layer, your shadows); no argument lists every customizable URL + lane |
 | `translate` | Translate `dist/` into `translation.languages` (`omega build` runs it automatically when enabled) |
 | `purge` | Cloudflare cache purge (alias `cloudflare-purge`) |
 | `clean` | Remove `dist/` + `.omega/` (alias `-c`) |

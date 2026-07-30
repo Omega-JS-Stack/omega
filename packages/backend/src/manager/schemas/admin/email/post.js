@@ -6,6 +6,11 @@
  * - UID string (no @): "abc123" — auto-fetches user doc from Firestore
  * - Email object: { email: "user@example.com", name: "John" }
  * - Array of any of the above
+ *
+ * No raw-HTML field is declared here. `html` (the top-level override) joins
+ * `contentHtml` and `trustedContent` as internal-caller only — the schema strip is
+ * the belt, `prepare.internalOnlyFieldFault()` in the handler is the braces
+ * ([#125](https://github.com/Omega-JS-Stack/omega/issues/125)).
  */
 const { fields: f } = require('../../../helpers/schema-zod.js');
 
@@ -23,5 +28,4 @@ module.exports = () => f.object({
   data: f.passthrough({ default: {} }),
   categories: f.array({ default: [] }),
   copy: f.boolean({ default: undefined }),
-  html: f.string({ default: undefined, sanitize: false }),
 });

@@ -16,9 +16,12 @@ join with `:`). Ratified 2026-07-29 ([#12](https://github.com/Omega-JS-Stack/ome
   segment: client `createLogger()` (`packages/client/src/modules/logger.js`), web
   core/js `createLogger()` (`packages/web/core/js/libs/logger.js`), and the
   desktop/extension `logger-lite` lineage.
-- **Backend** (Cloud Functions) is server-side runtime: the platform stamps every
-  entry, so `ctx.log`/`ctx.error`/every level emits the tag ALONE —
-  `[@omega.js/backend:<module>] <invocation-id>[ <logPrefix>]: message`. The module
+- **Backend** (Cloud Functions) is server-side runtime: in PRODUCTION Cloud Logging
+  stamps every entry, so every level emits the tag ALONE —
+  `[@omega.js/backend:<module>] <invocation-id>[ <logPrefix>]: message`. Outside
+  production (the emulator's `>` prefix carries no time; plain local runs have
+  nothing at all) the same `[HH:MM:SS]` bracket the build-time logger prints opens
+  the line ([#130](https://github.com/Omega-JS-Stack/omega/issues/130)). The module
   segment is the invocation's function name, which the context already knows
   (`options.functionName || FUNCTION_TARGET`). Home:
   `packages/backend/src/manager/helpers/context/logging.js`. A shared backend module

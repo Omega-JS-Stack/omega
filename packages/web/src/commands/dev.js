@@ -32,6 +32,7 @@ const {
   findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
+const { emitLanguageFlags } = require('../language-flags.js');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
@@ -167,6 +168,7 @@ module.exports = async function (options) {
     outDir: paths.out,
     coreIconsDir: path.join(PATHS.core, 'icons'),
   });
+  emitLanguageFlags({ outDir: paths.out });
 
   // ---- Rebuild assets in place on source changes
   const watchDirs = [

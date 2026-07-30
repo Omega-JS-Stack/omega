@@ -15,6 +15,14 @@
  * browser bundle, and shipping a copy of it to every page would cost more than
  * the platform already gives for free; an engine or code with no display name
  * falls back to the upper-cased code.
+ *
+ * Flags (#129) come from the SAME core set the retired footer dropdown drew
+ * (core/icons/flags), reached at its emitted path: src/language-flags.js writes
+ * language-named copies into the `lang/` namespace beside the country-named set
+ * (their own space — `ar` is Arabic AND Argentina), so a row needs only its own
+ * code and this module carries no language→country map. A language the set has
+ * no flag for 404s, and the failed <img> removes itself — a missing flag is a
+ * content problem, never a broken-image glyph (docs/shared/icons.md).
  */
 // Relative, not the __main_assets__ alias: the alias only resolves inside the
 // esbuild pass, and this module's logic is unit-tested by loading the file
@@ -29,6 +37,11 @@ const logger = createLogger('language-switcher');
 const MOUNT_SELECTOR = '[data-omega-language-switcher]';
 const LIST_SELECTOR = '[data-omega-language-list]';
 const ALTERNATE_SELECTOR = 'link[rel="alternate"][hreflang]';
+
+// The emitted icon set (emitIcons ships core/icons/* to assets/fa/*), served
+// from the site's own origin exactly like the runtime Font Awesome transport
+const FLAG_SELECTOR = 'img[data-omega-language-flag]';
+const FLAG_BASE = '/assets/fa/flags/lang/';
 
 /**
  * Name one language in its own tongue.
@@ -97,9 +110,27 @@ export function switcherHtml(entries) {
   return entries.map(({ code, href, label, current }) => {
     const classes = `dropdown-item${current ? ' active' : ''}`;
     const marker = current ? ' aria-current="true"' : '';
+    // alt is empty on purpose: the label beside it already names the language
+    const flag = `<img class="uj-language-flag" data-omega-language-flag src="${FLAG_BASE}${escapeHtml(code)}.svg" alt="" loading="lazy">`;
 
-    return `<li><a lang="${escapeHtml(code)}" dir="auto" hreflang="${escapeHtml(code)}" class="${classes}" href="${escapeHtml(href)}"${marker}>${escapeHtml(label)}</a></li>`;
+    return `<li><a lang="${escapeHtml(code)}" dir="auto" hreflang="${escapeHtml(code)}" class="${classes}" href="${escapeHtml(href)}"${marker}>${flag}${escapeHtml(label)}</a></li>`;
   }).join('');
+}
+
+/**
+ * Drop the flags the emitted set has no file for. The switcher renders before
+ * any fetch resolves, so the miss can only be known here.
+ * @param {Element} list - the filled <ul>
+ * @returns {number} the number of flags wired
+ */
+export function wireFlagFallback(list) {
+  const flags = list.querySelectorAll(FLAG_SELECTOR);
+
+  for (const flag of flags) {
+    flag.addEventListener('error', () => flag.remove(), { once: true });
+  }
+
+  return flags.length;
 }
 
 /**
@@ -123,6 +154,7 @@ export function mountLanguageSwitcher(doc) {
   }
 
   list.innerHTML = switcherHtml(entries);
+  wireFlagFallback(list);
   mount.hidden = false;
 
   return entries.length;

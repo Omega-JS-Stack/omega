@@ -233,3 +233,18 @@
     }
   }
 }
+
+// Language flag chip (the footer switcher's client-rendered rows, #129): the
+// flags size like inline icons, with a hairline ring + tiny radius so the
+// square set reads clean beside the native language name. Lives HERE, not in
+// base/_utilities, because every theme that inherits classy's footer include
+// imports this file — a theme-local home left the other themes with unsized
+// 512px flag images.
+.uj-language-flag {
+  width: 1.125em;
+  height: 1.125em;
+  margin-inline-end: 0.5em;
+  vertical-align: -0.15em;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--omega-line);
+}

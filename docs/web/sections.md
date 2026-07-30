@@ -36,6 +36,13 @@ theme → classy base. A consumer overriding a section owns ALL of it (markup +
 assets travel together). Theme sections live inside the installed package —
 consumer git holds only the consumer's own work.
 
+`omega customize --list` prints those paths (with their owning layer and your
+existing shadows) and `omega customize <path>` materializes one of them, so a
+consumer never reads the theme source tree to learn what it may shadow. The
+whole-folder rule still applies: materializing an entry's `section.scss` alone
+does nothing until the entry's `section.html` moves too, or the winner declares
+`inherit` — the command and the file's provenance header both say so.
+
 One declared exception: an override folder's json5 may carry
 `inherit: ['js']` (and/or `'scss'`) — §7 asset lanes it deliberately leaves
 to the chain, filled from the first LOWER full entry that has the file (the

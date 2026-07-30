@@ -35,6 +35,17 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 | Extension pages | `fetch(chrome.runtime.getURL('assets/fa/…'))` — the packaged set (gulp `fontawesome` task emits it to `dist/assets/fa` at every brand build), fully offline | `src/lib/icons.js` (self-starting side-effect import) in popup/options/sidepanel/page |
 | Extension content scripts | NOT auto-wired on purpose — watching a HOST page's DOM would collide with sites using FA themselves. Injected UI imports `createIconRenderer` and `scan()`s its own container; `assets/fa/*` is in `web_accessible_resources` for exactly this | manual, per injected surface |
 
+Country flags are the one non-FA set riding this channel: web's
+`core/icons/flags/<country>.svg` ships with the emitted set (to
+`assets/fa/flags/`), inlined at build time by `{% uj_icon <language> %}`
+through template-kit's language→country map. `src/language-flags.js` also
+writes language-named copies into their own namespace
+(`assets/fa/flags/lang/en.svg` = the us flag — language and country codes
+collide, so `ar` is Arabic there and Argentina one level up), so the
+client-side footer language switcher fetches a flag by the row's own hreflang
+code with no map in the browser; a language the set has no flag for drops its
+`<img>` rather than showing a broken glyph.
+
 Rendered elements carry `data-omega-fa="<style>/<name>"`. Unknown icons /
 Pro styles without a Pro set leave the element **empty** (marked) — a
 missing icon is a content problem, never a crash and never a wrong-style

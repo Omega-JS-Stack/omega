@@ -13,6 +13,7 @@ const { copyStaticAssets, hasFaviconSet } = require('./static-assets.js');
 const { processImages } = require('./imagemin.js');
 const { configureOmega } = require('./engine.js');
 const { emitIcons } = require('@omega.js/devkit/icons');
+const { emitLanguageFlags } = require('./language-flags.js');
 const { resolveThemeLayers } = require('./layers.js');
 const { PATHS } = require('./paths.js');
 
@@ -97,11 +98,16 @@ async function buildSite(options) {
     });
   });
 
-  // ---- runtime icon set (assets/fa/) — feeds the browser-side auto-render
-  await phase('icons', () => emitIcons({
-    outDir: options.outDir,
-    coreIconsDir: path.join(coreDir, 'icons'),
-  }));
+  // ---- runtime icon set (assets/fa/) — feeds the browser-side auto-render,
+  //      plus the language-named flag aliases the client switcher fetches
+  await phase('icons', () => {
+    const icons = emitIcons({
+      outDir: options.outDir,
+      coreIconsDir: path.join(coreDir, 'icons'),
+    });
+    emitLanguageFlags({ outDir: options.outDir });
+    return icons;
+  });
 
   // ---- static images: minted brand identity bridge + consumer src/assets/images
   if (options.staticDirs && options.staticDirs.length) {

@@ -207,7 +207,9 @@ Transactional.prototype.build = async function (settings) {
     email.sendAt = sendAt;
   }
 
-  // Raw HTML override — caller provides complete HTML, skip MJML
+  // Raw HTML override — caller provides complete HTML, skip MJML. INTERNAL callers
+  // only: the external lanes reject `html` through prepare.internalOnlyFieldFault()
+  // before they ever reach here ([#125](https://github.com/Omega-JS-Stack/omega/issues/125)).
   if (settings.html) {
     email.content = [{ type: 'text/html', value: settings.html }];
   }

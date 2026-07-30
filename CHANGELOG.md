@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#94](../../issues/94) — Consumers can discover what they may override: `omega customize --list` prints every shadowable file (sections, includes, css, pages) with its owning layer and the consumer's existing shadows, and `omega customize <path>` materializes ONE of them there, with a provenance header naming the source layer. Existing consumer files are never overwritten.
+
+### Changed
+- [#130](../../issues/130) — Backend log lines open with a `[HH:MM:SS]` local time bracket outside production, where nothing else stamps them; production lines are unchanged — Cloud Logging already carries the timestamp.
+
+### Removed
+- [#125](../../issues/125) — The top-level `html` override leaves the admin email lane: the schema strips it from `POST /admin/email`, the internal-only guard rejects anything that slips past the schema, and the MCP `send_email` tool no longer advertises the parameter — matching the `content.html` policy: raw HTML that bypasses the rendered template is first-party-only.
+
+### Fixed
+- [#129](../../issues/129) — The footer language switcher wears flags again: each row renders the country flag for its language before the native name, from the same core flag set the retired dropdown used. A language the set has no flag for shows the name alone rather than a broken image.
+
+- [#126](../../issues/126) — The extension build's error notification no longer passes a machine-specific icon path to notifly; the notification works identically on any machine.
+
+### Security
+- [#127](../../issues/127) — The admin email route's request log line carries recipient count, template, and subject instead of the full send payload.
+
 ## [0.7.0] (2026-07-29)
 
 ### Added

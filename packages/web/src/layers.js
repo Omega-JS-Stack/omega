@@ -10,13 +10,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
- * Collect the layered union of files under a list of layer directories.
+ * Collect EVERY layer that provides each relative path, in layer order. The
+ * first entry of each list is the winner; the rest are what it shadows —
+ * which is what the override map (`omega customize --list`) reports.
  * @param {string[]} layerDirs - ordered layer dirs (first wins)
  * @param {RegExp} [filter] - only include matching relative paths
- * @returns {Map<string, string>} relative path → winning absolute path
+ * @returns {Map<string, Array<{ dir: string, file: string }>>} relative path → providers
  */
-function collectLayered(layerDirs, filter) {
-  const winners = new Map();
+function collectProviders(layerDirs, filter) {
+  const providers = new Map();
 
   for (const dir of layerDirs) {
     if (!fs.existsSync(dir)) continue;
@@ -26,8 +28,25 @@ function collectLayered(layerDirs, filter) {
 
       const rel = path.relative(dir, path.join(entry.parentPath, entry.name));
       if (filter && !filter.test(rel)) continue;
-      if (!winners.has(rel)) winners.set(rel, path.join(dir, rel));
+      if (!providers.has(rel)) providers.set(rel, []);
+      providers.get(rel).push({ dir, file: path.join(dir, rel) });
     }
+  }
+
+  return providers;
+}
+
+/**
+ * Collect the layered union of files under a list of layer directories.
+ * @param {string[]} layerDirs - ordered layer dirs (first wins)
+ * @param {RegExp} [filter] - only include matching relative paths
+ * @returns {Map<string, string>} relative path → winning absolute path
+ */
+function collectLayered(layerDirs, filter) {
+  const winners = new Map();
+
+  for (const [rel, providers] of collectProviders(layerDirs, filter)) {
+    winners.set(rel, providers[0].file);
   }
 
   return winners;
@@ -54,4 +73,4 @@ function resolveThemeLayers({ activeTheme, consumerDir, themesDir }) {
   return [...new Set([activeTheme || 'classy', 'classy'])].map(resolveId);
 }
 
-module.exports = { collectLayered, resolveThemeLayers };
+module.exports = { collectLayered, collectProviders, resolveThemeLayers };

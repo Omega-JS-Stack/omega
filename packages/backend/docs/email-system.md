@@ -76,25 +76,26 @@ Newsletter template rendering (`generators/lib/templates/newsletter-shared.js`) 
 
 ### Internal-only send fields
 
-Three send/campaign fields hand the renderer raw HTML, or the trust to render it. Each is a real first-party lane AND a complete bypass of the escaped one, so first-party callers keep all three and **no caller arriving over the API may set any of them**. Ian's call on [#90](https://github.com/Omega-JS-Stack/omega/issues/90).
+Four send/campaign fields hand the renderer raw HTML, or the trust to render it. Each is a real first-party lane AND a complete bypass of the escaped one, so first-party callers keep all four and **no caller arriving over the API may set any of them**. Ian's call on [#90](https://github.com/Omega-JS-Stack/omega/issues/90), extended to `html` on [#125](https://github.com/Omega-JS-Stack/omega/issues/125).
 
 | Field | What it does | Its internal user |
 |---|---|---|
 | `data.content.html` | Skips markdown — the body lands in the inbox as live markup | Pre-rendered first-party bodies |
+| `html` (top level) | Replaces the rendered MJML document outright (`transactional/index.js` build) | Callers that hand over a complete document |
 | `contentHtml` (top level) | Same, on the campaign lane — read AHEAD of the escaped renderer (`marketing/index.js`), and it persists into the stored campaign doc that cron sends later | `generators/newsletter.js` |
 | `trustedContent` | Flips the body renderer to `html: true` (raw HTML *and* `javascript:` hrefs survive) | The dispute alert + the newsletter report email |
 
-| Lane | All three fields |
+| Lane | All four fields |
 |---|---|
 | Internal callers (generators, transition handlers, cron, auth hooks) | Accepted — unchanged |
-| `POST /admin/email` (the surface behind the MCP `send_email` tool) | **Rejected**, coded 400 |
-| `POST` / `PUT /marketing/campaign` (the MCP `create_campaign` / `update_campaign` tools) | **Rejected**, coded 400 |
+| `POST /admin/email` (the surface behind the MCP `send_email` tool) | **Blocked** — the route schema strips them (belt); the guard 400s any that slip past (braces) |
+| `POST` / `PUT /marketing/campaign` (the MCP `create_campaign` / `update_campaign` tools) | **Blocked** — same belt-and-braces pair |
 
-The check is one shared helper over one field table: `prepare.internalOnlyFieldFault(settings)` returns a coded-400 permanent fault (naming the offending field and the rule) when the caller's raw settings carry any of them, else null. Every caller-facing email lane runs its raw settings through it BEFORE handing them to the library — and, on the campaign routes, before `buildCampaignDoc()`, which blacklists doc-level fields rather than allowlisting and would otherwise persist whatever the caller sent. An external lane added later must do the same. Rejection is on the FIELD's presence, not its contents: an external caller has no legitimate reason to send any of these keys at all, and the rejection is logged by field name (never the payload).
+The check is one shared helper over one field table: `prepare.internalOnlyFieldFault(settings)` returns a coded-400 permanent fault (naming the offending field and the rule) when the caller's settings carry any of them, else null. In practice the route schemas strip these keys first, so over HTTP the guard is the braces behind that belt — it fires only for a lane whose schema misses a field. Every caller-facing email lane runs its resolved settings through it BEFORE handing them to the library — and, on the campaign routes, before `buildCampaignDoc()`, which blacklists doc-level fields rather than allowlisting and would otherwise persist whatever the caller sent. An external lane added later must do the same. Rejection is on the FIELD's presence, not its contents: an external caller has no legitimate reason to send any of these keys at all, and the rejection is logged by field name (never the payload).
 
-Two of the three (`contentHtml`, `trustedContent`) are also undeclared on the route schemas, and a zod object strips unknown keys — that strip is the belt, this guard the braces, and it is the guard that holds the moment a schema gains the field or a consumer route forwards raw settings. `data.content.html` has no belt: `data` is a schema passthrough, so the guard is its only stop.
+Three of the four (`html`, `contentHtml`, `trustedContent`) are also undeclared on the route schemas, and a zod object strips unknown keys — that strip is the belt, this guard the braces, and it is the guard that holds the moment a schema gains the field or a consumer route forwards raw settings. `data.content.html` has no belt: `data` is a schema passthrough, so the guard is its only stop.
 
-`settings.html` — the documented top-level raw-HTML override on `POST /admin/email` — is deliberately NOT in this table; it is a declared capability of the route and the MCP tool, tracked separately in [#125](https://github.com/Omega-JS-Stack/omega/issues/125).
+`html` was a declared field on the `POST /admin/email` schema and a documented MCP `send_email` parameter until [#125](https://github.com/Omega-JS-Stack/omega/issues/125); Ian ruled the admin/MCP lane matches the API lane exactly, so both the schema field and the tool parameter are gone and the guard covers it like the rest.
 
 Markdown in `data.content.message` is the external caller's lane, and it renders through the untrusted (escaped) renderer.
 

@@ -117,9 +117,12 @@ function renderContent({ content, html, trusted }, utmOptions) {
 
 // The send/campaign fields that hand the renderer raw HTML, or the trust to render
 // it. Each one is a real first-party lane AND a complete bypass of the escaped lane,
-// so no caller arriving over the API may set any of them.
+// so no caller arriving over the API may set any of them. `html` joined the list on
+// Ian's ruling for [#125](https://github.com/Omega-JS-Stack/omega/issues/125): the
+// admin/MCP lane matches the API lane exactly, raw HTML stays internal.
 const INTERNAL_ONLY_SEND_FIELDS = [
   { path: 'data.content.html', what: 'the raw-HTML body passthrough' },
+  { path: 'html', what: 'the top-level raw-HTML override that replaces the rendered MJML body' },
   { path: 'contentHtml', what: 'the pre-rendered campaign HTML the newsletter generator hands over' },
   { path: 'trustedContent', what: 'the flag that renders raw HTML inside the body' },
 ];

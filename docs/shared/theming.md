@@ -48,6 +48,15 @@ the tokens).
 
 ## Consumer customization (tier 1 — main.scss)
 
+- **Discovery**: `omega customize --list` prints the layered override map —
+  every shadowable file (sections, includes, css, pages), its owning layer
+  (framework / `theme:<id>` / consumer), and whether you already shadow it.
+  `omega customize <path>` materializes ONE of them at that path with a
+  provenance header; reading the theme source tree to guess a path is over.
+  The css lane lists only what sass actually layers by — `main.scss` and the
+  page sheets — because a bare relative `@use`/`@import` inside a theme sheet
+  resolves against the importing file, so a consumer copy of a partial would
+  never load.
 - **Recolor**: set `brand.color` in omega.json5. No CSS.
 - **Sass knobs**: every variable in `themes/classy/_config.scss` is `!default`
   — `@use 'omega:main' with ($primary: …, $font-family-sans-serif: …,
