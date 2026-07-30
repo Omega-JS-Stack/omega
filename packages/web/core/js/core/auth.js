@@ -1,4 +1,7 @@
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth');
 
 // Enforce page-load consent guard. When true, any authenticated user whose doc has
 // consent.legal.status !== 'granted' is silently signed out. Keep FALSE until the
@@ -22,7 +25,7 @@ export default function () {
   const unauthenticated = config.redirects.unauthenticated;
 
   // Log policy
-  console.log('[Auth] policy:', policy, {
+  logger.log('policy:', policy, {
     authenticated,
     unauthenticated,
     roles: requiredRoles,
@@ -45,7 +48,7 @@ export default function () {
       const authSignout = url.searchParams.get('authSignout');
 
       // Log
-      console.log('[Auth] state changed:', state);
+      logger.log('state changed:', state);
 
       // Short-circuit if a reverse-signup is in progress (libs/auth/oauth.js#reverseAccidentalSignup
       // sets this synchronously before .delete() + signOut()). Without this, the brief
@@ -53,7 +56,7 @@ export default function () {
       // policy-based redirect to /account (or authReturnUrl) BEFORE the user sees the
       // inline error on /signin. Flag is cleared at the end of reverseAccidentalSignup.
       if (window.__UJM_REVERSING_SIGNUP) {
-        console.warn('[Auth] Skipping state-change processing — reverse-signup in progress');
+        logger.warn('Skipping state-change processing — reverse-signup in progress');
         return;
       }
 
@@ -61,7 +64,7 @@ export default function () {
       // that handler owns the post-signin navigation (authReturnUrl), and this
       // listener's authenticated-default redirect must not race it.
       if (window.__UJM_CUSTOM_TOKEN_SIGNIN) {
-        console.warn('[Auth] Skipping state-change processing — custom-token sign-in owns navigation');
+        logger.warn('Skipping state-change processing — custom-token sign-in owns navigation');
         return;
       }
 
@@ -102,7 +105,7 @@ export default function () {
           const signupProcessed = state.account?.flags?.signupProcessed === true;
           const legalStatus = state.account?.consent?.legal?.status;
           if (signupProcessed && legalStatus && legalStatus !== 'granted') {
-            console.warn('[Auth] Signing out user with no legal consent on record');
+            logger.warn('Signing out user with no legal consent on record');
             await omega.auth().signOut();
             omega.utilities().showNotification(
               `This account hasn't completed setup. Please sign up first.`,
@@ -114,7 +117,7 @@ export default function () {
 
         // Prompt for push notification subscription (fire-and-forget)
         omega.notifications().subscribe().catch((e) => {
-          console.warn('[Auth] Notification subscribe failed:', e.message);
+          logger.warn('Notification subscribe failed:', e.message);
         });
 
         // Check if page requires user to be unauthenticated (e.g., signin page)
@@ -132,7 +135,7 @@ export default function () {
 
         // Check if page requires specific roles (e.g., admin: true)
         if (requiredRoles && !hasRequiredRoles(state.account, requiredRoles)) {
-          console.warn('[Auth] User missing required roles:', requiredRoles);
+          logger.warn('User missing required roles:', requiredRoles);
           redirect(authenticated);
           return;
         }
@@ -155,7 +158,7 @@ export default function () {
       }
     });
   } catch (e) {
-    console.warn('[Auth] Error setting up auth listener:', e);
+    logger.warn('Error setting up auth listener:', e);
 
     return;
   }
@@ -185,7 +188,7 @@ function redirect(url, returnUrl) {
   }
 
   // Log
-  console.log('[Auth] Redirecting to:', newURL.href);
+  logger.log('Redirecting to:', newURL.href);
 
   // Quit on testing
   // return;
@@ -284,7 +287,7 @@ async function sendUserSignupMetadata(account) {
     const signupProcessed = account?.flags?.signupProcessed === true;
 
     /* @dev-only:start */
-    console.log('[Auth] signupProcessed:', signupProcessed);
+    logger.log('signupProcessed:', signupProcessed);
     /* @dev-only:end */
 
     if (signupProcessed) {
@@ -304,7 +307,7 @@ async function sendUserSignupMetadata(account) {
     };
 
     // Log
-    console.log('[Auth] Sending user metadata:', payload);
+    logger.log('Sending user metadata:', payload);
 
     // Make API call to send signup metadata (route resolves via getApiUrl;
     // usage from the omega-properties header syncs into bindings automatically)
@@ -316,9 +319,9 @@ async function sendUserSignupMetadata(account) {
 
     // Log — the server set flags.signupProcessed on the doc, so the next page load's
     // state.account reflects it and this won't fire again. No client-side flag needed.
-    console.log('[Auth] User metadata sent successfully:', response);
+    logger.log('User metadata sent successfully:', response);
   } catch (error) {
-    console.error('[Auth] Error sending user metadata:', error);
+    logger.error('Error sending user metadata:', error);
     // Don't throw - we don't want to block the signup flow. The doc still shows
     // signupProcessed=false, so a refresh / next page load retries automatically.
 
@@ -361,5 +364,5 @@ function _legacyTranslateAppAuth() {
   url.searchParams.delete('cb');
   window.history.replaceState({}, '', url.toString());
 
-  console.log('[Auth] Translated legacy app params:', url.toString());
+  logger.log('Translated legacy app params:', url.toString());
 }

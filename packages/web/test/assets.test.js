@@ -206,6 +206,11 @@ test('tooltips: one shared initializer on the core layer, wired by every theme (
 });
 
 test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chunk', async () => {
+  // The invariant is per BUILD, and the count below walks the whole out dir —
+  // so start clean: stale chunks accumulated from PREVIOUS RUNS (differently
+  // hashed as sources drift) read as duplicates, exactly like the sibling
+  // tests that clear OUT before building.
+  fs.rmSync(OUT, { recursive: true, force: true });
   const manifest = await build(['classy']);
 
   // Page entries are thin boot stubs importing shared chunks

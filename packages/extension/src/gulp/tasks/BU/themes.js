@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('themes');
+const watcherLogger = Manager.logger('themes:watcher');
 const { src, dest, watch, series } = require('gulp');
 
 // Load package
@@ -49,17 +50,17 @@ function themes(complete) {
 function themesWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(input, { delay: delay, dot: true }, themes)
   .on('change', function(path) {
-    logger.log(`[watcher] File ${path} was changed`);
+    watcherLogger.log(`File ${path} was changed`);
   });
 
   // Complete

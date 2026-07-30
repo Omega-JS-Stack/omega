@@ -8,6 +8,9 @@
 
 import omega from '@omega.js/client';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('studio');
 
 const BASE_W = 960;
 const BASE_H = 540;
@@ -246,7 +249,7 @@ async function recordClip() {
     return;
   }
 
-  console.log(`[Studio] Recording clip: ${currentClip}`);
+  logger.log(`Recording clip: ${currentClip}`);
 
   recording = true;
   paused = true;
@@ -263,14 +266,14 @@ async function recordClip() {
 
   let stream;
   try {
-    console.log('[Studio] Requesting screen capture...');
+    logger.log('Requesting screen capture...');
     stream = await navigator.mediaDevices.getDisplayMedia({
       video: { displaySurface: 'browser', frameRate: { ideal: 60 } },
       preferCurrentTab: true,
     });
-    console.log('[Studio] Screen capture granted');
+    logger.log('Screen capture granted');
   } catch (err) {
-    console.warn('[Studio] Screen capture denied:', err.message);
+    logger.warn('Screen capture denied:', err.message);
     resetRecordState($btn, $fieldset);
     return;
   }
@@ -280,16 +283,16 @@ async function recordClip() {
     if (typeof CropTarget !== 'undefined' && stream.getVideoTracks()[0].cropTo) {
       const cropTarget = await CropTarget.fromElement($canvas);
       await stream.getVideoTracks()[0].cropTo(cropTarget);
-      console.log('[Studio] CropTarget applied — recording canvas only');
+      logger.log('CropTarget applied — recording canvas only');
     } else {
-      console.log('[Studio] CropTarget not available — recording full tab');
+      logger.log('CropTarget not available — recording full tab');
     }
   } catch (err) {
-    console.log('[Studio] CropTarget failed:', err.message, '— recording full tab');
+    logger.log('CropTarget failed:', err.message, '— recording full tab');
   }
 
   const mimeType = getSupportedMimeType();
-  console.log(`[Studio] Using mime type: ${mimeType}`);
+  logger.log(`Using mime type: ${mimeType}`);
 
   const recorder = new MediaRecorder(stream, {
     mimeType,
@@ -300,7 +303,7 @@ async function recordClip() {
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) {
       chunks.push(e.data);
-      console.log(`[Studio] Chunk received: ${(e.data.size / 1024).toFixed(1)}KB (${chunks.length} total)`);
+      logger.log(`Chunk received: ${(e.data.size / 1024).toFixed(1)}KB (${chunks.length} total)`);
     }
   };
 
@@ -313,8 +316,8 @@ async function recordClip() {
     const blob = new Blob(chunks, { type: recorder.mimeType });
     const filename = `${currentClip}-${aspect.replace(':', 'x')}-${w}x${h}.${ext}`;
 
-    console.log(`[Studio] Recording complete — ${chunks.length} chunks, ${(blob.size / 1024).toFixed(1)}KB, mime: ${recorder.mimeType}`);
-    console.log(`[Studio] Downloading: ${filename}`);
+    logger.log(`Recording complete — ${chunks.length} chunks, ${(blob.size / 1024).toFixed(1)}KB, mime: ${recorder.mimeType}`);
+    logger.log(`Downloading: ${filename}`);
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -328,11 +331,11 @@ async function recordClip() {
   };
 
   recorder.onerror = (e) => {
-    console.error('[Studio] Recorder error:', e.error);
+    logger.error('Recorder error:', e.error);
   };
 
   stream.getVideoTracks()[0].addEventListener('ended', () => {
-    console.log('[Studio] Screen sharing ended by user');
+    logger.log('Screen sharing ended by user');
     if (recorder.state !== 'inactive') {
       recorder.stop();
     }
@@ -342,11 +345,11 @@ async function recordClip() {
   $canvas.innerHTML = '';
   $canvas.classList.add('recording');
   await sleep(1000);
-  console.log('[Studio] Canvas settled, starting recorder...');
+  logger.log('Canvas settled, starting recorder...');
 
   await new Promise((resolve) => {
     recorder.onstart = () => {
-      console.log('[Studio] Recorder started');
+      logger.log('Recorder started');
       resolve();
     };
     recorder.start(100);
@@ -355,16 +358,16 @@ async function recordClip() {
   const pauseMs = parseInt(document.getElementById('studio-pause')?.value || 1500);
   const totalDuration = clip.duration / speed;
 
-  console.log(`[Studio] Pre-delay: ${pauseMs}ms, clip duration: ${totalDuration}ms (speed: ${speed}x)`);
+  logger.log(`Pre-delay: ${pauseMs}ms, clip duration: ${totalDuration}ms (speed: ${speed}x)`);
 
   await sleep(pauseMs);
 
-  console.log('[Studio] Building clip animation...');
+  logger.log('Building clip animation...');
   clip.build($canvas, getHelpers($canvas));
 
   await sleep(totalDuration);
 
-  console.log('[Studio] Clip finished, stopping recorder...');
+  logger.log('Clip finished, stopping recorder...');
   if (recorder.state !== 'inactive') {
     recorder.stop();
   }

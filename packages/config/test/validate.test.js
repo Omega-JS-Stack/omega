@@ -163,6 +163,24 @@ test('desktop remoteScripts is a declared key: the opt-in shape passes, wrong ty
   assert.ok(errors.some((e) => e.includes('config.remoteScripts.url') && e.includes('does not match')));
 });
 
+test('extension listings are declared keys: valid urls pass, a non-url bounces (#85)', () => {
+  const listed = {
+    ...VALID,
+    listings: {
+      chrome: { url: 'https://chromewebstore.google.com/detail/x', state: 'live' },
+      firefox: { url: 'https://addons.mozilla.org/x' },
+      edge: { url: 'https://microsoftedge.microsoft.com/addons/x' },
+    },
+  };
+  assert.deepStrictEqual(validateConfig(listed, { target: 'extension' }).errors, []);
+
+  const { errors } = validateConfig(
+    { ...VALID, listings: { chrome: { url: 'not-a-url' } } },
+    { target: 'extension' },
+  );
+  assert.ok(errors.some((e) => e.includes('config.listings.chrome.url') && e.includes('does not match')));
+});
+
 test('unknown options.target throws (programmer error, not a config error)', () => {
   assert.throws(() => validateConfig(VALID, { target: 'website' }), /Unknown target "website"/);
 });

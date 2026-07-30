@@ -63,6 +63,12 @@ const path = require('node:path');
 const JSON5 = require('json5');
 const yaml = require('js-yaml');
 const { deepMerge } = require('./merge.js');
+const Logger = require('@omega.js/devkit/logger');
+
+// The warning sink's default: build-time output stamps the identity tag
+// itself, so no message hand-writes a module prefix of its own (#12).
+// Callers that inject a sink (tests, the engine) still own their formatting.
+const logger = new Logger('sections');
 
 // The two tiers share one implementation — only the folder family and
 // filenames differ ({% section %} → _sections/<id>/section.*).
@@ -270,7 +276,7 @@ function readInheritLanes(entryDir, basename) {
  * @returns {Array<{kind: string, id: string, scss: string|null, js: string|null}>}
  */
 function collectSectionAssets(baseDirs, options = {}) {
-  const warn = options.warn || console.warn;
+  const warn = options.warn || logger.warn.bind(logger);
   const entries = new Map(); // `${kind}:${id}` → {kind, id, scss, js}
   const pending = new Map(); // `${kind}:${id}` → Set of inherit lanes still unfilled
 
@@ -329,7 +335,7 @@ function collectSectionAssets(baseDirs, options = {}) {
   }
 
   for (const [key, lanes] of pending) {
-    warn(`[sections] ${key}: declares inherit ${[...lanes].join(', ')} but no lower layer owns the file — nothing inherited`);
+    warn(`${key}: declares inherit ${[...lanes].join(', ')} but no lower layer owns the file — nothing inherited`);
   }
 
   return [...entries.values()].sort((a, b) => (a.kind + a.id).localeCompare(b.kind + b.id));
@@ -375,7 +381,7 @@ function collectSectionAssets(baseDirs, options = {}) {
  * @returns {{ entries: Array<object>, groups: Array<{kind: string, category: string, entries: Array<object>}> }}
  */
 function buildSectionLibrary(options) {
-  const warn = options.warn || console.warn;
+  const warn = options.warn || logger.warn.bind(logger);
   const entries = new Map(); // `${kind}:${id}` → entry
 
   // Display-ready HTML text (see the JSDoc: the { escape makes the string
@@ -397,11 +403,11 @@ function buildSectionLibrary(options) {
     let demo = [];
     if (meta.demo !== undefined) {
       if (!Array.isArray(meta.demo)) {
-        warn(`[sections] showcase ${label}: demo must be an array of { label, args } variants — ignoring`);
+        warn(`showcase ${label}: demo must be an array of { label, args } variants — ignoring`);
       } else {
         demo = meta.demo.filter((variant) => {
           const ok = variant && typeof variant === 'object' && typeof variant.label === 'string' && variant.label;
-          if (!ok) warn(`[sections] showcase ${label}: demo variant without a label — dropped`);
+          if (!ok) warn(`showcase ${label}: demo variant without a label — dropped`);
           return ok;
         });
       }
@@ -436,7 +442,7 @@ function buildSectionLibrary(options) {
         try {
           meta = JSON5.parse(fs.readFileSync(metaPath, 'utf8'));
         } catch (error) {
-          warn(`[sections] showcase: unreadable ${metaPath} (${error.message}) — listing with empty meta`);
+          warn(`showcase: unreadable ${metaPath} (${error.message}) — listing with empty meta`);
         }
       }
       entries.set(key, { kind, id, source, ...normalizeMeta(meta, key) });
@@ -476,7 +482,7 @@ function buildSectionLibrary(options) {
  * @param {function} [options.warn] - warning sink (default console.warn)
  */
 function registerSectionTags(engine, options) {
-  const warn = options.warn || console.warn;
+  const warn = options.warn || logger.warn.bind(logger);
 
   for (const [tagName, kind] of Object.entries(KINDS)) {
     const roots = options.baseDirs
@@ -501,7 +507,7 @@ function registerSectionTags(engine, options) {
           try {
             meta = JSON5.parse(fs.readFileSync(metaPath, 'utf8'));
           } catch (error) {
-            warn(`[sections] ${tagName} "${name}": unreadable ${kind.basename}.json5 (${error.message}) — treating as empty`);
+            warn(`${tagName} "${name}": unreadable ${kind.basename}.json5 (${error.message}) — treating as empty`);
           }
         }
         entry = { templatePath, meta };
@@ -597,7 +603,7 @@ function registerSectionTags(engine, options) {
           }
         }
         if (dataArg !== undefined && dataArg !== null && (typeof dataArg !== 'object' || Array.isArray(dataArg))) {
-          warn(`[sections] ${tagName} "${name}": data must be an object — ignoring ${typeof dataArg}`);
+          warn(`${tagName} "${name}": data must be an object — ignoring ${typeof dataArg}`);
           dataArg = undefined;
         }
 
@@ -621,11 +627,11 @@ function registerSectionTags(engine, options) {
           const incoming = { ...(dataArg || {}), ...passed, ...slotValues };
           for (const [key, value] of Object.entries(incoming)) {
             if (!known.includes(key)) {
-              warn(`[sections] ${tagName} "${name}": unknown arg "${key}"${suggest(key, known)}`);
+              warn(`${tagName} "${name}": unknown arg "${key}"${suggest(key, known)}`);
             } else {
               const type = typeof schema[key] === 'string' ? schema[key] : schema[key]?.type;
               if (type && !matchesType(value, type)) {
-                warn(`[sections] ${tagName} "${name}": arg "${key}" should be ${type}`);
+                warn(`${tagName} "${name}": arg "${key}" should be ${type}`);
               }
             }
           }

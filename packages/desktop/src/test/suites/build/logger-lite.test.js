@@ -48,7 +48,7 @@ module.exports = {
       },
     },
     {
-      name: 'log() always writes to console, never throws',
+      name: 'log() always writes to console with the identity tag and no timestamp, never throws',
       run: (ctx) => {
         delete require.cache[require.resolve(MOD_PATH)];
         const Logger = require(MOD_PATH);
@@ -62,7 +62,9 @@ module.exports = {
           console.log = origLog;
         }
         ctx.expect(captured).toBeDefined();
-        ctx.expect(captured[0]).toMatch(/test-console/);
+        // The ONE identity tag (#12) — devtools stamps runtime lines, so no [HH:MM:SS].
+        ctx.expect(captured[0]).toBe('[@omega.js/desktop:test-console]');
+        ctx.expect(captured[1]).toBe('hello');
       },
     },
     {

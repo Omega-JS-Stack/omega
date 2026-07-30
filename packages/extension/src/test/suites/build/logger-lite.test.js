@@ -1,5 +1,6 @@
-// Build-layer test for lib/logger-lite.js — verifies the timestamp prefix format
-// [HH:MM:SS] name: ... and the five method surface (log/error/warn/info/debug).
+// Build-layer test for lib/logger-lite.js — verifies the runtime identity tag
+// [@omega.js/extension:name] (no timestamp — devtools stamps runtime lines, #12)
+// and the five method surface (log/error/warn/info/debug).
 
 const path = require('path');
 
@@ -16,7 +17,7 @@ function captureConsole(method, fn) {
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'lib/logger-lite — timestamp prefix + five-method surface',
+  description: 'lib/logger-lite — identity tag prefix + five-method surface',
   tests: [
     {
       name: 'constructor stores name',
@@ -26,13 +27,13 @@ module.exports = {
       },
     },
     {
-      name: 'log() prefixes with [HH:MM:SS] name:',
+      name: 'log() prefixes with [@omega.js/extension:name] and no timestamp',
       run: (ctx) => {
         const log = new Logger('feature-x');
         const captured = captureConsole('log', () => log.log('hello', 'world'));
         ctx.expect(captured.length).toBe(1);
         const [prefix, ...rest] = captured[0];
-        ctx.expect(prefix).toMatch(/^\[\d{2}:\d{2}:\d{2}\] feature-x:$/);
+        ctx.expect(prefix).toBe('[@omega.js/extension:feature-x]');
         ctx.expect(rest).toEqual(['hello', 'world']);
       },
     },
@@ -51,7 +52,7 @@ module.exports = {
         const log = new Logger('err-comp');
         const captured = captureConsole('error', () => log.error('boom'));
         ctx.expect(captured.length).toBe(1);
-        ctx.expect(captured[0][0]).toMatch(/err-comp:/);
+        ctx.expect(captured[0][0]).toBe('[@omega.js/extension:err-comp]');
         ctx.expect(captured[0][1]).toBe('boom');
       },
     },

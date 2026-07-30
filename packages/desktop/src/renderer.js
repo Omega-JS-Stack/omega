@@ -315,7 +315,7 @@ Manager.prototype._wireAuthBridge = async function () {
 
   const auth = self.omega?.auth?.();
   const getCurrentUid = () => {
-    try { return auth?.user?.()?.uid || null; }
+    try { return auth ? (auth.getUser()?.uid || null) : null; }
     catch (e) { return null; }
   };
 

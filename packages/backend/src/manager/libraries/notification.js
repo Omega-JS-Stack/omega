@@ -23,8 +23,8 @@ const BATCH_SIZE = 500;
  * @param {object} options
  * @param {string} options.title - Notification title
  * @param {string} options.body - Notification body
- * @param {string} [options.icon] - Notification icon URL
- * @param {string} [options.clickAction] - URL to open on click
+ * @param {string} [options.icon] - Notification icon URL (defaults to brand.images.brandmark)
+ * @param {string} [options.clickAction] - URL to open on click (defaults to brand.url)
  * @param {object} [options.filters] - Targeting filters
  * @param {Array<string>} [options.filters.tags] - Filter by tags
  * @param {string} [options.filters.owner] - Filter by owner UID
@@ -39,25 +39,7 @@ async function send(ctx, options) {
     throw new Error('Notification title and body are required');
   }
 
-  // Build notification payload
-  const brand = ctx.Manager.config?.brand;
-  const notification = {
-    title,
-    body,
-    imageUrl: icon
-      || brand?.images?.brandmark
-      || 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/socials/itw-creative-works-brandmark-square-black-1024x1024.png',
-    click_action: clickAction || brand?.url || 'https://itwcreativeworks.com',
-  };
-
-  // Add cache buster to click_action URL
-  try {
-    const url = new URL(notification.click_action);
-    url.searchParams.set('cb', new Date().getTime());
-    notification.click_action = url.toString();
-  } catch (e) {
-    throw new Error(`Invalid click_action URL: ${e.message}`);
-  }
+  const notification = buildPayload(ctx.Manager.config?.brand, { title, body, icon, clickAction });
 
   ctx.log('notification.send():', notification);
 
@@ -72,6 +54,55 @@ async function send(ctx, options) {
   await processTokens(ctx, notification, filterOptions, response);
 
   return response;
+}
+
+/**
+ * Build the FCM payload from the caller's options and the brand's OWN config.
+ *
+ * A push notification lands on a user's lock screen wearing whoever's icon and
+ * link it carries, so there is no framework fallback for either. The icon comes
+ * from `brand.images.brandmark` and is OMITTED when unconfigured (a text-only
+ * notification, never another company's mark); the click target comes from
+ * `brand.url` and fails LOUDLY when unconfigured, because a push with nowhere
+ * to go is not worth sending anywhere else.
+ *
+ * @param {object} brand - Resolved brand config object
+ * @param {object} options
+ * @param {string} options.title
+ * @param {string} options.body
+ * @param {string} [options.icon] - Explicit icon URL (wins over config)
+ * @param {string} [options.clickAction] - Explicit click target (wins over config)
+ * @returns {{ title: string, body: string, imageUrl?: string, click_action: string }}
+ * @throws {Error} When no click target is configured, or it is not a valid URL
+ */
+function buildPayload(brand, { title, body, icon, clickAction }) {
+  const imageUrl = icon || brand?.images?.brandmark;
+  const clickTarget = clickAction || brand?.url;
+
+  if (!clickTarget) {
+    // Coded 400 like the email library's config-hole throws — a code-less Error
+    // would respond as a 500 and capture to Sentry for what is a brand-config fault.
+    const err = new Error('Missing brand.url in config/omega.json5 — required to send a push notification (or pass clickAction)');
+    err.code = 400;
+    throw err;
+  }
+
+  const notification = { title, body, click_action: clickTarget };
+
+  if (imageUrl) {
+    notification.imageUrl = imageUrl;
+  }
+
+  // Add cache buster to click_action URL
+  try {
+    const url = new URL(notification.click_action);
+    url.searchParams.set('cb', new Date().getTime());
+    notification.click_action = url.toString();
+  } catch (e) {
+    throw new Error(`Invalid click_action URL: ${e.message}`);
+  }
+
+  return notification;
 }
 
 async function processTokens(ctx, notification, options, response) {
@@ -115,7 +146,7 @@ async function processTokens(ctx, notification, options, response) {
 
   await Manager.Utilities().iterateCollection(
     async (batch, index) => {
-      let batchTokens = [];
+      const batchTokens = [];
 
       for (const doc of batch.docs) {
         if (options.limit && tokensProcessed >= options.limit) {
@@ -160,13 +191,13 @@ async function sendBatch(ctx, batch, id, notification, response) {
     notification: {
       title: notification.title,
       body: notification.body,
-      imageUrl: notification.imageUrl,
+      ...(notification.imageUrl ? { imageUrl: notification.imageUrl } : {}),
     },
     webpush: {
       notification: {
         title: notification.title,
         body: notification.body,
-        icon: notification.imageUrl,
+        ...(notification.imageUrl ? { icon: notification.imageUrl } : {}),
         click_action: notification.click_action,
       },
       data: {
@@ -222,4 +253,4 @@ async function cleanTokens(ctx, batch, results, id, response) {
   await Promise.all(cleanPromises);
 }
 
-module.exports = { send };
+module.exports = { send, buildPayload };

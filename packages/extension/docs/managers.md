@@ -28,7 +28,7 @@ await manager.initialize();
 
 // Manager now exposes:
 //   manager.extension   — cross-browser chrome.*/browser.* API wrapper (see docs/extension.md)
-//   manager.logger      — LoggerLite('popup') with timestamped output
+//   manager.logger      — LoggerLite('popup'); prints [@omega.js/extension:popup] (no timestamp — devtools stamps runtime lines)
 //   manager.omega  — Web Manager (Firebase, auth, analytics, bindings)
 //   manager.messenger   — wired automatically; chrome.runtime.onMessage listener installed
 //   manager.isDevelopment() / isProduction() / isTesting() / getVersion()  (cross-context helpers)

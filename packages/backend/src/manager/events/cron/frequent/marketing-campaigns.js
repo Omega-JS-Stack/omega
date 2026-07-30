@@ -33,6 +33,14 @@
  * Unknown campaign types / generators are marked 'failed' (they can never
  * succeed — usually a config typo — so retrying forever just burns runs).
  *
+ * A CODED 400 anywhere in a campaign's work — thrown by the send, thrown by
+ * the generator pipeline, or carried back in a provider result (sendCampaign()
+ * converts a provider's throw to { success: false, error, code }) — is the same
+ * kind of permanent fault and is finalized the same way: a brand-config hole or
+ * a bad prompt cannot heal itself, so retrying it would run forever. Every
+ * other failure is treated as transient and keeps its existing path (the
+ * stale-at-'processing' reclaim, or the success:false bookkeeping).
+ *
  * Runs on omega_cronFrequent (every 10 minutes).
  */
 const moment = require('moment');
@@ -132,11 +140,28 @@ module.exports = async ({ Manager, ctx, libraries }) => {
       ctx.log(`Running generator "${generator}" for ${campaignId}...`);
 
       const generatedId = pushid();
-      const generated = await generators[generator].generate(Manager, ctx, settings, {
-        campaignId: generatedId,
-        imageHost: 'github',
-        publishArticle: Manager.isProduction(),
-      });
+      let generated;
+
+      // The attempts ladder below only counts EMPTY generations — a throw never
+      // reaches it. A coded 400 out of the pipeline (a bad prompt, a missing
+      // image prompt — the AI library's invalid-request convention) is as
+      // permanent as a brand-config hole, so it is finalized here rather than
+      // reclaimed forever. Rate limits, 5xx and network faults are code-less
+      // and keep the retry.
+      try {
+        generated = await generators[generator].generate(Manager, ctx, settings, {
+          campaignId: generatedId,
+          imageHost: 'github',
+          publishArticle: Manager.isProduction(),
+        });
+      } catch (e) {
+        if (!isConfigFault(e)) {
+          throw e;
+        }
+
+        await failConfigFault(doc, ctx, campaignId, e.message);
+        return;
+      }
 
       // Nothing generated (no sources, filter dropped everything, disabled in
       // test mode, ...). Retry next run — up to the attempts cap.
@@ -194,8 +219,29 @@ module.exports = async ({ Manager, ctx, libraries }) => {
 
       ctx.log(`Generated content for ${campaignId}: "${generated.subject}"`);
 
-      // Send immediately
-      const campaignResults = await email.sendCampaign({ ...generatedSettings, sendAt: 'now' });
+      // Send immediately. The same coded-400 config faults reach this send as
+      // the plain email dispatch below (identical sendCampaign() call), so it
+      // gets the identical permanent-fault finalization.
+      let campaignResults;
+
+      try {
+        campaignResults = await email.sendCampaign({ ...generatedSettings, sendAt: 'now' });
+      } catch (e) {
+        if (!isConfigFault(e)) {
+          throw e;
+        }
+
+        await failConfigFault(doc, ctx, campaignId, e.message);
+        return;
+      }
+
+      const generatorFault = findConfigFault(campaignResults);
+
+      if (generatorFault) {
+        await failConfigFault(doc, ctx, campaignId, generatorFault);
+        return;
+      }
+
       const success = Object.values(campaignResults).some(r => r.success || r.sent > 0);
 
       // Store history record
@@ -242,30 +288,53 @@ module.exports = async ({ Manager, ctx, libraries }) => {
     // --- Dispatch by type ---
     let campaignResults;
 
-    if (type === 'email') {
-      campaignResults = await email.sendCampaign({ ...settings, sendAt: 'now' });
-    } else if (type === 'push') {
-      const pushFilters = settings.test
-        ? { owner: settings._testUid || null, ...settings.filters }
-        : (settings.filters || {});
+    try {
+      if (type === 'email') {
+        campaignResults = await email.sendCampaign({ ...settings, sendAt: 'now' });
+      } else if (type === 'push') {
+        const pushFilters = settings.test
+          ? { owner: settings._testUid || null, ...settings.filters }
+          : (settings.filters || {});
 
-      campaignResults = {
-        push: await notification.send(ctx, {
-          title: settings.name,
-          body: settings.subject || settings.body,
-          icon: settings.icon || Manager.config.brand?.images?.brandmark,
-          clickAction: settings.clickAction || Manager.config.brand?.url,
-          filters: pushFilters,
-        }),
-      };
-    } else {
-      await doc.ref.set({
-        status: 'failed',
-        error: `Unknown campaign type "${type}"`,
-        metadata: { updated: stamp() },
-      }, { merge: true });
+        campaignResults = {
+          push: await notification.send(ctx, {
+            title: settings.name,
+            body: settings.subject || settings.body,
+            icon: settings.icon || Manager.config.brand?.images?.brandmark,
+            clickAction: settings.clickAction || Manager.config.brand?.url,
+            filters: pushFilters,
+          }),
+        };
+      } else {
+        await doc.ref.set({
+          status: 'failed',
+          error: `Unknown campaign type "${type}"`,
+          metadata: { updated: stamp() },
+        }, { merge: true });
 
-      ctx.log(`Unknown campaign type "${type}" on ${campaignId} — marked failed`);
+        ctx.log(`Unknown campaign type "${type}" on ${campaignId} — marked failed`);
+        return;
+      }
+    } catch (e) {
+      // Transient faults rethrow into the stale-lease reclaim; a config hole
+      // never heals, so it is finalized here instead of retried forever.
+      if (!isConfigFault(e)) {
+        throw e;
+      }
+
+      await failConfigFault(doc, ctx, campaignId, e.message);
+      return;
+    }
+
+    // sendCampaign() never throws a provider's error — it converts each one to
+    // { success: false, error, code }. A carried 400 is the same permanent
+    // config hole as a thrown one (missing brand.contact.email, missing
+    // brand.contact.person.name) and must not ride the success:false path,
+    // which would advance a recurring campaign into the identical failure.
+    const configFault = findConfigFault(campaignResults);
+
+    if (configFault) {
+      await failConfigFault(doc, ctx, campaignId, configFault);
       return;
     }
 
@@ -342,6 +411,43 @@ function claimCampaign(admin, doc, now) {
 
     return true;
   });
+}
+
+/**
+ * A coded 400 is the framework's config-fault convention (the email library's
+ * errorWithCode(..., 400), notification.js's missing-brand.url throw, the AI
+ * library's invalid-request rejects). It marks a permanent fault — nothing
+ * heals it but a human editing the config or the prompt.
+ *
+ * Takes a thrown error OR a provider result: sendCampaign() converts a
+ * provider's throw into { success: false, error, code }, so the same fault
+ * arrives either way.
+ */
+function isConfigFault(subject) {
+  return subject?.code === 400;
+}
+
+/**
+ * The message of the first config fault carried by a provider results object,
+ * or undefined when there is none.
+ */
+function findConfigFault(campaignResults) {
+  return Object.values(campaignResults).find(isConfigFault)?.error;
+}
+
+/**
+ * Finalize a campaign that hit a permanent config fault, exactly like the
+ * unknown-type/unknown-generator branches. Recurring campaigns fail outright
+ * too: advancing to the next occurrence would just meet the same hole.
+ */
+async function failConfigFault(doc, ctx, campaignId, message) {
+  await doc.ref.set({
+    status: 'failed',
+    error: message,
+    metadata: { updated: stamp() },
+  }, { merge: true });
+
+  ctx.log(`Config fault on ${campaignId} — marked failed: ${message}`);
 }
 
 function stamp() {

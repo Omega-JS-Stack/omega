@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('development-rebuild');
+const watcherLogger = Manager.logger('development-rebuild:watcher');
 const { src, dest, watch, series } = require('gulp');
 const path = require('path');
 const { execute } = require('node-powertools');
@@ -74,17 +75,17 @@ async function developmentRebuild(complete) {
 function developmentRebuildWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(input, { delay: delay, dot: true }, developmentRebuild)
   .on('change', function(path) {
-    logger.log(`[watcher] File ${path} was changed`);
+    watcherLogger.log(`File ${path} was changed`);
   });
 
   // Complete

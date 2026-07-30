@@ -1,3 +1,7 @@
+import { createLogger } from './logger.js';
+
+const logger = createLogger('service-worker');
+
 class ServiceWorker {
   constructor(manager) {
     this.manager = manager;
@@ -93,14 +97,14 @@ class ServiceWorker {
       await Promise.all(registrations.map((registration) => registration.unregister()));
 
       if (registrations.length > 0) {
-        console.log(`[ServiceWorker] Unregistered ${registrations.length} service worker(s) claiming this origin`);
+        logger.log(`Unregistered ${registrations.length} service worker(s) claiming this origin`);
       }
 
       this._registration = null;
 
       return registrations.length;
     } catch (error) {
-      console.warn('[ServiceWorker] Failed to unregister service workers:', error);
+      logger.warn('Failed to unregister service workers:', error);
       return 0;
     }
   }

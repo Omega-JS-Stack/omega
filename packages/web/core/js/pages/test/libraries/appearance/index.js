@@ -4,6 +4,9 @@
 
 // Libraries
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('test:appearance');
 
 // Module
 export default () => {
@@ -68,7 +71,7 @@ function initDebugPanel() {
     const systemPref = prefersDark ? 'dark' : 'light';
     $debugSystem.textContent = `"${systemPref}" (prefers-color-scheme: ${prefersDark ? 'dark' : 'light'})`;
 
-    console.log('[Appearance Test] Debug updated:', {
+    logger.log('Debug updated:', {
       saved,
       resolved,
       attr,
@@ -109,19 +112,19 @@ function initControls() {
 
   // Toggle button
   document.getElementById('btn-toggle').addEventListener('click', () => {
-    console.log('[Appearance Test] Toggle clicked');
+    logger.log('Toggle clicked');
     appearance.toggle();
   });
 
   // Cycle button
   document.getElementById('btn-cycle').addEventListener('click', () => {
-    console.log('[Appearance Test] Cycle clicked');
+    logger.log('Cycle clicked');
     appearance.cycle();
   });
 
   // Clear button
   document.getElementById('btn-clear').addEventListener('click', () => {
-    console.log('[Appearance Test] Clear clicked');
+    logger.log('Clear clicked');
     appearance.clear();
     // Trigger debug update
     window.updateAppearanceDebug?.();
@@ -129,17 +132,17 @@ function initControls() {
 
   // Quick set buttons
   document.getElementById('btn-set-light').addEventListener('click', () => {
-    console.log('[Appearance Test] set("light") clicked');
+    logger.log('set("light") clicked');
     appearance.set('light');
   });
 
   document.getElementById('btn-set-dark').addEventListener('click', () => {
-    console.log('[Appearance Test] set("dark") clicked');
+    logger.log('set("dark") clicked');
     appearance.set('dark');
   });
 
   document.getElementById('btn-set-system').addEventListener('click', () => {
-    console.log('[Appearance Test] set("system") clicked');
+    logger.log('set("system") clicked');
     appearance.set('system');
   });
 }

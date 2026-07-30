@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('package');
+const watcherLogger = Manager.logger('package:watcher');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
@@ -147,17 +148,17 @@ const tasks = isSpecificBrowser
 function packageWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes in the dist folder
   watch(input, { delay: delay, dot: true }, parallel(...tasks))
     .on('change', function (path) {
-      logger.log(`[watcher] File ${path} was changed`);
+      watcherLogger.log(`File ${path} was changed`);
     });
 
   // Complete

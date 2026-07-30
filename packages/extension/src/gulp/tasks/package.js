@@ -1,6 +1,8 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('package');
+const watcherLogger = Manager.logger('package:watcher');
+const operaLogger = Manager.logger('package:opera');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
@@ -231,10 +233,10 @@ const TARGETS = {
             const key = manifest.short_name.replace(/^__MSG_/, '').replace(/__$/, '');
             if (messages[key]?.message) {
               manifest.short_name = messages[key].message;
-              logger.log(`[opera] Resolved short_name to "${manifest.short_name}"`);
+              operaLogger.log(`Resolved short_name to "${manifest.short_name}"`);
             }
           } catch (e) {
-            logger.warn(`[opera] Could not resolve short_name from locale: ${e.message}`);
+            operaLogger.warn(`Could not resolve short_name from locale: ${e.message}`);
           }
         }
       }
@@ -712,17 +714,17 @@ async function packageFn(complete) {
 function packageFnWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes in the dist folder
   watch(input, { delay: delay, dot: true }, packageFn)
     .on('change', function (path) {
-      logger.log(`[watcher] File ${path} was changed`);
+      watcherLogger.log(`File ${path} was changed`);
     });
 
   // Complete

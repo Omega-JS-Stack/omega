@@ -80,14 +80,17 @@ const defaults = {
 };
 ```
 
-## 7. Event Delegation
+## 7. Click Triggers
 
-Auth UI uses event delegation on document body:
+Click-driven UI never hand-rolls a listener: it registers on the shared trigger
+registry (`modules/triggers.js`), which owns the ONE delegated `document` click
+listener. The class is always `omega-<name>` — callers never spell it:
 
 ```javascript
-document.body.addEventListener('click', (e) => {
-  if (e.target.closest('.auth-signout-btn')) {
-    // Handle signout
-  }
+import { registerTrigger } from '@omega.js/client/modules/triggers.js';
+
+// A click on `.omega-signout` (or anything inside one) runs this
+registerTrigger('signout', async (event, element) => {
+  // Handle signout
 });
 ```

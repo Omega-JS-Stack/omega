@@ -1,16 +1,16 @@
 /**
- * jekyll-compat.js — Jekyll-specific Liquid filters as plain JS.
+ * jekyll-compat.js — omega's template helpers under the familiar Jekyll-style
+ * names (slugify, date_to_xmlschema, jsonify, strip_html, markdownify,
+ * relative_url, absolute_url, where_exp, group_by_exp, number_of_words,
+ * date_to_rfc822), as plain JS.
  *
- * Scoped by the real-usage audit (2026-07-06) across UJM's theme/blueprints
- * and consumer sites: slugify, date_to_xmlschema, jsonify, strip_html,
- * markdownify (+ push, which LiquidJS already ships). The plan's named extras
- * (relative_url, absolute_url, where_exp, group_by_exp, number_of_words,
- * date_to_rfc822) are included for the bake-off port surface.
+ * The names are the authoring surface; the contract is CORRECT BEHAVIOR, not
+ * emulation of Jekyll internals — where Jekyll's own semantics are surprising,
+ * these do the sane thing and the tests pin it.
  *
- * where_exp/group_by_exp implement the SIMPLE expression subset
- * (`item.path == literal`, !=, >, <, >=, <=, contains, and bare truthy paths)
- * — full Liquid expression parity is deliberately out of scope (zero real
- * usage found; revisit if a migrated site needs more).
+ * where_exp/group_by_exp read the SIMPLE expression subset (`item.path ==
+ * literal`, !=, >, <, >=, <=, contains, and bare paths) — full Liquid
+ * expression support is out of scope; widen it when a site needs more.
  */
 
 // Constants
@@ -30,9 +30,8 @@ function slugify(input) {
 }
 
 function toDate(input) {
-  if (input instanceof Date) return input;
   if (input === 'now' || input === 'today') return new Date();
-  const parsed = new Date(input);
+  const parsed = input instanceof Date ? input : new Date(input);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -45,7 +44,7 @@ function pad(value) {
  * OMEGA convention: content dates are UTC midnights (dated filenames) and CI
  * builds run UTC — rendering in the builder's local zone would shift days.
  * @param {Date|string} input
- * @returns {string}
+ * @returns {string|Date} Formatted string; unparseable input passes through untouched
  */
 function dateToXmlschema(input) {
   const date = toDate(input);
@@ -59,7 +58,7 @@ function dateToXmlschema(input) {
 /**
  * RFC-822 in UTC, CI-Jekyll parity: "Fri, 07 Nov 2008 13:07:54 +0000".
  * @param {Date|string} input
- * @returns {string}
+ * @returns {string|Date} Formatted string; unparseable input passes through untouched
  */
 function dateToRfc822(input) {
   const date = toDate(input);
@@ -131,8 +130,8 @@ function createAbsoluteUrl(site = {}) {
 }
 
 /**
- * Factory: liquify-then-markdown (Jekyll's markdownify). The markdown
- * converter is injected; without one the input passes through unchanged.
+ * Factory: render markdown to HTML. The markdown converter is injected;
+ * without one the input passes through unchanged.
  * @param {function} [markdown] - (content) => HTML
  * @returns {function}
  */
@@ -144,13 +143,15 @@ function createMarkdownify(markdown) {
 }
 
 /**
- * Evaluate the supported simple-expression subset against an item.
+ * Evaluate the supported simple-expression subset against an item, yielding
+ * the expression's VALUE — a comparison yields its boolean, a bare path the
+ * value it points at.
  * @param {*} item
  * @param {string} variable - the loop variable name (e.g. "item")
  * @param {string} expression - e.g. "item.type == 'post'"
- * @returns {boolean|*}
+ * @returns {*}
  */
-function evalSimpleExpression(item, variable, expression) {
+function evalExpressionValue(item, variable, expression) {
   const match = String(expression).trim().match(
     /^(.+?)\s*(==|!=|>=|<=|>|<|contains)\s*(.+)$/
   );
@@ -175,11 +176,8 @@ function evalSimpleExpression(item, variable, expression) {
     return current;
   };
 
-  if (!match) {
-    // Bare path — truthiness
-    const value = resolvePath(expression);
-    return !(value === null || value === undefined || value === false);
-  }
+  // Bare path — the value it points at (callers decide what to do with it)
+  if (!match) return resolvePath(expression);
 
   const left = resolvePath(match[1]);
   const right = resolvePath(match[3]);
@@ -200,18 +198,23 @@ function evalSimpleExpression(item, variable, expression) {
 }
 
 /**
- * Jekyll's where_exp (simple-expression subset).
+ * Keep the items whose expression is truthy (simple-expression subset).
  * @param {Array} input
  * @param {string} variable
  * @param {string} expression
  * @returns {Array}
  */
 function whereExp(input, variable, expression) {
-  return [].concat(input || []).filter((item) => evalSimpleExpression(item, variable, expression));
+  return [].concat(input || []).filter((item) => {
+    const value = evalExpressionValue(item, variable, expression);
+    return !(value === null || value === undefined || value === false);
+  });
 }
 
 /**
- * Jekyll's group_by_exp (simple-expression subset).
+ * Bucket the items by their expression VALUE — one group per distinct value,
+ * groups in first-seen order, items in input order. An absent value groups
+ * under '' so a rendered group name is never the text "undefined".
  * @param {Array} input
  * @param {string} variable
  * @param {string} expression
@@ -221,7 +224,8 @@ function groupByExp(input, variable, expression) {
   const groups = new Map();
 
   for (const item of [].concat(input || [])) {
-    const key = String(evalSimpleExpression(item, variable, expression));
+    const value = evalExpressionValue(item, variable, expression);
+    const key = value === null || value === undefined ? '' : String(value);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   }

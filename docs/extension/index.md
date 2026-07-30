@@ -70,7 +70,7 @@ await new Manager().initialize();
 
 After `initialize()`, the Manager exposes:
 - `manager.extension` — cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension.md](../../packages/extension/docs/extension.md))
-- `manager.logger` — timestamped per-context logger
+- `manager.logger` — per-context logger stamping the ONE identity tag, `[@omega.js/extension:<context>]`, with NO timestamp (devtools stamps runtime lines; only the build-time devkit logger prefixes `[HH:MM:SS]`) — [#12](https://github.com/Omega-JS-Stack/omega/issues/12)
 - `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive bindings)
 - `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
 - `manager.isDevelopment() / isProduction() / isTesting() / getVersion()` — cross-context helpers ([docs/environment-detection.md](../../packages/extension/docs/environment-detection.md))
@@ -100,7 +100,7 @@ Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/component
 
 Background.js is the source of truth for authentication. Other contexts compare their UID with background's on load and sync up — sign-ins / sign-outs broadcast across all open contexts via `chrome.runtime` messaging. No `chrome.storage` involved; Firebase persists per-context sessions in IndexedDB.
 
-Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.auth-signin-btn`, `.auth-signout-btn`, `.auth-account-btn`) wire UI without writing JS. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user"`) handle DOM state.
+Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.omega-signin`, `.omega-signout`) wire UI without writing JS — they are click triggers on @omega.js/client's shared registry ([client guide](../client/index.md#click-triggers-modulestriggersjs)), with the extension registering `omega-signin` itself. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user"`) handle DOM state.
 
 Required setup: `brand.url` in config (background.js watches that host for the /token redirect), `tabs` permission in manifest. See [docs/auth.md](../../packages/extension/docs/auth.md).
 

@@ -1,6 +1,9 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('publish');
+const chromeLogger = Manager.logger('publish:chrome');
+const firefoxLogger = Manager.logger('publish:firefox');
+const edgeLogger = Manager.logger('publish:edge');
 const argv = Manager.getArguments();
 const { series } = require('gulp');
 const jetpack = require('fs-jetpack');
@@ -247,7 +250,7 @@ async function publishToChrome() {
     throw new Error('Missing Chrome credentials. Set CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN in .env');
   }
 
-  logger.log('[chrome] Uploading to Chrome Web Store...');
+  chromeLogger.log('Uploading to Chrome Web Store...');
 
   // Use chrome-webstore-upload-cli with chromium build
   const command = [
@@ -261,7 +264,7 @@ async function publishToChrome() {
 
   await execute(command);
 
-  logger.log('[chrome] Upload complete');
+  chromeLogger.log('Upload complete');
 }
 
 // Publish to Firefox Add-ons
@@ -279,10 +282,10 @@ async function publishToFirefox() {
 
   // Log what we're doing
   if (extensionId) {
-    logger.log(`[firefox] Updating existing add-on: ${extensionId}`);
+    firefoxLogger.log(`Updating existing add-on: ${extensionId}`);
   } else {
-    logger.log('[firefox] Creating new add-on (no FIREFOX_EXTENSION_ID set)');
-    logger.log('[firefox] After publish, add FIREFOX_EXTENSION_ID to .env for future updates');
+    firefoxLogger.log('Creating new add-on (no FIREFOX_EXTENSION_ID set)');
+    firefoxLogger.log('After publish, add FIREFOX_EXTENSION_ID to .env for future updates');
   }
 
   // Use web-ext sign with firefox build
@@ -305,7 +308,7 @@ async function publishToFirefox() {
   // Clean up artifacts dir
   jetpack.remove(artifactsDir);
 
-  logger.log('[firefox] Upload complete (approval may take time)');
+  firefoxLogger.log('Upload complete (approval may take time)');
 }
 
 // Publish to Microsoft Edge Add-ons
@@ -329,7 +332,7 @@ async function publishToEdge() {
   // Helper to parse Edge API response (handles empty bodies)
   async function parseEdgeResponse(response, label) {
     const text = await response.text();
-    logger.log(`[edge] ${label} - Status: ${response.status}, Body: ${text || '(empty)'}`);
+    edgeLogger.log(`${label} - Status: ${response.status}, Body: ${text || '(empty)'}`);
 
     if (!text) {
       return { status: response.status, data: null };
@@ -343,7 +346,7 @@ async function publishToEdge() {
   }
 
   // Step 1: Upload the package first
-  logger.log('[edge] Uploading to Microsoft Edge Add-ons...');
+  edgeLogger.log('Uploading to Microsoft Edge Add-ons...');
 
   const zipBuffer = jetpack.read(PATHS.chromium.zip, 'buffer');
   const uploadUrl = `https://api.addons.microsoftedge.microsoft.com/v1/products/${productId}/submissions/draft/package`;
@@ -363,7 +366,7 @@ async function publishToEdge() {
     throw new Error(`Edge upload error: ${upload.status} - ${JSON.stringify(upload.data)}`);
   }
 
-  logger.log('[edge] Package uploaded, submitting for review...');
+  edgeLogger.log('Package uploaded, submitting for review...');
 
   // Step 2: Submit for review - this is where we'll get InProgressSubmission if there's a pending review
   const publishUrl = `https://api.addons.microsoftedge.microsoft.com/v1/products/${productId}/submissions`;
@@ -404,10 +407,10 @@ async function publishToEdge() {
 
   // HTTP 202 Accepted means submission was queued successfully
   if (publish.status === 202) {
-    logger.log('[edge] Submission accepted and queued for review');
+    edgeLogger.log('Submission accepted and queued for review');
   }
 
-  logger.log('[edge] Upload complete');
+  edgeLogger.log('Upload complete');
 }
 
 // Export task

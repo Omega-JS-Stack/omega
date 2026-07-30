@@ -14,6 +14,9 @@
 // Libraries
 import { ready as domReady } from './dom.js';
 import omega from '../index.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('form-manager');
 
 // Constants
 const HONEYPOT_SELECTOR = '[data-honey], [name="honey"]';
@@ -83,7 +86,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Initialized', {
+      logger.log('Initialized', {
         selector: typeof selector === 'string' ? selector : this.$form.id || this.$form,
         config: this.config,
       });
@@ -136,7 +139,7 @@ export class FormManager {
     {
       this.$form.querySelectorAll('input, select, textarea').forEach(($field) => {
         if (!$field.name && !$field.matches(HONEYPOT_SELECTOR) && $field.type !== 'hidden') {
-          console.warn('[Form-manager] Field missing "name" attribute — will be skipped by validation and getData():', $field);
+          logger.warn('Field missing "name" attribute — will be skipped by validation and getData():', $field);
         }
       });
     }
@@ -219,7 +222,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] DOM ready, setting initial state:', state);
+      logger.log('DOM ready, setting initial state:', state);
     }
     /* @dev-only:end */
 
@@ -236,7 +239,7 @@ export class FormManager {
   ready() {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] ready() called');
+      logger.log('ready() called');
     }
     /* @dev-only:end */
 
@@ -261,7 +264,7 @@ export class FormManager {
     if (this.state !== 'ready') {
       /* @dev-only:start */
       {
-        console.log('[Form-manager] Submit ignored, not ready. Current state:', this.state);
+        logger.log('Submit ignored, not ready. Current state:', this.state);
       }
       /* @dev-only:end */
       return;
@@ -289,7 +292,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Submitting', {
+      logger.log('Submitting', {
         data,
         submitButton: $submitButton?.name ? `${$submitButton.name}=${$submitButton.value}` : null,
       });
@@ -302,7 +305,7 @@ export class FormManager {
 
       /* @dev-only:start */
       {
-        console.log('[Form-manager] Submit success', {
+        logger.log('Submit success', {
           resetOnSuccess: this.config.resetOnSuccess,
           allowResubmit: this.config.allowResubmit,
         });
@@ -328,7 +331,7 @@ export class FormManager {
     } catch (error) {
       /* @dev-only:start */
       {
-        console.log('[Form-manager] Submit error:', error.message);
+        logger.log('Submit error:', error.message);
       }
       /* @dev-only:end */
 
@@ -351,7 +354,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Change', {
+      logger.log('Change', {
         name: e.target.name,
         value: e.target.value,
         data,
@@ -385,7 +388,7 @@ export class FormManager {
   async _runValidation(data, $submitButton) {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Running validation');
+      logger.log('Running validation');
     }
     /* @dev-only:end */
 
@@ -393,7 +396,7 @@ export class FormManager {
     if (this._isHoneypotFilled()) {
       /* @dev-only:start */
       {
-        console.log('[Form-manager] Honeypot triggered - rejecting submission');
+        logger.log('Honeypot triggered - rejecting submission');
       }
       /* @dev-only:end */
 
@@ -420,7 +423,7 @@ export class FormManager {
     if (errorCount > 0) {
       /* @dev-only:start */
       {
-        console.log('[Form-manager] Validation failed:', this._fieldErrors);
+        logger.log('Validation failed:', this._fieldErrors);
       }
       /* @dev-only:end */
 
@@ -435,7 +438,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Validation passed');
+      logger.log('Validation passed');
     }
     /* @dev-only:end */
 
@@ -750,7 +753,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Page restored from bfcache, current state:', this.state);
+      logger.log('Page restored from bfcache, current state:', this.state);
     }
     /* @dev-only:end */
 
@@ -773,7 +776,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Dirty state:', dirty);
+      logger.log('Dirty state:', dirty);
     }
     /* @dev-only:end */
   }
@@ -788,7 +791,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] State change', {
+      logger.log('State change', {
         from: previousState,
         to: newState,
       });
@@ -805,7 +808,7 @@ export class FormManager {
   _setDisabled(disabled) {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Set disabled:', disabled);
+      logger.log('Set disabled:', disabled);
     }
     /* @dev-only:end */
 
@@ -989,7 +992,7 @@ export class FormManager {
   showSuccess(message) {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Show success:', message);
+      logger.log('Show success:', message);
     }
     /* @dev-only:end */
 
@@ -1002,7 +1005,7 @@ export class FormManager {
   showError(message) {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Show error:', message);
+      logger.log('Show error:', message);
     }
     /* @dev-only:end */
 
@@ -1015,7 +1018,7 @@ export class FormManager {
   reset() {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] reset() called');
+      logger.log('reset() called');
     }
     /* @dev-only:end */
 
@@ -1072,7 +1075,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] setInputGroup:', this.config.inputGroup);
+      logger.log('setInputGroup:', this.config.inputGroup);
     }
     /* @dev-only:end */
 
@@ -1138,7 +1141,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] _initFileDropZones found', $zones.length, 'zones');
+      logger.log('_initFileDropZones found', $zones.length, 'zones');
     }
     /* @dev-only:end */
 
@@ -1162,7 +1165,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] Setting up file drop zone', {
+      logger.log('Setting up file drop zone', {
         mode: isPageMode ? 'page' : 'local',
         input: $input.name || $input.id,
       });
@@ -1300,7 +1303,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] File dropped', {
+      logger.log('File dropped', {
         files: Array.from(dt.files).map((f) => f.name),
         input: $input.name || $input.id,
       });
@@ -1398,7 +1401,7 @@ export class FormManager {
   setData(data) {
     /* @dev-only:start */
     {
-      console.log('[Form-manager] setData() called', data);
+      logger.log('setData() called', data);
     }
     /* @dev-only:end */
 
@@ -1448,7 +1451,7 @@ export class FormManager {
     if ($fields.length === 0) {
       /* @dev-only:start */
       {
-        console.log('[Form-manager] setData: field not found:', name);
+        logger.log('setData: field not found:', name);
       }
       /* @dev-only:end */
       return;
@@ -1483,7 +1486,7 @@ export class FormManager {
 
     /* @dev-only:start */
     {
-      console.log('[Form-manager] setData: set field', { name, value, type });
+      logger.log('setData: set field', { name, value, type });
     }
     /* @dev-only:end */
   }

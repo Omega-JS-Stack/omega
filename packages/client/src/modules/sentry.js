@@ -1,3 +1,7 @@
+import { createLogger } from './logger.js';
+
+const logger = createLogger('sentry');
+
 // Helper functions
 function isLighthouse() {
   try {
@@ -54,7 +58,7 @@ class mod {
           resolve({ initialized: true });
         })
         .catch((error) => {
-          console.error('[Sentry] Failed to initialize:', error);
+          logger.error('Failed to initialize:', error);
           reject(error);
         });
     });
@@ -109,7 +113,7 @@ class mod {
       };
 
       // Log error to console for debugging
-      console.error('[Sentry] Caught error:', {
+      logger.error('Caught error:', {
         message: event.message || (event.exception?.values?.[0]?.value) || 'Unknown error',
         level: event.level,
         tags: event.tags,
@@ -119,19 +123,19 @@ class mod {
 
       // Block sending in development mode
       if (this.manager.isDevelopment()) {
-        console.log('[Sentry] Development mode - not sending to Sentry');
+        logger.log('Development mode - not sending to Sentry');
         return null;
       }
 
       // Block sending if Lighthouse is running
       if (isLighthouse()) {
-        console.log('[Sentry] Lighthouse detected - not sending to Sentry');
+        logger.log('Lighthouse detected - not sending to Sentry');
         return null;
       }
 
       // Block sending if automated browser (Selenium, Puppeteer, etc.)
       if (isAutomatedBrowser()) {
-        console.log('[Sentry] Automated browser detected - not sending to Sentry');
+        logger.log('Automated browser detected - not sending to Sentry');
         return null;
       }
 
@@ -150,11 +154,11 @@ class mod {
    */
   captureException(error, captureContext) {
     // Log the error
-    console.error('[Sentry] Capturing exception:', error);
+    logger.error('Capturing exception:', error);
 
     // Safe to call - won't throw if not initialized
     if (!this.initialized) {
-      console.log('[Sentry] Not initialized, skipping capture');
+      logger.log('Not initialized, skipping capture');
       return null;
     }
 
@@ -162,7 +166,7 @@ class mod {
     try {
       return this.Sentry.captureException(error, captureContext);
     } catch (captureError) {
-      console.error('[Sentry] Failed to capture exception:', captureError);
+      logger.error('Failed to capture exception:', captureError);
       return null;
     }
   }
@@ -177,22 +181,22 @@ class mod {
   //  */
   // captureMessage(message, level = 'info', captureContext) {
   //   if (!message) {
-  //     console.warn('[Sentry] captureMessage called with no message');
+  //     logger.warn('captureMessage called with no message');
   //     return null;
   //   }
 
-  //   console.log(`[Sentry] Capturing message (${level}):`, message);
+  //   logger.log(`Capturing message (${level}):`, message);
 
   //   // Safe to call - won't throw if not initialized
   //   if (!this.initialized || !this.Sentry) {
-  //     console.log('[Sentry] Not initialized, skipping capture');
+  //     logger.log('Not initialized, skipping capture');
   //     return null;
   //   }
 
   //   try {
   //     return this.Sentry.captureMessage(message, level, captureContext);
   //   } catch (captureError) {
-  //     console.error('[Sentry] Failed to capture message:', captureError);
+  //     logger.error('Failed to capture message:', captureError);
   //     return null;
   //   }
   // }

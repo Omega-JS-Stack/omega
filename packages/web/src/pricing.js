@@ -16,6 +16,10 @@
  *                value falls back to limits[id], -1 renders as Unlimited
  */
 
+const Logger = require('@omega.js/devkit/logger');
+
+const logger = new Logger('pricing');
+
 /**
  * Normalize a feature value for display: -1 is the catalog's "unlimited"
  * sentinel; undefined stays null so templates can render name-only features.
@@ -185,7 +189,7 @@ function composePricing(payment) {
     const prevRank = prev.monthly || prev.annually;
     const currRank = curr.monthly || curr.annually;
     if (currRank < prevRank) {
-      console.warn(`[omega:pricing] payment.products lists "${plans[i].id}" after the pricier "${plans[i - 1].id}" — the comparison matrix inherits values by catalog order (lowest tier first); reorder the catalog.`);
+      logger.warn(`payment.products lists "${plans[i].id}" after the pricier "${plans[i - 1].id}" — the comparison matrix inherits values by catalog order (lowest tier first); reorder the catalog.`);
     }
   }
 

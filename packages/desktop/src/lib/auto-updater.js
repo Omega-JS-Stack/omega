@@ -385,7 +385,7 @@ const autoUpdater = {
     // during automated runs. Tests that want to assert prompt behavior should
     // override `_promptToInstall` per-test (see auto-updater.test.js).
     if (autoUpdater._manager.isTesting()) {
-      logger.log(`[testing] _promptToInstall(${version}) — skipped native dialog.`);
+      logger.log(`Test mode: _promptToInstall(${version}) — skipped native dialog.`);
       return;
     }
 

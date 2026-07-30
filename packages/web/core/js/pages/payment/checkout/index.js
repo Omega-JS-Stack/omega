@@ -7,6 +7,9 @@ import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('checkout');
 
 let formManager = null;
 
@@ -99,9 +102,9 @@ async function initializeCheckout() {
       const _dev_preDelay = urlParams.get('_dev_preDelay');
       if (_dev_preDelay) {
         const delayMs = parseInt(_dev_preDelay, 10) || 5000;
-        console.warn(`[Checkout Dev] Artificial pre-delay: ${delayMs}ms`);
+        logger.warn(`Artificial pre-delay: ${delayMs}ms`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        console.warn('[Checkout Dev] Pre-delay complete');
+        logger.warn('Pre-delay complete');
       }
     }
     /* @dev-only:end */
@@ -263,7 +266,9 @@ function setupForm() {
       get bindings() { return buildBindingsState(); },
       resolveProcessor: (method) => resolveProcessor(method || 'card'),
     };
-    console.log('%c[Checkout Dev] window._checkout available', 'color: #2563EB');
+    // The tag rides INSIDE the format string here — %c styles only what follows
+    // it in the first argument, so a separate tag arg would print a literal %c.
+    console.log(`%c${logger.tag} window._checkout available`, 'color: #2563EB');
 
     initDevPanel();
   }

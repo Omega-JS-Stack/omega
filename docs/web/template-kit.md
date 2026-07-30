@@ -51,15 +51,28 @@ Port simplification: the Ruby `member`/`post` `image-tag` property re-parsed a
 `{% uj_image %}` template string; the JS calls the shared `buildImageHtml()`
 directly — same output, no re-parse.
 
-## Jekyll-compat pack (`src/jekyll-compat.js`)
+Tag options (`src/variable-resolver.js`): a typed literal resolves TYPED —
+`max_width=640` is the number 640 and `webp=false` the boolean ([#102](https://github.com/Omega-JS-Stack/omega/issues/102));
+quote it (`max_width="640"`) to keep a string. A bare word keeps its literal
+text unless the context has it (`class=card` works), a dotted path always
+resolves, and a missing path yields `null` so a typo never renders its own
+name into the page.
 
-Scoped by the 2026-07-06 real-usage audit (UJM theme + somiibo): the ONLY
-Jekyll-specific filters used anywhere are `slugify`, `date_to_xmlschema`,
-`jsonify`, `strip_html`, `markdownify`, `push` (LiquidJS ships push).
-Implemented: those + `relative_url`, `absolute_url`, `date_to_rfc822`,
-`number_of_words`, `where_exp`, `group_by_exp`. The `*_exp` filters implement
-the SIMPLE expression subset (`item.path <op> literal`, contains, bare truthy)
-— zero real usage exists; extend only if a migrating site needs it.
+## Jekyll-style helper pack (`src/jekyll-compat.js`)
+
+These are omega's own template helpers under the familiar Jekyll-style names —
+the names are the authoring surface Ian writes in, and the contract is CORRECT
+BEHAVIOR, not emulation of Jekyll internals. Where Jekyll's own semantics are
+surprising, these do the sane thing and the tests pin it ([#102](https://github.com/Omega-JS-Stack/omega/issues/102)).
+
+Implemented: `slugify`, `date_to_xmlschema`, `date_to_rfc822`, `jsonify`,
+`strip_html`, `markdownify`, `relative_url`, `absolute_url`,
+`number_of_words`, `where_exp`, `group_by_exp` (`push` comes from LiquidJS).
+The `*_exp` filters read the SIMPLE expression subset (`item.path <op>
+literal`, contains, bare paths) — extend it when a site needs more.
+`where_exp` keeps the items whose expression is truthy; `group_by_exp` buckets
+by the expression's VALUE, one group per distinct value in first-seen order
+(an absent value groups under `''`).
 
 ## Adapter contract (`registerLiquid(engine, options)`)
 

@@ -1,6 +1,7 @@
 // Components styleguide page (/test/components) — wires the Bootstrap
-// widgets that need explicit init (popovers, toasts) plus the password-eye
-// demo. Tooltips are initialized theme-wide on DOM ready already.
+// widgets that need explicit init (popovers, toasts). Tooltips are initialized
+// theme-wide on DOM ready already, and the password eye is the shared
+// `omega-password-toggle` click trigger (#16), armed by the global module.
 
 // Libraries
 import omega from '@omega.js/client';
@@ -27,20 +28,6 @@ export default () => {
         });
       }
     }
-
-    // Password eye demo — same markup contract as the auth pages
-    document.querySelectorAll('.uj-password-toggle').forEach(($toggle) => {
-      $toggle.addEventListener('click', () => {
-        const $input = $toggle.closest('.input-group')?.querySelector('input');
-        if (!$input) {
-          return;
-        }
-        const show = $input.type === 'password';
-        $input.type = show ? 'text' : 'password';
-        $toggle.querySelector('.uj-password-show')?.classList.toggle('d-none', show);
-        $toggle.querySelector('.uj-password-hide')?.classList.toggle('d-none', !show);
-      });
-    });
 
     // Resolve after initialization
     return resolve();

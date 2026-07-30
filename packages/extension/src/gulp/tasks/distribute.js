@@ -1,6 +1,8 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('distribute');
+const fontAwesomeLogger = Manager.logger('distribute:fontawesome');
+const watcherLogger = Manager.logger('distribute:watcher');
 const { src, dest, watch, series } = require('gulp');
 const { Transform } = require('node:stream');
 const path = require('path');
@@ -49,7 +51,7 @@ function copyFontAwesomeWebfonts() {
 
   // Check if FontAwesome is installed
   if (!jetpack.exists(fontAwesomeWebfontsSource)) {
-    logger.log('[FontAwesome] Not installed, skipping webfonts copy');
+    fontAwesomeLogger.log('Not installed, skipping webfonts copy');
     return;
   }
 
@@ -63,10 +65,10 @@ function copyFontAwesomeWebfonts() {
     const fileName = path.basename(file);
     const destPath = path.join(fontAwesomeWebfontsDest, fileName);
     jetpack.copy(file, destPath, { overwrite: true });
-    logger.log(`[FontAwesome] Copied ${fileName}`);
+    fontAwesomeLogger.log(`Copied ${fileName}`);
   });
 
-  logger.log(`[FontAwesome] Copied ${webfontFiles.length} webfont file(s)`);
+  fontAwesomeLogger.log(`Copied ${webfontFiles.length} webfont file(s)`);
 }
 
 // Main task
@@ -143,17 +145,17 @@ function customTransform() {
 function distributeWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(input, { delay: delay, dot: true }, distribute)
   .on('change', function(path) {
-    logger.log(`[watcher] File ${path} was changed`);
+    watcherLogger.log(`File ${path} was changed`);
   });
 
   // Complete

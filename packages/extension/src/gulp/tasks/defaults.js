@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('defaults');
+const watcherLogger = Manager.logger('defaults:watcher');
 const { watch, series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
@@ -183,17 +184,17 @@ function defaults(complete, changedFile) {
 function defaultsWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(input, { delay: delay, dot: true })
   .on('change', (changedPath) => {
-    logger.log(`[watcher] File changed (${changedPath})`);
+    watcherLogger.log(`File changed (${changedPath})`);
     // Call defaults with just the changed file
     defaults(() => {}, changedPath);
   });

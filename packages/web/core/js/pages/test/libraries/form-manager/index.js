@@ -5,6 +5,15 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const case1Logger = createLogger('test:form-manager:1');
+const case2Logger = createLogger('test:form-manager:2');
+const case3Logger = createLogger('test:form-manager:3');
+const case4Logger = createLogger('test:form-manager:4');
+const case5Logger = createLogger('test:form-manager:5');
+const case6Logger = createLogger('test:form-manager:6');
+const case7Logger = createLogger('test:form-manager:7');
 
 // Module
 export default () => {
@@ -43,13 +52,13 @@ function initTestFormMain() {
   });
 
   formManager.on('change', ({ name, value, data }) => {
-    console.log('[Test 1] Change:', name, '=', value);
-    console.log('[Test 1] Full data:', data);
+    case1Logger.log('Change:', name, '=', value);
+    case1Logger.log('Full data:', data);
   });
 
   formManager.on('submit', async ({ data, $submitButton }) => {
-    console.log('[Test 1] Submitting:', data);
-    console.log('[Test 1] Submit button:', $submitButton?.dataset?.action);
+    case1Logger.log('Submitting:', data);
+    case1Logger.log('Submit button:', $submitButton?.dataset?.action);
 
     // Show action separately
     const action = $submitButton?.dataset?.action || 'unknown';
@@ -109,7 +118,7 @@ function initTestFormValidation() {
 
   // Validation event - runs BEFORE submit, use setError to accumulate errors
   formManager.on('validation', ({ data, setError }) => {
-    console.log('[Test 2] Validating:', data);
+    case2Logger.log('Validating:', data);
 
     // Custom validation (HTML5 validation handles required, email format, etc.)
     // Here we add business logic validation
@@ -123,7 +132,7 @@ function initTestFormValidation() {
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 2] Submitting (validation passed):', data);
+    case2Logger.log('Submitting (validation passed):', data);
 
     // If we reach here, validation passed
     await simulateApi(500);
@@ -154,12 +163,12 @@ function initTestFormContact() {
   });
 
   formManager.on('change', ({ name, value, data }) => {
-    console.log('[Test 3] Change:', name, '=', value);
-    console.log('[Test 3] Full data:', data);
+    case3Logger.log('Change:', name, '=', value);
+    case3Logger.log('Full data:', data);
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 3] Submitting:', data);
+    case3Logger.log('Submitting:', data);
     await simulateApi(1000);
     formManager.showSuccess('Message sent! Form is now locked.');
   });
@@ -175,19 +184,19 @@ function initTestFormManual() {
   });
 
   formManager.on('change', ({ name, value, data }) => {
-    console.log('[Test 4] Change:', name, '=', value);
-    console.log('[Test 4] Full data:', data);
+    case4Logger.log('Change:', name, '=', value);
+    case4Logger.log('Full data:', data);
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 4] Submitting:', data);
+    case4Logger.log('Submitting:', data);
     await simulateApi(1000);
     formManager.showSuccess('Done!');
   });
 
   // Simulate async initialization (e.g., loading user data)
   setTimeout(() => {
-    console.log('[Test 4] Now ready');
+    case4Logger.log('Now ready');
     formManager.ready();
   }, 2000);
 }
@@ -231,12 +240,12 @@ function initTestFormGroups() {
         ? `Filter: ${JSON.stringify(currentGroup)}`
         : 'Filter: none (all fields)';
 
-      console.log('[Test 5] Input group set to:', currentGroup);
+      case5Logger.log('Input group set to:', currentGroup);
     });
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 5] getData() result:', data);
+    case5Logger.log('getData() result:', data);
 
     // Show the filtered data
     $output.textContent = JSON.stringify(data, null, 2);
@@ -272,7 +281,7 @@ function initTestFormSnapshot() {
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 7] Submitting:', data);
+    case7Logger.log('Submitting:', data);
     logStates();
     await simulateApi(2000);
     cycles++;
@@ -308,11 +317,11 @@ function initTestFormFileDrop() {
   });
 
   formManager.on('change', ({ name, value }) => {
-    console.log('[Test 6] Change:', name, '=', value);
+    case6Logger.log('Change:', name, '=', value);
   });
 
   formManager.on('submit', async ({ data }) => {
-    console.log('[Test 6] Submitting:', data);
+    case6Logger.log('Submitting:', data);
     await simulateApi(500);
     formManager.showSuccess('File(s) submitted!');
   });

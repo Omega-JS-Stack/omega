@@ -11,7 +11,7 @@ This pattern avoids `chrome.storage` (no cross-context tokens on disk, no race c
 ## Sign-in flow
 
 ```
-User clicks .auth-signin-btn (in popup/options/sidepanel/page)
+User clicks .omega-signin (in popup/options/sidepanel/page)
   ↓
 openAuthPage() opens https://<brand.url host>/token?authSourceTabId=<n>
   ↓
@@ -49,7 +49,7 @@ Background compares UIDs:
 ## Sign-out flow
 
 ```
-User clicks .auth-signout-btn
+User clicks .omega-signout
   ↓
 Web Manager signs out that context's Firebase
   ↓
@@ -88,7 +88,7 @@ All contexts sign out
 | `syncWithBackground(context)` | Called on context boot. Compares context's UID with background's, syncs if different. |
 | `setupAuthBroadcastListener(context)` | Listens for sign-in / sign-out broadcasts from background. |
 | `setupSignOutListener(context)` | Notifies background when this context signs out. |
-| `setupAuthEventListeners(context)` | Wires delegated click handlers for `.auth-signin-btn` / `.auth-account-btn`. |
+| `setupAuthEventListeners(context)` | Registers the extension's `omega-signin` click trigger on @omega.js/client's shared registry. |
 | `openAuthPage(context, options)` | Opens the website's `/token` page with `authSourceTabId` for tab restoration. |
 
 Every popup/options/sidepanel/page Manager calls these automatically in `initialize()`. See [managers.md](managers.md).
@@ -99,9 +99,8 @@ Add these classes to HTML elements to wire up auth UI without writing JS:
 
 | Class | Action |
 |---|---|
-| `.auth-signin-btn` | Opens `/token` page on website. After authentication, signs in across all contexts. |
-| `.auth-signout-btn` | Signs out via Web Manager. Notifies background, which broadcasts to other contexts. |
-| `.auth-account-btn` | Opens `/account` page on website (for billing, profile, etc.) |
+| `.omega-signin` | Opens `/token` page on website. After authentication, signs in across all contexts. |
+| `.omega-signout` | Signs out via Web Manager. Notifies background, which broadcasts to other contexts. |
 
 ## Reactive bindings
 
@@ -109,7 +108,7 @@ Web Manager exposes `data-omega-bind` attributes for show/hide/text/attr based o
 
 ```html
 <!-- Sign-in button shown when logged out -->
-<button class="btn auth-signin-btn" data-omega-bind="@show !auth.user">
+<button class="btn omega-signin" data-omega-bind="@show !auth.user">
   Sign In
 </button>
 
@@ -117,8 +116,7 @@ Web Manager exposes `data-omega-bind` attributes for show/hide/text/attr based o
 <div data-omega-bind="@show auth.user" hidden>
   <img data-omega-bind="@attr src auth.user.photoURL">
   <span data-omega-bind="@text auth.user.displayName"></span>
-  <a class="auth-account-btn" href="#">Account</a>
-  <button class="auth-signout-btn">Sign Out</button>
+  <button class="omega-signout">Sign Out</button>
 </div>
 ```
 

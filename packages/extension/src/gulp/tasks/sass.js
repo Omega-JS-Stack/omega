@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('sass');
+const watcherLogger = Manager.logger('sass:watcher');
 const { src, dest, watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const path = require('path');
@@ -185,17 +186,17 @@ function sass(complete) {
 function sassWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(watchInput, { delay: delay, dot: true }, sass)
   .on('change', (path) => {
-    logger.log(`[watcher] File changed (${path})`);
+    watcherLogger.log(`File changed (${path})`);
   });
 
   // Complete

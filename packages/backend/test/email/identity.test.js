@@ -13,6 +13,7 @@
 const assert = require('node:assert');
 const { resolvePerson, resolveSignoff } = require('../../src/manager/libraries/email/prepare.js');
 const { footer } = require('../../src/manager/libraries/email/generators/lib/templates/base.js');
+const feedbackTemplate = require('../../src/manager/libraries/email/generators/lib/templates/feedback.js');
 
 // The identity the framework used to hardcode. Nothing may ever emit these again.
 const FRAMEWORK_IDENTITY = /Ian Wiedenman|ianwiedenman|ianwieds|ITW Creative Works|itwcreativeworks/i;
@@ -224,6 +225,42 @@ module.exports = {
         const out = footer({ name: 'Acme', url: 'https://acme.example' }, {});
 
         assert.ok(!out.includes('<mj-image'), `rendered a wordmark with nothing configured: ${out}`);
+      },
+    },
+
+    // ---------- Feedback template: no third-party asset host ----------
+
+    {
+      name: 'feedback template fetches no image from the framework CDN',
+
+      run() {
+        const out = feedbackTemplate.build({
+          data: { brand: brandWithPerson, email: { subject: 'Hi' } },
+          theme: {},
+        });
+
+        assert.ok(!FRAMEWORK_IDENTITY.test(out), 'feedback template leaked the framework identity');
+        assert.ok(!/<img/.test(out), `feedback template still loads a hosted image: ${out}`);
+      },
+    },
+
+    {
+      name: 'feedback template still renders all four rating faces',
+
+      run() {
+        const out = feedbackTemplate.build({
+          data: { brand: brandWithPerson, email: { subject: 'Hi' } },
+          theme: {},
+        });
+
+        // The glyphs that replaced the hosted PNGs — dislike/neutral/like/love.
+        for (const face of ['&#128542;', '&#128528;', '&#128578;', '&#128525;']) {
+          assert.ok(out.includes(face), `missing rating face ${face}`);
+        }
+
+        for (const rating of ['dislike', 'neutral', 'like', 'love']) {
+          assert.ok(out.includes(`rating=${rating}`), `missing rating link for ${rating}`);
+        }
       },
     },
 

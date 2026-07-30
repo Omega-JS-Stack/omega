@@ -99,9 +99,11 @@ async function findUserByEmail(admin, ctx, email) {
   return snapshot.docs[0].data();
 }
 
-// Exposed as statics for plain-node unit tests (consent-gate.test.js)
+// Exposed as statics for plain-node unit tests (consent-gate.test.js,
+// campaign-config-fault.test.js)
 Marketing.isMarketingRevoked = isMarketingRevoked;
 Marketing.findUserByEmail = findUserByEmail;
+Marketing.providerFailure = providerFailure;
 
 Marketing.prototype.add = async function (options) {
   const self = this;
@@ -416,7 +418,7 @@ Marketing.prototype.sendCampaign = async function (settings) {
     promises.push(
       _sendCampaignSendGrid(Manager, sgSettings, contentHtml)
         .then((r) => { results.campaigns = r; })
-        .catch((e) => { results.campaigns = { success: false, error: e.message }; })
+        .catch((e) => { results.campaigns = providerFailure(e); })
     );
   }
 
@@ -432,7 +434,7 @@ Marketing.prototype.sendCampaign = async function (settings) {
         excludeSegments: resolvedSegments.newsletter?.excludeSegments || [],
       })
         .then((r) => { results.newsletter = r; })
-        .catch((e) => { results.newsletter = { success: false, error: e.message }; })
+        .catch((e) => { results.newsletter = providerFailure(e); })
     );
   }
 
@@ -459,6 +461,26 @@ Marketing.prototype.listCampaigns = async function (options) {
 // ============================================================
 // SendGrid campaign delivery (private)
 // ============================================================
+
+/**
+ * Convert a provider throw into the result shape callers read.
+ *
+ * A CODED error keeps its code: prepare.js's config-hole throws are
+ * errorWithCode(..., 400), and swallowing that into a plain { success: false }
+ * makes a permanent brand-config hole indistinguishable from a transient
+ * provider failure — the campaigns cron needs the difference to finalize the
+ * campaign instead of retrying it every occurrence forever. The key is OMITTED
+ * when the error has no code: results are persisted on the campaign doc, and
+ * Firestore rejects undefined field values.
+ *
+ * @param {Error} error
+ * @returns {{ success: false, error: string, code?: number }}
+ */
+function providerFailure(error) {
+  return error.code
+    ? { success: false, error: error.message, code: error.code }
+    : { success: false, error: error.message };
+}
 
 /**
  * SendGrid-specific: prepare → render → audience → create Single Send → schedule.

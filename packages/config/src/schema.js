@@ -516,8 +516,88 @@ const TARGET_SCHEMAS = {
     },
   ],
 
-  // Near-empty at launch by design.
-  extension: [],
+  // Store listings drive the extension page's site.extension map and the
+  // curated site.targets.extension view (#85).
+  extension: [
+    {
+      path:        'listings.chrome.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Chrome Web Store listing URL. Feeds site.extension.chrome on the extension page.',
+    },
+    {
+      path:        'listings.chrome.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.firefox.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Firefox Add-ons (AMO) listing URL. Feeds site.extension.firefox.',
+    },
+    {
+      path:        'listings.firefox.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.edge.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Microsoft Edge Add-ons listing URL. Feeds site.extension.edge.',
+    },
+    {
+      path:        'listings.edge.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.opera.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Opera Add-ons listing URL. Feeds site.extension.opera.',
+    },
+    {
+      path:        'listings.opera.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.safari.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'App Store (Safari extension) listing URL. Feeds site.extension.safari.',
+    },
+    {
+      path:        'listings.safari.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.brave.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Brave listing URL (Chrome Web Store serves Brave). Feeds site.extension.brave.',
+    },
+    {
+      path:        'listings.brave.state',
+      type:        'string',
+      required:    false,
+      description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+  ],
 
   // RESERVED — MAM is parked for a separate overhaul; schema slot only.
   mobile: [],

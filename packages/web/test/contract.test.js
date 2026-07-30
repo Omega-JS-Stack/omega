@@ -179,6 +179,33 @@ test('no unresolved Liquid syntax leaks into any built page', () => {
   }
 });
 
+test('#16: no LEGACY click-trigger class survives in built output (html/css/js)', () => {
+  // The three names the unified `omega-*` trigger registry retired. No aliases
+  // were kept, so a single surviving spelling in dist means dead markup: the
+  // class no longer has a handler behind it.
+  const legacy = ['auth-signout-btn', 'auth-signin-btn', 'uj-password-toggle'];
+  for (const theme of THEMES) {
+    const outDir = path.join(PKG, '.omega', `contract-${theme}`);
+    const offenders = [];
+    for (const entry of fs.readdirSync(outDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !/\.(html|css|js)$/.test(entry.name)) continue;
+      const file = path.join(entry.parentPath, entry.name);
+      const contents = fs.readFileSync(file, 'utf8');
+      for (const name of legacy) {
+        if (contents.includes(name)) {
+          offenders.push(`${path.relative(outDir, file)} → ${name}`);
+        }
+      }
+    }
+    assert.deepStrictEqual(offenders, [], `${theme}: built files still carrying a legacy trigger class`);
+  }
+
+  // The replacements ARE in the output — otherwise the assertion above passes
+  // for the wrong reason (a build that emitted no auth markup at all).
+  assert.ok(page('classy', 'signin.html').includes('omega-password-toggle'), 'signin carries the password-eye trigger');
+  assert.ok(page('classy', 'dashboard/account.html').includes('omega-signout'), 'the account menu carries the sign-out trigger');
+});
+
 test('redirect module: careers renders the redirect chrome', () => {
   const careers = page('classy', 'careers.html');
   assert.ok(careers.includes('docs.google.com/forms'), 'redirect target URL present');

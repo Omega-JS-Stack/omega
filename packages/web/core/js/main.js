@@ -8,6 +8,7 @@ import appearanceModule from '__main_assets__/js/core/appearance.js';
 import appShellModule from '__main_assets__/js/core/app-shell.js';
 import motionModule from '__main_assets__/js/core/motion.js';
 import completeModule from '__main_assets__/js/core/complete.js';
+import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggle.js';
 
 import omega from '@omega.js/client';
 
@@ -38,6 +39,10 @@ export default async function ({ manager, options } = {}) {
   appearanceModule({ manager, options });
   appShellModule({ manager, options });
   motionModule({ manager, options });
+
+  // Web's own click triggers on the shared registry (#16) — registered here so
+  // every page has them (the auth pages and the styleguide both carry the eye)
+  setupPasswordToggle();
 
   // Dev palette (development only): the yellow DEV pull-tab — persona
   // switcher + quick links. Dynamic import so production pages never load

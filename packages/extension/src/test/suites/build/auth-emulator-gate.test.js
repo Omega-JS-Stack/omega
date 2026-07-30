@@ -108,7 +108,7 @@ module.exports = {
       run: (ctx) => {
         const calls = BACKGROUND.match(/connectAuthEmulator\(/g) || [];
         ctx.expect(calls.length).toBe(1);
-        ctx.expect(/if \(this\.isTesting\(\)\) \{\s*this\.logger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{AUTH_EMULATOR_PORT\}`/.test(BACKGROUND)).toBe(true);
+        ctx.expect(/if \(this\.isTesting\(\)\) \{\s*this\.authLogger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{AUTH_EMULATOR_PORT\}`/.test(BACKGROUND)).toBe(true);
         // Classic auth port — a SW can't read a bumped OMEGA_AUTH_PORT
         ctx.expect(BACKGROUND).toMatch(/const AUTH_EMULATOR_PORT = 9099;/);
       },

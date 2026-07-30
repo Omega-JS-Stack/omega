@@ -12,7 +12,7 @@ Vendored code resolves its deps (chalk, node-powertools) from the HOST framework
 
 | Module | What it is | Extracted from |
 |--------|-----------|----------------|
-| `src/logger.js` | Build-time console logger (`new Logger(name)`, `.log/.error/.warn/.info`, `.format` = chalk) | Identical ×4 in UJM/BXM/EM/MAM (EM's cleaned copy is canonical) |
+| `src/logger.js` | Build-time console logger (`new Logger(name)`, `.log/.error/.warn/.info`, `.format` = chalk). Prints the ONE identity tag after its own timestamp: `[HH:MM:SS] [@omega.js/<package>:<name>] message` — the package segment is derived at construction from the constructing file's nearest `package.json` (stack frame → walk up, cached; derivation failure falls back to `@omega.js/devkit` and never throws), so call sites never name their own package. Runtime lineages (client's `createLogger`, desktop/extension `logger-lite`) print the same tag with NO timestamp; `[DRY RUN]` is a separate marker after the tag. Plain `fs` on purpose — a vendored module must not push a dependency onto its hosts | Identical ×4 in UJM/BXM/EM/MAM (EM's cleaned copy is canonical) |
 | `src/safe-install.js` | `safeInstall(cmd)` — routes `npm install` through Socket Firewall when available | Byte-identical ×4 in UJM/BXM/EM/@omega.js/backend |
 | `src/attach-log-file.js` | Tee stdout/stderr to a log file, ANSI-stripped, stackable tees | Functionally identical ×4 (header now `# omega log`) |
 | `src/npm-registry.js` | `getPackageManifest(name)` / `getLatestVersion(name)` — plain `<registry>/<name>/latest` fetch, null on any failure (expected external condition); `registryUrl`/`timeout` options are the test seam | Replaces the unmaintained `npm-api` dep (cp270) across backend install/setup-test + desktop/extension setup |

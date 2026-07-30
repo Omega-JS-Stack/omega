@@ -3,6 +3,10 @@
 // triangle with data-omega-icon-missing="<slug>" (template-kit media.js) —
 // this scan turns those silent triangles into console errors you can't
 // miss, and re-checks once after load for late-rendered markup.
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('dev-icon-audit');
+
 
 /**
  * Scan the DOM for tagged fallback icons and console.error each distinct
@@ -17,7 +21,7 @@ export default function devIconAudit() {
       const key = `${slug}`;
       if (reported.has(key)) return;
       reported.add(key);
-      console.error(`[omega] Missing icon "${slug}" — rendered the fallback triangle`, el);
+      logger.error(`Missing icon "${slug}" — rendered the fallback triangle`, el);
     });
   };
 

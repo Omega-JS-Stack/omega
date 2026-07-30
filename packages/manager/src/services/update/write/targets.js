@@ -65,7 +65,7 @@ module.exports = async ({ brandRoot, apps, options }) => {
     console.log(`      ${chalk.dim('⊘ install: all dependencies resolve')}`);
     installSteps.push({ phase: 'install', success: true, skipped: true });
   } else if (options.dryRun) {
-    console.log(`      ${chalk.yellow('⊘')} install: would run npm install ${chalk.dim(`(missing: ${missing.join(', ')})`)} ${chalk.dim('[dry-run]')}`);
+    console.log(`      ${chalk.yellow('⊘')} install: would run npm install ${chalk.dim(`(missing: ${missing.join(', ')})`)} ${chalk.dim('[DRY RUN]')}`);
     installSteps.push({ phase: 'install', success: true, skipped: true, dryRun: true });
   } else {
     console.log(`      ${chalk.dim('→')} npm install ${chalk.dim(`(missing: ${missing.join(', ')})`)}`);
@@ -98,7 +98,7 @@ module.exports = async ({ brandRoot, apps, options }) => {
       console.log(`      ${chalk.dim(`⊘ ${app.name}: no build script`)}`);
       steps.push({ phase: 'build', success: true, skipped: true, reason: 'no build script' });
     } else if (options.dryRun) {
-      console.log(`      ${chalk.yellow('⊘')} ${app.name}: would run npm run build ${chalk.dim('[dry-run]')}`);
+      console.log(`      ${chalk.yellow('⊘')} ${app.name}: would run npm run build ${chalk.dim('[DRY RUN]')}`);
       steps.push({ phase: 'build', success: true, skipped: true, dryRun: true });
     } else {
       // Non-interactive certification runs (pipeline, CI) must be

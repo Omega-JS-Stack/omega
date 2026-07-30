@@ -2,6 +2,9 @@
 // public form that posts to a recaptcha-gated backend route (checkout
 // payment intent, newsletter capture). Site key: omega.config.recaptcha['site-key'].
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('recaptcha');
 
 let recaptchaReady = false;
 let recaptchaSiteKey = null;
@@ -64,11 +67,11 @@ export async function getRecaptchaToken(action = 'submit') {
   {
     const devRecaptcha = new URLSearchParams(window.location.search).get('_dev_recaptcha');
     if (devRecaptcha === 'invalid') {
-      console.warn('[Recaptcha Dev] Sending invalid reCAPTCHA token');
+      logger.warn('Sending invalid reCAPTCHA token');
       return 'invalid-dev-token';
     }
     if (devRecaptcha === 'empty') {
-      console.warn('[Recaptcha Dev] Sending empty reCAPTCHA token');
+      logger.warn('Sending empty reCAPTCHA token');
       return '';
     }
   }

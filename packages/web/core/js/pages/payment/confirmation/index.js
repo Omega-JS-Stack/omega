@@ -3,6 +3,9 @@ import { state, buildBindingsState } from './modules/state.js';
 import { trackPurchaseIfNeeded } from './modules/tracking.js';
 import { triggerCelebration } from './modules/celebration.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('confirmation');
 
 /* Test URL
   https://localhost:3000/payment/confirmation?orderId=ORD-TRIAL-123&productId=pro&productName=Pro%20Plan&amount=0&currency=USD&frequency=annually&paymentMethod=stripe&trial=true&track=true
@@ -40,7 +43,7 @@ async function initializeConfirmation() {
   document.querySelectorAll('.btn').forEach(($btn) => {
     $btn.addEventListener('click', () => {
       omega.notifications().subscribe().catch((e) => {
-        console.warn('[Confirmation] Notification subscribe failed:', e.message);
+        logger.warn('Notification subscribe failed:', e.message);
       });
     }, { once: true });
   });

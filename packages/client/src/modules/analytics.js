@@ -1,4 +1,7 @@
 import core from './analytics-core.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('analytics');
 
 // Supported runtimes for analytics
 const SUPPORTED_RUNTIMES = ['browser-extension', 'electron'];
@@ -37,13 +40,13 @@ class Analytics {
 
     // TODO: Add web runtime support
     if (!this._isSupported()) {
-      console.log(`[Analytics] Runtime "${this.runtime}" not supported yet, skipping`);
+      logger.log(`Runtime "${this.runtime}" not supported yet, skipping`);
       return;
     }
 
     // Skip if already initialized
     if (this.initialized) {
-      console.log('[Analytics] Already initialized');
+      logger.log('Already initialized');
       return;
     }
 
@@ -60,7 +63,7 @@ class Analytics {
 
     // Skip if no measurement ID
     if (!this.measurementId) {
-      console.log('[Analytics] No measurement ID provided, skipping initialization');
+      logger.log('No measurement ID provided, skipping initialization');
       return;
     }
 
@@ -72,7 +75,7 @@ class Analytics {
     this.clientId = this._getClientId();
 
     // Log initialization
-    console.log(`[Analytics] Initializing with measurement ID: ${this.measurementId}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
+    logger.log(`Initializing with measurement ID: ${this.measurementId}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
 
     // Mark as initialized
     this.initialized = true;
@@ -130,7 +133,7 @@ class Analytics {
     // so an event name lands (or is rejected) identically on every surface
     const name = core.normalizeEventName(eventName);
     if (!name) {
-      console.warn(`[Analytics] Dropping event with unusable name: ${eventName}`);
+      logger.warn(`Dropping event with unusable name: ${eventName}`);
       return;
     }
 
@@ -141,7 +144,7 @@ class Analytics {
     };
 
     // Log event
-    console.log(`[Analytics] Event: ${name}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
+    logger.log(`Event: ${name}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
 
     // Send via Measurement Protocol (fetch)
     this._sendViaFetch(name, eventParams);
@@ -151,13 +154,13 @@ class Analytics {
   _sendViaFetch(eventName, params = {}) {
     // Dev mode logs only — nothing posts
     if (this.devMode) {
-      console.log('[Analytics] Dev mode: event logged locally, not sent');
+      logger.log('Dev mode: event logged locally, not sent');
       return;
     }
 
     // Measurement Protocol requires api_secret
     if (!this.secret) {
-      console.warn('[Analytics] No API secret provided, cannot send via Measurement Protocol');
+      logger.warn('No API secret provided, cannot send via Measurement Protocol');
       return;
     }
 
@@ -180,7 +183,7 @@ class Analytics {
       method: 'POST',
       body: JSON.stringify(payload),
     }).catch((err) => {
-      console.warn('[Analytics] Failed to send event:', err);
+      logger.warn('Failed to send event:', err);
     });
   }
 

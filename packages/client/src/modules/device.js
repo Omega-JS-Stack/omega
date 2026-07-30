@@ -1,3 +1,7 @@
+import { createLogger } from './logger.js';
+
+const logger = createLogger('device');
+
 // Unit multipliers
 const UNITS = {
   milliseconds: 1,
@@ -125,7 +129,7 @@ class Device {
       const result = await storage.get(STORAGE_KEY);
       return result[STORAGE_KEY] || null;
     } catch (e) {
-      console.warn('[Device] Failed to load from extension storage:', e);
+      logger.warn('Failed to load from extension storage:', e);
       return null;
     }
   }
@@ -161,7 +165,7 @@ class Device {
     try {
       await storage.set({ [STORAGE_KEY]: this.data });
     } catch (e) {
-      console.warn('[Device] Failed to save to extension storage:', e);
+      logger.warn('Failed to save to extension storage:', e);
     }
   }
 

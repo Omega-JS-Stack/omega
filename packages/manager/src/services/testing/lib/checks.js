@@ -67,7 +67,7 @@ function createRecorder() {
     },
     // Display-only dry-run line for a skipped remote action
     would(action) {
-      console.log(`      ${chalk.yellow('⊘')} would ${action} ${chalk.dim('[dry-run]')}`);
+      console.log(`      ${chalk.yellow('⊘')} would ${action} ${chalk.dim('[DRY RUN]')}`);
     },
     results() {
       return { passed, warned, failed };

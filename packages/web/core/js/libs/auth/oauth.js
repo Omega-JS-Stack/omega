@@ -6,6 +6,9 @@
 import omega from '@omega.js/client';
 import { extractBlockingFunctionMessage, isUserError } from '__main_assets__/js/libs/auth/errors.js';
 import { trackLogin, trackSignup } from '__main_assets__/js/libs/auth/tracking.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth:oauth');
 
 /**
  * Google's signInWithPopup/Redirect auto-creates accounts. If a user lands on
@@ -14,7 +17,7 @@ import { trackLogin, trackSignup } from '__main_assets__/js/libs/auth/tracking.j
  * surface an inline error.
  */
 export async function reverseAccidentalSignup(ctx, newUser) {
-  console.warn('[Auth] Reversing accidental signup from /signin (new Google account created with no consent on record)');
+  logger.warn('Reversing accidental signup from /signin (new Google account created with no consent on record)');
 
   // SYNCHRONOUSLY flag the reversal so the auth-state-change listener in
   // core/auth.js short-circuits its policy-based redirect for this user.
@@ -31,7 +34,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
   } catch (e) {
     // Best-effort. If delete fails (network/token issue), the page-load consent guard
     // is the backstop — the orphan account will be signed out on every future visit.
-    console.error('[Auth] Failed to delete accidental account:', e);
+    logger.error('Failed to delete accidental account:', e);
     omega.sentry().captureException(new Error('Failed to reverse accidental signup', { cause: e }));
   }
 
@@ -39,7 +42,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
     const { getAuth, signOut } = await import('@firebase/auth');
     await signOut(getAuth());
   } catch (e) {
-    console.error('[Auth] Failed to sign out after accidental signup:', e);
+    logger.error('Failed to sign out after accidental signup:', e);
   }
 
   // Strip authReturnUrl so the next attempt doesn't redirect them away from /signin
@@ -73,7 +76,7 @@ export async function handleRedirectResult(ctx) {
   const simulateRedirect = url.searchParams.get('_dev_simulateRedirect');
 
   if (simulateRedirect) {
-    console.log('[Auth] Simulating OAuth redirect result:', simulateRedirect);
+    logger.log('Simulating OAuth redirect result:', simulateRedirect);
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     if (simulateRedirect !== 'error') {
@@ -100,14 +103,14 @@ export async function handleRedirectResult(ctx) {
     }
 
     // Log results for debugging
-    console.log('[Auth] Redirect result:', result);
+    logger.log('Redirect result:', result);
 
     // If no result, return false to indicate no redirect was processed
     if (!result || !result.user) {
       return false;
     }
 
-    console.log('[Auth] Successfully authenticated via redirect:', result.user.email);
+    logger.log('Successfully authenticated via redirect:', result.user.email);
 
     // Determine the provider from the result
     const providerId = result.providerId || result.user.providerData?.[0]?.providerId || 'unknown';
@@ -115,7 +118,7 @@ export async function handleRedirectResult(ctx) {
     const isNewUser = additionalUserInfo?.isNewUser;
     const pagePath = document.documentElement.getAttribute('data-page-path');
     const isSignupPage = pagePath === '/signup';
-    console.warn('[Auth] redirect additionalUserInfo:', additionalUserInfo, 'isNewUser:', isNewUser, 'pagePath:', pagePath, 'isSignupPage:', isSignupPage, 'operationType:', result.operationType);
+    logger.warn('redirect additionalUserInfo:', additionalUserInfo, 'isNewUser:', isNewUser, 'pagePath:', pagePath, 'isSignupPage:', isSignupPage, 'operationType:', result.operationType);
 
     // Google quirk: if a new account was auto-created during a signin attempt
     // (user came back from OAuth via the redirect path on /signin, not /signup),
@@ -140,7 +143,7 @@ export async function handleRedirectResult(ctx) {
       const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
         ? authReturnUrl
         : '/dashboard/account';
-      console.log('[Auth] Simulated redirect to:', redirectTo);
+      logger.log('Simulated redirect to:', redirectTo);
       await new Promise(resolve => setTimeout(resolve, 1500));
       window.location.href = redirectTo;
     }
@@ -238,14 +241,14 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
       try {
         // Try popup
         const result = await signInWithPopup(auth, provider);
-        console.log('[Auth] Successfully authenticated via popup:', result.user.email);
+        logger.log('Successfully authenticated via popup:', result.user.email);
 
         // Track based on whether this is a new user. v9 modular SDK requires
         // getAdditionalUserInfo(result) — the legacy `result.additionalUserInfo`
         // direct property does NOT exist on UserCredential in v9+.
         const additionalUserInfoPopup = getAdditionalUserInfo(result);
         const isNewUser = additionalUserInfoPopup?.isNewUser;
-        console.warn('[Auth] popup additionalUserInfo:', additionalUserInfoPopup, 'isNewUser:', isNewUser, 'action:', action);
+        logger.warn('popup additionalUserInfo:', additionalUserInfoPopup, 'isNewUser:', isNewUser, 'action:', action);
 
         // Google quirk: signInWithPopup auto-creates accounts. If a brand-new visitor
         // clicks "Sign in with Google" on the SIGNIN page (not signup), reverse the
@@ -268,7 +271,7 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
             popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/cancelled-popup-request') {
 
-          console.log('[Auth] Popup failed, falling back to redirect:', popupError.code);
+          logger.log('Popup failed, falling back to redirect:', popupError.code);
 
           // Fallback to redirect
           await signInWithRedirect(auth, provider);
@@ -281,7 +284,7 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
       }
     } else {
       // Use redirect by default
-      console.log('[Auth] Using redirect for authentication');
+      logger.log('Using redirect for authentication');
       await signInWithRedirect(auth, provider);
       // Note: This will redirect the user away from the page
       // The handleRedirectResult function will handle the result when they return

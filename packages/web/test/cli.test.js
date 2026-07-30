@@ -154,7 +154,7 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   // Standalone: the full template lane
   const standaloneLines = [];
   scaffoldDefaults({ outputDir: root, logger: { ...quiet, log: (m) => standaloneLines.push(m) } });
-  const standaloneMode = standaloneLines.filter((m) => m.startsWith('[setup]'));
+  const standaloneMode = standaloneLines.filter((m) => /standalone app/.test(m));
   assert.strictEqual(standaloneMode.length, 1, 'exactly one mode line');
   assert.match(standaloneMode[0], /standalone app/, 'names the mode');
   assert.match(standaloneMode[0], /full config template/, 'names the consequence');
@@ -167,7 +167,7 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
 
   const brandLines = [];
   scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, log: (m) => brandLines.push(m) } });
-  const brandMode = brandLines.filter((m) => m.startsWith('[setup]'));
+  const brandMode = brandLines.filter((m) => /brand monorepo detected/.test(m));
   assert.strictEqual(brandMode.length, 1, 'exactly one mode line');
   assert.match(brandMode[0], /brand monorepo detected/, 'names the mode');
   assert.match(brandMode[0], /targets-only config seed/, 'names the consequence');

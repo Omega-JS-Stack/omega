@@ -176,10 +176,10 @@ function applyDefaults(config) {
         jetpack.remove(destination);
         pruneEmptyDirs(path.dirname(destination), outputDir);
         result.removed.push(finalRelative);
-        logger.warn(`[defaults] Retired ${finalRelative} — framework-owned per-app doc; in a brand monorepo the BRAND ROOT (AGENTS.md / CHANGELOG.md / docs/) is the one doc home`);
+        logger.warn(`Retired ${finalRelative} — framework-owned per-app doc; in a brand monorepo the BRAND ROOT (AGENTS.md / CHANGELOG.md / docs/) is the one doc home`);
       } else {
         result.skipped.push(finalRelative);
-        logger.warn(`[defaults] Kept ${finalRelative} — it carries consumer content. Per-app docs are retired in brand monorepos: move that content to the brand root (AGENTS.md notes / brand CHANGELOG.md / brand docs/), then delete the file`);
+        logger.warn(`Kept ${finalRelative} — it carries consumer content. Per-app docs are retired in brand monorepos: move that content to the brand root (AGENTS.md notes / brand CHANGELOG.md / brand docs/), then delete the file`);
       }
       continue;
     }
@@ -211,7 +211,7 @@ function applyDefaults(config) {
         contents = JSON5.stringify(merged, null, 2);
         didMerge = true;
       } catch (error) {
-        logger.error(`[defaults] Error merging config file ${finalRelative}: ${error.message}`);
+        logger.error(`Error merging config file ${finalRelative}: ${error.message}`);
         // Fall through to normal processing.
       }
     }
@@ -221,7 +221,7 @@ function applyDefaults(config) {
         contents = mergeLineBasedFiles(jetpack.read(destination), contents, item.name);
         didMerge = true;
       } catch (error) {
-        logger.error(`[defaults] Error merging line-based file ${finalRelative}: ${error.message}`);
+        logger.error(`Error merging line-based file ${finalRelative}: ${error.message}`);
       }
     }
 
@@ -246,7 +246,7 @@ function applyDefaults(config) {
 
     jetpack.write(destination, contents);
     (didMerge ? result.merged : result.written).push(finalRelative);
-    logger.log(`[defaults] ${didMerge ? 'Merged' : 'Scaffolded'} → ${finalRelative}`);
+    logger.log(`${didMerge ? 'Merged' : 'Scaffolded'} → ${finalRelative}`);
   }
 
   return result;

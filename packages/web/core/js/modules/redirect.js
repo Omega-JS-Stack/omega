@@ -3,12 +3,18 @@
  * Handles intelligent redirects with querystring forwarding, custom modifiers, and development mode delays.
  * Configuration is passed via data attributes on a #redirect-config element.
  */
+// Relative, not the __main_assets__ alias: modules/ builds in the legacy IIFE
+// lane (src/assets.js), whose esbuild pass carries no layer-alias plugin.
+import { createLogger } from '../libs/logger.js';
+
+const logger = createLogger('redirect');
+
 
 const performRedirect = () => {
   // Get redirect configuration element
   const $redirectConfig = document.getElementById('redirect-config');
   if (!$redirectConfig) {
-    console.error('[Redirect] Configuration element #redirect-config not found');
+    logger.error('Configuration element #redirect-config not found');
     return;
   }
 
@@ -22,11 +28,11 @@ const performRedirect = () => {
   };
 
   // Log configuration
-  console.log('[Redirect] Configuration:', config);
+  logger.log('Configuration:', config);
 
   // Validate required configuration
   if (!config.siteUrl) {
-    console.error('[Redirect] Site URL is required but not provided');
+    logger.error('Site URL is required but not provided');
     return;
   }
 
@@ -38,7 +44,7 @@ const performRedirect = () => {
   const MODIFIERS = {
     'search-cse': (url) => {
       const q = url.searchParams.get('q');
-      url.searchParams.set('q', 'site:' + window.location.origin + ' ' + q);
+      url.searchParams.set('q', `site:${window.location.origin} ${q}`);
       return url;
     },
   };
@@ -50,7 +56,7 @@ const performRedirect = () => {
     if (MODIFIERS[modifierName]) {
       modifierFunction = MODIFIERS[modifierName];
     } else {
-      console.warn('[Redirect] Unknown modifier:', modifierName);
+      logger.warn('Unknown modifier:', modifierName);
     }
   }
 
@@ -77,7 +83,7 @@ const performRedirect = () => {
       redirectUrl = new URL(siteUrl);
     }
   } catch (error) {
-    console.error('[Redirect] Invalid redirect URL:', config.url, error);
+    logger.error('Invalid redirect URL:', config.url, error);
     redirectUrl = new URL(siteUrl);
   }
 
@@ -88,14 +94,14 @@ const performRedirect = () => {
     for (const [key, value] of currentUrl.searchParams.entries()) {
       redirectUrl.searchParams.set(key, value);
     }
-    console.log(`[Redirect] Forwarded ${currentUrl.searchParams.size} query parameters`);
+    logger.log(`Forwarded ${currentUrl.searchParams.size} query parameters`);
   }
 
   // Forward the fragment (#billing deep-links from emails/bookmarks) unless
   // the target declares its own
   if (currentUrl.hash && !redirectUrl.hash) {
     redirectUrl.hash = currentUrl.hash;
-    console.log('[Redirect] Forwarded fragment:', currentUrl.hash);
+    logger.log('Forwarded fragment:', currentUrl.hash);
   }
 
   // Apply modifier function
@@ -104,12 +110,12 @@ const performRedirect = () => {
     const modifiedUrl = modifierFunction(redirectUrl);
     finalUrl = modifiedUrl instanceof URL ? modifiedUrl.toString() : modifiedUrl;
   } catch (error) {
-    console.error('[Redirect] Modifier function threw an error:', error);
+    logger.error('Modifier function threw an error:', error);
     finalUrl = redirectUrl.toString();
   }
 
   // Log redirect details
-  console.group('[Redirect] Configuration');
+  console.group(logger.tag, 'Configuration');
   console.log('Original URL:', config.url);
   console.log('Querystring forwarding:', shouldForwardQuerystring);
   console.log('Modifier:', config.modifier);
@@ -120,7 +126,7 @@ const performRedirect = () => {
 
   // Show user-friendly message in development
   if (config.environment === 'development') {
-    console.log(`[Redirect] Delaying redirect by ${timeout}ms for development mode`);
+    logger.log(`Delaying redirect by ${timeout}ms for development mode`);
   }
 
   // Perform the redirect

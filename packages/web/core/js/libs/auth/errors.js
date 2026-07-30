@@ -1,5 +1,9 @@
 // Firebase Auth error translation — pure helpers shared by the email and
 // OAuth flows. No DOM, no form state.
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth:errors');
+
 
 /**
  * Firebase password-related auth error codes — these belong on the password
@@ -81,7 +85,7 @@ export function extractBlockingFunctionMessage(error) {
   // see exactly what Firebase delivers when @omega.js/backend's beforeCreate
   // throws. The 503 path (Identity Toolkit returns 503 with code -47, no
   // BLOCKING_FUNCTION wrapper) needs different handling than the 400 path.
-  console.warn('[Auth] extractBlockingFunctionMessage: error shape', {
+  logger.warn('extractBlockingFunctionMessage: error shape', {
     code: error?.code,
     message: error?.message,
     name: error?.name,

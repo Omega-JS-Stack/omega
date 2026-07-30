@@ -32,7 +32,7 @@
 ## Campaign Types
 
 - **Email**: dispatches to SendGrid (Single Send) + Beehiiv (Post) via `mailer.sendCampaign()`
-- **Push**: dispatches to FCM via `notification.send()` (shared library)
+- **Push**: dispatches to FCM via `notification.send()` (shared library). The icon falls back to `brand.images.brandmark` and is omitted when unset; the click target falls back to `brand.url` and throws when unset — a push never wears a framework identity.
 - Content is **markdown** — converted to HTML at send time. Template variables resolved before conversion.
 
 ## Claim/Lease Lifecycle
@@ -42,6 +42,8 @@ Every due campaign is **claimed** before any work happens: the cron transactiona
 - Every terminal path writes a final status: `sent`/`failed` for one-offs, back to `pending` (with an advanced `sendAt`) for recurring
 - If a run dies mid-flight (crash, function timeout), the doc stays `processing` until the **stale-lease reclaim** flips it back to `pending` after `PROCESSING_LEASE_SECONDS` (30 min) — a natural retry backoff
 - Unknown campaign `type`s and unknown `generator`s are marked `failed` with an `error` field (a config typo must not retry every 10 minutes forever)
+- A **coded 400** — the framework's permanent-fault convention (`errorWithCode(..., 400)` in the email library, the missing-`brand.url` throw in `notification.js`, the AI library's invalid-request rejects) — is finalized as `failed` with the message in `error`, in ONE pass. Such a fault never heals, so the lease reclaim would retry it forever; recurring campaigns fail outright too, since the next occurrence meets the same hole. It is caught in all three places it can arrive: thrown by the send, thrown by a generator's `generate()` (which the empty-generation attempts ladder never counts), and **carried** in a provider result — `sendCampaign()` converts each provider's throw to `{ success: false, error, code }`, so the email path's config-hole 400s reach the cron as data, not as throws
+- Every other failure keeps its existing path: a code-less throw stays `processing` for the reclaim, a code-less provider failure rides the `success: false` bookkeeping
 - `PUT /marketing/campaign` only edits `pending` campaigns, so a mid-flight campaign can't be edited out from under the cron
 
 ## Recurring Campaigns

@@ -5,11 +5,18 @@
  */
 const { skeleton, logo, cardWrapper, signoff, footer, escape } = require('./base.js');
 
-const RATING_IMAGES = {
-  dislike: 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/dislike.png',
-  neutral: 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/neutral.png',
-  like: 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/like.png',
-  love: 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/love.png',
+// The rating faces are unicode glyphs, not hosted images. They used to be PNGs on
+// the framework author's company CDN — a brand's mail fetching another company's
+// assets, and dark on the day that CDN goes away. The framework has no image host of
+// its own to move them to (the newsletter asset host is per-brand campaign content),
+// and no brand configures four rating faces, so the glyph IS the asset: it ships in
+// the template, needs no config, and renders in every client — the same call the
+// header emoji above already makes.
+const RATING_FACES = {
+  dislike: '&#128542;',
+  neutral: '&#128528;',
+  like: '&#128578;',
+  love: '&#128525;',
 };
 
 function build({ data, theme }) {
@@ -73,14 +80,14 @@ function build({ data, theme }) {
 
 function _ratingCell(rating, label, feedbackUrl, utm) {
   const url = `${feedbackUrl}?rating=${rating}&${utm}`;
-  const img = RATING_IMAGES[rating];
+  const face = RATING_FACES[rating];
   const labelStyle = label
     ? 'font-size: 11px; color: #888; margin-top: 4px;'
     : 'font-size: 11px; color: transparent; margin-top: 4px;';
 
   return `<td style="text-align: center; padding: 4px; width: 25%; vertical-align: top;">
-    <a href="${url}" style="text-decoration: none; display: inline-block;">
-      <img src="${img}" alt="${rating}" width="48" style="width: 48px; height: 48px; display: block; margin: 0 auto;" />
+    <a href="${url}" aria-label="${rating}" style="text-decoration: none; display: inline-block;">
+      <div style="font-size: 40px; line-height: 48px; height: 48px; margin: 0 auto;">${face}</div>
       <div style="${labelStyle}">${label || '&nbsp;'}</div>
     </a>
   </td>`;

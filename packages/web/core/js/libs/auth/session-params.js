@@ -4,6 +4,9 @@
 // Libraries
 import omega from '@omega.js/client';
 import { trackLogin } from '__main_assets__/js/libs/auth/tracking.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth:session-params');
 
 /**
  * ?authSignout=true — sign out, then strip the param so reloads don't loop.
@@ -17,7 +20,7 @@ export async function handleAuthSignout() {
   }
 
   try {
-    console.log('[Auth] Signing out user due to authSignout=true parameter');
+    logger.log('Signing out user due to authSignout=true parameter');
 
     await omega.auth().signOut();
 
@@ -25,7 +28,7 @@ export async function handleAuthSignout() {
     url.searchParams.delete('authSignout');
     window.history.replaceState({}, document.title, url.toString());
   } catch (error) {
-    console.error('[Auth] Error signing out:', error);
+    logger.error('Error signing out:', error);
   }
 }
 
@@ -42,7 +45,7 @@ export async function handleCustomTokenSignin() {
   }
 
   try {
-    console.log('[Auth] Signing in with custom token');
+    logger.log('Signing in with custom token');
 
     // This handler owns the post-signin navigation. Without the flag, the
     // core/auth.js listener races us on the same state-change and can win
@@ -55,7 +58,7 @@ export async function handleCustomTokenSignin() {
     const auth = getAuth();
 
     const userCredential = await signInWithCustomToken(auth, customToken);
-    console.log('[Auth] Custom token sign-in successful:', userCredential.user.email || userCredential.user.uid);
+    logger.log('Custom token sign-in successful:', userCredential.user.email || userCredential.user.uid);
 
     trackLogin('custom-token', userCredential.user);
 
@@ -71,7 +74,7 @@ export async function handleCustomTokenSignin() {
     window.__UJM_CUSTOM_TOKEN_SIGNIN = false;
 
     omega.sentry().captureException(new Error('Custom token sign-in error', { cause: error }));
-    console.error('[Auth] Custom token sign-in failed:', error);
+    logger.error('Custom token sign-in failed:', error);
 
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('authCustomToken');
@@ -95,7 +98,7 @@ export function updateAuthReturnUrl() {
 
   // Quit if no authReturnUrl is provided
   if (!authReturnUrl) {
-    console.warn('[Auth] No authReturnUrl provided in URL parameters.');
+    logger.warn('No authReturnUrl provided in URL parameters.');
     return;
   }
 
@@ -130,7 +133,7 @@ export function checkSubdomainAuth() {
   const isSubdomain = parts.length >= 3 && !hostname.includes('localhost') && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname);
 
   // Log relevant info
-  console.log('[Auth] checkSubdomainAuth - hostname:', hostname, 'parts:', parts, 'isSubdomain:', isSubdomain, 'allowSubdomainAuth:', allowSubdomainAuth);
+  logger.log('checkSubdomainAuth - hostname:', hostname, 'parts:', parts, 'isSubdomain:', isSubdomain, 'allowSubdomainAuth:', allowSubdomainAuth);
 
   // If subdomain auth is allowed, no need to redirect regardless of current domain
   if (allowSubdomainAuth) {
@@ -148,7 +151,7 @@ export function checkSubdomainAuth() {
   currentUrl.hostname = apexDomain;
 
   // Log
-  console.log('[Auth] Redirecting to apex domain for authentication:', currentUrl.href);
+  logger.log('Redirecting to apex domain for authentication:', currentUrl.href);
 
   // Perform the redirect
   window.location.href = currentUrl.href;

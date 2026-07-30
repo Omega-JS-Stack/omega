@@ -8,14 +8,18 @@
 //   session-params.js  ?authSignout / ?authCustomToken / authReturnUrl / subdomain policy
 //   errors.js          Firebase error translation (pure)
 //   tracking.js        GA4/FB/TikTok auth events
-//   password-toggle.js the eye
+//
+// The password eye is NOT wired here any more: it is a click trigger on the
+// shared registry (#16), registered once by the global module.
 
 // Libraries
 import omega from '@omega.js/client';
 import { initializeSigninForm, initializeSignupForm, initializeResetForm } from '__main_assets__/js/libs/auth/forms.js';
 import { handleRedirectResult } from '__main_assets__/js/libs/auth/oauth.js';
 import { handleAuthSignout, handleCustomTokenSignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
-import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggle.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth:pages');
 
 // Module
 export default function () {
@@ -30,14 +34,10 @@ export default function () {
   omega.dom().ready()
   .then(async () => {
     // Log
-    console.log('[Auth] Initialized. useAuthPopup:', ctx.useAuthPopup);
+    logger.log('Initialized. useAuthPopup:', ctx.useAuthPopup);
 
     // Check for authSignout parameter first
     await handleAuthSignout();
-
-    // Pure-UI wiring FIRST: the eye toggle must work even when a later step
-    // early-returns (custom token, OAuth redirect, subdomain bounce)
-    setupPasswordToggle();
 
     // Check for authCustomToken parameter (admin impersonation / custom token sign-in)
     const customTokenHandled = await handleCustomTokenSignin();
@@ -63,7 +63,7 @@ export default function () {
     const hasRedirectResult = await handleRedirectResult(ctx);
 
     // Log
-    console.log('[Auth] hasRedirectResult:', hasRedirectResult);
+    logger.log('hasRedirectResult:', hasRedirectResult);
 
     // If redirect result was found, don't enable the form - user will be redirected
     if (hasRedirectResult) {
@@ -90,7 +90,7 @@ export default function () {
     const pagePath = (document.documentElement.getAttribute('data-page-path') || '').replace(/\/+$/, '');
 
     if (!pagePath) {
-      console.warn('[Auth] No data-page-path attribute found on HTML element');
+      logger.warn('No data-page-path attribute found on HTML element');
       return;
     }
 
@@ -101,7 +101,7 @@ export default function () {
     } else if (pagePath.endsWith('/reset')) {
       initializeResetForm(ctx);
     } else {
-      console.warn(`[Auth] Unrecognized auth page path: ${pagePath}`);
+      logger.warn(`Unrecognized auth page path: ${pagePath}`);
     }
   }
 }

@@ -5,6 +5,9 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('account:billing');
 
 let paymentConfig = null;
 let cancelFormManager = null;
@@ -237,7 +240,7 @@ function setupCancellationForm() {
     const resolvedBeforeCancel = omega.auth().resolveSubscription(currentAccount);
     const isTrialCancel = resolvedBeforeCancel.trialing;
 
-    console.log('[Billing] Cancelling:', { plan: resolvedBeforeCancel.plan, isTrialCancel });
+    logger.log('Cancelling:', { plan: resolvedBeforeCancel.plan, isTrialCancel });
 
     trackBilling('cancel_submit');
 
@@ -255,7 +258,7 @@ function setupCancellationForm() {
       throw new Error(response.message || 'Failed to cancel subscription. Please try again.');
     }
 
-    console.log('[Billing] Cancel complete:', { isTrialCancel, productId: currentAccount?.subscription?.product?.id });
+    logger.log('Cancel complete:', { isTrialCancel, productId: currentAccount?.subscription?.product?.id });
 
     if (isTrialCancel) {
       cancelFormManager.showSuccess('Your trial has been cancelled. You\'ve been moved to the free plan. You can subscribe again anytime.');
@@ -299,7 +302,7 @@ function setupCancellationForm() {
         };
       }
 
-      console.log('[Billing] UI update after cancel:', { status: currentSub.status, productId: currentSub.product?.id, cancellationPending: currentSub.cancellation?.pending });
+      logger.log('UI update after cancel:', { status: currentSub.status, productId: currentSub.product?.id, cancellationPending: currentSub.cancellation?.pending });
 
       updateUI(currentAccount);
     }

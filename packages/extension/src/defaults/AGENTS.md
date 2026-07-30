@@ -82,7 +82,7 @@ After `initialize()`, every Manager exposes:
 - `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
 - `manager.isDevelopment()` / `isProduction()` / `isTesting()` / `getVersion()` — cross-context helpers. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive; testing wins). Gate side effects on the intentional check (`isProduction()` for prod-only; `isDevelopment() || isTesting()` for local-or-test) — never `!isDevelopment()`.
 
-Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth-account-btn` to buttons; the framework wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user"`.
+Auth UI is declarative — add `.omega-signin` / `.omega-signout` to buttons; the framework wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user"`.
 
 ## Dependency resolution
 

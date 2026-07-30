@@ -1,3 +1,7 @@
+import { createLogger } from './logger.js';
+
+const logger = createLogger('bindings');
+
 class Bindings {
   constructor(manager) {
     this.manager = manager;
@@ -37,7 +41,7 @@ class Bindings {
 
     /* @dev-only:start */
     {
-      console.log('[Bindings] Updating bindings', context, updatedKeys);
+      logger.log('Updating bindings', context, updatedKeys);
     }
     /* @dev-only:end */
 
@@ -154,7 +158,7 @@ class Bindings {
           const URL_ATTRS = ['href', 'src', 'action', 'formaction'];
           if (URL_ATTRS.includes(attrName.toLowerCase())
             && /^\s*javascript\s*:/i.test(String(attrValue))) {
-            console.warn(`[Bindings] Blocked javascript: URL in @attr ${attrName}`);
+            logger.warn(`Blocked javascript: URL in @attr ${attrName}`);
             return true;
           }
 

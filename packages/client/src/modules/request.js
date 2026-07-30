@@ -15,6 +15,11 @@
  *   onProperties(props)  -> optional; called with the parsed omega-properties object
  */
 
+import { createLogger } from './logger.js';
+
+const logger = createLogger('request');
+
+
 const PROPERTIES_HEADER = 'omega-properties';
 
 // Delay between retry attempts (options.tries)
@@ -40,7 +45,7 @@ function createRequest(deps) {
       if (idToken) {
         headers['Authorization'] = `Bearer ${idToken}`;
       } else {
-        console.warn('[Request] No authenticated user — sending without Authorization. Did auth settle yet?');
+        logger.warn('No authenticated user — sending without Authorization. Did auth settle yet?');
       }
     }
 
@@ -146,7 +151,7 @@ function parseProperties(raw) {
   try {
     return JSON.parse(raw);
   } catch (e) {
-    console.warn('[Request] Failed to parse omega-properties header:', e.message);
+    logger.warn('Failed to parse omega-properties header:', e.message);
     return null;
   }
 }

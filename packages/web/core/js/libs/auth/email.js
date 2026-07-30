@@ -4,6 +4,9 @@
 // Libraries
 import { extractBlockingFunctionMessage, isPasswordError, passwordErrorMessage } from '__main_assets__/js/libs/auth/errors.js';
 import { trackLogin, trackSignup, trackPasswordReset } from '__main_assets__/js/libs/auth/tracking.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('auth:email');
 
 async function attemptEmailSignIn(email, password) {
   const { getAuth, signInWithEmailAndPassword } = await import('@firebase/auth');
@@ -17,7 +20,7 @@ export async function handleEmailSignin(ctx, formData) {
   const email = formData.email?.trim() || '';
   const password = formData.password || '';
 
-  console.log('[Auth] Attempting email sign-in for:', email);
+  logger.log('Attempting email sign-in for:', email);
 
   try {
     const userCredential = await attemptEmailSignIn(email, password);
@@ -77,7 +80,7 @@ export async function handleEmailSignup(ctx, formData) {
     if (error.code === 'auth/email-already-in-use') {
       // Try to sign in with the same credentials
       try {
-        console.log('[Auth] Email already in use, attempting to sign in instead:', email);
+        logger.log('Email already in use, attempting to sign in instead:', email);
 
         const userCredential = await attemptEmailSignIn(email, password);
 

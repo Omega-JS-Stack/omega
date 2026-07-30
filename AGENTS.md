@@ -82,6 +82,7 @@ Single config format everywhere: shared sections (brand, firebaseConfig, analyti
 - [updates.md](docs/shared/updates.md) — the `omega update` dependency-update contract
 - [publishing.md](docs/shared/publishing.md) — the publish proving-checkpoint runbook (gated, not yet run)
 - [icons.md](docs/shared/icons.md) — the one Font Awesome mechanism on every surface
+- [logging.md](docs/shared/logging.md) — the one log-tag contract (`[@omega.js/<package>:<module>]`) and its guard
 - [theming.md](docs/shared/theming.md) — the `--omega-*` design-system contract, shell chrome, motion
 - [translation.md](docs/shared/translation.md) — the AI translation engine + config-driven cache
 - [agent-docs.md](docs/shared/agent-docs.md) — the agent-docs chain: thin pointers here, the brand chain in consumers

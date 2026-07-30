@@ -26,6 +26,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const { createRequire } = require('module');
 const { safeInstall } = require('./safe-install');
+const Logger = require('./logger');
 
 // Constants
 const SCOPE = '@omega.js/';
@@ -491,12 +492,16 @@ function startMonorepoWatch(options) {
   }
 
   const child = spawn('npm', ['start'], { cwd: monorepoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  // Forwarded child output keeps its OWN identity — these lines come from the
+  // monorepo watch, not from whatever command spawned it, so they stamp
+  // `[@omega.js/<host>:watch]` instead of borrowing the caller's logger (#12).
+  const watchLogger = new Logger('watch');
   const forward = (stream) => {
     stream.setEncoding('utf8');
     stream.on('data', (chunk) => {
       for (const line of chunk.split('\n')) {
         if (line.trim()) {
-          logger ? logger.log(`[watch] ${line}`) : console.log(`[watch] ${line}`);
+          watchLogger.log(line);
         }
       }
     });

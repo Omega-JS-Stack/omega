@@ -11,6 +11,12 @@ import Sentry from './modules/sentry.js';
 import Device from './modules/device.js';
 import Verts from './modules/verts.js';
 import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
+import { createLogger } from './modules/logger.js';
+
+const firebaseLogger = createLogger('firebase');
+const analyticsLogger = createLogger('analytics');
+const chatsyLogger = createLogger('chatsy');
+const versionLogger = createLogger('version');
 
 // Classic dev ports (N7) — the browser-side fallbacks when no resolved map is
 // provided. Lockstep with @omega.js/config's CLASSIC_PORTS: browser code can't
@@ -139,7 +145,7 @@ class Manager {
       if (this._resolveFirebaseConfig()?.apiKey) {
         await this._initializeFirebase();
       } else {
-        console.log('[Firebase] Skipped: config has no apiKey (Firebase-less site or empty framework merge blob)');
+        firebaseLogger.log('Skipped: config has no apiKey (Firebase-less site or empty framework merge blob)');
       }
 
       // Initialize Sentry if enabled
@@ -158,7 +164,7 @@ class Manager {
           projectId: this._resolveFirebaseConfig()?.projectId || this.config.brand?.id || null,
         });
       } else {
-        console.log('[Analytics] Skipped: missing analytics.providers.google id or secret');
+        analyticsLogger.log('Skipped: missing analytics.providers.google id or secret');
       }
 
       // Initialize service worker if enabled — dev included (push/caching are
@@ -513,12 +519,12 @@ class Manager {
     // page content in automated flows.
     if (this.isDevelopment()) {
       const ports = this._devPorts();
-      console.log(`[Firebase] Connecting to emulators (auth :${ports.auth}, firestore :${ports.firestore})`);
+      firebaseLogger.log(`Connecting to emulators (auth :${ports.auth}, firestore :${ports.firestore})`);
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
       connectAuthEmulator(this._firebaseAuth, `http://localhost:${ports.auth}`, { disableWarnings: true });
       connectFirestoreEmulator(this._firebaseFirestore, 'localhost', ports.firestore);
-      console.log('[Firebase] Emulators connected');
+      firebaseLogger.log('Emulators connected');
     }
 
     // Only initialize messaging if service workers AND push are supported —
@@ -676,9 +682,9 @@ class Manager {
         settings: config.settings,
       });
 
-      console.log('[Chatsy] Initialized');
+      chatsyLogger.log('Initialized');
     } catch (error) {
-      console.error('[Chatsy] Failed to initialize:', error);
+      chatsyLogger.error('Failed to initialize:', error);
     }
   }
 
@@ -732,7 +738,7 @@ class Manager {
     if (this.isDevelopment()) {
       /* @dev-only:start */
       {
-        console.log('[Version] Skipping version check in development mode');
+        versionLogger.log('Skipping version check in development mode');
       }
       /* @dev-only:end */
       return;
@@ -776,7 +782,7 @@ class Manager {
       buildTimeCurrent.setHours(buildTimeCurrent.getHours() + 1);
 
       // Log version info
-      console.log(`[Version] Current build time: ${buildTimeCurrent.toISOString()}, Live build time: ${buildTimeLive.toISOString()}`);
+      versionLogger.log(`Current build time: ${buildTimeCurrent.toISOString()}, Live build time: ${buildTimeLive.toISOString()}`);
 
       // If live version is newer, reload the page
       if (buildTimeCurrent >= buildTimeLive) {
@@ -784,11 +790,11 @@ class Manager {
       }
 
       // New version detected
-      console.log('[Version] New version detected, reloading page...');
+      versionLogger.log('New version detected, reloading page...');
 
       // If running in a non-browser environment, warn and return
       if (typeof window === 'undefined') {
-        console.warn('[Version] Cannot reload in non-browser environment');
+        versionLogger.warn('Cannot reload in non-browser environment');
         return;
       }
 
@@ -799,7 +805,7 @@ class Manager {
 
       window.location.reload(true);
     } catch (error) {
-      console.warn('[Version] Failed version check:', error);
+      versionLogger.warn('Failed version check:', error);
     }
   }
 }

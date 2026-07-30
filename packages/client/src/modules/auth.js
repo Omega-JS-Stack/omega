@@ -4,6 +4,7 @@
 // $uuid/$randomId/$apiKey fields resolve to null (real values always come from
 // the backend-written doc).
 import { resolveAccount, resolveSubscription } from '@omega.js/account';
+import { registerTrigger } from './triggers.js';
 
 class Auth {
   constructor(manager) {
@@ -289,37 +290,28 @@ class Auth {
     }
   }
 
-  // Set up DOM event listeners for auth buttons
+  // Register the GENERIC auth triggers on the shared click-trigger registry
+  // (#16). `omega-signout` is the one cross-surface trigger — web, desktop and
+  // extension all get it from here; surface-specific ones (the extension's
+  // `omega-signin`) are registered by that surface.
   setupEventListeners() {
-    // Only set up once DOM is ready
-    if (typeof document === 'undefined') return;
-
-    // Set up sign out button listeners using event delegation
-    document.addEventListener('click', async (event) => {
-      // Use closest to handle clicks on child elements
-      const signOutBtn = event.target.closest('.auth-signout-btn');
-
-      if (signOutBtn) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        try {
-          // Show confirmation
-          if (!confirm('Are you sure you want to sign out?')) {
-            return;
-          }
-
-          // Sign out
-          await this.signOut();
-
-          // Show success notification
-          this.manager.utilities().showNotification('Successfully signed out.', 'success');
-
-        } catch (error) {
-          console.error('Sign out error:', error);
-          // Show error notification if utilities are available
-          this.manager.utilities().showNotification('Failed to sign out. Please try again.', 'danger');
+    registerTrigger('signout', async () => {
+      try {
+        // Show confirmation
+        if (!confirm('Are you sure you want to sign out?')) {
+          return;
         }
+
+        // Sign out
+        await this.signOut();
+
+        // Show success notification
+        this.manager.utilities().showNotification('Successfully signed out.', 'success');
+
+      } catch (error) {
+        console.error('Sign out error:', error);
+        // Show error notification if utilities are available
+        this.manager.utilities().showNotification('Failed to sign out. Please try again.', 'danger');
       }
     });
   }

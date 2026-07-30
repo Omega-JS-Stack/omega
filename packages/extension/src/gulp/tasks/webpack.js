@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('webpack');
+const watcherLogger = Manager.logger('webpack:watcher');
 const { watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const path = require('path');
@@ -361,18 +362,18 @@ function webpack(complete) {
 function webpackWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(watchInput, { delay: delay, dot: true }, webpack)
   .on('change', (path) => {
     // Log
-    logger.log(`[watcher] File changed (${path})`);
+    watcherLogger.log(`File changed (${path})`);
   });
 
   // Complete

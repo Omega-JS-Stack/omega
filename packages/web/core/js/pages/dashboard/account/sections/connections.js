@@ -5,6 +5,9 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('account:connections');
 
 let oauth2Config = null;
 let accountData = null;
@@ -94,7 +97,7 @@ function displayConnections() {
 
     // Provider is enabled in API but has no HTML element — create a warning card
     hasEnabledProviders = true;
-    console.warn(`[Connections] Provider "${providerId}" is enabled in brand config but missing from the account page template. Add it to the connections frontmatter list.`);
+    logger.warn(`Provider "${providerId}" is enabled in brand config but missing from the account page template. Add it to the connections frontmatter list.`);
 
     const warningId = `connection-${providerId}-unconfigured`;
     if (document.getElementById(warningId)) {

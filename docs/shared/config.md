@@ -275,6 +275,31 @@ create standalone) and `gcp.billingAccount` (pick/create a billing account or st
 on Spark) — GCP-level resources live under `gcp`, not `firebase`. `firebase.supportEmail`'s
 null auto-derives the authorizing user's email instead of asking.
 
+## The site global: curated targets + derived page maps (#85)
+
+`toSiteGlobal()` (the web build's `site.*`) strips the raw `targets` machinery and
+replaces it with a CURATED `site.targets` — an allow-list of display-safe facts per
+declared target, never a spread of the raw config: every entry carries `enabled: true`,
+desktop adds a derived `releasesUrl`, extension adds its store `listings`.
+
+- **Desktop releases URL**: `https://github.com/<github.org>/<repo>/releases/latest`,
+  where repo is `targets.desktop.releases.repo` (where built artifacts live) →
+  `github.repo` → `brand.id`. No `github.org` → no URL.
+- **Extension listings**: `targets.extension.listings.<store>.{url,state}` for the six
+  stores the theme renders (chrome, firefox, edge, opera, safari, brave) —
+  schema-declared; url must be http(s). Entries with neither url nor state stay absent.
+- **Idempotent by contract**: the web build applies `toSiteGlobal` twice (loadSiteData,
+  then configureOmega) — a curated `releasesUrl` survives the second pass unchanged.
+- **Array-form (multi-instance) targets derive nothing** — presence only: which
+  instance's facts belong on the site is ambiguous, so instance-form brands supply
+  explicit page maps.
+
+The download and extension pages populate from these with no hand-supplied links:
+when the config has no explicit `download`/`extension` page map, `site.download`
+derives from the desktop target (every desktop platform → the releases URL, the exact
+shape brands used to hand-write) and `site.extension[browser]` derives from the
+listings' urls. An explicit map in config always wins over the derivation.
+
 ## Consumer access
 
 Each framework exposes the vendored loader — desktop: `require('@omega.js/desktop/config')`,

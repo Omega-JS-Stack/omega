@@ -348,7 +348,7 @@ On page load, Firebase Auth takes time to restore the user session. The auth set
 ```
 
 **HTML Auth Classes**:
-- `.auth-signout-btn` - Sign out button (shows confirmation dialog)
+- `.omega-signout` - Sign out button (shows confirmation dialog)
 
 **Resolve Subscription State**:
 

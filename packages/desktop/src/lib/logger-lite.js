@@ -1,4 +1,7 @@
-// Runtime-side logger.
+// Runtime-side logger. Prints the ONE identity tag, `[@omega.js/desktop:<name>]`,
+// with NO timestamp on the console — devtools stamps renderer lines and the file
+// transport carries its own timestamp
+// ([#12](https://github.com/Omega-JS-Stack/omega/issues/12)).
 //
 // Same per-name `new LoggerLite('foo')` API the rest of @omega.js/desktop has always used. Adds a
 // file transport when running inside Electron (main process) so consumers can read
@@ -17,6 +20,9 @@
 //
 // Outside Electron entirely (e.g. when build/CLI code requires this module — should
 // be rare; build/CLI use `lib/logger.js` instead) it falls back to console-only.
+
+// The package segment of the identity tag — this file IS @omega.js/desktop.
+const PACKAGE = '@omega.js/desktop';
 
 // Channel used by renderer/preload to forward log calls to main. Public for the
 // preload contextBridge to attach to.
@@ -198,14 +204,9 @@ function Logger(name) {
   Logger.prototype[method] = function () {
     const self = this;
 
-    // 1. Always write to console (dev visibility, parity with previous behavior).
-    const time = new Date().toLocaleTimeString('en-US', {
-      hour12: false,
-      hour:   '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    const consoleArgs = [`[${time}] ${self.name}:`, ...Array.from(arguments)];
+    // 1. Always write to console (dev visibility). The ONE identity tag, no
+    //    timestamp — devtools/electron-log stamp runtime lines themselves (#12).
+    const consoleArgs = [`[${PACKAGE}:${self.name}]`, ...Array.from(arguments)];
     if (typeof console[method] === 'function') {
       console[method].apply(console, consoleArgs);
     } else {

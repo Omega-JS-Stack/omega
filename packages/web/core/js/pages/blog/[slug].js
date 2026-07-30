@@ -1,5 +1,8 @@
 // Libraries
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('blog-post');
 
 // Module
 export default () => {
@@ -47,13 +50,13 @@ function insertBlogPostAds() {
   // Find the article content
   const $article = document.querySelector('article .blog-post-content');
   if (!$article) {
-    console.log('[Blog Post] No article element found');
+    logger.log('No article element found');
     return;
   }
 
   // Advertising is key-presence enabled — no config, no hosts inserted
   if (!omega.config?.advertising) {
-    console.log('[Blog Post] No advertising config — skipping vert insertion');
+    logger.log('No advertising config — skipping vert insertion');
     return;
   }
 
@@ -61,7 +64,7 @@ function insertBlogPostAds() {
   const $paragraphs = Array.from($article.querySelectorAll('p'))
     .filter(p => !p.closest('blockquote, details, figure'));
   if ($paragraphs.length < 3) {
-    console.log('[Blog Post] Not enough paragraphs for vert insertion');
+    logger.log('Not enough paragraphs for vert insertion');
     return;
   }
 
@@ -99,12 +102,12 @@ function insertBlogPostAds() {
   }
 
   if (positions.length === 0) {
-    console.log('[Blog Post] No valid positions for vert insertion');
+    logger.log('No valid positions for vert insertion');
     return;
   }
 
   // Log vert insertion
-  console.log('[Blog Post] Inserting', positions.length, 'verts');
+  logger.log('Inserting', positions.length, 'verts');
 
   // Insert a modern vert host at each position — the shared client verts module
   // owns the whole lifecycle (lazy arming, AdSense → house fallback ladder,

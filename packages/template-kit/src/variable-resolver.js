@@ -11,8 +11,8 @@
  * Resolve a variable or string literal.
  * @param {function} lookup - (dotPath) => value from the render context
  * @param {string} input - raw tag argument
- * @param {boolean} [preferLiteral=false] - unquoted strings are literals unless
- *   they contain dots or exist in context (Ruby parity)
+ * @param {boolean} [preferLiteral=false] - unquoted words stay literal text
+ *   unless they are typed literals, contain dots, or exist in context
  * @returns {*}
  */
 function resolveInput(lookup, input, preferLiteral = false) {
@@ -22,6 +22,11 @@ function resolveInput(lookup, input, preferLiteral = false) {
   if (quoted) return quoted[1];
 
   if (preferLiteral) {
+    // A typed literal is typed in this lane too — max_width=640 is the number
+    // 640 and webp=false the boolean, matching the plain lane below. Quoting
+    // is the author's opt-out.
+    const typed = parseLiteral(input);
+    if (typed) return typed.value;
     if (input.includes('.') || isTruthyLookup(lookup(input))) {
       return resolveVariable(lookup, input);
     }
@@ -29,6 +34,22 @@ function resolveInput(lookup, input, preferLiteral = false) {
   }
 
   return resolveVariable(lookup, input);
+}
+
+/**
+ * Read a bare typed literal (number, boolean, nil).
+ * @param {string} input
+ * @returns {{value: *}|null} null when the input is not a typed literal
+ */
+function parseLiteral(input) {
+  const trimmed = String(input).trim();
+
+  if (trimmed === 'nil' || trimmed === 'null') return { value: null };
+  if (trimmed === 'true') return { value: true };
+  if (trimmed === 'false') return { value: false };
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return { value: Number(trimmed) };
+
+  return null;
 }
 
 // Ruby's `context[input]` guard is plain truthiness
@@ -45,15 +66,11 @@ function isTruthyLookup(value) {
 function resolveVariable(lookup, variableName) {
   if (!variableName) return null;
 
-  // Bare literals evaluate to their values before any scope lookup — Ruby
-  // parity: Jekyll's context[...] evaluates Liquid expressions, so ported
-  // templates rely on max_width=640 / webp=false meaning the literal, not
-  // an (always-missing) scope path.
-  const trimmed = String(variableName).trim();
-  if (trimmed === 'nil' || trimmed === 'null') return null;
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+  // Bare literals evaluate to their values before any scope lookup — a
+  // template writes max_width=640 / webp=false meaning the literal, not an
+  // (always-missing) scope path.
+  const literal = parseLiteral(variableName);
+  if (literal) return literal.value;
 
   const value = lookup(variableName);
   return value === undefined ? null : value;
@@ -109,10 +126,11 @@ function parseOptions(args, lookup) {
 
     if (lookup) {
       // The ONE option parser (the image-tag lane in collections.js imports
-      // it too), on Ruby's preferLiteral rule: bare words keep their literal
-      // text unless they exist in context (class=hero works), while dotted
-      // paths resolve — and a missing path yields null so a typo'd variable
-      // never renders its own name into the page.
+      // it too), on the preferLiteral rule: typed literals resolve typed
+      // (max_width=640 is the number), bare words keep their literal text
+      // unless they exist in context (class=hero works), dotted paths
+      // resolve — and a missing path yields null so a typo'd variable never
+      // renders its own name into the page.
       value = resolveInput(lookup, value, true);
     } else {
       value = stripQuotes(value);

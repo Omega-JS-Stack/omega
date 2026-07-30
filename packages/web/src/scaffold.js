@@ -60,7 +60,7 @@ function scaffoldDefaults(options) {
     // Say which mode applied ([#95](https://github.com/Omega-JS-Stack/omega/issues/95)):
     // the branch below rewrites what setup scaffolds, and a silent branch made
     // a missing config template and a missing AGENTS.md read as a bug.
-    logger.log('[setup] brand monorepo detected — targets-only config seed; the agent docs live at the brand root');
+    logger.log('brand monorepo detected — targets-only config seed; the agent docs live at the brand root');
     if (!resolveConfigPath(options.outputDir)) {
       jetpack.write(path.join(options.outputDir, 'config', 'omega.json5'), renderBrandAppSeed('web'));
     }
@@ -72,7 +72,7 @@ function scaffoldDefaults(options) {
     fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
   } else {
-    logger.log('[setup] standalone app — full config template scaffolded; the per-app agent docs land here');
+    logger.log('standalone app — full config template scaffolded; the per-app agent docs land here');
   }
 
   return applyDefaults({

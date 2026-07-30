@@ -15,6 +15,9 @@
 
 const path = require('path');
 const fs   = require('fs');
+const Logger = require('../lib/logger');
+
+const logger = new Logger('notarize');
 
 module.exports = async function notarize(context) {
   const { electronPlatformName, appOutDir } = context;
@@ -28,7 +31,7 @@ module.exports = async function notarize(context) {
   const appleApiIssuer = process.env.APPLE_API_ISSUER;
 
   if (!appleApiKey || !appleApiKeyId || !appleApiIssuer) {
-    console.warn('[notarize] Skipping — set APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER to notarize.');
+    logger.warn('Skipping — set APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER to notarize.');
     return;
   }
 
@@ -44,7 +47,7 @@ module.exports = async function notarize(context) {
   const appName = context.packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
 
-  console.log(`[notarize] Notarizing ${appName} via App Store Connect API key (${appleApiKeyId})...`);
+  logger.log(`Notarizing ${appName} via App Store Connect API key (${appleApiKeyId})...`);
   const start = Date.now();
 
   await notarize({
@@ -56,7 +59,7 @@ module.exports = async function notarize(context) {
   });
 
   const duration = Math.round((Date.now() - start) / 1000);
-  console.log(`[notarize] Done in ${duration}s.`);
+  logger.log(`Done in ${duration}s.`);
 
   // After @omega.js/desktop's real notarization, optionally invoke the consumer's hooks/notarize/post.js as
   // an extension point. The consumer hook can do post-notarize work (custom stapling,

@@ -257,7 +257,7 @@ Handles ALL 9 order event types in one template. Event from `data.content.event`
 
 #### `feedback`
 
-Rating faces (dislike/neutral/like/love) with gift card incentive. Four clickable face images linking to a feedback URL with a `rating` query param. Invisible placeholder labels on empty cells for vertical alignment. Used by the signup post-onboarding feedback email.
+Rating faces (dislike/neutral/like/love) with gift card incentive. Four clickable faces linking to a feedback URL with a `rating` query param — unicode glyphs, not hosted images, so the mail fetches nothing from a third-party CDN. Invisible placeholder labels on empty cells for vertical alignment. Used by the signup post-onboarding feedback email.
 
 ### Newsletter Templates
 

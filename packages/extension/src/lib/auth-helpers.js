@@ -7,13 +7,21 @@
 // - If out of sync, background provides a fresh custom token (fetched from server)
 // - No BXM-specific storage - Web Manager handles auth state internally
 
+import { registerTrigger } from '@omega.js/client/modules/triggers.js';
+import LoggerLite from './logger-lite.js';
+
+// The auth sub-modules of the identity tag — these lines are about auth, not
+// about whichever surface (popup/options/sidepanel/page) called in.
+const syncLogger = new LoggerLite('auth:sync');
+const broadcastLogger = new LoggerLite('auth:broadcast');
+
 /**
  * Sync auth state with background.js on context load
  * Waits for @omega.js/client auth to settle, then asks background if in sync
- * @param {Object} context - The manager instance (must have extension, omega, logger)
+ * @param {Object} context - The manager instance (must have extension, omega)
  */
 export async function syncWithBackground(context) {
-  const { extension, omega, logger } = context;
+  const { extension, omega } = context;
 
   try {
     // Wait for @omega.js/client auth state to settle FIRST (prevents race conditions)
@@ -22,7 +30,7 @@ export async function syncWithBackground(context) {
     });
 
     const localUid = localState.user?.uid || null;
-    logger.log('[AUTH-SYNC] Local auth state settled, UID:', localUid);
+    syncLogger.log('Local auth state settled, UID:', localUid);
 
     // Ask background for auth state comparison
     const response = await new Promise((resolve) => {
@@ -30,7 +38,7 @@ export async function syncWithBackground(context) {
         { command: 'omega:syncAuth', contextUid: localUid },
         (res) => {
           if (extension.runtime.lastError) {
-            logger.log('[AUTH-SYNC] Background not ready:', extension.runtime.lastError.message);
+            syncLogger.log('Background not ready:', extension.runtime.lastError.message);
             resolve({ needsSync: false });
             return;
           }
@@ -41,36 +49,36 @@ export async function syncWithBackground(context) {
 
     // Already in sync
     if (!response.needsSync) {
-      logger.log('[AUTH-SYNC] Already in sync with background');
+      syncLogger.log('Already in sync with background');
       return;
     }
 
     // Need to sign out (background is signed out, context is signed in)
     if (response.signOut) {
-      logger.log('[AUTH-SYNC] Background signed out, signing out context...');
+      syncLogger.log('Background signed out, signing out context...');
       await omega.auth().signOut();
       return;
     }
 
     // Need to sign in with token
     if (response.customToken) {
-      logger.log('[AUTH-SYNC] Syncing with background...', response.user?.email);
+      syncLogger.log('Syncing with background...', response.user?.email);
       await omega.auth().signInWithCustomToken(response.customToken);
-      logger.log('[AUTH-SYNC] Synced successfully');
+      syncLogger.log('Synced successfully');
     }
 
   } catch (error) {
-    logger.error('[AUTH-SYNC] Error syncing with background:', error.message);
+    syncLogger.error('Error syncing with background:', error.message);
   }
 }
 
 /**
  * Set up listener for auth token broadcasts from background.js
  * Handles both sign-in broadcasts and sign-out broadcasts
- * @param {Object} context - The manager instance (must have extension, omega, logger)
+ * @param {Object} context - The manager instance (must have extension, omega)
  */
 export function setupAuthBroadcastListener(context) {
-  const { omega, logger } = context;
+  const { omega } = context;
 
   // Listen for messages from service worker (background.js)
   navigator.serviceWorker?.addEventListener('message', async (event) => {
@@ -78,12 +86,12 @@ export function setupAuthBroadcastListener(context) {
 
     // Handle sign-in broadcast
     if (command === 'omega:signInWithToken' && token) {
-      logger.log('[AUTH-BROADCAST] Received sign-in broadcast');
+      broadcastLogger.log('Received sign-in broadcast');
       try {
         await omega.auth().signInWithCustomToken(token);
-        logger.log('[AUTH-BROADCAST] Signed in via broadcast');
+        broadcastLogger.log('Signed in via broadcast');
       } catch (error) {
-        logger.error('[AUTH-BROADCAST] Error signing in:', error.message);
+        broadcastLogger.error('Error signing in:', error.message);
       }
       return;
     }
@@ -92,28 +100,28 @@ export function setupAuthBroadcastListener(context) {
     if (command === 'omega:signOut') {
       // Skip if already signed out (prevents loops)
       if (!omega.auth().getUser()) {
-        logger.log('[AUTH-BROADCAST] Already signed out, ignoring broadcast');
+        broadcastLogger.log('Already signed out, ignoring broadcast');
         return;
       }
-      logger.log('[AUTH-BROADCAST] Received sign-out broadcast');
+      broadcastLogger.log('Received sign-out broadcast');
       try {
         await omega.auth().signOut();
-        logger.log('[AUTH-BROADCAST] Signed out via broadcast');
+        broadcastLogger.log('Signed out via broadcast');
       } catch (error) {
-        logger.error('[AUTH-BROADCAST] Error signing out:', error.message);
+        broadcastLogger.error('Error signing out:', error.message);
       }
     }
   });
 
-  logger.log('[AUTH-BROADCAST] Broadcast listener set up');
+  broadcastLogger.log('Broadcast listener set up');
 }
 
 /**
  * Set up listener to notify background when user signs out from this context
- * @param {Object} context - The manager instance (must have extension, omega, logger)
+ * @param {Object} context - The manager instance (must have extension, omega)
  */
 export function setupSignOutListener(context) {
-  const { extension, omega, logger } = context;
+  const { extension, omega } = context;
 
   // Track previous user to detect sign-out
   let previousUid = null;
@@ -123,14 +131,14 @@ export function setupSignOutListener(context) {
 
     // Detect sign-out (had user, now don't)
     if (previousUid && !currentUid) {
-      logger.log('[AUTH-SYNC] Detected sign-out, notifying background...');
+      syncLogger.log('Detected sign-out, notifying background...');
       extension.runtime.sendMessage({ command: 'omega:signOut' });
     }
 
     previousUid = currentUid;
   });
 
-  logger.log('[AUTH-SYNC] Sign-out listener set up');
+  syncLogger.log('Sign-out listener set up');
 }
 
 /**
@@ -180,31 +188,15 @@ export function openAuthPage(context, options = {}) {
 }
 
 /**
- * Set up DOM event listeners for auth buttons (sign in, account)
- * Uses event delegation so it works with dynamically rendered content
+ * Register the extension's own auth triggers on the shared click-trigger
+ * registry (#16). `omega-signin` is surface-specific — only an extension opens
+ * the website's /token page in a new tab — so the extension owns it here;
+ * `omega-signout` comes from @omega.js/client (setupSignOutListener detects the
+ * sign-out and notifies background).
  * @param {Object} context - The manager instance (must have extension, omega, logger)
  */
 export function setupAuthEventListeners(context) {
-  // Only set up once DOM is ready
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  // Sign in button (.auth-signin-btn) - opens auth page
-  document.addEventListener('click', (event) => {
-    const $signInBtn = event.target.closest('.auth-signin-btn');
-    if (!$signInBtn) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    openAuthPage(context);
-  });
-
-  // Note: .auth-signout-btn is handled by @omega.js/client's auth module
-  // setupSignOutListener detects sign-out and notifies background
+  registerTrigger('signin', () => openAuthPage(context));
 
   // Log
   context.logger.log('Auth event listeners set up');

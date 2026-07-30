@@ -2,11 +2,12 @@
  * variable-resolver.test.js — argument parsing + variable resolution, direct.
  *
  * register-liquid.test.js proves the resolver reaches real tag markup; this
- * suite pins the Ruby-parity rules the ported uj_* tags were written against:
- * bare literals evaluate before any scope lookup (max_width=640 is the number
- * 640, not a missing path), preferLiteral keeps bare words as text unless the
- * context has them, quote-aware splitting survives commas inside strings, and
- * an unresolvable path yields null so a typo never renders its own name.
+ * suite pins the rules the uj_* tags are written against: typed literals
+ * evaluate before any scope lookup, in BOTH lanes (max_width=640 is the number
+ * 640, not a missing path or its own text), preferLiteral keeps bare words as
+ * text unless the context has them, quote-aware splitting survives commas
+ * inside strings, and an unresolvable path yields null so a typo never renders
+ * its own name.
  */
 
 const test = require('node:test');
@@ -43,6 +44,17 @@ test('empty and absent input resolve to null', () => {
   assert.strictEqual(resolver.resolveInput(lookup, ''), null);
   assert.strictEqual(resolver.resolveInput(lookup, null), null);
   assert.strictEqual(resolver.resolveInput(lookup, undefined), null);
+});
+
+test('preferLiteral resolves typed literals typed', () => {
+  assert.strictEqual(resolver.resolveInput(lookup, '640', true), 640);
+  assert.strictEqual(resolver.resolveInput(lookup, '-12', true), -12);
+  assert.strictEqual(resolver.resolveInput(lookup, '1.5', true), 1.5);
+  assert.strictEqual(resolver.resolveInput(lookup, 'true', true), true);
+  assert.strictEqual(resolver.resolveInput(lookup, 'false', true), false);
+  assert.strictEqual(resolver.resolveInput(lookup, 'nil', true), null);
+  // A quoted number stays a string — the quotes are the author's opt-out.
+  assert.strictEqual(resolver.resolveInput(lookup, '"640"', true), '640');
 });
 
 test('preferLiteral keeps bare words as text unless the context has them', () => {
@@ -117,11 +129,11 @@ test('parseOptions with a lookup applies the preferLiteral rule per value', () =
   ], lookup);
 
   assert.deepStrictEqual(options, {
-    // preferLiteral short-circuits BEFORE resolveVariable's literal branch, so
-    // a dotless numeric/boolean word stays the raw STRING here (the branch that
-    // yields 640/false is the non-preferLiteral lane, pinned above).
-    width: '640',
-    webp: 'false',
+    // A typed literal resolves TYPED in this lane too — max_width=640 is the
+    // number 640, webp=false the boolean, exactly as the non-preferLiteral
+    // lane pinned above.
+    width: 640,
+    webp: false,
     // A bare word absent from context keeps its text — class=card works.
     class: 'card',
     // A bare word PRESENT in context resolves instead.

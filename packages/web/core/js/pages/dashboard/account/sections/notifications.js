@@ -12,6 +12,9 @@
  */
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('account:push');
 
 const FORM_ID = 'marketing-emails-form';
 const TOGGLE_ID = 'marketing-emails';
@@ -126,7 +129,7 @@ function updatePushUI() {
     if (pushFormManager) { pushFormManager.ready(); }
   }
 
-  console.log('[Account:push] updatePushUI →', state, { storedSubscribed: stored.subscribed, storedToken: stored.token?.slice(-8), permission });
+  logger.log('updatePushUI →', state, { storedSubscribed: stored.subscribed, storedToken: stored.token?.slice(-8), permission });
 }
 
 async function initPushNotifications() {
@@ -153,9 +156,9 @@ async function initPushNotifications() {
     });
 
     pushFormManager.on('submit', async () => {
-      console.log('[Account:push] Subscribe button clicked');
+      logger.log('Subscribe button clicked');
       await notifications.subscribe();
-      console.log('[Account:push] Subscribe complete — updating UI');
+      logger.log('Subscribe complete — updating UI');
       setTimeout(() => updatePushUI(), 0);
     });
   }

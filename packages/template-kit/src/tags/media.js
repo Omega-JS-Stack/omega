@@ -139,7 +139,7 @@ function aliasFor(aliasFile, iconName) {
 function defaultIconWithWarning(iconName, dirs) {
   if (iconName && dirs.length && !warnedIcons.has(iconName)) {
     warnedIcons.add(iconName);
-    console.warn(`[template-kit] uj_icon: no SVG found for "${iconName}" — rendering the default icon`);
+    console.warn(`[@omega.js/template-kit:media] uj_icon: no SVG found for "${iconName}" — rendering the default icon`);
   }
   return tagMissing(DEFAULT_ICON, iconName);
 }
@@ -207,7 +207,7 @@ function loadLogo(ctx, logoName, type, color) {
   if (!svg) {
     if (!warnedIcons.has(`logo:${logoName}`)) {
       warnedIcons.add(`logo:${logoName}`);
-      console.warn(`[template-kit] uj_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
+      console.warn(`[@omega.js/template-kit:media] uj_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
     }
     svg = tagMissing(DEFAULT_ICON, `logo:${logoName}`);
   }

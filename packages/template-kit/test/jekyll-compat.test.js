@@ -1,8 +1,8 @@
 /**
- * jekyll-compat.test.js — the Jekyll filter semantics, direct.
+ * jekyll-compat.test.js — the helper semantics, direct.
  *
- * register-liquid.test.js proves these reach LiquidJS under their Jekyll
- * names; this suite pins the SEMANTICS the ported templates depend on —
+ * register-liquid.test.js proves these reach LiquidJS under their familiar
+ * Jekyll-style names; this suite pins the SEMANTICS templates depend on —
  * UTC-pinned dates (CI builds run UTC, content dates are UTC midnights),
  * the baseurl/url join rules, and the where_exp/group_by_exp expression
  * subset, whose comparison table nothing else exercises.
@@ -35,6 +35,11 @@ test('dates render in UTC regardless of the builder timezone', () => {
 test('an unparseable date passes through untouched', () => {
   assert.strictEqual(compat.dateToXmlschema('not a date'), 'not a date');
   assert.strictEqual(compat.dateToRfc822('not a date'), 'not a date');
+
+  // An invalid Date OBJECT is unparseable too — never "NaN-NaN-NaN" in a page.
+  const invalid = new Date('not a date');
+  assert.strictEqual(compat.dateToXmlschema(invalid), invalid);
+  assert.strictEqual(compat.dateToRfc822(invalid), invalid);
 });
 
 test('jsonify encodes values, and an absent value emits null (Ruby nil.to_json parity)', () => {
@@ -132,22 +137,30 @@ test('group_by_exp buckets by the stringified expression value with sizes', () =
   assert.deepStrictEqual(groups[1].items.map((i) => i.title), ['b']);
 });
 
-test('group_by_exp on a BARE path buckets by truthiness, not by value', () => {
-  // Documented limitation of the simple-expression subset: a bare path is
-  // evaluated for TRUTHINESS (evalSimpleExpression's no-operator branch), so
-  // Jekyll's `group_by_exp: "item", "item.type"` — which buckets by the value
-  // — collapses to one 'true' group here. Comparison expressions are the
-  // supported form; pinned so a future widening of the subset is a deliberate,
-  // visible change rather than a silent one.
+test('group_by_exp on a BARE path buckets by VALUE, one group per distinct value', () => {
   const items = [
     { type: 'post', title: 'a' },
     { type: 'page', title: 'b' },
     { title: 'c' },
+    { type: 'post', title: 'd' },
   ];
 
   const groups = compat.groupByExp(items, 'item', 'item.type');
 
-  assert.deepStrictEqual(groups.map((g) => [g.name, g.size]), [['true', 2], ['false', 1]]);
+  // Groups appear in first-seen order; an absent value groups under '' so a
+  // rendered group name is never the text "undefined".
+  assert.deepStrictEqual(groups.map((g) => [g.name, g.size]), [['post', 2], ['page', 1], ['', 1]]);
+  assert.deepStrictEqual(groups[0].items.map((i) => i.title), ['a', 'd']);
+  assert.deepStrictEqual(groups[1].items.map((i) => i.title), ['b']);
+  assert.deepStrictEqual(groups[2].items.map((i) => i.title), ['c']);
+});
+
+test('group_by_exp keeps input order inside a group and buckets numbers by value', () => {
+  const items = [{ n: 2 }, { n: 1 }, { n: 2 }];
+
+  const groups = compat.groupByExp(items, 'item', 'item.n');
+
+  assert.deepStrictEqual(groups.map((g) => [g.name, g.size]), [['2', 2], ['1', 1]]);
 });
 
 test('COMPAT_NAMES maps the Jekyll filter names onto the implementations', () => {

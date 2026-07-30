@@ -12,6 +12,11 @@ import { getAuth, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator
 // Variables
 const serviceWorker = self;
 
+// Install-lane logger. MODULE level, not an instance property: the install
+// listener is registered by setupGlobalHandlers(), which runs bare at top
+// level before any Manager exists — `this` is undefined in there.
+const installLogger = new LoggerLite('install');
+
 // Cache warming is DISABLED (same call as the web SW — page speed wins,
 // nothing reads it): this cache is write-only — one caches.open, zero reads
 // anywhere in the extension, and no context even sends 'update-cache' today.
@@ -39,6 +44,7 @@ class Manager {
     // Properties
     this.extension = null;
     this.logger = null;
+    this.authLogger = null;
     this.serviceWorker = null;
 
     // Load config from build.js
@@ -66,6 +72,7 @@ class Manager {
     // Set properties
     this.extension = extension;
     this.logger = new LoggerLite('background');
+    this.authLogger = new LoggerLite('auth');
     this.serviceWorker = serviceWorker;
 
     // Parse config file
@@ -165,24 +172,24 @@ class Manager {
       const bgUser = auth.currentUser;
       const bgUid = bgUser?.uid || null;
 
-      this.logger.log('[AUTH] syncAuth: Comparing UIDs - context:', contextUid, 'background:', bgUid);
+      this.authLogger.log('syncAuth: Comparing UIDs - context:', contextUid, 'background:', bgUid);
 
       // Already in sync (both null, or same UID)
       if (contextUid === bgUid) {
-        this.logger.log('[AUTH] syncAuth: Already in sync');
+        this.authLogger.log('syncAuth: Already in sync');
         sendResponse({ needsSync: false });
         return;
       }
 
       // Context is signed in but background is not → context should sign out
       if (!bgUser && contextUid) {
-        this.logger.log('[AUTH] syncAuth: Background signed out, telling context to sign out');
+        this.authLogger.log('syncAuth: Background signed out, telling context to sign out');
         sendResponse({ needsSync: true, signOut: true });
         return;
       }
 
       // Background is signed in, context is not (or different user) → provide token
-      this.logger.log('[AUTH] syncAuth: Fetching fresh custom token for context...', bgUser.email);
+      this.authLogger.log('syncAuth: Fetching fresh custom token for context...', bgUser.email);
 
       // Fetch a fresh custom token from the /user/token route via the shared
       // request layer (uid defaults server-side to the authenticated caller).
@@ -199,7 +206,7 @@ class Manager {
         throw new Error('No token in server response');
       }
 
-      this.logger.log('[AUTH] syncAuth: Got fresh custom token, sending to context');
+      this.authLogger.log('syncAuth: Got fresh custom token, sending to context');
 
       // Send user info and fresh custom token
       sendResponse({
@@ -215,7 +222,7 @@ class Manager {
       });
 
     } catch (error) {
-      this.logger.error('[AUTH] syncAuth error:', error.message);
+      this.authLogger.error('syncAuth error:', error.message);
       sendResponse({ needsSync: false, error: error.message });
     }
   }
@@ -224,7 +231,7 @@ class Manager {
   // Signs out background's Firebase and broadcasts to all other contexts
   async handleSignOut(sendResponse) {
     try {
-      this.logger.log('[AUTH] handleSignOut: Signing out background Firebase...');
+      this.authLogger.log('handleSignOut: Signing out background Firebase...');
 
       // Sign out background's Firebase
       if (this.libraries.firebaseAuth?.currentUser) {
@@ -234,10 +241,10 @@ class Manager {
       // Broadcast to all contexts
       await this.broadcastSignOut();
 
-      this.logger.log('[AUTH] handleSignOut: Complete');
+      this.authLogger.log('handleSignOut: Complete');
       sendResponse({ success: true });
     } catch (error) {
-      this.logger.error('[AUTH] handleSignOut error:', error.message);
+      this.authLogger.error('handleSignOut error:', error.message);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -247,15 +254,15 @@ class Manager {
     try {
       const clients = await self.clients.matchAll({ type: 'all' });
 
-      this.logger.log(`[AUTH] Broadcasting sign-out to ${clients.length} clients...`);
+      this.authLogger.log(`Broadcasting sign-out to ${clients.length} clients...`);
 
       for (const client of clients) {
         client.postMessage({ command: 'omega:signOut' });
       }
 
-      this.logger.log('[AUTH] Sign-out broadcast complete');
+      this.authLogger.log('Sign-out broadcast complete');
     } catch (error) {
-      this.logger.error('[AUTH] Error broadcasting sign-out:', error.message);
+      this.authLogger.error('Error broadcasting sign-out:', error.message);
     }
   }
 
@@ -318,9 +325,9 @@ class Manager {
   // Setup auth token listener (monitors tabs for auth tokens from website)
   setupAuthTokenListener() {
     // DEBUG: Log the full config to see what we have
-    console.log('[AUTH] setupAuthTokenListener called');
-    console.log('[AUTH] this.config:', this.config);
-    console.log('[AUTH] OMEGA_BUILD_JSON:', serviceWorker.OMEGA_BUILD_JSON);
+    this.authLogger.log('setupAuthTokenListener called');
+    this.authLogger.log('this.config:', this.config);
+    this.authLogger.log('OMEGA_BUILD_JSON:', serviceWorker.OMEGA_BUILD_JSON);
 
     // The sign-in round trip lands on the BRAND site (/token redirects with
     // ?authToken=…), so match the brand.url host — never authDomain, which
@@ -329,14 +336,14 @@ class Manager {
 
     // Skip if no brand url configured
     if (!brandUrl) {
-      this.logger.log('[AUTH] No brand.url configured, skipping auth token listener');
+      this.authLogger.log('No brand.url configured, skipping auth token listener');
       return;
     }
 
     const brandHost = new URL(brandUrl).hostname;
 
     // Log
-    this.logger.log(`[AUTH] Setting up auth token listener for domain: ${brandHost}`);
+    this.authLogger.log(`Setting up auth token listener for domain: ${brandHost}`);
 
     // Listen for tab URL changes
     this.extension.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -354,7 +361,7 @@ class Manager {
       }
 
       // Log every tab update for auth domain matching
-      this.logger.log(`[AUTH] Tab updated: ${tabUrl.hostname} (looking for: ${brandHost})`);
+      this.authLogger.log(`Tab updated: ${tabUrl.hostname} (looking for: ${brandHost})`);
 
       // Check if this is our brand site
       if (tabUrl.hostname !== brandHost) {
@@ -362,12 +369,12 @@ class Manager {
       }
 
       // Log - we found our domain
-      this.logger.log(`[AUTH] Auth domain matched! Checking for authToken param...`);
+      this.authLogger.log(`Auth domain matched! Checking for authToken param...`);
 
       // Check for authToken param
       const authToken = tabUrl.searchParams.get('authToken');
       if (!authToken) {
-        this.logger.log(`[AUTH] No authToken param found in URL: ${tabUrl.href}`);
+        this.authLogger.log(`No authToken param found in URL: ${tabUrl.href}`);
         return;
       }
 
@@ -375,7 +382,7 @@ class Manager {
       const authSourceTabId = tabUrl.searchParams.get('authSourceTabId');
 
       // Log
-      this.logger.log('[AUTH] Auth token detected in tab:', tabId);
+      this.authLogger.log('Auth token detected in tab:', tabId);
 
       // Handle the auth token
       this.handleAuthToken(authToken, tabId, authSourceTabId ? parseInt(authSourceTabId, 10) : null);
@@ -388,19 +395,19 @@ class Manager {
     // Get Firebase config
     const firebaseConfig = this.config?.cloud?.config;
     if (!firebaseConfig) {
-      this.logger.log('[AUTH] Firebase config not available, skipping auth initialization');
+      this.authLogger.log('Firebase config not available, skipping auth initialization');
       return;
     }
 
     // Initialize Firebase auth - it will auto-restore from IndexedDB if session exists
-    this.logger.log('[AUTH] Initializing Firebase Auth (will restore persisted session if any)...');
+    this.authLogger.log('Initializing Firebase Auth (will restore persisted session if any)...');
     const auth = this.getFirebaseAuth();
 
     // Check if already signed in (Firebase restored from IndexedDB)
     if (auth.currentUser) {
-      this.logger.log('[AUTH] Firebase restored session from persistence:', auth.currentUser.email);
+      this.authLogger.log('Firebase restored session from persistence:', auth.currentUser.email);
     } else {
-      this.logger.log('[AUTH] No persisted Firebase session found');
+      this.authLogger.log('No persisted Firebase session found');
     }
   }
 
@@ -432,7 +439,7 @@ class Manager {
     // move @omega.js/client makes for emulator runs. Only a build baked with
     // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
     if (this.isTesting()) {
-      this.logger.log(`[AUTH] Testing build — connecting auth to the emulator on :${AUTH_EMULATOR_PORT}`);
+      this.authLogger.log(`Testing build — connecting auth to the emulator on :${AUTH_EMULATOR_PORT}`);
       connectAuthEmulator(this.libraries.firebaseAuth, `http://localhost:${AUTH_EMULATOR_PORT}`, { disableWarnings: true });
     }
 
@@ -447,7 +454,7 @@ class Manager {
   // Handle Firebase auth state changes (source of truth for all contexts)
   // No storage operations - Web Manager handles auth state internally
   handleAuthStateChange(user) {
-    this.logger.log('[AUTH] Auth state changed:', user?.email || 'signed out');
+    this.authLogger.log('Auth state changed:', user?.email || 'signed out');
     // Nothing else to do - contexts sync via messages, @omega.js/client handles UI
   }
 
@@ -455,18 +462,18 @@ class Manager {
   async handleAuthToken(token, tabId, authSourceTabId = null) {
     try {
       // Log
-      this.logger.log('[AUTH] Processing auth token...');
+      this.authLogger.log('Processing auth token...');
 
       // Get or initialize Firebase auth
       const auth = this.getFirebaseAuth();
 
       // Sign in with custom token
-      this.logger.log('[AUTH] Calling signInWithCustomToken...');
+      this.authLogger.log('Calling signInWithCustomToken...');
       const userCredential = await signInWithCustomToken(auth, token);
       const user = userCredential.user;
 
       // Log
-      this.logger.log('[AUTH] Signed in successfully:', user.email);
+      this.authLogger.log('Signed in successfully:', user.email);
 
       // Broadcast token to all open extension contexts so they can sign in immediately
       // Token is NOT stored - it expires in 1 hour and is only needed for initial sign-in
@@ -477,21 +484,21 @@ class Manager {
 
       // Close the auth tab
       await this.extension.tabs.remove(tabId);
-      this.logger.log('[AUTH] Auth tab closed');
+      this.authLogger.log('Auth tab closed');
 
       // Reactivate the source tab if provided
       if (authSourceTabId) {
         try {
           await this.extension.tabs.update(authSourceTabId, { active: true });
-          this.logger.log('[AUTH] Restored source tab:', authSourceTabId);
+          this.authLogger.log('Restored source tab:', authSourceTabId);
         } catch (e) {
           // Tab may have been closed, ignore
-          this.logger.log('[AUTH] Could not restore source tab (may be closed):', authSourceTabId);
+          this.authLogger.log('Could not restore source tab (may be closed):', authSourceTabId);
         }
       }
 
     } catch (error) {
-      this.logger.error('[AUTH] Error handling auth token:', error);
+      this.authLogger.error('Error handling auth token:', error);
     }
   }
 
@@ -502,7 +509,7 @@ class Manager {
       // Get all clients (extension pages, popups, etc.)
       const clients = await self.clients.matchAll({ type: 'all' });
 
-      this.logger.log(`[AUTH] Broadcasting token to ${clients.length} clients...`);
+      this.authLogger.log(`Broadcasting token to ${clients.length} clients...`);
 
       // Send token to each client
       for (const client of clients) {
@@ -512,9 +519,9 @@ class Manager {
         });
       }
 
-      this.logger.log('[AUTH] Token broadcast complete');
+      this.authLogger.log('Token broadcast complete');
     } catch (error) {
-      this.logger.error('[AUTH] Error broadcasting token:', error.message);
+      this.authLogger.error('Error broadcasting token:', error.message);
     }
   }
 
@@ -627,13 +634,13 @@ function setupGlobalHandlers() {
 
     // Skip if no website configured
     if (!website) {
-      console.log('[INSTALL] No website configured, skipping install page');
+      installLogger.log('No website configured, skipping install page');
       return;
     }
 
     // Open the installed page
     const installedUrl = `${website}/extension/installed`;
-    console.log('[INSTALL] Opening install page:', installedUrl);
+    installLogger.log('Opening install page:', installedUrl);
 
     extension.tabs.create({ url: installedUrl });
   });

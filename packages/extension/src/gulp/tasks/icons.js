@@ -1,6 +1,7 @@
 // Libraries
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('icons');
+const watcherLogger = Manager.logger('icons:watcher');
 const { src, dest, watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const responsive = require('gulp-responsive-modern');
@@ -104,17 +105,17 @@ function icons(complete) {
 function iconsWatcher(complete) {
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    logger.log('[watcher] Skipping watcher in build mode');
+    watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
 
   // Log
-  logger.log('[watcher] Watching for changes...');
+  watcherLogger.log('Watching for changes...');
 
   // Watch for changes
   watch(input, { delay: delay, dot: true }, icons)
   .on('change', function(path) {
-    logger.log(`[watcher] File ${path} was changed`);
+    watcherLogger.log(`File ${path} was changed`);
   });
 
   // Complete

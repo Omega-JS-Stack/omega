@@ -25,7 +25,7 @@
     {
       label: 'Sign out',
       icon: 'arrow-right-from-bracket',
-      class: 'auth-signout-btn text-danger'
+      class: 'omega-signout text-danger'
     }
   ]
 }

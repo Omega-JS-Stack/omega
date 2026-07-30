@@ -22,7 +22,7 @@ module.exports = async function (options) {
   if (result.status === 'skipped') {
     logger.log(`Purge skipped — ${result.reason}`);
   } else if (result.status === 'planned') {
-    logger.log(`[dry-run] Would purge Cloudflare zone ${result.zoneName || result.zone} (purge_everything)`);
+    logger.log(`[DRY RUN] Would purge Cloudflare zone ${result.zoneName || result.zone} (purge_everything)`);
   } else {
     logger.log(`Cloudflare cache purged (zone ${result.zoneName || result.zone})`);
   }

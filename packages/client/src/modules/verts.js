@@ -31,6 +31,10 @@
  *   full URL  → used verbatim (trailing slashes stripped)
  */
 
+import { createLogger } from './logger.js';
+
+const logger = createLogger('verts');
+
 // Size presets (name → max-height in pixels) — the ONE px table (SSOT; the
 // section scss carries no copy, the module applies the constraint inline).
 const SIZE_PRESETS = {
@@ -356,7 +360,7 @@ class VertUnit {
       try {
         callback(detail);
       } catch (e) {
-        console.error(`[Verts] on${name} callback error:`, e);
+        logger.error(`on${name} callback error:`, e);
       }
     }
 
@@ -399,13 +403,13 @@ class Verts {
     if (configured === 'company') {
       const companyUrl = this.manager.config.company?.url;
       if (!companyUrl) {
-        console.warn('[Verts] inhouse source is "company" but config.company.url is not set');
+        logger.warn('inhouse source is "company" but config.company.url is not set');
         return null;
       }
       return this.manager.getApiUrl(null, companyUrl);
     }
 
-    console.warn('[Verts] Unsupported inhouse source:', configured);
+    logger.warn('Unsupported inhouse source:', configured);
     return null;
   }
 
@@ -505,7 +509,7 @@ class Verts {
 
     const format = ADSENSE_FORMATS[type];
     if (!format) {
-      console.warn('[Verts] Unsupported ad type:', type);
+      logger.warn('Unsupported ad type:', type);
       return this._fallback($el, options);
     }
 
@@ -517,7 +521,7 @@ class Verts {
     try {
       await this._loadAdSenseScript(adsense.client);
     } catch (e) {
-      console.warn('[Verts] AdSense script blocked/failed — fallback lane:', e?.message || e);
+      logger.warn('AdSense script blocked/failed — fallback lane:', e?.message || e);
       return this._fallback($el, options);
     }
 
@@ -595,7 +599,7 @@ class Verts {
       try {
         callback(detail);
       } catch (e) {
-        console.error(`[Verts] on${name} callback error:`, e);
+        logger.error(`on${name} callback error:`, e);
       }
     }
 

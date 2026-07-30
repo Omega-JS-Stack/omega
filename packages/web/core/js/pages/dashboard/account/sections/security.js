@@ -6,6 +6,9 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('account:security');
 
 let firebaseAuth = null;
 let signinMethodForms = new Map(); // Store FormManager instances for signin methods
@@ -28,7 +31,7 @@ export function loadData(account) {
     return;
   }
 
-  console.log('[DEBUG] security.js - loadData() called with account:', account);
+  logger.log('security.js - loadData() called with account:', account);
 
   // CRITICAL: Update signin methods BEFORE initializing FormManagers
   // This ensures FormManager stores the correct button state from the start
@@ -46,7 +49,7 @@ export function loadData(account) {
 
 // Initialize signin methods
 async function initializeSigninMethods() {
-  console.log('[DEBUG] security.js - initializeSigninMethods() called');
+  logger.log('security.js - initializeSigninMethods() called');
 
   // Get Firebase auth instance
   firebaseAuth = omega.firebaseAuth;
@@ -78,23 +81,23 @@ async function checkRedirectResult() {
 
 // Update signin methods display
 async function updateSigninMethods() {
-  console.log('[DEBUG] security.js - updateSigninMethods() called');
+  logger.log('security.js - updateSigninMethods() called');
 
   // Use Firebase auth directly for most up-to-date provider information
   const firebaseUser = firebaseAuth?.currentUser;
   if (!firebaseUser) {
-    console.log('[DEBUG] security.js - No firebaseUser, returning');
+    logger.log('security.js - No firebaseUser, returning');
     return;
   }
 
   // Get the formatted user from omega for consistency, but we'll use firebaseUser for provider data
   const user = omega.auth().getUser();
   if (!user) {
-    console.log('[DEBUG] security.js - No user, returning');
+    logger.log('security.js - No user, returning');
     return;
   }
 
-  console.log('[DEBUG] security.js - firebaseUser.providerData:', firebaseUser.providerData);
+  logger.log('security.js - firebaseUser.providerData:', firebaseUser.providerData);
 
   // Update password email display
   const $passwordEmail = document.getElementById('password-email');
@@ -102,7 +105,7 @@ async function updateSigninMethods() {
     // Check if user has password provider using firebaseUser for most up-to-date data
     const hasPassword = firebaseUser.providerData?.some(provider => provider.providerId === 'password');
     $passwordEmail.textContent = hasPassword ? user.email : 'Not set';
-    console.log('[DEBUG] security.js - hasPassword:', hasPassword);
+    logger.log('security.js - hasPassword:', hasPassword);
   }
 
   // Update Google signin display
@@ -111,7 +114,7 @@ async function updateSigninMethods() {
   const $connectButton = $googleForm?.querySelector('button[data-action="connect"]');
   const $disconnectButton = $googleForm?.querySelector('button[data-action="disconnect"]');
 
-  console.log('[DEBUG] security.js - Google DOM elements:', {
+  logger.log('security.js - Google DOM elements:', {
     $googleEmail: !!$googleEmail,
     $googleForm: !!$googleForm,
     $connectButton: !!$connectButton,
@@ -122,18 +125,18 @@ async function updateSigninMethods() {
     // Check if user has Google provider using firebaseUser for most up-to-date data
     const googleProvider = firebaseUser.providerData?.find(provider => provider.providerId === 'google.com');
 
-    console.log('[DEBUG] security.js - googleProvider:', googleProvider);
-    console.log('[DEBUG] security.js - googleProvider found:', !!googleProvider);
+    logger.log('security.js - googleProvider:', googleProvider);
+    logger.log('security.js - googleProvider found:', !!googleProvider);
 
     if (googleProvider) {
-      console.log('[DEBUG] security.js - Showing disconnect button');
+      logger.log('security.js - Showing disconnect button');
 
       $googleEmail.textContent = googleProvider.email || 'Connected';
       // Hide connect button, show disconnect button
       $connectButton.classList.add('d-none');
       $disconnectButton.classList.remove('d-none');
     } else {
-      console.log('[DEBUG] security.js - Showing connect button');
+      logger.log('security.js - Showing connect button');
 
       $googleEmail.textContent = 'Not connected';
       // Show connect button, hide disconnect button
@@ -313,13 +316,13 @@ async function updateActiveSessions(account) {
 
 // Initialize FormManager for signin methods
 function initializeSigninMethodForms() {
-  console.log('[DEBUG] security.js - initializeSigninMethodForms() called');
+  logger.log('security.js - initializeSigninMethodForms() called');
 
   // Initialize password form
   const $passwordForm = document.getElementById('signin-method-password-form');
 
   if ($passwordForm && !signinMethodForms.has('password')) {
-    console.log('[DEBUG] security.js - Initializing password FormManager');
+    logger.log('security.js - Initializing password FormManager');
 
     const formManager = new FormManager($passwordForm, {
       allowResubmit: false,
@@ -339,15 +342,15 @@ function initializeSigninMethodForms() {
   const $googleForm = document.getElementById('signin-method-google-form');
 
   if ($googleForm && !signinMethodForms.has('google')) {
-    console.log('[DEBUG] security.js - About to initialize Google FormManager');
-    console.log('[DEBUG] security.js - Google form exists:', !!$googleForm);
+    logger.log('security.js - About to initialize Google FormManager');
+    logger.log('security.js - Google form exists:', !!$googleForm);
 
     const formManager = new FormManager($googleForm, {
       submittingText: 'Connecting...',
     });
 
     signinMethodForms.set('google', formManager);
-    console.log('[DEBUG] security.js - Google FormManager initialized and stored');
+    logger.log('security.js - Google FormManager initialized and stored');
 
     formManager.on('submit', async ({ $submitButton }) => {
       // Determine action from the clicked button's data-action attribute
@@ -466,7 +469,7 @@ function initializeSigninLinkGenerator() {
       $warningView.classList.add('d-none');
       $resultView.classList.remove('d-none');
     } catch (error) {
-      console.error('[Security] Failed to generate signin link:', error);
+      logger.error('Failed to generate signin link:', error);
       omega.utilities().showNotification(
         `Failed to generate signin link: ${error.message || 'Unknown error'}`,
         { type: 'danger', timeout: 8000 }

@@ -80,8 +80,8 @@ async function main() {
       if (initError) {
         throw new Error(`@omega.js/client initialize failed: ${initError}`);
       }
-      if (!harness.pageConsole.some((line) => line.includes('[Firebase] Emulators connected'))) {
-        throw new Error('client did not auto-connect to the emulators (dev mode must connect with zero flags — check [Firebase] lines in page.log)');
+      if (!harness.pageConsole.some((line) => line.includes('[@omega.js/client:firebase] Emulators connected'))) {
+        throw new Error('client did not auto-connect to the emulators (dev mode must connect with zero flags — check [@omega.js/client:firebase] lines in page.log)');
       }
     });
 

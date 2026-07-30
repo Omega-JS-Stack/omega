@@ -1,6 +1,9 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
 import omega from '@omega.js/client';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('token');
 
 // Module
 export default function () {
@@ -27,7 +30,7 @@ export default function () {
   omega.dom().ready()
   .then(async () => {
     // Log
-    console.log('[Token] Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'authReturnUrl:', authReturnUrl);
+    logger.log('Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'authReturnUrl:', authReturnUrl);
 
     // Validate redirect URLs
     if (authReturnUrl && !omega.isValidRedirectUrl(authReturnUrl)) {
@@ -64,7 +67,7 @@ export default function () {
           }
 
           const redirectUrl = returnUrl.toString();
-          console.log('[Token] MCP redirect to:', redirectUrl);
+          logger.log('MCP redirect to:', redirectUrl);
 
           updateStatus('Redirecting to Claude...');
 
@@ -95,7 +98,7 @@ export default function () {
           _legacyTranslateTokenRedirect(returnUrl, token);
 
           const redirectUrl = returnUrl.toString();
-          console.log('[Token] Redirecting to:', redirectUrl);
+          logger.log('Redirecting to:', redirectUrl);
 
           // Show retry button after a delay in case the redirect was cancelled (e.g. custom protocol dialog)
           setTimeout(() => {
@@ -112,7 +115,7 @@ export default function () {
           updateStatus('You can close this tab now.');
         }
       } catch (error) {
-        console.error('[Token] Error generating token:', error);
+        logger.error('Error generating token:', error);
         showError(error.message || 'Failed to generate token. Please try again.');
       }
     });

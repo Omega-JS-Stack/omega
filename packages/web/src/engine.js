@@ -15,6 +15,7 @@ const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
+const Logger = require('@omega.js/devkit/logger');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
@@ -27,6 +28,8 @@ const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
 const { PATHS } = require('./paths.js');
+
+const logger = new Logger('engine');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything
 // else IS the resolved page data (the cascade already deep-merged layout
@@ -360,8 +363,8 @@ function configureOmega(eleventyConfig, options) {
       const contentKeys = own ? Object.keys(own).filter((key) => !PAGE_FRONTMATTER_ALLOW.has(key)) : [];
       if (contentKeys.length) {
         for (const key of contentKeys) delete data[key];
-        console.warn(
-          `[omega] ${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
+        logger.warn(
+          `${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
           + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append); `
           + `content lives in {% section %} calls in the page body (docs/web/sections.md).`,
         );

@@ -186,7 +186,9 @@ for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
 test('wave-3 W5: out-of-order catalog warns (comparison inherits by catalog order)', () => {
   const warnings = [];
   const original = console.warn;
-  console.warn = (message) => warnings.push(message);
+  // The composer warns through the devkit logger, so the tag arrives as its own
+  // argument ahead of the message — join what one call printed.
+  console.warn = (...args) => warnings.push(args.join(' '));
 
   try {
     composePricing({

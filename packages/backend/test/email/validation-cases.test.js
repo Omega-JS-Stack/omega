@@ -124,6 +124,12 @@ module.exports = {
     ...CASES.map(({ email, expect: expected, check: expectedCheck }) => ({
       name: `${expected}: ${email || '(empty)'}`,
       timeout: 10000,
+      // Negative DNS cases need a live NXDOMAIN answer — extended-only, matching
+      // validation.test.js. Pass cases keep the dns check: it is offline-safe
+      // (network errors skip; only definitive no-MX/NXDOMAIN answers block).
+      skip: expectedCheck === 'dns' && !process.env.TEST_EXTENDED_MODE
+        ? 'TEST_EXTENDED_MODE not set (requires live DNS resolution)'
+        : false,
 
       async run() {
         const result = await validate(email, { checks: FREE_CHECKS });

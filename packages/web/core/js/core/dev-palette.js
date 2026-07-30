@@ -215,20 +215,14 @@ export default function devPalette() {
     personaGrid.appendChild(button);
   });
 
+  // Sign out rides the SHARED trigger (#16) — the class IS the wiring, so the
+  // palette can never drift from what a real sign-out button does.
   const signOut = doc.createElement('button');
   signOut.type = 'button';
-  signOut.className = 'omega-devbar__btn';
+  signOut.className = 'omega-devbar__btn omega-signout';
   signOut.textContent = 'Sign out';
   signOut.style.marginTop = '0.375rem';
   signOut.style.width = '100%';
-  signOut.addEventListener('click', async () => {
-    try {
-      await omega.auth().signOut();
-      window.location.reload();
-    } catch (error) {
-      who.textContent = `✕ ${error.message}`;
-    }
-  });
 
   // Quick links
   const links = doc.createElement('div');
