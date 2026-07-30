@@ -232,7 +232,7 @@ module.exports = async function (options) {
     configPath: false,
     config: (eleventyConfig) => {
       eleventyConfig.setServerOptions(devServerOptions(paths.out));
-      registerTemplateWatchTargets(eleventyConfig, paths.src);
+      registerTemplateWatchTargets(eleventyConfig, { consumerDir: paths.src, activeTheme });
       return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
         siteData,
@@ -301,23 +301,66 @@ function devServerOptions(outDir) {
  * rebuild logs "Wrote N files" and re-renders the stale capture until the
  * server is restarted.
  *
- * BOTH path forms are registered. The absolute form alone carries the reset
- * today (the dev loop hands Eleventy absolute dirs, so the watcher's event
- * arrives absolute and matches it). Registering the relative form ADDS a
- * second, relative event for the same edit — each event decides the reset for
- * itself and the last one wins the throttle, which is why the relative form
- * must never be registered ALONE — and is kept as insurance so a reset still
- * fires if Eleventy ever reports these edits in relative form. Its observable
- * cost is a duplicate "File changed" line per save.
+ * EVERY layer of the same chain the engine reads is a target (#134), not just
+ * the consumer's: consumer `src/` → the theme layers (a consumer-local
+ * `src/themes/<id>` or the packaged one) → core. Same chain, same resolution
+ * — `resolveThemeLayers` — so a target can never drift from what
+ * `configureOmega` actually captured. Only the `_layouts`/`_includes`
+ * subtrees: a whole theme dir would drag scss (the sass lane's own watcher)
+ * and pages (the incremental rebuild path) into full config resets.
+ *
+ * Packaged targets register REAL paths. A linked brand reaches the framework
+ * through a `node_modules/@omega.js/web` symlink, and Eleventy's watcher
+ * ignores everything under `node_modules` — the resolved path sidesteps it.
+ *
+ * BOTH path forms are registered for cwd-contained targets. The absolute form
+ * alone carries the reset today (the dev loop hands Eleventy absolute dirs, so
+ * the watcher's event arrives absolute and matches it). Registering the
+ * relative form ADDS a second, relative event for the same edit — each event
+ * decides the reset for itself and the last one wins the throttle, which is
+ * why the relative form must never be registered ALONE — and is kept as
+ * insurance so a reset still fires if Eleventy ever reports these edits in
+ * relative form. Its observable cost is a duplicate "File changed" line per
+ * save. A target OUTSIDE cwd (a linked brand's framework layers, a hoisted
+ * node_modules) registers ONLY absolute: an escaping `../` watch target makes
+ * Eleventy re-root its watcher to the common ancestor, after which NO event
+ * path matches ANY registered target and every reset dies — including the
+ * consumer ones (#134 verification).
  * @param {object} eleventyConfig
- * @param {string} consumerDir - the Eleventy input dir (<root>/src)
+ * @param {object} options
+ * @param {string} options.consumerDir - the Eleventy input dir (<root>/src)
+ * @param {string} [options.activeTheme] - theme id (default 'classy')
+ * @param {string} [options.themesDir] - packaged themes root (default: packaged themes)
+ * @param {string} [options.coreDir] - the framework core layer (default: packaged core)
  */
-function registerTemplateWatchTargets(eleventyConfig, consumerDir) {
-  const relative = path.relative(process.cwd(), consumerDir);
+function registerTemplateWatchTargets(eleventyConfig, options) {
+  const themesDir = options.themesDir || PATHS.themes;
+  const coreDir = options.coreDir || PATHS.core;
+  const themeLayers = resolveThemeLayers({
+    activeTheme: options.activeTheme,
+    consumerDir: options.consumerDir,
+    themesDir,
+  });
+  const targets = new Set();
 
   for (const dir of ['_layouts', '_includes']) {
-    for (const target of new Set([path.join(relative, dir), path.join(consumerDir, dir)])) {
-      eleventyConfig.addWatchTarget(target, { resetConfig: true });
+    // The consumer's own dirs register unconditionally — a brand may author
+    // src/_includes mid-session, and the reset must already be armed.
+    targets.add(path.join(options.consumerDir, dir));
+
+    // Framework layers exist per theme, not per convention — most carry only
+    // one of the two dirs, and a missing one is not a watchable path.
+    for (const layer of [...themeLayers, coreDir]) {
+      const target = path.join(layer, dir);
+      if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
+    }
+  }
+
+  for (const target of targets) {
+    const relative = path.relative(process.cwd(), target);
+    const forms = relative.startsWith('..') ? [target] : new Set([target, relative]);
+    for (const form of forms) {
+      eleventyConfig.addWatchTarget(form, { resetConfig: true });
     }
   }
 }

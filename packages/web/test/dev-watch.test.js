@@ -28,37 +28,68 @@ const POLL_MS = 50;
 // Consecutive quiet polls (no build running) that mean the watch loop is done.
 const DRAIN_QUIET_POLLS = 20;
 
+const ACTIVE_THEME = 'toy-theme';
+
 const SITE_DATA = {
   url: 'http://localhost:4000',
   brand: { id: 'watch', name: 'WatchCo', description: 'Watch-loop test brand' },
   meta: { title: 'WatchCo', description: 'Watch meta description' },
-  theme: { id: 'classy' },
+  theme: { id: ACTIVE_THEME },
 };
 
-// A minimal consumer app: its own _layouts winner, a json-in-_includes data
-// file, and one page that renders both. Teardown is the caller's (startWatch's)
-// — the tree must outlive the watcher, or an in-flight rebuild writes into a
-// deleted dir.
+// A minimal consumer app carrying EVERY layer of the layout chain (#134): its
+// own _layouts winner, a json-in-_includes data file, a consumer-local theme
+// layer, and a packaged layer reached the way a linked brand reaches it — a
+// `node_modules/@omega.js/web` symlink over the real framework tree. One page
+// per layer renders that layer's layout. Teardown is the caller's
+// (startWatch's) — the tree must outlive the watcher, or an in-flight rebuild
+// writes into a deleted dir.
 function app() {
   // realpath: the dev loop derives its paths from process.cwd(), which is the
   // RESOLVED path — on macOS /var/folders/… is a symlink to /private/var/…
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-watch-')));
   const src = path.join(root, 'src');
-  const write = (rel, contents) => {
-    const abs = path.join(src, rel);
+  // The packaged tree lives OUTSIDE the app root — in a real linked brand the
+  // symlink resolves to the monorepo, far outside cwd, and an escaping `../`
+  // relative watch target makes Eleventy re-root its watcher and drop EVERY
+  // reset (#134 verification). In-root would hide that regression.
+  const packaged = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-pkg-')));
+  const writer = (base) => (rel, contents) => {
+    const abs = path.join(base, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
   };
+  const write = writer(src);
+  const writePackaged = writer(packaged);
+  const page = (layout, permalink, body) => [
+    '---',
+    `layout: ${layout}`,
+    `permalink: ${permalink}`,
+    '---',
+    body,
+  ].join('\n');
 
   write('_layouts/toy.html', '<main data-layout="BEFORE">{{ content }}</main>');
   write('_includes/nav.json', '{ label: "BEFORE" }');
-  write('pages/index.html', [
-    '---',
-    'layout: toy.html',
-    'permalink: /',
-    '---',
-    '<p data-nav="{{ site.data._includes.nav.label }}">home</p>',
-  ].join('\n'));
+  write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="BEFORE">{{ content }}</main>');
+  writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="BEFORE">{{ content }}</main>');
+  // The base theme layer of every chain — present, empty, exactly as a theme
+  // that ships no layouts is. The default-pages dir is empty too: the real one
+  // renders against the real core layouts, which this fixture replaces.
+  fs.mkdirSync(path.join(packaged, 'themes', 'classy'), { recursive: true });
+  for (const set of ['sample-posts', 'sample-team', 'sample-updates']) {
+    fs.mkdirSync(path.join(packaged, 'defaults', set), { recursive: true });
+  }
+
+  write('pages/index.html', page('toy.html', '/', '<p data-nav="{{ site.data._includes.nav.label }}">home</p>'));
+  write('pages/theme-page.html', page('theme-toy.html', '/theme-page.html', '<p>theme</p>'));
+  write('pages/core-page.html', page('core-toy.html', '/core-page.html', '<p data-page="BEFORE">core</p>'));
+
+  // The linked-brand shape: the framework is reached through node_modules,
+  // whose subtree Eleventy's watcher ignores wholesale.
+  const linked = path.join(root, 'node_modules', '@omega.js', 'web');
+  fs.mkdirSync(path.dirname(linked), { recursive: true });
+  fs.symlinkSync(packaged, linked);
 
   const cwd = process.cwd();
   process.chdir(root);
@@ -67,10 +98,15 @@ function app() {
     root,
     src,
     out: path.join(root, 'dist'),
+    themesDir: path.join(linked, 'themes'),
+    coreDir: path.join(linked, 'core'),
+    defaultsDir: path.join(linked, 'defaults'),
     write,
+    writePackaged,
     cleanup: () => {
       process.chdir(cwd);
       fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(packaged, { recursive: true, force: true });
     },
   };
 }
@@ -85,14 +121,27 @@ function app() {
  */
 async function startWatch(t, fixture) {
   const Eleventy = require('@11ty/eleventy').default;
+  // Eleventy re-runs the config callback ONLY on a config reset — counting
+  // the runs is how a reset is told apart from an incremental rebuild.
+  const configRuns = { count: 0 };
   const elev = new Eleventy(fixture.src, fixture.out, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      registerTemplateWatchTargets(eleventyConfig, fixture.src);
+      configRuns.count += 1;
+      registerTemplateWatchTargets(eleventyConfig, {
+        consumerDir: fixture.src,
+        activeTheme: ACTIVE_THEME,
+        themesDir: fixture.themesDir,
+        coreDir: fixture.coreDir,
+      });
       return configureOmega(eleventyConfig, {
         consumerDir: fixture.src,
         siteData: SITE_DATA,
+        activeTheme: ACTIVE_THEME,
+        themesDir: fixture.themesDir,
+        coreDir: fixture.coreDir,
+        defaultsDir: fixture.defaultsDir,
         environment: 'development',
         assetManifest: {
           js: { main: '/assets/js/main-TEST.js', pages: {} },
@@ -117,17 +166,18 @@ async function startWatch(t, fixture) {
     fixture.cleanup();
   });
 
-  const page = () => fs.readFileSync(path.join(fixture.out, 'index.html'), 'utf8');
+  const page = (file = 'index.html') => fs.readFileSync(path.join(fixture.out, file), 'utf8');
 
   return {
     page,
-    async pageBecomes(pattern, message) {
+    configRuns,
+    async pageBecomes(pattern, message, file) {
       const deadline = Date.now() + REBUILD_DEADLINE_MS;
-      let rendered = page();
+      let rendered = page(file);
 
       while (!pattern.test(rendered) && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-        rendered = page();
+        rendered = page(file);
       }
 
       assert.match(rendered, pattern, message);
@@ -161,4 +211,54 @@ test('a watched _includes json edit is served by the very next rebuild', async (
 
   fixture.write('_includes/nav.json', '{ label: "AGAIN" }');
   await watch.pageBecomes(/data-nav="AGAIN"/, 'every later edit lands too');
+});
+
+test('a watched theme-layer _layouts edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('theme-page.html'), /data-theme-layout="BEFORE"/, 'the first build renders the theme layer\'s layout');
+
+  fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AFTER">{{ content }}</main>');
+  await watch.pageBecomes(/data-theme-layout="AFTER"/, 'the rebuild serves the theme-layer edit', 'theme-page.html');
+
+  fixture.write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="AGAIN">{{ content }}</main>');
+  await watch.pageBecomes(/data-theme-layout="AGAIN"/, 'every later edit lands too', 'theme-page.html');
+});
+
+test('a watched packaged-layer _layouts edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('core-page.html'), /data-core-layout="BEFORE"/, 'the first build renders the core layer\'s layout');
+
+  fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AFTER">{{ content }}</main>');
+  await watch.pageBecomes(/data-core-layout="AFTER"/, 'the rebuild serves the packaged-layer edit — the node_modules ignore does not swallow it', 'core-page.html');
+
+  fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AGAIN">{{ content }}</main>');
+  await watch.pageBecomes(/data-core-layout="AGAIN"/, 'every later edit lands too', 'core-page.html');
+});
+
+test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  const runsAfterFirstBuild = watch.configRuns.count;
+
+  fixture.write('pages/core-page.html', [
+    '---',
+    'layout: core-toy.html',
+    'permalink: /core-page.html',
+    '---',
+    '<p data-page="AFTER">core</p>',
+  ].join('\n'));
+  await watch.pageBecomes(/data-page="AFTER"/, 'the page edit lands', 'core-page.html');
+
+  assert.equal(watch.configRuns.count, runsAfterFirstBuild, 'a content edit never re-runs the config — page edits stay on the incremental path');
+
+  // The contrast: a layout edit DOES reset, so the counter is a real signal
+  // and not a constant.
+  fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
+  await watch.pageBecomes(/data-layout="AFTER"/, 'the layout edit lands');
+  assert.ok(watch.configRuns.count > runsAfterFirstBuild, 'a layout edit re-runs the config (the reset)');
 });
