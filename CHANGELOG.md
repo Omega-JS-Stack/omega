@@ -6,24 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] (2026-07-29)
+
 ### Added
-- [#85](../../issues/85) — Download and extension pages populate from config `targets` with no hand-supplied links: `site.targets` exposes a curated per-target view, desktop download URLs derive from the GitHub org and releases repo, and extension store listings are schema-declared config; an explicit page map still wins.
+- [#85](../../issues/85) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — Download and extension pages populate from config `targets` with no hand-supplied links: `site.targets` exposes a curated per-target view, desktop download URLs derive from the GitHub org and releases repo, and extension store listings are schema-declared config; an explicit page map still wins.
 
 ### Changed
-- [#16](../../issues/16) — Click-trigger classes unify into one client-owned registry with `omega-*` names: `omega-signout`, `omega-signin`, and `omega-password-toggle` replace the three legacy classes outright (no aliases), and a stock-theme build assertion keeps legacy trigger classes out of dist.
+- [#16](../../issues/16) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — Click-trigger classes unify into one client-owned registry with `omega-*` names: `omega-signout`, `omega-signin`, and `omega-password-toggle` replace the three legacy classes outright (no aliases), and a stock-theme build assertion keeps legacy trigger classes out of dist.
 
-- [#12](../../issues/12) — Every log line across the frameworks now carries one identity tag, `[@omega.js/<package>:<module>]` — build-time output adds a timestamp bracket, runtime consoles don't — replacing 328 hand-written prefixes; a repo-level guard test keeps new deviants out.
+- [#12](../../issues/12) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — Every log line across the frameworks now carries one identity tag, `[@omega.js/<package>:<module>]` — build-time output adds a timestamp bracket, runtime consoles don't — replacing 328 hand-written prefixes; a repo-level guard test keeps new deviants out.
 
 ### Fixed
-- [#102](../../issues/102) — Template filters keep their familiar Jekyll-style names and now behave correctly: `group_by_exp` groups by value instead of collapsing everything into one truthiness bucket, numeric and boolean tag options arrive typed (`width=640` is the number 640), and an unparseable date passes through instead of rendering `NaN-NaN-NaN` into the page.
+- [#102](../../issues/102) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — Template filters keep their familiar Jekyll-style names and now behave correctly: `group_by_exp` groups by value instead of collapsing everything into one truthiness bucket, numeric and boolean tag options arrive typed (`width=640` is the number 640), and an unparseable date passes through instead of rendering `NaN-NaN-NaN` into the page.
 
-- [#103](../../issues/103) — A desktop renderer now reports its real signed-in UID in the auth sync-request: it read the client's auth handle through a `user()` accessor that never existed (the real one is `getUser()`), so every boot claimed "signed out" and forced a needless custom-token round-trip.
+- [#103](../../issues/103) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — A desktop renderer now reports its real signed-in UID in the auth sync-request: it read the client's auth handle through a `user()` accessor that never existed (the real one is `getUser()`), so every boot claimed "signed out" and forced a needless custom-token round-trip.
 
-- [#119](../../issues/119) — The three negative-DNS cases in the backend email corpus now gate behind `TEST_EXTENDED_MODE` like the sibling suite's, so a default run needs no live DNS answer; the offline-safe pass cases stay in the default lane.
+- [#119](../../issues/119) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — The three negative-DNS cases in the backend email corpus now gate behind `TEST_EXTENDED_MODE` like the sibling suite's, so a default run needs no live DNS answer; the offline-safe pass cases stay in the default lane.
 
-- [#120](../../issues/120) — A marketing campaign that fails for a permanent reason (a brand-config hole or a bad AI prompt, thrown or carried in a provider result) is marked failed after one cron pass instead of silently retrying forever; temporary failures keep the existing retry.
+- [#120](../../issues/120) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — A marketing campaign that fails for a permanent reason (a brand-config hole or a bad AI prompt, thrown or carried in a provider result) is marked failed after one cron pass instead of silently retrying forever; temporary failures keep the existing retry.
 
-- [#93](../../issues/93) — A backend push notification takes its icon and click target from the brand's own config: no brandmark omits the icon, and a missing `brand.url` throws rather than defaulting to the framework author's company. The feedback email's rating faces are unicode glyphs, no longer images from that company's CDN.
+- [#93](../../issues/93) [`e4a18bd4`](../../commit/e4a18bd4) Thanks [@ianwieds]! — A backend push notification takes its icon and click target from the brand's own config: no brandmark omits the icon, and a missing `brand.url` throws rather than defaulting to the framework author's company. The feedback email's rating faces are unicode glyphs, no longer images from that company's CDN.
 
 ## [0.5.0] (2026-07-29)
 
