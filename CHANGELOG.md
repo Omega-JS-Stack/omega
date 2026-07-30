@@ -6,28 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] (2026-07-29)
+
 ### Added
-- [#98](../../issues/98) — A theme that reaches neither CSS fall-through lane no longer breaks silently: the web asset lane checks the compiled bundle for the shared `classy-*` vocabulary and warns once, naming the theme, the missing piece (hatch or floor), and the line to add. The neobrutalism theme gained the floor it lacked.
+- [#98](../../issues/98) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — A theme that reaches neither CSS fall-through lane no longer breaks silently: the web asset lane checks the compiled bundle for the shared `classy-*` vocabulary and warns once, naming the theme, the missing piece (hatch or floor), and the line to add. The neobrutalism theme gained the floor it lacked.
 
-- [#88](../../issues/88) — Three quality skills ship in the omega plugin — `omega:seo`, `omega:accessibility`, `omega:brandcheck` — and a hook fires them by construction: editing a web surface names the skills that own it, and the Stop pass blocks a sign-off that skipped their checklists.
+- [#88](../../issues/88) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Three quality skills ship in the omega plugin — `omega:seo`, `omega:accessibility`, `omega:brandcheck` — and a hook fires them by construction: editing a web surface names the skills that own it, and the Stop pass blocks a sign-off that skipped their checklists.
 
-- [#80](../../issues/80) — The sitemap covers translations: every produced `/{lang}/...` page joins `dist/sitemap.xml` as its own entry, and each entry of a translated set — source and copies alike — carries `xhtml:link` hreflang alternates with `x-default` at the source language. A skipped or failed pair is listed nowhere.
+- [#80](../../issues/80) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — The sitemap covers translations: every produced `/{lang}/...` page joins `dist/sitemap.xml` as its own entry, and each entry of a translated set — source and copies alike — carries `xhtml:link` hreflang alternates with `x-default` at the source language. A skipped or failed pair is listed nowhere.
 
-- [#80](../../issues/80) — Visitors can switch language: the shared footer dropup renders client-side from the page's own hreflang alternates, so it lists only the languages actually produced, names each in its own tongue, marks the current one, and hides when there is no choice. The old dropdown's flag icons retire.
+- [#80](../../issues/80) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Visitors can switch language: the shared footer dropup renders client-side from the page's own hreflang alternates, so it lists only the languages actually produced, names each in its own tongue, marks the current one, and hides when there is no choice. The old dropdown's flag icons retire.
 
-- [#122](../../issues/122) — Extensions get an `omega-account` click trigger: any `.omega-account` element opens the brand site's `/account` page in a new tab, resolved from `brand.url` exactly like `.omega-signin`. The never-wired `.auth-account-btn` name does not return.
+- [#122](../../issues/122) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Extensions get an `omega-account` click trigger: any `.omega-account` element opens the brand site's `/account` page in a new tab, resolved from `brand.url` exactly like `.omega-signin`. The never-wired `.auth-account-btn` name does not return.
 
 ### Fixed
-- [#90](../../issues/90) — Outbound email closes its escape-lane bypasses: the raw-HTML fields (`data.content.html`, `contentHtml`, `trustedContent`) are rejected with a coded 400 on the API lanes (`/admin/email`, `/marketing/campaign` — the MCP tools) and stay first-party-only, and every interpolated `href` is scheme-checked, so a `javascript:` URL is dropped instead of escaped.
+- [#90](../../issues/90) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Outbound email closes its escape-lane bypasses: the raw-HTML fields (`data.content.html`, `contentHtml`, `trustedContent`) are rejected with a coded 400 on the API lanes (`/admin/email`, `/marketing/campaign` — the MCP tools) and stay first-party-only, and every interpolated `href` is scheme-checked, so a `javascript:` URL is dropped instead of escaped.
 
-- [#123](../../issues/123) — A machine without the notifly binary no longer sees a raw `spawn notifly ENOENT` dump after an extension build error: the reporter detects the missing binary and warns `notifly not installed — skipping desktop notification` once. Every other spawn failure keeps its logged-not-thrown error.
+- [#123](../../issues/123) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — A machine without the notifly binary no longer sees a raw `spawn notifly ENOENT` dump after an extension build error: the reporter detects the missing binary and warns `notifly not installed — skipping desktop notification` once. Every other spawn failure keeps its logged-not-thrown error.
 
-- [#80](../../issues/80) — Translated pages stop over-advertising and stop shipping half-translated: a copy's hreflang/`og:locale:alternate` tags name only the languages actually produced for that page, a provider failure skips its page-language pair whole with a loud warning, and `og:locale` now carries Open Graph's `language_TERRITORY` form (`en_US`, `es_ES`).
+- [#80](../../issues/80) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Translated pages stop over-advertising and stop shipping half-translated: a copy's hreflang/`og:locale:alternate` tags name only the languages actually produced for that page, a provider failure skips its page-language pair whole with a loud warning, and `og:locale` now carries Open Graph's `language_TERRITORY` form (`en_US`, `es_ES`).
 
 ### Changed
-- [#124](../../issues/124) — Derived desktop download links are now opt-in: `site.targets.desktop.releasesUrl` and the derived `site.download` appear only when the config carries a `targets.desktop.releases` block (`enabled` defaults true when present, `false` suppresses), so merely declaring a desktop target no longer publishes releases/latest links before a release exists. An explicit `download` map still wins.
+- [#124](../../issues/124) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Derived desktop download links are now opt-in: `site.targets.desktop.releasesUrl` and the derived `site.download` appear only when the config carries a `targets.desktop.releases` block (`enabled` defaults true when present, `false` suppresses), so merely declaring a desktop target no longer publishes releases/latest links before a release exists. An explicit `download` map still wins.
 
-- [#121](../../issues/121) — Backend Cloud Functions logs join the one-tag contract: every `ctx.log`/`ctx.error` line opens with `[@omega.js/backend:<function-name>]` and drops its timestamp bracket (the platform stamps entries), the record classifiers (`skip`, `expire`, `authenticated`, `test-mode`) survive as leading words instead of brackets, and the repo log-tag guard no longer exempts the package.
+- [#121](../../issues/121) [`05b479cc`](../../commit/05b479cc) Thanks [@ianwieds]! — Backend Cloud Functions logs join the one-tag contract: every `ctx.log`/`ctx.error` line opens with `[@omega.js/backend:<function-name>]` and drops its timestamp bracket (the platform stamps entries), the record classifiers (`skip`, `expire`, `authenticated`, `test-mode`) survive as leading words instead of brackets, and the repo log-tag guard no longer exempts the package.
 
 ## [0.6.0] (2026-07-29)
 
