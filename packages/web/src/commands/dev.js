@@ -232,6 +232,7 @@ module.exports = async function (options) {
     configPath: false,
     config: (eleventyConfig) => {
       eleventyConfig.setServerOptions(devServerOptions(paths.out));
+      registerTemplateWatchTargets(eleventyConfig, paths.src);
       return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
         siteData,
@@ -289,6 +290,36 @@ function devServerOptions(outDir) {
       path.join(outDir, 'assets', 'js'),
     ],
   };
+}
+
+/**
+ * Force a config RESET on edits under the template-source dirs (#49). Both
+ * layered layouts (registered as virtual templates, content read at config
+ * time) and the json-in-_includes data system (read into site.data._includes
+ * at config time) are CAPTURES — and Eleventy reuses one config across watch
+ * rebuilds unless the changed file triggers a reset, so without this the
+ * rebuild logs "Wrote N files" and re-renders the stale capture until the
+ * server is restarted.
+ *
+ * BOTH path forms are registered. The absolute form alone carries the reset
+ * today (the dev loop hands Eleventy absolute dirs, so the watcher's event
+ * arrives absolute and matches it). Registering the relative form ADDS a
+ * second, relative event for the same edit — each event decides the reset for
+ * itself and the last one wins the throttle, which is why the relative form
+ * must never be registered ALONE — and is kept as insurance so a reset still
+ * fires if Eleventy ever reports these edits in relative form. Its observable
+ * cost is a duplicate "File changed" line per save.
+ * @param {object} eleventyConfig
+ * @param {string} consumerDir - the Eleventy input dir (<root>/src)
+ */
+function registerTemplateWatchTargets(eleventyConfig, consumerDir) {
+  const relative = path.relative(process.cwd(), consumerDir);
+
+  for (const dir of ['_layouts', '_includes']) {
+    for (const target of new Set([path.join(relative, dir), path.join(consumerDir, dir)])) {
+      eleventyConfig.addWatchTarget(target, { resetConfig: true });
+    }
+  }
 }
 
 /**
@@ -453,6 +484,7 @@ module.exports.resolveWebsitePort = resolveWebsitePort;
 module.exports.websiteWantedPort = websiteWantedPort;
 module.exports.readSiblingPorts = readSiblingPorts;
 module.exports.devServerOptions = devServerOptions;
+module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 
 async function linkBrandToMonorepo() {

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- [#135](../../issues/135) — The self-hosted Firebase sign-in pages render instead of downloading: `omega build` writes them as `handler.html`/`iframe.html` so GitHub Pages serves the `/__/auth/*` URLs as HTML through its clean-URL fallback, which a literal extensionless file was defeating with `application/octet-stream`.
+- [#49](../../issues/49) — `omega dev` serves layout and include edits on the very next rebuild. An edit under `src/_layouts/` or `src/_includes/` now rebuilds Eleventy's config, so the layered layouts and the json-in-`_includes` data system are re-read instead of re-rendering the copy captured at startup — no dev-server restart needed.
+
 ## [0.8.0] (2026-07-30)
 
 ### Added

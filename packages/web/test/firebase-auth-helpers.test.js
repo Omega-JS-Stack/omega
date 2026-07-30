@@ -67,15 +67,20 @@ test('firebase-auth-helpers: fetches all six helper files into /__/ and stamps t
 
     assert.equal(result.skipped, false);
     for (const file of HELPER_FILES) {
-      assert.ok(fs.existsSync(path.join(outDir, file.remote)), `${file.remote} written`);
+      assert.ok(fs.existsSync(path.join(outDir, file.local || file.remote)), `${file.local || file.remote} written`);
     }
-    // The handler must land at the exact path Firebase redirects to
-    assert.equal(fs.readFileSync(path.join(outDir, '__/auth/handler'), 'utf8'), 'content of /__/auth/handler');
+    // The PAGE files land as .html so GitHub Pages serves them as text/html —
+    // and the extensionless names must NOT exist, because a literal
+    // extensionless file wins over Pages' clean-URL .html fallback and serves
+    // as application/octet-stream (#135)
+    assert.equal(fs.readFileSync(path.join(outDir, '__/auth/handler.html'), 'utf8'), 'content of /__/auth/handler');
+    assert.ok(!fs.existsSync(path.join(outDir, '__/auth/handler')), 'extensionless handler not emitted');
+    assert.ok(!fs.existsSync(path.join(outDir, '__/auth/iframe')), 'extensionless iframe not emitted');
     assert.equal(fs.readFileSync(path.join(outDir, '__/firebase/init.json'), 'utf8'), 'content of /__/firebase/init.json');
     // iframe.js reference carries a cache breaker HASHED from iframe.js'
     // fetched content — changes exactly when Firebase ships a new helper
     // (the scaffolded Cloudflare rule caches it for a year)
-    const iframePage = fs.readFileSync(path.join(outDir, '__/auth/iframe'), 'utf8');
+    const iframePage = fs.readFileSync(path.join(outDir, '__/auth/iframe.html'), 'utf8');
     const expectedHash = crypto.createHash('md5').update('content of /__/auth/iframe.js').digest('hex').slice(0, 8);
     assert.equal(iframePage, `<script src="iframe.js?cb=${expectedHash}"></script>`);
     assert.equal(served.length, HELPER_FILES.length);
@@ -107,7 +112,7 @@ test('firebase-auth-helpers: a changed iframe markup warns loudly instead of sil
     assert.equal(result.skipped, false);
     assert.match(warnings.join('\n'), /cache breaker NOT applied/);
     // The page still ships verbatim — only the breaker is missing
-    assert.equal(fs.readFileSync(path.join(outDir, '__/auth/iframe'), 'utf8'), '<script type="module" src="./iframe.mjs"></script>');
+    assert.equal(fs.readFileSync(path.join(outDir, '__/auth/iframe.html'), 'utf8'), '<script type="module" src="./iframe.mjs"></script>');
   } finally {
     server.close();
   }

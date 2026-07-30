@@ -16,17 +16,22 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
-// Extensionless handler/iframe are served as text/html by GitHub Pages.
+// The two PAGE files land as .html and their extensionless names are never
+// emitted: GitHub Pages serves a literal extensionless FILE as
+// application/octet-stream (found live on omegajs.dev, #135) — the browser
+// downloads the sign-in page instead of rendering it. The extensionless URL
+// Firebase redirects to (/__/auth/handler) resolves to handler.html via
+// Pages' clean-URL fallback, which only applies when no literal file exists.
 // The iframe page references iframe.js relatively; the ?cb= rewrite busts
 // the long-lived edge cache (the scaffolded Cloudflare cache rule pins
 // /__/auth/iframe.js for a year). The breaker is a HASH of the fetched
 // iframe.js content — it changes exactly when Firebase ships a new helper,
 // and stays stable (cache-friendly, idempotent builds) when they don't.
 const HELPER_FILES = [
-  { remote: '__/auth/handler' },
+  { remote: '__/auth/handler', local: '__/auth/handler.html' },
   { remote: '__/auth/handler.js' },
   { remote: '__/auth/experiments.js' },
-  { remote: '__/auth/iframe' },
+  { remote: '__/auth/iframe', local: '__/auth/iframe.html' },
   { remote: '__/auth/iframe.js' },
   { remote: '__/firebase/init.json' },
 ];
@@ -109,8 +114,8 @@ async function fetchFirebaseAuthHelpers(options) {
     logger.warn(`firebase-auth: ${IFRAME_SRC_MARKER} not found in ${IFRAME_PAGE} — cache breaker NOT applied; check Firebase's helper markup`);
   }
 
-  for (const [remote, content] of contents) {
-    jetpack.write(path.join(outDir, remote), content);
+  for (const file of HELPER_FILES) {
+    jetpack.write(path.join(outDir, file.local || file.remote), contents.get(file.remote));
   }
 
   logger.log(`firebase-auth: self-hosted ${HELPER_FILES.length} helper files from ${projectId}.firebaseapp.com → /__/`);
