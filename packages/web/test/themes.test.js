@@ -12,11 +12,14 @@
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const sass = require('sass');
 
-const { resolveThemeLayers } = require('../src/layers.js');
+const { collectLayered, resolveThemeLayers } = require('../src/layers.js');
+const { consumerPaths } = require('../src/consumer.js');
+const { resolveAssetThemeLayers } = require('../src/commands/dev.js');
 const { buildAssets, layeredFileImporter, sectionsImporter } = require('../src/assets.js');
 const { checkThemeVocabulary } = require('../src/theme-vocabulary.js');
 const { buildWith: sharedBuildWith, miniData, MINI, PKG } = require('./lib/build.js');
@@ -48,6 +51,31 @@ test('resolveThemeLayers: consumer-local theme wins; packaged is the fallback; c
   // classy active (and the default) dedups to a single layer
   assert.deepEqual(resolveThemeLayers({ activeTheme: 'classy', consumerDir: MINI, themesDir }), [path.join(themesDir, 'classy')]);
   assert.deepEqual(resolveThemeLayers({ themesDir }), [path.join(themesDir, 'classy')]);
+});
+
+test('the dev asset lane resolves the consumer-local theme the engine renders (#137)', () => {
+  // A brand's own theme lives at src/themes/<id> — the engine, the production
+  // build, and customize all probe the Eleventy INPUT dir. The dev asset lane
+  // must probe the same place, or the theme's scss/js never enters the bundle
+  // and its dir never enters the asset watcher.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-assets-')));
+  const themeDir = path.join(root, 'src', 'themes', 'toy-theme');
+  fs.mkdirSync(path.join(themeDir, 'css'), { recursive: true });
+  fs.writeFileSync(path.join(themeDir, 'css', 'main.scss'), '.toy { color: red; }');
+
+  try {
+    const layers = resolveAssetThemeLayers(consumerPaths(root), 'toy-theme');
+
+    assert.deepEqual(layers, [themeDir, path.join(PKG, 'themes', 'classy')]);
+    // The consequence: the theme's stylesheet is what the css lane compiles.
+    assert.equal(
+      collectLayered(layers.map((layer) => path.join(layer, 'css')), /^main\.scss$/).get('main.scss'),
+      path.join(themeDir, 'css', 'main.scss'),
+      'the consumer-local theme wins the asset lane\'s main.scss lookup',
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 // ─── Tier 1: consumer main.scss over the stock chain ─────────────────────────

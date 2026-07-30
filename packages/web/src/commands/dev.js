@@ -97,7 +97,7 @@ module.exports = async function (options) {
   samples.removed.forEach((collectionDir) => logger.log(`Sample content: ${collectionDir} is yours now — materialized samples removed`));
 
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
-  const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: paths.root, themesDir: PATHS.themes });
+  const themeLayerDirs = resolveAssetThemeLayers(paths, activeTheme);
   const layers = [
     ...(fs.existsSync(paths.assets) ? [paths.assets] : []),
     ...themeLayerDirs,
@@ -272,6 +272,23 @@ module.exports = async function (options) {
 };
 
 /**
+ * The asset lane's theme layer chain (#137). `resolveThemeLayers` probes
+ * `<consumerDir>/themes/<id>` for a consumer-local theme, and EVERY other
+ * caller — the engine, the production build, customize, the override map —
+ * passes the Eleventy input dir, so a consumer-local theme lives at
+ * `src/themes/<id>`. Resolving the asset lane from the app ROOT instead made
+ * that theme invisible to the scss/js build AND to the asset watcher (both
+ * derive from this list), so a brand's own theme silently rendered with the
+ * packaged theme's styles.
+ * @param {object} paths - consumerPaths() output
+ * @param {string} activeTheme - theme id
+ * @returns {string[]} ordered theme layer dirs
+ */
+function resolveAssetThemeLayers(paths, activeTheme) {
+  return resolveThemeLayers({ activeTheme, consumerDir: paths.src, themesDir: PATHS.themes });
+}
+
+/**
  * Dev-server options: the image-variant fallback middleware (dev never runs
  * the responsive matrix — missing -NNNpx/.webp URLs rewrite to the verbatim
  * original) + live-reload on ASSET rebuilds. Eleventy's dev server only
@@ -305,9 +322,11 @@ function devServerOptions(outDir) {
  * the consumer's: consumer `src/` → the theme layers (a consumer-local
  * `src/themes/<id>` or the packaged one) → core. Same chain, same resolution
  * — `resolveThemeLayers` — so a target can never drift from what
- * `configureOmega` actually captured. Only the `_layouts`/`_includes`
- * subtrees: a whole theme dir would drag scss (the sass lane's own watcher)
- * and pages (the incremental rebuild path) into full config resets.
+ * `configureOmega` actually captured. Only the machinery subtrees of a layer
+ * (`_layouts`/`_includes`/`_sections`/`_components`): a whole theme dir would
+ * drag scss (the sass lane's own watcher) and pages (the incremental rebuild
+ * path) into full config resets. The packaged `defaults` tree is the one whole
+ * root (#136) — nothing in it rides the incremental path.
  *
  * Packaged targets register REAL paths. A linked brand reaches the framework
  * through a `node_modules/@omega.js/web` symlink, and Eleventy's watcher
@@ -332,16 +351,26 @@ function devServerOptions(outDir) {
  * @param {string} [options.activeTheme] - theme id (default 'classy')
  * @param {string} [options.themesDir] - packaged themes root (default: packaged themes)
  * @param {string} [options.coreDir] - the framework core layer (default: packaged core)
+ * @param {string} [options.defaultsDir] - framework defaults root (default: packaged defaults)
  */
 function registerTemplateWatchTargets(eleventyConfig, options) {
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
+  const defaultsDir = options.defaultsDir || PATHS.defaults;
   const themeLayers = resolveThemeLayers({
     activeTheme: options.activeTheme,
     consumerDir: options.consumerDir,
     themesDir,
   });
   const targets = new Set();
+
+  // The defaults tree WHOLE (#136): every dir under it — pages, showcase, the
+  // sample-content corpora — is read at config time and registered as virtual
+  // templates, so an edit to a packaged default page serves stale until
+  // restart. Nothing under defaults/ rides the incremental path (it is not the
+  // Eleventy input dir and carries no assets), so the root is the honest
+  // target — it cannot drift as the engine grows another defaults reader.
+  if (fs.existsSync(defaultsDir)) targets.add(fs.realpathSync(defaultsDir));
 
   for (const dir of ['_layouts', '_includes']) {
     // The consumer's own dirs register unconditionally — a brand may author
@@ -351,6 +380,22 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
     // Framework layers exist per theme, not per convention — most carry only
     // one of the two dirs, and a missing one is not a watchable path.
     for (const layer of [...themeLayers, coreDir]) {
+      const target = path.join(layer, dir);
+      if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
+    }
+  }
+
+  // Section/component entries are the same capture shape over a shorter chain
+  // (consumer → theme layers, no core): sections.js caches each entry's
+  // resolved template and its json5 defaults PER config registration, so an
+  // edit to a section renders the cached parse until a reset. The dirs are
+  // Eleventy-ignored, so template/json5 edits have no other lane — but the
+  // dirs are also asset watchDirs, so a section.scss/js edit rides BOTH lanes:
+  // its css hot-swap AND a config reset (accepted cost, #138).
+  for (const dir of ['_sections', '_components']) {
+    targets.add(path.join(options.consumerDir, dir));
+
+    for (const layer of themeLayers) {
       const target = path.join(layer, dir);
       if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
     }
@@ -527,6 +572,7 @@ module.exports.resolveWebsitePort = resolveWebsitePort;
 module.exports.websiteWantedPort = websiteWantedPort;
 module.exports.readSiblingPorts = readSiblingPorts;
 module.exports.devServerOptions = devServerOptions;
+module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 

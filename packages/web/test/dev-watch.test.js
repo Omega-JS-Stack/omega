@@ -74,14 +74,32 @@ function app() {
   write(`themes/${ACTIVE_THEME}/_layouts/theme-toy.html`, '<main data-theme-layout="BEFORE">{{ content }}</main>');
   writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="BEFORE">{{ content }}</main>');
   // The base theme layer of every chain — present, empty, exactly as a theme
-  // that ships no layouts is. The default-pages dir is empty too: the real one
-  // renders against the real core layouts, which this fixture replaces.
+  // that ships no layouts is.
   fs.mkdirSync(path.join(packaged, 'themes', 'classy'), { recursive: true });
   for (const set of ['sample-posts', 'sample-team', 'sample-updates']) {
     fs.mkdirSync(path.join(packaged, 'defaults', set), { recursive: true });
   }
+  // Packaged default pages + showcase pages (#136): layout-less, because the
+  // real ones render against the real core layouts, which this fixture
+  // replaces. Both are read at CONFIG time and registered as virtual
+  // templates, so an edit only lands through a config reset.
+  const defaultPage = (permalink, marker, body) => [
+    '---',
+    `permalink: ${permalink}`,
+    '---',
+    `<p ${marker}="BEFORE">${body}</p>`,
+  ].join('\n');
+  writePackaged('defaults/pages/default-toy.html', defaultPage('/default-page.html', 'data-default', 'default'));
+  writePackaged('defaults/showcase/showcase-toy.html', defaultPage('/showcase-page.html', 'data-showcase', 'showcase'));
+
+  // A consumer-local section: its template AND its json5 defaults are read
+  // once per config registration (sections.js entry/template caches), so both
+  // are config-time captures like the layouts.
+  write('_sections/toy-section/section.html', '<section data-section="{{ args.label }}">toy</section>');
+  write('_sections/toy-section/section.json5', '{ defaults: { label: "BEFORE" } }');
 
   write('pages/index.html', page('toy.html', '/', '<p data-nav="{{ site.data._includes.nav.label }}">home</p>'));
+  write('pages/section-page.html', page('toy.html', '/section-page.html', '{% section "toy-section" %}'));
   write('pages/theme-page.html', page('theme-toy.html', '/theme-page.html', '<p>theme</p>'));
   write('pages/core-page.html', page('core-toy.html', '/core-page.html', '<p data-page="BEFORE">core</p>'));
 
@@ -134,6 +152,7 @@ async function startWatch(t, fixture) {
         activeTheme: ACTIVE_THEME,
         themesDir: fixture.themesDir,
         coreDir: fixture.coreDir,
+        defaultsDir: fixture.defaultsDir,
       });
       return configureOmega(eleventyConfig, {
         consumerDir: fixture.src,
@@ -237,6 +256,45 @@ test('a watched packaged-layer _layouts edit is served by the very next rebuild'
 
   fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AGAIN">{{ content }}</main>');
   await watch.pageBecomes(/data-core-layout="AGAIN"/, 'every later edit lands too', 'core-page.html');
+});
+
+test('a watched defaults/pages edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('default-page.html'), /data-default="BEFORE"/, 'the first build renders the packaged default page');
+
+  fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AFTER">default</p>');
+  await watch.pageBecomes(/data-default="AFTER"/, 'the rebuild serves the defaults edit, not the config-time capture', 'default-page.html');
+
+  fixture.writePackaged('defaults/pages/default-toy.html', '---\npermalink: /default-page.html\n---\n<p data-default="AGAIN">default</p>');
+  await watch.pageBecomes(/data-default="AGAIN"/, 'every later edit lands too', 'default-page.html');
+});
+
+test('a watched defaults/showcase edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('showcase-page.html'), /data-showcase="BEFORE"/, 'the first build renders the packaged showcase page');
+
+  fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AFTER">showcase</p>');
+  await watch.pageBecomes(/data-showcase="AFTER"/, 'the rebuild serves the showcase edit, not the config-time capture', 'showcase-page.html');
+
+  fixture.writePackaged('defaults/showcase/showcase-toy.html', '---\npermalink: /showcase-page.html\n---\n<p data-showcase="AGAIN">showcase</p>');
+  await watch.pageBecomes(/data-showcase="AGAIN"/, 'every later edit lands too', 'showcase-page.html');
+});
+
+test('a watched _sections edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('section-page.html'), /data-section="BEFORE"/, 'the first build renders the authored section');
+
+  fixture.write('_sections/toy-section/section.html', '<section data-section="AFTER-{{ args.label }}">toy</section>');
+  await watch.pageBecomes(/data-section="AFTER-BEFORE"/, 'the rebuild serves the section template edit, not the cached parse', 'section-page.html');
+
+  fixture.write('_sections/toy-section/section.json5', '{ defaults: { label: "AFTER" } }');
+  await watch.pageBecomes(/data-section="AFTER-AFTER"/, 'the section defaults are re-read too', 'section-page.html');
 });
 
 test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {

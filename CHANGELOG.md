@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- [#136](../../issues/136) — `omega dev` serves edits to the packaged defaults tree (default pages, the section showcase, the sample-content corpora) on the very next rebuild, instead of re-rendering the copy captured when the server started.
+- [#138](../../issues/138) — `omega dev` serves edits to section and component entries (`_sections`/`_components`, consumer and theme layers) on the very next rebuild — the per-registration template and `section.json5` caches are rebuilt instead of served stale until restart.
+- [#137](../../issues/137) — A consumer-local theme at `src/themes/<id>` reaches the dev asset build and its watcher: the asset lane now resolves the theme chain from the same directory the engine does, so the brand's own theme styles the dev site instead of the packaged theme's.
+
 ## [0.8.2] (2026-07-30)
 
 ### Fixed
