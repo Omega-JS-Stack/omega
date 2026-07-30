@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.2] (2026-07-30)
+
 ### Fixed
-- [#134](../../issues/134) — `omega dev` serves layout and include edits from every layer, not just the consumer's: the theme layers' and the framework core's `_layouts`/`_includes` are watch targets too, so such an edit lands on the next rebuild with no restart. Only those subtrees — css and page edits keep their lanes.
+- [#134](../../issues/134) [`2ecae1af`](../../commit/2ecae1af) Thanks [@ianwieds]! — `omega dev` serves layout and include edits from every layer, not just the consumer's: the theme layers' and the framework core's `_layouts`/`_includes` are watch targets too, so such an edit lands on the next rebuild with no restart. Only those subtrees — css and page edits keep their lanes.
 
 ## [0.8.1] (2026-07-30)
 
