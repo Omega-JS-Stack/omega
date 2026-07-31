@@ -252,6 +252,7 @@ API references for each subsystem live in `docs/`:
 - [docs/extension.md](../../packages/extension/docs/extension.md) — cross-browser `chrome.*` / `browser.*` API wrapper
 - [docs/auth.md](../../packages/extension/docs/auth.md) — cross-context auth sync, sign-in / load / sign-out flows, button CSS classes
 - [docs/verts.md](../../packages/extension/docs/verts.md) — `[data-omega-vert]` auto-bind to @omega.js/client's verts module on page surfaces (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense; content scripts never bind)
+- [docs/affiliatizer.md](../../packages/extension/docs/affiliatizer.md) — the content script's affiliate-link redirect on matched partner hostnames (a fixed framework-level map, not brand config): default-on, once per partner per 24h, `?affiliatizerStatus=block|allow|reset` control, store-listing disclosure
 - [docs/offscreen.md](../../packages/extension/docs/offscreen.md) — offscreen document lifecycle, creation from background, messaging
 - [docs/xss-prevention.md](../../packages/extension/docs/xss-prevention.md) — escapeHTML/sanitizeURL canonical forms, extension attack vectors
 

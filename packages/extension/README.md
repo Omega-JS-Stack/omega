@@ -24,6 +24,7 @@
 - **One-line bootstrap per context** with cross-browser API wrapper
 - **Cross-context auth sync**: sign-in in one tab is reflected in all open contexts (no `chrome.storage` needed)
 - **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/verts.md](docs/verts.md)
+- **Affiliate redirects**: a visit to a partner site (Amazon, Rakuten, NordVPN, …) redirects once per 24h to an affiliate URL — default-on, `?affiliatizerStatus=block` to stop it. The partner map is a fixed framework constant carrying the framework author's referral codes, not per-brand config. See [docs/affiliatizer.md](docs/affiliatizer.md)
 - **Auto-translation** to 16 languages via Claude CLI on every build
 - **Four-layer test framework**: build / background / view / boot — real Chromium, real MV3 service worker, real consumer extensions
 - **Multi-browser packaging + auto-publish** to Chrome / Firefox / Edge stores from one command

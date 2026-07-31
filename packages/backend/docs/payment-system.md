@@ -325,3 +325,5 @@ Key rules:
 ## Test Processor
 
 The `test` processor generates Stripe-shaped data and auto-fires webhooks to the local server. Only available in non-production environments. Use `processor: 'test'` in intent requests during testing. The test webhook processor delegates to Stripe's parser since it generates Stripe-shaped payloads.
+
+Both doors enforce that: the intent side throws inside `intent/processors/test.js`, and `POST /payments/webhook?processor=test` answers 403 in production (the webhook processors receive only the raw request, so the route's dispatch layer carries the guard). Real processors are unaffected — a provider dashboard points at `POST /omega/payments/webhook?processor=<processor>&key=<OMEGA_WEBHOOK_KEY>`, and that shared key compare is the whole verification story for the webhook door.

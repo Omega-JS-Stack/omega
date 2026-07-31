@@ -31,6 +31,13 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond('Invalid key', { code: 401 });
   }
 
+  // Guard: test processor is not available in production
+  // (mirrors the intent side's guard — the webhook processors receive only the raw
+  // req, so the dispatch layer is where this side has a ctx to ask)
+  if (processor === 'test' && ctx.isProduction()) {
+    return ctx.respond('Test processor is not available in production', { code: 403 });
+  }
+
   // Validate brand — quit if a brand is specified and doesn't match ours
   const brand = query.brand;
   const ourBrand = Manager.config.brand?.id;

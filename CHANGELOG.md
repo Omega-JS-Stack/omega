@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#28](../../issues/28) — Desktop builds resolve their macOS signing certificate in one order: `CSC_LINK`, the brand's gitignored `.omega/certificates/apple/` tree, its company's tree via the `.omega/company.json` stamp, then the Keychain — still the default. A tree certificate is used only when `CSC_KEY_PASSWORD` opens it.
+- [#55](../../issues/55) — The extension's Affiliatizer is documented in [packages/extension/docs/affiliatizer.md](packages/extension/docs/affiliatizer.md): the hostname-match redirect, its default-on storage flag, the 24-hour per-partner dedupe, `?affiliatizerStatus=block|allow|reset`, and the disclosure. The partner map is a fixed framework constant, not per-brand config ([#147](../../issues/147)).
+
+### Changed
+- [#51](../../issues/51) — The backend CLI's state-mutating subcommands (`firestore:set`, `firestore:delete`, `auth:set-claims`, `auth:delete`, joining `auth:token`) now target the EMULATOR by default; `--production` is the deliberate opt-in to touch live, and every one names the stack it hit in its success line. Read-only subcommands keep their live default with `--emulator`.
+- [#50](../../issues/50) — The payments webhook's `test` processor is now non-production only: `POST /payments/webhook?processor=test` answers 403 in production, the rule the intent side already enforced. The shared `?key=<OMEGA_WEBHOOK_KEY>` compare stays the verification story for every real processor.
+
 ## [0.10.1] (2026-07-30)
 
 ### Changed

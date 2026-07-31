@@ -2,6 +2,7 @@ const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const { confirm } = require('@inquirer/prompts');
 const { initFirebase } = require('./firebase-init');
+const { resolveTarget } = require('../utils/target');
 
 class FirestoreCommand extends BaseCommand {
   async execute() {
@@ -10,8 +11,9 @@ class FirestoreCommand extends BaseCommand {
     const subcommand = args[0]; // e.g., 'firestore:get'
     const action = subcommand.split(':')[1];
 
-    // Initialize Firebase
-    const isEmulator = argv.emulator || false;
+    // Initialize Firebase. Writes target the emulator unless --production is
+    // passed; reads keep the live default (src/cli/utils/target.js owns the rule).
+    const { emulator: isEmulator, label: target } = resolveTarget(subcommand, argv);
     let firebase;
 
     try {
@@ -25,7 +27,6 @@ class FirestoreCommand extends BaseCommand {
     }
 
     const { admin, projectId } = firebase;
-    const target = isEmulator ? 'emulator' : 'production';
     this.log(chalk.gray(`  Target: ${projectId} (${target})\n`));
 
     // Dispatch to subcommand handler
@@ -33,11 +34,11 @@ class FirestoreCommand extends BaseCommand {
       case 'get':
         return await this.get(admin, args, argv);
       case 'set':
-        return await this.set(admin, args, argv);
+        return await this.set(admin, args, argv, target);
       case 'query':
         return await this.query(admin, args, argv);
       case 'delete':
-        return await this.del(admin, args, argv, isEmulator);
+        return await this.del(admin, args, argv, isEmulator, target);
       default:
         this.logError(`Unknown firestore subcommand: ${action}`);
         this.log(chalk.gray('  Available: firestore:get, firestore:set, firestore:query, firestore:delete'));
@@ -79,15 +80,15 @@ class FirestoreCommand extends BaseCommand {
   }
 
   /**
-   * Write/merge to a document.
-   * Usage: npx bm firestore:set users/abc123 '{"field": "value"}'
+   * Write/merge to a document. Emulator unless --production.
+   * Usage: npx bm firestore:set users/abc123 '{"field": "value"}' [--production]
    */
-  async set(admin, args, argv) {
+  async set(admin, args, argv, target) {
     const docPath = args[1];
     const jsonString = args[2];
 
     if (!docPath || !jsonString) {
-      this.logError('Usage: npx bm firestore:set <path> \'<json>\'');
+      this.logError('Usage: npx bm firestore:set <path> \'<json>\' [--production]');
       return;
     }
 
@@ -103,7 +104,7 @@ class FirestoreCommand extends BaseCommand {
 
     try {
       await admin.firestore().doc(docPath).set(data, { merge });
-      this.logSuccess(`Document written: ${docPath} (merge: ${merge})`);
+      this.logSuccess(`Document written to ${target}: ${docPath} (merge: ${merge})`);
       this.output(data, argv);
     } catch (error) {
       this.logError(`Failed to write document: ${error.message}`);
@@ -162,14 +163,14 @@ class FirestoreCommand extends BaseCommand {
   }
 
   /**
-   * Delete a document.
-   * Usage: npx bm firestore:delete users/abc123 [--force]
+   * Delete a document. Emulator unless --production.
+   * Usage: npx bm firestore:delete users/abc123 [--production] [--force]
    */
-  async del(admin, args, argv, isEmulator) {
+  async del(admin, args, argv, isEmulator, target) {
     const docPath = args[1];
 
     if (!docPath) {
-      this.logError('Usage: npx bm firestore:delete <path> [--force]');
+      this.logError('Usage: npx bm firestore:delete <path> [--production] [--force]');
       return;
     }
 
@@ -188,7 +189,7 @@ class FirestoreCommand extends BaseCommand {
 
     try {
       await admin.firestore().doc(docPath).delete();
-      this.logSuccess(`Document deleted: ${docPath}`);
+      this.logSuccess(`Document deleted from ${target}: ${docPath}`);
     } catch (error) {
       this.logError(`Failed to delete document: ${error.message}`);
     }

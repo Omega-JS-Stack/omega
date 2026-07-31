@@ -38,6 +38,17 @@ if (logFileEnv !== 'false' && logFileEnv !== '0') {
   logger.log(`Logs tee'd to ${logPath}`);
 }
 
+// Signing certificate lookup: explicit CSC_LINK → the brand's gitignored
+// .omega/certificates tree → the Keychain (the default, and what a tree-less
+// setup keeps getting). Runs AFTER the log tee so the chosen source and reason
+// land in build.log — the line a CI signing failure is diagnosed from.
+// See utils/resolve-signing-cert.js.
+const signingCert = require('../utils/resolve-signing-cert.js')({ projectRoot });
+if (signingCert.source === 'certificates') {
+  process.env.CSC_LINK = signingCert.cscLink;
+}
+logger.log(`Signing certificate: ${signingCert.source} (${signingCert.reason})`);
+
 logger.log('Starting...', argv);
 
 // Auto-load tasks from src/gulp/tasks/*.js

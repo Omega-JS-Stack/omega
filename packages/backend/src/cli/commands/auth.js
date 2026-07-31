@@ -2,6 +2,7 @@ const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const { confirm } = require('@inquirer/prompts');
 const { initFirebase } = require('./firebase-init');
+const { resolveTarget } = require('../utils/target');
 
 class AuthCommand extends BaseCommand {
   async execute() {
@@ -10,12 +11,11 @@ class AuthCommand extends BaseCommand {
     const subcommand = args[0]; // e.g., 'auth:get' or 'auth:set-claims'
     const action = subcommand.split(':').slice(1).join(':'); // handles 'auth:set-claims'
 
-    // Initialize Firebase. auth:token is a dev/QA surface — it defaults to
-    // the EMULATOR (pass --production deliberately); the other subcommands
-    // keep their explicit --emulator opt-in.
-    const isEmulator = subcommand === 'auth:token'
-      ? !argv.production
-      : (argv.emulator || false);
+    // Initialize Firebase. The subcommands that MUTATE state (set-claims,
+    // delete, and the credential-minting token) default to the EMULATOR — pass
+    // --production deliberately; the read-only ones keep their explicit
+    // --emulator opt-in (src/cli/utils/target.js owns the rule).
+    const { emulator: isEmulator, label: target } = resolveTarget(subcommand, argv);
     let firebase;
 
     try {
@@ -29,7 +29,6 @@ class AuthCommand extends BaseCommand {
     }
 
     const { admin, projectId } = firebase;
-    const target = isEmulator ? 'emulator' : 'production';
     this.log(chalk.gray(`  Target: ${projectId} (${target})\n`));
 
     // Dispatch to subcommand handler
@@ -39,9 +38,9 @@ class AuthCommand extends BaseCommand {
       case 'list':
         return await this.list(admin, args, argv);
       case 'delete':
-        return await this.del(admin, args, argv, isEmulator);
+        return await this.del(admin, args, argv, isEmulator, target);
       case 'set-claims':
-        return await this.setClaims(admin, args, argv);
+        return await this.setClaims(admin, args, argv, target);
       case 'token':
         return await this.token(admin, args, argv, isEmulator);
       default:
@@ -56,13 +55,13 @@ class AuthCommand extends BaseCommand {
    * ?authCustomToken= (+ optional authReturnUrl), so the printed URL signs
    * the browser in directly. Emulator by default; --production is explicit.
    * Usage: npx omega auth:token _test.admin@playground.omegajs.dev
-   *        npx omega auth:token <uid> --url http://localhost:4000 --return /account
+   *        npx omega auth:token <uid> [--production] --url http://localhost:4000 --return /account
    */
   async token(admin, args, argv, isEmulator) {
     const identifier = args[1];
 
     if (!identifier) {
-      this.logError('Usage: npx omega auth:token <uid-or-email> [--url http://localhost:4000] [--return /account]');
+      this.logError('Usage: npx omega auth:token <uid-or-email> [--production] [--url http://localhost:4000] [--return /account]');
       return;
     }
 
@@ -157,14 +156,14 @@ class AuthCommand extends BaseCommand {
   }
 
   /**
-   * Delete a user.
-   * Usage: npx bm auth:delete user@email.com [--force]
+   * Delete a user. Emulator unless --production.
+   * Usage: npx bm auth:delete user@email.com [--production] [--force]
    */
-  async del(admin, args, argv, isEmulator) {
+  async del(admin, args, argv, isEmulator, target) {
     const identifier = args[1];
 
     if (!identifier) {
-      this.logError('Usage: npx bm auth:delete <uid-or-email> [--force]');
+      this.logError('Usage: npx bm auth:delete <uid-or-email> [--production] [--force]');
       return;
     }
 
@@ -198,22 +197,22 @@ class AuthCommand extends BaseCommand {
 
     try {
       await admin.auth().deleteUser(user.uid);
-      this.logSuccess(`User deleted: ${user.uid}`);
+      this.logSuccess(`User deleted from ${target}: ${user.uid}`);
     } catch (error) {
       this.logError(`Failed to delete user: ${error.message}`);
     }
   }
 
   /**
-   * Set custom claims on a user.
-   * Usage: npx bm auth:set-claims user@email.com '{"admin": true}'
+   * Set custom claims on a user. Emulator unless --production.
+   * Usage: npx bm auth:set-claims user@email.com '{"admin": true}' [--production]
    */
-  async setClaims(admin, args, argv) {
+  async setClaims(admin, args, argv, target) {
     const identifier = args[1];
     const jsonString = args[2];
 
     if (!identifier || !jsonString) {
-      this.logError('Usage: npx bm auth:set-claims <uid-or-email> \'<json>\'');
+      this.logError('Usage: npx bm auth:set-claims <uid-or-email> \'<json>\' [--production]');
       return;
     }
 
@@ -239,7 +238,7 @@ class AuthCommand extends BaseCommand {
 
     try {
       await admin.auth().setCustomUserClaims(user.uid, claims);
-      this.logSuccess(`Custom claims set for ${user.uid}:`);
+      this.logSuccess(`Custom claims set for ${user.uid} on ${target}:`);
       this.output(claims, argv);
     } catch (error) {
       this.logError(`Failed to set claims: ${error.message}`);

@@ -23,6 +23,39 @@ Cross-platform code signing reference. Covers macOS (sign + notarize), Windows (
   .env                                 # gitignored — env vars referencing config/certs/*
 ```
 
+## Where the macOS certificate comes from (the lookup order)
+
+A signed build resolves its Developer ID Application certificate in ONE order
+([src/utils/resolve-signing-cert.js](../src/utils/resolve-signing-cert.js), applied at the
+gulp boundary):
+
+1. **`CSC_LINK`** in the environment — an explicit answer always wins.
+2. **The brand's signing tree** —
+   `<brandRoot>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12`,
+   where the brand root is the nearest directory at or above the app carrying a `.omega/`.
+   This is the portable/CI path: `@omega.js/manager`'s certificates service produces the
+   tree ([the manager guide](../../../docs/manager/index.md)).
+3. **The company's tree**, when the brand is company-managed. A brand is NEVER physically
+   inside its company folder — membership is the `.omega/company.json` stamp at the brand
+   root, read through `@omega.js/config`'s `readCompanyRoot` (the ecosystem's one company
+   rule). The stamp's target is used as given: it is explicit config, not discovery.
+4. **The macOS Keychain** — electron-builder's own identity auto-discovery.
+
+**Keychain stays the default.** A project with no signing tree resolves to it exactly as
+before. Two further conditions keep a build on the Keychain rather than handing
+electron-builder a file it cannot use: no `CSC_KEY_PASSWORD` in the `.env` cascade, or a
+password that does not OPEN the `.p12` (verified with `openssl pkcs12 -legacy`, retried
+without the flag for LibreSSL — stock macOS openssl — which reads legacy containers but
+rejects the flag; a missing openssl is named as the reason rather than blamed on the
+password). The build log names the source it picked, and the reason, on every run.
+
+The brand-root walk stops **below the home directory**: `~/.omega` is a real personal
+overlay on developer machines, so a tree at or above `~` is never a signing tree.
+
+The password itself never lives in config: `CSC_KEY_PASSWORD` comes from the `.env`
+cascade (the manager's certificates service writes it to the signing root's `.env`),
+and the config validator hard-fails secret-shaped config keys.
+
 ## What's universal vs per-brand
 
 **Universal (one set per Apple Developer team / Windows signing identity):**

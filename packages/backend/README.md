@@ -742,17 +742,17 @@ npx @omega.js/backend <command>
 | `mgr firestore:indexes:get` | Get Firestore indexes |
 | `mgr cwd` | Show current working directory |
 | `mgr firestore:get <path>` | Read a Firestore document |
-| `mgr firestore:set <path> '<json>'` | Write/merge a Firestore document |
+| `mgr firestore:set <path> '<json>'` | Write/merge a Firestore document (emulator unless `--production`) |
 | `mgr firestore:query <collection>` | Query a Firestore collection |
-| `mgr firestore:delete <path>` | Delete a Firestore document |
+| `mgr firestore:delete <path>` | Delete a Firestore document (emulator unless `--production`) |
 | `mgr auth:get <uid-or-email>` | Get an Auth user by UID or email |
 | `mgr auth:list` | List Auth users |
-| `mgr auth:delete <uid-or-email>` | Delete an Auth user |
-| `mgr auth:set-claims <uid-or-email> '<json>'` | Set custom claims on an Auth user |
+| `mgr auth:delete <uid-or-email>` | Delete an Auth user (emulator unless `--production`) |
+| `mgr auth:set-claims <uid-or-email> '<json>'` | Set custom claims on an Auth user (emulator unless `--production`) |
 | `mgr logs:read` | Fetch Cloud Function logs from Google Cloud Logging |
 | `mgr logs:tail` | Stream live Cloud Function logs |
 
-All Firestore and Auth commands support `--emulator` to target the local emulator, `--force` to skip confirmation, and `--raw` for compact JSON output.
+The state-mutating Firestore/Auth subcommands (`firestore:set`, `firestore:delete`, `auth:set-claims`, `auth:delete`, `auth:token`) target the local emulator by default and reach live only with `--production`; the read-only ones default to live and take `--emulator`. All of them support `--force` to skip confirmation and `--raw` for compact JSON output, and every one prints the stack it hit.
 
 Logs commands support `--fn <name>` (function name filter), `--severity <level>`, `--since <duration>` (read only), `--limit <n>` (read only), and `--raw`. Requires `gcloud` CLI installed and authenticated.
 
