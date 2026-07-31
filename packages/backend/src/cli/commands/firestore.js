@@ -11,9 +11,10 @@ class FirestoreCommand extends BaseCommand {
     const subcommand = args[0]; // e.g., 'firestore:get'
     const action = subcommand.split(':')[1];
 
-    // Initialize Firebase. Writes target the emulator unless --production is
-    // passed; reads keep the live default (src/cli/utils/target.js owns the rule).
-    const { emulator: isEmulator, label: target } = resolveTarget(subcommand, argv);
+    // Initialize Firebase. Every subcommand — reads and writes alike — defaults
+    // to the EMULATOR; --production is the deliberate opt-in to touch live
+    // (src/cli/utils/target.js owns the rule).
+    const { emulator: isEmulator, label: target } = resolveTarget(argv);
     let firebase;
 
     try {

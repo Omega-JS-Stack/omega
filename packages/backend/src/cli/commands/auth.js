@@ -11,11 +11,10 @@ class AuthCommand extends BaseCommand {
     const subcommand = args[0]; // e.g., 'auth:get' or 'auth:set-claims'
     const action = subcommand.split(':').slice(1).join(':'); // handles 'auth:set-claims'
 
-    // Initialize Firebase. The subcommands that MUTATE state (set-claims,
-    // delete, and the credential-minting token) default to the EMULATOR — pass
-    // --production deliberately; the read-only ones keep their explicit
-    // --emulator opt-in (src/cli/utils/target.js owns the rule).
-    const { emulator: isEmulator, label: target } = resolveTarget(subcommand, argv);
+    // Initialize Firebase. Every subcommand — reads and writes alike — defaults
+    // to the EMULATOR; --production is the deliberate opt-in to touch live
+    // (src/cli/utils/target.js owns the rule).
+    const { emulator: isEmulator, label: target } = resolveTarget(argv);
     let firebase;
 
     try {

@@ -78,8 +78,8 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `test` | Run the project's test suites against an emulator (`framework:` / `full:` reach the framework suite) |
 | `update` | Dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
 | `mcp` | Start the stdio MCP server (for Claude Code / Claude Desktop). Supports `--token <key>` for user-level connections |
-| `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal (writes go to the emulator unless `--production`) |
-| `auth:get/list/delete/set-claims` | Manage Auth users from the terminal (mutations go to the emulator unless `--production`) |
+| `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal (emulator unless `--production`) |
+| `auth:get/list/delete/set-claims` | Manage Auth users from the terminal (emulator unless `--production`) |
 | `auth:token` | Mint a custom token + one-click sign-in URL (QA "log in as anyone"; emulator by default, `--production` explicit) |
 | `logs:read` / `logs:tail` | Cloud Function logs from Google Cloud Logging |
 | `stripe` | Standalone Stripe CLI webhook forwarding |

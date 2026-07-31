@@ -22,4 +22,7 @@ Ian's durable rulings, migrated verbatim from PROGRESS.md's Rulings lane when th
 - Ian 2026-07-20: per-app docs retire in brand context — the brand root is the ONE home (AGENTS.md chain + one README/docs/CHANGELOG)
 - Standing: secrets never in omega.json5 (.env only; config hard-fails); npu never raw npm/npx; explicit `git -C`; commit-and-continue; de-ITW to config = standard scope
 - Standing: checkpoint discipline — survey → design → implement → tests → sandbox/fixture proof → docs → commit; live checks never touch real ITW resources outside sanctioned paths
+- Ian 2026-07-30: uniformity — commands/surfaces of the same TYPE act the SAME; no split defaults within one family (the CLI read/write emulator split was the offense: every backend CLI subcommand now defaults to the emulator, `--production` the only path to live)
+- Ian 2026-07-30: NO legacy accommodations in the new system — no code path accepting a superseded form; breaking changes get DOCUMENTED (register: #148) and migrated once, manually (playbook: #149); the config-convert input lane is the one sanctioned legacy-reading exception
+- Ian 2026-07-30: company membership is the `.omega/company.json` stamp POINTER — brands never physically nest inside a company folder; anything resolving the company must follow the stamp, never the directory tree
 

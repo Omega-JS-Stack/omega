@@ -752,7 +752,7 @@ npx @omega.js/backend <command>
 | `mgr logs:read` | Fetch Cloud Function logs from Google Cloud Logging |
 | `mgr logs:tail` | Stream live Cloud Function logs |
 
-The state-mutating Firestore/Auth subcommands (`firestore:set`, `firestore:delete`, `auth:set-claims`, `auth:delete`, `auth:token`) target the local emulator by default and reach live only with `--production`; the read-only ones default to live and take `--emulator`. All of them support `--force` to skip confirmation and `--raw` for compact JSON output, and every one prints the stack it hit.
+Every Firestore/Auth subcommand — reads and writes alike — targets the local emulator by default and reaches live only with `--production` (one rule, no exceptions; `--emulator` is accepted but just names the default). All of them support `--force` to skip confirmation and `--raw` for compact JSON output, and every one prints the stack it hit.
 
 Logs commands support `--fn <name>` (function name filter), `--severity <level>`, `--since <duration>` (read only), `--limit <n>` (read only), and `--raw`. Requires `gcloud` CLI installed and authenticated.
 

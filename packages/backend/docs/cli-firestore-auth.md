@@ -2,7 +2,7 @@
 
 Quick commands for reading/writing Firestore and managing Auth users directly from the terminal. Works in any @omega.js/backend consumer project (production needs the service-account chain; the emulator needs nothing).
 
-**Which stack a subcommand hits** ([#51](https://github.com/Omega-JS-Stack/omega/issues/51)): the ones that MUTATE state — `firestore:set`, `firestore:delete`, `auth:set-claims`, `auth:delete`, `auth:token` — target the **emulator by default**, and reach live only with an explicit `--production`. The read-only ones (`firestore:get`, `firestore:query`, `auth:get`, `auth:list`) keep the opposite default: live, with `--emulator` to look at the local stack. Every command prints the stack it hit — the `Target: <projectId> (<stack>)` header, and again in the success line (`Document written to emulator: …`). The rule lives in one place: `src/cli/utils/target.js`.
+**Which stack a subcommand hits** ([#51](https://github.com/Omega-JS-Stack/omega/issues/51)): EVERY subcommand — reads and writes alike — targets the **emulator by default** and reaches live only with an explicit `--production`. One rule, no exceptions; `--emulator` is accepted but just names the default. Every command prints the stack it hit — the `Target: <projectId> (<stack>)` header, and again in the success line (`Document written to emulator: …`). The rule lives in one place: `src/cli/utils/target.js`.
 
 **IMPORTANT: All CLI commands (`npx omega ...`) MUST be run from the consumer project's `functions/` subdirectory** (e.g., `cd /path/to/my-project/functions && npx omega ...`). The `mgr` binary lives in `functions/node_modules/.bin/` — running from the project root or any other directory will fail.
 
@@ -11,7 +11,7 @@ For log commands, see [docs/cli-logs.md](cli-logs.md).
 ## Firestore Commands
 
 ```bash
-npx omega firestore:get <path>                          # Read a document
+npx omega firestore:get <path>                          # Read a document (emulator; --production for live)
 npx omega firestore:set <path> '<json>'                 # Write/merge a document (emulator; --production for live)
 npx omega firestore:set <path> '<json>' --no-merge      # Overwrite a document entirely
 npx omega firestore:query <collection>                  # Query a collection (default limit 25)
@@ -24,8 +24,8 @@ npx omega firestore:delete <path>                       # Delete a document (emu
 ## Auth Commands
 
 ```bash
-npx omega auth:get <uid-or-email>                       # Get user by UID or email (auto-detected via @)
-npx omega auth:list [--limit N] [--page-token T]        # List users (default 100)
+npx omega auth:get <uid-or-email>                       # Get user by UID or email (emulator; --production for live)
+npx omega auth:list [--limit N] [--page-token T]        # List users (emulator; --production for live)
 npx omega auth:delete <uid-or-email>                    # Delete user (emulator; --production prompts for confirmation)
 npx omega auth:set-claims <uid-or-email> '<json>'       # Set custom claims (emulator; --production for live)
 npx omega auth:token <uid-or-email>                     # Mint a custom token + one-click sign-in URL (QA)
@@ -35,7 +35,7 @@ npx omega auth:token <uid-or-email>                     # Mint a custom token + 
 
 Mints a custom token for the user and prints a URL the auth pages consume
 directly (`/signin?authCustomToken=…&authReturnUrl=…`) — open it and the
-browser IS that user. Like the other state-mutating subcommands it targets the
+browser IS that user. Like every subcommand it targets the
 **emulator by default**; pass `--production` deliberately.
 
 | Flag | Description |
@@ -48,16 +48,19 @@ browser IS that user. Like the other state-mutating subcommands it targets the
 
 | Flag | Description |
 |------|-------------|
-| `--production` | Target the live stack instead of the emulator (state-mutating subcommands) |
-| `--emulator` | Target the local emulator instead of live (read-only subcommands) |
+| `--production` | Target the live stack instead of the emulator (every subcommand) |
+| `--emulator` | Accepted for muscle memory — the emulator is already the default |
 | `--force` | Skip confirmation on destructive operations |
 | `--raw` | Compact JSON output (for piping to `jq` etc.) |
 
 ## Examples
 
 ```bash
-# Read a user document from production
+# Read a user document from the emulator (the default)
 npx omega firestore:get users/abc123
+
+# Read a user document from production (deliberate)
+npx omega firestore:get users/abc123 --production
 
 # Write to the emulator (the default)
 npx omega firestore:set users/test123 '{"name":"Test User"}'

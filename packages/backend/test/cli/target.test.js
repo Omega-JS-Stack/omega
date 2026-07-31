@@ -1,10 +1,11 @@
 /**
- * Test: which stack a state-mutating CLI subcommand talks to
+ * Test: which stack a backend CLI subcommand talks to
  * ([#51](https://github.com/Omega-JS-Stack/omega/issues/51)).
  *
- * Ruling: state-mutating backend CLI subcommands target the EMULATOR by default;
- * `--production` is the deliberate opt-in to touch live. Read-only subcommands keep
- * their production default with the `--emulator` opt-in.
+ * Ruling (uniformity amendment, Ian 2026-07-30): EVERY backend CLI subcommand
+ * targets the EMULATOR by default — reads and writes alike, one rule for the
+ * whole surface; `--production` is the only opt-in to touch live. A habitual
+ * `--emulator` names the default and consults nothing.
  *
  * Two layers: the resolver itself (pure), then the two command classes actually
  * asking it — `initFirebase` is swapped for a recorder there because the real one
@@ -94,32 +95,26 @@ module.exports = {
 
   tests: [
     {
-      name: 'state-mutating-subcommands-default-to-the-emulator',
+      name: 'every-subcommand-defaults-to-the-emulator',
       async run({ assert }) {
-        ['firestore:set', 'firestore:delete', 'auth:set-claims', 'auth:delete', 'auth:token'].forEach((subcommand) => {
-          assert.equal(resolveTarget(subcommand, {}).emulator, true, `${subcommand} should default to the emulator`);
-          assert.equal(resolveTarget(subcommand, {}).label, 'emulator', `${subcommand} should be labelled emulator`);
-        });
+        assert.equal(resolveTarget({}).emulator, true, 'no flags should default to the emulator');
+        assert.equal(resolveTarget({}).label, 'emulator', 'no flags should be labelled emulator');
       },
     },
 
     {
       name: 'production-flag-is-the-only-way-to-the-live-stack',
       async run({ assert }) {
-        ['firestore:set', 'firestore:delete', 'auth:set-claims', 'auth:delete', 'auth:token'].forEach((subcommand) => {
-          assert.equal(resolveTarget(subcommand, { production: true }).emulator, false, `${subcommand} --production should hit live`);
-          assert.equal(resolveTarget(subcommand, { production: true }).label, 'production', `${subcommand} --production should be labelled production`);
-        });
+        assert.equal(resolveTarget({ production: true }).emulator, false, '--production should hit live');
+        assert.equal(resolveTarget({ production: true }).label, 'production', '--production should be labelled production');
       },
     },
 
     {
-      name: 'read-only-subcommands-keep-the-production-default',
+      name: 'emulator-flag-names-the-default-and-consults-nothing',
       async run({ assert }) {
-        ['firestore:get', 'firestore:query', 'auth:get', 'auth:list'].forEach((subcommand) => {
-          assert.equal(resolveTarget(subcommand, {}).emulator, false, `${subcommand} should still read live by default`);
-          assert.equal(resolveTarget(subcommand, { emulator: true }).emulator, true, `${subcommand} --emulator should read the emulator`);
-        });
+        assert.equal(resolveTarget({ emulator: true }).emulator, true, '--emulator lands where the default already goes');
+        assert.equal(resolveTarget({ emulator: true, production: true }).emulator, false, '--production wins; --emulator is not consulted');
       },
     },
 
@@ -166,11 +161,20 @@ module.exports = {
     },
 
     {
-      name: 'a-read-subcommand-still-reaches-live-through-the-same-dispatcher',
+      name: 'a-read-subcommand-follows-the-same-emulator-default',
       async run({ assert }) {
         const run = await runSubcommand(AUTH_PATH, ['auth:get', '_test-uid'], {});
 
-        assert.equal(run.emulator, false, 'auth:get should still default to live');
+        assert.equal(run.emulator, true, 'auth:get should default to the emulator like everything else');
+      },
+    },
+
+    {
+      name: 'a-read-subcommand-reaches-live-with-production',
+      async run({ assert }) {
+        const run = await runSubcommand(AUTH_PATH, ['auth:get', '_test-uid'], { production: true });
+
+        assert.equal(run.emulator, false, 'auth:get --production should hit live');
       },
     },
   ],

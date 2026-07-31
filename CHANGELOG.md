@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- [#51](../../issues/51) — The emulator default now covers EVERY backend CLI subcommand: reads (`firestore:get`, `firestore:query`, `auth:get`, `auth:list`) join the writes, one rule with `--production` as the only path to live. The read-only live default and its `--emulator` opt-in are gone.
+
 ## [0.11.0] (2026-07-30)
 
 ### Added
