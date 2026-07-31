@@ -23,12 +23,12 @@ skills/
 ```yaml
 ---
 name: <name>
-description: <what it covers> - <when to use it, with the trigger words>
+description: <when to use it — one sentence, 300 characters or less>
 user-invocable: true
 ---
 ```
 
-The `description` is the whole loading decision — it is the only part Claude reads before choosing to load the skill, so it carries both halves: what the skill knows, and the phrases that should pull it in.
+The `description` is the whole loading decision — it is the only part Claude reads before choosing to load the skill — and every skill's sits in EVERY session, so it is a shared context budget. One tight sentence naming WHEN to invoke this skill: the package, the surfaces, the situations. Nothing about what the skill knows — the body and the docs carry that. `scripts/skill-descriptions.test.js` fails the structure lane on anything over 300 characters.
 
 ## The body points; the repo docs are the source
 

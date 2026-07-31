@@ -1,6 +1,6 @@
 ---
 name: web
-description: Router for @omega.js/web — the Eleventy 3 + LiquidJS website framework: layered themes, the section/component library, default pages, the asset pipeline, and the omega CLI. - Use when working on a brand's website app or on the web framework itself. Triggers on "@omega.js/web", "omega web", "website app", "apps/website", "Eleventy", "eleventy.config", "LiquidJS", "liquid template", "section", "component", "{% section %}", "composition", "section schema", "theme", "classy", "newsflash", "neobrutalism", "layer", "layered layout", "blueprint", "default page", "omega customize", "omega dev", "omega build", "omega migrate", "omega translate", "omega purge", "PurgeCSS", "esbuild", "sass", "--omega-* token", "design token", "permalink", "page frontmatter", "collections", "posts", "pricing", "service worker", "verts", "ads", "targets.web", or any work in a website app's src/pages/, src/assets/, or the framework's packages/web/.
+description: Use when working on a brand's website app or on @omega.js/web itself — Eleventy and Liquid templates, sections and components, themes, blueprints and default pages, the asset pipeline, or the omega CLI, in apps/website or packages/web/.
 user-invocable: true
 ---
 

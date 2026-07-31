@@ -1,6 +1,6 @@
 ---
 name: main
-description: OMEGA ecosystem hub — the package roster and which skill routes each one, the docs topology, the brand map, and where project state lives. Orients a session; the guides teach. - Use when working across more than one OMEGA framework, when working in the monorepo itself, or when the right home for a change is not yet known. Triggers on "OMEGA", "omega monorepo", "the monorepo", "@omega.js", "which package", "which framework", "cross-framework", "shared docs", "docs/shared", "omega.json5", "the brands", "sandbox-brand", "omega-playground", "newsflash-brand", "omega-brand", "which brand", "the omega plugin", "omega skills", "project state", "the queue", "full stack", "every framework", "all the frameworks", or any question about where a fact or a change belongs.
+description: Use when working across more than one OMEGA framework, in the monorepo itself, or when the right home for a change is not yet known — which package owns a thing, the docs topology, the brand map, or where project state lives.
 user-invocable: true
 ---
 

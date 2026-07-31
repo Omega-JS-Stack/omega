@@ -1,6 +1,6 @@
 ---
 name: seo
-description: The search-surface checklist for an OMEGA web page — title/description, canonical and social meta, structured data, one h1, sitemap/robots, link shape — and which mechanism owns each one. - Use before finishing any page work in a website app or in packages/web. Triggers on "SEO", "meta title", "meta description", "canonical", "og:image", "open graph", "social preview", "structured data", "schema.org", "json-ld", "rich result", "sitemap", "robots.txt", "noindex", "indexable", "search ranking", "page meta", or a page/layout/head-chrome edit.
+description: Use before finishing any page work in a website app or in packages/web — or when the ask names SEO, meta title or description, canonical, open graph, structured data, one h1, sitemap, robots.txt, noindex, or search ranking.
 user-invocable: true
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: client
-description: Router for @omega.js/client — the shared frontend runtime singleton embedded by web, desktop, and extension: auth, reactive data-omega-bind bindings, Firestore, storage, notifications, Sentry, omega.request(), verts, icons, motion. - Use when working IN the client package, or on any frontend behavior it owns. Triggers on "@omega.js/client", "omega client", "packages/client", "the client singleton", "import omega from", "data-omega-bind", "binding", "binding action", "bindings engine", "resolveSubscription", "settler pattern", "omega.request", "omega-properties", "auth state", "signin flow", "firestore module", "notifications module", "service-worker module", "sentry module", "escapeHTML", "sanitizeURL", "icon-core", "icon-renderer", "motion", "verts module", or any work in packages/client/src/modules/.
+description: Use when working in @omega.js/client or on any frontend behavior it owns — the runtime singleton, auth state, data-omega-bind bindings, the Firestore, storage, notifications and Sentry modules, omega.request(), verts, icons, motion, or anything in packages/client/.
 user-invocable: true
 ---
 

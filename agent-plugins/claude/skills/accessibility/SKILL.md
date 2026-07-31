@@ -1,6 +1,6 @@
 ---
 name: accessibility
-description: The accessibility checklist for OMEGA front-end work — landmarks and heading order, image alt text, control names, color through the --omega-* tokens, focus visibility, and reduced-motion behavior. - Use before finishing any markup, theme, section, or stylesheet change in a website app, packages/web, or a desktop/extension UI surface. Triggers on "accessibility", "a11y", "screen reader", "aria", "alt text", "keyboard navigation", "focus ring", "tab order", "contrast", "color contrast", "reduced motion", "prefers-reduced-motion", "WCAG", "label", "landmark", or any section/component/layout/scss edit.
+description: Use before finishing any markup, theme, section, or stylesheet change in a website app, packages/web, or a desktop/extension UI surface — or when the ask names accessibility, a11y, aria, alt text, keyboard navigation, focus, contrast, reduced motion, or WCAG.
 user-invocable: true
 ---
 

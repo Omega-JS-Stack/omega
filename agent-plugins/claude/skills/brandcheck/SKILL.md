@@ -1,6 +1,6 @@
 ---
 name: brandcheck
-description: Config and copy consistency for an OMEGA brand — brand facts read from omega.json5 instead of literals, one brand hex driving the accent ramp, the merge chain, and secrets staying out of config. - Use when editing omega.json5, theme or default-page copy, section defaults, or any file that names a brand. Triggers on "brand name", "brand color", "brand.url", "omega.json5", "config consistency", "hardcoded name", "hardcoded url", "site.brand", "brand voice", "copy check", "fork-portable", "brandcheck".
+description: Use when editing config/omega.json5, theme or default-page copy, section defaults, or any file that names a brand — brand facts belong in config, never as a hardcoded name, url, or hex, and secrets never in config at all.
 user-invocable: true
 ---
 

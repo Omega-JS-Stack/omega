@@ -1,6 +1,6 @@
 ---
 name: browser
-description: Drive a per-session isolated Chrome through the mcp-router's chrome-devtools upstreams (CDP) — navigate, click, fill, screenshot, evaluate JS, Lighthouse — plus the electron and unpacked-extension variants for omega desktop and extension apps. - Use when the user wants to open, view, test, check, or debug a page in a browser, take screenshots of a site, fill or submit web forms, scrape/inspect live pages, run Lighthouse audits, attach to a running desktop dev app, test an unpacked extension, or automate any web UI. Triggers on "in the browser", "open the page", "screenshot the site", "test this in chrome", "check the page", "drive the browser", "attach to the app", "test the extension".
+description: Use when the user wants to open, view, screenshot, test, or debug a page in a real browser, fill or submit forms, inspect live pages, run Lighthouse, attach to a running desktop dev app, or test an unpacked extension.
 user-invocable: true
 ---
 

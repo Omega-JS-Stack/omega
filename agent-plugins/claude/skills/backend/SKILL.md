@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Router for @omega.js/backend — the Firebase Cloud Functions framework: schema-validated routes, usage tracking, payments, email, auth hooks, the MCP server, and the emulator test harness. - Use when working on a brand's backend app or on the backend framework itself. Triggers on "@omega.js/backend", "omega backend", "backend app", "apps/backend", "functions/", "route", "schema", "endpoint", "omega_api", "Manager.init", "RouteContext", "ctx.respond", "Cloud Function", "Firebase function", "Firestore", "firestore rules", "firestore index", "emulator", "omega emulator", "omega serve", "omega test", "usage", "rate limit", "quota", "payment", "Stripe", "PayPal", "resolveSubscription", "auth hook", "before-create", "before-signin", "cron job", "marketing campaign", "consent", "email template", "MJML", "MCP server", "logs:read", "logs:tail", "firestore:get", "auth:token", "getApiUrl", "targets.backend", or any work in src/routes/, src/schemas/, src/hooks/, or packages/backend/.
+description: Use when working on a brand's backend app or on @omega.js/backend itself — Cloud Functions routes, schemas, auth hooks, the emulator harness, usage, payments, email, or anything under apps/backend, functions/, or packages/backend/.
 user-invocable: true
 ---
 

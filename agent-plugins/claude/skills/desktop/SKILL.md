@@ -1,6 +1,6 @@
 ---
 name: desktop
-description: Router for @omega.js/desktop — the Electron framework: per-process Manager singletons, file-based windows/tray/menu definitions, deep links, the auto-updater, and the multi-platform sign/notarize/release pipeline. - Use when working on a brand's desktop app or on the desktop framework itself. Triggers on "@omega.js/desktop", "omega desktop", "desktop app", "apps/desktop", "Electron", "main process", "renderer", "preload", "manager.windows", "window-manager", "tray", "menu", "context-menu", "ipc", "electron-store", "deep link", "protocol", "single-instance", "auto-updater", "electron-updater", "electron-builder", "app-state", "client-bridge", "auth-persistence", "safeStorage", "remote-config", "remote-scripts", "restart-manager", "omega publish", "sign-windows", "notarize", "validate-certs", "finalize-release", "omega launch", "release/", "targets.desktop", or any work in a desktop app's src/main.js, src/preload.js, src/integrations/, or packages/desktop/.
+description: Use when working on a brand's desktop app or on @omega.js/desktop itself — Electron main, renderer or preload, windows, tray, menus, ipc, deep links, the auto-updater, or the sign/notarize/release pipeline, in apps/desktop or packages/desktop/.
 user-invocable: true
 ---
 

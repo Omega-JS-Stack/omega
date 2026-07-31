@@ -1,6 +1,6 @@
 ---
 name: manager
-description: Router for @omega.js/manager — the brand orchestration engine that walks every service in dependency order and reconciles a brand monorepo to its config/omega.json5, plus the brand-root guide every consumer brand imports. - Use when working at a brand monorepo root, on the manage cycle, or on the manager package itself. Triggers on "@omega.js/manager", "omega manager", "packages/manager", "brand monorepo", "brand root", "manage cycle", "reconcile", "npm start at the brand root", "--service=", "--dry-run", "--continue-on-error", "--strict", "omega onboard", "onboarding wizard", "company mode", "--brand=", "omega deploy fan-out", "omega update fan-out", ".omega/state.json", ".omega/runs", "devlog", "disperse", "workspace service", "github service", "cloud service", "cloudflare service", "domain service", "payment service", "seo service", "certificates service", "agent-docs chain", "AGENTS.md import", or any work in a brand's config/omega.json5 or apps/ layout.
+description: Use when working at a brand monorepo root, on the manage cycle, or on @omega.js/manager itself — the service walk, reconciling a brand to its config/omega.json5, onboarding, deploy and update fan-out, .omega state, disperse, or the agent-docs chain.
 user-invocable: true
 ---
 

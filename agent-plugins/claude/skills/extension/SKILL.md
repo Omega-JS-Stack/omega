@@ -1,6 +1,6 @@
 ---
 name: extension
-description: Router for @omega.js/extension — the cross-browser MV3 extension framework: per-context Manager singletons, the component architecture, cross-context auth sync, auto-translation, and the multi-browser package/publish pipeline. - Use when working on a brand's extension app or on the extension framework itself. Triggers on "@omega.js/extension", "omega extension", "extension app", "apps/extension", "chrome extension", "firefox extension", "MV3", "manifest.json", "manifest v3", "background service worker", "popup", "options page", "sidepanel", "content script", "offscreen document", "chrome.runtime", "chrome.storage", "chrome.tabs", "cross-context auth", "syncAuth", "packaged/", "gulp", "webpack", "_locales", "auto-translation", "build hook", "build:pre", "build:post", "OMEGA_BUILD_MODE", "OMEGA_IS_PUBLISH", "chrome web store", "store publish", "targets.extension", or any work in an extension app's src/views/, src/assets/js/components/, or packages/extension/.
+description: Use when working on a brand's extension app or on @omega.js/extension itself — the MV3 manifest, background service worker, popup, options, sidepanel, content scripts, cross-context auth, _locales translation, or the package/publish pipeline, in apps/extension or packages/extension/.
 user-invocable: true
 ---
 

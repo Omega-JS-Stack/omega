@@ -3,7 +3,7 @@ layout: frontend/pages/updates/update
 
 meta:
   title: "Version {{ page.update.version }} - {{ site.brand.name }}"
-  description: "{{ page.update.summary | default: 'Release notes for version ' | append: page.update.version | append: ' of ' | append: site.brand.name }}"
+  description: "{% capture updateFallback %}Release notes for version {{ page.update.version }} of {{ site.brand.name }}{% endcapture %}{{ page.update.summary | default: updateFallback }}"
   breadcrumb: "v{{ page.update.version }}"
 ---
 

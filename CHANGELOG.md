@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- [#140](../../issues/140) — The omega Claude plugin's 11 skill descriptions are now single trigger sentences (8,760 → 2,654 chars), keeping the always-resident skill listing inside its context budget; a structure-lane test hard-fails any description over 300 characters.
+
+### Fixed
+- [#143](../../issues/143) — An update page carrying a summary no longer gets the version and brand name glued onto its meta description; the "Release notes for version X of Brand" text is now reachable only when no summary exists, on the page itself and in `pages.json` / `llms.txt`.
+
 ## [0.10.0] (2026-07-30)
 
 ### Added
