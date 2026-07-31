@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.12.1] (2026-07-31)
+
 ### Fixed
-- [#150](../../issues/150) — The client's verts module reads AdSense slot ids from the schema's `advertising.providers.adsense.*Slot` keys (`displaySlot`, `inArticleSlot`, `inFeedSlot`, `multiplexSlot`); the old `slots.*` read never matched any schema shape, so `data-ad-slot` was never set from config. Settles [#35](../../issues/35)'s reader half.
+- [#150](../../issues/150) [`1beb150e`](../../commit/1beb150e) Thanks [@ianwieds]! — The client's verts module reads AdSense slot ids from the schema's `advertising.providers.adsense.*Slot` keys (`displaySlot`, `inArticleSlot`, `inFeedSlot`, `multiplexSlot`); the old `slots.*` read never matched any schema shape, so `data-ad-slot` was never set from config. Settles [#35](../../issues/35)'s reader half.
 
 ## [0.12.0] (2026-07-31)
 
