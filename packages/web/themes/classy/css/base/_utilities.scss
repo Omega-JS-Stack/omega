@@ -225,12 +225,17 @@
 // iridescent OUTLINE for the few surfaces that earn it (recommended plan
 // card, trial CTA, nav signup). Two-layer paint: the inner layer fills
 // padding-box with the surface/button bg, the gradient paints only the
-// border-box ring. Per Ian's refs (2026-07-16): a PASTEL spectrum that
-// wraps the perimeter (conic), not a diagonal sweep — modern rainbow,
-// deliberately brand-agnostic. Stops are hand-mixed and unique to v2:
-// legacy classy gradients (aurora/sunset/rainbow) are retired, and every
-// obvious Tailwind hex collides with legacy semantic tokens — never
-// reintroduce either. First stop repeats last so the wrap is seamless.
+// border-box ring. Per Ian's refs (2026-07-16): a spectrum that wraps the
+// perimeter (conic), not a diagonal sweep — modern rainbow, deliberately
+// brand-agnostic. Legacy classy gradients (aurora/sunset/rainbow) are
+// retired — never reintroduce them. First stop repeats last so the wrap is
+// seamless.
+//
+// ONE rainbow formula (Ian 2026-07-31): the ring and the omega dotfield are
+// the SAME ramp — fixed saturation/lightness, hue sweeping the wheel. The
+// dots sample it continuously in canvas (`@omega.js/client` motion.js,
+// RAINBOW_S 0.68 / RAINBOW_L 0.58, mirrored below); CSS samples the same
+// ramp every 45°. Change the ramp in both places or in neither.
 // ============================================
 @property --classy-ring-angle {
   syntax: '<angle>';
@@ -238,9 +243,29 @@
   initial-value: 0deg;
 }
 
+// The dotfield's fixed S/L — the ONE definition on the CSS side
+$classy-rainbow-s: 68%;
+$classy-rainbow-l: 58%;
+
+// One sample of the shared ramp.
+// @param {Number} $hue - hue angle in degrees
+// @return {Color} the ramp's color at that hue
+@function classy-rainbow($hue) {
+  @return hsl($hue, $classy-rainbow-s, $classy-rainbow-l);
+}
+
 :root {
-  // butter → coral → pink → lavender → periwinkle → aqua → soft green
-  --classy-gradient-stops: #f2d478, #f2a288, #f094c2, #bd97f2, #88b4f2, #7fd9cf, #a5e08c, #f2d478;
+  // red → orange → yellow → green → aqua → blue → indigo → magenta → red
+  --classy-gradient-stops:
+    #{classy-rainbow(0)},
+    #{classy-rainbow(45)},
+    #{classy-rainbow(90)},
+    #{classy-rainbow(135)},
+    #{classy-rainbow(180)},
+    #{classy-rainbow(225)},
+    #{classy-rainbow(270)},
+    #{classy-rainbow(315)},
+    #{classy-rainbow(360)};
   --classy-gradient: conic-gradient(from 250deg, var(--classy-gradient-stops));
 }
 

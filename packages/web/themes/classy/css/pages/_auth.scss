@@ -134,8 +134,10 @@
     margin-bottom: 1.5rem;
   }
 
-  // Social provider button: neutral ghost with the provider's brand icon
-  // (inlined via uj_icon — the ITW CDN logo <img> is retired)
+  // Social provider button: neutral ghost with the provider's mark — the
+  // brandmark in its own colors when the frontmatter names `logo:` (uj_logo),
+  // the monochrome uj_icon glyph otherwise. Either way an inline SVG: the ITW
+  // CDN logo <img> stays retired.
   .classy-auth__social {
     svg {
       width: 1.125rem;

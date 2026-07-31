@@ -1,0 +1,57 @@
+// Blog search results
+// The client-side result list the blog index renders in place of its normal
+// listing (core/js/pages/blog/index.js). Token-painted only, so it reads as
+// native in any theme and holds in both modes.
+
+.omega-blog-search__summary {
+  color: var(--omega-ink-muted);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.omega-blog-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.omega-blog-search__item {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--omega-line);
+
+  &:last-child {
+    border-bottom: 1px solid var(--omega-line);
+  }
+}
+
+.omega-blog-search__title {
+  color: var(--omega-ink);
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--omega-accent);
+  }
+}
+
+.omega-blog-search__meta {
+  color: var(--omega-ink-faint);
+  font-size: 0.8125rem;
+  margin: 0.25rem 0 0;
+}
+
+.omega-blog-search__excerpt {
+  color: var(--omega-ink-muted);
+  margin: 0.5rem 0 0;
+  max-width: 60ch;
+}
+
+.omega-blog-search__empty {
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  color: var(--omega-ink-muted);
+  padding: 3rem 1.5rem;
+  text-align: center;
+}

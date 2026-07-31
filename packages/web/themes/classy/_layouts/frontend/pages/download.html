@@ -95,7 +95,7 @@ features:
   subheadline: ""
   items:
     - title: "Everything syncs"
-      description: "Sign in anywhere and your work is already there — desktop, mobile, browser."
+      description: "Sign in anywhere and your work is already there: desktop, mobile, browser."
       icon: "rotate"
     - title: "Updates itself"
       description: "New versions arrive quietly in the background. You never install twice."
@@ -142,7 +142,7 @@ faqs:
   subheadline: "The questions everyone asks, answered straight."
   items:
     - question: "Is {{ site.brand.name }} free to download?"
-      answer: "Yes. The download is free and the core product works without a card. Paid plans add capacity and team features — see pricing when you're ready."
+      answer: "Yes. The download is free and the core product works without a card. Paid plans add capacity and team features. See pricing when you're ready."
     - question: "How do updates work?"
       answer: "The app keeps itself current in the background and tells you when something notable lands. Release notes live on the updates page."
     - question: "Can I use one account on all my devices?"
@@ -276,7 +276,7 @@ cta:
               {% for type in platform.types %}
                 {% assign config_url = site.download[platform.id][type.type] %}
                 {% iftruthy config_url %}
-                  <a href="{{ config_url }}" class="classy-dl-store__badge" data-download="true" aria-label="{{ platform.name }} — {{ type.name }}">
+                  <a href="{{ config_url }}" class="classy-dl-store__badge" data-download="true" aria-label="{{ platform.name }}: {{ type.name }}">
                     {% uj_logo platform.store_badge, "brandmarks" %}
                     <span class="classy-dl-store__badge-text">
                       <span class="classy-dl-store__hint">Download on</span>

@@ -22,7 +22,7 @@
     id: "omega-playground",
     name: "Paperloom",
     company: "ITW Creative Works",
-    description: "A quiet home for your writing — notes, drafts, and finished pages that follow you from browser to desk.",
+    description: "A quiet home for your writing: notes, drafts, and finished pages that follow you from browser to desk.",
     tagline: "Where drafts become pages.",
     color: "#166534", // "forest ink" — deliberately distinct from the real brand's ocean blue so the two sites never twin; drives the --omega-accent-* ramps
     // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
@@ -159,7 +159,7 @@
           // definition = the dotted-underline tooltip; author it ONCE per
           // feature id — the pricing composer backfills every other copy
           { id: "requests", name: "Saves", icon: "feather", definition: "Notes, clips, and pages you can save per month." },
-          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true, definition: "Web app, writing desk, and browser clipper — one library across all of them." },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true, definition: "Web app, writing desk, and browser clipper: one library across all of them." },
         ],
       },
       {
@@ -181,6 +181,27 @@
         chargebee: { itemId: null, legacyPlanIds: [] },
       },
       {
+        // Second paid tier — proves the card grid with more than one priced
+        // plan (no Stripe test product minted for it yet)
+        id: "pro",
+        name: "Press",
+        type: "subscription",
+        tagline: "best for teams publishing together",
+        limits: { requests: -1 },
+        trial: { days: 14 },
+        prices: { monthly: 24.99, annually: 249.99 },
+        features: [
+          { id: "requests", name: "Saves", icon: "feather" },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
+          { id: "support", name: "Priority support", icon: "headset", value: true },
+          { id: "seats", name: "Writers on your team", icon: "users", value: 10, definition: "People who can write in your shared library at the same time." },
+          { id: "review", name: "Draft review & approvals", icon: "pen-nib", value: true, definition: "Send a draft for review, collect comments, publish once it's approved." },
+        ],
+        stripe: { productId: null },
+        paypal: { productId: null },
+        chargebee: { itemId: null, legacyPlanIds: [] },
+      },
+      {
         id: "launch-kit",
         name: "Starter Library",
         type: "one-time",
@@ -191,6 +212,22 @@
         ],
         stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },
+      },
+      {
+        // enterprise: true leaves the card grid and renders as its own
+        // full-width row under the cards — priced by conversation
+        id: "enterprise",
+        name: "Bindery",
+        type: "subscription",
+        enterprise: true,
+        tagline: "best for publishing houses and organizations that need their own terms",
+        url: "/contact",
+        features: [
+          { id: "seats", name: "Unlimited writers", icon: "users", value: true },
+          { id: "sso", name: "SSO & provisioning", icon: "key", value: true },
+          { id: "residency", name: "Data residency & retention terms", icon: "shield-halved", value: true },
+          { id: "manager", name: "Named account manager", icon: "headset", value: true },
+        ],
       },
     ],
   },

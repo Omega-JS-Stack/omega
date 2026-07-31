@@ -9,9 +9,9 @@ post:
   tags: ["announcements"]
 ---
 
-Every good product deserves a place to think out loud. This blog is ours — release notes that explain *why*, engineering write-ups when we learn something the hard way, and the occasional look behind the curtain.
+Every good product deserves a place to think out loud. This blog is ours: release notes that explain *why*, engineering write-ups when we learn something the hard way, and the occasional look behind the curtain.
 
-**A quick note:** the posts you're reading right now are sample content. They only appear in local development while this site has no posts of its own — publish your first real post and they step aside automatically. Until then, they're here so the blog, categories, tags, and reading experience all render exactly the way they will with real writing in place.
+**A quick note:** the posts you're reading right now are sample content. They only appear in local development while this site has no posts of its own. Publish your first real post and they step aside automatically. Until then, they're here so the blog, categories, tags, and reading experience all render exactly the way they will with real writing in place.
 
 ## What to expect
 

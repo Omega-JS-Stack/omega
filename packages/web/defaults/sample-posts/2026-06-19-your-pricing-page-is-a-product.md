@@ -9,11 +9,11 @@ post:
   tags: ["product", "business"]
 ---
 
-Nobody arrives at a pricing page by accident. Every visitor is mid-decision, wallet half-open, looking for a reason to close it — or close the tab. That makes it the highest-stakes surface you own, and the one most teams last touched two rebrands ago.
+Nobody arrives at a pricing page by accident. Every visitor is mid-decision, wallet half-open, looking for a reason to close it, or to close the tab. That makes it the highest-stakes surface you own, and the one most teams last touched two rebrands ago.
 
 ## Answer the four questions fast
 
-Every pricing visitor is running the same script: *What does it cost? What do I get? What's the catch? What happens if I outgrow it?* A good page answers all four above the fold. Anything that delays those answers — mystery tiers, "Contact us" as the only number, features named after your internal jargon — reads as evasion. Evasion reads as expensive.
+Every pricing visitor is running the same script: *What does it cost? What do I get? What's the catch? What happens if I outgrow it?* A good page answers all four above the fold. Anything that delays those answers (mystery tiers, "Contact us" as the only number, features named after your internal jargon) reads as evasion. Evasion reads as expensive.
 
 ## Compare honestly or don't compare
 
@@ -25,4 +25,4 @@ A visible money-back guarantee converts skeptics not because anyone plans to use
 
 ## Measure it like a product
 
-The pricing page has a funnel, an activation rate, and failure modes — so instrument it. Where do people leave? Which plan gets hovered and abandoned? What do support tickets ask that the page should have answered? Ship changes, watch the numbers, repeat. Brochures get reprinted; products get better.
+The pricing page has a funnel, an activation rate, and failure modes, so instrument it. Where do people leave? Which plan gets hovered and abandoned? What do support tickets ask that the page should have answered? Ship changes, watch the numbers, repeat. Brochures get reprinted; products get better.

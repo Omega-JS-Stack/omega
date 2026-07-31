@@ -43,13 +43,15 @@ faqs:
   Pricing renders from config alone (C2): resolved.pricing is composed from
   payment.products by the engine. The marketing chrome above ships ON by
   default; consumer frontmatter overrides any of it (pricing.promo: false
-  kills the banner, pricing.enterprise: false the enterprise panel).
+  kills the banner). The enterprise panel is DATA, not chrome: it renders
+  only for the catalog product marked `enterprise: true`.
 {% endcomment %}
 
 {% assign _plans = resolved.pricing.plans %}
 {% assign _plan_count = _plans | size %}
 {% assign _onetime = resolved.pricing.oneTime %}
 {% assign _onetime_count = _onetime | size %}
+{% assign _enterprise = resolved.pricing.enterprise %}
 {% assign _show_toggle = false %}
 {% if resolved.pricing.billing.monthly and resolved.pricing.billing.annually %}
   {% assign _show_toggle = true %}
@@ -97,7 +99,7 @@ faqs:
   </div>
 </section>
 
-{% if _plan_count == 0 and _onetime_count == 0 %}
+{% if _plan_count == 0 and _onetime_count == 0 and _enterprise == nil %}
 <!-- Empty state: no published catalog (payment.products) — never render fiction -->
 <section class="pricing-plans pt-0">
   <div class="container">
@@ -262,21 +264,45 @@ faqs:
       {% endfor %}
     </div>
 
-    <!-- Enterprise block — ON by default; pricing.enterprise overrides copy, false kills -->
-    {% unless resolved.pricing.enterprise == false %}
-      <div class="card enterprise-panel">
-        <div>
-          <h3 class="enterprise-panel-title">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</h3>
-          <p class="mb-0 fw-medium">{{ resolved.pricing.enterprise.description | default: "Custom solutions for large organizations. Advanced security and flexible pricing based on your needs." }}</p>
-        </div>
-        <button class="btn btn-primary btn-lg fw-bold flex-shrink-0" data-plan-id="enterprise">
-          {% uj_icon "envelope", "me-2" %}{{ resolved.pricing.enterprise.button_text | default: "Contact us" }}
-        </button>
-      </div>
-    {% endunless %}
   </div>
 </section>
 {% endif %}
+
+{% iftruthy _enterprise %}
+<!-- ============================================ -->
+<!-- ENTERPRISE — its own hard-edged block under the cards (the catalog -->
+<!-- product marked enterprise: true; no such product, no block) -->
+<!-- ============================================ -->
+<section class="pricing-plans pt-0">
+  <div class="container">
+    <div class="card enterprise-panel">
+      <div>
+        <h3 class="enterprise-panel-title">{{ _enterprise.name }}</h3>
+        {% iftruthy _enterprise.tagline %}
+          <p class="mb-0 fw-medium">{{ _enterprise.tagline }}</p>
+        {% endiftruthy %}
+        {% if _enterprise.features.size > 0 %}
+          <ul class="pricing-plan-features enterprise-panel-features">
+            {% for feature in _enterprise.features %}
+              <li>
+                <span class="pricing-plan-feature-icon">{% uj_icon "check", "fa-sm" %}</span>
+                <span>
+                  {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | uj_commaify }}{% endif %}
+                  {% iftruthy feature.definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>{% endiftruthy %}
+                  {% iffalsy feature.definition %}{{ feature.name }}{% endiffalsy %}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      <a href="{{ _enterprise.url }}" class="btn btn-primary btn-lg fw-bold flex-shrink-0" data-plan-enterprise="{{ _enterprise.id }}">
+        {% uj_icon "envelope", "me-2" %}Contact us
+      </a>
+    </div>
+  </div>
+</section>
+{% endiftruthy %}
 
 {% if _onetime_count > 0 %}
 <!-- ============================================ -->
@@ -289,7 +315,7 @@ faqs:
         {{ resolved.pricing.one_time_headline | default: "One-time" }}
         <span class="text-accent">{{ resolved.pricing.one_time_headline_accent | default: "purchases" }}</span>
       </h2>
-      <p class="fw-medium">{{ resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." }}</p>
+      <p class="fw-medium">{{ resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever. No subscription required." }}</p>
     </header>
 
     <div class="pricing-plan-grid">
@@ -309,7 +335,7 @@ faqs:
           </div>
 
           <p class="pricing-plan-guarantee">
-            {% uj_icon "circle-check", "omega-check me-1" %}Yours forever — pay once
+            {% uj_icon "circle-check", "omega-check me-1" %}Yours forever, pay once
           </p>
 
           {% if product.features.size > 0 %}

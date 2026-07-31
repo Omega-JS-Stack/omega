@@ -19,6 +19,6 @@ member:
       url: https://x.com
 ---
 
-Hi, I'm Riley — one of the sample teammates who keep this page alive in local development. We bow out as soon as your real team arrives in `_team/`.
+Hi, I'm Riley, one of the sample teammates who keep this page alive in local development. We bow out as soon as your real team arrives in `_team/`.
 
 Support isn't a queue, it's the product's second first impression.

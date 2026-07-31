@@ -13,7 +13,7 @@
     id: "daily-build",
     name: "The Daily Build",
     company: "ITW Creative Works",
-    description: "The dev-news daily: ship logs, release radar, and the state of the toolchain — fresh off the press.",
+    description: "The dev-news daily: ship logs, release radar, and the state of the toolchain, fresh off the press.",
     tagline: "Fresh off the press.",
     color: "#F03612", // newsflash vermilion — the theme's signature accent drives the --omega-accent-* ramps
     // SUBDOMAIN of omegajs.dev (same rule as the playground): derived

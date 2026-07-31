@@ -5,7 +5,7 @@ layout: frontend/core/base
 hero:
   headline: "Thoughts, news and"
   headline_accent: "stories"
-  subheadline: "The latest from {{ site.brand.name }} — product news, guides, and perspectives."
+  subheadline: "The latest from {{ site.brand.name }}: product news, guides, and perspectives."
 
 # Newsletter CTA Section
 newsletter_cta:
@@ -29,17 +29,19 @@ newsletter_cta:
       </div>
 
       <div class="classy-masthead__actions" data-omega-reveal>
-        <form action="/search/cse" target="_blank" class="classy-blog-search">
+        {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
+        <div class="classy-blog-search">
           <span class="classy-blog-search__icon">{% uj_icon "search", "fa-sm" %}</span>
+          <label for="blog-search" class="visually-hidden">Search posts</label>
           <input
             type="search"
+            id="blog-search"
             class="classy-blog-search__input"
             name="q"
             placeholder="Search posts..."
-            aria-label="Search posts"
+            autocomplete="off"
           >
-          <button class="btn btn-adaptive btn-sm" type="submit">{% uj_icon "magnifying-glass", "fa-xs me-1" %}Search</button>
-        </form>
+        </div>
       </div>
     </div>
 
@@ -67,8 +69,11 @@ newsletter_cta:
   </div>
 </section>
 
+<!-- ═══ Search results — rendered client-side, replaces the listing while querying ═══ -->
+<section id="blog-search-results" class="omega-blog-search" aria-live="polite" hidden></section>
+
 <!-- ═══ Posts — featured lead (page 1) + unboxed grid ═══ -->
-<section>
+<section data-blog-listing>
   <div class="container">
     {% assign post_count = paginator.posts | size %}
     {% if post_count == 0 %}
@@ -77,7 +82,7 @@ newsletter_cta:
           <div class="card" data-omega-reveal>
             <div class="card-body p-5 text-center text-muted">
               <h2 class="h5">No posts yet</h2>
-              <p class="mb-0">Check back soon — new writing lands here first.</p>
+              <p class="mb-0">Check back soon. New writing lands here first.</p>
             </div>
           </div>
         </div>
@@ -217,12 +222,14 @@ newsletter_cta:
       </nav>
     {% endif %}
 
-    <!-- In-Feed Ad -->
-    <div class="row justify-content-center">
-      <div class="col-12 col-lg-8">
-        {% section "verts/unit", type: "in-feed" %}
+    <!-- In-Feed Vert (auto placement — the advertising config key gates it) -->
+    {% if site.advertising %}
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+          {% section "verts/unit", type: "in-feed" %}
+        </div>
       </div>
-    </div>
+    {% endif %}
   </div>
 </section>
 

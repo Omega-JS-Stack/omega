@@ -304,7 +304,7 @@ meta:
       <div class="card">
         <div class="card-header">
           <h5 class="mb-0">Test 7: Disabled-State Snapshot</h5>
-          <small class="text-muted">Elements disabled in HTML stay disabled through every FM state transition. Submit buttons are loading guards — FM takes them over.</small>
+          <small class="text-muted">Elements disabled in HTML stay disabled through every FM state transition. Submit buttons are loading guards. FM takes them over.</small>
         </div>
         <div class="card-body">
           <form id="test-form-snapshot" data-form-state="initializing" onsubmit="return false">
@@ -349,7 +349,7 @@ meta:
                   <textarea class="form-control" id="snapshot-notes" name="notes" rows="2" disabled>Restricted field</textarea>
                 </div>
                 <div class="alert alert-info small mb-0">
-                  Enterprise radio, Region select, and Notes textarea have <code>disabled</code> in the HTML. FM snapshots them at init and never re-enables them. The other fields start without <code>disabled</code> — the form-level <code>data-form-state</code> + CSS blocks interaction until FM is ready.
+                  Enterprise radio, Region select, and Notes textarea have <code>disabled</code> in the HTML. FM snapshots them at init and never re-enables them. The other fields start without <code>disabled</code>, and the form-level <code>data-form-state</code> + CSS blocks interaction until FM is ready.
                 </div>
               </div>
             </div>

@@ -1,23 +1,23 @@
 # ========== Default Values ==========
-# OMEGA Backend (@omega.js/backend) — consumer project
+# OMEGA Backend (@omega.js/backend) consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N) — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md) with the same sections in the same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
 
 ## Framework
 
-This project consumes **OMEGA Backend** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+This project consumes **OMEGA Backend** (@omega.js/backend), a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
-**Before doing ANY work on this codebase, the agent MUST read the framework documentation — that is where the architecture, conventions, APIs, and gotchas live. Skipping these will result in solutions that conflict with framework patterns.**
+**Before doing ANY work on this codebase, the agent MUST read the framework documentation: that is where the architecture, conventions, APIs, and gotchas live. Skipping these will result in solutions that conflict with framework patterns.**
 
 **Required reading:**
-- **`node_modules/@omega.js/AGENTS.md`** — the OMEGA map, the one agent entry into the framework docs; follow it to `docs/backend/index.md` (the @omega.js/backend guide: identity, architecture, conventions)
-- **`node_modules/@omega.js/backend/docs/`** — subsystem deep references (read the relevant ones for the task at hand)
+- **`node_modules/@omega.js/AGENTS.md`**: the OMEGA map, the one agent entry into the framework docs; follow it to `docs/backend/index.md` (the @omega.js/backend guide: identity, architecture, conventions)
+- **`node_modules/@omega.js/backend/docs/`**: subsystem deep references (read the relevant ones for the task at hand)
 
 ## Quick start
 
-All commands run from the **app root** (this directory). `dist/` is staged build output — never edit it.
+All commands run from the **app root** (this directory). `dist/` is staged build output; never edit it.
 
 ```bash
 npx omega setup             # validate config + scaffold defaults + stage dist/ + run checks
@@ -40,24 +40,24 @@ npx omega install live      # restore the published @omega.js/backend from npm
 
 ## Where things live
 
-- `package.json` — THE app manifest: scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
-- `src/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
-- `src/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `src/routes/get/hello.js` → `GET /hello`).
-- `src/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
-- `src/hooks/<area>/<event>.js` — auth/cron hooks.
-- `src/public/` — OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
-- `config/omega.json5` — STANDALONE apps only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this app's settings) and this app carries NO config file.
-- `.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored; staged into `dist/` for the deploy artifact.
-- `service-account.json` — Firebase Admin credentials (STANDALONE apps; brand apps keep it in the brand's `.omega/secrets/`). Gitignored.
-- `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
-- `.firebaserc` — Firebase project ID alias.
-- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside each; everything outside is yours.
-- `dist/` — GENERATED staged output (`omega build`): src copy + derived manifest + composed config + hosting boilerplate. Never edit; gitignored.
+- `package.json`: THE app manifest, carrying scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
+- `src/index.js`: entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
+- `src/routes/<verb>/<path>.js`: custom routes mounted at runtime (e.g. `src/routes/get/hello.js` → `GET /hello`).
+- `src/schemas/<name>.js`: schema definitions for `Manager.Settings()` validation.
+- `src/hooks/<area>/<event>.js`: auth/cron hooks.
+- `src/public/`: OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
+- `config/omega.json5`: STANDALONE apps only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this app's settings) and this app carries NO config file.
+- `.env`: secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored; staged into `dist/` for the deploy artifact.
+- `service-account.json`: Firebase Admin credentials (STANDALONE apps; brand apps keep it in the brand's `.omega/secrets/`). Gitignored.
+- `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
+- `.firebaserc`: Firebase project ID alias.
+- `firestore.rules` / `database.rules.json`: security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside each; everything outside is yours.
+- `dist/`: GENERATED staged output (`omega build`) carrying the src copy, derived manifest, composed config, and hosting boilerplate. Never edit; gitignored.
 
 ## Per-context imports
 
 ```js
-// src/index.js — the entire backend bootstrap
+// src/index.js: the entire backend bootstrap
 const Manager = require('@omega.js/backend');
 Manager.init(exports, {
   projectType: 'firebase',
@@ -73,17 +73,17 @@ module.exports = async function(Manager, ctx) {
 ## Available APIs at runtime
 
 After `Manager.init()`, the Manager instance exposes factory methods:
-- `Manager.RouteContext({ req, res })` — request handler with user + analytics + utility access
-- `Manager.User(data)` — user property structure + schema
-- `Manager.Analytics({ ctx })` — GA4 event tracking
-- `Manager.Usage()` — rate-limiting
-- `Manager.Middleware(req, res)` — request pipeline
-- `Manager.Settings()` — schema validation against `src/schemas/*`
-- `Manager.Utilities()` — batch operations + helpers
-- `Manager.Metadata(doc)` — timestamps + tag helpers
-- `Manager.storage({ name })` — local JSON storage (lowdb)
+- `Manager.RouteContext({ req, res })`: request handler with user + analytics + utility access
+- `Manager.User(data)`: user property structure + schema
+- `Manager.Analytics({ ctx })`: GA4 event tracking
+- `Manager.Usage()`: rate-limiting
+- `Manager.Middleware(req, res)`: request pipeline
+- `Manager.Settings()`: schema validation against `src/schemas/*`
+- `Manager.Utilities()`: batch operations + helpers
+- `Manager.Metadata(doc)`: timestamps + tag helpers
+- `Manager.storage({ name })`: local JSON storage (lowdb)
 
-Auth events, payment-webhook transitions, and cron jobs are wired automatically — hook into them by exporting from `src/hooks/<area>/<event>.js`.
+Auth events, payment-webhook transitions, and cron jobs are wired automatically; hook into them by exporting from `src/hooks/<area>/<event>.js`.
 
 ## Dependency resolution
 
@@ -92,7 +92,7 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically 
 
 ## Testing
 
-Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/@omega.js/backend/docs/test-framework.md`.
+Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/`: handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)`: registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one; "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/@omega.js/backend/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten on every `npx omega setup`. Add your project-specific notes below — they are preserved across setups. -->
 

@@ -1,14 +1,87 @@
-// `omega dev` (brand root) — target-selection rules. The spawn plumbing is
-// composition of tested pieces (discoverApps, resolveAppNode, watch-all's
-// forwarding pattern); the SELECTION is the behavior with rules worth
-// pinning: default set, --only/--except/--all, unknowns, missing apps,
-// backend-first ordering.
+// `omega dev` (brand root) — target-selection rules plus the boot SEQUENCE
+// (manage cycle, then the app legs). The spawn plumbing is composition of
+// tested pieces (discoverApps, resolveAppNode, watch-all's forwarding
+// pattern); the SELECTION is the behavior with rules worth pinning: default
+// set, --only/--except/--all, unknowns, missing apps, backend-first ordering.
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
+const childProcess = require('node:child_process');
 
-const { selectDevTargets, DEFAULT_TARGETS } = require('../src/commands/dev.js');
+// ─── Boot-sequence instrumentation ───────────────────────────────────────────
+// Both boundaries dev.js binds at load time (child_process.spawn, manage's
+// runManage) are replaced BEFORE it is required, so the order of the two is
+// observable in-process without booting anything real.
+
+const boot = [];
+let manageReport = { hasErrors: false, results: {}, brand: {} };
+
+childProcess.spawn = (command, args, options) => {
+  boot.push(`spawn:${path.basename(options.cwd)}`);
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = () => {};
+  return child;
+};
+
+const managePath = require.resolve('../src/manage.js');
+require.cache[managePath] = {
+  id: managePath,
+  filename: managePath,
+  path: path.dirname(managePath),
+  loaded: true,
+  exports: {
+    runManage: async (startDir) => {
+      boot.push(`manage:${startDir}`);
+      return manageReport;
+    },
+  },
+};
+
+const devCommand = require('../src/commands/dev.js');
+const { selectDevTargets, DEFAULT_TARGETS } = devCommand;
 
 const ALL_APPS = ['web', 'backend', 'desktop', 'extension'];
+
+/** Stage a brand monorepo with a single website app. */
+function stageBrand() {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
+
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  targets: { web: {} },
+}
+`);
+
+  const website = path.join(root, 'apps', 'website');
+  fs.mkdirSync(website, { recursive: true });
+  fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({ name: 'fixture-website', private: true }));
+
+  return root;
+}
+
+/**
+ * Boot the dev command from `cwd`. It never resolves by design (it holds the
+ * orchestrator alive while children run), so the run races a settle timer;
+ * a rejection still surfaces.
+ */
+async function bootDev(cwd, options = {}) {
+  const cwd0 = process.cwd();
+  process.chdir(cwd);
+  try {
+    return await Promise.race([
+      devCommand(options),
+      new Promise((resolve) => setTimeout(() => resolve('running'), 250)),
+    ]);
+  } finally {
+    process.chdir(cwd0);
+  }
+}
 
 test('default set is the local web loop — web + backend, GUI targets stay down', () => {
   const { selected, unknown, missing } = selectDevTargets({ available: ALL_APPS });
@@ -53,4 +126,27 @@ test('a web-only brand defaults to just web — no phantom backend leg', () => {
 
   assert.deepStrictEqual(selected, ['web']);
   assert.deepStrictEqual(missing, [], 'the default set adapts to the brand instead of warning');
+});
+
+// ─── Boot sequence ───────────────────────────────────────────────────────────
+
+test('boot opens with the manage cycle, THEN spawns the app legs — brand asset edits land on restart', async () => {
+  boot.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const outcome = await bootDev(root, { only: 'web' });
+
+  assert.strictEqual(outcome, 'running', 'the orchestrator stays alive after booting');
+  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'],
+    'the full service walk runs against the brand root before any app leg starts');
+});
+
+test('a manage cycle with errors stops dev boot loudly — no app leg spawns', async () => {
+  boot.length = 0;
+  manageReport = { hasErrors: true, results: {}, brand: {} };
+  const root = stageBrand();
+
+  await assert.rejects(() => bootDev(root, { only: 'web' }), /manage/i);
+  assert.deepStrictEqual(boot, [`manage:${root}`], 'nothing booted on top of a broken brand');
 });

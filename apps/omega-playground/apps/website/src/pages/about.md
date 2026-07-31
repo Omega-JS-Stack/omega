@@ -20,14 +20,14 @@ facts:
   - number: "100%"
     label: "Yours"
 {% endsection %}
-<!-- ═══ The letter — mission & vision ═══ -->
+<!-- ═══ The letter: mission & vision ═══ -->
 {% section "about/letter" %}
 mission:
   title: "Our mission"
-  description: "Give every writer one calm, trustworthy home for their words — capture anywhere, shape it at the desk, publish with pride — so the time goes into the <em>writing</em>, never the filing."
+  description: "Give every writer one calm, trustworthy home for their words: capture anywhere, shape it at the desk, publish with pride, so the time goes into the <em>writing</em>, never the filing."
 vision:
   title: "Our vision"
-  description: "A world where no good sentence dies in a lost tab — where your library outlives your devices, your apps, and your worst backup habits. The tools <em>disappear</em>; the pages are all anyone sees."
+  description: "A world where no good sentence dies in a lost tab, where your library outlives your devices, your apps, and your worst backup habits. The tools <em>disappear</em>; the pages are all anyone sees."
 {% endsection %}
 <!-- ═══ The journey ═══ -->
 {% section "about/timeline" %}
@@ -39,13 +39,13 @@ subheadline: "The small history of {{ site.brand.name }}."
 items:
   - year: "Before"
     title: "Words everywhere, library nowhere"
-    description: "Notes in one app, drafts in another, clippings in bookmarks — every good idea filed somewhere it would never be found again"
+    description: "Notes in one app, drafts in another, clippings in bookmarks, every good idea filed somewhere it would never be found again"
   - year: "The idea"
     title: "One library"
     description: "Paperloom began as a single stubborn rule: every word you write lands in the same library, no matter where you wrote it"
   - year: "The craft"
     title: "The desk, the page, the clipper"
-    description: "The writing desk for long mornings, the web app for anywhere, the clipper for everything worth keeping — all reading one library"
+    description: "The writing desk for long mornings, the web app for anywhere, the clipper for everything worth keeping, all reading one library"
   - year: "Next"
     title: "Shelves for everyone"
     description: "Shared journals, small-press publishing, and a library that grows old gracefully with you"

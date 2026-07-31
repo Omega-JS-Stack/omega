@@ -29,8 +29,9 @@ newsletter_cta:
   story splash, an editorial tile grid for the rest of the page's posts, pill
   pagination, category/tag chips, and the vermilion newsletter slab (the
   shared marketing/newsletter-cta band — the nf override inherits classy's
-  §7 FormManager section.js). Preserves classy's contracts: paginator,
-  /search/cse form, the form-manager dialect, and the verts/unit section.
+  §7 FormManager section.js). Preserves classy's contracts: paginator, the
+  client-side search wiring (#blog-search + #blog-search-results +
+  [data-blog-listing]), the form-manager dialect, and the verts/unit section.
 {% endcomment %}
 
 <!-- Page head: serif title + dek + search -->
@@ -50,27 +51,29 @@ newsletter_cta:
         {% endiftruthy %}
       </div>
       <div class="col-lg-4">
-        <form action="{{ site.url }}/search/cse" target="_blank">
-          <div class="input-group">
-            <input
-              type="search"
-              class="form-control"
-              name="q"
-              placeholder="Search posts..."
-              aria-label="Search posts"
-            >
-            <button class="btn btn-outline-dark" type="submit">
-              {% uj_icon "search" %}
-            </button>
-          </div>
-        </form>
+        {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
+        <label for="blog-search" class="visually-hidden">Search posts</label>
+        <div class="input-group">
+          <span class="input-group-text bg-transparent">{% uj_icon "search" %}</span>
+          <input
+            type="search"
+            id="blog-search"
+            class="form-control"
+            name="q"
+            placeholder="Search posts..."
+            autocomplete="off"
+          >
+        </div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- Search results — rendered client-side, replaces the feed while querying -->
+<section id="blog-search-results" class="omega-blog-search pt-0" aria-live="polite" hidden></section>
+
 <!-- Lead story + feed -->
-<section class="pt-0">
+<section class="pt-0" data-blog-listing>
   <div class="container">
     {% if paginator.posts.size > 0 %}
       <!-- Lead story splash -->
@@ -200,12 +203,14 @@ newsletter_cta:
       </div>
     </div>
 
-    <!-- In-Feed Ad -->
-    <div class="row justify-content-center mb-5">
-      <div class="col-12 col-lg-8" data-lazy="@class animation-slide-up">
-        {% section "verts/unit", type: "in-feed" %}
+    <!-- In-Feed Vert (auto placement — the advertising config key gates it) -->
+    {% if site.advertising %}
+      <div class="row justify-content-center mb-5">
+        <div class="col-12 col-lg-8" data-lazy="@class animation-slide-up">
+          {% section "verts/unit", type: "in-feed" %}
+        </div>
       </div>
-    </div>
+    {% endif %}
 
     <!-- Categories & Tags -->
     {% comment %} Build unique categories list (max 10) {% endcomment %}

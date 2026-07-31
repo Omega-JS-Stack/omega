@@ -31,7 +31,7 @@
         items: [
           {
             question: 'Do I need a credit card to start?',
-            answer: 'No — the free plan needs only an email address.',
+            answer: 'No. The free plan needs only an email address.',
           },
           {
             question: 'Can I bring my own domain?',
@@ -55,7 +55,7 @@
         items: [
           {
             question: 'Is there a free tier?',
-            answer: 'Yes — free forever for personal projects.',
+            answer: 'Yes. Free forever for personal projects.',
           },
           {
             question: 'How do upgrades work?',

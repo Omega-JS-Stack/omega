@@ -33,8 +33,15 @@ newsletter:
 <!-- Reading progress — accent hairline pinned under the nav (post JS drives width) -->
 <div class="classy-read-progress" aria-hidden="true"><span data-read-progress></span></div>
 
+{% comment %} Vert placement (docs/web/ads-system.md): auto-placed units need the
+  `advertising` config key, and a post opts out with `verts: false` in its
+  frontmatter. The opt-out also travels to the mid-article JS insertion lane
+  (pages/blog/[slug].js) through data-omega-verts on the article. {% endcomment %}
+{% assign _verts_on = false %}
+{% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
+
 <!-- ═══ Article — left-aligned editorial header (bronn pattern) ═══ -->
-<article class="classy-dotgrid">
+<article class="classy-dotgrid"{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-xl-9 col-lg-10 col-12">
@@ -128,12 +135,14 @@ newsletter:
       <div class="col-xl-2 d-none d-xl-block"><!-- optical balance --></div>
     </div>
 
-    <!-- Ad -->
-    <div class="row justify-content-center mb-3">
-      <div class="col-xl-7 col-lg-8 col-md-12 col-12">
-        {% section "verts/unit", type: "in-article" %}
+    <!-- Vert -->
+    {% if _verts_on %}
+      <div class="row justify-content-center mb-3">
+        <div class="col-xl-7 col-lg-8 col-md-12 col-12">
+          {% section "verts/unit", type: "in-article" %}
+        </div>
       </div>
-    </div>
+    {% endif %}
   </div>
 </article>
 

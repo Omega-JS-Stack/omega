@@ -107,7 +107,8 @@ test('default pages render when the consumer has no same-URL file', () => {
 test('wildcard page modules emit for every URL in the family (spec §7, asset_path is dead)', () => {
   // Every sample post URL rides the ONE blog/[slug] manifest entry — resolved
   // from the URL alone at render time, emitted verbatim (brackets included).
-  const posts = [...pages.keys()].filter((url) => /^\/blog\/[^/]+$/.test(url) && !url.includes('page'));
+  // (`[^/.]+` keeps the blog's machine file, /blog/index.json, out of the family)
+  const posts = [...pages.keys()].filter((url) => /^\/blog\/[^/.]+$/.test(url) && !url.includes('page'));
   assert.ok(posts.length >= 3, `sample posts rendered (${posts.length})`);
   for (const url of posts) {
     assert.ok(pages.get(url).includes('/assets/js/pages/blog/[slug]-TEST.js'), `${url} links the wildcard module`);

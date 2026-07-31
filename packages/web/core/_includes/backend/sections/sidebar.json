@@ -26,5 +26,14 @@
       href: '/contact',
       icon: 'circle-question'
     },
-  ]
+  ],
+
+  // The rail vert slot — the user app opts in; a brand with no `advertising`
+  // config renders nothing (the include's second gate), and paying users never
+  // see the unit (the standard auth binding).
+  bottom: {
+    vert: {
+      enabled: true,
+    },
+  },
 }

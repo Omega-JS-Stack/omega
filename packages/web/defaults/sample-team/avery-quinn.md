@@ -19,6 +19,6 @@ member:
       url: https://github.com
 ---
 
-Hey, I'm Avery — a sample profile that only shows up in local development. Add a real `_team/` member and I disappear.
+Hey, I'm Avery, a sample profile that only shows up in local development. Add a real `_team/` member and I disappear.
 
 I care about boring infrastructure, fast builds, and deleting more code than I write.

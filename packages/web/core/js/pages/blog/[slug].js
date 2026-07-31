@@ -60,6 +60,13 @@ function insertBlogPostAds() {
     return;
   }
 
+  // Per-post opt-out: `verts: false` frontmatter marks the article
+  // (the same flag suppresses the layout's in-article unit)
+  if ($article.closest('[data-omega-verts="false"]')) {
+    logger.log('Post opted out of verts — skipping vert insertion');
+    return;
+  }
+
   // Get all top-level paragraphs (exclude those inside blockquotes, details, etc.)
   const $paragraphs = Array.from($article.querySelectorAll('p'))
     .filter(p => !p.closest('blockquote, details, figure'));

@@ -337,7 +337,10 @@ class Manager {
           okButton: {
             text: 'Claim 15% Discount',
             link: '/pricing'
-          }
+          },
+          // Social-proof faces above the offer (foot.html renders them);
+          // an empty list renders four neutral glyph slots
+          avatars: []
         }
       },
       lazyLoading: {

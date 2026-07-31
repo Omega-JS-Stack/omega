@@ -2,16 +2,16 @@
 layout: blueprint/blog/post
 post:
   title: "The case for one config"
-  description: "Why every surface of this product reads from a single source of truth — and what that buys you in practice."
+  description: "Why every surface of this product reads from a single source of truth, and what that buys you in practice."
   id: 9000004
   image: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1600&q=80"
   categories: ["Product"]
   tags: ["product", "architecture"]
 ---
 
-Ask any team where their brand color is defined and you'll usually get a list: the website has one, the app has another, the emails have a third that someone eyeballed in 2023. None of them are wrong, exactly. They've just drifted — the way anything defined in five places always drifts.
+Ask any team where their brand color is defined and you'll usually get a list: the website has one, the app has another, the emails have a third that someone eyeballed in 2023. None of them are wrong, exactly. They've just drifted, the way anything defined in five places always drifts.
 
-We took the opposite bet: **one config, every surface**. The name, the colors, the links, the plans — defined once, consumed everywhere.
+We took the opposite bet: **one config, every surface**. The name, the colors, the links, the plans: defined once, consumed everywhere.
 
 ## What "everywhere" means
 
@@ -25,12 +25,12 @@ The alternative isn't hypothetical. It's the bug report that says "the website s
 
 ## The discipline it takes
 
-Single-source-of-truth is a habit you defend, not a feature you install. The temptation is always the quick fix — hardcode it here, just this once, we'll clean it up later. Every one of those is a small loan against the system, and the interest compounds.
+Single-source-of-truth is a habit you defend, not a feature you install. The temptation is always the quick fix: hardcode it here, just this once, we'll clean it up later. Every one of those is a small loan against the system, and the interest compounds.
 
 Our rule: if you're about to type a value that already exists somewhere else, stop. Reference it. If you can't reference it, that's an architecture bug worth fixing before the feature ships.
 
 ## Where it pays off most
 
-Honestly? Onboarding. A new teammate who finds one well-documented config file understands the product's shape in an afternoon. The same teammate facing five scattered definitions learns the shape the way everyone else did — by breaking something.
+Honestly? Onboarding. A new teammate who finds one well-documented config file understands the product's shape in an afternoon. The same teammate facing five scattered definitions learns the shape the way everyone else did: by breaking something.
 
 One config. Every surface. It's less exciting than it is correct, and we'll take that trade every time.

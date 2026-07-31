@@ -13,6 +13,10 @@
  *   omega dev --except backend      default minus
  *   omega dev --all                 every target with a dev leg
  *
+ * Boot order: a full manage cycle first (the brand's services reconcile —
+ * derived assets, .env dispersal, certs), then the legs. See
+ * docs/shared/local-dev.md for what refreshes when.
+ *
  * Port coordination is already solved (N7): the backend leg publishes its
  * emulator ports; the web leg reads them and bakes dev.ports into pages —
  * order tolerant, but backend boots first here so the fast path wins.
@@ -23,6 +27,7 @@ const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 
 // Local
+const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
 const { resolveAppNode, nodeEnvFor } = require('../lib/node-version.js');
 
@@ -93,6 +98,16 @@ module.exports = async (options = {}) => {
   console.log(chalk.bold(`🚀 omega dev — booting ${selected.join(' + ')} ${chalk.dim(`(${brandRoot})`)}`));
   if (!options.only && !options.all) {
     console.log(chalk.dim('   default set is web + backend — `--only`, `--except`, `--all` filter it'));
+  }
+
+  // Boot opens with a full manage cycle (#44): the app watchers see only
+  // their own app, so brand-level sources — assets/logo/brandmark.svg, .env,
+  // certs — reach the apps ONLY through the service walk. Without this, a
+  // brand edit sits invisible until someone remembers to run `npx omega`.
+  // A broken brand fails the boot instead of serving stale output.
+  const report = await runManage(brandRoot, {});
+  if (report.hasErrors) {
+    throw new Error('omega dev: the manage cycle reported errors — fix them (see the run summary above), then boot again');
   }
 
   const pad = Math.max(...selected.map((target) => target.length));

@@ -223,15 +223,112 @@ test('classy: monthly-only catalog hides the billing toggle', async () => {
   assert.ok(html.includes('data-plan-id="solo"'), 'plan still renders');
 });
 
-test('classy: marketing chrome defaults ship ON (Ian 2026-07-11 — social proof, testimonials, FAQs, enterprise)', async () => {
+test('classy: marketing chrome defaults ship ON (Ian 2026-07-11 — social proof, testimonials, FAQs)', async () => {
   const pages = await buildWith({ ...miniData, payment: CATALOG });
   const html = pages.get('/pricing');
   assert.ok(html.includes('5M'), 'default social proof');
   assert.ok(html.includes('Sarah Johnson'), 'default testimonials');
   assert.ok(html.includes('Can I cancel at any time?'), 'default FAQs');
-  assert.ok(html.includes('data-plan-id="enterprise"'), 'enterprise card on by default');
   assert.ok(html.includes('7-day money-back guarantee'), 'guarantee line default');
 });
+
+test('composePricing: the enterprise product leaves the grid (issue #44 item 8)', () => {
+  const pricing = composePricing({
+    products: [
+      ...CATALOG.products,
+      { id: 'enterprise', name: 'Bindery', enterprise: true, tagline: 'for organizations', features: [{ id: 'sso', name: 'SSO' }] },
+    ],
+  });
+
+  assert.strictEqual(pricing.plans.length, 2, 'the enterprise tier is not a plan card');
+  assert.ok(!pricing.comparison.features.some((f) => f.id === 'sso'), 'nor a comparison column');
+  assert.strictEqual(pricing.enterprise.name, 'Bindery');
+  assert.strictEqual(pricing.enterprise.tagline, 'for organizations');
+  assert.strictEqual(pricing.enterprise.url, '/contact', 'contact CTA by default');
+  assert.deepStrictEqual(pricing.enterprise.features.map((f) => f.name), ['SSO']);
+
+  assert.strictEqual(composePricing(CATALOG).enterprise, null, 'no enterprise product → nothing to render');
+});
+
+test('composePricing: the enterprise flag wins over the type — one product, one lane', () => {
+  const pricing = composePricing({
+    products: [
+      ...CATALOG.products,
+      { id: 'partnership', name: 'Partnership', type: 'one-time', enterprise: true, prices: { once: 5000 } },
+    ],
+  });
+
+  assert.deepStrictEqual(pricing.oneTime.map((p) => p.id), ['launch-kit'], 'an enterprise-flagged one-time product leaves the one-time grid too');
+  assert.strictEqual(pricing.enterprise.id, 'partnership', 'it renders as the enterprise row, once');
+});
+
+test('classy: the enterprise row renders only when the catalog declares it (issue #44 item 8)', async () => {
+  const withEnterprise = await buildWith({
+    ...miniData,
+    payment: {
+      products: [
+        ...CATALOG.products,
+        {
+          id: 'enterprise',
+          name: 'Bindery',
+          enterprise: true,
+          tagline: 'for organizations that need their own terms',
+          url: '/contact',
+          features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+        },
+      ],
+    },
+  });
+  const html = withEnterprise.get('/pricing');
+
+  assert.ok(html.includes('classy-band--enterprise'), 'its own full-width row, not a card');
+  assert.ok(html.includes('Bindery'), 'plan name from the catalog');
+  assert.ok(html.includes('for organizations that need their own terms'), 'the one-line pitch');
+  assert.ok(html.includes('SSO & provisioning'), 'the feature list');
+  assert.ok(html.includes('data-plan-enterprise="enterprise"'), 'contact CTA (a link, not a checkout button)');
+  assert.ok(!html.includes('data-plan-id="enterprise"'), 'never a card in the grid');
+
+  const without = await buildWith({ ...miniData, payment: CATALOG });
+  assert.ok(!without.get('/pricing').includes('classy-band--enterprise'), 'no enterprise in the data → no row');
+});
+
+for (const theme of ['newsflash', 'neobrutalism']) {
+  test(`${theme}: the enterprise strip is DATA too — its own idiom, same contract (issue #44 item 8)`, async () => {
+    const withEnterprise = await buildWith({
+      ...miniData,
+      payment: {
+        products: [
+          ...CATALOG.products,
+          {
+            id: 'enterprise',
+            name: 'Bindery',
+            enterprise: true,
+            tagline: 'for organizations that need their own terms',
+            url: '/contact',
+            features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+          },
+        ],
+      },
+    }, { activeTheme: theme });
+    const html = withEnterprise.get('/pricing');
+
+    assert.ok(html.includes('Bindery'), `${theme}: plan name from the catalog`);
+    assert.ok(html.includes('for organizations that need their own terms'), `${theme}: the one-line pitch`);
+    assert.ok(html.includes('SSO & provisioning'), `${theme}: the feature list`);
+    assert.ok(html.includes('data-plan-enterprise="enterprise"'), `${theme}: contact CTA (a link, not a checkout button)`);
+    assert.ok(html.includes('href="/contact"'), `${theme}: the CTA points at the product url`);
+    assert.ok(!html.includes('data-plan-id="enterprise"'), `${theme}: never a card in the grid`);
+    assert.ok(!html.includes('classy-band'), `${theme}: rendered in this theme's own vocabulary`);
+
+    // The invented copy the old always-on strip carried is gone
+    assert.ok(!html.includes('Custom solutions for large organizations'), `${theme}: no fictional enterprise blurb`);
+    assert.ok(!html.includes('Bulk memberships for companies'), `${theme}: no fictional group-access blurb`);
+
+    const without = await buildWith({ ...miniData, payment: CATALOG }, { activeTheme: theme });
+    assert.ok(!without.get('/pricing').includes('data-plan-enterprise'), `${theme}: no enterprise in the data → no strip`);
+    assert.ok(!without.get('/pricing').includes('>Enterprise<'), `${theme}: nor its heading`);
+  });
+}
 
 test('classy: consumer frontmatter still overrides presentation (consumer surface)', async () => {
   // The mini fixture has no consumer pricing page — resolved.pricing comes

@@ -19,6 +19,6 @@ member:
       url: https://example.com
 ---
 
-I'm Sam — sample content while your team page waits for its real people. Local development only; your first `_team/` profile replaces the whole sample crew.
+I'm Sam, sample content while your team page waits for its real people. Local development only; your first `_team/` profile replaces the whole sample crew.
 
 Good design is mostly restraint. The rest is kerning.

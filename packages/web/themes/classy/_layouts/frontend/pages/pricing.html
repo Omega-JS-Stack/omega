@@ -4,7 +4,7 @@ layout: frontend/core/base
 # Marketing-section defaults (Ian 2026-07-11: deliberate product behavior —
 # promo banner, social proof, testimonials, FAQs ship ON by default and are
 # consumer-overridable). PLANS never live here: payment.products is the only
-# pricing source (C2).
+# pricing source (C2) — the enterprise row included.
 
 # Hero Section — the page's copy (shared heading/masthead cluster; the old
 # inline | default: fallbacks in markup live here now)
@@ -33,7 +33,7 @@ social_proof:
 # | default: fallbacks in markup live here now)
 cta:
   headline: "Need help finding the right plan?"
-  subheadline: "Talk to our support team — we'll point you to exactly what you need."
+  subheadline: "Talk to our support team. We'll point you to exactly what you need."
   primary_button:
     text: "Talk to us"
     href: "/contact"
@@ -82,13 +82,15 @@ faqs:
   availability, savings %, comparison matrix. The marketing chrome above
   (banner, social proof, testimonials, FAQs) ships ON by default; consumer
   page frontmatter overrides any of it (pricing.promo: false kills the
-  banner, pricing.enterprise: false the enterprise card).
+  banner). The enterprise row is DATA, not chrome: it renders only for the
+  catalog product marked `enterprise: true`.
 {% endcomment %}
 
 {% assign _plans = resolved.pricing.plans %}
 {% assign _plan_count = _plans | size %}
 {% assign _onetime = resolved.pricing.oneTime %}
 {% assign _onetime_count = _onetime | size %}
+{% assign _enterprise = resolved.pricing.enterprise %}
 {% assign _show_toggle = false %}
 {% if resolved.pricing.billing.monthly and resolved.pricing.billing.annually %}
   {% assign _show_toggle = true %}
@@ -131,7 +133,7 @@ faqs:
   </div>
 </section>
 
-{% if _plan_count == 0 and _onetime_count == 0 %}
+{% if _plan_count == 0 and _onetime_count == 0 and _enterprise == nil %}
   <!-- Empty state: no published catalog (payment.products) — never render fiction -->
   <section class="pt-0">
     <div class="container">
@@ -176,12 +178,9 @@ faqs:
           </div>
         {% endif %}
 
-        {% comment %} Enterprise rides the SAME row as a peer card (bronn) —
-        pricing.enterprise: false kills it {% endcomment %}
-        {% assign _has_enterprise = true %}
-        {% if resolved.pricing.enterprise == false %}{% assign _has_enterprise = false %}{% endif %}
+        {% comment %} Enterprise left the grid (issue #44 item 8) — it gets its
+        own full-width row below, so the cards are peers of each other {% endcomment %}
         {% assign _card_count = _plan_count %}
-        {% if _has_enterprise %}{% assign _card_count = _plan_count | plus: 1 %}{% endif %}
 
         <!-- Determine column classes based on number of cards -->
         {% if _card_count == 1 %}
@@ -198,7 +197,7 @@ faqs:
           {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2" %}
         {% endif %}
 
-        <div class="row g-4 g-xl-5 mb-2 justify-content-center" data-omega-reveal-stagger="80">
+        <div class="row g-4 g-xl-5 mb-4 justify-content-center" data-omega-reveal-stagger="80">
           {% for plan in _plans %}
             <div class="{{ col_classes }}" data-omega-reveal>
               <div class="card classy-price-card {% if plan.popular %}classy-price-card--popular{% endif %} h-100">
@@ -341,60 +340,6 @@ faqs:
               </div>
             </div>
           {% endfor %}
-
-          {% comment %} Enterprise — a PEER card with the serif Custom amount {% endcomment %}
-          {% if _has_enterprise %}
-            <div class="{{ col_classes }}" data-omega-reveal>
-              <div class="card classy-price-card h-100">
-                <h3 class="card-title classy-price-card__name mb-0">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</h3>
-                <p class="classy-price-card__tagline">{{ resolved.pricing.enterprise.tagline | default: "Larger teams & organizations" }}</p>
-
-                <div class="classy-price-card__price">
-                  <span class="classy-price-card__amount">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
-                </div>
-
-                <p class="classy-price-card__billing">
-                  <span>{{ resolved.pricing.enterprise.billing_label | default: "Tailored to your needs" }}</span>
-                </p>
-
-                <ul class="classy-price-card__features">
-                  {% if resolved.pricing.enterprise.features %}
-                    {% for feature in resolved.pricing.enterprise.features %}
-                      <li>
-                        <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
-                        <span>{{ feature }}</span>
-                      </li>
-                    {% endfor %}
-                  {% else %}
-                    {% assign _last_plan = _plans | last %}
-                    <li>
-                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
-                      <span>Everything in {{ _last_plan.name }}</span>
-                    </li>
-                    <li>
-                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
-                      <span>Custom volume &amp; terms</span>
-                    </li>
-                    <li>
-                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
-                      <span>Security review &amp; SLA</span>
-                    </li>
-                    <li>
-                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
-                      <span>Dedicated support</span>
-                    </li>
-                  {% endif %}
-                </ul>
-
-                <div class="d-grid classy-price-card__cta">
-                  <button class="btn btn-outline-adaptive fw-semibold omega-hover-nudge" data-plan-id="enterprise">
-                    <span class="button-text">{{ resolved.pricing.enterprise.button_text | default: "Contact us" }}</span>
-                    <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          {% endif %}
         </div>
 
         <p class="small text-center classy-quiet mb-0" data-omega-reveal>
@@ -408,6 +353,52 @@ faqs:
 </section>
 {% endif %}
 
+{% iftruthy _enterprise %}
+<!-- Enterprise — its own full-width row under the cards (the catalog product
+     marked enterprise: true; no such product, no row) -->
+<section class="pt-0">
+  <div class="container">
+    <div class="classy-band classy-band--enterprise" data-omega-reveal>
+      <div class="classy-band__body">
+        <h3 class="classy-band__title">{{ _enterprise.name }}</h3>
+        {% iftruthy _enterprise.tagline %}
+          <p class="classy-band__desc">{{ _enterprise.tagline }}</p>
+        {% endiftruthy %}
+        {% if _enterprise.features.size > 0 %}
+          <ul class="classy-band__features">
+            {% for feature in _enterprise.features %}
+              <li>
+                <span class="classy-band__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
+                <span>
+                  {% if feature.value == 'Unlimited' %}
+                    Unlimited
+                  {% elsif feature.value and feature.value != true %}
+                    {{ feature.value | uj_commaify }}
+                  {% endif %}
+                  {% iftruthy feature.definition %}
+                    <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
+                  {% endiftruthy %}
+                  {% iffalsy feature.definition %}
+                    {{ feature.name }}
+                  {% endiffalsy %}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="classy-band__actions">
+        <a href="{{ _enterprise.url }}" class="btn btn-outline-adaptive fw-semibold omega-hover-nudge" data-plan-enterprise="{{ _enterprise.id }}">
+          Contact us
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endiftruthy %}
+
 {% if _onetime_count > 0 %}
 <!-- One-time Purchases Section (friction #7: presented per type, no billing cadence) -->
 <section class="pt-0">
@@ -415,7 +406,7 @@ faqs:
     <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
       {% comment %} resolved.pricing is engine-composed from payment.products
       (C2) — copy defaults stay INLINE filter args, never frontmatter. {% endcomment %}
-      {% component "heading/section-head", headline: resolved.pricing.one_time_headline | default: "One-time", headline_accent: resolved.pricing.one_time_headline_accent | default: "purchases", sub: resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." %}
+      {% component "heading/section-head", headline: resolved.pricing.one_time_headline | default: "One-time", headline_accent: resolved.pricing.one_time_headline_accent | default: "purchases", sub: resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever. No subscription required." %}
     </div>
 
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="80">
@@ -432,7 +423,7 @@ faqs:
             </div>
 
             <p class="classy-price-card__billing">
-              <span>Yours forever — pay once</span>
+              <span>Yours forever, pay once</span>
             </p>
 
             {% if product.features.size > 0 %}
@@ -583,7 +574,7 @@ faqs:
             <span class="classy-micro classy-fragment__label">How billing behaves</span>
             <div class="classy-fragment__msg">
               <span class="classy-fragment__msg-mark">{% uj_icon "arrows-rotate", "fa-xs" %}</span>
-              <span>Switch plans anytime — <strong>prorated</strong> automatically</span>
+              <span>Switch plans anytime, <strong>prorated</strong> automatically</span>
             </div>
             <div class="classy-fragment__msg">
               <span class="classy-fragment__msg-mark">{% uj_icon "rotate-left", "fa-xs" %}</span>

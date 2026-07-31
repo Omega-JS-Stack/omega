@@ -46,8 +46,15 @@ newsletter:
 <!-- Reading progress — filled by the theme page JS (pages/blog/post.js) -->
 <div class="reading-progress" aria-hidden="true"><span></span></div>
 
+{% comment %} Vert placement (docs/web/ads-system.md): auto-placed units need the
+  `advertising` config key, and a post opts out with `verts: false` in its
+  frontmatter. The opt-out also travels to the mid-article JS insertion lane
+  (pages/blog/[slug].js) through data-omega-verts on the article. {% endcomment %}
+{% assign _verts_on = false %}
+{% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
+
 <!-- Article Header & Content -->
-<article class="pt-8">
+<article class="pt-8"{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
   <div class="container">
     <!-- Article head — centered editorial opening -->
     <div class="row justify-content-center">
@@ -113,12 +120,14 @@ newsletter:
       </div>
     </div>
 
-    <!-- Ad -->
-    <div class="row justify-content-center mb-3">
-      <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
-        {% section "verts/unit", type: "in-article" %}
+    <!-- Vert -->
+    {% if _verts_on %}
+      <div class="row justify-content-center mb-3">
+        <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
+          {% section "verts/unit", type: "in-article" %}
+        </div>
       </div>
-    </div>
+    {% endif %}
   </div>
 </article>
 

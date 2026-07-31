@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#44](../../issues/44) — An enterprise tier is declared in data: `enterprise: true` on a `payment.products` entry renders it as its own full-width contact band below the plan grid, out of the cards and billing math. The hardcoded always-on enterprise card and its `pricing.enterprise: false` opt-out are gone.
+
+### Changed
+- [#44](../../issues/44) — Blog search is client-side: the build emits a small `/blog/index.json` and the blog page ranks matches locally with a `?q=` deep link. The Google CSE form, the dead `/search/cse` targets in the schema SearchAction and opensearch.xml, and the never-wired legacy filter are gone.
+- [#44](../../issues/44) — Automatic vert placements (blog post, blog feed, mid-article, dashboard rail) render only when `advertising` is configured, a post opts out with `verts: false`, and the rail keys on the sidebar's `bottom.vert.enabled`. Hand-authored vert tags stay ungated.
+- [#44](../../issues/44) — The pricing rainbow and the omega dots share one color formula: the gradient samples the client's hue ramp instead of hand-mixed pastels. Geometry is unchanged.
+- [#44](../../issues/44) — The exit popup's subscriber line regains its overlapping avatar row: a brand supplies faces via `client.exitPopup.config.avatars`, and the default renders neutral slots with no external images.
+- [#44](../../issues/44) — Site copy drops the em-dash everywhere: 185 sentences across themes, core layouts, default pages, and shipped sample content rewritten to read naturally without it. Code comments and numeric ranges keep theirs.
+- [#44](../../issues/44) — Classy polish, first wave: pricing gains breathing room, the billing toggle reads in light mode, the footer copyright credits a configured parent company across all themes, the team page drops the stock-photos line, and the Google sign-in button renders the full-color Google brandmark.
+
+### Fixed
+- [#44](../../issues/44) — Classy's first-section nav clearance keys on `:first-of-type`, not `:first-child`, so a preceding non-section element (the pricing promo banner, the blog read-progress bar) no longer steals the hero's top padding — /pricing and /about now start level. The contact page's decorative live-support chat demo is removed.
+- [#44](../../issues/44) — `omega dev` opens with a full manage cycle before spawning any app leg, so brand-level edits (the brandmark and its derived set, `.env`, certs) are redistributed on boot instead of going stale; errors in that cycle stop the boot. What refreshes when is documented as the redistribution contract in local-dev.
+
 ## [0.12.1] (2026-07-31)
 
 ### Fixed

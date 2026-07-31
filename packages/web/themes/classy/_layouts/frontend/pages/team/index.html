@@ -17,7 +17,7 @@ principles:
   headline_accent: "strong opinions"
   items:
     - title: "We ship weekly"
-      description: "Small releases, every week — momentum beats ceremony."
+      description: "Small releases, every week. Momentum beats ceremony."
       icon: "rocket"
     - title: "Everyone talks to users"
       description: "Support isn't a department. The person who built it answers for it."
@@ -45,12 +45,6 @@ join_cta:
     {% component "heading/masthead", eyebrow: "Team", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
 
     {% assign _team_count = site.team | size %}
-    {% if _team_count > 0 %}
-      <p class="classy-quiet small mt-3" data-omega-reveal>
-        {% uj_icon "users", "fa-xs me-1" %}
-        All {{ _team_count }} of us — real people, no stock photos.
-      </p>
-    {% endif %}
   </div>
 </section>
 

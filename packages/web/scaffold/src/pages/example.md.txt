@@ -5,11 +5,11 @@ for as long as it is useful.
 
 To turn it into a real page: copy it to `src/pages/<name>.md`, drop everything
 above and below the rule lines, and edit. The file path IS the URL unless a
-permalink says otherwise — `src/pages/about.md` serves /about.
+permalink says otherwise: `src/pages/about.md` serves /about.
 
 Everything inside the rule lines is safe to ship as-is: the notes in it are
-Liquid comments, which the render drops. An HTML comment would NOT be — it is
-shipped bytes, published to every visitor — so keep private notes in the
+Liquid comments, which the render drops. An HTML comment would NOT be. It is
+shipped bytes, published to every visitor, so keep private notes in the
 Liquid form.
 
 ────────────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ Liquid form.
 #
 #   layout                          which layout renders the page chrome
 #   permalink                       the URL, when it isn't the file path
-#   meta                            title / description / image — the <head>
+#   meta                            title / description / image for the <head>
 #   schema                          structured data (JSON-LD) for this page
 #   theme                           per-page theme overrides (nav, footer…)
 #   client                          per-page @omega.js/client settings (auth…)
@@ -27,7 +27,7 @@ Liquid form.
 #   templateEngineOverride          the engine, when it isn't inferred
 #   eleventyExcludeFromCollections  keep the page out of collections
 #
-# Any OTHER key is content-in-frontmatter — a lane that does not exist. The
+# Any OTHER key is content-in-frontmatter, a lane that does not exist. The
 # build strips it before rendering and warns; sections never see it. Content
 # lives in the page BODY, below, as {% section %} calls.
 layout: frontend/core/base
@@ -43,7 +43,7 @@ meta:
   you write only what you want to change.
 
   These notes are LIQUID comments, and that is deliberate. An HTML comment
-  is shipped bytes — it survives into dist/ for every visitor to read — so
+  is shipped bytes: it survives into dist/ for every visitor to read. So
   anything you would not publish belongs in a Liquid comment, which the
   render drops. Two more traps worth knowing: Liquid runs INSIDE an HTML
   comment (a tag in there really executes), and a comment of either kind is
@@ -51,23 +51,23 @@ meta:
   these notes spell no tags.
 {% endcomment %}
 
-{% comment %} Inline form — simple values, which are real Liquid expressions. {% endcomment %}
+{% comment %} Inline form: simple values, which are real Liquid expressions. {% endcomment %}
 {% section "marketing/hero", headline: "Everything you need", description: "Built with {{ site.brand.name }}." %}
 
-{% comment %} No args at all — the section renders its own defaults. {% endcomment %}
+{% comment %} No args at all: the section renders its own defaults. {% endcomment %}
 {% section "marketing/stats" %}
 
 {% comment %}
-  Block form — structured args, written as YAML. Liquid output tokens
+  Block form: structured args, written as YAML. Liquid output tokens
   inside the values render against this page.
 {% endcomment %}
 {% section "marketing/faq" %}
 headline: "Questions, answered"
 items:
   - question: "Do I have to write every page?"
-    answer: "No — the stock pages already render. This one is extra."
+    answer: "No. The stock pages already render; this one is extra."
   - question: "Where does the copy live?"
-    answer: "Right here, in the section call — never in frontmatter."
+    answer: "Right here, in the section call, never in frontmatter."
 {% endsection %}
 
 {% comment %} Slots pass finished MARKUP where a string won't do. {% endcomment %}
@@ -79,7 +79,7 @@ items:
 ────────────────────────────────────────────────────────────────────────────
 
 Every stock page (home, pricing, about, the legal set, the whole auth flow)
-already renders without a file here — this directory is empty on purpose. To
+already renders without a file here; this directory is empty on purpose. To
 start from one of them instead of a blank page, materialize it:
 
     npx omega customize <url>
@@ -88,6 +88,5 @@ start from one of them instead of a blank page, materialize it:
 with its composition intact, yours to edit. Bare `npx omega customize` lists
 every customizable URL.
 
-The full contract — every section id, the arg schemas, slots, and the
-directory-data lane for site-wide overrides — is the framework's
-docs/web/sections.md.
+The framework's docs/web/sections.md is the full contract: every section id,
+the arg schemas, slots, and the directory-data lane for site-wide overrides.

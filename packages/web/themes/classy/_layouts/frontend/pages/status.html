@@ -56,7 +56,7 @@ updates:
 # Maintenance Section
 maintenance:
   headline: "Scheduled maintenance"
-  empty_message: "Nothing scheduled — no planned interruptions."
+  empty_message: "Nothing scheduled. No planned interruptions."
 
 # Incidents Section
 incidents:
@@ -114,7 +114,7 @@ build_info:
                   <span class="fw-semibold">{{ service.name }}</span>
                 {% endiffalsy %}
                 {% iftruthy service.description %}
-                  <span class="classy-quiet small d-none d-md-inline">— {{ service.description }}</span>
+                  <span class="classy-quiet small d-none d-md-inline">{{ service.description }}</span>
                 {% endiftruthy %}
               </div>
               <div class="d-flex align-items-center gap-2">

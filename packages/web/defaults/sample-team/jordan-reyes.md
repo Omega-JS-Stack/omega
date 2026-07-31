@@ -22,6 +22,6 @@ member:
       url: https://github.com
 ---
 
-Hi, I'm Jordan — sample content, standing in so the team page renders the way it will with your real people on it. I appear only in local development and step aside the moment you add your own `_team/` profiles.
+Hi, I'm Jordan, sample content standing in so the team page renders the way it will with your real people on it. I appear only in local development and step aside the moment you add your own `_team/` profiles.
 
 Around here I own the roadmap, write the changelog nobody asked for, and make sure "simple" stays a feature.

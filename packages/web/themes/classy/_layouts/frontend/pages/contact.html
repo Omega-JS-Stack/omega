@@ -5,7 +5,7 @@ layout: frontend/core/base
 hero:
   headline: "Talk to a <em>human</em>"
   headline_accent: ""
-  subheadline: "Questions, ideas, or something broken — a real person from {{ site.brand.name }} reads every message."
+  subheadline: "Questions, ideas, or something broken: a real person from {{ site.brand.name }} reads every message."
 
 # Contact Methods Section (the channels rail)
 contact_methods:
@@ -71,7 +71,7 @@ faqs:
 <section id="form">
   <div class="container">
     <div class="classy-duo" style="--classy-duo-cols: 5fr 7fr;">
-      <!-- Rail: ways to reach us + a live-support object -->
+      <!-- Rail: ways to reach us -->
       <div class="classy-duo__aside" data-omega-reveal-stagger="80">
         <span class="classy-micro d-block mb-2" data-omega-reveal>Ways to reach us</span>
 
@@ -86,29 +86,6 @@ faqs:
               <span class="classy-channel__arrow">{% uj_icon "arrow-right", "fa-sm" %}</span>
             </a>
           {% endfor %}
-        </div>
-
-        <!-- A real conversation, not a stat wall -->
-        <div class="classy-object position-relative pe-4" data-omega-reveal>
-          <div class="classy-fragment pb-5">
-            <span class="classy-micro classy-fragment__label">Live support</span>
-            <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "user", "fa-xs" %}</span>
-              <span>How do I connect a custom domain?</span>
-            </div>
-            <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "headset", "fa-xs" %}</span>
-              <span><strong>Two clicks</strong> — Settings → Domains. Want me to walk you through it?</span>
-            </div>
-            <div class="classy-fragment__msg" aria-hidden="true">
-              <span class="classy-fragment__msg-mark">{% uj_icon "user", "fa-xs" %}</span>
-              <span class="classy-typing"><span></span><span></span><span></span></span>
-            </div>
-          </div>
-          <div class="classy-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
-            <span class="classy-dot classy-status--ok"></span>
-            Replied in 4m
-          </div>
         </div>
 
         <!-- Response facts (count up on reveal) -->
@@ -220,7 +197,7 @@ faqs:
             </button>
             <span class="small classy-quiet">
               {% uj_icon "lock", "fa-xs me-1" %}
-              We only use this to reply — nothing else.
+              We only use this to reply, nothing else.
             </span>
           </div>
         </form>

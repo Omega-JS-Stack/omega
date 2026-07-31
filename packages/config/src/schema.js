@@ -287,7 +287,7 @@ const SHARED_SCHEMA = [
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, url, features [{ id, name, icon, definition, value }].',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), url, features [{ id, name, icon, definition, value }].',
   },
 
   // ── monitoring (role: error monitoring; D12 provider-discriminated) ──────

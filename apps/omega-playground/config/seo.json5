@@ -13,7 +13,7 @@
         name: 'omega-playground-seo-demo',
         template: 'developer-tool',
         title: 'Paperloom SEO Demo',
-        description: 'Demo SEO repo for Paperloom — the quiet writing studio: capture from any tab, shape drafts at your desk, and publish pages you are proud of.',
+        description: 'Demo SEO repo for Paperloom, the quiet writing studio: capture from any tab, shape drafts at your desk, and publish pages you are proud of.',
         features: [],
       },
     ],

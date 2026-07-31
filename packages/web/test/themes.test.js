@@ -285,6 +285,29 @@ test('statgrid: columns come from the container, never the viewport (#69)', () =
   assert.ok(css.includes('overflow: hidden'), 'the card still clips to its rounded frame');
 });
 
+// ─── Section rhythm: nav clearance rides first-of-TYPE ──────────────────────
+
+test('the first section takes nav clearance by TYPE, so a preceding div cannot steal it (#44)', () => {
+  const warnings = [];
+  const css = sass.compile(path.join(PKG, 'themes', 'classy', 'css', 'layout', '_general.scss'), {
+    logger: { warn: (message) => warnings.push(message), debug: () => {} },
+  }).css;
+
+  assert.deepEqual(warnings, [], 'the layout floor compiles clean');
+
+  // /pricing opens with the promo-banner <div> before its hero, and a blog
+  // post with the read-progress bar — under :first-child neither hero
+  // matched, so those pages started ~5rem tighter than /about. The page JS
+  // already pushes the banner down via `main > section:first-of-type`; the
+  // stylesheet names the same element.
+  assert.match(css, /main > section:first-of-type/, 'the hero is the first section OF ITS TYPE, not the first child');
+  assert.match(css, /main > article:first-of-type/, 'a blog post opens with an <article> and clears the nav too');
+  assert.ok(!/main > (section|article):first-child/.test(css), 'no first-child clearance left to lose to a leading div');
+
+  // Both the base and the ≥992px step carry the clearance.
+  assert.equal((css.match(/main > section:first-of-type/g) || []).length, 2, 'clearance set at both breakpoints');
+});
+
 test('font preloads: newsflash emits Fraunces + Schibsted normal-latin preloads (cp198)', async () => {
   const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
   const home = pages.get('/');

@@ -32,7 +32,7 @@
       'shipping faster',
       'scaling your team',
     ],
-    description: 'Everything you need to launch, measure, and grow — auth, payments, analytics, and every surface of your product in one place.',
+    description: 'Everything you need to launch, measure, and grow: auth, payments, analytics, and every surface of your product in one place.',
     primary_button: {
       text: 'Get started free',
       href: '/signup',

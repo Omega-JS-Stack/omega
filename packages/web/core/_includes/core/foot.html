@@ -45,8 +45,30 @@
 
           <hr class="my-4">
 
-          <!-- Social proof -->
-          <small class="text-muted d-block"><strong class="text-body">Join 10k+</strong> happy subscribers!</small>
+          <!-- Social proof: the subscriber line keeps its faces (#44 item 21).
+               Neutral slots by default (the framework ships no photos and
+               never hotlinks one); a brand supplies its own through
+               client.exitPopup.config.avatars. -->
+          {% assign _exit_avatars = resolved.client.exitPopup.config.avatars %}
+          {% assign _exit_avatar_count = _exit_avatars | size %}
+          <div class="d-flex align-items-center justify-content-center gap-2">
+            <div class="d-flex">
+              {% if _exit_avatar_count > 0 %}
+                {% for avatar in _exit_avatars %}
+                  <span class="modal-exit-avatar avatar avatar-sm rounded-circle overflow-hidden{% unless forloop.last %} me-n2{% endunless %}">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ avatar }}" alt="">
+                  </span>
+                {% endfor %}
+              {% else %}
+                {% for i in (1..4) %}
+                  <span class="modal-exit-avatar avatar avatar-sm rounded-circle{% unless forloop.last %} me-n2{% endunless %}">
+                    {% uj_icon "user", "fa-xs" %}
+                  </span>
+                {% endfor %}
+              {% endif %}
+            </div>
+            <small class="text-muted"><strong class="text-body">Join 10k+</strong> happy subscribers!</small>
+          </div>
         </div>
       </div>
     </div>
@@ -308,7 +330,8 @@
     "name": "{{ site.brand.name | uj_json_escape }}",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "{{ site.url }}/search/cse?q={search_term_string}",
+      {%- comment -%} The blog index IS the site's search surface: it reads ?q= on load {%- endcomment -%}
+      "target": "{{ site.url }}/blog?q={search_term_string}",
       "query-input": "required name=search_term_string"
     },
     "publisher": {

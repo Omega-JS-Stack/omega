@@ -84,7 +84,20 @@
           {% if data.copyright.text %}
             {{ data.copyright.text | uj_liquify }}
           {% else %}
-            © {{ site.uj.date.year }} {{ site.brand.name }}. All rights reserved.
+            {% comment %} A sub-brand credits its parent (brand.company), linked
+            when company.url names one — no parent configured (or a company that
+            IS the brand) keeps the plain line {% endcomment %}
+            {% assign parent_company = site.brand.company %}
+            {% if parent_company and parent_company != '' and parent_company != 'null' and parent_company != site.brand.name %}
+              {% if site.company.url %}
+                {% capture parent_mark %}<a href="{{ site.company.url }}">{{ parent_company }}</a>{% endcapture %}
+              {% else %}
+                {% capture parent_mark %}{{ parent_company }}{% endcapture %}
+              {% endif %}
+              © {{ site.uj.date.year }} {{ site.brand.name }} by {{ parent_mark }}. All rights reserved.
+            {% else %}
+              © {{ site.uj.date.year }} {{ site.brand.name }}. All rights reserved.
+            {% endif %}
           {% endif %}
         </span>
       {% endif %}

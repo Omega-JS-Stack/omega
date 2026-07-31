@@ -1,5 +1,8 @@
 ---
 layout: blueprint/blog/post
+# The per-post vert opt-out lives here (verts-config.test.js asserts it) —
+# first-post stays the "verts on" case, this one the opt-out case.
+verts: false
 post:
   title: "Second post"
   description: "The second mini post"

@@ -68,6 +68,13 @@ advertising: {
 - Desktop/extension: no AdSense (policy/no-web-context) — the shared client ships the same fallback-lane logic as an `omega.ads()` module binding `data-omega-ad` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
 - `ads.txt`: web build emits it from `providers.adsense.client` when present (closes the parity-gap item).
 
+### Automatic placements (#44 items 24/25, 2026-07-31)
+
+- The AUTOMATIC placements — blog post in-article unit, blog index in-feed unit, mid-article insertion (`[slug].js`, every 4th paragraph), and the dashboard rail slot — are build-time gated on `site.advertising`: no advertising config, zero vert markup. Hand-authored `{% section "verts/unit" %}` calls stay ungated — an author who writes the tag asked for it.
+- A post opts out with `verts: false` frontmatter: suppresses the layout unit and stamps `data-omega-verts="false"` on the article, which the mid-article inserter honors.
+- The dashboard rail slot keys on the sidebar data's `bottom.vert.enabled` AND `site.advertising`; the admin sidebar carries no bottom block, so staff surfaces stay vert-free.
+- Visual QA: `/test/libraries/verts` shows every format and size preset with the literal producing tag and a config-state banner.
+
 ## Sequencing (proposed)
 
 1. Backend module (collection + serve/redirect routes + tests) — provable offline via emulator.

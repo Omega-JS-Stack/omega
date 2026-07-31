@@ -257,7 +257,7 @@
   }
 
   .classy-price-card__tier-note {
-    margin: 0.375rem 0 0.25rem;
+    margin: 0.875rem 0 0.25rem;
     font-size: 0.75rem;
     font-style: italic;
     color: var(--omega-ink-faint);
@@ -270,13 +270,19 @@
   }
 }
 
-// Billing toggle — segmented ink control
+// Billing toggle — segmented ink control.
+// The track is the RAISED surface: --omega-surface-2 sits a hair off
+// --omega-ground in light mode, so the control disappeared into the page.
+// --omega-surface + the strong hairline separates it from the ground in BOTH
+// modes, and the selected segment inverts to the recessed surface-2 (the
+// footer's appearance control re-skins its thumb the same way).
 .classy-billing-toggle {
   display: inline-flex;
   padding: 0.25rem;
-  background: var(--omega-surface-2);
-  border: 1px solid var(--omega-line);
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
   border-radius: var(--omega-radius-m);
+  box-shadow: var(--omega-shadow-1);
 
   .btn {
     --bs-btn-color: var(--omega-ink-muted);
@@ -286,8 +292,8 @@
     --bs-btn-hover-bg: transparent;
     --bs-btn-hover-border-color: transparent;
     --bs-btn-active-color: var(--omega-ink);
-    --bs-btn-active-bg: var(--omega-surface);
-    --bs-btn-active-border-color: var(--omega-line);
+    --bs-btn-active-bg: var(--omega-surface-2);
+    --bs-btn-active-border-color: var(--omega-line-strong);
 
     border-radius: var(--omega-radius-s) !important;
     font-size: 0.875rem;
@@ -303,15 +309,21 @@
 
   .btn-check:checked + .btn {
     color: var(--omega-ink);
-    background: var(--omega-surface);
-    border-color: var(--omega-line);
-    box-shadow: var(--omega-shadow-1);
+    background: var(--omega-surface-2);
+    border-color: var(--omega-line-strong);
+    box-shadow: none;
   }
 
   // The gliding thumb carries the active surface once the engine is live
   &[data-omega-segmented-ready] .btn-check:checked + .btn {
     background: transparent;
     border-color: transparent;
+    box-shadow: none;
+  }
+
+  .omega-segmented__thumb {
+    background: var(--omega-surface-2);
+    border-color: var(--omega-line-strong);
     box-shadow: none;
   }
 }

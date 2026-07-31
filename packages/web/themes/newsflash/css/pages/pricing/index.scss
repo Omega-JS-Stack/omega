@@ -192,3 +192,11 @@
     align-items: flex-start;
   }
 }
+
+// The strip is WIDE, so its proof list reads across the row instead of down it
+.enterprise-panel-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 1.5rem;
+  margin: 0.75rem 0 0;
+}

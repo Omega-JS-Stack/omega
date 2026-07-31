@@ -20,7 +20,7 @@
       args: {
         superheadline: { text: 'Newsletter' },
         headline: 'Stay in the loop',
-        subheadline: 'One email a month — product updates, guides, and nothing else.',
+        subheadline: 'One email a month: product updates, guides, and nothing else.',
         button: { text: 'Subscribe' },
         form: { placeholder: 'you@example.com' },
       },

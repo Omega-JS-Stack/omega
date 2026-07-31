@@ -25,7 +25,7 @@
         superheadline: { icon: 'envelope', text: 'Newsletter' },
         headline: 'Never miss an',
         headline_accent: 'issue',
-        subheadline: 'One email a week — the best of the desk, nothing else.',
+        subheadline: 'One email a week: the best of the desk, nothing else.',
         button: { text: 'Subscribe' },
         form: { placeholder: 'you@example.com' },
       },

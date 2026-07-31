@@ -172,6 +172,14 @@ function setupPlanButtons() {
       handlePlanSelection(this);
     });
   });
+
+  // The enterprise tier is a LINK in its own row (no checkout, no cart) — the
+  // browser does the navigating, we only track the intent on the way out
+  document.querySelectorAll('a[data-plan-enterprise]').forEach($link => {
+    $link.addEventListener('click', function() {
+      trackEnterpriseContact();
+    });
+  });
 }
 
 // Handle plan selection

@@ -15,7 +15,7 @@ benefits:
 social_signup:
   - id: "google.com"
     name: "Google"
-    icon: "google"
+    logo: "google"
 ---
 
 <section class="col-12">
@@ -45,7 +45,15 @@ social_signup:
             {% for provider in resolved.social_signup %}
               <button type="submit" class="btn btn-outline-adaptive classy-auth__social w-100 mb-2 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
                 {{ initializing_spinner }}
-                {% uj_icon provider.icon, "me-2" %}
+                {% comment %} `logo:` renders the provider's own brandmark in
+                FULL COLOR (core/logos, inlined by uj_logo); `icon:` is the
+                monochrome currentColor glyph for providers without one {% endcomment %}
+                {% iftruthy provider.logo %}
+                  <span class="d-inline-flex me-2" aria-hidden="true">{% uj_logo provider.logo, "brandmarks" %}</span>
+                {% endiftruthy %}
+                {% iffalsy provider.logo %}
+                  {% uj_icon provider.icon, "me-2" %}
+                {% endiffalsy %}
                 <span class="button-text">Sign up with {{ provider.name }}</span>
               </button>
             {% endfor %}
@@ -118,7 +126,7 @@ social_signup:
         {% for benefit in resolved.benefits %}
           <div class="classy-auth__aside-row">
             {% uj_icon "check", "omega-check fa-sm" %}
-            <span><strong>{{ benefit.title }}</strong> — {{ benefit.description }}</span>
+            <span><strong>{{ benefit.title }}</strong>: {{ benefit.description }}</span>
           </div>
         {% endfor %}
       </div>

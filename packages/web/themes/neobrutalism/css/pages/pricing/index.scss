@@ -207,6 +207,14 @@
 }
 .enterprise-panel-title { font-family: $nb-font-display; font-weight: 900; font-size: 1.75rem; margin-bottom: 0.25rem; }
 
+// The panel is WIDE, so its proof list marches across the row, not down it
+.enterprise-panel-features {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+  margin-top: 1rem;
+}
+
 // ============================================
 // Stats / social proof (.text-bg-* gives the fill)
 // ============================================

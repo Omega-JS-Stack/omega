@@ -1,0 +1,27 @@
+---
+permalink: /blog/index.json
+sitemap:
+  include: false
+---
+{%- comment -%}
+  The blog search index: every post reduced to the fields the blog index page
+  already shows publicly (title, description, date, taxonomy). The client-side
+  search on /blog fetches this once, on first use — no third-party search
+  widget, no query leaving the site. Descriptions are capped so the index stays
+  a few KB even on a large blog; post bodies are deliberately NOT included.
+  URLs are site-relative: the same shape the blog cards link with.
+{%- endcomment -%}
+[
+  {%- assign first = true -%}
+  {%- for post in collections.posts -%}
+    {%- unless first %},{% endunless -%}{%- assign first = false %}
+  {
+    "url": "{{ post.url }}",
+    "title": "{{ post.data.post.title | strip_html | uj_json_escape }}",
+    "desc": "{{ post.data.post.description | default: '' | strip_html | truncate: 180 | uj_json_escape }}",
+    "date": "{{ post.date | date: '%Y-%m-%d' }}",
+    "categories": {% if post.data.post.categories %}{{ post.data.post.categories | json }}{% else %}[]{% endif %},
+    "tags": {% if post.data.post.tags %}{{ post.data.post.tags | json }}{% else %}[]{% endif %}
+  }
+  {%- endfor %}
+]

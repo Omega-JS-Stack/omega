@@ -4,7 +4,7 @@ layout: frontend/core/cover
 social_signin:
   - id: "google.com"
     name: "Google"
-    icon: "google"
+    logo: "google"
 ---
 
 <section class="col-12">
@@ -33,7 +33,15 @@ social_signin:
             {% for provider in resolved.social_signin %}
               <button type="submit" class="btn btn-outline-adaptive classy-auth__social w-100 mb-2 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
                 {{ initializing_spinner }}
-                {% uj_icon provider.icon, "me-2" %}
+                {% comment %} `logo:` renders the provider's own brandmark in
+                FULL COLOR (core/logos, inlined by uj_logo); `icon:` is the
+                monochrome currentColor glyph for providers without one {% endcomment %}
+                {% iftruthy provider.logo %}
+                  <span class="d-inline-flex me-2" aria-hidden="true">{% uj_logo provider.logo, "brandmarks" %}</span>
+                {% endiftruthy %}
+                {% iffalsy provider.logo %}
+                  {% uj_icon provider.icon, "me-2" %}
+                {% endiffalsy %}
                 <span class="button-text">Continue with {{ provider.name }}</span>
               </button>
             {% endfor %}

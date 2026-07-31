@@ -19,7 +19,11 @@ main {
       padding-bottom: 7rem;
     }
 
-    &:first-child {
+    // first-of-TYPE, not first-child: /pricing opens with the promo-banner
+    // div and a post with the read-progress bar, and either would otherwise
+    // swallow the clearance the hero needs (the page JS names the same
+    // element when it pushes the banner down)
+    &:first-of-type {
       padding-top: 10rem; // 4rem nav clearance + hero breathing room
       transition: padding-top var(--omega-speed-slow) var(--omega-ease); // promo-banner push-down glides
 

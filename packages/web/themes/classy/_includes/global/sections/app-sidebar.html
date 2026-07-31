@@ -10,7 +10,7 @@
                | { header: true, label }
                | { divider: true }
                | { label, icon, dropdown: [ …links, nested dropdowns… ] }]
-    bottom:   { ad: { enabled } }                                                        (optional)
+    bottom:   { vert: { enabled } }                                                      (optional)
 
   Anything textual wears .omega-shell__label so the rail collapse hides it
   (core/css/shell). Active detection via urlmatches, including nested groups.
@@ -200,9 +200,12 @@
     {% endfor %}
   </ul>
 
-  <!-- Bottom section: optional ad slot + user row -->
+  <!-- Bottom section: optional vert slot + user row -->
   <div class="mt-auto">
-    {% if data.bottom.ad.enabled %}
+    {% comment %} The rail vert slot: the surface opts in through its sidebar data
+      (the dashboard does, admin does not) and the brand's `advertising` config key
+      gates it — no config, no slot chrome (docs/web/ads-system.md). {% endcomment %}
+    {% if data.bottom.vert.enabled and site.advertising %}
       <div class="classy-side__ad omega-shell__label">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <span class="classy-chip">Sponsored</span>

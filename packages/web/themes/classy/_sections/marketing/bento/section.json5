@@ -12,21 +12,21 @@
   defaults: {
     superheadline: 'Why {{ site.brand.name }}',
     headline: "Everything you need. <em>Nothing you don't.</em>",
-    subheadline: 'A complete foundation that stays out of your way — configure once, ship everywhere.',
+    subheadline: 'A complete foundation that stays out of your way: configure once, ship everywhere.',
     items: [
       {
         type: 'code',
         span: 'big',
         icon: 'sliders',
         title: 'One config, every surface',
-        description: 'A single file drives your brand, targets, and integrations — change it once and every page follows.',
+        description: 'A single file drives your brand, targets, and integrations. Change it once and every page follows.',
       },
       {
         type: 'split',
         span: 'tall',
         icon: 'circle-half-stroke',
         title: 'Light & dark, born together',
-        description: 'Every component ships in both modes from day one — no bolted-on dark theme.',
+        description: 'Every component ships in both modes from day one, with no bolted-on dark theme.',
       },
       {
         type: 'terminal',
@@ -38,7 +38,7 @@
         type: 'brand',
         icon: 'palette',
         title: 'Your brand, everywhere',
-        description: 'One brand color recolors every accent surface — buttons, links, focus rings, charts.',
+        description: 'One brand color recolors every accent surface: buttons, links, focus rings, charts.',
       },
       {
         type: 'default',
@@ -55,7 +55,7 @@
     // per-ITEM args the same way: item.terminal.{command,out,ok}, defaulting
     // to a generic npm session.
     config_demo: {
-      label: '// one config — every target',
+      label: '// one config, every target',
       name: '{{ site.brand.name }}',
       color: '{{ site.brand.color | default: "#2563EB" }}',
     },
@@ -68,7 +68,7 @@
       label: 'Three tiles',
       args: {
         headline: 'The essentials',
-        subheadline: 'A tighter grid — layout self-adjusts to the item count.',
+        subheadline: 'A tighter grid: layout self-adjusts to the item count.',
         items: [
           {
             type: 'terminal',

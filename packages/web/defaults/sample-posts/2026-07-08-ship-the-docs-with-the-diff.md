@@ -9,7 +9,7 @@ post:
   tags: ["culture", "engineering", "docs"]
 ---
 
-Every team agrees documentation matters, the way everyone agrees flossing matters. And every team has a wiki page titled "Getting Started" that starts you toward a build system retired eighteen months ago. The gap isn't discipline. It's *distance* — the further docs live from the change that invalidates them, the faster they rot.
+Every team agrees documentation matters, the way everyone agrees flossing matters. And every team has a wiki page titled "Getting Started" that starts you toward a build system retired eighteen months ago. The gap isn't discipline. It's *distance*: the further docs live from the change that invalidates them, the faster they rot.
 
 ## Later never comes
 
@@ -21,7 +21,7 @@ The rule that actually works is mechanical, not motivational: a change that alte
 
 ## Write for the person at 2am
 
-The reader of internal docs is usually someone mid-incident, holding a pager and a search box. Optimize for them: lead with the command, not the philosophy. State what's true *now*, never the history of how it got that way — that story lives in commit messages, where it's already written and can never drift.
+The reader of internal docs is usually someone mid-incident, holding a pager and a search box. Optimize for them: lead with the command, not the philosophy. State what's true *now*, never the history of how it got that way. That story lives in commit messages, where it's already written and can never drift.
 
 ## One home per fact
 

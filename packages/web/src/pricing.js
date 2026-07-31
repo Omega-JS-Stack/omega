@@ -10,8 +10,13 @@
  * id/name/type/limits/prices/trial):
  *   tagline    - short line under the plan name
  *   popular    - highlight badge on the plan card
- *   url        - CTA href (defaults to /signup for free plans; paid plans
- *                without a url get a checkout button instead)
+ *   enterprise - the "talk to us" tier: leaves BOTH card lanes (plans and
+ *                one-time, whatever its type) and renders as its own
+ *                full-width row (no enterprise product in the catalog → no
+ *                row, never invented)
+ *   url        - CTA href (defaults to /signup for free plans; /contact for
+ *                the enterprise tier; paid plans without a url get a
+ *                checkout button instead)
  *   features   - display list [{ id, name, icon, definition, value }];
  *                value falls back to limits[id], -1 renders as Unlimited
  */
@@ -73,6 +78,23 @@ function composePlan(product) {
       // What the card shows in "$N /month" while the annual toggle is active
       annuallyPerMonth: annually > 0 ? Math.round(annually / 12) : 0,
     },
+    features: composeFeatures(product),
+  };
+}
+
+/**
+ * Compose the enterprise tier: the "talk to us" product, priced by
+ * conversation instead of by card — no prices, no billing cadence, a contact
+ * CTA. It never enters the plan grid or the comparison matrix.
+ * @param {object} product - catalog entry flagged `enterprise: true`
+ * @returns {object} enterprise view-model
+ */
+function composeEnterprise(product) {
+  return {
+    id: product.id,
+    name: product.name,
+    tagline: product.tagline || null,
+    url: product.url || '/contact',
     features: composeFeatures(product),
   };
 }
@@ -159,18 +181,23 @@ function composeComparison(plans) {
 /**
  * Compose the pricing view-model from the shared payment section.
  * @param {object} payment - resolved config `payment` section
- * @returns {object|null} { plans, oneTime, billing, savingsPercent, comparison } or null when the catalog is empty
+ * @returns {object|null} { plans, oneTime, enterprise, billing, savingsPercent, comparison } or null when the catalog is empty
  */
 function composePricing(payment) {
   const products = payment && Array.isArray(payment.products) ? payment.products : [];
   if (products.length === 0) return null;
 
+  // The enterprise tier is a product like any other, marked `enterprise: true`
+  // — it leaves the grid so the cards stay peers of each other
+  const enterpriseProduct = products.find((product) => product.enterprise === true);
+  const enterprise = enterpriseProduct ? composeEnterprise(enterpriseProduct) : null;
+
   const plans = products
-    .filter((product) => (product.type || 'subscription') === 'subscription')
+    .filter((product) => (product.type || 'subscription') === 'subscription' && product.enterprise !== true)
     .map(composePlan);
 
   const oneTime = products
-    .filter((product) => product.type === 'one-time')
+    .filter((product) => product.type === 'one-time' && product.enterprise !== true)
     .map((product) => ({
       id: product.id,
       name: product.name,
@@ -197,6 +224,7 @@ function composePricing(payment) {
   backfillDefinitions([
     ...plans.map((plan) => plan.features),
     ...oneTime.map((product) => product.features),
+    ...(enterprise ? [enterprise.features] : []),
   ]);
   splitCommonFeatures(plans);
 
@@ -218,6 +246,7 @@ function composePricing(payment) {
   return {
     plans: plans,
     oneTime: oneTime,
+    enterprise: enterprise,
     billing: billing,
     savingsPercent: savingsPercent,
     comparison: composeComparison(plans),

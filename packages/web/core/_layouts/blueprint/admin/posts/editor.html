@@ -24,7 +24,7 @@ meta:
 <div class="row mb-4">
   <div class="col">
     <div class="d-flex justify-content-between align-items-center">
-      <p class="text-muted mb-0" id="editor-mode-note">Write a new post — it commits straight to the website repo</p>
+      <p class="text-muted mb-0" id="editor-mode-note">Write a new post. It commits straight to the website repo</p>
       <a class="btn btn-outline-adaptive" href="/admin/posts">
         {% uj_icon "arrow-left", "fa-md me-2" %}
         All posts
@@ -90,7 +90,7 @@ meta:
           <span class="input-group-text">/blog/</span>
           <input type="text" class="form-control font-monospace" id="editor-slug" name="post.url" placeholder="my-post" required>
         </div>
-        <small class="text-muted">Follows the title — edit to override</small>
+        <small class="text-muted">Follows the title. Edit to override</small>
       </div>
 
       <!-- Description (create only) -->
@@ -103,7 +103,7 @@ meta:
       <div class="mb-3 create-only">
         <label for="editor-header-image" class="form-label small">Header image URL</label>
         <input type="url" class="form-control" id="editor-header-image" name="post.headerImageURL" placeholder="https://images.unsplash.com/..." required>
-        <small class="text-muted">Must resolve to a JPEG — it's downloaded, resized, and committed as the post's hero</small>
+        <small class="text-muted">Must resolve to a JPEG. It's downloaded, resized, and committed as the post's hero</small>
       </div>
 
       <div class="row create-only">
@@ -125,7 +125,7 @@ meta:
       <!-- Body -->
       <div class="mb-3">
         <label for="editor-body" class="form-label small">Body</label>
-        <textarea class="form-control font-monospace" id="editor-body" name="post.body" rows="16" placeholder="Markdown. No need to repeat the title as a heading — the layout renders it." required></textarea>
+        <textarea class="form-control font-monospace" id="editor-body" name="post.body" rows="16" placeholder="Markdown. No need to repeat the title as a heading. The layout renders it." required></textarea>
         <small class="text-muted">Markdown. Images referenced by URL (<code>![alt](https://...)</code>) are downloaded, resized, and committed with the post.</small>
       </div>
 
@@ -141,7 +141,7 @@ meta:
       <div class="form-check form-switch mb-4">
         <input class="form-check-input" type="checkbox" id="editor-deploy" name="post.deploy" checked>
         <label class="form-check-label" for="editor-deploy">Dispatch a site build after saving</label>
-        <small class="text-muted d-block">The post is committed either way — uncheck to batch several changes into one build</small>
+        <small class="text-muted d-block">The post is committed either way. Uncheck to batch several changes into one build</small>
       </div>
 
       <!-- Submit -->

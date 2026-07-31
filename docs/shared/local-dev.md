@@ -27,11 +27,26 @@ omega dev --except backend     # default set minus
 omega dev --all                # every target with a dev leg (desktop/extension opt-in)
 ```
 
+- **Boot opens with a manage cycle** ([#44](https://github.com/Omega-JS-Stack/omega/issues/44)): before any leg spawns, `omega dev` runs the full service walk against the brand — the same one a bare `npx omega` runs — so brand-level sources reach the apps instead of sitting stale (see the redistribution contract below). Errors in that cycle stop the boot loudly; nothing serves on top of a broken brand.
 - **Default set = `web` + `backend`** — the local web loop. GUI/watcher targets (desktop opens an Electron window; extension runs a build watcher) never boot unless named via `--only`/`--all`. The default also adapts: a web-only brand boots just web, no warning.
 - **Legs**: web → the app's `npm start` (`omega dev`, :4000); backend → `npm run emulator` (auth/firestore/functions/database/hosting + seeded personas). Backend boots first so its port map is published before web reads it (N7 makes the order optional — web falls back to the classic ports).
 - **Multi-instance web ports offset deterministically**: each instance wants the classic base + its position in the `targets.web` instances array (apps/website → :4000, apps/website-admin → :4001), so instances dev side-by-side from their own app dirs; the N7 allocator still bumps if the offset port happens to be taken, and pins (`--port` / config `ports.website`) win verbatim. Single-object brands stay on :4000 exactly as before.
 - **Per-app Node**: each leg spawns under its app's own `.nvmrc` major (web and backend pin different ones).
 - Output is line-prefixed per target (`[backend] …`, `[web] …`); one Ctrl-C stops everything; a leg dying alone is announced and its siblings stay up.
+
+## What refreshes when — the redistribution contract
+
+Brand-level sources are not read by the apps directly; most of them are **redistributed** by the manage cycle, and app watchers only watch their own app. So:
+
+| You edited | What moves it | When it lands |
+|---|---|---|
+| `assets/logo/*.svg`, `assets/templates/*.psd` | assets service → derived variants in the gitignored `.omega/assets/`, mtime-diffed (only stale outputs regenerate) | a manage cycle: restart `omega dev`, or run `npx omega` in the brand |
+| `.omega/assets/*` (the derived set) | the web build's static channel copies them into the site as `assets/images/brand/*` + `assets/images/favicon` (`packages/web/src/static-assets.js`) | the web build's `static` phase — the dev server copies at BOOT, no watcher, so a restart picks them up |
+| brand `.env`, signing certs | disperse service → each app's gitignored `.env` and certs dir | a manage cycle (same as above) |
+| `config/omega.json5` (brand or app) | nothing — apps read it directly, there is no mirror to disperse | the reading process's own reload (a dev-server restart is always enough) |
+| an app's own `src/` | that app's watcher | live |
+
+The short version: **anything under the brand root that isn't inside an app needs the manage cycle**, and `omega dev` now runs one at boot ([#44](https://github.com/Omega-JS-Stack/omega/issues/44)) — so the loop for a brandmark edit is *edit the svg → restart `omega dev`*. Mid-session, `npx omega` (or `npx omega --service=assets`) does the same without stopping the stack, then restart the web leg to pick up the copies.
 
 ## One-command consumer sessions: `omega dev --local`
 

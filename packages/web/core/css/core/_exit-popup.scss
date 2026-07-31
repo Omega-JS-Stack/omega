@@ -1,3 +1,14 @@
+// Social-proof faces beside the subscriber line: each slot rings itself in the
+// modal surface so the overlap reads as a stack in both color modes.
+.modal-exit-avatar {
+  align-items: center;
+  background: var(--omega-surface-2);
+  border: 2px solid var(--omega-surface);
+  color: var(--omega-ink-faint);
+  display: inline-flex;
+  justify-content: center;
+}
+
 // Simple wave animation for the hand icon
 .animation-hand-wave {
   animation: wave 1s ease-in-out infinite;
