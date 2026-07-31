@@ -55,6 +55,24 @@ test('marketplace: every source resolves to a directory holding a manifest', () 
   }
 });
 
+test('settings: the repo registers its own marketplace and enables the plugin every session', () => {
+  const settings = readJson(path.join(ROOT, '.claude', 'settings.json'));
+  const marketplace = readJson(MARKETPLACE);
+
+  assert.deepEqual(
+    settings.extraKnownMarketplaces[marketplace.name].source,
+    { source: 'directory', path: './' },
+    'the repo IS the marketplace directory — no cache copy, no absolute path'
+  );
+
+  // A brand's committed settings say the same two things about its INSTALLED
+  // manager package ([#62]) — same plugin id, so the two can never drift.
+  const { PLUGIN_ID, MARKETPLACE_NAME } = require(path.join(ROOT, 'packages', 'manager', 'src', 'lib', 'claude-settings.js'));
+  assert.equal(MARKETPLACE_NAME, marketplace.name);
+  assert.equal(PLUGIN_ID, `${marketplace.plugins[0].name}@${marketplace.name}`);
+  assert.equal(settings.enabledPlugins[PLUGIN_ID], true);
+});
+
 test('skills: each one is bare-named, matches its directory, and describes itself', () => {
   for (const entry of readJson(MARKETPLACE).plugins) {
     const skillsDir = path.join(ROOT, entry.source, 'skills');

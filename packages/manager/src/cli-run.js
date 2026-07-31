@@ -5,17 +5,19 @@
  * (`omega test`, `omega manage`) fan out over apps/* instead of guessing
  * one framework.
  */
+// Value-less flags must be declared boolean — otherwise yargs treats the next
+// positional as the flag's VALUE (mirrors the framework bins).
+const BOOLEAN_FLAGS = ['continue-on-error', 'dry-run', 'parallel', 'manage', 'all', 'verify', 'publish'];
+
 async function run() {
   // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
   // invocation re-execs once, so no command ever runs stale framework code
   require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/manager' });
 
-  // Value-less flags must be declared boolean — otherwise yargs treats the next
-  // positional as the flag's VALUE (mirrors the framework bins). yargs' built-in
-  // --version/--help are disabled so `-v`/`--version` route to our version
-  // command through the alias table.
+  // yargs' built-in --version/--help are disabled so `-v`/`--version` route to
+  // our version command through the alias table.
   const argv = require('yargs')(process.argv.slice(2))
-    .boolean(['continue-on-error', 'dry-run', 'parallel', 'manage', 'all'])
+    .boolean(BOOLEAN_FLAGS)
     .version(false)
     .help(false)
     .parseSync();
@@ -24,4 +26,4 @@ async function run() {
   await cli.process(argv);
 }
 
-module.exports = { run };
+module.exports = { run, BOOLEAN_FLAGS };

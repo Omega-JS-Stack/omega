@@ -591,6 +591,7 @@ const OPERATIONS = {
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` (legacy omega-manager healed) + a deploy script exists
     { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
+    { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
   ],
 

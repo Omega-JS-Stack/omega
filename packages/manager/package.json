@@ -8,8 +8,11 @@
     "omega-manager": "./bin/omega-manager"
   },
   "files": [
+    ".claude-plugin/",
     "bin/",
-    "dist/"
+    "claude-plugin/",
+    "dist/",
+    "docs/"
   ],
   "exports": {
     ".": "./dist/index.js",

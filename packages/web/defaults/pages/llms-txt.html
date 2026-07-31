@@ -31,8 +31,10 @@ A consumer file at /llms.txt suppresses this one like any default page.
   {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
   {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
   {%- if item.data.post.id -%}{%- continue -%}{%- endif -%}
-  {%- assign entry_title = item.data.meta.title | default: item.url -%}
-  {%- assign entry_desc = item.data.meta.description -%}
+  {%- comment -%} omega_rendered: layout-contributed meta holds raw Liquid
+      until the owning page renders it (#141) {%- endcomment -%}
+  {%- assign entry_title = item | omega_rendered: 'meta.title' | default: item.url -%}
+  {%- assign entry_desc = item | omega_rendered: 'meta.description' -%}
 - [{{ entry_title }}]({{ site.url }}{{ item.url }}){% if entry_desc %}: {{ entry_desc }}{% endif %}
 {% endfor -%}
 {%- assign posts = collections.posts | default: empty -%}
@@ -41,8 +43,10 @@ A consumer file at /llms.txt suppresses this one like any default page.
 {% for item in posts -%}
   {%- unless item.url -%}{%- continue -%}{%- endunless -%}
   {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
-  {%- assign post_title = item.data.post.title | default: item.data.meta.title | default: item.url -%}
-  {%- assign post_desc = item.data.post.description | default: item.data.meta.description -%}
+  {%- assign post_meta_title = item | omega_rendered: 'meta.title' -%}
+  {%- assign post_meta_desc = item | omega_rendered: 'meta.description' -%}
+  {%- assign post_title = item | omega_rendered: 'post.title' | default: post_meta_title | default: item.url -%}
+  {%- assign post_desc = item | omega_rendered: 'post.description' | default: post_meta_desc -%}
 - [{{ post_title }}]({{ site.url }}{{ item.url }}){% if post_desc %}: {{ post_desc }}{% endif %}
 {% endfor -%}
 {%- endif -%}

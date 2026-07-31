@@ -15,6 +15,7 @@
     "core/",
     "defaults/",
     "dist/",
+    "docs/",
     "runtime/",
     "scaffold/",
     "sw/",

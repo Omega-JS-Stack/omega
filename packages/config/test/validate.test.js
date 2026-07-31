@@ -204,6 +204,37 @@ test('secret-shaped keys are validation errors', () => {
   assert.ok(errors.some((e) => e.includes('config.payment.processors.stripe.apiSecret looks like a secret')));
 });
 
+// ─── validateConfig: retired keys (#142) ───
+
+test('a retired key is an error wherever it sits — shared level and inside a target', () => {
+  const shared = validateConfig({ ...VALID, web_manager: { auth: { enabled: true } } });
+  assert.ok(shared.errors.some((e) => e.includes('config.web_manager')
+    && e.includes('web_manager') && e.includes('client')), 'shared-level web_manager bounces');
+
+  const scoped = validateConfig({ ...VALID, targets: { web: { web_manager: { chatsy: {} } } } });
+  assert.ok(scoped.errors.some((e) => e.includes('config.targets.web.web_manager')
+    && e.includes('client')), 'target-level web_manager bounces');
+
+  // The message names the doc row, so the fix does not need a search.
+  assert.ok(scoped.errors.some((e) => e.includes('docs/shared/config.md')), 'the mapping table is cited');
+});
+
+test('the retired firebaseConfig key is an error; its replacement passes', () => {
+  const { errors } = validateConfig({ ...VALID, firebaseConfig: { projectId: 'acme' } });
+  assert.ok(errors.some((e) => e.includes('config.firebaseConfig') && e.includes('cloud')));
+
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, cloud: { provider: 'firebase', config: { projectId: 'acme' } } }).errors,
+    [],
+  );
+});
+
+test('the current client key is untouched by the retired-key guard', () => {
+  const config = { ...VALID, targets: { web: { client: { auth: {}, chatsy: {}, cookieConsent: {} } } } };
+
+  assert.deepStrictEqual(validateConfig(config).errors, []);
+});
+
 // ─── runSchema: conditional required ───
 
 test('required-as-function receives the full config', () => {

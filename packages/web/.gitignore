@@ -1,2 +1,12 @@
 # GENERATED output — prepare-package rebuilds dist from src on install/pack/publish
 /dist/
+
+# GENERATED — the prepare-time docs lane (@omega.js/devkit tools/vendor-docs.js)
+# vendors the monorepo guide + docs/shared/ into the shipped package (#64)
+/docs/index.md
+/docs/ads-system.md
+/docs/classy-v2/
+/docs/omega-sections-spec.md
+/docs/sections.md
+/docs/template-kit.md
+/docs/shared/

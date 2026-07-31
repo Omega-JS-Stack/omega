@@ -10,7 +10,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
                   below:   `# <brand> — brand notes` + the brand's own notes — NEVER touched by the framework
 ```
 
-`node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. Published installs get the map vendored into the package and the link retargeted (gated on the docs-vendoring issue, [#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+`node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. Published installs get the framework DOCS vendored into each package already (below); the top-level map itself is not vendored yet, so the link still resolves only through a local-era install — vendoring the map and retargeting the link is [#144](https://github.com/Omega-JS-Stack/omega/issues/144).
 
 (The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short; heals scrub any legacy copy.)
 
@@ -31,6 +31,33 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 | `CLAUDE.md` carries content | WARNED (never clobbered) with the move-it-to-AGENTS.md message |
 
 Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip, path resolution, create/heal/idempotence, content preservation).
+
+## Published packages carry their own docs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64))
+
+A consumer install has no monorepo to point at, so the prepare lane ships the knowledge INSIDE each publishable. The devkit vendor hook every framework already runs (`packages/devkit/tools/vendor-docs.js`, called from `tools/vendor.js`) copies, for `@omega.js/{backend,client,desktop,extension,manager,web}`:
+
+| Monorepo source | Shipped as | Notes |
+|---|---|---|
+| `docs/<package>/` | `<package>/docs/` (flat) | The guide lands at `docs/index.md`, beside the package's committed deep docs; nested dirs (`classy-v2/`) survive |
+| `docs/shared/` | `<package>/docs/shared/` | The cross-framework contracts, verbatim |
+| `agent-plugins/claude/` | `manager/claude-plugin/` + `manager/.claude-plugin/marketplace.json` | Manager ONLY — the plugin every brand enables (see below). The copy ships WITHOUT `.mcp.json`: that server lives outside the plugin, in the monorepo's `packages/mcp-router`, which is not in the publish set — how the router reaches consumers is [#144](https://github.com/Omega-JS-Stack/omega/issues/144) |
+
+The guide's monorepo-relative links are rewritten to the shipped layout on the way in (`../../packages/<self>/` → `../`, `../shared/` → `shared/`), so `docs/index.md` still reaches the package's deep docs, its README, and the shared contracts. Cross-framework links (`../backend/index.md`) are left verbatim — another framework's guide isn't in this tarball. Everything written is GENERATED: gitignored per package, cleared before each rewrite, and pinned by `scripts/vendor-docs.test.js`, which packs all six for real and reads the tarball listings.
+
+Version-matched by construction: the docs in `node_modules/@omega.js/web/docs/` are the docs of the version installed there.
+
+## Brands enable the plugin from their installed manager ([#62](https://github.com/Omega-JS-Stack/omega/issues/62))
+
+The plugin rides in `@omega.js/manager` because that is the package every brand installs. The workspace service's `claude-settings` op writes/heals the brand's committed `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": { "omega": { "source": { "source": "directory", "path": "./node_modules/@omega.js/manager" } } },
+  "enabledPlugins": { "omega@omega": true }
+}
+```
+
+Committed, so every collaborator's session in that brand loads the omega skills and hooks — a directory marketplace is read LIVE from that path, so `npm update` moves the plugin with the package. The op only fires on a PUBLISHED install: `node_modules/@omega.js/manager` must carry the vendored `.claude-plugin/marketplace.json` **and** be a real directory. A locally linked brand's manager is a SYMLINK into the monorepo — whose `packages/manager` grows that same generated marketplace on every prepare — so the link itself is the local-era signal and the step skips; the developer's own user-scope install covers those sessions. The brand file NEVER points at a monorepo path — it would be machine-specific.
 
 ## Packages carry no agent docs (Ian 2026-07-27)
 

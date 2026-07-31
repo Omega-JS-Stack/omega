@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#64](../../issues/64) — Every publishable package now ships the docs that match its version: prepare vendors the framework's guide as `docs/index.md` plus the shared contracts under `docs/shared/`, so a consumer install has the knowledge locally instead of pointers into a monorepo it doesn't have.
+- [#62](../../issues/62) — Consumer brands get the omega Claude plugin automatically: it is vendored into `@omega.js/manager`, and the manage cycle writes the brand's committed `.claude/settings.json` to enable it from the installed package — every collaborator's session, no setup. Published installs only; other settings are never touched.
+- [#48](../../issues/48) — `omega pipeline` now closes a launch by proving it: after the `--deploy` legs, `verify:site` / `verify:domain` / `verify:cloudflare` check the live surface as scorecard rows, failing the run like any deploy leg. `--verify` runs the sweep alone; demo-only brands record gated skips instead of network calls.
+- [#142](../../issues/142) — A config carrying a retired key (`web_manager`, `firebaseConfig`) now fails validation wherever the key sits, naming its replacement (`client`, `cloud`) and the mapping table. There is no dual-read, so the old name used to be ignored silently along with everything under it.
+
+### Fixed
+- [#141](../../issues/141) — `pages.json` and `llms.txt` no longer emit unrendered Liquid: titles and descriptions contributed by a layout (the `/updates/*` release pages' `Version {{ page.update.version }}`) are rendered against the page they belong to, exactly as that page's own `<title>` renders them.
+
 ## [0.9.0] (2026-07-30)
 
 ### Added

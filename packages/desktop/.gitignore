@@ -53,3 +53,8 @@ package-lock.json
 # Personal scratch (not committed)
 /my-messages/
 /TODO.md
+
+# GENERATED — the prepare-time docs lane (@omega.js/devkit tools/vendor-docs.js)
+# vendors the monorepo guide + docs/shared/ into the shipped package (#64)
+/docs/index.md
+/docs/shared/

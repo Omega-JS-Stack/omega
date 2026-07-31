@@ -357,6 +357,17 @@ oauth2 verbatim; `firebaseConfig` becomes `cloud: { provider: 'firebase', config
 `sentry` becomes `monitoring: { provider: 'sentry', … }` — D12 provider-discriminated role
 keys); everything framework-specific moves under `targets.<type>`.
 
+**Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142)):
+a name that was renamed OUTRIGHT is a validation error wherever it sits — shared level,
+inside a `targets.<type>` entry, inside an instance array — naming its replacement and
+pointing back here. Today that is `web_manager` → `client` and `firebaseConfig` → `cloud`
+(`src/retired-keys.js` is the list). Without the guard the old key validated clean and
+everything under it vanished, since nothing dual-reads it. Names that live on as legitimate
+keys elsewhere (`sentry`, which survives as `client.sentry`; `google`/`meta` under
+`analytics.providers`) stay out of the list — the rows below are their only guide. The
+`omega migrate` converter is unaffected: it READS legacy files as input and emits the new
+names, and only its output is validated.
+
 ### electron-manager (`config/electron-manager.json` → `config/omega.json5`) — DONE (checkpoint 18)
 
 | Legacy | New |
@@ -463,6 +474,7 @@ const {
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
   findSecretKeys,      // (object) → dot-paths of secret-shaped keys
+  findRetiredKeys,     // (object) → [{ path, key, replacement, why }] — renamed-outright keys (#142)
   applyConfigEdits,    // (source, edits) → edited source — comment-preserving (see Writeback)
   writeConfigValues,   // (projectDir, edits, { dryRun }?) → { path, changed, applied }
   deepMerge,           // agnostic layer merge

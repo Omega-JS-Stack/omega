@@ -27,6 +27,13 @@
  *    pipeline. desktop/extension are PUBLISH legs (GH release flow / store
  *    CI dispatch — both Ian-gated): without `--publish` they record as a
  *    gated skip instead of running.
+ *  - After the deploy legs, the VERIFY sweep runs automatically for whatever
+ *    was deployed (web → site + domain + cloudflare), landing as
+ *    `verify:<name>` rows — a failed check fails the run exactly like a
+ *    failed deploy leg. `--verify` alone runs the sweep without deploying
+ *    (the post-hoc "is it still up?" pass); a dry run, a demo-* brand, and a
+ *    brand with no cloud project all record gated skips and never touch the
+ *    network (lib/verify-live.js).
  *
  * This spends real API calls and reconciles real infrastructure — run it
  * on demand, SPARINGLY. It is deliberately NOT part of `npm test` or CI.
@@ -36,7 +43,8 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 
-const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
+const { resolveBrandRoot, loadBrand, discoverApps } = require('../lib/brand.js');
+const { runVerifyLegs, VERIFY_LEGS } = require('../lib/verify-live.js');
 
 // deploy target → the command run in that target's app dir (desktop/
 // extension apps carry no deploy script — their D13 verb is the local bin)
@@ -63,6 +71,22 @@ const CORE_SERVICES = [
 ];
 
 const STATUS_ICONS = { success: chalk.green('✓'), warned: chalk.yellow('⚠'), skipped: chalk.dim('⊘'), error: chalk.red('✗') };
+
+/**
+ * Which targets the verify sweep covers: whatever was just deployed, or —
+ * with `--verify` and no deploy — every target that HAS a live surface (the
+ * post-hoc "is it still up?" check).
+ *
+ * @param {object} argv - Parsed CLI args.
+ * @param {string[]} deployTargets - Targets whose deploy legs just ran.
+ * @returns {string[]}
+ */
+function resolveVerifyTargets(argv, deployTargets) {
+  if (deployTargets.length > 0) {
+    return deployTargets;
+  }
+  return argv.verify ? Object.keys(VERIFY_LEGS) : [];
+}
 
 /**
  * Judge one run record against the pipeline policy.
@@ -227,6 +251,16 @@ module.exports = async (argv = {}) => {
     });
   }
 
+  // Verify sweep — the last mile: the deploy legs pushed, these prove the
+  // launch surface answers. Rows join the record as verify:<name> so a
+  // failed check fails the pipeline exactly like a failed deploy leg.
+  const verifyTargets = resolveVerifyTargets(argv, deployTargets).filter((target) => VERIFY_LEGS[target]);
+  if (verifyTargets.length > 0) {
+    const dryRun = Boolean(argv.dryRun || argv['dry-run']);
+    console.log(chalk.bold(`\n🧪 Verify sweep: ${verifyTargets.join(', ')}${dryRun ? chalk.dim(' (dry run — plan only)') : ''}`));
+    found.record.services.push(...await runVerifyLegs(verifyTargets, loadBrand(brandRoot).config, {}, { dryRun }));
+  }
+
   const verdict = evaluatePipeline(found.record, { require: requireExtra, scoped: Boolean(argv.service) });
 
   console.log(chalk.bold('\n🧪 Pipeline scorecard'));
@@ -255,5 +289,6 @@ module.exports = async (argv = {}) => {
 
 module.exports.evaluatePipeline = evaluatePipeline;
 module.exports.findRunRecord = findRunRecord;
+module.exports.resolveVerifyTargets = resolveVerifyTargets;
 module.exports.CORE_SERVICES = CORE_SERVICES;
 module.exports.PUBLISH_LEGS = PUBLISH_LEGS;

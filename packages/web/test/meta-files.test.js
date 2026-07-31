@@ -94,6 +94,25 @@ test('pages.json: VALID search index — real pages with titles, machine files o
   assert.ok(post.title.length > 0, 'post title populated');
 });
 
+// #141 — the meta-file lane emitted LAYOUT-contributed meta values verbatim:
+// blueprint/updates/update's `meta.title: "Version {{ page.update.version }} …"`
+// reached pages.json and llms.txt as raw Liquid source. Layout frontmatter is
+// rendered per page in the `resolved` computed, so the meta files read the
+// rendered twin — no template output may carry Liquid delimiters.
+test('pages.json + llms.txt: no unrendered Liquid survives the meta-file lane (#141)', () => {
+  for (const file of ['/pages.json', '/llms.txt']) {
+    const body = pages.get(file);
+    assert.ok(!body.includes('{{'), `${file} carries no unrendered Liquid output`);
+    assert.ok(!body.includes('{%'), `${file} carries no unrendered Liquid tags`);
+  }
+
+  // The wildcard /updates/* family is the reproducer: per-page refs and all.
+  const update = JSON.parse(pages.get('/pages.json')).find((entry) => entry.url.endsWith('/updates/v1.0.0'));
+  assert.ok(update, 'the update page is indexed');
+  assert.strictEqual(update.breadcrumb, 'v1.0.0', 'per-page refs render against the item');
+  assert.ok(update.desc.includes('The first public release'), 'the page description renders');
+});
+
 test('ads.txt: renders the configured AdSense client with the ca- prefix stripped', () => {
   assert.match(pages.get('/ads.txt'), /^google\.com, pub-1234567890, DIRECT, f08c47fec0942fa0$/m);
 });

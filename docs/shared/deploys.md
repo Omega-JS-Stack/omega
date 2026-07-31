@@ -59,6 +59,31 @@ At a brand root the dispatcher hands `omega deploy` to `@omega.js/manager`'s dep
 
 **Mirrored rule (Ian 2026-07-20): every deploy verb auto-detects linked local packages (`findLocalSpecs` — tree-wide, cp194) and takes its LOCAL-ARTIFACT lane**, loudly, so a linked brand ships the local framework without flags or errors; CI dispatch is only for registry-clean trees (`omega i live` restores them). Dry-runs show whichever plan would actually run. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 
+## One command, repo to live — manage + deploy + verify ([#48](https://github.com/Omega-JS-Stack/omega/issues/48))
+
+A brand goes from repo to live through the EXISTING verbs, not a new one:
+`omega pipeline --deploy=web,backend` at a brand root runs the full manage
+cycle (provisioning every service), then each target's deploy leg, then the
+**verify sweep** — the last mile that proves the launch surface actually
+answers from the outside:
+
+| Check | What it proves | How |
+|---|---|---|
+| `verify:site` | the canonical URL serves a real page | HTTPS GET on `brand.url` → 200 + `text/html` + a non-trivial body (a 200 empty shell fails) |
+| `verify:domain` | the names resolve | DNS resolution of the apex (plus `www` when the brand owns the apex; a subdomain brand checks only its own host) |
+| `verify:cloudflare` | traffic arrives proxied, not origin-direct | `cf-ray` header, or `server: cloudflare` |
+
+Checks land in the pipeline scorecard as `verify:<name>` rows and are judged
+exactly like deploy legs — a failed check fails the run. The sweep runs
+automatically for whatever was deployed (`--deploy=web` → all three);
+`--verify` alone runs it WITHOUT deploying (the post-hoc "is it still up?"
+pass). Three states gate the sweep — a dry run (plan-only, like every other
+manager verb), a demo-* (emulator-only) brand, and a brand with no cloud
+project at all: each check records a gated skip with its reason and no
+transport is called, so the offline brands stay offline. Home: `packages/manager/src/lib/verify-live.js`
+(both transports — fetch and DNS — are injected seams, so the tests run
+fully offline).
+
 ## Local frameworks in production artifacts (iterate without publishing)
 
 A brand linked to the local monorepo (`file:` specs) can ship the LOCAL framework code to production — no npm publish involved. This is a supported feature (Ian 2026-07-20: iterate fast on unproven framework changes without burning registry versions). Per target:

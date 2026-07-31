@@ -22,6 +22,7 @@
 const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
+const { findRetiredKeys, RETIRED_KEYS } = require('./retired-keys.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
@@ -91,6 +92,8 @@ module.exports = {
   formatErrors,
   findSecretKeys,
   SECRET_KEY_PATTERN,
+  findRetiredKeys,
+  RETIRED_KEYS,
 
   // Merge
   deepMerge,

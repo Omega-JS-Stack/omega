@@ -32,6 +32,11 @@
 // package's --omega-* token sheet). Same freshness contract as module
 // vendoring: re-copied from the resolved source on every prepare.
 //
+// Docs (#64): the same hook also vendors KNOWLEDGE — tools/vendor-docs.js
+// copies the monorepo's guide tree + docs/shared/ into every publishable (and
+// the Claude plugin into @omega.js/manager), so a published install carries
+// docs that match its version. One lane, two payloads: code and knowledge.
+//
 // Notes:
 //   - prepare-package `after` hooks are non-blocking AT THE RUNNER (a failure
 //     warns but doesn't stop prepare — third-party prepare-package behavior).
@@ -50,6 +55,7 @@ const fs = require('fs');
 const path = require('path');
 const { isBuiltin } = require('node:module');
 const jetpack = require('fs-jetpack');
+const vendorDocs = require('./vendor-docs');
 const Logger = require('../src/logger');
 
 const logger = new Logger('devkit-vendor');
@@ -257,7 +263,7 @@ function resolveNeededFiles(name, packageRoot, seeds) {
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - Host framework root (defaults to process.cwd())
- * @returns {{ rewritten: number, vendored: Object<string, string[]>, assets: string[], vendorRoot: string }}
+ * @returns {{ rewritten: number, vendored: Object<string, string[]>, assets: string[], docs: object, vendorRoot: string }}
  */
 function vendorPackages(options) {
   options = options || {};
@@ -275,6 +281,11 @@ function vendorPackages(options) {
   }
 
   const vendorRoot = path.join(distPath, 'vendor');
+
+  // The monorepo's guide + shared contracts (and, for the manager, the Claude
+  // plugin) ship inside the package — see tools/vendor-docs.js. Independent of
+  // dist: knowledge is vendored for every publishable on every prepare.
+  const docs = vendorDocs({ cwd });
 
   // Declared cross-package assets copy on every run, independent of whether
   // any dist JS references @omega.js modules.
@@ -349,7 +360,7 @@ function vendorPackages(options) {
   jetpack.remove(vendorRoot);
   if (seedsByPackage.size === 0) {
     logger.log(`No @omega.js references found in ${hostPackage.name} dist — nothing to vendor`);
-    return { rewritten: 0, vendored: {}, assets, vendorRoot };
+    return { rewritten: 0, vendored: {}, assets, docs, vendorRoot };
   }
 
   // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
@@ -442,7 +453,7 @@ function vendorPackages(options) {
   const summary = Object.entries(vendored).map(([name, files]) => `${name} (${files.length})`).join(', ');
   logger.log(`Vendored ${summary} into ${path.relative(cwd, vendorRoot)}, rewrote ${rewritten} file(s) in ${hostPackage.name}`);
 
-  return { rewritten, vendored, assets, vendorRoot };
+  return { rewritten, vendored, assets, docs, vendorRoot };
 }
 
 module.exports = vendorPackages;

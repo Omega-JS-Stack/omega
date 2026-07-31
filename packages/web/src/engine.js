@@ -377,6 +377,29 @@ function configureOmega(eleventyConfig, options) {
     frontmatter.resolveData(data);
   });
 
+  // The meta-file lane's reader (#141): a page's cascade data may still hold
+  // RAW Liquid contributed by a LAYOUT (blueprint/updates/update sets
+  // `meta.title: "Version {{ page.update.version }} - {{ site.brand.name }}"`)
+  // — per-page refs defer at frontmatter time and render in that page's own
+  // `resolved` computed. sitemap.xml/pages.json/llms.txt read OTHER pages'
+  // data, so they read it through this filter: the value renders against THAT
+  // item's scope, exactly as the page's own head rendered it. Reading
+  // `item.data.resolved` directly would work too but change the fallbacks —
+  // resolved seeds the site sections, so every entry without its own title
+  // would inherit the SITE's meta.title instead of the template's default.
+  const dataAt = (data, dottedPath) => String(dottedPath).split('.')
+    .reduce((node, key) => (node == null ? node : node[key]), data);
+  eleventyConfig.addFilter('omega_rendered', (item, dottedPath) => {
+    const value = dataAt(item && item.data, dottedPath);
+    if (typeof value !== 'string' || !(value.includes('{{') || value.includes('{%'))) return value;
+    const resolved = item.data.resolved;
+    if (!resolved) return value; // no computed data (never in a real build) — raw beats crashing
+    return frontmatter.render(value, {
+      resolved,
+      page: { ...resolved, resolved, url: item.url, slug: item.data.page.fileSlug, fileSlug: item.data.page.fileSlug },
+    });
+  });
+
   // A body that composes sections is Liquid-HTML, not prose: rendered
   // section markup must never pass through the markdown transform — blank
   // lines inside emitted HTML blocks become empty <p> elements that land

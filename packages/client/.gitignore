@@ -70,3 +70,8 @@ node_modules/
 # Custom
 _legacy
 dist
+
+# GENERATED — the prepare-time docs lane (@omega.js/devkit tools/vendor-docs.js)
+# vendors the monorepo guide + docs/shared/ into the shipped package (#64)
+/docs/index.md
+/docs/shared/

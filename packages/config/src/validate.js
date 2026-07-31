@@ -14,12 +14,16 @@
  *     present entry must be an object ({} = enabled with defaults) OR an
  *     array of id'd instance entries (multi-instance targets: ids required,
  *     dir-safe, unique per type; >1 backend instance is a WARNING)
+ *   - retired keys are always errors (see retired-keys.js) — a name that was
+ *     renamed outright reads as nothing at all, so it fails loudly instead of
+ *     losing its settings silently
  *   - secret-shaped keys are always errors (see secrets.js) — loadConfig
  *     additionally hard-fails on them before any merge happens
  */
 
 const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
+const { findRetiredKeys } = require('./retired-keys.js');
 const { isPlainObject } = require('./merge.js');
 const { INSTANCE_ID_PATTERN } = require('./instances.js');
 
@@ -180,6 +184,15 @@ function validateConfig(config, options) {
       }
     });
   }
+
+  // ─── retired keys (#142) ───────────────────────────────────────────────
+  findRetiredKeys(config).forEach(({ path, replacement, why }) => {
+    errors.push(
+      `config.${path} is retired — the key is now "${replacement}" (${why}). `
+      + `Rename it; there is no dual-read, so the old name is silently ignored `
+      + `(docs/shared/config.md → "Migration — legacy configs")`,
+    );
+  });
 
   // ─── secrets ───────────────────────────────────────────────────────────
   findSecretKeys(config).forEach((keyPath) => {

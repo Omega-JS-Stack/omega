@@ -22,16 +22,23 @@ meta:
       {%- assign page_type = item.data.settings['page-type'] -%}
     {%- endif -%}
     {%- comment -%} A post's own title beats cascaded meta (dir data can
-        shadow meta.title for posts, which never set their own) {%- endcomment -%}
-    {%- assign entry_title = item.data.post.title | default: item.data.meta.title -%}
-    {%- assign entry_desc = item.data.post.description | default: item.data.meta.description -%}
+        shadow meta.title for posts, which never set their own). Every value
+        comes through omega_rendered — layout-contributed meta carries raw
+        Liquid until the owning page renders it (#141) {%- endcomment -%}
+    {%- assign meta_title = item | omega_rendered: 'meta.title' -%}
+    {%- assign meta_desc = item | omega_rendered: 'meta.description' -%}
+    {%- assign entry_title = item | omega_rendered: 'post.title' | default: meta_title -%}
+    {%- assign entry_desc = item | omega_rendered: 'post.description' | default: meta_desc -%}
+    {%- assign entry_breadcrumb = item | omega_rendered: 'meta.breadcrumb' -%}
+    {%- assign post_category = item | omega_rendered: 'post.category' -%}
+    {%- assign entry_category = item | omega_rendered: 'search.category' | default: post_category -%}
     {%- unless first %},{% endunless -%}{%- assign first = false %}
   {
     "url": "{{ site.url }}{{ item.url }}",
     "title": "{{ entry_title | default: '' | uj_json_escape }}",
     "desc": "{{ entry_desc | default: '' | uj_json_escape }}",
-    "breadcrumb": "{{ item.data.meta.breadcrumb | default: '' | uj_json_escape }}",
-    "category": "{{ item.data.search.category | default: item.data.post.category | default: '' | uj_json_escape }}",
+    "breadcrumb": "{{ entry_breadcrumb | default: '' | uj_json_escape }}",
+    "category": "{{ entry_category | default: '' | uj_json_escape }}",
     "type": "{{ page_type | default: '' | uj_json_escape }}"
   }
   {%- endfor %}

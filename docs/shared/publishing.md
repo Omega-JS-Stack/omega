@@ -14,6 +14,21 @@
 Registry-real internal ranges (everything else is workspace `*`): `@omega.js/client`
 `^0.1.0` in web/desktop/extension; `@omega.js/backend` `^0.1.0` in manager.
 
+## What prepare vendors into a tarball
+
+Every publishable's prepare `after` hook runs the devkit vendor lane, which
+ships two payloads: the private packages' MODULES into `dist/vendor/`
+(`tools/vendor.js`), and the DOCS into the package root (`tools/vendor-docs.js`
+— the package's guide as `docs/index.md` plus `docs/shared/`, and for
+`@omega.js/manager` also `claude-plugin/` + `.claude-plugin/marketplace.json`,
+the plugin a consumer brand enables from its node_modules — minus the plugin's
+`.mcp.json`, whose server lives outside the plugin in the monorepo's
+`packages/mcp-router`, which is not in the publish set
+([#144](https://github.com/Omega-JS-Stack/omega/issues/144))). All of it is
+generated and gitignored; `node --test scripts/vendor-docs.test.js` packs all
+six for real and asserts the tarball listings. Contract:
+[agent-docs.md](agent-docs.md).
+
 ## Pre-flight (any day, no GO needed)
 
 1. `npm run release:check` — packs all six through their real prepare (vendoring

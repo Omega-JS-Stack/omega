@@ -9,7 +9,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { evaluatePipeline, findRunRecord, CORE_SERVICES } = require('../src/commands/pipeline.js');
+const { evaluatePipeline, findRunRecord, resolveVerifyTargets, CORE_SERVICES } = require('../src/commands/pipeline.js');
+const { runVerifyLegs } = require('../src/lib/verify-live.js');
 
 /** Full-run record where every core service is green. */
 function greenRecord(extra = []) {
@@ -104,6 +105,47 @@ test('pipeline: deploy legs ride the same rules — an error leg fails, a green 
   const verdict = evaluatePipeline(bad);
   assert.equal(verdict.pass, false);
   assert.match(verdict.failures[0], /deploy:backend: error — exit 1/);
+});
+
+test('pipeline: verify targets follow the deploy legs; --verify alone sweeps every verifiable target', () => {
+  assert.deepEqual(resolveVerifyTargets({ deploy: 'web,backend' }, ['web', 'backend']), ['web', 'backend'], 'deploying verifies what was deployed');
+  assert.deepEqual(resolveVerifyTargets({ verify: true }, []), ['web'], '--verify alone is the post-hoc sweep');
+  assert.deepEqual(resolveVerifyTargets({}, []), [], 'no deploy, no --verify → no sweep');
+});
+
+test('pipeline: every value-less pipeline flag is declared boolean (yargs would eat the next positional)', () => {
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  for (const flag of ['dry-run', 'verify', 'publish']) {
+    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value — it must be declared boolean`);
+  }
+});
+
+test('pipeline: verify rows land AFTER the deploy legs and ride the same judging rules', async () => {
+  const record = greenRecord();
+  const brandConfig = { brand: { url: 'https://playground.omegajs.dev' }, cloud: { config: { projectId: 'omegajs-playground' } } };
+  const fetchImpl = async () => ({ status: 500, headers: { get: () => 'text/html' }, text: async () => '' });
+  const resolve = async () => ['203.0.113.7'];
+
+  record.services.push({ service: 'deploy:web', status: 'success', output: null, error: null });
+  record.services.push(...await runVerifyLegs(['web'], brandConfig, { fetch: fetchImpl, resolve }));
+
+  const services = record.services.map((entry) => entry.service);
+  assert.ok(services.indexOf('deploy:web') < services.indexOf('verify:site'), 'the sweep runs after the deploy leg');
+
+  const verdict = evaluatePipeline(record);
+  assert.equal(verdict.pass, false, 'a failed check fails the pipeline like a failed deploy leg');
+  assert.ok(verdict.failures.some((failure) => /verify:site: error — .*500/.test(failure)));
+});
+
+test('pipeline: a demo-only brand records verify:* as tolerated gated skips', async () => {
+  const record = greenRecord();
+  const demoConfig = { brand: { url: 'https://sandbox-brand.example.com' }, cloud: { config: { projectId: 'demo-sandbox-brand' } } };
+
+  record.services.push(...await runVerifyLegs(['web'], demoConfig, {}));
+
+  const verdict = evaluatePipeline(record);
+  assert.equal(verdict.pass, true, 'gated verify skips never fail the run');
+  assert.equal(verdict.skips.filter((skip) => skip.startsWith('verify:')).length, 3);
 });
 
 test('pipeline: headless Google consent fails FAST with the seeding instruction (no server, no 5-min wait)', async () => {
