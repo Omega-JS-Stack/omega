@@ -48,10 +48,10 @@ const SIZE_PRESETS = {
 // AdSense unit attributes per type — the ONE layout table (the legacy
 // duplicated the in-feed layout keys across includes).
 const ADSENSE_FORMATS = {
-  display: { style: 'display:block', attributes: { 'data-ad-format': 'auto', 'data-full-width-responsive': 'true' }, slotKey: 'display' },
-  'in-article': { style: 'display:block; text-align:center', attributes: { 'data-ad-layout': 'in-article', 'data-ad-format': 'fluid' }, slotKey: 'inArticle' },
-  'in-feed': { style: 'display:block', attributes: { 'data-ad-format': 'fluid' }, slotKey: 'inFeed', layoutKeys: { 'image-above': '-6t+ed+2x-11-88', 'image-side': '-fb+5w+4e-db+86' } },
-  multiplex: { style: 'display:block', attributes: { 'data-ad-format': 'autorelaxed' }, slotKey: 'multiplex' },
+  display: { style: 'display:block', attributes: { 'data-ad-format': 'auto', 'data-full-width-responsive': 'true' }, slotKey: 'displaySlot' },
+  'in-article': { style: 'display:block; text-align:center', attributes: { 'data-ad-layout': 'in-article', 'data-ad-format': 'fluid' }, slotKey: 'inArticleSlot' },
+  'in-feed': { style: 'display:block', attributes: { 'data-ad-format': 'fluid' }, slotKey: 'inFeedSlot', layoutKeys: { 'image-above': '-6t+ed+2x-11-88', 'image-side': '-fb+5w+4e-db+86' } },
+  multiplex: { style: 'display:block', attributes: { 'data-ad-format': 'autorelaxed' }, slotKey: 'multiplexSlot' },
 };
 
 // Fixed postMessage vocabulary (matches @omega.js/backend's rendered unit)
@@ -636,7 +636,7 @@ class Verts {
       $ins.setAttribute('data-ad-layout-key', layoutKey);
     }
 
-    const slot = adsense.slots?.[format.slotKey];
+    const slot = adsense[format.slotKey];
     if (slot) {
       $ins.setAttribute('data-ad-slot', slot);
     }

@@ -408,4 +408,36 @@ describe('Verts Module', () => {
       assert.strictEqual(unit.destroyed, true);
     });
   });
+
+  // #150 — the slot read must resolve the schema's *Slot keys
+  // (advertising.providers.adsense.displaySlot etc.), not a slots.* subobject
+  describe('adsense slot wiring', () => {
+    it('_buildIns wires data-ad-slot from each schema *Slot key', () => {
+      const verts = getManager().verts();
+      const adsense = {
+        client: 'ca-pub-test',
+        displaySlot: '1111111111',
+        inArticleSlot: '2222222222',
+        inFeedSlot: '3333333333',
+        multiplexSlot: '4444444444',
+      };
+      const expected = {
+        display: '1111111111',
+        'in-article': '2222222222',
+        'in-feed': '3333333333',
+        multiplex: '4444444444',
+      };
+      for (const [type, slot] of Object.entries(expected)) {
+        const format = vertsModule.ADSENSE_FORMATS[type];
+        const $ins = verts._buildIns(adsense, type, format, {});
+        assert.strictEqual($ins.getAttribute('data-ad-slot'), slot, `${type} slot`);
+      }
+    });
+
+    it('_buildIns omits data-ad-slot when the slot is not configured', () => {
+      const format = vertsModule.ADSENSE_FORMATS.display;
+      const $ins = getManager().verts()._buildIns({ client: 'ca-pub-test' }, 'display', format, {});
+      assert.strictEqual($ins.getAttribute('data-ad-slot'), null);
+    });
+  });
 });

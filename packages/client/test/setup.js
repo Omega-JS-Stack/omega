@@ -69,13 +69,14 @@ Object.defineProperty(globalThis, 'navigator', {
 global.document = {
   readyState: 'complete',
   createElement: (tag) => {
+    const attributes = {};
     const element = {
       tag,
       className: '',
       textContent: '',
       type: '',
-      setAttribute: () => {},
-      getAttribute: () => null,
+      setAttribute: (name, value) => { attributes[name] = String(value); },
+      getAttribute: (name) => attributes[name] ?? null,
       addEventListener: () => {},
       removeEventListener: () => {},
       remove: () => {},

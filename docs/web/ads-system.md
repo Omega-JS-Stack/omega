@@ -31,7 +31,7 @@ advertising: {
   providers: {
     adsense: {
       client: 'ca-pub-XXXX',            // feeds the ad tag AND ads.txt (SSOT)
-      slots: { display: '…', inArticle: '…', inFeed: '…', multiplex: '…' },
+      displaySlot: '…', inArticleSlot: '…', inFeedSlot: '…', multiplexSlot: '…',
     },
     inhouse: {
       source: 'company',                 // 'self' (this brand's backend) | 'company' (parent's api) | full URL
