@@ -1,5 +1,5 @@
 /**
- * Ensure Managed Transforms match `cloudflare.rules.managedTransforms`.
+ * Ensure Managed Transforms match `edge.providers.cloudflare.rules.managedTransforms`.
  *
  * 1. Reads the current managed_request_headers + managed_response_headers state.
  * 2. Diffs against the config (enable/disable each Cloudflare-named transform).
@@ -37,7 +37,7 @@ module.exports = async function ensureManagedTransforms(context) {
   cacheRead(brandRoot, 'rules-managed-transforms', { managedRequestHeaders, managedResponseHeaders });
 
   // === DIFF ===
-  const managedTransformsConfig = brandConfig?.cloudflare?.rules?.managedTransforms;
+  const managedTransformsConfig = brandConfig?.edge?.providers?.cloudflare?.rules?.managedTransforms;
   if (!managedTransformsConfig) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

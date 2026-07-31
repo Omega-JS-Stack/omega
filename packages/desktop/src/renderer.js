@@ -258,7 +258,7 @@ Manager.prototype._wireTooltips = function () {
 // postMessage, host-owned rotation + staleness recovery, no-fill collapse.
 // The type is PINNED to 'house': desktop surfaces never run the AdSense
 // provider lane (policy: no web context), so even a shared omega.json5 that
-// carries `advertising.providers['google-adsense']` can only ever take the
+// carries `advertising.providers.adsense` can only ever take the
 // house/company inventory here. mount() merges passed options OVER the
 // element attributes, so the pin is absolute; bound hosts are marked
 // `data-omega-vert-bound="house"` for observability.

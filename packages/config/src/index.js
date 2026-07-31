@@ -22,7 +22,7 @@
 const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
-const { findRetiredKeys, RETIRED_KEYS } = require('./retired-keys.js');
+const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
@@ -76,9 +76,9 @@ module.exports = {
   // Template surface
   toSiteGlobal,
 
-  // Brand repo derivation from the optional github.repo slug ("owner/name"
-  // or bare name; name → brand.id, owner → github.org — the legacy
-  // orgMain/orgWebsite split rides the slug's owner)
+  // Brand repo derivation from the shared repo.providers.github block, overlaid
+  // by a target's own github entry (backend: targets.backend.github.repo slug —
+  // "owner/name" or bare name; name → brand.id, owner → repo.providers.github.org)
   parseRepoSlug,
   // demo-* project ids are emulator-only (Firebase's convention) — cloud
   // surfaces short-circuit on this instead of 403ing at Google
@@ -94,6 +94,7 @@ module.exports = {
   SECRET_KEY_PATTERN,
   findRetiredKeys,
   RETIRED_KEYS,
+  RETIRED_PATHS,
 
   // Merge
   deepMerge,

@@ -1,6 +1,6 @@
 /**
  * Cloud service (Firebase provider) — reconciles the brand's Firebase/GCP project to
- * `firebase: {}` in omega.json5: Blaze billing, required Google Cloud APIs,
+ * `cloud: {}` in omega.json5: Blaze billing, required Google Cloud APIs,
  * project identity, OAuth consent screen, Admin SDK service account + key,
  * Hosting api.{domain} custom domains (DNS via Cloudflare), Firestore (+PITR),
  * Realtime Database, Authentication (Identity Platform + sign-in methods),
@@ -8,12 +8,12 @@
  *
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env (OAuth2;
  * tokens cache to .omega/auth/google-tokens.json — the first run prints an
- * auth URL). No credentials → the service skips. No firebase.projectId →
+ * auth URL). No credentials → the service skips. No cloud.config.projectId →
  * interactive runs offer the project selection/creation flow
  * (lib/project-flow.js, lands the id in omega.json5); otherwise skip with
  * guidance.
  *
- * `firebase.shared: true` (project shared by multiple brands) filters to the
+ * `cloud.shared: true` (project shared by multiple brands) filters to the
  * per-brand operations only (service-account, sdk-config) so one brand never
  * rewrites a shared project's settings.
  */
@@ -33,10 +33,10 @@ const SHARED_OPERATIONS = new Set(['service-account', 'sdk-config']);
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const firebase = context.brandConfig.firebase || {};
+    const cloud = context.brandConfig.cloud || {};
 
-    if (firebase.enabled === false) {
-      return { skip: true, reason: 'firebase.enabled = false' };
+    if (cloud.enabled === false) {
+      return { skip: true, reason: 'cloud.enabled = false' };
     }
 
     const haveCreds = Boolean(
@@ -51,16 +51,15 @@ module.exports.run = createServiceRunner({
       tokenStorePath: googleTokenStorePath(context.brandRoot),
     });
 
-    // firebase.projectId, falling back to the client web config — a brand
-    // that ran the framework flow first (setup/dev) already names the project
-    // in cloud.config. Still missing → offer the interactive selection/
-    // creation flow (lands firebase.projectId in omega.json5); needs credentials
-    let projectId = firebase.projectId || context.brandConfig.cloud?.config?.projectId;
+    // ONE home (#23): cloud.config.projectId, where the framework flow
+    // (setup/dev) already names the project. Missing → offer the interactive
+    // selection/creation flow (lands it in omega.json5); needs credentials
+    let projectId = cloud.config?.projectId;
     if (!projectId && haveCreds) {
       projectId = await resolveFirebaseProject(context, makeApi());
     }
     if (!projectId) {
-      return { skip: true, reason: 'no firebase.projectId configured (rerun interactively to select/create the project)' };
+      return { skip: true, reason: 'no cloud.config.projectId configured (rerun interactively to select/create the project)' };
     }
 
     // demo-* = emulator-only by Firebase's own convention: no real GCP
@@ -99,7 +98,7 @@ module.exports.run = createServiceRunner({
       console.log(`    ${chalk.green('✓')} Access healed — ${chalk.cyan(access.grantor)} granted ${chalk.cyan(access.manageEmail)} ${chalk.cyan(access.roles.join(' + '))} on ${chalk.cyan(projectId)}`);
     }
 
-    const shared = firebase.shared === true;
+    const shared = cloud.shared === true;
     console.log(`    Project: ${chalk.cyan(projectId)}${shared ? chalk.dim(' (shared)') : ''}`);
     const cloudflareApi = context.cloudflareApi
       || (process.env.CLOUDFLARE_TOKEN ? new CloudflareAPI() : null);

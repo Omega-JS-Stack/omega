@@ -2,7 +2,7 @@
  * Ensure the brand's Chatsy owner account has the configured plan.
  *
  * The agent's owner UID identifies the user account; that user's
- * subscription is set to chatsy.plan (DEFAULTS: Chatsy's Max top tier)
+ * subscription is set to inbound.chat.providers.chatsy.plan (DEFAULTS: Chatsy's Max top tier)
  * via the shared owner-plan reconciliation. omega-manager resolved the
  * plan by reading the chatsy brand's own config from `.brands/` (company
  * mode); the port takes it from the brand's config with the top tier as
@@ -14,17 +14,17 @@ const { ensureOwnerPlan } = require('../../../lib/owner-plan.js');
 module.exports = async function ensureUser(context) {
   const { brandConfig, db, agentId, options } = context;
 
-  const plan = brandConfig.chatsy?.plan;
+  const plan = brandConfig.inbound?.chat?.providers?.chatsy?.plan;
   if (!plan?.id) {
-    console.log(`      ${chalk.red('✗')} No chatsy.plan configured`);
-    return { status: 'error', error: 'no chatsy.plan.id configured' };
+    console.log(`      ${chalk.red('✗')} No inbound.chat.providers.chatsy.plan configured`);
+    return { status: 'error', error: 'no inbound.chat.providers.chatsy.plan.id configured' };
   }
 
   // The agent document carries the owner UID
   const agent = await db.getDoc(`agents/${agentId}`);
 
   if (!agent) {
-    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Chatsy — check chatsy.agentId`);
+    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Chatsy — check inbound.chat.providers.chatsy.agentId`);
     return { status: 'error', error: `agent ${agentId} not found` };
   }
 

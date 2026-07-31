@@ -41,7 +41,7 @@ module.exports.run = createServiceRunner({
     // Skip for shared Firebase projects — migrations iterate whole collections,
     // so the owning brand's run covers the project; per-shared-brand runs would
     // just repeat the same migration against the same Firestore
-    if (context.brandConfig.firebase?.shared === true) {
+    if (context.brandConfig.cloud?.shared === true) {
       return { skip: true, reason: 'shared Firebase project (owning brand runs migrations)' };
     }
 

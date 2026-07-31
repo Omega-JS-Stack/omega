@@ -25,12 +25,16 @@ const { parseRoot } = require('./edit.js');
 
 // `targets` goes LAST (Ian 2026-07-14) — it's the per-target override layer,
 // so it reads best after every shared section it can override.
+// The de-branding rekey (#23) collapsed several vendor-named top-level keys
+// into role-shaped homes — `repo`, `edge`, `captcha`, `search`, `forms`,
+// `inbound` — and folded `firebase`/`gcp` into `cloud`. Only the TOP level is
+// ordered, so each fold is one entry here; the nesting under it is authored.
 const CANONICAL_TOP_LEVEL_ORDER = [
-  'enabled', 'parent', 'brand', 'company', 'account', 'local', 'github', 'domain',
-  'cloudflare', 'cloud', 'firebase', 'gcp', 'recaptcha', 'analytics',
+  'enabled', 'parent', 'brand', 'company', 'account', 'local', 'repo', 'domain',
+  'edge', 'cloud', 'captcha', 'analytics',
   'monitoring', 'advertising', 'payment', 'oauth2', 'sponsorships',
-  'marketing', 'blog', 'devlog', 'reviews', 'seo', 'searchConsole',
-  'testing', 'dataRequest', 'slapform', 'chatsy', 'replyify',
+  'marketing', 'blog', 'devlog', 'reviews', 'seo', 'search',
+  'testing', 'dataRequest', 'forms', 'inbound',
   'server', 'assets',
   'certificates', 'theme', 'translation', 'migrations', 'targets',
 ];

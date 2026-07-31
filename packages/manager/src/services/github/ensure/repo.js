@@ -16,7 +16,7 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureRepo(context) {
   const { brandConfig, options = {}, githubApi: api } = context;
 
-  const github = brandConfig.github;
+  const github = brandConfig.repo?.providers?.github;
   const repoName = brandRepoName(brandConfig);
   const repoOwner = brandRepoOwner(brandConfig);
   const fullName = `${repoOwner}/${repoName}`;

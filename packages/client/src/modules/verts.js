@@ -500,7 +500,7 @@ class Verts {
    */
   async render($el, options = {}) {
     const advertising = this.manager.config.advertising || {};
-    const adsense = advertising.providers?.['google-adsense'];
+    const adsense = advertising.providers?.adsense;
     const type = options.type || 'display';
 
     if (type === 'house') {

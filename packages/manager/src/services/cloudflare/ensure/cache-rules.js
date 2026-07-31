@@ -1,5 +1,5 @@
 /**
- * Ensure cache rules match `cloudflare.cacheRules`.
+ * Ensure cache rules match `edge.providers.cloudflare.cacheRules`.
  *
  * 1. Reads the http_request_cache_settings entrypoint ruleset (or notes it needs creating).
  * 2. Diffs each configured rule by description — creates missing, updates stale, removes unconfigured.
@@ -22,7 +22,7 @@ module.exports = async function ensureCacheRules(context) {
   cacheRead(brandRoot, 'cache-rules', { count: readCount, ruleset, needsCreate });
 
   // === DIFF ===
-  const cacheRulesConfig = brandConfig?.cloudflare?.cacheRules;
+  const cacheRulesConfig = brandConfig?.edge?.providers?.cloudflare?.cacheRules;
   if (!cacheRulesConfig || !Array.isArray(cacheRulesConfig) || cacheRulesConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

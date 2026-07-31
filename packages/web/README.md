@@ -151,7 +151,7 @@ see the harness README for the honest before/after numbers.
   consumer file at the same URL overrides. sitemap.xml and pages.json emit
   entries in URL byte order (deterministic across builds). JSON outputs are
   valid by construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
-  renders the configured `advertising.providers.google-adsense.client` or an
+  renders the configured `advertising.providers.adsense.client` or an
   honest comment.
 - `defaults/sample-posts/**`, `sample-team/**`, `sample-updates/**` — the
   shared sample-content corpus (spec §8: 11 posts, 4 teammates, 4 updates),

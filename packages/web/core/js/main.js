@@ -83,7 +83,10 @@ export default async function ({ manager, options } = {}) {
           .catch(error => console.error(`Failed to load ${module.path}:`, error))
       );
     } else {
-      console.log(`Skipping ${module.path} (no ${module.configKey} config section enables it)`);
+      // Truthful either way (#23): an absent section and a section that says
+      // `enabled: false` are different answers, so they get different words.
+      const why = moduleConfig ? `${module.configKey} is disabled` : `${module.configKey} is not configured`;
+      console.log(`Skipping ${module.path} (${why})`);
     }
   }
 

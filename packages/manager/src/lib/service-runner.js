@@ -66,7 +66,7 @@ function getOperationHandler(serviceDir, operationName, type) {
  * Any other top-level key throws. This prevents accidental data leakage into
  * state via an "everything dumps to serviceData" pattern.
  *
- * Handlers that produce durable IDs (firebase.projectId, stripe.productId,
+ * Handlers that produce durable IDs (cloud.config.projectId, stripe.productId,
  * agent IDs, etc.) MUST wrap them in `state`. Anything else (counts, success/
  * fail flags, "what happened this run") goes to `output`.
  */

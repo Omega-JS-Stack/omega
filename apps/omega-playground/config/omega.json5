@@ -63,10 +63,14 @@
   // lookup. shared: the org profile belongs to the OMEGA project, not this
   // rehearsal brand. public: GitHub Pages on a free org needs a public repo
   // — only built site output lands in it (gh-pages), public by definition.
-  github: {
-    org: "Omega-JS-Stack",
-    shared: true,
-    private: false,
+  repo: {
+    providers: {
+      github: {
+        org: "Omega-JS-Stack",
+        shared: true,
+        private: false,
+      },
+    },
   },
 
   // Download endpoints (site.download[platform][type]) — drive the /download
@@ -94,6 +98,15 @@
   // temporarily set projectId back to the demo-* convention (demo-omega-playground).
   cloud: {
     provider: "firebase",
+    // Platform-level resources the manage cycle's project ensures consume
+    // (#23 folded them out of the old `gcp` key — one cloud home).
+    // billingAccount = ITW Main Billing Account (ID only — unusable without
+    // IAM; repo is private). The billing ensure-step links it → Blaze.
+    // organizationId = ITW Creative Works GCP org — projects the manager
+    // creates land inside it (org placement grants the default compute SA
+    // roles; legacy omega-manager hardcoded this id, now it's config).
+    billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
+    organizationId: "1076309192968",
     config: {
       apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
       // Brand host (cp268): first-party sign-in redirects under storage
@@ -107,18 +120,6 @@
       databaseURL: "https://omegajs-playground-default-rtdb.firebaseio.com",
       measurementId: "G-0SGDR7ZPJ9",
     },
-  },
-
-  // Google Cloud platform-level resources (the manage cycle's project
-  // ensures consume these; projectId derives from cloud.config above —
-  // cp100). billingAccount = ITW Main Billing Account (ID only — unusable
-  // without IAM; repo is private). The billing ensure-step links it → Blaze.
-  // organizationId = ITW Creative Works GCP org — projects the manager
-  // creates land inside it (org placement grants the default compute SA
-  // roles; legacy omega-manager hardcoded this id, now it's config).
-  gcp: {
-    billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
-    organizationId: "1076309192968",
   },
 
   analytics: {
@@ -209,7 +210,7 @@
   // Rekeyed cp268: provider-neutral advertising section (client = ca-pub-…).
   advertising: {
     providers: {
-      'google-adsense': {
+      adsense: {
         client: "ca-pub-7372939085773564",
       },
     },
@@ -220,17 +221,31 @@
   // the SHAPE DONOR only (read once at mint, never written). The minted ids
   // land here via comment-preserving writeback; ITW's originals return to
   // ITW's own convergence entirely (no more cross-brand re-branding).
-  slapform: {
-    templateFormId: "UlXJ49Q4C",
-    formId: "POZXbmsFFHOW1I",
+  forms: {
+    providers: {
+      slapform: {
+        templateFormId: "UlXJ49Q4C",
+        formId: "POZXbmsFFHOW1I",
+      },
+    },
   },
-  chatsy: {
-    templateAgentId: "8YIsRlzAAiv03d",
-    agentId: "KJT3xUjlQQVuaC",
-  },
-  replyify: {
-    templateAgentId: "stcbsieo7n1Lrk",
-    agentId: "hkBrbPds9V4U0F",
+  inbound: {
+    chat: {
+      providers: {
+        chatsy: {
+          templateAgentId: "8YIsRlzAAiv03d",
+          agentId: "KJT3xUjlQQVuaC",
+        },
+      },
+    },
+    email: {
+      providers: {
+        replyify: {
+          templateAgentId: "stcbsieo7n1Lrk",
+          agentId: "hkBrbPds9V4U0F",
+        },
+      },
+    },
   },
 
   // Apple signing (certificates service): reverse-DNS prefix (ITW is the

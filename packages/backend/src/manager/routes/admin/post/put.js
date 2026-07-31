@@ -28,7 +28,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   }
 
   if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return ctx.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
+    return ctx.respond('GitHub repo not configured (set targets.backend.github.repo — "owner/name" or bare name — or repo.providers.github.org + brand.id).', { code: 500 });
   }
 
   ctx.log('main(): settings', settings);

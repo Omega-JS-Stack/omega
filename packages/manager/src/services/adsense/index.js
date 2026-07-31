@@ -8,7 +8,7 @@
  * and poll until the site appears. Never mutates AdSense — dry-run is
  * identical to a normal run.
  *
- * Config home: `advertising.providers.google-adsense` (the provider-neutral
+ * Config home: `advertising.providers.adsense` (the provider-neutral
  * advertising section — never a brand-named top-level key). `client`
  * (ca-pub-…) is required config; the API accountId is the same id without
  * the `ca-` prefix. omega-manager defaulted the account to the company's
@@ -30,14 +30,14 @@ module.exports.run = createServiceRunner({
   setup: async (context) => {
     // No provider entry = deliberate absence — never resolve or write back an
     // account the brand didn't opt into (wave-5 F10; authoring
-    // `advertising: { providers: { 'google-adsense': {} } }` opts in).
-    const provider = context.brandConfig.advertising?.providers?.['google-adsense'];
+    // `advertising: { providers: { adsense: {} } }` opts in).
+    const provider = context.brandConfig.advertising?.providers?.adsense;
     if (!provider) {
-      return { skip: true, reason: 'no advertising.providers.google-adsense section in omega.json5 (author it — even empty — to opt in)' };
+      return { skip: true, reason: 'no advertising.providers.adsense section in omega.json5 (author it — even empty — to opt in)' };
     }
 
     if (provider.enabled === false) {
-      return { skip: true, reason: 'advertising.providers.google-adsense.enabled = false' };
+      return { skip: true, reason: 'advertising.providers.adsense.enabled = false' };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -62,11 +62,11 @@ module.exports.run = createServiceRunner({
     if (!client && haveCreds) {
       const flowApi = makeApi();
       client = await resolveConfigValue(context, {
-        path: 'advertising.providers.google-adsense.client',
+        path: 'advertising.providers.adsense.client',
         // Disable must NOT land `client: false` — client is schema-typed as a
         // string and the config would hard-fail validation forever. The
         // enabled flag is the gate this service already honors.
-        disablePath: 'advertising.providers.google-adsense.enabled',
+        disablePath: 'advertising.providers.adsense.enabled',
         label: 'AdSense account',
         choices: () => flowApi.listAccounts(),
         getName: (account) => {
@@ -78,7 +78,7 @@ module.exports.run = createServiceRunner({
       });
     }
     if (!client) {
-      return { skip: true, reason: 'no advertising.providers.google-adsense.client configured (ca-pub-… from https://adsense.google.com → Settings → Account information — or rerun interactively)' };
+      return { skip: true, reason: 'no advertising.providers.adsense.client configured (ca-pub-… from https://adsense.google.com → Settings → Account information — or rerun interactively)' };
     }
     const accountId = client.replace(/^ca-/, '');
 

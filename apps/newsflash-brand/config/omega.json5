@@ -52,10 +52,11 @@
   },
 
   // Deliberately ABSENT sections (offline testbed — no real resources ever):
-  // github (no repo; deploys never run here), download (no desktop/extension
-  // targets — the /download page demos the notify-me flow), domain/gcp
-  // (no registrar, no billing), adsense, slapform/chatsy/replyify (services
-  // skip when unconfigured), certificates (no desktop target).
+  // repo (no repo; deploys never run here), download (no desktop/extension
+  // targets — the /download page demos the notify-me flow), domain and the
+  // cloud billing/org fields (no registrar, no billing), advertising, forms
+  // and inbound (services skip when unconfigured), certificates (no desktop
+  // target).
 
   // Demo project (Firebase emulators run fully offline against demo-*).
   cloud: {

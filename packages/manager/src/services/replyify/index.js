@@ -10,7 +10,7 @@
  * Auth tiers (2b, Ian 2026-07-13):
  *   1. Operator SA — REPLYIFY_SERVICE_ACCOUNT in the brand .env (path to
  *      the service-account JSON, absolute or brand-root-relative). Full
- *      create + manage: a missing agentId with `replyify.templateAgentId`
+ *      create + manage: a missing agentId with `inbound.email.providers.replyify.templateAgentId`
  *      configured (the company layer's shape donor) MINTS the brand's own
  *      agent — product user (email = brand contact email, password via the
  *      account service's owner channels) + doc shape-templated from the
@@ -37,15 +37,15 @@ const REPLYIFY_URL = 'https://replyify.app';
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const config = context.brandConfig.replyify;
+    const config = context.brandConfig.inbound?.email?.providers?.replyify;
 
     if (config === false || config?.enabled === false) {
-      return { skip: true, reason: 'replyify.enabled = false' };
+      return { skip: true, reason: 'inbound.email.providers.replyify.enabled = false' };
     }
 
     // A shared agent managed by another brand must not be rewritten here
     if (config?.updateAgentInfo === false) {
-      return { skip: true, reason: 'agent managed by another brand (replyify.updateAgentInfo = false)' };
+      return { skip: true, reason: 'agent managed by another brand (inbound.email.providers.replyify.updateAgentInfo = false)' };
     }
 
     // The agent answers the brand's support email, which the backend serves
@@ -91,28 +91,28 @@ module.exports.run = createServiceRunner({
       });
 
       if (!created) {
-        return { skip: true, reason: 'dry run — agent creation planned (from replyify.templateAgentId)' };
+        return { skip: true, reason: 'dry run — agent creation planned (from inbound.email.providers.replyify.templateAgentId)' };
       }
 
-      landValue(context, 'replyify.agentId', created.id);
-      console.log(`      ${chalk.green('✓')} replyify.agentId = ${chalk.cyan(created.id)} written to omega.json5`);
+      landValue(context, 'inbound.email.providers.replyify.agentId', created.id);
+      console.log(`      ${chalk.green('✓')} inbound.email.providers.replyify.agentId = ${chalk.cyan(created.id)} written to omega.json5`);
       agentId = created.id;
     }
 
     if (!agentId) {
       agentId = await resolveConfigValue(context, {
-        path: 'replyify.agentId',
+        path: 'inbound.email.providers.replyify.agentId',
         label: 'Replyify email agent',
         instructions: [
           `1. Create an account at ${chalk.cyan(REPLYIFY_URL)} (if you haven't already)`,
           `2. Create an email agent for ${chalk.cyan(brand.name || context.brandId)}`,
         ],
         entry: { url: REPLYIFY_URL, message: 'Replyify agent ID:' },
-        disablePath: 'replyify',
+        disablePath: 'inbound.email.providers.replyify',
       });
     }
     if (!agentId) {
-      return { skip: true, reason: 'no replyify.agentId configured — set replyify.templateAgentId + the operator SA to mint one automatically, create one at https://replyify.app (paste back interactively), or set it in omega.json5' };
+      return { skip: true, reason: 'no inbound.email.providers.replyify.agentId configured — set inbound.email.providers.replyify.templateAgentId + the operator SA to mint one automatically, create one at https://replyify.app (paste back interactively), or set it in omega.json5' };
     }
 
     if (!db) {

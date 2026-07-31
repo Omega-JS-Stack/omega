@@ -26,7 +26,7 @@ staleness recovery, and no-fill collapse (the host hides itself).
 Desktop surfaces never run the AdSense provider lane (policy: no web
 context). The wiring pins `type: 'house'` on every mount — the pin wins over
 the element's `data-omega-vert` type, so even a shared omega.json5 that carries
-`advertising.providers['google-adsense']` (the web target uses it) can only
+`advertising.providers.adsense` (the web target uses it) can only
 ever reach the house/company inventory here. Pinned by the renderer verts
 suite: an AdSense-configured harness must never see an `adsbygoogle` script
 or `<ins>`.

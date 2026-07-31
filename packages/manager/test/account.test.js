@@ -53,11 +53,11 @@ function stageBrand() {
   return mkdtempSync(join(tmpdir(), 'omega-account-'));
 }
 
-function brandConfig({ account, admins, products, firebase, url } = {}) {
+function brandConfig({ account, admins, products, cloud, url } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: url !== undefined ? url : `https://${DOMAIN}` },
     targets: { web: {}, backend: {} },
-    firebase: firebase || { shared: false },
+    cloud: cloud || { shared: false },
     payment: {
       products: products !== undefined ? products : [
         { id: 'basic', name: 'Basic' },
@@ -243,7 +243,7 @@ test('account: no backend target skips the service', async () => {
 });
 
 test('account: shared Firebase project skips the service', async () => {
-  const result = await runService(brandConfig({ firebase: { shared: true } }));
+  const result = await runService(brandConfig({ cloud: { shared: true } }));
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /shared Firebase project/);
 });

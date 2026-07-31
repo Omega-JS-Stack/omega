@@ -27,10 +27,10 @@ const SUBDOMAIN_OPERATIONS = new Set(['zone', 'dns-records']);
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const cloudflare = context.brandConfig.cloudflare || {};
+    const cloudflare = context.brandConfig.edge?.providers?.cloudflare || {};
 
     if (cloudflare.enabled === false) {
-      return { skip: true, reason: 'cloudflare.enabled = false' };
+      return { skip: true, reason: 'edge.providers.cloudflare.enabled = false' };
     }
 
     if (!context.cloudflareApi) {

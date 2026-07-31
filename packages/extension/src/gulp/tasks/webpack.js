@@ -460,8 +460,9 @@ function getTemplateReplaceOptions() {
   }
   const now = Math.round(new Date().getTime() / 1000);
 
-  // Set webManagerConfiguration (matching @omega.js/client's expected structure)
-  const webManagerConfig = options.omega || {};
+  // Compose the @omega.js/client runtime blob by hand (the web build gets it
+  // free from the site-global spread; the extension has no such pass).
+  const clientConfig = options.omega || {};
   options.webManagerConfiguration = JSON.stringify({
     environment: options.environment || 'production',
     buildTime: now,
@@ -476,30 +477,37 @@ function getTemplateReplaceOptions() {
         combomark: options.brand?.images?.combomark || '',
       },
     },
-    auth: webManagerConfig.auth || { enabled: true, config: {} },
+    auth: clientConfig.auth || { enabled: true, config: {} },
     firebase: {
       app: {
-        enabled: !!(options.cloud?.config?.apiKey || webManagerConfig.firebase?.app?.config?.apiKey),
-        config: options.cloud?.config || webManagerConfig.firebase?.app?.config || {},
+        enabled: !!(options.cloud?.config?.apiKey || clientConfig.firebase?.app?.config?.apiKey),
+        config: options.cloud?.config || clientConfig.firebase?.app?.config || {},
       },
-      appCheck: webManagerConfig.firebase?.appCheck || { enabled: false, config: {} },
+      appCheck: clientConfig.firebase?.appCheck || { enabled: false, config: {} },
     },
-    cookieConsent: webManagerConfig.cookieConsent || { enabled: true, config: {} },
-    chatsy: webManagerConfig.chatsy || { enabled: true, config: {} },
-    sentry: webManagerConfig.sentry || (() => {
+    cookieConsent: clientConfig.cookieConsent || { enabled: true, config: {} },
+    inbound: (() => {
+      // Curated to the leaves the client runtime reads (#23) — the provisioning-only
+      // siblings (template ids, plan, update flags) never ship in the bundle
+      const chatsy = options.inbound?.chat?.providers?.chatsy;
+      return { chat: { providers: { chatsy: chatsy
+        ? { enabled: chatsy.enabled, agentId: chatsy.agentId, settings: chatsy.settings }
+        : { enabled: false } } } };
+    })(),
+    sentry: clientConfig.sentry || (() => {
       // omega.json5 `monitoring` → client sentry contract (provider discriminator
       // stripped — the blob feeds Sentry.init directly)
       const sentryConfig = { ...(options.monitoring || {}) };
       delete sentryConfig.provider;
       return { enabled: !!sentryConfig.dsn, config: sentryConfig };
     })(),
-    exitPopup: webManagerConfig.exitPopup || { enabled: false, config: {} },
-    lazyLoading: webManagerConfig.lazyLoading || { enabled: true, config: {} },
-    socialSharing: webManagerConfig.socialSharing || { enabled: false, config: {} },
-    pushNotifications: webManagerConfig.pushNotifications || { enabled: false, config: {} },
-    validRedirectHosts: webManagerConfig.validRedirectHosts || [],
-    refreshNewVersion: webManagerConfig.refreshNewVersion || { enabled: true, config: {} },
-    serviceWorker: webManagerConfig.serviceWorker || { enabled: false, config: {} },
+    exitPopup: clientConfig.exitPopup || { enabled: false, config: {} },
+    lazyLoading: clientConfig.lazyLoading || { enabled: true, config: {} },
+    socialSharing: clientConfig.socialSharing || { enabled: false, config: {} },
+    pushNotifications: clientConfig.pushNotifications || { enabled: false, config: {} },
+    validRedirectHosts: clientConfig.validRedirectHosts || [],
+    refreshNewVersion: clientConfig.refreshNewVersion || { enabled: true, config: {} },
+    serviceWorker: clientConfig.serviceWorker || { enabled: false, config: {} },
   });
 
   // Return

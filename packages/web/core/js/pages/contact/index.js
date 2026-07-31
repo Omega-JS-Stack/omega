@@ -34,13 +34,13 @@ function setupForm() {
   });
 
   formManager.on('submit', async ({ data }) => {
-    const slapformId = omega.config.brand.contact['slapform-form-id'];
+    const slapformId = omega.config.forms?.providers?.slapform?.formId;
 
     console.log('Contact form submission:', data);
 
     // Check if slapformId is missing
     if (!slapformId) {
-      omega.sentry().captureException(new Error('Contact form is not configured - missing slapform ID'));
+      omega.sentry().captureException(new Error('Contact form is not configured — no forms.providers.slapform.formId'));
       throw new Error('Contact form is not configured properly. Please try again later.');
     }
 

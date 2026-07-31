@@ -32,13 +32,16 @@ test('blog [slug].js rides the modern verts lane — config-gated, module-delega
 
 test('packaged content speaks advertising.providers.* only', () => {
   const files = [
-    ['core/_includes/core/head.html', 'advertising.providers.google-adsense.client'],
+    ['core/_includes/core/head.html', 'advertising.providers.adsense.client'],
   ];
 
   for (const [relative, marker] of files) {
     const contents = fs.readFileSync(path.join(PKG, relative), 'utf8');
     assert.ok(contents.includes(marker), `${relative} reads the providers path`);
     assert.ok(!/advertising\.google-adsense|advertising\?\.\['google-adsense'\]/.test(contents), `${relative} has no pre-providers spelling`);
+    // #23/#35: the vendor prefix and the kebab slot keys are gone for good
+    assert.ok(!contents.includes('google-adsense'), `${relative} has no vendor-prefixed provider id`);
+    assert.ok(!/(display|in-article|in-feed|multiplex)-slot/.test(contents), `${relative} has no kebab-case slot key`);
   }
 });
 
@@ -46,9 +49,9 @@ test('packaged content speaks advertising.providers.* only', () => {
 
 const ADVERTISING = {
   providers: {
-    'google-adsense': {
+    adsense: {
       client: 'ca-pub-TEST123',
-      'in-article-slot': '9990001',
+      inArticleSlot: '9990001',
     },
     inhouse: { source: 'self' },
   },

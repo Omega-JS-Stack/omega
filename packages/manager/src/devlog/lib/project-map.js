@@ -4,10 +4,10 @@
  * belongs to. Repos not in the map are treated as standalone and linked to
  * GitHub instead.
  *
- * In the brand-monorepo world every brand is ONE repo (`github.org` +
- * `github.repo || brand id` — the github service's exact derivation);
+ * In the brand-monorepo world every brand is ONE repo (`repo.providers.github.org` +
+ * `repo.providers.github.repo || brand id` — the github service's exact derivation);
  * omega-manager's per-target + subdomain repo fan-out collapsed at the
- * redesign. Brands without a github.org are skipped (the github service
+ * redesign. Brands without a repo.providers.github.org are skipped (the github service
  * skips them too).
  */
 
@@ -18,7 +18,7 @@
  * @returns {{ owner: string, repo: string }|null}
  */
 function brandRepo(brand) {
-  const github = brand.config.github;
+  const github = brand.config.repo?.providers?.github;
 
   if (!github.org) {
     return null;

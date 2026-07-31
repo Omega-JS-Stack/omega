@@ -32,7 +32,7 @@ Extension surfaces never run the AdSense provider lane (store policy — and
 the scaffolded MV3 `extension_pages` CSP blocks the remote script anyway).
 The wiring pins `type: 'house'` on every mount — the pin wins over the
 element's `data-omega-vert` type, so even a shared omega.json5 that carries
-`advertising.providers['google-adsense']` (the web target uses it) can only
+`advertising.providers.adsense` (the web target uses it) can only
 ever reach the house/company inventory here. Pinned by the build-layer
 `verts-binding` suite.
 

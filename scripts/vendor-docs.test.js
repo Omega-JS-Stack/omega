@@ -20,7 +20,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const { DOCUMENTED_PACKAGES } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
+const { DOCUMENTED_PACKAGES, PLUGIN_DIR, MARKETPLACE_FILE } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
 
 // One pack per package is the expensive part — pack once, share the listing.
 const listings = new Map();
@@ -87,13 +87,33 @@ test('vendor-docs: @omega.js/manager also ships the Claude plugin and its market
   );
 });
 
+/**
+ * The exact destinations the lane writes into a package: one per entry of the
+ * monorepo guide tree (flattened into `docs/`), the shared contracts, and —
+ * for the manager — the vendored plugin and its marketplace. Scoping to THESE
+ * (not the whole `docs/` dir) keeps the assertion about the lane's own output:
+ * a hand-authored committed doc with unrelated edits beside them is not this
+ * test's business, but a lane write to a non-gitignored path still trips it.
+ *
+ * @param {string} short - Package short name ('web', 'manager', …)
+ * @returns {string[]} Repo-relative paths.
+ */
+function laneOutputs(short) {
+  const paths = fs.readdirSync(path.join(ROOT, 'docs', short)).map((entry) => `packages/${short}/docs/${entry}`);
+  paths.push(`packages/${short}/docs/shared`);
+  if (short === 'manager') {
+    paths.push(`packages/${short}/${PLUGIN_DIR}`, `packages/${short}/${MARKETPLACE_FILE}`);
+  }
+  return paths;
+}
+
 test('vendor-docs: everything the lane writes is generated — gitignored, never a committed file', () => {
   // Scoped to the paths the lane writes: unrelated work in progress elsewhere
   // in the tree is not this test's business.
   const paths = [];
   for (const short of DOCUMENTED_PACKAGES) {
     packedFiles(short);
-    paths.push(`packages/${short}/docs`, `packages/${short}/claude-plugin`, `packages/${short}/.claude-plugin`);
+    paths.push(...laneOutputs(short));
   }
 
   const status = spawnSync('git', ['status', '--porcelain', '--', ...paths], { cwd: ROOT, encoding: 'utf8' });

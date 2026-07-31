@@ -1,7 +1,8 @@
 /**
  * `omega deploy --direct` plan tests — the pure repo/domain derivation
- * (shared @omega.js/config derivation from the github.repo slug — name →
- * brand.id, owner → github.org; cname from brand.url's host). The build+push path is exercised
+ * (shared @omega.js/config derivation from the repo.providers.github.repo
+ * slug — name → brand.id, owner → repo.providers.github.org; cname from
+ * brand.url's host). The build+push path is exercised
  * live against the playground via the manager's pipeline command, not here.
  */
 const assert = require('node:assert');
@@ -18,7 +19,7 @@ test('pagesHost: bare host from brand.url; empty when unset (feeds plan cname + 
 
 test('direct plan: org + explicit repo + cname from brand.url host', () => {
   const plan = buildDirectPlan({
-    github: { org: 'Org', repo: 'site' },
+    repo: { providers: { github: { org: 'Org', repo: 'site' } } },
     brand: { id: 'b', url: 'https://www.example.com/landing' },
   });
   assert.equal(plan.repo, 'Org/site');
@@ -29,7 +30,7 @@ test('direct plan: org + explicit repo + cname from brand.url host', () => {
 
 test('direct plan: bare-name slug names the repo (launch-night collision fix — never the monorepo)', () => {
   const plan = buildDirectPlan({
-    github: { org: 'Omega-JS-Stack', repo: 'omega-brand' },
+    repo: { providers: { github: { org: 'Omega-JS-Stack', repo: 'omega-brand' } } },
     brand: { id: 'omega', url: 'https://omegajs.dev' },
   });
   assert.equal(plan.repo, 'Omega-JS-Stack/omega-brand');
@@ -38,19 +39,19 @@ test('direct plan: bare-name slug names the repo (launch-night collision fix —
 
 test('direct plan: owner/name slug carries both (ITW-housed brand repo, org still the brand org)', () => {
   const plan = buildDirectPlan({
-    github: { org: 'Omega-JS-Stack', repo: 'itw-creative-works/omega-brand' },
+    repo: { providers: { github: { org: 'Omega-JS-Stack', repo: 'itw-creative-works/omega-brand' } } },
     brand: { id: 'omega', url: 'https://omegajs.dev' },
   });
   assert.equal(plan.repo, 'itw-creative-works/omega-brand');
 });
 
 test('direct plan: repo defaults to brand.id when no slug is set', () => {
-  const plan = buildDirectPlan({ github: { org: 'Org' }, brand: { id: 'my-brand', url: 'https://my.brand' } });
+  const plan = buildDirectPlan({ repo: { providers: { github: { org: 'Org' } } }, brand: { id: 'my-brand', url: 'https://my.brand' } });
   assert.equal(plan.repo, 'Org/my-brand');
 });
 
 test('direct plan: missing org / repo name / url each refuse with an instruction', () => {
-  assert.throws(() => buildDirectPlan({ brand: { id: 'b', url: 'https://x.y' } }), /github\.org/);
-  assert.throws(() => buildDirectPlan({ github: { org: 'O' }, brand: { url: 'https://x.y' } }), /github\.repo or brand\.id/);
-  assert.throws(() => buildDirectPlan({ github: { org: 'O' }, brand: { id: 'b' } }), /brand\.url/);
+  assert.throws(() => buildDirectPlan({ brand: { id: 'b', url: 'https://x.y' } }), /repo\.providers\.github\.org/);
+  assert.throws(() => buildDirectPlan({ repo: { providers: { github: { org: 'O' } } }, brand: { url: 'https://x.y' } }), /repo\.providers\.github\.repo or brand\.id/);
+  assert.throws(() => buildDirectPlan({ repo: { providers: { github: { org: 'O' } } }, brand: { id: 'b' } }), /brand\.url/);
 });

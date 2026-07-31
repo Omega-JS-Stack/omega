@@ -67,10 +67,10 @@ test('wave-4 secret shapes are flagged: service-account snake_case, secretKey, p
   }
 });
 
-test('wave-4 public shapes still pass: vapidKey, site-key, apiKey', () => {
+test('wave-4 public shapes still pass: vapidKey, siteKey, apiKey', () => {
   const found = findSecretKeys({
     cloud: { messaging: { vapidKey: 'B_public' }, config: { apiKey: 'public' } },
-    recaptcha: { 'site-key': 'public' },
+    captcha: { providers: { recaptcha: { siteKey: 'public' } } },
   });
   assert.deepStrictEqual(found, []);
 });

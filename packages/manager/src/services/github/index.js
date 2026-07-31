@@ -8,7 +8,7 @@
  *   org      — repo owner (GitHub org or user). No default; unset = service skips.
  *   shared   — org shared with other brands → org-level reconciliation skipped.
  *   repo     — optional "owner/name" slug or bare name; name defaults to the
- *              brand id, owner to github.org (@omega.js/config brandRepoName/
+ *              brand id, owner to repo.providers.github.org (@omega.js/config brandRepoName/
  *              brandRepoOwner — shared with deploy --direct).
  *   private  — repo visibility (manager default: true).
  *   location — org profile location; only reconciled when set.
@@ -25,14 +25,14 @@ const SHARED_SKIP_OPERATIONS = new Set(['org']);
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: (context) => {
-    const github = context.brandConfig.github || {};
+    const github = context.brandConfig.repo?.providers?.github || {};
 
     if (github.enabled === false) {
       return { skip: true, reason: 'github.enabled = false' };
     }
 
     if (!github.org) {
-      return { skip: true, reason: 'no github.org configured (set github.org in config/omega.json5)' };
+      return { skip: true, reason: 'no repo.providers.github.org configured (set repo.providers.github.org in config/omega.json5)' };
     }
 
     const repoName = brandRepoName(context.brandConfig);

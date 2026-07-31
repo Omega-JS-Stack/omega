@@ -60,7 +60,7 @@ function brandConfig({ seo, content = [contentItem()], github = { org: 'default-
   const config = {
     brand: structuredClone(BRAND),
     targets: { web: {} },
-    github,
+    repo: { providers: { github } },
   };
   if (seo !== undefined) {
     config.seo = seo;

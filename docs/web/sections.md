@@ -133,7 +133,8 @@ frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter"; softened same
 day: no build-fail)**: a real file under `pages/` may carry only `layout`,
 `permalink`, `meta`, `schema`, `theme`, `client`, `sitemap`, `append` (+ engine
 plumbing). `client` (#1) is the `@omega.js/client` settings blob — auth policy,
-cookie consent, chatsy, exit popup — the key the core chrome reads into the
+cookie consent, exit popup (the chat widget moved to
+`inbound.chat.providers.chatsy` in #23) — the key the core chrome reads into the
 Configuration payload via `resolved.client`; it is machinery configuration, the
 same class as `theme` and `schema`, so a page may set it and the layout chain
 still merges underneath. (It was `web_manager` through the UJM era; WebManager

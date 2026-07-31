@@ -159,7 +159,7 @@ test('zero-page consumer still gets a homepage at / (cp194 wizard-rehearsal catc
 test('resolved site seed: site sections surface as resolved.* (Configuration block)', () => {
   const html = pages.get('/');
   assert.ok(html.includes('brand: {"id":"mini","name":"MiniCo"'), 'resolved.brand jsonified from site seed');
-  assert.ok(html.includes('recaptcha: null'), 'absent sections emit null (valid JS), not empty');
+  assert.ok(html.includes('captcha: null'), 'absent sections emit null (valid JS), not empty');
   assert.ok(html.includes('src="/assets/js/main-TEST.js"'), 'main bundle from the manifest');
 });
 

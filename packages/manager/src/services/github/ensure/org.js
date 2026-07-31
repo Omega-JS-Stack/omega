@@ -12,7 +12,7 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureOrg(context) {
   const { brandConfig, options = {}, githubApi: api } = context;
 
-  const github = brandConfig.github;
+  const github = brandConfig.repo?.providers?.github;
   const org = api.getOrg(github.org);
 
   if (!org) {

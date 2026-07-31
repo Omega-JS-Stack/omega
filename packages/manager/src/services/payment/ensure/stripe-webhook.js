@@ -47,7 +47,7 @@ module.exports = async function ensureStripeWebhook(context) {
   }
 
   // Shared Firebase project — no backend deploys from this brand, so api.{domain} doesn't exist
-  if (brandConfig.firebase?.shared === true) {
+  if (brandConfig.cloud?.shared === true) {
     console.log(`      ${chalk.dim('⊘ Shared Firebase project — no brand API for webhooks')}`);
     return {};
   }

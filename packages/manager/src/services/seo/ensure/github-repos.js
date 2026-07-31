@@ -224,7 +224,7 @@ module.exports = async (context) => {
   const { seoApi: api, seoContent: content, brandConfig } = context;
   const dryRun = context.options?.dryRun || false;
 
-  const defaultOrg = brandConfig.github?.org;
+  const defaultOrg = brandConfig.repo?.providers?.github?.org;
   const results = [];
 
   for (let i = 0; i < content.length; i++) {
@@ -234,7 +234,7 @@ module.exports = async (context) => {
 
     if (!org || !name) {
       console.log(`      ${chalk.red('✗')} [${i + 1}/${content.length}] Missing org or name — skipping`);
-      results.push({ repo: `${org || '?'}/${name || '?'}`, status: 'error', error: 'missing org or name (set item.org or github.org)' });
+      results.push({ repo: `${org || '?'}/${name || '?'}`, status: 'error', error: 'missing org or name (set item.org or repo.providers.github.org)' });
       continue;
     }
 

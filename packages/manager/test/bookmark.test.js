@@ -18,9 +18,9 @@ const { openTtyPrompt } = require('./lib/interactive.js');
 
 const FULL_CONFIG = {
   brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' },
-  firebase: { projectId: 'fixture-project' },
+  cloud: { config: { projectId: 'fixture-project' } },
   analytics: { providers: { google: { accountId: '111', propertyId: '222' } } },
-  github: { org: 'fixture-org' },
+  repo: { providers: { github: { org: 'fixture-org' } } },
   payment: { processors: { stripe: { publishableKey: 'pk_fixture' } } },
 };
 
@@ -85,7 +85,7 @@ test('bookmark: groups with unmet inputs are absent', () => {
 
   // github.repo overrides the brand-id repo name; no backend app → no API link
   const partial = generateLinks(
-    { brand: { id: 'p', url: 'https://p.example' }, github: { org: 'o', repo: 'custom-repo' } },
+    { brand: { id: 'p', url: 'https://p.example' }, repo: { providers: { github: { org: 'o', repo: 'custom-repo' } } } },
     {},
     [{ name: 'web', target: 'web' }],
   );
@@ -126,8 +126,8 @@ test('bookmark: extension ack lands the sync as success', async () => {
   const port = await freePort();
   process.env.OMEGA_EXTENSION_PORT = String(port);
 
-  // No firebase.projectId → no gcloud shell-out during the test
-  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, github: { org: 'o' } };
+  // No cloud.config.projectId → no gcloud shell-out during the test
+  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, repo: { providers: { github: { org: 'o' } } } };
 
   const tty = openTtyPrompt();
   try {

@@ -38,9 +38,13 @@ const SUBSCRIPTION_FIELD_PATHS = [
 function brandConfig({ slapform = {}, targets = { web: {}, backend: {} } } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: 'https://fixture-brand.test' },
-    slapform: slapform === false
-      ? false
-      : { ...structuredClone(DEFAULTS.slapform), formId: FORM_ID, ...slapform },
+    forms: {
+      providers: {
+        slapform: slapform === false
+          ? false
+          : { ...structuredClone(DEFAULTS.forms.providers.slapform), formId: FORM_ID, ...slapform },
+      },
+    },
     targets,
   };
 }
@@ -112,9 +116,9 @@ test('slapform: registered after payment with the form + user operations', () =>
 });
 
 test('slapform: defaults carry no formId and Slapform\'s top tier as the plan', () => {
-  assert.equal(DEFAULTS.slapform.enabled, true);
-  assert.equal(DEFAULTS.slapform.formId, null);
-  assert.deepEqual(DEFAULTS.slapform.plan, { id: 'grandmaster', name: 'Grandmaster' });
+  assert.equal(DEFAULTS.forms.providers.slapform.enabled, true);
+  assert.equal(DEFAULTS.forms.providers.slapform.formId, null);
+  assert.deepEqual(DEFAULTS.forms.providers.slapform.plan, { id: 'grandmaster', name: 'Grandmaster' });
 });
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
@@ -122,13 +126,13 @@ test('slapform: defaults carry no formId and Slapform\'s top tier as the plan', 
 test('slapform: slapform.enabled = false skips the service', async () => {
   const result = await runService(brandConfig({ slapform: { enabled: false } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /slapform\.enabled/);
+  assert.match(result.reason, /forms\.providers\.slapform\.enabled/);
 });
 
 test('slapform: scalar slapform: false skips the service', async () => {
   const result = await runService(brandConfig({ slapform: false }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /slapform\.enabled/);
+  assert.match(result.reason, /forms\.providers\.slapform\.enabled/);
 });
 
 test('slapform: skips without a web target (the form lives on the website)', async () => {
@@ -140,7 +144,7 @@ test('slapform: skips without a web target (the form lives on the website)', asy
 test('slapform: skips without slapform.formId', async () => {
   const result = await runService(brandConfig({ slapform: { formId: null } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /slapform\.formId/);
+  assert.match(result.reason, /forms\.providers\.slapform\.formId/);
 });
 
 test('slapform: skips without SLAPFORM_SERVICE_ACCOUNT in .env', async () => {
@@ -395,7 +399,7 @@ test('slapform 2b: missing formId + SA + template donor mints the brand-owned fo
   const authAdmin = fakeAuthAdmin();
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  slapform: { enabled: true, templateFormId: "tmplForm1" }, // formId lands here
+  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } }, // formId lands here
 }
 `);
 
@@ -450,7 +454,7 @@ test('slapform 2b: dry run plans the mint — zero writes, no user creation, no 
   const authAdmin = fakeAuthAdmin();
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  slapform: { enabled: true, templateFormId: "tmplForm1" },
+  forms: { providers: { slapform: { enabled: true, templateFormId: "tmplForm1" } } },
 }
 `);
 
@@ -484,7 +488,7 @@ test('slapform 2b: an existing product user is reused — no createUser, no user
   const authAdmin = fakeAuthAdmin({ existing: { uid: 'uid_existing9', email: 'support@fixture-brand.test' } });
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  slapform: { enabled: true },
+  forms: { providers: { slapform: { enabled: true } } },
 }
 `);
 
@@ -538,7 +542,7 @@ test('slapform 2b: no brand contact email → no mint attempt, normal missing-id
   const result = await runService(config, { db: store });
 
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /slapform\.formId/);
+  assert.match(result.reason, /forms\.providers\.slapform\.formId/);
   assert.deepEqual(store.sets(), []);
 });
 
@@ -553,7 +557,7 @@ test('setup: interactive run lands the pasted form id in omega.json5 and proceed
   const db = fakeDb(convergedResponses());
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  slapform: { enabled: true }, // formId lands here
+  forms: { providers: { slapform: { enabled: true } } }, // formId lands here
 }
 `);
   const opened = [];

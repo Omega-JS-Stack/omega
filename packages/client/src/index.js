@@ -202,7 +202,8 @@ class Manager {
       }
 
       // Initialize Chatsy chat widget if enabled
-      if (this.config.chatsy?.enabled && this.config.chatsy?.config?.agentId) {
+      const chatsy = this.config.inbound?.chat?.providers?.chatsy;
+      if (chatsy?.enabled && chatsy?.agentId) {
         this._initializeChatsy();
       }
 
@@ -245,8 +246,7 @@ class Manager {
         },
         contact: {
           email: '',
-          phone: '',
-          'slapform-form-id': ''
+          phone: ''
         },
         address: {}
       },
@@ -297,17 +297,24 @@ class Manager {
           }
         }
       },
-      chatsy: {
-        enabled: false,
-        config: {
-          agentId: '',
-          settings: {
-            button: {
-              backgroundColor: '#237afc',
-              textColor: '#FFFFFF',
-              position: 'bottom-right',
-              type: 'round',
-              icon: 'default',
+      // ONE home (#23): the manager provisions the agent and writes agentId
+      // here, and the widget's presentation settings sit beside it — there is
+      // no second `chatsy` blob to keep in sync.
+      inbound: {
+        chat: {
+          providers: {
+            chatsy: {
+              enabled: false,
+              agentId: '',
+              settings: {
+                button: {
+                  backgroundColor: '#237afc',
+                  textColor: '#FFFFFF',
+                  position: 'bottom-right',
+                  type: 'round',
+                  icon: 'default',
+                }
+              }
             }
           }
         }
@@ -676,7 +683,7 @@ class Manager {
   async _initializeChatsy() {
     try {
       const { default: Chatsy } = await import('chatsy');
-      const config = this.config.chatsy.config;
+      const config = this.config.inbound.chat.providers.chatsy;
 
       this._chatsy = new Chatsy(config.agentId, {
         settings: config.settings,

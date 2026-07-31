@@ -114,7 +114,7 @@ try {
     testManager.omega = wmMod.default || wmMod;
     testManager.omega.config = Object.assign({}, testManager.omega.config, {
       advertising: {
-        providers: { 'google-adsense': { client: 'ca-pub-test' } },
+        providers: { adsense: { client: 'ca-pub-test' } },
       },
     });
     testManager._wireAds();

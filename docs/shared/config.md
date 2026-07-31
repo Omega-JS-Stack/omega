@@ -28,9 +28,16 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // SHARED sections — identical spelling in every project type.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, company, contact: { email, person: {…}, carbonCopy: […] }, address: {…}, images: {…} },   // contact.person = the human who signs "personal" email (name, firstName, image, url, urlText); contact.carbonCopy = audit BCCs; images.companyWordmark = parent wordmark in email footers
-  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey } },   // vapidKey: web-push public key (console → Cloud Messaging), public by design
+  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, apiSubdomain, organizationId, billingAccount },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design
+  repo:           { providers: { github: { org, repo, shared, private } } },
+  edge:           { providers: { cloudflare: { zone, dns, settings, rules, cacheRules, speedTest, workers } } },
+  captcha:        { providers: { recaptcha: { project, siteKey } } },
+  search:         { providers: { searchConsole: { submitSitemap, sitemapPaths } } },
+  forms:          { providers: { slapform: { enabled, formId, templateFormId, updateFormInfo, plan } } },
+  inbound:        { chat:  { providers: { chatsy:   { enabled, agentId, templateAgentId, updateAgentInfo, plan, sponsorshipsUrl, settings } } },
+                    email: { providers: { replyify: { enabled, agentId, templateAgentId, updateAgentInfo, plan, discount } } } },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
-  advertising:    { providers: { 'google-adsense': { client, 'display-slot', 'in-article-slot', 'in-feed-slot', 'multiplex-slot' }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
+  advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
   payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […] },
   monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },
@@ -270,15 +277,19 @@ config-flow engine (`packages/manager/src/lib/config-flow.js`):
 | Value | Meaning |
 |-------|---------|
 | missing / `null` | ASK in an interactive run — the answer lands in omega.json5; without a TTY: warn + skip, aggregated in the run summary |
-| `false` | The user opted OUT — silent skip, never prompt or warn again. `false` on an ancestor section (`chatsy: false`) opts out every key under it |
+| `false` | The user opted OUT — silent skip, never prompt or warn again. `false` on an ancestor section (`inbound.chat.providers.chatsy: false`) opts out every key under it |
 | anything else | Use it |
 
 Every ask offers the opt-out (the gate's "Disable" and, in selection flows, an inline
 "No …" choice), so `false` is always reachable; delete the line to be asked again.
-First consumers: `gcp.organizationId` (asked at project creation — pick an org or
-create standalone) and `gcp.billingAccount` (pick/create a billing account or stay
-on Spark) — GCP-level resources live under `gcp`, not `firebase`. `firebase.supportEmail`'s
-null auto-derives the authorizing user's email instead of asking.
+First consumers: `cloud.organizationId` (asked at project creation — pick an org or
+create standalone) and `cloud.billingAccount` (pick/create a billing account or stay
+on Spark). ONE cloud home (#23, reversing the old `gcp`-vs-`firebase` split): the
+platform-level org and billing account, the provisioning switches (`cloud.shared`,
+`cloud.supportEmail`, `cloud.apiSubdomain`) and the app config (`cloud.provider`,
+`cloud.config`) are all `cloud.*`, and the project id has exactly one address —
+`cloud.config.projectId`. `cloud.supportEmail`'s null auto-derives the authorizing
+user's email instead of asking.
 
 ## The site global: curated targets + derived page maps (#85)
 
@@ -296,9 +307,9 @@ store `listings`.
   switch for the whole release surface: the desktop build also reads it
   (electron-builder publish config), so `false` turns off desktop publishing too — and
   there it defaults true even with no `releases` block.
-- **Desktop releases URL**: `https://github.com/<github.org>/<repo>/releases/latest`,
+- **Desktop releases URL**: `https://github.com/<repo.providers.github.org>/<repo>/releases/latest`,
   where repo is `targets.desktop.releases.repo` (where built artifacts live) →
-  `github.repo` → `brand.id`. No `github.org` → no URL.
+  `repo.providers.github.repo` → `brand.id`. No `repo.providers.github.org` → no URL.
 - **Extension listings**: `targets.extension.listings.<store>.{url,state}` for the six
   stores the theme renders (chrome, firefox, edge, opera, safari, brave) —
   schema-declared; url must be http(s). Entries with neither url nor state stay absent.
@@ -364,7 +375,27 @@ pointing back here. Today that is `web_manager` → `client` and `firebaseConfig
 (`src/retired-keys.js` is the list). Without the guard the old key validated clean and
 everything under it vanished, since nothing dual-reads it. Names that live on as legitimate
 keys elsewhere (`sentry`, which survives as `client.sentry`; `google`/`meta` under
-`analytics.providers`) stay out of the list — the rows below are their only guide. The
+`analytics.providers`) stay out of the list — the rows below are their only guide.
+
+The de-branding rekey ([#23](https://github.com/Omega-JS-Stack/omega/issues/23)) adds a
+second, PATH-based half in the same file (`RETIRED_PATHS`): keys whose provider keeps its
+own name one level down inside the new home, so a name test would false-positive. Each
+entry matches ONE exact path from the root:
+
+| Retired path | New home |
+|---|---|
+| `slapform` | **`forms.providers.slapform`** |
+| `chatsy` | **`inbound.chat.providers.chatsy`** (the widget `settings` moved here too — one home) |
+| `replyify` | **`inbound.email.providers.replyify`** |
+| `cloudflare` | **`edge.providers.cloudflare`** |
+| `recaptcha` | **`captcha.providers.recaptcha`** (`site-key` → `siteKey`) |
+| `searchConsole` | **`search.providers.searchConsole`** (`seo` already means the parasite-SEO content feature) |
+| `gcp` | **`cloud`** (`cloud.organizationId`, `cloud.billingAccount`) |
+| `firebase` | **`cloud`** (`cloud.shared`, `cloud.supportEmail`, `cloud.apiSubdomain`; projectId only at `cloud.config.projectId`) |
+| `advertising.providers.google-adsense` | **`advertising.providers.adsense`** + camelCase slots |
+| `github` | **`repo.providers.github`** — the ONE row with no guard: rules run against the RESOLVED config, where `targets.backend.github` (content identity, unchanged) is overlaid at the top level and would false-positive. This table is its only guide |
+
+The
 `omega migrate` converter is unaffected: it READS legacy files as input and emits the new
 names, and only its output is validated.
 
@@ -431,8 +462,12 @@ before the report prints.
 | `analytics.{google,meta,tiktok}` (flat scalars) | `analytics.providers.<p>.id` — the unified spelling; the web chrome emits the client's flat shape from it |
 | `web_manager.firebase.app.config` | **`cloud: { provider: 'firebase', config: {…} }`** (top level); the engine composes `cloud.config` back into `client.firebase.app.config` at build |
 | `web_manager.payment` | **`payment`** (top level); composed back into `client.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
-| `web_manager` (rest: auth, chatsy, sentry, cookieConsent, exitPopup, …) | **`targets.web.client`** — the client-runtime settings blob, whole, under its new name (#1: `web_manager` → `client`, since it configures `@omega.js/client`; WebManager is not an OMEGA concept). No dual-read: the old key name is not honored anywhere |
-| `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `recaptcha`, `cloudflare`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |
+| `web_manager` (rest: auth, sentry, cookieConsent, exitPopup, …) | **`targets.web.client`** — the client-runtime settings blob, whole, under its new name (#1: `web_manager` → `client`, since it configures `@omega.js/client`; WebManager is not an OMEGA concept). No dual-read: the old key name is not honored anywhere |
+| `web_manager.chatsy` (agentId + widget settings) | **`inbound.chat.providers.chatsy`** — the chat widget left the client blob for the one chat home the manager also provisions (#23) |
+| `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |
+| `recaptcha` (incl. `site-key`) | **`captcha.providers.recaptcha`** (`siteKey` — every key is camelCase, #23) |
+| `cloudflare` (the purge `zone`) | **`edge.providers.cloudflare`** — one cloudflare home, shared with the manager's zone reconciliation (#23) |
+| `advertising.google-adsense` (flat or under `providers`) | **`advertising.providers.adsense`** with camelCase slots (`displaySlot`, `inArticleSlot`, `inFeedSlot`, `multiplexSlot`) — provider ids drop the vendor prefix (#23) |
 | `permalink`, `pagination`, `collections`, `defaults`, `generators` | `targets.web.<same key>` (codemod rule 8's home — engine consumption of custom collections rides the consumer-theme waves) |
 | UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` — `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs) |
 | UJM-json `webpack`, `gems`; `_config.yml` Jekyll machinery (`plugins`, `exclude`, …) | dropped, noted in the report |

@@ -26,7 +26,7 @@ const BRAND = { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixtur
 const CONFIG_SOURCE = `{
   // Fixture Brand — config-flow writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  chatsy: { enabled: true }, // agent id lands here
+  inbound: { chat: { providers: { chatsy: { enabled: true } } } }, // agent id lands here
 }
 `;
 
@@ -85,10 +85,10 @@ test('config-flow: without an explicit default the cursor lands on the best real
 test('config-flow: an existing config value is returned untouched, no prompts', async () => {
   setPromptStreams(makeStreams({ tty: false })); // any prompt would throw
   const context = makeContext();
-  context.brandConfig.chatsy.agentId = 'already-set';
+  context.brandConfig.inbound.chat.providers.chatsy.agentId = 'already-set';
 
   const value = await resolveConfigValue(context, {
-    path: 'chatsy.agentId',
+    path: 'inbound.chat.providers.chatsy.agentId',
     label: 'Chatsy chat agent',
     entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
   });
@@ -102,7 +102,7 @@ test('config-flow: non-interactive returns null and writes nothing', async () =>
   const context = makeContext();
 
   const value = await resolveConfigValue(context, {
-    path: 'chatsy.agentId',
+    path: 'inbound.chat.providers.chatsy.agentId',
     label: 'Chatsy chat agent',
     entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
   });
@@ -116,7 +116,7 @@ test('config-flow: dry-run returns null without prompting, even with a TTY', asy
   try {
     const context = makeContext({ options: { dryRun: true } });
     const value = await resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     });
@@ -137,11 +137,11 @@ test('config-flow: entry flow opens the dashboard, lands the pasted id in file +
   try {
     const context = makeContext();
     const run = resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       instructions: ['1. Create an account', '2. Create a chat agent'],
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
-      disablePath: 'chatsy',
+      disablePath: 'inbound.chat.providers.chatsy',
     });
     await tty.answer('Set up now?', '\r'); // Yes
     await tty.answer('Chatsy agent ID:', '  agent_123  \r');
@@ -149,7 +149,7 @@ test('config-flow: entry flow opens the dashboard, lands the pasted id in file +
 
     assert.equal(value, 'agent_123'); // trimmed
     assert.deepEqual(opened, ['https://chatsy.ai']);
-    assert.equal(context.brandConfig.chatsy.agentId, 'agent_123');
+    assert.equal(context.brandConfig.inbound.chat.providers.chatsy.agentId, 'agent_123');
     const written = readConfigSource(context.brandRoot);
     assert.ok(written.includes('agentId: "agent_123"'));
     assert.ok(written.includes('// agent id lands here')); // comment survived
@@ -163,7 +163,7 @@ test('config-flow: Skip answer returns null and writes nothing', async () => {
   try {
     const context = makeContext();
     const run = resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     });
@@ -181,10 +181,10 @@ test('config-flow: `false` at the path = opted out — null with no prompting, e
   const tty = openTtyPrompt();
   try {
     const context = makeContext();
-    context.brandConfig.chatsy.agentId = false;
+    context.brandConfig.inbound.chat.providers.chatsy.agentId = false;
 
     const value = await resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     });
@@ -200,10 +200,10 @@ test('config-flow: `false` on an ancestor section = opted out for every path und
   const tty = openTtyPrompt();
   try {
     const context = makeContext();
-    context.brandConfig.chatsy = false; // the section-level Disable landing shape
+    context.brandConfig.inbound.chat.providers.chatsy = false; // the section-level Disable landing shape
 
     const value = await resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     });
@@ -219,7 +219,7 @@ test('config-flow: Disable without an explicit disablePath writes `<path>: false
   try {
     const context = makeContext();
     const spec = {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
     };
@@ -228,7 +228,7 @@ test('config-flow: Disable without an explicit disablePath writes `<path>: false
     await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
     assert.equal(await run, null);
 
-    assert.equal(context.brandConfig.chatsy.agentId, false);
+    assert.equal(context.brandConfig.inbound.chat.providers.chatsy.agentId, false);
     assert.ok(readConfigSource(context.brandRoot).includes('agentId: false'));
 
     // Round-trip: the landed false short-circuits silently (a prompt would hang here)
@@ -262,17 +262,17 @@ test('config-flow: Disable answer writes `<section>: false` and returns null', a
   try {
     const context = makeContext();
     const run = resolveConfigValue(context, {
-      path: 'chatsy.agentId',
+      path: 'inbound.chat.providers.chatsy.agentId',
       label: 'Chatsy chat agent',
       entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
-      disablePath: 'chatsy',
+      disablePath: 'inbound.chat.providers.chatsy',
     });
     await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
     assert.equal(await run, null);
 
-    assert.equal(context.brandConfig.chatsy, false);
+    assert.equal(context.brandConfig.inbound.chat.providers.chatsy, false);
     const written = readConfigSource(context.brandRoot);
-    assert.ok(written.includes('chatsy: false, // agent id lands here')); // value replaced, comment kept
+    assert.ok(written.includes('inbound: { chat: { providers: { chatsy: false } } }, // agent id lands here')); // value replaced, comment kept
   } finally {
     tty.close();
   }

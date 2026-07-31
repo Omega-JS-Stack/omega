@@ -4,7 +4,7 @@
  * token server-side); this talks to the Cloudflare API directly with the
  * BRAND's own CLOUDFLARE_TOKEN from the .env cascade.
  *
- * Zone resolution: config `cloudflare.zone` (the migrated UJM key) wins;
+ * Zone resolution: config `edge.providers.cloudflare.zone` wins;
  * otherwise the zone is looked up by the brand URL's apex domain. No token
  * → a clean skip (machine-readable), never a failure — purging is a
  * post-deploy nicety, not a gate.
@@ -15,7 +15,7 @@ const API = 'https://api.cloudflare.com/client/v4';
 
 /**
  * The apex domain of a site URL: playground.omegajs.dev → omegajs.dev.
- * Multi-label TLDs aren't handled (none of ours) — config `cloudflare.zone`
+ * Multi-label TLDs aren't handled (none of ours) — config `edge.providers.cloudflare.zone`
  * is the override for exotic zones.
  * @param {string} url
  * @returns {string|null}
@@ -33,7 +33,7 @@ function apexOf(url) {
  * Purge the site's Cloudflare zone cache (purge_everything).
  *
  * @param {object} options
- * @param {object} options.config - resolved web config (cloudflare.zone, brand.url)
+ * @param {object} options.config - resolved web config (edge.providers.cloudflare.zone, brand.url)
  * @param {string} [options.token] - Cloudflare API token (default: env CLOUDFLARE_TOKEN)
  * @param {boolean} [options.dryRun] - resolve + plan, send nothing
  * @param {function} [options.fetcher] - injection point for tests (default: wonderful-fetch)
@@ -50,12 +50,12 @@ async function purgeZoneCache(options) {
   const headers = { Authorization: `Bearer ${token}` };
 
   // Zone id: explicit config wins; otherwise look it up by apex domain
-  let zone = config.cloudflare && config.cloudflare.zone;
+  let zone = config.edge && config.edge.providers && config.edge.providers.cloudflare && config.edge.providers.cloudflare.zone;
   let zoneName = null;
   if (!zone) {
     const apex = apexOf(config.brand && config.brand.url);
     if (!apex) {
-      return { status: 'skipped', reason: 'no cloudflare.zone in config and no brand.url to derive the zone from' };
+      return { status: 'skipped', reason: 'no edge.providers.cloudflare.zone in config and no brand.url to derive the zone from' };
     }
     const lookup = await fetcher(`${API}/zones?name=${apex}`, { method: 'get', response: 'json', headers });
     const match = lookup && lookup.result && lookup.result[0];

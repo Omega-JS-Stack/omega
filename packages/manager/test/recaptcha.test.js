@@ -23,7 +23,7 @@ const SITE_KEY = '6LfixtureFixtureFixtureFixture';
 function brandConfig({ url = `https://${DOMAIN}` } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    recaptcha: structuredClone(DEFAULTS.recaptcha),
+    captcha: { providers: { recaptcha: structuredClone(DEFAULTS.captcha.providers.recaptcha) } },
     targets: { web: {} },
   };
 }
@@ -94,13 +94,13 @@ test('recaptcha: skip reason names only the missing key', async () => {
   assert.deepEqual(result.missingEnv, ['RECAPTCHA_SECRET_KEY']);
 });
 
-test('recaptcha: recaptcha.enabled = false skips the service', async () => {
+test('recaptcha: captcha.providers.recaptcha.enabled = false skips the service', async () => {
   const config = brandConfig();
-  config.recaptcha.enabled = false;
+  config.captcha.providers.recaptcha.enabled = false;
 
   const result = await runService(config, { recaptcha: fakeRecaptcha() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /recaptcha\.enabled/);
+  assert.match(result.reason, /captcha\.providers\.recaptcha\.enabled/);
 });
 
 test('recaptcha: skips without brand.url', async () => {
@@ -142,9 +142,9 @@ test('recaptcha: no project configured → generic classic admin console URL', a
   assert.equal(result.output.siteKey.consoleUrl, 'https://www.google.com/recaptcha/admin');
 });
 
-test('recaptcha: recaptcha.project deep-links the cloud console key page', async () => {
+test('recaptcha: captcha.providers.recaptcha.project deep-links the cloud console key page', async () => {
   const config = brandConfig();
-  config.recaptcha.project = 'my-shared-project';
+  config.captcha.providers.recaptcha.project = 'my-shared-project';
 
   const result = await runService(config, { recaptcha: fakeRecaptcha() });
 
@@ -216,8 +216,8 @@ test("requires: RECAPTCHA_* walkthrough mints at the GCP reCAPTCHA console (the 
 
 test('requires/defaults: no ITW or hardcoded key value anywhere in the recaptcha registry', () => {
   // The paste flow must be the only path to a key — no default value exists
-  assert.equal(DEFAULTS.recaptcha.project, null);
-  const serialized = JSON.stringify({ defaults: DEFAULTS.recaptcha, requires: { why: REQUIRES.recaptcha.why, env: REQUIRES.recaptcha.env } });
+  assert.equal(DEFAULTS.captcha.providers.recaptcha.project, null);
+  const serialized = JSON.stringify({ defaults: DEFAULTS.captcha.providers.recaptcha, requires: { why: REQUIRES.recaptcha.why, env: REQUIRES.recaptcha.env } });
   assert.doesNotMatch(serialized, /itw/i);
   assert.doesNotMatch(serialized, /6L[0-9A-Za-z_-]{38}/); // a real site-key literal
 });

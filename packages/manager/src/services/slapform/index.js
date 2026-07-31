@@ -9,7 +9,7 @@
  * Auth tiers (2b, Ian 2026-07-13):
  *   1. Operator SA — SLAPFORM_SERVICE_ACCOUNT in the brand .env (path to
  *      the service-account JSON, absolute or brand-root-relative). Full
- *      create + manage: a missing formId with `slapform.templateFormId`
+ *      create + manage: a missing formId with `forms.providers.slapform.templateFormId`
  *      configured (the company layer's shape donor) MINTS the brand's own
  *      form — product user (email = brand contact email, password via the
  *      account service's owner channels) + doc shape-templated from the
@@ -36,16 +36,16 @@ const SLAPFORM_URL = 'https://slapform.com';
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const config = context.brandConfig.slapform;
+    const config = context.brandConfig.forms?.providers?.slapform;
 
     if (config === false || config?.enabled === false) {
-      return { skip: true, reason: 'slapform.enabled = false' };
+      return { skip: true, reason: 'forms.providers.slapform.enabled = false' };
     }
 
     // Shared form: another brand owns its branding (the chatsy/replyify
     // updateAgentInfo pattern) — never rename or re-enable it from here
     if (config?.updateFormInfo === false) {
-      return { skip: true, reason: 'form managed by another brand (slapform.updateFormInfo = false)' };
+      return { skip: true, reason: 'form managed by another brand (forms.providers.slapform.updateFormInfo = false)' };
     }
 
     // The contact form lives on the brand's website
@@ -91,28 +91,28 @@ module.exports.run = createServiceRunner({
       });
 
       if (!created) {
-        return { skip: true, reason: 'dry run — form creation planned (from slapform.templateFormId)' };
+        return { skip: true, reason: 'dry run — form creation planned (from forms.providers.slapform.templateFormId)' };
       }
 
-      landValue(context, 'slapform.formId', created.id);
-      console.log(`      ${chalk.green('✓')} slapform.formId = ${chalk.cyan(created.id)} written to omega.json5`);
+      landValue(context, 'forms.providers.slapform.formId', created.id);
+      console.log(`      ${chalk.green('✓')} forms.providers.slapform.formId = ${chalk.cyan(created.id)} written to omega.json5`);
       formId = created.id;
     }
 
     if (!formId) {
       formId = await resolveConfigValue(context, {
-        path: 'slapform.formId',
+        path: 'forms.providers.slapform.formId',
         label: 'Slapform contact form',
         instructions: [
           `1. Create an account at ${chalk.cyan(SLAPFORM_URL)} (if you haven't already)`,
           `2. Create a contact form for ${chalk.cyan(brand.name || context.brandId)}`,
         ],
         entry: { url: SLAPFORM_URL, message: 'Slapform form ID:' },
-        disablePath: 'slapform',
+        disablePath: 'forms.providers.slapform',
       });
     }
     if (!formId) {
-      return { skip: true, reason: 'no slapform.formId configured — set slapform.templateFormId + the operator SA to mint one automatically, create one at https://slapform.com (paste back interactively), or set it in omega.json5' };
+      return { skip: true, reason: 'no forms.providers.slapform.formId configured — set forms.providers.slapform.templateFormId + the operator SA to mint one automatically, create one at https://slapform.com (paste back interactively), or set it in omega.json5' };
     }
 
     if (!db) {

@@ -259,7 +259,7 @@ function enforceSPF(record, content, brandConfig) {
   if (record.type !== 'TXT') return content;
   if (!content.toLowerCase().includes('v=spf1')) return content;
 
-  const spfSetting = brandConfig?.cloudflare?.dns?.spf;
+  const spfSetting = brandConfig?.edge?.providers?.cloudflare?.dns?.spf;
   if (!spfSetting) return content;
 
   const spfQualifiers = { strict: '-all', soft: '~all', neutral: '?all', pass: '+all' };
@@ -306,7 +306,7 @@ function reorderDMARC(record, content, brandConfig) {
     }
   }
 
-  const dnsConfig = brandConfig?.cloudflare?.dns;
+  const dnsConfig = brandConfig?.edge?.providers?.cloudflare?.dns;
   const dmarcSetting = dnsConfig?.dmarcPolicy;
   if (dmarcSetting && ['none', 'quarantine', 'reject'].includes(dmarcSetting)) {
     tags.p = dmarcSetting;
@@ -353,7 +353,7 @@ function txtKind(content = '') {
 // =============================================================================
 
 function diffRecords({ records, brandConfig, domain, isSubdomainProject }) {
-  const dnsConfig = brandConfig?.cloudflare?.dns;
+  const dnsConfig = brandConfig?.edge?.providers?.cloudflare?.dns;
 
   if (!dnsConfig && !isSubdomainProject) {
     return null;

@@ -11,11 +11,11 @@ permalink: /recipes/the-best-brown-butter-chocolate-chip-cookies
 date: 2024-06-01
 advertising:
   providers:
-    google-adsense:
+    adsense:
       client: "ca-pub-PORTSTEST"
-      display-slot: "1111111111"
-      in-article-slot: "2222222222"
-      multiplex-slot: "3333333333"
+      displaySlot: "1111111111"
+      inArticleSlot: "2222222222"
+      multiplexSlot: "3333333333"
 
 recipe:
   id: 1764775196

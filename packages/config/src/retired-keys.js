@@ -11,6 +11,20 @@
  * still exists as a legitimate key somewhere in the schema (`sentry`, which
  * lives on as `client.sentry`; `google`/`meta` under `analytics.providers`)
  * would false-positive and is left to the mapping tables.
+ *
+ * RETIRED_PATHS is the second half (#23): the de-branding rekey moved whole
+ * top-level keys into role-shaped homes where the provider keeps its own
+ * name (`slapform` → `forms.providers.slapform`), and folded two keys into
+ * `cloud`. A name test can't express those — `slapform` is legitimate again
+ * one level down, and `firebase` lives on as `client.firebase` — so these
+ * match one EXACT path from the root.
+ *
+ * `github` is deliberately NOT here: rules run against the RESOLVED config,
+ * where a target section's keys are overlaid at the top level, so the
+ * legitimate `targets.backend.github` (content identity, unchanged) arrives
+ * as top-level `github` and would false-positive. Its rename to
+ * `repo.providers.github` is carried by the mapping tables in
+ * docs/shared/config.md instead.
  */
 
 // key name → { replacement, why } (docs/shared/config.md carries the rows)
@@ -22,6 +36,46 @@ const RETIRED_KEYS = {
   firebaseConfig: {
     replacement: 'cloud',
     why: "the provider-discriminated role key: cloud: { provider: 'firebase', config: {…} }",
+  },
+};
+
+// exact dotted path → { replacement, why } (docs/shared/config.md carries the rows)
+const RETIRED_PATHS = {
+  slapform: {
+    replacement: 'forms.providers.slapform',
+    why: 'config keys name the ROLE, not the vendor (#23)',
+  },
+  chatsy: {
+    replacement: 'inbound.chat.providers.chatsy',
+    why: 'config keys name the ROLE, not the vendor (#23) — one home for the manager fields and the widget settings',
+  },
+  replyify: {
+    replacement: 'inbound.email.providers.replyify',
+    why: 'config keys name the ROLE, not the vendor (#23)',
+  },
+  cloudflare: {
+    replacement: 'edge.providers.cloudflare',
+    why: 'config keys name the ROLE, not the vendor (#23)',
+  },
+  recaptcha: {
+    replacement: 'captcha.providers.recaptcha',
+    why: 'config keys name the ROLE, not the vendor (#23)',
+  },
+  searchConsole: {
+    replacement: 'search.providers.searchConsole',
+    why: 'config keys name the ROLE, not the vendor (#23) — `seo` already means the parasite-SEO content feature',
+  },
+  gcp: {
+    replacement: 'cloud',
+    why: 'one cloud home (#23): gcp.organizationId/billingAccount are now cloud.organizationId/cloud.billingAccount',
+  },
+  firebase: {
+    replacement: 'cloud',
+    why: 'one cloud home (#23): the provisioning fields are now cloud.shared/supportEmail/apiSubdomain, and projectId lives only at cloud.config.projectId',
+  },
+  'advertising.providers.google-adsense': {
+    replacement: 'advertising.providers.adsense',
+    why: 'provider ids drop the vendor prefix and every key is camelCase (#23) — the slots are displaySlot/inArticleSlot/inFeedSlot/multiplexSlot',
   },
 };
 
@@ -42,6 +96,10 @@ function walk(node, path, found) {
       found.push({ path: keyPath, key, ...RETIRED_KEYS[key] });
     }
 
+    if (RETIRED_PATHS[keyPath]) {
+      found.push({ path: keyPath, key, ...RETIRED_PATHS[keyPath] });
+    }
+
     walk(node[key], keyPath, found);
   });
 }
@@ -57,4 +115,4 @@ function findRetiredKeys(object) {
   return found;
 }
 
-module.exports = { findRetiredKeys, RETIRED_KEYS };
+module.exports = { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS };

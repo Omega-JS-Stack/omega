@@ -67,7 +67,7 @@ function brandConfig({ url = `https://${DOMAIN}`, targets = { web: {}, backend: 
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     analytics: structuredClone(DEFAULTS.analytics),
-    firebase: { projectId: PROJECT },
+    cloud: { config: { projectId: PROJECT } },
     targets,
   };
   if (google) {
@@ -374,16 +374,15 @@ test('analytics: interactive acknowledgement — Enter-gated open, retry poll la
   }
 });
 
-test('analytics: firebase-link derives the project from cloud.config when firebase.projectId is absent', async () => {
+test('analytics: firebase-link derives the project from cloud.config — its ONE home (#23)', async () => {
   const config = brandConfig({ targets: { web: {} } });
-  config.firebase = {};
   config.cloud = { provider: 'firebase', config: { projectId: PROJECT } };
 
   const api = fakeAnalytics(convergedResponses());
   const result = await runService(config, { analytics: api, brandState: FIREBASE_STATE });
 
   assert.equal(result.status, 'success');
-  assert.ok(api.callsTo('listFirebaseLinks').length > 0, 'the link op ran instead of skipping on a missing firebase.projectId');
+  assert.ok(api.callsTo('listFirebaseLinks').length > 0, 'the link op ran instead of skipping on a missing cloud.config.projectId');
   assert.equal(api.mutations().length, 0, 'converged link stays a no-op');
 });
 
@@ -578,7 +577,7 @@ test('analytics: dry-run on a fully drifted brand performs zero mutations', asyn
 const FLOW_WRITEBACK_CONFIG = `{
   // Fixture Brand — analytics writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  firebase: { projectId: 'fixture-proj' },
+  cloud: { config: { projectId: 'fixture-proj' } },
   targets: { web: {}, backend: {} },
 }
 `;

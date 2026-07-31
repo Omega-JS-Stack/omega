@@ -1,5 +1,5 @@
 /**
- * Ensure response header transform rules match `cloudflare.rules.responseHeaders`.
+ * Ensure response header transform rules match `edge.providers.cloudflare.rules.responseHeaders`.
  *
  * Different from other ruleset operations: always uses PUT, but targets either
  * the existing ruleset's ID or the phase's entrypoint URL when it doesn't yet
@@ -27,7 +27,7 @@ module.exports = async function ensureRulesResponseHeaders(context) {
   });
 
   // === DIFF ===
-  const responseHeadersConfig = brandConfig?.cloudflare?.rules?.responseHeaders;
+  const responseHeadersConfig = brandConfig?.edge?.providers?.cloudflare?.rules?.responseHeaders;
   if (!responseHeadersConfig || responseHeadersConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

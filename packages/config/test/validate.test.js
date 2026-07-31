@@ -235,6 +235,58 @@ test('the current client key is untouched by the retired-key guard', () => {
   assert.deepStrictEqual(validateConfig(config).errors, []);
 });
 
+// ─── validateConfig: retired PATHS — the de-branding rekey (#23) ───
+
+test('every de-branded top-level key hard-fails and names its new home', () => {
+  const moved = {
+    slapform: 'forms.providers.slapform',
+    chatsy: 'inbound.chat.providers.chatsy',
+    replyify: 'inbound.email.providers.replyify',
+    cloudflare: 'edge.providers.cloudflare',
+    recaptcha: 'captcha.providers.recaptcha',
+    searchConsole: 'search.providers.searchConsole',
+    gcp: 'cloud',
+    firebase: 'cloud',
+  };
+
+  for (const [key, replacement] of Object.entries(moved)) {
+    const { errors } = validateConfig({ ...VALID, [key]: {} });
+    assert.ok(
+      errors.some((e) => e.includes(`config.${key} is retired`) && e.includes(replacement)),
+      `${key} must bounce toward ${replacement}`,
+    );
+  }
+});
+
+test('the retired google-adsense provider id bounces at its nested path', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    advertising: { providers: { 'google-adsense': { client: 'ca-pub-1' } } },
+  });
+
+  assert.ok(errors.some((e) => e.includes('config.advertising.providers.google-adsense is retired')
+    && e.includes('advertising.providers.adsense')));
+});
+
+test('the new homes themselves validate clean — the provider keeps its own name one level down', () => {
+  const config = {
+    ...VALID,
+    forms: { providers: { slapform: { formId: 'abc' } } },
+    inbound: {
+      chat: { providers: { chatsy: { agentId: 'abc', settings: {} } } },
+      email: { providers: { replyify: { agentId: 'abc' } } },
+    },
+    edge: { providers: { cloudflare: { zone: 'zone-id' } } },
+    captcha: { providers: { recaptcha: { siteKey: 'key' } } },
+    search: { providers: { searchConsole: { submitSitemap: false } } },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    cloud: { provider: 'firebase', config: { projectId: 'acme' }, organizationId: false, billingAccount: false },
+    advertising: { providers: { adsense: { client: 'ca-pub-1', displaySlot: '1' } } },
+  };
+
+  assert.deepStrictEqual(validateConfig(config).errors, []);
+});
+
 // ─── runSchema: conditional required ───
 
 test('required-as-function receives the full config', () => {

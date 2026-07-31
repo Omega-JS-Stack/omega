@@ -4,7 +4,7 @@
  * Submits only what's MISSING — omega-manager resubmitted existing sitemaps
  * on every run ("refresh"), which made a converged brand mutate forever;
  * Google re-crawls submitted sitemaps on its own. Paths come from
- * `searchConsole.sitemapPaths` (default `/sitemap.xml`); brands without a
+ * `search.providers.searchConsole.sitemapPaths` (default `/sitemap.xml`); brands without a
  * web target have no sitemap to serve and are skipped.
  */
 const chalk = require('chalk').default;
@@ -13,8 +13,8 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureSitemaps(context) {
   const { searchConsoleApi: api, brandConfig, brand, domain, serviceData, options = {} } = context;
 
-  if (brandConfig.searchConsole?.submitSitemap === false) {
-    console.log(chalk.dim('      ⊘ Sitemap submission disabled (searchConsole.submitSitemap = false)'));
+  if (brandConfig.search?.providers?.searchConsole?.submitSitemap === false) {
+    console.log(chalk.dim('      ⊘ Sitemap submission disabled (search.providers.searchConsole.submitSitemap = false)'));
     return {};
   }
 
@@ -29,7 +29,7 @@ module.exports = async function ensureSitemaps(context) {
   }
 
   const siteUrl = serviceData.propertyUrl;
-  const paths = brandConfig.searchConsole?.sitemapPaths || ['/sitemap.xml'];
+  const paths = brandConfig.search?.providers?.searchConsole?.sitemapPaths || ['/sitemap.xml'];
   const wanted = paths.map((path) => `https://${domain}${path}`);
 
   // === READ ===

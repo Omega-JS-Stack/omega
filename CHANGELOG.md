@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- [#23](https://github.com/Omega-JS-Stack/omega/issues/23) — omega.json5 keys name the ROLE, not the vendor, and every key is camelCase: `forms.providers.slapform`, `inbound.chat.providers.chatsy`, `inbound.email.providers.replyify`, `edge.providers.cloudflare`, `captcha.providers.recaptcha`, `search.providers.searchConsole`, `repo.providers.github`, `advertising.providers.adsense` (settling [#35](https://github.com/Omega-JS-Stack/omega/issues/35)'s naming half); `gcp` and `firebase` fold into `cloud.*`. Old spellings are hard validator errors — rename them.
+
+### Fixed
+- [#151](https://github.com/Omega-JS-Stack/omega/issues/151) — The vendor-docs structure test now scopes its "everything the lane writes is generated" check to the lane's own destinations, not each package's whole `docs/` directory, so uncommitted edits to committed docs no longer turn the scripts lane red. A lane write to a non-gitignored path still fails it.
+
 ## [0.11.1] (2026-07-30)
 
 ### Changed

@@ -49,7 +49,7 @@ function brandConfig(overrides = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
     targets: { web: {}, backend: {} },
-    firebase: { shared: false },
+    cloud: { shared: false },
     ...overrides,
   };
 }
@@ -244,7 +244,7 @@ test('migrations: no backend target skips the service', async () => {
 });
 
 test('migrations: shared Firebase project skips the service', async () => {
-  const result = await runService(brandConfig({ firebase: { shared: true } }));
+  const result = await runService(brandConfig({ cloud: { shared: true } }));
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /shared Firebase project/);
 });

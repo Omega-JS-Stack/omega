@@ -8,7 +8,7 @@
  * block (guest-post rules, the company sponsorship URL, its promo code) is
  * GONE from the packaged template — company business prose belongs in the
  * brand/company config/replyify.md that gets appended to the baseline. The
- * discount section only renders when `replyify.discount` is configured
+ * discount section only renders when `inbound.email.providers.replyify.discount` is configured
  * (omega-manager hardcoded the company's GIFT15 code for every brand); with
  * no code configured the section is omitted entirely so agents can never
  * invent one.
@@ -21,7 +21,7 @@ const BASELINE_KNOWLEDGE = fs.readFileSync(join(__dirname, '..', 'data', 'baseli
 const BASELINE_FILTER = fs.readFileSync(join(__dirname, '..', 'data', 'baseline-filter.md'), 'utf8').trimEnd();
 
 // Spliced into baseline-knowledge.md's {discountSection} slot only when
-// replyify.discount carries a code
+// inbound.email.providers.replyify.discount carries a code
 const DISCOUNT_SECTION = `  <discount followup="0">
     <reasoning>
       - DO NOT offer or mention a discount proactively. Only provide a code if the user SPECIFICALLY asks for one (e.g. they reply asking for a deal, a promo code, or a way to save).
@@ -40,7 +40,7 @@ const DISCOUNT_SECTION = `  <discount followup="0">
  * an undefined value.
  */
 function templateContext(brandConfig, domain) {
-  const discount = brandConfig.replyify?.discount;
+  const discount = brandConfig.inbound?.email?.providers?.replyify?.discount;
 
   return {
     'brand.name': brandConfig.brand.name,
@@ -52,14 +52,14 @@ function templateContext(brandConfig, domain) {
 
 /**
  * Get the baseline knowledge with placeholders replaced and the discount
- * section rendered only when replyify.discount is configured.
+ * section rendered only when inbound.email.providers.replyify.discount is configured.
  *
  * @param {Object} brandConfig - The full brand config object
  * @param {string} domain - Brand domain (e.g. "fixture-brand.test")
  * @returns {string}
  */
 function getBaselineKnowledge(brandConfig, domain) {
-  const discount = brandConfig.replyify?.discount;
+  const discount = brandConfig.inbound?.email?.providers?.replyify?.discount;
   const withDiscount = BASELINE_KNOWLEDGE.replace(
     '{discountSection}',
     discount?.code ? `\n${DISCOUNT_SECTION}\n` : '',

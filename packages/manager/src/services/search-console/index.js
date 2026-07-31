@@ -20,10 +20,10 @@ const { GoogleSearchConsoleAPI } = require('./lib/search-console-api.js');
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const searchConsole = context.brandConfig.searchConsole || {};
+    const searchConsole = context.brandConfig.search?.providers?.searchConsole || {};
 
     if (searchConsole.enabled === false) {
-      return { skip: true, reason: 'searchConsole.enabled = false' };
+      return { skip: true, reason: 'search.providers.searchConsole.enabled = false' };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

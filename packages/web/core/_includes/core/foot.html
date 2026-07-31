@@ -71,7 +71,15 @@
       {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
     {% endfor %}
     env: {{ resolved.client.env | jsonify }},
-    recaptcha: {{ resolved.recaptcha | jsonify }},
+    captcha: {{ resolved.captcha | jsonify }},
+    // Role sections the page/client runtime reads directly (#23): the contact
+    // page's form endpoint and the chat widget's agent + settings. CURATED to
+    // those leaves at their real paths — the provisioning-only siblings
+    // (template ids, plan, update flags, sponsorshipsUrl) never go public.
+    {% assign slapform = resolved.forms.providers.slapform %}
+    forms: {% if slapform %}{ providers: { slapform: { formId: {{ slapform.formId | jsonify }} } } }{% else %}null{% endif %},
+    {% assign chatsy = resolved.inbound.chat.providers.chatsy %}
+    inbound: {% if chatsy %}{ chat: { providers: { chatsy: { enabled: {{ chatsy.enabled | jsonify }}, agentId: {{ chatsy.agentId | jsonify }}, settings: {{ chatsy.settings | jsonify }} } } } }{% else %}null{% endif %},
     oauth2: {{ resolved.oauth2 | jsonify }},
   };
 </script>
@@ -192,9 +200,9 @@
 
 <!-- Script - Google Adsense -->
 {% comment %}
-{% iftruthy resolved.advertising.providers.google-adsense.client %}
+{% iftruthy resolved.advertising.providers.adsense.client %}
   <!-- client is the embed-ready ca-pub-… form (schema) — never prefix it -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ resolved.advertising.providers.google-adsense.client }}" crossorigin="anonymous"></script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ resolved.advertising.providers.adsense.client }}" crossorigin="anonymous"></script>
 {% endiftruthy %}
 {% endcomment %}
 

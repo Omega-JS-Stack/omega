@@ -11,7 +11,7 @@
  * Auth tiers (2b, Ian 2026-07-13):
  *   1. Operator SA — CHATSY_SERVICE_ACCOUNT in the brand .env (path to the
  *      service-account JSON, absolute or brand-root-relative). Full create
- *      + manage: a missing agentId with `chatsy.templateAgentId` configured
+ *      + manage: a missing agentId with `inbound.chat.providers.chatsy.templateAgentId` configured
  *      (the company layer's shape donor) MINTS the brand's own agent —
  *      product user (email = brand contact email, password via the account
  *      service's owner channels) + doc shape-templated from the donor —
@@ -38,15 +38,15 @@ const CHATSY_URL = 'https://chatsy.ai';
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const config = context.brandConfig.chatsy;
+    const config = context.brandConfig.inbound?.chat?.providers?.chatsy;
 
     if (config === false || config?.enabled === false) {
-      return { skip: true, reason: 'chatsy.enabled = false' };
+      return { skip: true, reason: 'inbound.chat.providers.chatsy.enabled = false' };
     }
 
     // A shared agent managed by another brand must not be rewritten here
     if (config?.updateAgentInfo === false) {
-      return { skip: true, reason: 'agent managed by another brand (chatsy.updateAgentInfo = false)' };
+      return { skip: true, reason: 'agent managed by another brand (inbound.chat.providers.chatsy.updateAgentInfo = false)' };
     }
 
     // The chat widget lives on the brand's website
@@ -92,28 +92,28 @@ module.exports.run = createServiceRunner({
       });
 
       if (!created) {
-        return { skip: true, reason: 'dry run — agent creation planned (from chatsy.templateAgentId)' };
+        return { skip: true, reason: 'dry run — agent creation planned (from inbound.chat.providers.chatsy.templateAgentId)' };
       }
 
-      landValue(context, 'chatsy.agentId', created.id);
-      console.log(`      ${chalk.green('✓')} chatsy.agentId = ${chalk.cyan(created.id)} written to omega.json5`);
+      landValue(context, 'inbound.chat.providers.chatsy.agentId', created.id);
+      console.log(`      ${chalk.green('✓')} inbound.chat.providers.chatsy.agentId = ${chalk.cyan(created.id)} written to omega.json5`);
       agentId = created.id;
     }
 
     if (!agentId) {
       agentId = await resolveConfigValue(context, {
-        path: 'chatsy.agentId',
+        path: 'inbound.chat.providers.chatsy.agentId',
         label: 'Chatsy chat agent',
         instructions: [
           `1. Create an account at ${chalk.cyan(CHATSY_URL)} (if you haven't already)`,
           `2. Create a chat agent for ${chalk.cyan(brand.name || context.brandId)}`,
         ],
         entry: { url: CHATSY_URL, message: 'Chatsy agent ID:' },
-        disablePath: 'chatsy',
+        disablePath: 'inbound.chat.providers.chatsy',
       });
     }
     if (!agentId) {
-      return { skip: true, reason: 'no chatsy.agentId configured — set chatsy.templateAgentId + the operator SA to mint one automatically, create one at https://chatsy.ai (paste back interactively), or set it in omega.json5' };
+      return { skip: true, reason: 'no inbound.chat.providers.chatsy.agentId configured — set inbound.chat.providers.chatsy.templateAgentId + the operator SA to mint one automatically, create one at https://chatsy.ai (paste back interactively), or set it in omega.json5' };
     }
 
     if (!db) {

@@ -24,7 +24,7 @@ function brandConfig(github = {}, extra = {}) {
       url: 'https://fixture-brand.test',
       description: 'A fixture brand',
     },
-    github: { shared: false, private: true, org: 'fixture-org', ...github },
+    repo: { providers: { github: { shared: false, private: true, org: 'fixture-org', ...github } } },
     targets: { web: {} },
     ...extra,
   };
@@ -99,9 +99,9 @@ function run(config, api, options = {}) {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('github: skips without github.org', async () => {
+test('github: skips without repo.providers.github.org', async () => {
   const config = brandConfig();
-  delete config.github.org;
+  delete config.repo.providers.github.org;
 
   const result = await run(config, fakeApi());
   assert.equal(result.status, 'skipped');

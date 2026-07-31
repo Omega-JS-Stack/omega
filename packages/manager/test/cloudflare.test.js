@@ -35,7 +35,7 @@ function brandConfig(url = `https://${DOMAIN}`) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     domain: structuredClone(DEFAULTS.domain),
-    cloudflare: structuredClone(DEFAULTS.cloudflare),
+    edge: { providers: { cloudflare: structuredClone(DEFAULTS.edge.providers.cloudflare) } },
     targets: { web: {} },
   };
   return templateObject(config, { domain: url.replace(/^https?:\/\//, '') });
@@ -106,10 +106,10 @@ function handlerContext(config, api, extra = {}) {
 
 /** Every read a fully-converged default-config zone answers. */
 function convergedResponses(config) {
-  const cache = config.cloudflare.cacheRules[0];
-  const redirect = config.cloudflare.rules.redirect[0];
-  const sec = config.cloudflare.rules.security[0];
-  const csp = config.cloudflare.rules.responseHeaders[0].headers['Content-Security-Policy'];
+  const cache = config.edge.providers.cloudflare.cacheRules[0];
+  const redirect = config.edge.providers.cloudflare.rules.redirect[0];
+  const sec = config.edge.providers.cloudflare.rules.security[0];
+  const csp = config.edge.providers.cloudflare.rules.responseHeaders[0].headers['Content-Security-Policy'];
 
   return {
     'GET /accounts': [{ id: 'acct-1' }],
@@ -120,7 +120,7 @@ function convergedResponses(config) {
       { id: 'r4', type: 'TXT', name: DOMAIN, content: '"v=spf1 include:_spf.google.com include:sendgrid.net -all"', comment: 'SPF policy' },
       { id: 'r5', type: 'TXT', name: `_dmarc.${DOMAIN}`, content: '"v=DMARC1; p=quarantine; pct=100"', comment: 'DMARC policy' },
     ],
-    'GET /zones/zone-1/settings': Object.entries(config.cloudflare.settings)
+    'GET /zones/zone-1/settings': Object.entries(config.edge.providers.cloudflare.settings)
       .map(([id, value]) => ({ id, value: structuredClone(value), editable: true })),
     'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': {
       id: 'rs-cache', kind: 'zone', phase: 'http_request_cache_settings', name: 'Cache Rules', description: 'managed',
@@ -193,9 +193,9 @@ test('cloudflare: skips without CLOUDFLARE_TOKEN', async () => {
   assert.match(result.reason, /CLOUDFLARE_TOKEN/);
 });
 
-test('cloudflare: cloudflare.enabled = false skips the service', async () => {
+test('cloudflare: edge.providers.cloudflare.enabled = false skips the service', async () => {
   const config = brandConfig();
-  config.cloudflare.enabled = false;
+  config.edge.providers.cloudflare.enabled = false;
 
   const result = await runService(config, fakeApi());
   assert.equal(result.status, 'skipped');
@@ -335,7 +335,7 @@ test('zone: a zone created this run is visible to later operations via serviceDa
 
   // zoneId null at setup time (zone didn't exist), zone op returned state
   const config = brandConfig();
-  config.cloudflare.dns = null; // diff returns null — read is the point here
+  config.edge.providers.cloudflare.dns = null; // diff returns null — read is the point here
   await ensureDns(handlerContext(config, api, { zoneId: null, serviceData: { zoneId: 'zone-fresh' } }));
 
   assert.ok(api.call('GET', '/zones/zone-fresh/dns_records'));
@@ -345,7 +345,7 @@ test('zone: a zone created this run is visible to later operations via serviceDa
 
 test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC reports) are config-gated', () => {
   // Default config: no BIMI, no SendGrid, DMARC without report addresses
-  const defaults = buildRequiredRecords(DOMAIN, brandConfig().cloudflare.dns, false, null);
+  const defaults = buildRequiredRecords(DOMAIN, brandConfig().edge.providers.cloudflare.dns, false, null);
   const names = defaults.map((r) => r.name);
   assert.ok(!names.some((n) => n.includes('_bimi')));
   assert.ok(!names.some((n) => n.includes('emailauth')));
@@ -480,7 +480,7 @@ test('zone-settings: dry-run lists the plan, patches nothing', async () => {
 test('cache-rules: updates stale TTLs and removes unconfigured rules in one PUT', async () => {
   const ensureCacheRules = require('../src/services/cloudflare/ensure/cache-rules.js');
   const config = brandConfig();
-  const cache = config.cloudflare.cacheRules[0];
+  const cache = config.edge.providers.cloudflare.cacheRules[0];
 
   const api = fakeApi({
     responses: {

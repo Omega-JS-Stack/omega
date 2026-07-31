@@ -1,7 +1,7 @@
 /**
  * cp140 — Cloudflare cache purge (the UJM cloudflare-purge successor,
  * de-ITW'd): direct API with the brand's own token, zone from config
- * `cloudflare.zone` or looked up by the brand URL's apex, clean skips
+ * `edge.providers.cloudflare.zone` or looked up by the brand URL's apex, clean skips
  * without a token, dry-run plans without purging. All over an injected
  * fetch recorder — no live Cloudflare in the suite.
  */
@@ -27,10 +27,10 @@ test('apexOf: derives the zone apex from a site url', () => {
   assert.strictEqual(apexOf(''), null);
 });
 
-test('purge: explicit cloudflare.zone purges directly — one POST, bearer token, purge_everything', async () => {
+test('purge: explicit edge.providers.cloudflare.zone purges directly — one POST, bearer token, purge_everything', async () => {
   const { calls, fetcher } = recorder([{ success: true }]);
   const result = await purgeZoneCache({
-    config: { cloudflare: { zone: 'zone-123' }, brand: { url: 'https://x.dev' } },
+    config: { edge: { providers: { cloudflare: { zone: 'zone-123' } } }, brand: { url: 'https://x.dev' } },
     token: 'tok-1',
     fetcher,
   });
@@ -89,7 +89,7 @@ test('purge: dry run resolves the zone and plans, sends no purge', async () => {
 test('purge: a Cloudflare error surfaces with the API detail', async () => {
   const { fetcher } = recorder([{ success: false, errors: [{ code: 9109, message: 'Invalid access token' }] }]);
   await assert.rejects(
-    purgeZoneCache({ config: { cloudflare: { zone: 'z' } }, token: 'bad', fetcher }),
+    purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'bad', fetcher }),
     /Invalid access token/
   );
 });
@@ -97,7 +97,7 @@ test('purge: a Cloudflare error surfaces with the API detail', async () => {
 test('purge: the DNS-scoped-token failure (code 10000) names the missing Cache Purge permission', async () => {
   const { fetcher } = recorder([{ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }]);
   await assert.rejects(
-    purgeZoneCache({ config: { cloudflare: { zone: 'z' } }, token: 'dns-only', fetcher }),
+    purgeZoneCache({ config: { edge: { providers: { cloudflare: { zone: 'z' } } } }, token: 'dns-only', fetcher }),
     /Cache Purge permission.*dash\.cloudflare\.com/
   );
 });

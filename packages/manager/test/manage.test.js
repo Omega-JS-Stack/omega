@@ -205,9 +205,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No domain.provider configured → clean skip
   assert.equal(report.results.domain.status, 'skipped');
   assert.match(report.results.domain.reason, /domain\.provider/);
-  // No firebase.projectId configured → clean skip
+  // No cloud.config.projectId configured → clean skip
   assert.equal(report.results.cloud.status, 'skipped');
-  assert.match(report.results.cloud.reason, /firebase\.projectId/);
+  assert.match(report.results.cloud.reason, /cloud\.config\.projectId/);
   // No shared reCAPTCHA keys in the environment → clean skip
   assert.equal(report.results.recaptcha.status, 'skipped');
   assert.match(report.results.recaptcha.reason, /RECAPTCHA_SITE_KEY/);
@@ -220,7 +220,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No advertising provider authored → clean skip (wave-5 F10: through the
   // REAL pipeline — proves the DEFAULTS merge doesn't resurrect the entry)
   assert.equal(report.results.adsense.status, 'skipped');
-  assert.match(report.results.adsense.reason, /no advertising\.providers\.google-adsense/);
+  assert.match(report.results.adsense.reason, /no advertising\.providers\.adsense/);
   // No monitoring section configured → clean skip
   assert.equal(report.results.monitoring.status, 'skipped');
   assert.match(report.results.monitoring.reason, /no monitoring config/);
@@ -235,10 +235,10 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.match(report.results.payment.reason, /no paid products/);
   // No slapform.formId configured → clean skip
   assert.equal(report.results.slapform.status, 'skipped');
-  assert.match(report.results.slapform.reason, /slapform\.formId/);
+  assert.match(report.results.slapform.reason, /forms\.providers\.slapform\.formId/);
   // No chatsy.agentId configured → clean skip
   assert.equal(report.results.chatsy.status, 'skipped');
-  assert.match(report.results.chatsy.reason, /chatsy\.agentId/);
+  assert.match(report.results.chatsy.reason, /inbound\.chat\.providers\.chatsy\.agentId/);
   // Web-only fixture → the email agent has no backend to answer for
   assert.equal(report.results.replyify.status, 'skipped');
   assert.match(report.results.replyify.reason, /no backend target/);

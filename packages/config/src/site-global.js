@@ -53,14 +53,14 @@ function desktopReleasesEnabled(config) {
 /**
  * The GitHub releases URL a desktop target's downloads point at.
  * Repo precedence: targets.desktop.releases.repo (where built artifacts
- * live) → github.repo (the brand website repo) → brand.id (the derivation
- * default for the repo name). No github.org → no URL.
+ * live) → repo.providers.github.repo (the brand website repo) → brand.id (the derivation
+ * default for the repo name). No repo.providers.github.org → no URL.
  * @param {object} config - resolved config object
  * @returns {string|undefined}
  */
 function desktopReleasesUrl(config) {
   const desktop = targetEntry(config, 'desktop');
-  const org = config?.github?.org;
+  const org = config?.repo?.providers?.github?.org;
   const repo = desktop?.releases?.repo;
 
   if (repo && org) return `https://github.com/${org}/${repo}/releases/latest`;
@@ -68,11 +68,11 @@ function desktopReleasesUrl(config) {
   // Idempotence: the build pipeline applies toSiteGlobal more than once
   // (consumer.js loadSiteData, then engine.js configureOmega). On a second
   // pass the raw releases.repo is gone — the curated view's own URL is the
-  // authority, and re-deriving from github.repo/brand.id would silently
+  // authority, and re-deriving from repo.providers.github.repo/brand.id would silently
   // change it.
   if (desktop?.releasesUrl) return desktop.releasesUrl;
 
-  const fallback = config?.github?.repo || config?.brand?.id;
+  const fallback = config?.repo?.providers?.github?.repo || config?.brand?.id;
   if (!org || !fallback) return undefined;
 
   return `https://github.com/${org}/${fallback}/releases/latest`;

@@ -342,7 +342,7 @@ async function checkHomepage(recorder, app, ctx) {
 async function checkApiHealth(recorder, app, ctx) {
   const name = `${app.name}: API health`;
 
-  if (ctx.brandConfig.firebase?.shared === true) {
+  if (ctx.brandConfig.cloud?.shared === true) {
     recorder.note(name, 'shared Firebase project (owning brand deploys the backend)');
     return;
   }
@@ -406,11 +406,11 @@ async function checkApiHealth(recorder, app, ctx) {
 
 /**
  * GitHub Actions check — latest workflow run of the brand repo. Silent when
- * no github.org is configured (the github service already reports that skip)
+ * no repo.providers.github.org is configured (the github service already reports that skip)
  * or when the gh CLI is unavailable.
  */
 function checkGitHubActions(recorder, ctx) {
-  const github = ctx.brandConfig.github || {};
+  const github = ctx.brandConfig.repo?.providers?.github || {};
   if (!github.org) return;
 
   const repo = `${github.org}/${github.repo || ctx.brandId}`;

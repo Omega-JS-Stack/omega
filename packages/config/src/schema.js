@@ -32,7 +32,7 @@ const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
-const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
+const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
 
 const SHARED_SCHEMA = [
   // ── brand ────────────────────────────────────────────────────────────────
@@ -163,6 +163,37 @@ const SHARED_SCHEMA = [
     required:    false,
     description: 'Web-push VAPID public key (Firebase console → Cloud Messaging → Web Push certificates). Public by design — it ships to every browser; the private half stays in the console.',
   },
+  {
+    path:        'cloud.shared',
+    type:        'boolean',
+    required:    false,
+    description: 'true = the cloud project is shared with other brands; only per-brand operations run (service-account, sdk-config).',
+  },
+  {
+    path:        'cloud.supportEmail',
+    type:        'string',
+    required:    false,
+    match:       /@/,
+    description: "OAuth consent screen support email. Defaults to the AUTHORIZING user's email — the provider rejects any address the caller doesn't own; set only for an owned Google Group.",
+  },
+  {
+    path:        'cloud.apiSubdomain',
+    type:        'boolean',
+    required:    false,
+    description: 'false = skip the api.{domain} hosting custom domain.',
+  },
+  {
+    path:        'cloud.organizationId',
+    type:        'string|boolean',
+    required:    false,
+    description: 'Cloud organization ID the project is created inside — tri-state: unset = ask at project create, false = no org (standalone), value = create inside it.',
+  },
+  {
+    path:        'cloud.billingAccount',
+    type:        'string|boolean',
+    required:    false,
+    description: "Billing account ('billingAccounts/XXXXXX-XXXXXX-XXXXXX') — tri-state: unset = ask, false = stay on the free tier, value = auto-upgrade.",
+  },
 
   // ── analytics ────────────────────────────────────────────────────────────
   {
@@ -187,31 +218,31 @@ const SHARED_SCHEMA = [
 
   // ── advertising ──────────────────────────────────────────────────────────
   {
-    path:        'advertising.providers.google-adsense.client',
+    path:        'advertising.providers.adsense.client',
     type:        'string',
     required:    false,
     description: 'AdSense publisher client id (ca-pub-…). Presence-driven: set to enable ad units.',
   },
   {
-    path:        'advertising.providers.google-adsense.display-slot',
+    path:        'advertising.providers.adsense.displaySlot',
     type:        'string',
     required:    false,
     description: 'Default AdSense slot id for display units (per-include override wins).',
   },
   {
-    path:        'advertising.providers.google-adsense.in-article-slot',
+    path:        'advertising.providers.adsense.inArticleSlot',
     type:        'string',
     required:    false,
     description: 'Default AdSense slot id for in-article units.',
   },
   {
-    path:        'advertising.providers.google-adsense.in-feed-slot',
+    path:        'advertising.providers.adsense.inFeedSlot',
     type:        'string',
     required:    false,
     description: 'Default AdSense slot id for in-feed units.',
   },
   {
-    path:        'advertising.providers.google-adsense.multiplex-slot',
+    path:        'advertising.providers.adsense.multiplexSlot',
     type:        'string',
     required:    false,
     description: 'Default AdSense slot id for multiplex units.',
@@ -287,6 +318,186 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     description: 'Public OAuth client IDs only — never client secrets.',
+  },
+
+  // ── repo (role: source hosting; provider-discriminated) ─────────────────
+  {
+    path:        'repo.providers.github.org',
+    type:        'string',
+    required:    false,
+    description: "GitHub org/user the brand monorepo lives in. No org → the repo service skips and the site's desktop release URLs stay underived.",
+  },
+  {
+    path:        'repo.providers.github.repo',
+    type:        'string',
+    required:    false,
+    description: 'Brand repo name, or an "owner/name" slug when the repo lives under a different org than repo.providers.github.org. Defaults to brand.id.',
+  },
+  {
+    path:        'repo.providers.github.shared',
+    type:        'boolean',
+    required:    false,
+    description: 'true = the org is shared with other brands; org-level reconciliation is skipped.',
+  },
+  {
+    path:        'repo.providers.github.private',
+    type:        'boolean',
+    required:    false,
+    description: 'Brand repo visibility (default true).',
+  },
+
+  // ── edge (role: CDN/DNS edge; provider-discriminated) ────────────────────
+  {
+    path:        'edge.providers.cloudflare',
+    type:        'object',
+    required:    false,
+    description: 'Cloudflare zone reconciliation (@omega.js/manager cloudflare service): dns, settings, rules, cacheRules, speedTest, workers. Tokens live in .env.',
+  },
+  {
+    path:        'edge.providers.cloudflare.zone',
+    type:        'string',
+    required:    false,
+    description: "Cloudflare zone id. The web build's cache purge (`omega purge`) targets it; unset = purge skips.",
+  },
+
+  // ── captcha (role: bot defense; provider-discriminated) ──────────────────
+  {
+    path:        'captcha.providers.recaptcha.project',
+    type:        'string',
+    required:    false,
+    description: "The brand's OWN GCP project hosting the classic reCAPTCHA key — used only for the console deep-link in guidance. Site/secret keys stay in .env.",
+  },
+  {
+    path:        'captcha.providers.recaptcha.siteKey',
+    type:        'string',
+    required:    false,
+    description: 'Classic reCAPTCHA site key rendered client-side. Public by design — the secret half stays in .env (RECAPTCHA_SECRET_KEY).',
+  },
+
+  // ── forms (role: form handling; provider-discriminated) ──────────────────
+  {
+    path:        'forms.providers.slapform.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the slapform service skips and the contact page has no form endpoint.',
+  },
+  {
+    path:        'forms.providers.slapform.formId',
+    type:        'string',
+    required:    false,
+    description: 'Slapform form id — the contact page posts to https://api.slapform.com/{formId}. Interactive manager runs land it here.',
+  },
+  {
+    path:        'forms.providers.slapform.templateFormId',
+    type:        'string',
+    required:    false,
+    description: 'Existing form the new form is cloned from when the service creates one.',
+  },
+  {
+    path:        'forms.providers.slapform.updateFormInfo',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the form is shared and managed by another brand; its name/settings are left alone.',
+  },
+  {
+    path:        'forms.providers.slapform.plan',
+    type:        'object',
+    required:    false,
+    description: 'Tier granted to the form-owner account ({ id, name }) — Slapform-operator only.',
+  },
+
+  // ── inbound (role: inbound conversations; per-channel providers) ─────────
+  {
+    path:        'inbound.chat.providers.chatsy.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'false = no chat widget boots and the chatsy service skips.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.agentId',
+    type:        'string',
+    required:    false,
+    description: 'Chatsy agent id. The manager writes it back here; @omega.js/client boots the widget from it.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.templateAgentId',
+    type:        'string',
+    required:    false,
+    description: 'Existing agent the new agent is cloned from when the service creates one.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.updateAgentInfo',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the agent is shared and managed by another brand; its settings/knowledge are left alone.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.plan',
+    type:        'object',
+    required:    false,
+    description: 'Tier granted to the agent-owner account ({ id, name }) — Chatsy-operator only.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.sponsorshipsUrl',
+    type:        'string',
+    required:    false,
+    description: "Sponsorship page the baseline knowledge points at. Unset → {website}/contact.",
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.settings',
+    type:        'object',
+    required:    false,
+    description: 'Widget presentation settings passed verbatim to the Chatsy SDK by @omega.js/client.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the replyify service skips.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.agentId',
+    type:        'string',
+    required:    false,
+    description: 'Replyify agent id. Interactive manager runs land it here.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.templateAgentId',
+    type:        'string',
+    required:    false,
+    description: 'Existing agent the new agent is cloned from when the service creates one.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.updateAgentInfo',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the agent is shared and managed by another brand; its filter/knowledge are left alone.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.plan',
+    type:        'object',
+    required:    false,
+    description: 'Tier granted to the agent-owner account ({ id, name }) — Replyify-operator only.',
+  },
+  {
+    path:        'inbound.email.providers.replyify.discount',
+    type:        'object',
+    required:    false,
+    description: 'Discount the baseline knowledge offers ({ code, label }). Unset = no discount section.',
+  },
+
+  // ── search (role: search-engine surfaces; provider-discriminated) ────────
+  {
+    path:        'search.providers.searchConsole.submitSitemap',
+    type:        'boolean',
+    required:    false,
+    description: 'false = skip sitemap submission to Google Search Console.',
+  },
+  {
+    path:        'search.providers.searchConsole.sitemapPaths',
+    type:        'array',
+    required:    false,
+    description: "Sitemap paths submitted as https://{domain}{path} (default ['/sitemap.xml']).",
   },
 
   // ── devlog ───────────────────────────────────────────────────────────────

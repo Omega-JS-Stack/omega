@@ -44,15 +44,20 @@ function tmpRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-fb-'));
 }
 
-function brandConfig({ firebase = {}, gcp = {}, firebaseConfig } = {}) {
+// ONE cloud home (#23): the provisioning fields, the platform-level org +
+// billing account, and the app config all live under `cloud`.
+function brandConfig({ cloud = {}, sdkConfig } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
-    firebase: { ...structuredClone(DEFAULTS.firebase), projectId: PROJECT, ...firebase },
-    gcp: { ...structuredClone(DEFAULTS.gcp), ...gcp },
+    cloud: {
+      ...structuredClone(DEFAULTS.cloud),
+      ...cloud,
+      config: { projectId: PROJECT, ...(sdkConfig || {}), ...(cloud.config || {}) },
+    },
     targets: { web: {}, backend: {} },
   };
-  if (firebaseConfig) {
-    config.cloud = { provider: 'firebase', config: firebaseConfig };
+  if (sdkConfig) {
+    config.cloud.provider = 'firebase';
   }
   return config;
 }
@@ -253,32 +258,32 @@ function stagedRoot() {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('cloud: skips without firebase.projectId', async () => {
+test('cloud: skips without cloud.config.projectId', async () => {
   const config = brandConfig();
-  config.firebase.projectId = null;
+  config.cloud.config.projectId = null;
 
   const result = await runService(config, { firebase: fakeFirebase() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /firebase\.projectId/);
+  assert.match(result.reason, /cloud\.config\.projectId/);
 });
 
-test('cloud: derives projectId from cloud.config when firebase.projectId is absent (framework-first brands)', async () => {
+test('cloud: derives projectId from cloud.config — the ONE home (#23)', async () => {
   const config = brandConfig();
-  config.firebase.projectId = null;
+  config.cloud.config.projectId = null;
   config.cloud = { provider: 'firebase', config: { projectId: PROJECT } };
 
   const result = await runService(config, { firebase: fakeFirebase() });
   assert.notEqual(result.status, 'skipped', 'cloud.config.projectId names the project — no skip');
 });
 
-test('cloud: firebase.enabled = false skips the service', async () => {
-  const config = brandConfig({ firebase: { enabled: false } });
+test('cloud: cloud.enabled = false skips the service', async () => {
+  const config = brandConfig({ cloud: { enabled: false } });
   const result = await runService(config, { firebase: fakeFirebase() });
   assert.equal(result.status, 'skipped');
 });
 
 test('cloud: demo-* project skips (emulator-only — no real cloud to reconcile)', async () => {
-  const config = brandConfig({ firebase: { projectId: 'demo-omega' } });
+  const config = brandConfig({ cloud: { config: { projectId: 'demo-omega' } } });
   const result = await runService(config, { firebase: fakeFirebase() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /demo-\*/);
@@ -292,8 +297,8 @@ test('cloud: skips without GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET', async () => {
 
 test('cloud: shared project only runs service-account + sdk-config', async () => {
   const config = brandConfig({
-    firebase: { shared: true },
-    firebaseConfig: { ...EXPECTED_SDK },
+    cloud: { shared: true },
+    sdkConfig: { ...EXPECTED_SDK },
   });
   const api = fakeFirebase(convergedResponses());
 
@@ -313,8 +318,8 @@ test('cloud: shared project only runs service-account + sdk-config', async () =>
 
 test('cloud: brand.url with a path/port derives a hostname-only domain — authDomain never carries them (cp268)', async () => {
   const config = brandConfig({
-    firebase: { shared: true },
-    firebaseConfig: { ...EXPECTED_SDK },
+    cloud: { shared: true },
+    sdkConfig: { ...EXPECTED_SDK },
   });
   config.brand.url = `https://${DOMAIN}:8443/app`; // schema allows any http(s) URL
   const api = fakeFirebase(convergedResponses());
@@ -331,7 +336,7 @@ test('cloud: brand.url with a path/port derives a hostname-only domain — authD
 // ─── The flagship: converged project = zero-mutation no-op ───────────────────
 
 test('cloud: fully converged project is a zero-mutation no-op across all 13 operations', async () => {
-  const config = brandConfig({ firebaseConfig: { ...EXPECTED_SDK } });
+  const config = brandConfig({ sdkConfig: { ...EXPECTED_SDK } });
   const api = fakeFirebase(convergedResponses());
   const cf = fakeCf({
     records: [{ id: 'c1', type: 'CNAME', name: `api.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: true }],
@@ -468,7 +473,7 @@ test('hosting: no Cloudflare client — verified domain reports without DNS writ
 
 // ─── Billing (de-ITW'd) ──────────────────────────────────────────────────────
 
-test('billing: Spark plan with no gcp.billingAccount warns instead of linking', async () => {
+test('billing: Spark plan with no cloud.billingAccount warns instead of linking', async () => {
   const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
 
@@ -480,10 +485,10 @@ test('billing: Spark plan with no gcp.billingAccount warns instead of linking', 
   assert.ok(result.output.billing.needsInteractive.includes('billing account'));
 });
 
-test('billing: gcp.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
+test('billing: cloud.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
   const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
-  const config = brandConfig({ gcp: { billingAccount: false } });
+  const config = brandConfig({ cloud: { billingAccount: false } });
 
   const result = await handler(handlerContext(config, api));
 
@@ -515,14 +520,14 @@ test('billing: interactive flow lists accounts, lands the pick in omega.json5, l
 
     assert.equal(result.state.billing.enabled, true);
     assert.deepEqual(api.callsTo('linkBillingAccount')[0].args, [PROJECT, 'billingAccounts/FIXTURE-222']);
-    assert.equal(config.gcp.billingAccount, 'billingAccounts/FIXTURE-222');
+    assert.equal(config.cloud.billingAccount, 'billingAccounts/FIXTURE-222');
     assert.ok(readConfigSource(brandRoot).includes('billingAccount: "billingAccounts/FIXTURE-222"'));
   } finally {
     tty.close();
   }
 });
 
-test('billing: interactive opt-out lands gcp.billingAccount: false and stays on Spark', async () => {
+test('billing: interactive opt-out lands cloud.billingAccount: false and stays on Spark', async () => {
   const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
@@ -544,7 +549,7 @@ test('billing: interactive opt-out lands gcp.billingAccount: false and stays on 
 
     assert.equal(result.status, undefined); // success — an opt-out is a clean state
     assert.ok(result.output.billing.note.includes('opted out'));
-    assert.equal(config.gcp.billingAccount, false);
+    assert.equal(config.cloud.billingAccount, false);
     assert.ok(readConfigSource(brandRoot).includes('billingAccount: false'));
     assert.equal(api.mutations().length, 0);
   } finally {
@@ -558,7 +563,7 @@ test('billing: Spark plan with a configured account links it', async () => {
     getProjectBillingInfo: { billingEnabled: false },
     linkBillingAccount: {},
   });
-  const config = brandConfig({ gcp: { billingAccount: 'billingAccounts/MY-OWN' } });
+  const config = brandConfig({ cloud: { billingAccount: 'billingAccounts/MY-OWN' } });
 
   const result = await handler(handlerContext(config, api));
 
@@ -734,16 +739,21 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
 
 // ─── SDK config drift check ──────────────────────────────────────────────────
 
-test('sdk-config: missing omega.json5 cloud.config is written back, comments intact', async () => {
+test('sdk-config: the missing omega.json5 cloud.config keys are written back, comments intact', async () => {
   const handler = require('../src/services/cloud/ensure/sdk-config.js');
   const api = fakeFirebase(convergedResponses());
   const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
 
-  const result = await handler(handlerContext(brandConfig(), api, { brandRoot })); // no cloud.config in config
+  // The fixture's cloud.config carries only projectId (its ONE home, #23) —
+  // every other SDK key is missing and must land.
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot }));
 
   assert.equal(result.status, undefined); // drift healed — success, not warned
   assert.deepEqual(result.state.sdkConfig, EXPECTED_SDK);
-  assert.deepEqual(result.output.sdkConfig.updated.slice().sort(), Object.keys(EXPECTED_SDK).filter((k) => EXPECTED_SDK[k]).sort());
+  assert.deepEqual(
+    result.output.sdkConfig.updated.slice().sort(),
+    Object.keys(EXPECTED_SDK).filter((k) => EXPECTED_SDK[k] && k !== 'projectId').sort(),
+  );
   assert.equal(api.callsTo('createWebApp').length, 0);
 
   const written = readConfigSource(brandRoot);
@@ -806,10 +816,10 @@ test('hosting: missing domain is created, ownership TXT + unproxied CNAME writte
   assert.ok(!writes.some((w) => w.body?.type === 'A')); // A records skipped
 });
 
-test('hosting: firebase.apiSubdomain = false skips without touching anything', async () => {
+test('hosting: cloud.apiSubdomain = false skips without touching anything', async () => {
   const handler = require('../src/services/cloud/ensure/hosting.js');
   const api = fakeFirebase({});
-  const config = brandConfig({ firebase: { apiSubdomain: false } });
+  const config = brandConfig({ cloud: { apiSubdomain: false } });
 
   const result = await handler(handlerContext(config, api));
 
@@ -820,7 +830,7 @@ test('hosting: firebase.apiSubdomain = false skips without touching anything', a
 // ─── Dry run: drifted everywhere, zero mutations ─────────────────────────────
 
 test('cloud: dry-run on a fully drifted project performs zero mutations', async () => {
-  const config = brandConfig({ gcp: { billingAccount: 'billingAccounts/MY-OWN' } });
+  const config = brandConfig({ cloud: { billingAccount: 'billingAccounts/MY-OWN' } });
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
     listEnabledServices: [],
@@ -878,7 +888,7 @@ test('oauth-consent: config supportEmail (owned Google Group) wins; no email at 
   });
   await ensureOAuthConsent({
     firebaseApi: grp,
-    brandConfig: brandConfig({ firebase: { supportEmail: 'team@groups.example.com' } }),
+    brandConfig: brandConfig({ cloud: { supportEmail: 'team@groups.example.com' } }),
     projectId: PROJECT,
     domain: DOMAIN,
   });
@@ -898,8 +908,7 @@ const { resolveFirebaseProject } = require('../src/services/cloud/lib/project-fl
 const PROJECT_FLOW_CONFIG = `{
   // Fixture Brand — firebase writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  firebase: {}, // projectId lands next to this
-  gcp: { organizationId: "123456789" },
+  cloud: { organizationId: "123456789" }, // projectId lands under cloud.config
 }
 `;
 
@@ -910,13 +919,12 @@ function projectFlowContext(brandRoot) {
     options: {},
     brandConfig: {
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-      firebase: {},
-      gcp: { organizationId: '123456789' },
+      cloud: { organizationId: '123456789' },
     },
   };
 }
 
-test('project-flow: selecting an existing project lands firebase.projectId in omega.json5', async () => {
+test('project-flow: selecting an existing project lands cloud.config.projectId in omega.json5', async () => {
   const api = {
     listProjects: async () => [
       { projectId: 'other-proj', displayName: 'Other' },
@@ -935,10 +943,10 @@ test('project-flow: selecting an existing project lands firebase.projectId in om
     const projectId = await run;
 
     assert.equal(projectId, 'fixture-brand');
-    assert.equal(context.brandConfig.firebase.projectId, 'fixture-brand');
+    assert.equal(context.brandConfig.cloud.config.projectId, 'fixture-brand');
     const written = readConfigSource(brandRoot);
     assert.ok(written.includes('projectId: "fixture-brand"'));
-    assert.ok(written.includes('// projectId lands next to this'));
+    assert.ok(written.includes('// projectId lands under cloud.config'));
   } finally {
     tty.close();
   }
@@ -987,7 +995,7 @@ test('project-flow: create-new with no org configured asks — the picked org la
   };
   const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
   const context = projectFlowContext(brandRoot);
-  delete context.brandConfig.gcp.organizationId; // unset → tri-state asks
+  delete context.brandConfig.cloud.organizationId; // unset → tri-state asks
   const tty = openTtyPrompt();
 
   try {
@@ -1008,7 +1016,7 @@ test('project-flow: create-new with no org configured asks — the picked org la
   }
 });
 
-test('project-flow: org opt-out creates the project standalone and lands gcp.organizationId: false (#33)', async () => {
+test('project-flow: org opt-out creates the project standalone and lands cloud.organizationId: false (#33)', async () => {
   const created = [];
   const api = {
     listProjects: async () => [],
@@ -1022,7 +1030,7 @@ test('project-flow: org opt-out creates the project standalone and lands gcp.org
   };
   const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
   const context = projectFlowContext(brandRoot);
-  delete context.brandConfig.gcp.organizationId;
+  delete context.brandConfig.cloud.organizationId;
   const tty = openTtyPrompt();
 
   try {
@@ -1041,7 +1049,7 @@ test('project-flow: org opt-out creates the project standalone and lands gcp.org
     assert.deepEqual(created, [{ projectId: 'fixture-brand', displayName: 'Fixture Brand', organizationId: null }]);
     const written = readConfigSource(brandRoot);
     assert.ok(written.includes('organizationId: false'));
-    assert.equal(context.brandConfig.gcp.organizationId, false);
+    assert.equal(context.brandConfig.cloud.organizationId, false);
   } finally {
     tty.close();
   }

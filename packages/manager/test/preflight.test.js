@@ -78,7 +78,7 @@ function stageTokenStore(tokens) {
 // ─── checkService: when-gates + env + scopes ────────────────────────────────
 
 test('preflight: service when-gate false → no finding (disabled cloudflare)', () => {
-  const finding = checkService('cloudflare', REQUIRES.cloudflare, { cloudflare: { enabled: false } }, EMPTY_STORE);
+  const finding = checkService('cloudflare', REQUIRES.cloudflare, { edge: { providers: { cloudflare: { enabled: false } } } }, EMPTY_STORE);
   assert.equal(finding, null);
 });
 

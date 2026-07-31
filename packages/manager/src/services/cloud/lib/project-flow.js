@@ -1,11 +1,11 @@
 /**
  * Interactive Firebase project selection/creation (config-landing flow):
- * when firebase.projectId is missing in an interactive run, pick from the
+ * when cloud.config.projectId is missing in an interactive run, pick from the
  * projects the authed user can see, or create one — project id + display
  * name prompted (brand id/name as defaults), with the 30-project quota
  * shown. The chosen id lands in omega.json5 (comment-preserving writeback).
  *
- * The organization is tri-state (#33): gcp.organizationId set → the
+ * The organization is tri-state (#33): cloud.organizationId set → the
  * project is created inside it (that's what gives the compute service
  * account its default roles); `false` → standalone, no questions; missing →
  * pick from the orgs the authed user can see or opt out — either answer
@@ -30,7 +30,7 @@ const PROJECT_ID_PATTERN = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
  */
 async function resolveOrganization(context, api) {
   return resolveConfigValue(context, {
-    path: 'gcp.organizationId',
+    path: 'cloud.organizationId',
     label: 'Google Cloud organization',
     gate: false,
     message: 'Create the project inside a Google Cloud organization?',
@@ -50,7 +50,7 @@ async function resolveOrganization(context, api) {
  */
 async function resolveFirebaseProject(context, api) {
   return resolveConfigValue(context, {
-    path: 'firebase.projectId',
+    path: 'cloud.config.projectId',
     label: 'Firebase project',
     choices: () => api.listProjects(),
     getName: (project) => `${project.displayName} (${project.projectId})`,

@@ -2,7 +2,7 @@
  * Test: GET /content/post
  * Tests the content fetch post endpoint
  * Fetches blog post content from GitHub
- * Requires GitHub API key and a resolvable github repo (github.repo slug or github.org + brand.id)
+ * Requires GitHub API key and a resolvable github repo (targets.backend.github.repo slug or repo.providers.github.org + brand.id)
  */
 module.exports = {
   description: 'General fetch post from GitHub',

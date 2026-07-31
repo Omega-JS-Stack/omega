@@ -28,7 +28,7 @@ function fakeBrand(id, { org = 'fixture-org', repo, name, url } = {}) {
     id,
     config: {
       brand: { id, name: name ?? `${id} brand`, url: url ?? `https://${id}.test` },
-      github: { org, repo },
+      repo: { providers: { github: { org, repo } } },
     },
   };
 }
@@ -103,7 +103,7 @@ function devlogConfig(id, { enabled = true, org = 'fixture-org' } = {}) {
   return `{
   brand: { id: '${id}', name: '${id} brand', url: 'https://${id}.test' },
   targets: { web: {} },
-  github: { org: '${org}' },
+  repo: { providers: { github: { org: '${org}' } } },
   devlog: { enabled: ${enabled}, orgs: ['${org}'] },
 }`;
 }
@@ -242,7 +242,7 @@ function brandConfigFor(id, overrides = {}) {
   return {
     brand: { id, name: `${id} brand`, url: `https://${id}.test`, description: 'We build things.' },
     devlog: { ...DEFAULTS.devlog, enabled: true, orgs: ['fixture-org'], ...overrides },
-    github: { org: 'fixture-org' },
+    repo: { providers: { github: { org: 'fixture-org' } } },
   };
 }
 

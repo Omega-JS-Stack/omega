@@ -40,7 +40,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * @returns {{ url: string|null, hostnames: string[], gated: string|null }} - `gated` is the skip reason when live checks must not run.
  */
 function resolveVerifySurface(brandConfig) {
-  const projectId = brandConfig?.firebase?.projectId || brandConfig?.cloud?.config?.projectId;
+  const projectId = brandConfig?.cloud?.config?.projectId;
   if (!projectId) {
     return { url: null, hostnames: [], gated: 'no cloud project configured — no live surface to verify' };
   }

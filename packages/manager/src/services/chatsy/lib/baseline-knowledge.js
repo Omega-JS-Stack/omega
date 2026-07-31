@@ -6,7 +6,7 @@
  *
  * Placeholders: {website} (brand.url), {description} (brand.description),
  * {pricing} (generated from payment.products), and {sponsorshipsUrl}
- * (chatsy.sponsorshipsUrl, default {website}/contact — omega-manager
+ * (inbound.chat.providers.chatsy.sponsorshipsUrl, default {website}/contact — omega-manager
  * hardcoded the company sponsorship page here).
  */
 const { join } = require('node:path');
@@ -112,7 +112,7 @@ function getBaselineKnowledge(brandConfig) {
   const websiteUrl = brandConfig.brand.url;
   const pricing = generatePricing(brandConfig);
   const description = brandConfig.brand.description || brandConfig.brand.name;
-  const sponsorshipsUrl = brandConfig.chatsy?.sponsorshipsUrl || `${websiteUrl}/contact`;
+  const sponsorshipsUrl = brandConfig.inbound?.chat?.providers?.chatsy?.sponsorshipsUrl || `${websiteUrl}/contact`;
 
   return BASELINE_KNOWLEDGE
     .replace('{description}', description)

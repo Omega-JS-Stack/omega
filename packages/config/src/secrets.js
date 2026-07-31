@@ -12,7 +12,7 @@
 // Suffix-anchored shapes: *secret / *password / *token / *credential(s) /
 // secretKey / secret_key / privateKey / private_key (+ _id — the pasted
 // service-account JSON classic). Public credentials stay non-matching by
-// design: publishableKey, clientId, apiKey, vapidKey, site-key.
+// design: publishableKey, clientId, apiKey, vapidKey, siteKey.
 const SECRET_KEY_PATTERN = /(secret|password|passwd|token|credentials?|(secret|private)[_-]?key([_-]?id)?)$/i;
 
 function walk(node, path, found) {

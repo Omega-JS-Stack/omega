@@ -71,7 +71,7 @@ module.exports = async function ensureChat(context) {
   const agent = await db.getDoc(`agents/${agentId}`);
 
   if (!agent) {
-    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Chatsy — check chatsy.agentId (agents are created at ${chalk.cyan('https://chatsy.ai')})`);
+    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Chatsy — check inbound.chat.providers.chatsy.agentId (agents are created at ${chalk.cyan('https://chatsy.ai')})`);
     return { status: 'error', error: `agent ${agentId} not found` };
   }
 

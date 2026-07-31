@@ -9,10 +9,13 @@
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment`,
  *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`,
- *   flat `advertising.<provider>` → `advertising.providers.<provider>`.
+ *   flat `advertising.<provider>` → `advertising.providers.<provider>`
+ *   (`google-adsense` → `adsense` + camelCase slots — #23),
+ *   `recaptcha` → `captcha.providers.recaptcha` (camelCase sub-keys),
+ *   `cloudflare` → `edge.providers.cloudflare`.
  * - Everything web-only under `targets.web`: presentation sections (meta,
- *   socials, download, extension, favicon, manifest, icons, recaptcha,
- *   cloudflare, translation), blog/engine config (permalink, pagination,
+ *   socials, download, extension, favicon, manifest, icons,
+ *   translation), blog/engine config (permalink, pagination,
  *   collections, defaults, generators — codemod rule 8's home), the
  *   remaining `web_manager` client-settings blob (renamed `client` on the way
  *   out — #1: WebManager is not an OMEGA concept), and the UJM-json build
@@ -40,9 +43,32 @@ const DROPPED_JEKYLL_KEYS = [
 // _config.yml sections that stay web-scoped (targets.web), in output order
 const WEB_SECTION_ORDER = [
   'meta', 'socials', 'download', 'extension', 'favicon', 'manifest', 'icons',
-  'recaptcha', 'cloudflare', 'translation', 'permalink', 'pagination',
+  'translation', 'permalink', 'pagination',
   'collections', 'defaults', 'generators', 'client',
 ];
+
+// Legacy kebab-case sub-keys → the camelCase names every OMEGA config key uses (#23)
+const ADSENSE_SLOT_KEYS = {
+  'display-slot': 'displaySlot',
+  'in-article-slot': 'inArticleSlot',
+  'in-feed-slot': 'inFeedSlot',
+  'multiplex-slot': 'multiplexSlot',
+};
+const RECAPTCHA_KEYS = { 'site-key': 'siteKey' };
+
+/**
+ * Copy an object with the named keys renamed, order preserved.
+ * @param {object} object - source object
+ * @param {Record<string, string>} map - old key → new key
+ * @returns {object}
+ */
+function renameKeys(object, map) {
+  const out = {};
+  for (const [key, value] of Object.entries(object)) {
+    out[map[key] || key] = value;
+  }
+  return out;
+}
 
 /**
  * True for values that carry no information (null/undefined/{}/[]).
@@ -110,10 +136,32 @@ function convertConfig({ jekyll, ujm }) {
     if (!isEmpty(providers)) omega.analytics = { providers };
   }
 
-  // ---- advertising: legacy flat providers → role-keyed providers shape
+  // ---- advertising: legacy flat providers → role-keyed providers shape.
+  // The provider id drops its vendor prefix and every slot key goes camelCase
+  // (#23) — the legacy world spelled both the other way.
   const advertising = take('advertising');
   if (!isEmpty(advertising)) {
-    omega.advertising = advertising.providers ? advertising : { providers: advertising };
+    const providers = advertising.providers ? { ...advertising.providers } : { ...advertising };
+    if (providers['google-adsense']) {
+      providers.adsense = providers['google-adsense'];
+      delete providers['google-adsense'];
+    }
+    if (providers.adsense) {
+      providers.adsense = renameKeys(providers.adsense, ADSENSE_SLOT_KEYS);
+    }
+    omega.advertising = { ...(advertising.providers ? advertising : {}), providers };
+  }
+
+  // ---- recaptcha → captcha.providers.recaptcha (camelCase sub-keys, #23)
+  const recaptcha = take('recaptcha');
+  if (!isEmpty(recaptcha)) {
+    omega.captcha = { providers: { recaptcha: renameKeys(recaptcha, RECAPTCHA_KEYS) } };
+  }
+
+  // ---- cloudflare → edge.providers.cloudflare (#23)
+  const cloudflare = take('cloudflare');
+  if (!isEmpty(cloudflare)) {
+    omega.edge = { providers: { cloudflare } };
   }
 
   if (!isEmpty(legacyWebManager.payment)) {

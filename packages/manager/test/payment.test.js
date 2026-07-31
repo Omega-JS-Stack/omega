@@ -100,7 +100,7 @@ function brandConfig({ url = BRAND_URL, products = makeProducts(), payment = {},
       contact: { email: CONTACT_EMAIL },
       images: brandmark ? { brandmark } : {},
     },
-    firebase: { shared: false, ...firebase },
+    cloud: { shared: false, ...firebase },
     payment: {
       ...paymentDefaults,
       ...payment,

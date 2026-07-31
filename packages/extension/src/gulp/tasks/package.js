@@ -100,7 +100,14 @@ async function generateBuildJs(outputDir) {
         },
 
         cookieConsent: { enabled: true, config: {} },
-        chatsy: { enabled: true, config: {} },
+        inbound: (() => {
+          // Curated to the leaves the client runtime reads (#23) — the provisioning-only
+          // siblings (template ids, plan, update flags) never ship in the bundle
+          const chatsy = config.inbound?.chat?.providers?.chatsy;
+          return { chat: { providers: { chatsy: chatsy
+            ? { enabled: chatsy.enabled, agentId: chatsy.agentId, settings: chatsy.settings }
+            : { enabled: false } } } };
+        })(),
         sentry: {
           enabled: !!(sentryConfig.dsn),
           config: sentryConfig,

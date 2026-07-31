@@ -1,6 +1,6 @@
 // Shared reCAPTCHA v3 management — lazy script load + token mint for any
 // public form that posts to a recaptcha-gated backend route (checkout
-// payment intent, newsletter capture). Site key: omega.config.recaptcha['site-key'].
+// payment intent, newsletter capture). Site key: omega.config.captcha.providers.recaptcha.siteKey.
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 

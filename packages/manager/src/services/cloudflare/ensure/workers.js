@@ -1,5 +1,5 @@
 /**
- * Ensure Workers + routes match `cloudflare.workers`
+ * Ensure Workers + routes match `edge.providers.cloudflare.workers`
  * [{ name, route, script, env }] — script is a filename in this service's
  * workers/ dir; route supports `{ domain }` templating.
  *
@@ -41,7 +41,7 @@ module.exports = async function ensureWorkers(context) {
   if (gated) return gated;
 
   // === DIFF config presence first — reads are pointless without any config ===
-  const workersConfig = brandConfig?.cloudflare?.workers;
+  const workersConfig = brandConfig?.edge?.providers?.cloudflare?.workers;
   if (!workersConfig || workersConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No workers configured')}`);
     return;

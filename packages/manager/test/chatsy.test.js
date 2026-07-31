@@ -10,7 +10,8 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, mkdirSync, writeFileSync } = require('node:fs');
+const fs = require('node:fs');
+const { mkdtempSync, mkdirSync, writeFileSync } = fs;
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
@@ -36,9 +37,15 @@ const OWNER_UID = 'uid_owner1';
 function brandConfig({ chatsy = {}, targets = { web: {}, backend: {} }, images = { brandmark: BRANDMARK }, products } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: URL, description: DESCRIPTION, images },
-    chatsy: chatsy === false
-      ? false
-      : { ...structuredClone(DEFAULTS.chatsy), agentId: AGENT_ID, ...chatsy },
+    inbound: {
+      chat: {
+        providers: {
+          chatsy: chatsy === false
+            ? false
+            : { ...structuredClone(DEFAULTS.inbound.chat.providers.chatsy), agentId: AGENT_ID, ...chatsy },
+        },
+      },
+    },
     payment: { products: products || [{ id: 'plus', name: 'Plus', type: 'subscription', prices: { monthly: 10, annually: 100 }, trial: { days: 14 } }] },
     targets,
   };
@@ -124,12 +131,41 @@ test('chatsy: registered after slapform with the chat + user operations', () => 
   assert.deepEqual(OPERATIONS.chatsy.map((o) => o.name), ['chat', 'user']);
 });
 
+// #23 D4 — ONE chatsy home. The dotted path pinned here is the SAME string
+// @omega.js/client reads (pinned on that side in packages/web's
+// test/config-rekey.test.js): rename one without the other and both break.
+test('chatsy: the agent id lands at inbound.chat.providers.chatsy.agentId — the path the client reads', () => {
+  const source = fs.readFileSync(require.resolve('../src/services/chatsy/index.js'), 'utf8');
+
+  assert.ok(
+    source.includes("landValue(context, 'inbound.chat.providers.chatsy.agentId'"),
+    'the mint writeback lands the ONE path',
+  );
+  assert.ok(
+    source.includes("path: 'inbound.chat.providers.chatsy.agentId'"),
+    'the interactive flow lands the ONE path',
+  );
+  assert.ok(
+    source.includes("disablePath: 'inbound.chat.providers.chatsy'"),
+    'Disable writes false at the section, not at a stale top-level key',
+  );
+  assert.ok(!/'chatsy\.agentId'/.test(source), 'no bare chatsy.* path survives');
+});
+
+test('chatsy: the widget settings share the provisioning home — schema-declared, one place', () => {
+  const { SHARED_SCHEMA } = require('@omega.js/config');
+  const paths = SHARED_SCHEMA.map((entry) => entry.path);
+
+  assert.ok(paths.includes('inbound.chat.providers.chatsy.agentId'));
+  assert.ok(paths.includes('inbound.chat.providers.chatsy.settings'));
+});
+
 test('chatsy: defaults carry no agentId, Chatsy\'s top tier, and no company sponsorship URL', () => {
-  assert.equal(DEFAULTS.chatsy.enabled, true);
-  assert.equal(DEFAULTS.chatsy.updateAgentInfo, true);
-  assert.equal(DEFAULTS.chatsy.agentId, null);
-  assert.deepEqual(DEFAULTS.chatsy.plan, { id: 'max', name: 'Max' });
-  assert.equal(DEFAULTS.chatsy.sponsorshipsUrl, null);
+  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
+  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.updateAgentInfo, true);
+  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.agentId, null);
+  assert.deepEqual(DEFAULTS.inbound.chat.providers.chatsy.plan, { id: 'max', name: 'Max' });
+  assert.equal(DEFAULTS.inbound.chat.providers.chatsy.sponsorshipsUrl, null);
 });
 
 // ─── Baseline knowledge generation ───────────────────────────────────────────
@@ -173,13 +209,13 @@ test('chatsy: the sponsorships URL is config — default {website}/contact, not 
 test('chatsy: chatsy.enabled = false skips the service', async () => {
   const result = await runService(brandConfig({ chatsy: { enabled: false } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /chatsy\.enabled/);
+  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.enabled/);
 });
 
 test('chatsy: scalar chatsy: false skips the service', async () => {
   const result = await runService(brandConfig({ chatsy: false }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /chatsy\.enabled/);
+  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.enabled/);
 });
 
 test('chatsy: a shared agent managed by another brand skips the service', async () => {
@@ -197,7 +233,7 @@ test('chatsy: skips without a web target (the widget lives on the website)', asy
 test('chatsy: skips without chatsy.agentId', async () => {
   const result = await runService(brandConfig({ chatsy: { agentId: null } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /chatsy\.agentId/);
+  assert.match(result.reason, /inbound\.chat\.providers\.chatsy\.agentId/);
 });
 
 test('chatsy: skips without CHATSY_SERVICE_ACCOUNT in .env', async () => {
@@ -388,7 +424,7 @@ const DOWN_KEY = '\x1B[B';
 const WRITEBACK_CONFIG = `{
   // Fixture Brand — chatsy writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  chatsy: { enabled: true }, // agentId lands here
+  inbound: { chat: { providers: { chatsy: { enabled: true } } } }, // agentId lands here
 }
 `;
 
@@ -428,7 +464,7 @@ test('setup: interactive Disable writes chatsy: false and skips the service', as
     const result = await run;
 
     assert.equal(result.status, 'skipped');
-    assert.ok(readConfigSource(brandRoot).includes('chatsy: false, // agentId lands here'));
+    assert.ok(readConfigSource(brandRoot).includes('inbound: { chat: { providers: { chatsy: false } } }, // agentId lands here'));
   } finally {
     tty.close();
   }
@@ -454,7 +490,7 @@ test('chatsy 2b: missing agentId + SA + template donor mints the brand-owned age
   config.brand.contact = { email: 'support@fixture-brand.test' };
   const brandRoot = makeBrandRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  chatsy: { enabled: true, templateAgentId: "tmplAgent1" },
+  inbound: { chat: { providers: { chatsy: { enabled: true, templateAgentId: "tmplAgent1" } } } },
 }
 `);
 

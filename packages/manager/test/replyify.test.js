@@ -35,9 +35,15 @@ const OWNER_UID = 'uid_owner1';
 function brandConfig({ replyify = {}, targets = { web: {}, backend: {} } } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: URL, description: DESCRIPTION },
-    replyify: replyify === false
-      ? false
-      : { ...structuredClone(DEFAULTS.replyify), agentId: AGENT_ID, ...replyify },
+    inbound: {
+      email: {
+        providers: {
+          replyify: replyify === false
+            ? false
+            : { ...structuredClone(DEFAULTS.inbound.email.providers.replyify), agentId: AGENT_ID, ...replyify },
+        },
+      },
+    },
     targets,
   };
 }
@@ -121,11 +127,11 @@ test('replyify: registered after chatsy with the agent + user operations', () =>
 });
 
 test('replyify: defaults carry no agentId, Replyify\'s top tier, and no discount', () => {
-  assert.equal(DEFAULTS.replyify.enabled, true);
-  assert.equal(DEFAULTS.replyify.updateAgentInfo, true);
-  assert.equal(DEFAULTS.replyify.agentId, null);
-  assert.deepEqual(DEFAULTS.replyify.plan, { id: 'max', name: 'Max' });
-  assert.equal(DEFAULTS.replyify.discount, null);
+  assert.equal(DEFAULTS.inbound.email.providers.replyify.enabled, true);
+  assert.equal(DEFAULTS.inbound.email.providers.replyify.updateAgentInfo, true);
+  assert.equal(DEFAULTS.inbound.email.providers.replyify.agentId, null);
+  assert.deepEqual(DEFAULTS.inbound.email.providers.replyify.plan, { id: 'max', name: 'Max' });
+  assert.equal(DEFAULTS.inbound.email.providers.replyify.discount, null);
 });
 
 // ─── Baseline generation ─────────────────────────────────────────────────────
@@ -189,13 +195,13 @@ test('replyify: parseKnowledgeFile handles all four file formats', () => {
 test('replyify: replyify.enabled = false skips the service', async () => {
   const result = await runService(brandConfig({ replyify: { enabled: false } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /replyify\.enabled/);
+  assert.match(result.reason, /inbound\.email\.providers\.replyify\.enabled/);
 });
 
 test('replyify: scalar replyify: false skips the service', async () => {
   const result = await runService(brandConfig({ replyify: false }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /replyify\.enabled/);
+  assert.match(result.reason, /inbound\.email\.providers\.replyify\.enabled/);
 });
 
 test('replyify: a shared agent managed by another brand skips the service', async () => {
@@ -213,7 +219,7 @@ test('replyify: skips without a backend target (the agent answers the backend\'s
 test('replyify: skips without replyify.agentId', async () => {
   const result = await runService(brandConfig({ replyify: { agentId: null } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /replyify\.agentId/);
+  assert.match(result.reason, /inbound\.email\.providers\.replyify\.agentId/);
 });
 
 test('replyify: skips without REPLYIFY_SERVICE_ACCOUNT in .env', async () => {
@@ -404,7 +410,7 @@ test('setup: interactive run lands the pasted agent id in omega.json5 and procee
   const db = fakeDb(convergedResponses(config));
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  replyify: { enabled: true }, // agentId lands here
+  inbound: { email: { providers: { replyify: { enabled: true } } } }, // agentId lands here
 }
 `);
   const opened = [];
@@ -448,7 +454,7 @@ test('replyify 2b: missing agentId + SA + template donor mints the brand-owned a
   config.brand.contact = { email: 'support@fixture-brand.test' };
   const brandRoot = makeRoot(`{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  replyify: { enabled: true, templateAgentId: "tmplAgent1" },
+  inbound: { email: { providers: { replyify: { enabled: true, templateAgentId: "tmplAgent1" } } } },
 }
 `);
 

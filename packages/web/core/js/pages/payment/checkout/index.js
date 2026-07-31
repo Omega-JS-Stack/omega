@@ -94,7 +94,7 @@ async function initializeCheckout() {
     // Parallel fetch: trial eligibility + reCAPTCHA
     const [trialResult, recaptchaResult] = await Promise.allSettled([
       fetchTrialEligibility(),
-      initializeRecaptcha(omega.config?.recaptcha?.['site-key']),
+      initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey),
     ]);
 
     /* @dev-only:start */

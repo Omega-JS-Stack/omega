@@ -21,10 +21,10 @@ const { RecaptchaAPI } = require('./lib/recaptcha-api.js');
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const recaptchaConfig = context.brandConfig.recaptcha || {};
+    const recaptchaConfig = context.brandConfig.captcha?.providers?.recaptcha || {};
 
     if (recaptchaConfig.enabled === false) {
-      return { skip: true, reason: 'recaptcha.enabled = false' };
+      return { skip: true, reason: 'captcha.providers.recaptcha.enabled = false' };
     }
 
     const url = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '');

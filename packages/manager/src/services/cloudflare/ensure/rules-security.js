@@ -1,5 +1,5 @@
 /**
- * Ensure custom firewall rules match `cloudflare.rules.security`.
+ * Ensure custom firewall rules match `edge.providers.cloudflare.rules.security`.
  *
  * 1. Reads the http_request_firewall_custom entrypoint ruleset (and managed for cache only).
  * 2. Diffs each configured rule by description (name) — creates/updates `skip`-style rules.
@@ -29,7 +29,7 @@ module.exports = async function ensureRulesSecurity(context) {
   });
 
   // === DIFF ===
-  const securityRulesConfig = brandConfig?.cloudflare?.rules?.security;
+  const securityRulesConfig = brandConfig?.edge?.providers?.cloudflare?.rules?.security;
   if (!securityRulesConfig || !Array.isArray(securityRulesConfig) || securityRulesConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

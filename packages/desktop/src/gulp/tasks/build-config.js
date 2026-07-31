@@ -73,13 +73,13 @@ module.exports = function buildConfig(done) {
     }
 
     // Inject `publish` from `releases` config. Owner: explicit releases.owner
-    // → the brand's github.org (config-first — a brand-monorepo app has no
+    // → the brand's repo.providers.github.org (config-first — a brand-monorepo app has no
     // git remote of its own, the cp142 rehearsal catch) → git discovery.
     // Without a publish block electron-builder's update-info step crashes on
     // a null publish config, so resolving from config isn't cosmetic.
     if (config.releases?.enabled !== false) {
       const releases = config.releases || {};
-      let releaseOwner = releases.owner || config.github?.org;
+      let releaseOwner = releases.owner || config.repo?.providers?.github?.org;
       if (!releaseOwner) {
         try {
           const { discoverRepo } = require('../../utils/github.js');

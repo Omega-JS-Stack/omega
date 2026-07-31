@@ -22,7 +22,7 @@ const PROBE_TOKEN = 'omega-manager-secret-validation-probe';
 module.exports = async function ensureSiteKey(context) {
   const { recaptchaApi, siteKey, domain, brandConfig, serviceData = {}, options = {} } = context;
 
-  const consoleUrl = buildConsoleUrl(siteKey, brandConfig.recaptcha?.project);
+  const consoleUrl = buildConsoleUrl(siteKey, brandConfig.captcha?.providers?.recaptcha?.project);
 
   console.log(`      ${chalk.dim('→')} Validating reCAPTCHA secret key...`);
   const verification = await recaptchaApi.verify(PROBE_TOKEN);
@@ -67,7 +67,7 @@ module.exports = async function ensureSiteKey(context) {
 };
 
 function buildConsoleUrl(siteKey, project) {
-  // omega-manager hardcoded the company GCP project here; recaptcha.project
+  // omega-manager hardcoded the company GCP project here; captcha.providers.recaptcha.project
   // is config now. Without it, the classic admin console lists your keys
   // (it deep-links by internal numeric ID, not site key, so no key in the URL)
   if (project) {

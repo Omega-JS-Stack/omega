@@ -318,7 +318,7 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
   const fetch = fakeFetch({});
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ firebase: { shared: true }, targets: { backend: {} } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ cloud: { shared: true }, targets: { backend: {} } }), { root, apps, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(fetch.calls, []);
@@ -460,7 +460,7 @@ test('testing: GitHub Actions success — exact gh command, repo defaults to bra
     [GH_CMD]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ github: { org: 'sandbox-org' } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, apps, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.ok(report.output.results.passed.includes('GitHub Actions'));
@@ -478,7 +478,7 @@ test('testing: github.repo overrides the repo name in the gh command', async () 
   });
 
   const report = await runService(
-    brandConfig({ github: { org: 'sandbox-org', repo: 'custom-repo' } }),
+    brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'custom-repo' } } } }),
     { root, apps, fetch, exec },
   );
 
@@ -495,7 +495,7 @@ test('testing: failed GitHub Actions run → error', async () => {
     [GH_CMD]: '[{"status":"completed","conclusion":"failure","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ github: { org: 'sandbox-org' } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, apps, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [
@@ -507,7 +507,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
   const root = stageBrand();
   const apps = [stageWebApp(root)];
 
-  const inProgress = await runService(brandConfig({ github: { org: 'sandbox-org' } }), {
+  const inProgress = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
     root,
     apps,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -518,7 +518,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
     { name: 'GitHub Actions', warning: 'Build → in progress' },
   ]);
 
-  const unavailable = await runService(brandConfig({ github: { org: 'sandbox-org' } }), {
+  const unavailable = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
     root,
     apps,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -539,7 +539,7 @@ test('testing: dry-run — zero network, local checks still run', async () => {
   const exec = fakeExec({ [GIT_CMD]: '' });
 
   const report = await runService(
-    brandConfig({ github: { org: 'sandbox-org' } }),
+    brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }),
     { root, apps, fetch, exec, options: { dryRun: true } },
   );
 

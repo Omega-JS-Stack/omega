@@ -42,7 +42,7 @@ module.exports.run = createServiceRunner({
     }
 
     // Shared Firebase project — the owning brand manages accounts
-    if (context.brandConfig.firebase?.shared === true) {
+    if (context.brandConfig.cloud?.shared === true) {
       return { skip: true, reason: 'shared Firebase project' };
     }
 

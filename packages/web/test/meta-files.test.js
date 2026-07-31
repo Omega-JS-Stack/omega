@@ -21,7 +21,7 @@ let pages;
 before(async () => {
   pages = await buildWith({
     ...miniData,
-    advertising: { providers: { 'google-adsense': { client: 'ca-pub-1234567890' } } },
+    advertising: { providers: { adsense: { client: 'ca-pub-1234567890' } } },
     socials: { twitter: 'https://twitter.com/minico' },
   }, {}, 'meta-files');
 });

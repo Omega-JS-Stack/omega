@@ -27,7 +27,7 @@ const powertools = require('node-powertools');
  * Generate an article via the Ghostii API.
  *
  * @param {object} args
- * @param {object} args.brand - Public brand config ({ brand: { url, ... }, github: { ... } })
+ * @param {object} args.brand - Public brand config ({ brand: { url, ... }, repo: { ... } })
  * @param {string} args.description - The article brief / prompt content
  * @param {string[]} [args.links] - Optional links to inject into the article body
  * @param {string} [args.sourceContent] - Reference article text for source-based generation

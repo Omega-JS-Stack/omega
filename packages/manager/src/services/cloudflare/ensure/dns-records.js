@@ -1,5 +1,5 @@
 /**
- * Ensure DNS records match `cloudflare.dns` plus the platform record set
+ * Ensure DNS records match `edge.providers.cloudflare.dns` plus the platform record set
  * (GitHub Pages, www, email-provider MX/SPF, DMARC; BIMI/SendGrid only when
  * configured — see lib/dns-records-helpers.js).
  *

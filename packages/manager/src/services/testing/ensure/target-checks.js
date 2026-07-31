@@ -13,7 +13,7 @@
  *   (all)    → package.json, framework version when declared
  *
  * Repo-level (once): working tree clean, latest GitHub Actions run (only
- * with github.org configured).
+ * with repo.providers.github.org configured).
  *
  * The output shape matches omega-manager's testing service so RunSummary's
  * drill-down works unchanged. Data problems roll up honestly: any failed

@@ -36,7 +36,7 @@ const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureHosting(context) {
   const { firebaseApi: api, cloudflareApi, brandConfig, projectId, domain, apexDomain, isSubdomainProject, options = {} } = context;
 
-  if (brandConfig.firebase?.apiSubdomain === false) {
+  if (brandConfig.cloud?.apiSubdomain === false) {
     console.log(chalk.dim('      ⊘ API subdomain disabled in config, skipping'));
     return {};
   }

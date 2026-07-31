@@ -1,5 +1,5 @@
 /**
- * Ensure zone settings match `cloudflare.settings`.
+ * Ensure zone settings match `edge.providers.cloudflare.settings`.
  *
  * 1. Reads all settings in one bulk call + any addon settings individually.
  * 2. Diffs against desired settings — skips read-only and absent ones.
@@ -29,7 +29,7 @@ module.exports = async function ensureZoneSettings(context) {
     settings[s.id] = { value: s.value, editable: s.editable !== false };
   }
 
-  const targetAddons = ADDON_SETTINGS.filter((id) => Object.keys(DEFAULTS.cloudflare.settings).includes(id));
+  const targetAddons = ADDON_SETTINGS.filter((id) => Object.keys(DEFAULTS.edge.providers.cloudflare.settings).includes(id));
   for (const id of targetAddons) {
     if (settings[id]) continue;
     try {
@@ -44,7 +44,7 @@ module.exports = async function ensureZoneSettings(context) {
   cacheRead(brandRoot, 'zone-settings', { count: Object.keys(settings).length, settings });
 
   // === DIFF ===
-  const desired = brandConfig?.cloudflare?.settings;
+  const desired = brandConfig?.edge?.providers?.cloudflare?.settings;
   if (!desired || typeof desired !== 'object') {
     return;
   }

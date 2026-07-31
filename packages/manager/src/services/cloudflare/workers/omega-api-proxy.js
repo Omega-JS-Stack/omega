@@ -10,7 +10,7 @@
  * us-central1-{FIREBASE_PROJECT_ID}.cloudfunctions.net/omega_api; everything
  * else passes through to the origin untouched.
  *
- * Attach via cloudflare.workers config, e.g.:
+ * Attach via edge.providers.cloudflare.workers config, e.g.:
  *   { script: 'omega-api-proxy.js', route: 'api.{ domain }/omega*',
  *     env: { FIREBASE_PROJECT_ID: '…' } }
  */

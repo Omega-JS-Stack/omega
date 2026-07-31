@@ -1,7 +1,7 @@
 /**
  * Sync the brand's registry entry to the company server's Firestore at
  * brands/{brand.id}. Only the whitelisted top-level config sections cross
- * (brand identity, github org info, sponsorship terms), and the document
+ * (brand identity, repo org info, sponsorship terms), and the document
  * is fully REPLACED on write so keys removed from config disappear from
  * the registry too — omega-manager's `set(data, { merge: false })`
  * semantic, but diff-synced: omega-manager overwrote the document blindly
@@ -11,7 +11,7 @@
 const chalk = require('chalk').default;
 
 // Only these top-level config sections are published to the registry
-const SYNCED_KEYS = ['brand', 'github', 'sponsorships'];
+const SYNCED_KEYS = ['brand', 'repo', 'sponsorships'];
 
 /** Structural equality, key-order-insensitive — a full-replace write means
  * ANY difference (including extra keys in the current doc) is drift. */

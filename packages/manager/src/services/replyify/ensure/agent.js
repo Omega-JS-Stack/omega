@@ -75,7 +75,7 @@ module.exports = async function ensureAgent(context) {
   const agent = await db.getDoc(`agents/${agentId}`);
 
   if (!agent) {
-    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Replyify — check replyify.agentId (agents are created at ${chalk.cyan('https://replyify.app')})`);
+    console.log(`      ${chalk.red('✗')} Agent ${chalk.cyan(agentId)} not found in Replyify — check inbound.email.providers.replyify.agentId (agents are created at ${chalk.cyan('https://replyify.app')})`);
     return { status: 'error', error: `agent ${agentId} not found` };
   }
 

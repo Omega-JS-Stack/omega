@@ -30,7 +30,7 @@ const DOC_PATH = `brands/${BRAND.id}`;
 function brandConfig({ server = {}, sponsorships = SPONSORSHIPS } = {}) {
   const config = {
     brand: structuredClone(BRAND),
-    github: structuredClone(GITHUB),
+    repo: { providers: { github: structuredClone(GITHUB) } },
     server: server === false ? false : { ...structuredClone(DEFAULTS.server), ...server },
     targets: { web: {}, backend: {} },
     // Non-whitelisted sections — must never reach the registry
@@ -45,7 +45,7 @@ function brandConfig({ server = {}, sponsorships = SPONSORSHIPS } = {}) {
 
 /** The exact document the registry should hold for the default fixture. */
 function desiredDoc() {
-  return { brand: structuredClone(BRAND), github: structuredClone(GITHUB), sponsorships: structuredClone(SPONSORSHIPS) };
+  return { brand: structuredClone(BRAND), repo: { providers: { github: structuredClone(GITHUB) } }, sponsorships: structuredClone(SPONSORSHIPS) };
 }
 
 /** Method-level recording fake — a call with no configured response throws LOUDLY. */
@@ -138,7 +138,7 @@ test('server: key order differences are not drift', async () => {
         unacceptable: ['spam'],
         acceptable: ['tech', 'marketing'],
       },
-      github: { private: true, shared: false },
+      repo: { providers: { github: { private: true, shared: false } } },
       brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
   });
@@ -168,7 +168,7 @@ test('server: an absent sponsorships section is omitted from the document', asyn
   const result = await runService(brandConfig({ sponsorships: null }), { db });
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations()[0].args[1], { brand: BRAND, github: GITHUB });
+  assert.deepEqual(db.mutations()[0].args[1], { brand: BRAND, repo: { providers: { github: GITHUB } } });
 });
 
 test('server: drifted brand data is replace-written with the full document', async () => {

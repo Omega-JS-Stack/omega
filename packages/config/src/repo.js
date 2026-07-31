@@ -4,12 +4,13 @@
  * `omega deploy --direct`, the manager's github service setup/repo/pages,
  * the backend CMS routes that commit posts).
  *
- * One optional key: `github.repo` — either a bare name ("omega-brand") or
- * an "owner/name" slug ("itw-creative-works/omega-brand"). Defaults: name
- * falls to `brand.id`, owner falls to `github.org`. The slug's owner slot
+ * One optional key: `repo.providers.github.repo` (or, on a backend load, the
+ * target-overlaid `targets.backend.github.repo`, which wins) — either a bare name
+ * ("omega-brand") or an "owner/name" slug ("itw-creative-works/omega-brand").
+ * Defaults: name falls to `brand.id`, owner falls to `repo.providers.github.org`. The slug's owner slot
  * carries the legacy omega-manager orgMain/orgWebsite split (Ian
  * 2026-07-19): most ITW brands house the brand repo under the paid company
- * org (itw-creative-works) while `github.org` keeps naming the brand's own
+ * org (itw-creative-works) while `repo.providers.github.org` keeps naming the brand's own
  * org for org-profile reconciliation. The retired `repoWebsite` URL key
  * (2026-07-19, Ian: "we no longer need it — that was for when the website
  * lived NOT in the monorepo") is superseded by this slug: one repo per
@@ -21,7 +22,7 @@
  */
 
 /**
- * Parse a `github.repo` value: "owner/name" slug or bare "name".
+ * Parse a `repo.providers.github.repo` value: "owner/name" slug or bare "name".
  *
  * @param {string} value - e.g. "itw-creative-works/omega-brand" or "omega-brand"
  * @returns {{ owner: string, name: string }} owner is '' for bare names.
@@ -35,13 +36,26 @@ function parseRepoSlug(value) {
 }
 
 /**
+ * The github keys the derivation reads: the shared `repo.providers.github`
+ * block, overlaid by the target's own `github` entry (a backend load composes
+ * `targets.backend.github` — the CMS's content identity — onto the top level,
+ * and per the merge chain the target wins).
+ *
+ * @param {object} config - Composed omega config (brand + app layers).
+ * @returns {object} Merged `{ org, repo, … }` keys.
+ */
+function githubKeys(config) {
+  return { ...(config?.repo?.providers?.github || {}), ...(config?.github || {}) };
+}
+
+/**
  * The brand repo's bare name (no owner).
  *
  * @param {object} config - Composed omega config (brand + app layers).
  * @returns {string} Repo name ('' when nothing in the chain resolves).
  */
 function brandRepoName(config) {
-  const github = config?.github || {};
+  const github = githubKeys(config);
   return parseRepoSlug(github.repo).name || config?.brand?.id || '';
 }
 
@@ -52,7 +66,7 @@ function brandRepoName(config) {
  * @returns {string} Owner ('' when nothing in the chain resolves).
  */
 function brandRepoOwner(config) {
-  const github = config?.github || {};
+  const github = githubKeys(config);
   return parseRepoSlug(github.repo).owner || github.org || '';
 }
 

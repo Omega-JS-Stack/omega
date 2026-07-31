@@ -29,7 +29,7 @@ created: 2026-07-20
 ```json5
 advertising: {
   providers: {
-    'google-adsense': {
+    adsense: {
       client: 'ca-pub-XXXX',            // feeds the ad tag AND ads.txt (SSOT)
       slots: { display: '…', inArticle: '…', inFeed: '…', multiplex: '…' },
     },
@@ -66,7 +66,7 @@ advertising: {
   3. Fallback lane: sandboxed iframe → resolved inhouse source's `/omega/ads/serve`; origin-validated postMessage (set-dimensions/click); HOST-side rotation + staleness recovery.
   4. Paying users: unit hides on `auth.resolved.active` via the standard bindings (legacy behavior kept).
 - Desktop/extension: no AdSense (policy/no-web-context) — the shared client ships the same fallback-lane logic as an `omega.ads()` module binding `data-omega-ad` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
-- `ads.txt`: web build emits it from `providers['google-adsense'].client` when present (closes the parity-gap item).
+- `ads.txt`: web build emits it from `providers.adsense.client` when present (closes the parity-gap item).
 
 ## Sequencing (proposed)
 

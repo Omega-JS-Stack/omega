@@ -22,7 +22,7 @@ Added with Ian 2026-07-17. Id `daily-build`, url dailybuild.omegajs.dev (same su
 
 ### `../omega-brand` — the REAL brand (sibling repo)
 
-BORN 2026-07-18 (cp229), LIVE 2026-07-19 (cp232). Lives outside the monorepo with its own git history; folder + repo renamed from omegajs.dev per Ian 2026-07-19 — consistent with the `*-brand` family, and bare "omega" is the monorepo. GitHub: `itw-creative-works/omega-brand` via the `github.repo` slug (the legacy orgWebsite housing).
+BORN 2026-07-18 (cp229), LIVE 2026-07-19 (cp232). Lives outside the monorepo with its own git history; folder + repo renamed from omegajs.dev per Ian 2026-07-19 — consistent with the `*-brand` family, and bare "omega" is the monorepo. GitHub: `itw-creative-works/omega-brand` via the `targets.backend.github.repo` slug (the legacy orgWebsite housing).
 
 Id `omega`, name "OMEGA", url omegajs.dev (LIVE — GitHub Pages + Cloudflare), classy theme, website port 4200, website + backend targets. Born by FORKING the playground's polished content 1:1 (never a promotion of the test project; stale es caches dropped and re-translated fresh). It is the first SUB-BRAND of Ian's eventual company umbrella — the config `company` layer models this.
 

@@ -1,5 +1,5 @@
 /**
- * Ensure configuration rules match `cloudflare.rules.configuration`.
+ * Ensure configuration rules match `edge.providers.cloudflare.rules.configuration`.
  *
  * 1. Reads the http_config_settings entrypoint ruleset (or notes it needs creating).
  * 2. Diffs each configured rule by description — creates missing, updates stale, removes unconfigured.
@@ -22,7 +22,7 @@ module.exports = async function ensureRulesConfiguration(context) {
   cacheRead(brandRoot, 'rules-configuration', { count: readCount, ruleset, needsCreate });
 
   // === DIFF ===
-  const configRulesConfig = brandConfig?.cloudflare?.rules?.configuration;
+  const configRulesConfig = brandConfig?.edge?.providers?.cloudflare?.rules?.configuration;
   if (!configRulesConfig || !Array.isArray(configRulesConfig) || configRulesConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

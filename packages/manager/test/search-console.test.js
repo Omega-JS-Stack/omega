@@ -29,7 +29,7 @@ const SITEMAP_URL = `https://${DOMAIN}/sitemap.xml`;
 function brandConfig({ url = `https://${DOMAIN}`, targets = { web: {} }, gaProperty = GA_PROPERTY } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    searchConsole: structuredClone(DEFAULTS.searchConsole),
+    search: { providers: { searchConsole: structuredClone(DEFAULTS.search.providers.searchConsole) } },
     analytics: structuredClone(DEFAULTS.analytics),
     targets,
   };
@@ -108,13 +108,13 @@ test('search-console: skips without Google credentials', async () => {
   assert.match(result.reason, /GOOGLE_CLIENT_ID/);
 });
 
-test('search-console: searchConsole.enabled = false skips the service', async () => {
+test('search-console: search.providers.searchConsole.enabled = false skips the service', async () => {
   const config = brandConfig();
-  config.searchConsole.enabled = false;
+  config.search.providers.searchConsole.enabled = false;
 
   const result = await runService(config, { gsc: fakeGsc() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /searchConsole\.enabled/);
+  assert.match(result.reason, /search\.providers\.searchConsole\.enabled/);
 });
 
 test('search-console: skips without brand.url', async () => {
@@ -359,7 +359,7 @@ test('search-console: missing sitemaps are submitted; existing ones are left alo
 
 test('search-console: submitSitemap = false skips submission without reading', async () => {
   const config = brandConfig();
-  config.searchConsole.submitSitemap = false;
+  config.search.providers.searchConsole.submitSitemap = false;
 
   const gsc = fakeGsc({
     listSites: [{ siteUrl: PROPERTY_URL, permissionLevel: 'siteOwner' }],

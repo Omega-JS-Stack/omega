@@ -25,7 +25,7 @@ export default (el) => {
   // Warm reCAPTCHA on first interaction so the token is ready by submit
   let recaptchaWarmup = null;
   const warmup = () => {
-    recaptchaWarmup = recaptchaWarmup || initializeRecaptcha(omega.config?.recaptcha?.['site-key']);
+    recaptchaWarmup = recaptchaWarmup || initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey);
     return recaptchaWarmup;
   };
   $form.addEventListener('focusin', warmup, { once: true });

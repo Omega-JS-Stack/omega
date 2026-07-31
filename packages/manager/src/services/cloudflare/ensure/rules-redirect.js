@@ -1,5 +1,5 @@
 /**
- * Ensure redirect rules match `cloudflare.rules.redirect`.
+ * Ensure redirect rules match `edge.providers.cloudflare.rules.redirect`.
  *
  * 1. Reads the http_request_dynamic_redirect entrypoint ruleset (or notes it needs creating).
  * 2. Diffs each configured rule by description — creates missing, updates stale, removes unconfigured.
@@ -22,7 +22,7 @@ module.exports = async function ensureRulesRedirect(context) {
   cacheRead(brandRoot, 'rules-redirect', { count: readCount, ruleset, needsCreate });
 
   // === DIFF ===
-  const redirectRulesConfig = brandConfig?.cloudflare?.rules?.redirect;
+  const redirectRulesConfig = brandConfig?.edge?.providers?.cloudflare?.rules?.redirect;
   if (!redirectRulesConfig || !Array.isArray(redirectRulesConfig) || redirectRulesConfig.length === 0) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

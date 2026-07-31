@@ -19,7 +19,7 @@ module.exports = async function ensureForm(context) {
   const form = await db.getDoc(`forms/${formId}`);
 
   if (!form) {
-    console.log(`      ${chalk.red('✗')} Form ${chalk.cyan(formId)} not found in Slapform — check slapform.formId (forms are created at ${chalk.cyan('https://slapform.com')})`);
+    console.log(`      ${chalk.red('✗')} Form ${chalk.cyan(formId)} not found in Slapform — check forms.providers.slapform.formId (forms are created at ${chalk.cyan('https://slapform.com')})`);
     return { status: 'error', error: `form ${formId} not found` };
   }
 

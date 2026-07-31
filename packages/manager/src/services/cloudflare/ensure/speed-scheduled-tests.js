@@ -1,6 +1,6 @@
 /**
  * Ensure a Cloudflare Speed Test schedule for the brand homepage matches
- * `cloudflare.speedTest`.
+ * `edge.providers.cloudflare.speedTest`.
  *
  * 1. Reads all currently-tested pages + their schedules.
  * 2. Locates the homepage schedule (compared loosely — Cloudflare returns mixed URL formats).
@@ -50,7 +50,7 @@ module.exports = async function ensureSpeedScheduledTests(context) {
   cacheRead(brandRoot, 'speed-scheduled-tests', { schedules });
 
   // === DIFF ===
-  const speedTestConfig = brandConfig?.cloudflare?.speedTest;
+  const speedTestConfig = brandConfig?.edge?.providers?.cloudflare?.speedTest;
   if (!speedTestConfig) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;

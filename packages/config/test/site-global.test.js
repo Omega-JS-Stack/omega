@@ -69,7 +69,7 @@ test('exposes curated site.targets: presence + enabled, machinery absent', () =>
 test('derives the desktop releases URL: playground parity (org + brand.id)', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
-    github: { org: 'Omega-JS-Stack' },
+    repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
     targets: { desktop: { releases: {} } },
   });
 
@@ -80,8 +80,8 @@ test('derives the desktop releases URL: playground parity (org + brand.id)', () 
   );
 });
 
-test('desktop releases URL: releases.repo wins over github.repo wins over brand.id', () => {
-  const base = { brand: { id: 'acme' }, github: { org: 'Acme-Org', repo: 'acme-site' } };
+test('desktop releases URL: releases.repo wins over repo.providers.github.repo wins over brand.id', () => {
+  const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } } };
 
   assert.strictEqual(
     toSiteGlobal({ ...base, targets: { desktop: { releases: { repo: 'update-server' } } } })
@@ -105,7 +105,7 @@ test('desktop releases URL omitted without a github org', () => {
 test('a bare desktop target derives nothing — no releases config, no links', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    github: { org: 'Acme-Org', repo: 'acme-site' },
+    repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } },
     targets: { desktop: { app: { category: 'utilities' } } },
   });
 
@@ -115,7 +115,7 @@ test('a bare desktop target derives nothing — no releases config, no links', (
 
 test('a present releases block opts in (enabled defaults true)', () => {
   const url = 'https://github.com/Acme-Org/acme-site/releases/latest';
-  const base = { brand: { id: 'acme' }, github: { org: 'Acme-Org', repo: 'acme-site' } };
+  const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } } };
 
   for (const releases of [{}, { enabled: true }, { repo: 'acme-site' }]) {
     const site = toSiteGlobal({ ...base, targets: { desktop: { releases } } });
@@ -127,7 +127,7 @@ test('a present releases block opts in (enabled defaults true)', () => {
 test('releases.enabled false always suppresses the derivation', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    github: { org: 'Acme-Org', repo: 'acme-site' },
+    repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } },
     targets: { desktop: { releases: { enabled: false, repo: 'update-server' } } },
   });
 
@@ -137,7 +137,7 @@ test('releases.enabled false always suppresses the derivation', () => {
 
 test('an explicit download map still wins on a suppressed (or bare) desktop target', () => {
   const explicit = { mac: { universal: 'https://acme.com/dl/mac' } };
-  const base = { brand: { id: 'acme' }, github: { org: 'Acme-Org' }, download: explicit };
+  const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } }, download: explicit };
 
   assert.deepStrictEqual(toSiteGlobal({ ...base, targets: { desktop: {} } }).download, explicit);
   assert.deepStrictEqual(
@@ -150,7 +150,7 @@ test('double application is idempotent for a bare and a suppressed desktop targe
   for (const desktop of [{}, { releases: { enabled: false, repo: 'update-server' } }]) {
     const once = toSiteGlobal({
       brand: { id: 'acme' },
-      github: { org: 'Acme-Org', repo: 'acme-site' },
+      repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } },
       targets: { desktop },
     });
     const twice = toSiteGlobal(once);
@@ -183,7 +183,7 @@ test('exposes extension listings on site.targets.extension', () => {
 test('derives site.download from the desktop target when no explicit map exists', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
-    github: { org: 'Omega-JS-Stack' },
+    repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
     targets: { desktop: { releases: {} } },
   });
 
@@ -200,7 +200,7 @@ test('explicit download map wins over the derivation', () => {
   const explicit = { mac: { universal: 'https://acme.com/dl/mac' } };
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    github: { org: 'Acme-Org' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
     download: explicit,
     targets: { desktop: { releases: {} } },
   });
@@ -209,7 +209,7 @@ test('explicit download map wins over the derivation', () => {
 });
 
 test('no desktop target (or no derivable URL) leaves site.download absent', () => {
-  assert.strictEqual(toSiteGlobal({ brand: { id: 'acme' }, github: { org: 'X' } }).download, undefined);
+  assert.strictEqual(toSiteGlobal({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'X' } } } }).download, undefined);
   assert.strictEqual(
     toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { releases: {} } } }).download,
     undefined,
@@ -238,7 +238,7 @@ test('derives site.extension store URLs from listings when no explicit map exist
 test('double application is idempotent — the build pipeline applies toSiteGlobal twice', () => {
   const resolved = {
     brand: { id: 'acme' },
-    github: { org: 'Acme-Org', repo: 'acme-site' },
+    repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } },
     targets: {
       desktop: { releases: { repo: 'update-server' } },
       extension: { listings: { chrome: { url: 'https://store/x', state: 'live' } } },
@@ -249,7 +249,7 @@ test('double application is idempotent — the build pipeline applies toSiteGlob
   const twice = toSiteGlobal(once);
 
   // The releases.repo-derived URL must survive the second pass — the raw key is
-  // gone by then and a re-derivation would silently fall back to github.repo.
+  // gone by then and a re-derivation would silently fall back to repo.providers.github.repo.
   assert.strictEqual(once.targets.desktop.releasesUrl, 'https://github.com/Acme-Org/update-server/releases/latest');
   assert.deepStrictEqual(twice, once);
 });
@@ -257,7 +257,7 @@ test('double application is idempotent — the build pipeline applies toSiteGlob
 test('array-form (multi-instance) targets derive nothing — presence only', () => {
   const site = toSiteGlobal({
     brand: { id: 'acme' },
-    github: { org: 'Acme-Org' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
     targets: {
       desktop: [{ id: 'main', releases: { repo: 'update-server' } }],
       extension: [{ id: 'main', listings: { chrome: { url: 'https://store/x' } } }],

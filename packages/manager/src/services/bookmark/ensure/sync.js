@@ -51,9 +51,9 @@ function generateLinks(brandConfig, brandState, apps = [], extras = {}) {
 
   const brandUrl = brandConfig.brand?.url;
   const domain = brandUrl?.replace(/^https?:\/\//, '');
-  const firebaseProjectId = brandConfig.firebase?.projectId;
+  const firebaseProjectId = brandConfig.cloud?.config?.projectId;
   const google = brandConfig.analytics?.providers?.google || {};
-  const github = brandConfig.github || {};
+  const github = brandConfig.repo?.providers?.github || {};
   const deployedFunctions = extras.deployedFunctions || [];
 
   // Cloud Console
@@ -170,7 +170,7 @@ module.exports = async function ensureSync(context) {
     return { output: { sync: { reason: 'non-interactive' } } };
   }
 
-  const firebaseProjectId = brandConfig.firebase?.projectId;
+  const firebaseProjectId = brandConfig.cloud?.config?.projectId;
   const links = generateLinks(brandConfig, brandState, apps, {
     deployedFunctions: firebaseProjectId ? getDeployedFunctions(firebaseProjectId) : [],
   });
