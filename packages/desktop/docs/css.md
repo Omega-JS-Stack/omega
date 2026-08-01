@@ -62,7 +62,7 @@ import appShell from '__main_assets__/js/core/app-shell.js';
 appShell();
 ```
 
-The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container — `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"` — which is what the CSS keys off; the API is also registered at `omega._ujLibrary.appShell`. Add `.omega-shell--locked` when `main` should never scroll (the page manages its own interior scroll).
+The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container — `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"` — which is what the CSS keys off; the API is also registered at `omega._library.appShell`. Add `.omega-shell--locked` when `main` should never scroll (the page manages its own interior scroll).
 
 ## Bootstrap-first convention
 

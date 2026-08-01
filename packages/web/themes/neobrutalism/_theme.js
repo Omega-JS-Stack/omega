@@ -4,7 +4,7 @@
 import bootstrap from '__main_assets__/themes/bootstrap/js/index.umd.js';
 import { ready as domReady } from '@omega.js/client/modules/dom.js';
 
-// Make Bootstrap available globally (used by UJM utilities + components)
+// Make Bootstrap available globally (used by omega utilities + components)
 window.bootstrap = bootstrap;
 
 /* @dev-only:start */

@@ -137,7 +137,7 @@ test('§7 asset lanes: section.scss joins the main sheet, section.js boots behin
 test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {
   await build(['classy']);
   // The redirect layout references /assets/js/modules/<name>.bundle.js
-  // directly (uj_cachebreak query, no content hash) — the lane must emit it.
+  // directly (omega_cachebreak query, no content hash) — the lane must emit it.
   const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
   assert.ok(redirect.includes('redirect-config'), 'redirect module bundled at its fixed URL');
   assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');

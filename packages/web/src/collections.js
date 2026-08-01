@@ -3,8 +3,8 @@
  * the blog taxonomy aggregated from posts' `post.categories`/`post.tags`
  * (jekyll-uj-powertools' blog-taxonomy generator equivalent), plus the
  * URL-sorted `allByUrl` view the meta-files iterate. Every content
- * collection is mirrored into the template-kit holder so uj_* tags
- * (uj_member) can read it mid-render.
+ * collection is mirrored into the template-kit holder so omega_* tags
+ * (omega_member) can read it mid-render.
  */
 
 // Jekyll-default slugify — taxonomy slugs must match what templates' slugify
@@ -22,8 +22,8 @@ const byDateThenSlug = (a, b) => (b.date - a.date) || a.page.fileSlug.localeComp
  * @param {Map<string, object[]>} collectionsHolder - template-kit's collection view
  */
 function registerCollections(eleventyConfig, collectionsHolder) {
-  // Jekyll-style doc id ('/team/ian', '/blog/slug') — the shape the uj_member
-  // and uj_post tags match on and derive asset paths from. inputPath only as
+  // Jekyll-style doc id ('/team/ian', '/blog/slug') — the shape the omega_member
+  // and omega_post tags match on and derive asset paths from. inputPath only as
   // a fallback for url-less docs.
   const toDoc = (item) => ({
     id: String(item.url || '').replace(/\/+$/, '') || item.inputPath,

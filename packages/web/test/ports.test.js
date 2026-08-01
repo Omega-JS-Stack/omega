@@ -7,7 +7,7 @@
  * forms, include leading slash, interpolated-tag-arg fix-forward, and
  * content-entry pages → collection dirs: the recipe doc lives in _recipes/
  * because page frontmatter is meta-only since 2026-07-19).
- * Assertions target REAL data: the UJM default team member via uj_member,
+ * Assertions target REAL data: the UJM default team member via omega_member,
  * verts/unit section placements, and the full JSON-LD Recipe schema.
  *
  * Since B2 the two ported layouts live in the fixture's own `_layouts/` —
@@ -75,7 +75,7 @@ test('real classy contact: layout-frontmatter Liquid, fixed icon args, full sect
   assert.ok(!html.includes('text-{{'), 'no raw Liquid left in classes');
 });
 
-test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, verts/unit sections', () => {
+test('real sweet-saucy recipe: page-scoped meta, omega_member vs real team doc, verts/unit sections', () => {
   const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
   assert.ok(html, 'recipe page rendered');
 
@@ -87,9 +87,9 @@ test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ver
   assert.ok(html.includes('/recipes/cuisines/american'), 'cuisine slug breadcrumb');
   assert.strictEqual((html.match(/recipe-ingredient-check/g) || []).length, 11, '11 ingredient checkboxes');
 
-  // uj_member against the REAL UJM default team doc
-  assert.ok(html.includes('Alex Raeburn'), 'uj_member name resolved from team collection');
-  assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'uj_member url resolved');
+  // omega_member against the REAL UJM default team doc
+  assert.ok(html.includes('Alex Raeburn'), 'omega_member name resolved from team collection');
+  assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'omega_member url resolved');
 
   // The modern verts/unit section, 3 placements by type (client/slot values
   // live in config — the client verts module reads them at mount, never markup)
@@ -104,7 +104,7 @@ test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ver
 
 test('real sweet-saucy recipe: JSON-LD Recipe schema is valid and complete', () => {
   const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
-  const match = html.match(/<script id="uj-schema-recipe" type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  const match = html.match(/<script id="omega-schema-recipe" type="application\/ld\+json">([\s\S]*?)<\/script>/);
   assert.ok(match, 'schema script present');
 
   const schema = JSON.parse(match[1]);
@@ -135,7 +135,7 @@ test('real somiibo index: verbatim content page with consumer include', () => {
   assert.ok(html.includes('data-action-1="New follower"'), 'hero-demo config bridge');
 
   assert.ok(html.includes('/platforms/instagram-bot'), 'platform cards');
-  assert.ok((html.match(/class="fa[ "]/g) || []).length > 30, 'dozens of uj_icon renders');
+  assert.ok((html.match(/class="fa[ "]/g) || []).length > 30, 'dozens of omega_icon renders');
 });
 
 test('team doc renders at its permalink (Jekyll outputs team pages)', () => {

@@ -140,7 +140,7 @@ faqs:
         <div class="{{ col_classes }}">
           <div class="card h-100 text-center p-4" data-lazy="@class animation-slide-up">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3 mx-auto">
-              {% uj_icon method.icon %}
+              {% omega_icon method.icon %}
             </span>
             <h3 class="h5 mb-1">{{ method.title }}</h3>
             <p class="text-body-secondary mb-3">{{ method.description }}</p>
@@ -165,7 +165,7 @@ faqs:
               {% iftruthy resolved.contact_form.superheadline.text %}
                 <span class="kicker mb-2">
                   {% iftruthy resolved.contact_form.superheadline.icon %}
-                    {% uj_icon resolved.contact_form.superheadline.icon, "me-1" %}
+                    {% omega_icon resolved.contact_form.superheadline.icon, "me-1" %}
                   {% endiftruthy %}
                   {{ resolved.contact_form.superheadline.text }}
                 </span>
@@ -257,11 +257,11 @@ faqs:
 
               <div class="d-grid gap-2 d-md-flex justify-content-md-between align-items-center">
                 <button type="submit" class="btn btn-primary btn-lg px-5">
-                  {% uj_icon "paper-plane", "me-2" %}
+                  {% omega_icon "paper-plane", "me-2" %}
                   Send message
                 </button>
                 <a href="{{ site.url }}" class="btn btn-link">
-                  {% uj_icon "arrow-left", "me-1" %}
+                  {% omega_icon "arrow-left", "me-1" %}
                   Back to home
                 </a>
               </div>
@@ -281,7 +281,7 @@ faqs:
       {% for stat in resolved.stats.items %}
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="stat-num">{{ stat.number }}</div>
-          <div class="fw-bold">{% uj_icon stat.icon, "me-2 text-primary" %}{{ stat.label }}</div>
+          <div class="fw-bold">{% omega_icon stat.icon, "me-2 text-primary" %}{{ stat.label }}</div>
         </div>
       {% endfor %}
     </div>
@@ -319,4 +319,4 @@ faqs:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

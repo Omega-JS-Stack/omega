@@ -16,7 +16,7 @@
 // Tags whose quoted args template-kit resolves as variables — the rule-3
 // capture hoist is scoped to these (interpolation inside OTHER tags' quoted
 // strings is a Jekyll silent no-op we only report).
-const { TAGS } = require('@omega.js/template-kit');
+const { TAGS, filters: { FILTER_NAMES } } = require('@omega.js/template-kit');
 
 // Packaged theme ids whose hardcoded layout prefixes the engine aliases
 const PACKAGED_THEMES = ['classy', 'neobrutalism', 'newsflash', 'bootstrap'];
@@ -69,6 +69,49 @@ function replacePerLine(id, text, pattern, replacement) {
   });
   return { text: fromLines(out, trailingNewline), edits };
 }
+
+// ---------------------------------------------------------------------------
+// Rule 0 — legacy `uj_`/`uj-`/`site.uj` spellings → the `omega` names
+// (runs first: every later rule matches template-kit's CURRENT tag names)
+// ---------------------------------------------------------------------------
+
+// The context-coupled filters register-liquid installs directly, so they are
+// absent from FILTER_NAMES but are still part of the renamed surface.
+const CONTEXT_FILTERS = ['omega_liquify', 'omega_content_format', 'omega_increment_return'];
+
+// `uj_<name>` for every name the kit registers today — a legacy template that
+// spelled something else keeps its text (it was never a template-kit call).
+const LEGACY_NAMES = [...Object.keys(TAGS), ...Object.keys(FILTER_NAMES), ...CONTEXT_FILTERS]
+  .map((name) => name.replace(/^omega_/, ''));
+
+const LEGACY_CLASSES = {
+  'uj-password-show': 'omega-password-show',
+  'uj-password-hide': 'omega-password-hide',
+  'uj-language-flag': 'omega-language-flag',
+  'uj-language-dropdown': 'omega-language-dropdown',
+  'data-uj-no-translate': 'data-omega-no-translate',
+};
+
+const legacyPrefix = {
+  id: 'legacy-prefix',
+  title: '`uj_*` tags/filters → `omega_*`; `site.uj` → `site.omega`; `uj-*` classes → `omega-*`',
+  apply(text) {
+    const names = new RegExp(`\\buj_(${LEGACY_NAMES.join('|')})\\b`, 'g');
+    const classes = new RegExp(Object.keys(LEGACY_CLASSES).join('|'), 'g');
+    const { lines, trailingNewline } = toLines(text);
+    const edits = [];
+    const out = lines.map((line, index) => {
+      const replaced = line
+        .replace(names, 'omega_$1')
+        .replace(/\bsite\.uj\b/g, 'site.omega')
+        .replace(/\buj-schema-/g, 'omega-schema-')
+        .replace(classes, (whole) => LEGACY_CLASSES[whole]);
+      if (replaced !== line) edits.push({ rule: 'legacy-prefix', line: index + 1, before: line.trim(), after: replaced.trim() });
+      return replaced;
+    });
+    return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Rule 1 — page.resolved.* → resolved.*
@@ -139,7 +182,7 @@ const tagArgInterpolation = {
         // Only hoist when the quoted string actually interpolates
         if (!/\{\{.*\}\}/.test(inner)) return whole;
         captureCount += 1;
-        const varName = `uj_migrate_arg_${captureCount}`;
+        const varName = `omega_migrate_arg_${captureCount}`;
         captures.push(`${indent}{% capture ${varName} %}${inner}{% endcapture %}`);
         return varName;
       });
@@ -245,7 +288,7 @@ const parentloop = {
     // Pass 2: emit — insert assigns right after each parent for-line (that
     // line ends in the parent loop's scope: were an unclosed inner loop open
     // there, pass 1 flagged the ref instead), and rewrite references with
-    // depth-scoped names (uj_parentloop<depth>_<prop>) so nested hoists
+    // depth-scoped names (omega_parentloop<depth>_<prop>) so nested hoists
     // never shadow each other.
     const depthByFor = new Map();
     {
@@ -263,7 +306,7 @@ const parentloop = {
       if (lineRewrites.has(i)) {
         const depth = lineRewrites.get(i);
         const rewritten = line.replace(/forloop\.parentloop\.(\w+)/g, (whole, prop) =>
-          PARENTLOOP_PROPS.includes(prop) ? `uj_parentloop${depth}_${prop}` : whole);
+          PARENTLOOP_PROPS.includes(prop) ? `omega_parentloop${depth}_${prop}` : whole);
         if (rewritten !== line) {
           edits.push({ rule: 'parentloop', line: i + 1, before: line.trim(), after: rewritten.trim() });
           line = rewritten;
@@ -274,8 +317,8 @@ const parentloop = {
         const indent = (lines[i].match(/^\s*/) || [''])[0];
         const depth = depthByFor.get(i);
         for (const prop of hoists.get(i)) {
-          out.push(`${indent}  {% assign uj_parentloop${depth}_${prop} = forloop.${prop} %}`);
-          edits.push({ rule: 'parentloop', line: i + 1, before: '(parent loop)', after: `{% assign uj_parentloop${depth}_${prop} = forloop.${prop} %}` });
+          out.push(`${indent}  {% assign omega_parentloop${depth}_${prop} = forloop.${prop} %}`);
+          edits.push({ rule: 'parentloop', line: i + 1, before: '(parent loop)', after: `{% assign omega_parentloop${depth}_${prop} = forloop.${prop} %}` });
         }
       }
     }
@@ -376,6 +419,7 @@ const analyticsShape = {
 // — it moves config, not template text.
 
 const RULES = [
+  legacyPrefix,        // 0 — must precede every rule that matches tag names
   pageResolved,        // 1
   bracketLayout,       // 2
   tagArgInterpolation, // 3

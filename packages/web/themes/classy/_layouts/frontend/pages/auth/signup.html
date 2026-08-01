@@ -24,7 +24,7 @@ social_signup:
     <div class="classy-auth__card">
       <!-- Logo -->
       <div class="classy-auth__brand">
-        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
@@ -46,13 +46,13 @@ social_signup:
               <button type="submit" class="btn btn-outline-adaptive classy-auth__social w-100 mb-2 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
                 {{ initializing_spinner }}
                 {% comment %} `logo:` renders the provider's own brandmark in
-                FULL COLOR (core/logos, inlined by uj_logo); `icon:` is the
+                FULL COLOR (core/logos, inlined by omega_logo); `icon:` is the
                 monochrome currentColor glyph for providers without one {% endcomment %}
                 {% iftruthy provider.logo %}
-                  <span class="d-inline-flex me-2" aria-hidden="true">{% uj_logo provider.logo, "brandmarks" %}</span>
+                  <span class="d-inline-flex me-2" aria-hidden="true">{% omega_logo provider.logo, "brandmarks" %}</span>
                 {% endiftruthy %}
                 {% iffalsy provider.logo %}
-                  {% uj_icon provider.icon, "me-2" %}
+                  {% omega_icon provider.icon, "me-2" %}
                 {% endiffalsy %}
                 <span class="button-text">Sign up with {{ provider.name }}</span>
               </button>
@@ -77,8 +77,8 @@ social_signup:
           <div class="input-group">
             <input type="password" class="form-control" id="password" name="password" placeholder="Create a strong password" autocomplete="new-password">
             <button class="btn omega-password-toggle px-3" type="button" aria-label="Toggle password visibility">
-              <span class="uj-password-show">{% uj_icon "eye", "fa-fw" %}</span>
-              <span class="uj-password-hide d-none">{% uj_icon "eye-slash", "fa-fw" %}</span>
+              <span class="omega-password-show">{% omega_icon "eye", "fa-fw" %}</span>
+              <span class="omega-password-hide d-none">{% omega_icon "eye-slash", "fa-fw" %}</span>
             </button>
           </div>
         </div>
@@ -106,7 +106,7 @@ social_signup:
         <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
           {{ initializing_spinner }}
           <span class="button-text">Create account</span>
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </button>
       </form>
 
@@ -125,7 +125,7 @@ social_signup:
       <div>
         {% for benefit in resolved.benefits %}
           <div class="classy-auth__aside-row">
-            {% uj_icon "check", "text-success fa-sm" %}
+            {% omega_icon "check", "text-success fa-sm" %}
             <span><strong>{{ benefit.title }}</strong>: {{ benefit.description }}</span>
           </div>
         {% endfor %}
@@ -137,4 +137,4 @@ social_signup:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

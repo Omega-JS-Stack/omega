@@ -36,7 +36,7 @@ prerender_icons:
       </div>
       <div>
         <button class="btn btn-outline-adaptive" id="btn-refresh-explorer">
-          {% uj_icon "rotate", "fa-md me-2" %}
+          {% omega_icon "rotate", "fa-md me-2" %}
           Refresh
         </button>
       </div>
@@ -50,31 +50,31 @@ prerender_icons:
     <!-- Collections -->
     <div class="card">
       <div class="card-header">
-        <h6 class="mb-0">{% uj_icon "database", "fa-sm me-2" %} Collections</h6>
+        <h6 class="mb-0">{% omega_icon "database", "fa-sm me-2" %} Collections</h6>
       </div>
       <div class="card-body p-2">
         <!-- Quick access -->
         <div class="nav flex-column collection-nav" id="collection-links">
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="users">
-            {% uj_icon "folder", "fa-sm me-2" %} users
+            {% omega_icon "folder", "fa-sm me-2" %} users
             <span class="classy-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="notifications">
-            {% uj_icon "folder", "fa-sm me-2" %} notifications
+            {% omega_icon "folder", "fa-sm me-2" %} notifications
             <span class="classy-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="payments-orders">
-            {% uj_icon "folder", "fa-sm me-2" %} payments-orders
+            {% omega_icon "folder", "fa-sm me-2" %} payments-orders
             <span class="classy-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="meta">
-            {% uj_icon "folder", "fa-sm me-2" %} meta
+            {% omega_icon "folder", "fa-sm me-2" %} meta
             <span class="classy-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
@@ -88,7 +88,7 @@ prerender_icons:
           <div class="input-group input-group-sm">
             <input type="text" class="form-control" name="collection.path" placeholder="Collection path..." aria-label="Collection path" required>
             <button type="submit" class="btn btn-outline-adaptive">
-              <span class="button-text">{% uj_icon "arrow-right", "fa-sm" %}</span>
+              <span class="button-text">{% omega_icon "arrow-right", "fa-sm" %}</span>
             </button>
           </div>
         </form>
@@ -98,7 +98,7 @@ prerender_icons:
     <!-- Query Builder -->
     <div class="card mt-3">
       <div class="card-header">
-        <h6 class="mb-0">{% uj_icon "magnifying-glass", "fa-sm me-2" %} Query</h6>
+        <h6 class="mb-0">{% omega_icon "magnifying-glass", "fa-sm me-2" %} Query</h6>
       </div>
       <div class="card-body">
         <form id="query-form" data-form-state="initializing" onsubmit="return false">
@@ -123,7 +123,7 @@ prerender_icons:
             <div class="form-text" style="font-size: 0.7rem;">Numbers and booleans auto-detected</div>
           </div>
           <button type="submit" class="btn btn-sm btn-adaptive w-100">
-            {% uj_icon "magnifying-glass", "fa-sm me-2" %}
+            {% omega_icon "magnifying-glass", "fa-sm me-2" %}
             <span class="button-text">Run query</span>
           </button>
         </form>
@@ -140,7 +140,7 @@ prerender_icons:
     <nav class="mb-3" id="explorer-breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item">
-          <a href="#" id="breadcrumb-root">{% uj_icon "database", "fa-xs" %}</a>
+          <a href="#" id="breadcrumb-root">{% omega_icon "database", "fa-xs" %}</a>
         </li>
       </ol>
     </nav>
@@ -156,7 +156,7 @@ prerender_icons:
 
           <!-- Empty / No Collection -->
           <div id="docs-empty" class="text-center text-muted py-5">
-            {% uj_icon "folder-open", "fa-2xl mb-3 d-block" %}
+            {% omega_icon "folder-open", "fa-2xl mb-3 d-block" %}
             Select a collection to browse documents
           </div>
 
@@ -188,11 +188,11 @@ prerender_icons:
           <h6 class="mb-0 font-monospace small" id="doc-detail-path"></h6>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-adaptive" id="btn-edit-doc">
-              {% uj_icon "pen", "fa-sm me-1" %}
+              {% omega_icon "pen", "fa-sm me-1" %}
               Edit
             </button>
             <button class="btn btn-sm btn-outline-adaptive" id="btn-back-to-list">
-              {% uj_icon "arrow-left", "fa-sm me-1" %}
+              {% omega_icon "arrow-left", "fa-sm me-1" %}
               Back
             </button>
           </div>
@@ -207,7 +207,7 @@ prerender_icons:
             <div id="doc-editor-error" class="text-danger small mt-2 d-none"></div>
             <div class="d-flex gap-2 mt-3">
               <button class="btn btn-sm btn-adaptive" id="btn-save-doc">
-                {% uj_icon "floppy-disk", "fa-sm me-1" %}
+                {% omega_icon "floppy-disk", "fa-sm me-1" %}
                 Save
               </button>
               <button class="btn btn-sm btn-outline-adaptive" id="btn-cancel-edit">

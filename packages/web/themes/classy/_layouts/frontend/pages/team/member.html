@@ -5,7 +5,7 @@ layout: frontend/core/base
 <!-- ═══ Member — portrait split ═══ -->
 <section class="classy-dotgrid" data-omega-dotfield>
   <div class="container">
-    {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
+    {%- capture member_name -%}{%- omega_member resolved.member.id, "name" -%}{%- endcapture -%}
     {%- assign first_name = member_name | split: ' ' | first -%}
 
     <!-- Mono breadcrumb -->
@@ -20,7 +20,7 @@ layout: frontend/core/base
       <div class="classy-duo__aside" data-omega-reveal>
         <div class="classy-person mb-4">
           <span class="classy-person__portrait">
-            {%- uj_member resolved.member.id, "image-tag", class="" -%}
+            {%- omega_member resolved.member.id, "image-tag", class="" -%}
           </span>
         </div>
 
@@ -54,7 +54,7 @@ layout: frontend/core/base
                 {% assign link_icon = link.id %}
                 {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
                 <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                  {% uj_icon link_icon, "fa-sm" %}
+                  {% omega_icon link_icon, "fa-sm" %}
                 </a>
               {% endfor %}
             </span>
@@ -77,7 +77,7 @@ layout: frontend/core/base
         {% endif %}
 
         <div class="classy-prose" data-omega-reveal>
-          {{ content | uj_content_format }}
+          {{ content | omega_content_format }}
         </div>
       </div>
     </div>
@@ -96,7 +96,7 @@ layout: frontend/core/base
         <h2 class="classy-panel-head justify-content-start h5 mb-0">More of the team</h2>
         <a href="/team" class="text-decoration-none small">
           Everyone
-          {% uj_icon "arrow-right", "fa-xs ms-1" %}
+          {% omega_icon "arrow-right", "fa-xs ms-1" %}
         </a>
       </div>
 
@@ -108,11 +108,11 @@ layout: frontend/core/base
           <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
             <div class="classy-person">
               <a href="{{ other.url }}" class="classy-person__portrait">
-                {%- uj_member other.id, "image-tag", class="" -%}
+                {%- omega_member other.id, "image-tag", class="" -%}
               </a>
               <div class="classy-person__body">
                 <h3 class="classy-person__name">
-                  <a href="{{ other.url }}">{%- uj_member other.id, "name" -%}</a>
+                  <a href="{{ other.url }}">{%- omega_member other.id, "name" -%}</a>
                 </h3>
                 <span class="classy-micro classy-person__role">{{ other.member.position }}</span>
               </div>

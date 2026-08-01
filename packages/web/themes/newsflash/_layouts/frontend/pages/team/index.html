@@ -31,7 +31,7 @@ company_values:
 <!-- ============================================ -->
 <section class="pb-4">
   <div class="container text-center" data-lazy="@class animation-slide-up">
-    <span class="kicker mb-3">{% uj_icon "pen-nib", "me-1" %}The masthead</span>
+    <span class="kicker mb-3">{% omega_icon "pen-nib", "me-1" %}The masthead</span>
     <h1 class="display-4 my-3">
       The people behind <span class="text-accent">the bylines</span>
     </h1>
@@ -54,13 +54,13 @@ company_values:
           <div class="card h-100 p-4 text-center d-flex flex-column">
             <a href="{{ site.url }}{{ member.url }}" class="text-decoration-none d-inline-block mx-auto mb-3">
               <div class="avatar avatar-2xl">
-                {%- uj_member member.id, "image-tag", class="rounded-circle object-fit-cover d-block team-member-image" -%}
+                {%- omega_member member.id, "image-tag", class="rounded-circle object-fit-cover d-block team-member-image" -%}
               </div>
             </a>
 
             <h3 class="h4 mb-1">
               <a href="{{ site.url }}{{ member.url }}" class="text-decoration-none text-body">
-                {%- uj_member member.id, "name" -%}
+                {%- omega_member member.id, "name" -%}
               </a>
             </h3>
             <span class="kicker justify-content-center mb-3">{{ member.member.position }}</span>
@@ -72,7 +72,7 @@ company_values:
                   {% assign link_icon = link.id %}
                   {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
                   <a href="{{ link.url }}" class="btn btn-outline-dark btn-sm avatar avatar-md rounded-circle d-flex align-items-center justify-content-center" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                    {% uj_icon link_icon, "" %}
+                    {% omega_icon link_icon, "" %}
                   </a>
                 {% endfor %}
               </div>
@@ -98,7 +98,7 @@ company_values:
     <div class="cta-panel" data-lazy="@class animation-slide-up">
       <div class="cta-rings" aria-hidden="true"></div>
       <div class="position-relative">
-        <span class="kicker mb-3">{% uj_icon "quote-left", "me-1" %}The charter</span>
+        <span class="kicker mb-3">{% omega_icon "quote-left", "me-1" %}The charter</span>
         <h2 class="cta-title">Report it right. <span class="text-accent">Write it sharp.</span></h2>
         <p class="cta-desc mb-4">
           "Our job is simple to say and hard to do: find out what's true, explain why it matters, and answer to no one but the reader."
@@ -135,10 +135,10 @@ company_values:
         {% if mission_member %}
           <div class="d-flex align-items-center gap-3">
             <div class="avatar avatar-lg">
-              {%- uj_member mission_member.id, "image-tag", class="rounded-circle object-fit-cover d-block" -%}
+              {%- omega_member mission_member.id, "image-tag", class="rounded-circle object-fit-cover d-block" -%}
             </div>
             <div>
-              <div class="fw-bold">{%- uj_member mission_member.id, "name" -%}</div>
+              <div class="fw-bold">{%- omega_member mission_member.id, "name" -%}</div>
               <div class="opacity-75">{{ mission_member.member.position }}</div>
             </div>
           </div>
@@ -160,7 +160,7 @@ company_values:
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
-              {% uj_icon value.icon %}
+              {% omega_icon value.icon %}
             </span>
             <h3 class="h4 mb-2">{{ value.title }}</h3>
             <p class="text-body-secondary mb-0">{{ value.description }}</p>
@@ -178,17 +178,17 @@ company_values:
   <div class="container text-center" data-lazy="@class animation-slide-up">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <span class="kicker justify-content-center mb-3">{% uj_icon "briefcase", "me-1" %}Join us</span>
+        <span class="kicker justify-content-center mb-3">{% omega_icon "briefcase", "me-1" %}Join us</span>
         <h2 class="h1 mb-3">Want your name on <span class="text-accent">the masthead?</span></h2>
         <p class="lead mb-4">
           We're always looking for sharp reporters, ruthless editors, and people who sweat the details.
         </p>
         <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
           <a href="/careers" class="btn btn-primary btn-lg">
-            {% uj_icon "rocket", "me-2" %}Apply now
+            {% omega_icon "rocket", "me-2" %}Apply now
           </a>
           <a href="/contact" class="btn btn-outline-dark btn-lg">
-            {% uj_icon "envelope", "me-2" %}Get in touch
+            {% omega_icon "envelope", "me-2" %}Get in touch
           </a>
         </div>
       </div>
@@ -196,4 +196,4 @@ company_values:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

@@ -36,37 +36,37 @@ function makeEngine(overrides = {}) {
   return engine;
 }
 
-test('uj filters render through the engine', async () => {
+test('omega_ filters render through the engine', async () => {
   const engine = makeEngine();
 
-  assert.strictEqual(await engine.parseAndRender('{{ "hello world" | uj_title_case }}'), 'Hello World');
-  assert.strictEqual(await engine.parseAndRender('{{ 10000 | uj_commaify }}'), '10,000');
-  assert.strictEqual(await engine.parseAndRender('{{ "hello" | uj_hash: 1000 }}'), '994');
-  assert.strictEqual(await engine.parseAndRender('{{ 5 | uj_pluralize: "post", "posts" }}'), 'posts');
-  assert.match(await engine.parseAndRender('{{ "https://x.com/a.png" | uj_cachebreak }}'), /a\.png\?cb=\d+$/);
+  assert.strictEqual(await engine.parseAndRender('{{ "hello world" | omega_title_case }}'), 'Hello World');
+  assert.strictEqual(await engine.parseAndRender('{{ 10000 | omega_commaify }}'), '10,000');
+  assert.strictEqual(await engine.parseAndRender('{{ "hello" | omega_hash: 1000 }}'), '994');
+  assert.strictEqual(await engine.parseAndRender('{{ 5 | omega_pluralize: "post", "posts" }}'), 'posts');
+  assert.match(await engine.parseAndRender('{{ "https://x.com/a.png" | omega_cachebreak }}'), /a\.png\?cb=\d+$/);
 });
 
-test('uj_liquify recursively resolves through the render scope', async () => {
+test('omega_liquify recursively resolves through the render scope', async () => {
   const engine = makeEngine();
   const scope = { nested: '{{ inner }}', inner: 'DEEP', wrapper: 'A {{ nested }} Z' };
 
-  assert.strictEqual(await engine.parseAndRender('{{ wrapper | uj_liquify }}', scope), 'A DEEP Z');
+  assert.strictEqual(await engine.parseAndRender('{{ wrapper | omega_liquify }}', scope), 'A DEEP Z');
 });
 
-test('uj_content_format markdownifies only for .md pages', async () => {
+test('omega_content_format markdownifies only for .md pages', async () => {
   const markdown = (str) => `<md>${str}</md>`;
   const engine = makeEngine({ markdown });
 
   const mdScope = { page: { extension: '.md' }, body: 'hello {{ page.extension }}' };
-  assert.strictEqual(await engine.parseAndRender('{{ body | uj_content_format }}', mdScope), '<md>hello .md</md>');
+  assert.strictEqual(await engine.parseAndRender('{{ body | omega_content_format }}', mdScope), '<md>hello .md</md>');
 
   const htmlScope = { page: { extension: '.html' }, body: 'hello' };
-  assert.strictEqual(await engine.parseAndRender('{{ body | uj_content_format }}', htmlScope), 'hello');
+  assert.strictEqual(await engine.parseAndRender('{{ body | omega_content_format }}', htmlScope), 'hello');
 });
 
-test('uj_increment_return counts within one render and resets across renders', async () => {
+test('omega_increment_return counts within one render and resets across renders', async () => {
   const engine = makeEngine();
-  const tpl = '{{ 1 | uj_increment_return }}-{{ 1 | uj_increment_return }}-{{ 2 | uj_increment_return }}';
+  const tpl = '{{ 1 | omega_increment_return }}-{{ 1 | omega_increment_return }}-{{ 2 | omega_increment_return }}';
 
   assert.strictEqual(await engine.parseAndRender(tpl), '1-2-4');
   assert.strictEqual(await engine.parseAndRender(tpl), '1-2-4'); // fresh context => fresh counter
@@ -96,29 +96,29 @@ test('urlmatches reads page.url from the render scope', async () => {
   assert.strictEqual(await engine.parseAndRender(tpl, { page: { url: '/pricing' } }), '');
 });
 
-test('uj_icon + uj_logo render inline SVGs through the engine', async () => {
+test('omega_icon + omega_logo render inline SVGs through the engine', async () => {
   const engine = makeEngine();
 
-  const icon = await engine.parseAndRender('{% uj_icon rocket, "me-2" %}');
+  const icon = await engine.parseAndRender('{% omega_icon rocket, "me-2" %}');
   assert.ok(icon.startsWith('<i class="fa me-2" data-icon="rocket">'));
   assert.ok(icon.includes('M1 1'));
 
-  const logo = await engine.parseAndRender('{% uj_logo acme %}');
+  const logo = await engine.parseAndRender('{% omega_logo acme %}');
   assert.match(logo, /id="acme-\d+-grad"/);
 });
 
-test('uj_external uses the configured site.url', async () => {
+test('omega_external uses the configured site.url', async () => {
   const engine = makeEngine();
   assert.strictEqual(
-    await engine.parseAndRender('{% uj_external "pricing" %}'),
+    await engine.parseAndRender('{% omega_external "pricing" %}'),
     'https://bakeoff.example.com/pricing'
   );
 });
 
-test('uj_translation_url uses the configured site.translation', async () => {
+test('omega_translation_url uses the configured site.translation', async () => {
   const engine = makeEngine();
-  assert.strictEqual(await engine.parseAndRender('{% uj_translation_url "es", "/pricing" %}'), '/es/pricing');
-  assert.strictEqual(await engine.parseAndRender('{% uj_translation_url "en", "/pricing" %}'), '/pricing');
+  assert.strictEqual(await engine.parseAndRender('{% omega_translation_url "es", "/pricing" %}'), '/es/pricing');
+  assert.strictEqual(await engine.parseAndRender('{% omega_translation_url "en", "/pricing" %}'), '/pricing');
 });
 
 test('collection-backed tags resolve through injected accessors', async () => {
@@ -129,10 +129,10 @@ test('collection-backed tags resolve through injected accessors', async () => {
     getCollectionNames: () => ['team', 'posts'],
   });
 
-  assert.strictEqual(await engine.parseAndRender('{% uj_member "ian" %}'), 'Ian');
-  assert.strictEqual(await engine.parseAndRender('{% uj_post "hello" %}'), 'Hello World');
+  assert.strictEqual(await engine.parseAndRender('{% omega_member "ian" %}'), 'Ian');
+  assert.strictEqual(await engine.parseAndRender('{% omega_post "hello" %}'), 'Hello World');
   assert.strictEqual(
-    await engine.parseAndRender('{% uj_post "hello", "url" %}'),
+    await engine.parseAndRender('{% omega_post "hello", "url" %}'),
     'https://bakeoff.example.com/blog/hello'
   );
 });
@@ -169,6 +169,6 @@ test('variable-resolver arguments flow through real tag markup', async () => {
 
   // unquoted variable resolves; quoted literal stays literal (unknown codes
   // echo back DOWNCASED — Ruby downcases before the lookup)
-  assert.strictEqual(await engine.parseAndRender('{% uj_language platformName %}', scope), 'Spanish');
-  assert.strictEqual(await engine.parseAndRender('{% uj_language "platformName" %}'), 'platformname');
+  assert.strictEqual(await engine.parseAndRender('{% omega_language platformName %}', scope), 'Spanish');
+  assert.strictEqual(await engine.parseAndRender('{% omega_language "platformName" %}'), 'platformname');
 });

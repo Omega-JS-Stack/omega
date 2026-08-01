@@ -113,7 +113,7 @@ meta:
         <button type="button" class="btn btn-outline-primary">Outline primary</button>
         <button type="button" class="btn btn-adaptive classy-btn-ring">Gradient ring</button>
         <button type="button" class="btn btn-cmd"><span class="classy-cmd-prompt">$</span>npx omega setup</button>
-        <button type="button" class="btn btn-icon" aria-label="Icon button">{% uj_icon "gear" %}</button>
+        <button type="button" class="btn btn-icon" aria-label="Icon button">{% omega_icon "gear" %}</button>
       </div>
 
       <span class="classy-micro d-block mb-3">Sizes & states</span>
@@ -132,15 +132,15 @@ meta:
       <div class="d-flex flex-wrap align-items-center gap-2">
         <a href="#buttons" class="btn btn-adaptive omega-hover-nudge">
           Continue
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
         <a href="#buttons" class="btn btn-outline-adaptive">
-          {% uj_icon "paper-plane", "fa-sm me-2" %}
+          {% omega_icon "paper-plane", "fa-sm me-2" %}
           Send message
         </a>
         <a href="#buttons" class="btn btn-primary omega-hover-nudge">
           Get free trial
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       </div>
     </div>
@@ -196,8 +196,8 @@ meta:
             <div class="input-group">
               <input type="password" class="form-control" id="sg-password" placeholder="Enter your password"/>
               <button class="btn omega-password-toggle px-3" type="button" aria-label="Toggle password visibility">
-                <span class="uj-password-show">{% uj_icon "eye", "fa-fw" %}</span>
-                <span class="uj-password-hide d-none">{% uj_icon "eye-slash", "fa-fw" %}</span>
+                <span class="omega-password-show">{% omega_icon "eye", "fa-fw" %}</span>
+                <span class="omega-password-hide d-none">{% omega_icon "eye-slash", "fa-fw" %}</span>
               </button>
             </div>
           </div>
@@ -530,7 +530,7 @@ meta:
   <div class="container">
     <div class="classy-section-head mb-4" data-omega-reveal>
       <span class="classy-micro">Icons</span>
-      <h2 class="classy-display classy-display--section">uj_icon</h2>
+      <h2 class="classy-display classy-display--section">omega_icon</h2>
       <p>Build-time inlined SVGs: solid by default, brands resolve automatically.</p>
     </div>
 
@@ -539,14 +539,14 @@ meta:
       <div class="d-flex flex-wrap gap-3 fs-4 mb-4">
         {% assign _solid = "house|user|gear|bell|check|xmark|magnifying-glass|paper-plane|rocket|heart|bolt|cloud|lock|wand-magic-sparkles|layer-group|headset|palette|shield-halved|circle-question|arrow-right" | split: "|" %}
         {% for name in _solid %}
-          <span title="{{ name }}">{% uj_icon name %}</span>
+          <span title="{{ name }}">{% omega_icon name %}</span>
         {% endfor %}
       </div>
       <span class="classy-micro d-block mb-3">Brands</span>
       <div class="d-flex flex-wrap gap-3 fs-4">
         {% assign _brands = "chrome|firefox|edge|safari|opera|brave|apple|windows|linux|android|github|google|x-twitter|discord|slack|youtube" | split: "|" %}
         {% for name in _brands %}
-          <span title="{{ name }}">{% uj_icon name %}</span>
+          <span title="{{ name }}">{% omega_icon name %}</span>
         {% endfor %}
       </div>
     </div>
@@ -583,4 +583,4 @@ meta:
   </div>
 </div>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

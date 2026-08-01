@@ -1,12 +1,12 @@
 /**
- * filters.js — the uj_* Liquid filters as plain JS.
+ * filters.js — the omega_* Liquid filters as plain JS.
  *
  * Ported from jekyll-uj-powertools lib/filters/main.rb (READ-ONLY reference).
- * Pure functions except the engine-coupled pair (ujLiquify / ujContentFormat),
+ * Pure functions except the engine-coupled pair (omegaLiquify / omegaContentFormat),
  * which are factories taking the engine's render/markdown hooks — the
  * register-liquid.js adapter wires those to a real LiquidJS instance.
  *
- * Registered filter names keep their Jekyll spelling (uj_strip_ads, …) via
+ * Registered filter names keep their Jekyll spelling (omega_strip_ads, …) via
  * the FILTER_NAMES map so templates port verbatim.
  */
 
@@ -22,7 +22,7 @@ const CACHE_TIMESTAMP = String(Date.now());
  * @param {string} input
  * @returns {string}
  */
-function ujStripAds(input) {
+function omegaStripAds(input) {
   return String(input)
     .replace(/\s*<ad-unit>[\s\S]*?<\/ad-unit>\s*/gm, '')
     .replace(/\s*\{% include \/master\/modules\/adunits\/[\s\S]*? %\}\s*/gm, '');
@@ -33,7 +33,7 @@ function ujStripAds(input) {
  * @param {*} value
  * @returns {string}
  */
-function ujJsonEscape(value) {
+function omegaJsonEscape(value) {
   return JSON.stringify(String(value)).slice(1, -1);
 }
 
@@ -42,7 +42,7 @@ function ujJsonEscape(value) {
  * @param {number} input
  * @returns {number}
  */
-function ujRandom(input) {
+function omegaRandom(input) {
   return Math.floor(Math.random() * Number(input));
 }
 
@@ -53,7 +53,7 @@ function ujRandom(input) {
  * @param {number} max
  * @returns {number}
  */
-function ujHash(input, max) {
+function omegaHash(input, max) {
   const digest = crypto.createHash('md5').update(String(input)).digest('hex');
   return Number(BigInt(`0x${digest}`) % BigInt(parseInt(max, 10)));
 }
@@ -64,7 +64,7 @@ function ujHash(input, max) {
  * @param {string} input
  * @returns {string}
  */
-function ujTitleCase(input) {
+function omegaTitleCase(input) {
   return String(input)
     .split(' ')
     .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word))
@@ -77,7 +77,7 @@ function ujTitleCase(input) {
  * @param {number} [indentSize=2]
  * @returns {string}
  */
-function ujJsonify(input, indentSize = 2) {
+function omegaJsonify(input, indentSize = 2) {
   return JSON.stringify(input, null, ' '.repeat(parseInt(indentSize, 10)));
 }
 
@@ -88,7 +88,7 @@ function ujJsonify(input, indentSize = 2) {
  * @param {string} value
  * @returns {string}
  */
-function ujAppendParam(input, key, value) {
+function omegaAppendParam(input, key, value) {
   if (input === null || input === undefined || String(input).trim() === '') return input;
   const url = String(input).trim();
   const sep = url.includes('?') ? '&' : '?';
@@ -100,8 +100,8 @@ function ujAppendParam(input, key, value) {
  * @param {string} input
  * @returns {string}
  */
-function ujCachebreak(input) {
-  return ujAppendParam(input, 'cb', CACHE_TIMESTAMP);
+function omegaCachebreak(input) {
+  return omegaAppendParam(input, 'cb', CACHE_TIMESTAMP);
 }
 
 /**
@@ -111,7 +111,7 @@ function ujCachebreak(input) {
  * @param {string} [plural] - defaults to singular + 's'
  * @returns {string}
  */
-function ujPluralize(count, singular, plural) {
+function omegaPluralize(count, singular, plural) {
   const resolved = plural || `${singular}s`;
   return parseInt(count, 10) === 1 ? singular : resolved;
 }
@@ -122,7 +122,7 @@ function ujPluralize(count, singular, plural) {
  * @param {*} input
  * @returns {*}
  */
-function ujCommaify(input) {
+function omegaCommaify(input) {
   if (input === null || input === undefined || input === false) return input;
   const str = String(input).trim();
   if (!str) return input;
@@ -139,10 +139,10 @@ function ujCommaify(input) {
  * @returns {function} (input) => number
  */
 function createIncrementReturn(getRegisters) {
-  return function ujIncrementReturn(input) {
+  return function omegaIncrementReturn(input) {
     const registers = getRegisters();
-    registers.ujIncrementalReturn = (registers.ujIncrementalReturn || 0) + Number(input);
-    return registers.ujIncrementalReturn;
+    registers.omegaIncrementalReturn = (registers.omegaIncrementalReturn || 0) + Number(input);
+    return registers.omegaIncrementalReturn;
   };
 }
 
@@ -152,7 +152,7 @@ function createIncrementReturn(getRegisters) {
  * @returns {function} (input, maxDepth) => string
  */
 function createLiquify(render) {
-  return function ujLiquify(input, maxDepth = 10) {
+  return function omegaLiquify(input, maxDepth = 10) {
     if (input === null || input === undefined || input === false) return '';
 
     let depth = 0;
@@ -180,7 +180,7 @@ function createLiquify(render) {
 function createContentFormat(render, hooks = {}) {
   const liquify = createLiquify(render);
 
-  return function ujContentFormat(input) {
+  return function omegaContentFormat(input) {
     if (input === null || input === undefined || input === false) return '';
 
     const liquified = liquify(input);
@@ -196,31 +196,31 @@ function createContentFormat(render, hooks = {}) {
 // Jekyll-spelled filter name => implementation (context-free filters only;
 // the factories register separately in the engine adapter)
 const FILTER_NAMES = {
-  uj_strip_ads: ujStripAds,
-  uj_json_escape: ujJsonEscape,
-  uj_random: ujRandom,
-  uj_hash: ujHash,
-  uj_title_case: ujTitleCase,
-  uj_jsonify: ujJsonify,
-  uj_append_param: ujAppendParam,
-  uj_cachebreak: ujCachebreak,
-  uj_pluralize: ujPluralize,
-  uj_commaify: ujCommaify,
+  omega_strip_ads: omegaStripAds,
+  omega_json_escape: omegaJsonEscape,
+  omega_random: omegaRandom,
+  omega_hash: omegaHash,
+  omega_title_case: omegaTitleCase,
+  omega_jsonify: omegaJsonify,
+  omega_append_param: omegaAppendParam,
+  omega_cachebreak: omegaCachebreak,
+  omega_pluralize: omegaPluralize,
+  omega_commaify: omegaCommaify,
 };
 
 module.exports = {
   CACHE_TIMESTAMP,
   FILTER_NAMES,
-  ujStripAds,
-  ujJsonEscape,
-  ujRandom,
-  ujHash,
-  ujTitleCase,
-  ujJsonify,
-  ujAppendParam,
-  ujCachebreak,
-  ujPluralize,
-  ujCommaify,
+  omegaStripAds,
+  omegaJsonEscape,
+  omegaRandom,
+  omegaHash,
+  omegaTitleCase,
+  omegaJsonify,
+  omegaAppendParam,
+  omegaCachebreak,
+  omegaPluralize,
+  omegaCommaify,
   createIncrementReturn,
   createLiquify,
   createContentFormat,

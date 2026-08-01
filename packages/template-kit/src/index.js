@@ -1,7 +1,7 @@
 /**
  * index.js — @omega.js/template-kit public surface.
  *
- * The uj_* template filters/tags from jekyll-uj-powertools as plain,
+ * The omega_* template filters/tags from jekyll-uj-powertools as plain,
  * engine-neutral JS, plus the Jekyll-compat filter pack and the LiquidJS
  * adapter. Eleventy path: `registerLiquid(engine, options)`. Astro/direct
  * path: import the functions and call them.

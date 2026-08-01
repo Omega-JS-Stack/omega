@@ -12,7 +12,7 @@ prerender_icons:
       <!-- Logo -->
       <div class="text-center mb-3">
         <div class="avatar avatar-xl">
-          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+          <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
         </div>
       </div>
 
@@ -25,11 +25,11 @@ prerender_icons:
       <!-- Error state (hidden by default) -->
       <div id="email-preferences-error" class="text-center" hidden>
         <div class="alert alert-danger mb-4">
-          {% uj_icon "triangle-exclamation", "me-1" %}
+          {% omega_icon "triangle-exclamation", "me-1" %}
           <span id="email-preferences-error-message">Invalid or missing parameters.</span>
         </div>
         <a href="/" class="btn btn-outline-adaptive">
-          {% uj_icon "arrow-left", "me-1" %}
+          {% omega_icon "arrow-left", "me-1" %}
           Back to home
         </a>
       </div>
@@ -48,11 +48,11 @@ prerender_icons:
           <div class="mb-4">
             <div class="d-flex" role="group" aria-label="Email preference action" data-omega-segmented>
               <button type="button" class="btn flex-fill active" data-action="unsubscribe">
-                {% uj_icon "bell-slash", "fa-sm me-1" %}
+                {% omega_icon "bell-slash", "fa-sm me-1" %}
                 Unsubscribe
               </button>
               <button type="button" class="btn flex-fill" data-action="resubscribe">
-                {% uj_icon "bell", "fa-sm me-1" %}
+                {% omega_icon "bell", "fa-sm me-1" %}
                 Resubscribe
               </button>
             </div>
@@ -86,7 +86,7 @@ prerender_icons:
           </div>
 
           <button type="submit" class="btn btn-adaptive w-100 mb-4" id="email-preferences-submit">
-            {% uj_icon "bell-slash", "fa-sm me-2" %}
+            {% omega_icon "bell-slash", "fa-sm me-2" %}
             <span class="button-text">Unsubscribe</span>
           </button>
         </form>
@@ -94,7 +94,7 @@ prerender_icons:
         <!-- Back to Home -->
         <div class="mt-3 pt-3 hairline-top text-center">
           <a href="/" class="btn btn-outline-adaptive btn-sm">
-            {% uj_icon "arrow-left", "fa-xs me-1" %}
+            {% omega_icon "arrow-left", "fa-xs me-1" %}
             Back to home
           </a>
         </div>
@@ -103,4 +103,4 @@ prerender_icons:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

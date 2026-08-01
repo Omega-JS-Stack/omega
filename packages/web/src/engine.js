@@ -46,7 +46,7 @@ const RESOLVED_OMIT = new Set([
 // via site.* directly — mirrors inject-properties.rb's config exclusions,
 // which also dropped `collections`; seeding the site collection arrays
 // would make every page's resolved walk all 1,030 post docs).
-const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'updates', 'alternatives']);
+const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team', 'updates', 'alternatives']);
 
 // Consumer PAGE frontmatter is meta-only (Ian's rule, 2026-07-19: content
 // lives in {% section %} calls — and nothing may even TRY to consume it from
@@ -210,7 +210,7 @@ function configureOmega(eleventyConfig, options) {
     if (SITE_COLLECTIONS.includes(name)) {
       site[name].length = 0;
       // id rides along (Jekyll doc parity — layouts pass member.id/post.id
-      // to the uj_member/uj_post tags); explicit frontmatter id still wins
+      // to the omega_member/omega_post tags); explicit frontmatter id still wins
       // via the data spread.
       site[name].push(...docs.map((doc) => ({ id: doc.id, url: doc.url, date: doc.date, ...doc.data })));
     }
@@ -584,18 +584,18 @@ function configureOmega(eleventyConfig, options) {
     }
   }
 
-  // ---- Globals. site.uj carries UJM-runtime site values the core includes
+  // ---- Globals. site.omega carries UJM-runtime site values the core includes
   // read (cache_breaker in the @omega.js/client Configuration, date.year in
   // the copyright meta, date.iso as the sitemap/feed build stamp — legacy
   // site.time, placeholder.src in lazy-loaded imgs).
-  site.uj = {
+  site.omega = {
     // The build stamp the runtime lazy-loader appends (cb=) — same value as
-    // uj_cachebreak and the omega-cachebreak-img transform. Was 0 (inert)
+    // omega_cachebreak and the omega-cachebreak-img transform. Was 0 (inert)
     // until the central cache-breaker landed.
     cache_breaker: CACHE_TIMESTAMP,
     date: { year: new Date().getFullYear(), iso: new Date().toISOString() },
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
-    ...(site.uj || {}),
+    ...(site.omega || {}),
   };
   eleventyConfig.addGlobalData('site', site);
   // og:locale wants Open Graph's language_TERRITORY form (en → en_US), and the
@@ -614,7 +614,7 @@ function configureOmega(eleventyConfig, options) {
   // ---- Image cache-breaker (dev AND prod): every local <img>/<source> URL
   // in a .html output carries ?cb=<build stamp> so image edits show up on
   // rebuilds. Registered before the minifier (transforms run in order) and
-  // shares the uj_cachebreak filter's stamp — one value per build process.
+  // shares the omega_cachebreak filter's stamp — one value per build process.
   const { cachebreakHtml } = require('./cachebreak-html.js');
   eleventyConfig.addTransform('omega-cachebreak-img', function (content) {
     if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {

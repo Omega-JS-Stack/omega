@@ -8,7 +8,7 @@
  * built site cannot show you cheaply: date-desc/slug-asc post order,
  * byte-order (not locale) URL sort for the meta-file lane, taxonomy keyed by
  * SLUG with the most-frequent spelling winning the display name, and the
- * template-kit holder mirror the uj_* tags read mid-render.
+ * template-kit holder mirror the omega_* tags read mid-render.
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
@@ -74,7 +74,7 @@ test('posts mirror into the template-kit holder as Jekyll-style docs', () => {
   registry(holder).get('posts')(api(items));
 
   assert.deepStrictEqual(holder.get('posts'), [{
-    // Trailing slashes stripped — the id shape uj_post matches on.
+    // Trailing slashes stripped — the id shape omega_post matches on.
     id: '/blog/hello',
     url: '/blog/hello/',
     date: new Date('2024-01-01'),

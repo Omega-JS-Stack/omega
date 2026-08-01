@@ -1,9 +1,9 @@
 {
-  description: 'Newsflash story tile — framed art (uj_post image-tag from the post id), optional display-ready kicker, h5 headline, nested news/byline. url arrives absolute (site.url | append: post.url); date pre-formatted; readtime pre-captured.',
+  description: 'Newsflash story tile — framed art (omega_post image-tag from the post id), optional display-ready kicker, h5 headline, nested news/byline. url arrives absolute (site.url | append: post.url); date pre-formatted; readtime pre-captured.',
 
   args: {
     url: 'string',
-    id: { description: 'post id — string or number (uj_post resolves either; posts carry numeric ids by convention)' },
+    id: { description: 'post id — string or number (omega_post resolves either; posts carry numeric ids by convention)' },
     kicker: 'string',
     title: 'string',
     author: 'string',
@@ -13,8 +13,8 @@
 
   defaults: {},
 
-  // No demo (spec §9, deliberate): the tile resolves its art through uj_post
-  // (and its byline through uj_member) against live site content — a
+  // No demo (spec §9, deliberate): the tile resolves its art through omega_post
+  // (and its byline through omega_member) against live site content — a
   // showcase page can't fabricate those lookups, so the entry documents
   // args only.
 }

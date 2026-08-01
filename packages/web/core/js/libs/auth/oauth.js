@@ -75,7 +75,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
   // (or authReturnUrl) before the user ever sees the inline error.
   // Cleared in the finally block after signOut() has fired the followup
   // auth-state-change with user=null.
-  window.__UJM_REVERSING_SIGNUP = true;
+  window.__OMEGA_REVERSING_SIGNUP = true;
 
   try {
     await newUser.delete();
@@ -108,7 +108,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
   // Clear the flag now that signOut() has fired its auth-state-change
   // with user=null. Future state changes (e.g. user re-clicks Continue
   // with Google after seeing the error) get normal listener processing.
-  window.__UJM_REVERSING_SIGNUP = false;
+  window.__OMEGA_REVERSING_SIGNUP = false;
 }
 
 /**

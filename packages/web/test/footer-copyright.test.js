@@ -2,7 +2,7 @@
  * The footer copyright line — a sub-brand credits the parent company from
  * CONFIG (brand.company, linked with company.url), never a typed literal.
  * Three shapes: no parent (the plain line), a parent without a url (plain
- * text), a parent with one (a link). The year keeps coming from site.uj.date.
+ * text), a parent with one (a link). The year keeps coming from site.omega.date.
  */
 const assert = require('node:assert');
 const { test } = require('node:test');

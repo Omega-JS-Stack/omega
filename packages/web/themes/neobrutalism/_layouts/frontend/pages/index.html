@@ -161,10 +161,10 @@ cta:
       <div class="col-lg-5">
         <div class="d-grid gap-3 hero-actions">
           <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-dark btn-lg">
-            {% uj_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
+            {% omega_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
           </a>
           <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-light btn-lg">
-            {% uj_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
+            {% omega_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
           </a>
         </div>
       </div>
@@ -183,13 +183,13 @@ cta:
         <div class="infinite-scroll-track">
           {% for logo in resolved.trusted_by.logos %}
             <div class="infinite-scroll-item infinite-scroll-item--logo filter-adaptive">
-              {% uj_logo logo.name, "combomarks", "original" %}
+              {% omega_logo logo.name, "combomarks", "original" %}
             </div>
           {% endfor %}
           {% comment %} duplicate for seamless loop {% endcomment %}
           {% for logo in resolved.trusted_by.logos %}
             <div class="infinite-scroll-item infinite-scroll-item--logo filter-adaptive" aria-hidden="true">
-              {% uj_logo logo.name, "combomarks", "original" %}
+              {% omega_logo logo.name, "combomarks", "original" %}
             </div>
           {% endfor %}
         </div>
@@ -206,7 +206,7 @@ cta:
     <header class="section-head mb-5">
       {% iftruthy resolved.showcase.superheadline.text %}
         <span class="kicker mb-3">
-          {% uj_icon resolved.showcase.superheadline.icon, "me-1" %}{{ resolved.showcase.superheadline.text }}
+          {% omega_icon resolved.showcase.superheadline.icon, "me-1" %}{{ resolved.showcase.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="section-title">
@@ -243,7 +243,7 @@ cta:
     <header class="section-head mb-5">
       {% iftruthy resolved.features.superheadline.text %}
         <span class="kicker mb-3">
-          {% uj_icon resolved.features.superheadline.icon, "me-1" %}{{ resolved.features.superheadline.text }}
+          {% omega_icon resolved.features.superheadline.icon, "me-1" %}{{ resolved.features.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="section-title">
@@ -259,7 +259,7 @@ cta:
             <div class="card-body">
               <div class="step-card-top">
                 <span class="step-card-num">{{ forloop.index }}</span>
-                <span class="step-card-icon">{% uj_icon feature.icon %}</span>
+                <span class="step-card-icon">{% omega_icon feature.icon %}</span>
               </div>
               <h3 class="step-card-title">{{ feature.title }}</h3>
               <p class="step-card-desc">{{ feature.description }}</p>
@@ -272,7 +272,7 @@ cta:
     {% iftruthy resolved.features.cta_button %}
       <div class="text-center mt-5">
         <a href="{{ resolved.features.cta_button.href }}" class="btn btn-warning btn-lg">
-          {% uj_icon resolved.features.cta_button.icon, "me-2" %}{{ resolved.features.cta_button.text }}
+          {% omega_icon resolved.features.cta_button.icon, "me-2" %}{{ resolved.features.cta_button.text }}
         </a>
       </div>
     {% endiftruthy %}
@@ -315,7 +315,7 @@ cta:
     <div class="cta-panel">
       {% iftruthy resolved.cta.superheadline.text %}
         <span class="kicker kicker--invert mb-4">
-          {% uj_icon resolved.cta.superheadline.icon, "me-1" %}{{ resolved.cta.superheadline.text }}
+          {% omega_icon resolved.cta.superheadline.icon, "me-1" %}{{ resolved.cta.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="cta-title">
@@ -325,11 +325,11 @@ cta:
       <p class="cta-desc">{{ resolved.cta.description }}</p>
       <div class="d-flex flex-wrap gap-3 justify-content-center">
         <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-warning btn-lg">
-          {% uj_icon resolved.cta.primary_button.icon, "me-2" %}{{ resolved.cta.primary_button.text }}
+          {% omega_icon resolved.cta.primary_button.icon, "me-2" %}{{ resolved.cta.primary_button.text }}
         </a>
         {% iftruthy resolved.cta.secondary_button %}
           <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg">
-            {% uj_icon resolved.cta.secondary_button.icon, "me-2" %}{{ resolved.cta.secondary_button.text }}
+            {% omega_icon resolved.cta.secondary_button.icon, "me-2" %}{{ resolved.cta.secondary_button.text }}
           </a>
         {% endiftruthy %}
       </div>
@@ -337,4 +337,4 @@ cta:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

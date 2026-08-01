@@ -18,11 +18,11 @@
         <div class="col-md-4" data-lazy="@class animation-slide-up">
           <a href="{{ desk_href }}" class="card story-card h-100 p-4 text-decoration-none">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
-              {% uj_icon desk.icon %}
+              {% omega_icon desk.icon %}
             </span>
             <h3 class="h4 mb-2">{{ desk.title }}</h3>
             <p class="text-body-secondary mb-0">{{ desk.description }}</p>
-            <span class="small fw-bold text-primary mt-3">Read the desk {% uj_icon "arrow-right", "ms-1" %}</span>
+            <span class="small fw-bold text-primary mt-3">Read the desk {% omega_icon "arrow-right", "ms-1" %}</span>
           </a>
         </div>
       {% endfor %}
@@ -31,7 +31,7 @@
     {% iftruthy args.cta_button %}
       <div class="text-center mt-5" data-lazy="@class animation-slide-up">
         <a href="{{ args.cta_button.href }}" class="btn btn-primary btn-lg">
-          {% uj_icon args.cta_button.icon, "me-2" %}{{ args.cta_button.text }}
+          {% omega_icon args.cta_button.icon, "me-2" %}{{ args.cta_button.text }}
         </a>
       </div>
     {% endiftruthy %}

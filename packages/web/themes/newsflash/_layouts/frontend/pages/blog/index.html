@@ -54,7 +54,7 @@ newsletter_cta:
         {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
         <label for="blog-search" class="visually-hidden">Search posts</label>
         <div class="input-group">
-          <span class="input-group-text bg-transparent">{% uj_icon "search" %}</span>
+          <span class="input-group-text bg-transparent">{% omega_icon "search" %}</span>
           <input
             type="search"
             id="blog-search"
@@ -83,17 +83,17 @@ newsletter_cta:
         <div class="row g-4 g-lg-5 align-items-center">
           <div class="col-lg-7">
             <div class="art-frame shadow">
-              {%- uj_post lead.post.id, "image-tag", class="w-100" -%}
+              {%- omega_post lead.post.id, "image-tag", class="w-100" -%}
             </div>
           </div>
           <div class="col-lg-5">
             {% if lead.post.categories[0] %}
-              <span class="kicker mb-2">{{ lead.post.categories[0] | uj_title_case }}</span>
+              <span class="kicker mb-2">{{ lead.post.categories[0] | omega_title_case }}</span>
             {% endif %}
             <h3 class="h1 my-2">{{ lead.post.title }}</h3>
-            {% capture lead_rt %}{% uj_readtime lead.content %}{% endcapture %}
+            {% capture lead_rt %}{% omega_readtime lead.content %}{% endcapture %}
             {% component "news/byline", author: lead.post.author, date: lead.date | date: "%b %d, %Y", readtime: lead_rt, p_class: "text-body-secondary mb-3" %}
-            <span class="btn btn-outline-dark btn-sm">Read the story {% uj_icon "arrow-right", "ms-1" %}</span>
+            <span class="btn btn-outline-dark btn-sm">Read the story {% omega_icon "arrow-right", "ms-1" %}</span>
           </div>
         </div>
       </a>
@@ -104,8 +104,8 @@ newsletter_cta:
         <div class="row g-4 mb-4">
           {% for post in paginator.posts offset: 1 %}
             <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
-              {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
-              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | uj_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+              {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
+              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
             </div>
           {% endfor %}
         </div>
@@ -129,14 +129,14 @@ newsletter_cta:
               {% if paginator.previous_page %}
                 <li class="page-item">
                   <a class="page-link" href="{{ paginator.previous_page_path }}" aria-label="Previous page">
-                    {% uj_icon "chevron-left" %}
+                    {% omega_icon "chevron-left" %}
                     <span class="d-none d-sm-inline ms-1">Previous</span>
                   </a>
                 </li>
               {% else %}
                 <li class="page-item disabled">
                   <span class="page-link">
-                    {% uj_icon "chevron-left" %}
+                    {% omega_icon "chevron-left" %}
                     <span class="d-none d-sm-inline ms-1">Previous</span>
                   </span>
                 </li>
@@ -186,14 +186,14 @@ newsletter_cta:
                 <li class="page-item">
                   <a class="page-link" href="{{ paginator.next_page_path }}" aria-label="Next page">
                     <span class="d-none d-sm-inline me-1">Next</span>
-                    {% uj_icon "chevron-right" %}
+                    {% omega_icon "chevron-right" %}
                   </a>
                 </li>
               {% else %}
                 <li class="page-item disabled">
                   <span class="page-link">
                     <span class="d-none d-sm-inline me-1">Next</span>
-                    {% uj_icon "chevron-right" %}
+                    {% omega_icon "chevron-right" %}
                   </span>
                 </li>
               {% endif %}
@@ -220,7 +220,7 @@ newsletter_cta:
         {% break %}
       {% endif %}
       {% for category in post.post.categories %}
-        {% assign category_fixed = category | uj_title_case %}
+        {% assign category_fixed = category | omega_title_case %}
         {% unless categories contains category_fixed %}
           {% assign categories = categories | push: category_fixed %}
         {% endunless %}
@@ -234,7 +234,7 @@ newsletter_cta:
         {% break %}
       {% endif %}
       {% for tag in post.post.tags %}
-        {% assign tag_fixed = tag | uj_title_case %}
+        {% assign tag_fixed = tag | omega_title_case %}
         {% unless tags contains tag_fixed %}
           {% assign tags = tags | push: tag_fixed %}
         {% endunless %}
@@ -248,7 +248,7 @@ newsletter_cta:
           {% if categories.size > 0 %}
             <div class="mb-5 text-center">
               <h3 class="h5 mb-3">
-                {% uj_icon "folder", "me-2" %}
+                {% omega_icon "folder", "me-2" %}
                 Categories
               </h3>
               <div>
@@ -258,7 +258,7 @@ newsletter_cta:
                   </a>
                 {% endfor %}
                 <a href="{{ site.url }}/blog/categories" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
-                  View all {% uj_icon "arrow-right", "ms-1" %}
+                  View all {% omega_icon "arrow-right", "ms-1" %}
                 </a>
               </div>
             </div>
@@ -268,7 +268,7 @@ newsletter_cta:
           {% if tags.size > 0 %}
             <div class="text-center">
               <h3 class="h5 mb-3">
-                {% uj_icon "tags", "me-2" %}
+                {% omega_icon "tags", "me-2" %}
                 Tags
               </h3>
               <div>
@@ -278,7 +278,7 @@ newsletter_cta:
                   </a>
                 {% endfor %}
                 <a href="{{ site.url }}/blog/tags" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
-                  View all {% uj_icon "arrow-right", "ms-1" %}
+                  View all {% omega_icon "arrow-right", "ms-1" %}
                 </a>
               </div>
             </div>
@@ -292,4 +292,4 @@ newsletter_cta:
 <!-- Newsletter CTA — the vermilion slab (shared marketing/newsletter-cta, nf override) -->
 {% section "marketing/newsletter-cta", data: resolved.newsletter_cta %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

@@ -74,7 +74,7 @@ prerender_icons:
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="campaign-modal-title">
-          {% uj_icon "plus", "fa-md me-2" %}
+          {% omega_icon "plus", "fa-md me-2" %}
           <span id="campaign-modal-title-text">Create campaign</span>
           <small class="text-muted fw-normal ms-2 d-none" id="campaign-modal-id" style="font-size: 0.6rem"></small>
         </h5>
@@ -85,21 +85,21 @@ prerender_icons:
 
           <!-- Campaign Type -->
           <h6 class="mb-3">
-            {% uj_icon "bullhorn", "me-2" %}
+            {% omega_icon "bullhorn", "me-2" %}
             Campaign type
           </h6>
           <div class="row mb-4">
             <div class="col-6">
               <input type="radio" class="btn-check" name="campaign.type" id="campaign-type-email" value="email" checked autocomplete="off">
               <label class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center" for="campaign-type-email">
-                {% uj_icon "envelope", "fa-sm me-2" %}
+                {% omega_icon "envelope", "fa-sm me-2" %}
                 Email
               </label>
             </div>
             <div class="col-6">
               <input type="radio" class="btn-check" name="campaign.type" id="campaign-type-push" value="push" autocomplete="off">
               <label class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center" for="campaign-type-push">
-                {% uj_icon "bell", "fa-sm me-2" %}
+                {% omega_icon "bell", "fa-sm me-2" %}
                 Push notification
               </label>
             </div>
@@ -109,12 +109,12 @@ prerender_icons:
           <ul class="nav nav-tabs mb-3" id="campaign-content-tabs" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active" id="tab-edit" data-bs-toggle="tab" data-bs-target="#panel-edit" type="button" role="tab">
-                {% uj_icon "pen", "fa-sm me-1" %} Edit
+                {% omega_icon "pen", "fa-sm me-1" %} Edit
               </button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link" id="tab-preview" data-bs-toggle="tab" data-bs-target="#panel-preview" type="button" role="tab">
-                {% uj_icon "eye", "fa-sm me-1" %} Preview
+                {% omega_icon "eye", "fa-sm me-1" %} Preview
               </button>
             </li>
           </ul>
@@ -244,7 +244,7 @@ prerender_icons:
 
             <div class="mb-3">
               <label for="campaign-push-tags" class="form-label">
-                {% uj_icon "tags", "fa-sm me-1" %}
+                {% omega_icon "tags", "fa-sm me-1" %}
                 Filter by tags
                 <small class="text-muted fw-normal ms-1">(comma-separated)</small>
               </label>
@@ -296,7 +296,7 @@ prerender_icons:
 
           <!-- Schedule -->
           <h6 class="mb-3 mt-4">
-            {% uj_icon "clock", "me-2" %}
+            {% omega_icon "clock", "me-2" %}
             Schedule
             <small class="text-muted fw-normal ms-1">(UTC)</small>
           </h6>
@@ -327,7 +327,7 @@ prerender_icons:
             </div>
             <div class="col-md-3 d-flex align-items-end">
               <button type="button" class="btn btn-md btn-outline-primary w-100" id="btn-send-now">
-                {% uj_icon "clock", "fa-sm me-1" %}
+                {% omega_icon "clock", "fa-sm me-1" %}
                 Set now
               </button>
             </div>
@@ -338,7 +338,7 @@ prerender_icons:
 
           <!-- Recurrence -->
           <h6 class="mb-3 mt-4">
-            {% uj_icon "repeat", "me-2" %}
+            {% omega_icon "repeat", "me-2" %}
             Recurrence
             <small class="text-muted fw-normal ms-1">(optional)</small>
           </h6>
@@ -441,7 +441,7 @@ prerender_icons:
 
           <!-- Targeting -->
           <h6 class="mb-3 mt-4">
-            {% uj_icon "users", "me-2" %}
+            {% omega_icon "users", "me-2" %}
             Targeting
           </h6>
 
@@ -521,7 +521,7 @@ prerender_icons:
           <!-- Advanced Settings (collapsible) -->
           <h6 class="mb-3 mt-4">
             <a class="text-decoration-none" data-bs-toggle="collapse" href="#advanced-settings" role="button" aria-expanded="false">
-              {% uj_icon "sliders", "me-2" %}
+              {% omega_icon "sliders", "me-2" %}
               Advanced settings
               <small class="text-muted fw-normal ms-1">(optional)</small>
             </a>
@@ -575,17 +575,17 @@ prerender_icons:
           <div class="modal-footer d-flex justify-content-between">
             <div>
               <button type="submit" name="action" value="delete" formnovalidate class="btn btn-outline-danger d-none" id="btn-delete-campaign">
-                {% uj_icon "trash", "fa-sm me-1" %}
+                {% omega_icon "trash", "fa-sm me-1" %}
                 <span class="button-text">Delete</span>
               </button>
             </div>
             <div class="d-flex gap-2">
               <button type="submit" name="action" value="test" formnovalidate class="btn btn-outline-warning" id="btn-send-test">
-                {% uj_icon "vial", "fa-sm me-1" %}
+                {% omega_icon "vial", "fa-sm me-1" %}
                 <span class="button-text">Send test</span>
               </button>
               <button type="submit" name="action" value="save" class="btn btn-adaptive" id="btn-save-campaign">
-                {% uj_icon "paper-plane", "fa-sm me-1" %}
+                {% omega_icon "paper-plane", "fa-sm me-1" %}
                 <span class="button-text">Save campaign</span>
               </button>
             </div>
@@ -602,7 +602,7 @@ prerender_icons:
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="campaign-results-title">
-          {% uj_icon "eye", "fa-md me-2" %}
+          {% omega_icon "eye", "fa-md me-2" %}
           <span id="campaign-results-title-text">Campaign details</span>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -612,7 +612,7 @@ prerender_icons:
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-danger d-none" id="btn-retry-campaign">
-          {% uj_icon "rotate-right", "fa-sm me-1" %}
+          {% omega_icon "rotate-right", "fa-sm me-1" %}
           Retry (Create new)
         </button>
         <button type="button" class="btn btn-outline-adaptive" data-bs-dismiss="modal">Close</button>

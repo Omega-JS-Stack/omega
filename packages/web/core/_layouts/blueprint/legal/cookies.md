@@ -11,8 +11,8 @@ client:
     enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | uj_liquify }}**{% endcapture %}
-{% capture breadcrumb %}{{ resolved.meta.breadcrumb | uj_liquify }}{% endcapture %}
+{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 <p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
@@ -47,7 +47,7 @@ In some special cases we also use cookies provided by trusted third parties. The
 * **Affiliate tracking:** Several partners advertise on our behalf and affiliate tracking cookies simply allow us to see if our customers have come to the site through one of our partner sites so that we can credit them appropriately and where applicable allow our affiliate partners to provide any bonus that they may provide you for making a purchase.
 * **Social media:** We also use social media buttons and/or plugins on this site that allow you to connect with your social network in various ways. For these to work, the social media sites we integrate with will set cookies through our site which may be used to enhance your profile on their site or contribute to the data they hold for various purposes outlined in their respective privacy policies.
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}
 
 ## More Information
 Hopefully that has clarified things for you and as was previously mentioned if there is something that you aren't sure whether you need or not it's usually safer to leave cookies enabled in case it does interact with one of the features you use on our site. <a href="https://cookiepolicygenerator.com" rel="nofollow">This Cookies Policy was created with the help of the CookiePolicyGenerator.com</a>

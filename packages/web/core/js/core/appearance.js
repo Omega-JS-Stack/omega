@@ -82,8 +82,8 @@ export default () => {
     }
   };
 
-  // Register on UJ library
-  omega._ujLibrary.appearance = appearanceAPI;
+  // Register on the omega library
+  omega._library.appearance = appearanceAPI;
 
   // Initialize UI event listeners
   initializeUI();
@@ -159,7 +159,7 @@ const initializeUI = () => {
     event.preventDefault();
 
     const value = $target.getAttribute('data-appearance-set');
-    omega.uj().appearance.set(value);
+    omega.library().appearance.set(value);
   });
 };
 

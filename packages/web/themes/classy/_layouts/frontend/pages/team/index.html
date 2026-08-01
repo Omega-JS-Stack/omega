@@ -69,13 +69,13 @@ join_cta:
         <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
           <div class="classy-person">
             <a href="{{ member.url }}" class="classy-person__portrait">
-              {%- uj_member member.id, "image-tag", class="" -%}
+              {%- omega_member member.id, "image-tag", class="" -%}
             </a>
 
             <div class="classy-person__body">
               <h3 class="classy-person__name">
                 <a href="{{ member.url }}">
-                  {%- uj_member member.id, "name" -%}
+                  {%- omega_member member.id, "name" -%}
                 </a>
               </h3>
               <span class="classy-micro classy-person__role">{{ member.member.position }}</span>
@@ -86,7 +86,7 @@ join_cta:
                     {% assign link_icon = link.id %}
                     {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
                     <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                      {% uj_icon link_icon, "fa-sm" %}
+                      {% omega_icon link_icon, "fa-sm" %}
                     </a>
                   {% endfor %}
                 </div>
@@ -112,7 +112,7 @@ join_cta:
         {% for item in resolved.principles.items %}
           <div class="classy-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon item.icon, "fa-sm" %}</span>
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon item.icon, "fa-sm" %}</span>
               <strong>{{ item.title }}</strong>
             </span>
             <span class="classy-rowlist__meta">{{ item.description }}</span>
@@ -156,9 +156,9 @@ join_cta:
       {% if mission_member %}
         <figcaption class="classy-quote__attr">
           <span class="classy-quote__avatar overflow-hidden">
-            {%- uj_member mission_member.id, "image-tag", class="w-100 h-100 object-fit-cover" -%}
+            {%- omega_member mission_member.id, "image-tag", class="w-100 h-100 object-fit-cover" -%}
           </span>
-          <span class="classy-quote__name">{%- uj_member mission_member.id, "name" -%}</span>
+          <span class="classy-quote__name">{%- omega_member mission_member.id, "name" -%}</span>
           <span class="classy-quote__role">{{ mission_member.member.position }}</span>
         </figcaption>
       {% endif %}
@@ -171,4 +171,4 @@ join_cta:
 {% capture join_cta_class %}{% if _team_count == 0 %}pt-0{% endif %}{% endcapture %}
 {% section "marketing/cta", data: resolved.join_cta, section_class: join_cta_class %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

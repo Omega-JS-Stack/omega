@@ -18,7 +18,7 @@
  * Slots (Ian 2026-07-18): a body may carry named markup blocks —
  * {% slot demo %}<any html>{% endslot %} — alongside the YAML (or alongside
  * inline args: the XOR rule applies to the YAML remainder only). Slot content
- * renders in the CALLER's scope (site.*, captures, uj_* tags all work) and
+ * renders in the CALLER's scope (site.*, captures, omega_* tags all work) and
  * reaches the section as a finished-HTML string arg (schema type 'html'),
  * merged OUTERMOST after call-site liquification — so slot output never
  * re-renders and literal braces (code samples via {% raw %}) survive. An
@@ -49,7 +49,7 @@
  *
  * {% composition %}…{% endcomposition %} (spec §8) wraps a page layout's
  * default section composition. Three page states, all byte-parity with the
- * `{{ content | uj_content_format }}` layout line the wrap replaces:
+ * `{{ content | omega_content_format }}` layout line the wrap replaces:
  *   - empty page → the wrapped one-liners render (absence is the spine)
  *   - body content → the body REPLACES the composition (a page that writes
  *     a body means it — Ian's 2026-07-19 ruling; what `omega customize
@@ -608,7 +608,7 @@ function registerSectionTags(engine, options) {
         }
 
         // ---- slots render NOW, in the caller's scope (site.*, captures,
-        // uj_* tags) — finished HTML that merges outermost below, after
+        // omega_* tags) — finished HTML that merges outermost below, after
         // call-site liquification, so it never re-renders.
         const scope = typeof context.getAll === 'function' ? context.getAll() : context.environments;
         const slotValues = {};
@@ -691,10 +691,10 @@ function registerSectionTags(engine, options) {
       // body REPLACES the layout's default composition, no flag needed (the
       // old `composition: true` key is retired). The rare page that wants
       // the legacy add-below contract — body rendered BELOW the default
-      // composition, exactly like the `{{ content | uj_content_format }}`
+      // composition, exactly like the `{{ content | omega_content_format }}`
       // line this wrap replaced — declares `append: true`.
       if (!blank && !read('append')) {
-        if (!contentParity) contentParity = this.liquid.parse('{{ content | uj_content_format }}');
+        if (!contentParity) contentParity = this.liquid.parse('{{ content | omega_content_format }}');
         emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
         return;
       }
@@ -706,7 +706,7 @@ function registerSectionTags(engine, options) {
         // newlines.
         if (typeof content === 'string') emitter.write(content);
       } else {
-        if (!contentParity) contentParity = this.liquid.parse('{{ content | uj_content_format }}');
+        if (!contentParity) contentParity = this.liquid.parse('{{ content | omega_content_format }}');
         emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
       }
     },

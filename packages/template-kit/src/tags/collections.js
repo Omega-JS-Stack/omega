@@ -1,11 +1,11 @@
 /**
- * collections.js — the collection-lookup uj tags (member, post).
+ * collections.js — the collection-lookup omega_ tags (member, post).
  *
  * Ported from jekyll-uj-powertools lib/tags/{member,post}.rb. Collection
  * access is injected: the adapter provides `ctx.site.getCollection(name)`
  * returning an array of docs shaped `{ id, url, data }` (Jekyll doc parity —
  * `id` like '/team/ian' or '/posts/2024-01-01-slug', `data` = frontmatter).
- * The Ruby's image-tag property re-parsed a {% uj_image %} template; here it
+ * The Ruby's image-tag property re-parsed a {% omega_image %} template; here it
  * calls the shared buildImageHtml() directly — same output, no re-parse.
  */
 
@@ -13,8 +13,8 @@
 const { resolveVariable, parseArguments, parseOptions, isQuoted, stripQuotes } = require('../variable-resolver.js');
 const { buildImageHtml } = require('./media.js');
 
-// {% uj_member member_id, "property" %} — look up a team member doc
-const ujMember = {
+// {% omega_member member_id, "property" %} — look up a team member doc
+const omegaMember = {
   block: false,
   render(ctx, markup) {
     const args = parseArguments(markup);
@@ -76,8 +76,8 @@ function resolveMemberId(ctx, memberInput) {
   return resolveVariable(ctx.lookup, memberInput);
 }
 
-// {% uj_post post_id, "property" %} — look up a post doc across collections
-const ujPost = {
+// {% omega_post post_id, "property" %} — look up a post doc across collections
+const omegaPost = {
   block: false,
   render(ctx, markup) {
     const args = parseArguments(markup);
@@ -188,4 +188,4 @@ function findPost(site, postId) {
   return null;
 }
 
-module.exports = { ujMember, ujPost };
+module.exports = { omegaMember, omegaPost };

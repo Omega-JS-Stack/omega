@@ -15,12 +15,12 @@ layout: frontend/core/base
 <section class="pb-4">
   <div class="container text-center" data-lazy="@class animation-slide-up">
     <div class="avatar avatar-5xl mb-4 mx-auto">
-      {%- uj_member resolved.member.id, "image-tag", class="rounded-circle object-fit-cover team-member-image" -%}
+      {%- omega_member resolved.member.id, "image-tag", class="rounded-circle object-fit-cover team-member-image" -%}
     </div>
 
     <span class="kicker d-flex justify-content-center mb-2">{{ resolved.member.position }}</span>
     <h1 class="display-4 my-2">
-      {%- uj_member resolved.member.id, "name" -%}
+      {%- omega_member resolved.member.id, "name" -%}
     </h1>
 
     {% iftruthy resolved.member.description %}
@@ -33,7 +33,7 @@ layout: frontend/core/base
           {% assign link_icon = link.id %}
           {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
           <a href="{{ link.url }}" class="btn btn-outline-dark avatar avatar-lg rounded-circle d-flex align-items-center justify-content-center" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-            {% uj_icon link_icon, "" %}
+            {% omega_icon link_icon, "" %}
           </a>
         {% endfor %}
       </div>
@@ -51,7 +51,7 @@ layout: frontend/core/base
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4 text-center">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3 mx-auto">
-              {% uj_icon "map-marker-alt" %}
+              {% omega_icon "map-marker-alt" %}
             </span>
             <span class="kicker justify-content-center mb-2">Based in</span>
             <p class="fw-bold mb-0">{{ resolved.member.location }}</p>
@@ -63,7 +63,7 @@ layout: frontend/core/base
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4 text-center">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3 mx-auto">
-              {% uj_icon "calendar" %}
+              {% omega_icon "calendar" %}
             </span>
             <span class="kicker justify-content-center mb-2">On the masthead since</span>
             <p class="fw-bold mb-0">{{ resolved.member.joined | date: "%B %Y" }}</p>
@@ -75,7 +75,7 @@ layout: frontend/core/base
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4 text-center">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3 mx-auto">
-              {% uj_icon "briefcase" %}
+              {% omega_icon "briefcase" %}
             </span>
             <span class="kicker justify-content-center mb-2">The beat</span>
             <p class="fw-bold mb-0">{{ resolved.member.skills | join: ", " }}</p>
@@ -87,7 +87,7 @@ layout: frontend/core/base
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4 text-center">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3 mx-auto">
-              {% uj_icon "heart" %}
+              {% omega_icon "heart" %}
             </span>
             <span class="kicker justify-content-center mb-2">Off the clock</span>
             <p class="fw-bold mb-0">{{ resolved.member.hobbies | join: ", " }}</p>
@@ -105,11 +105,11 @@ layout: frontend/core/base
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-9">
-        {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
+        {%- capture member_name -%}{%- omega_member resolved.member.id, "name" -%}{%- endcapture -%}
         {%- assign first_name = member_name | split: ' ' | first -%}
         {% component "heading/rule-head", text: "About " | append: first_name %}
         <div class="fs-5" data-lazy="@class animation-slide-up">
-          {{ content | uj_content_format }}
+          {{ content | omega_content_format }}
         </div>
       </div>
     </div>
@@ -122,7 +122,7 @@ layout: frontend/core/base
 <section class="pt-0">
   <div class="container text-center" data-lazy="@class animation-slide-up">
     <a href="/team" class="btn btn-outline-dark btn-lg">
-      {% uj_icon "arrow-left", "me-2" %}Back to the newsroom
+      {% omega_icon "arrow-left", "me-2" %}Back to the newsroom
     </a>
   </div>
 </section>

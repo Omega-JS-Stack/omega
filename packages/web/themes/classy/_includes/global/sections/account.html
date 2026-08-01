@@ -9,7 +9,7 @@
     <span class="d-flex align-items-center">
       <span class="position-relative d-inline-flex">
         <span class="avatar avatar-{{ avatar_size }} rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden d-inline-flex">
-          <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+          <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
         </span>
         <!-- Active status indicator -->
         <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -25,7 +25,7 @@
         <div class="d-flex align-items-center">
           <div class="position-relative me-3">
             <div class="avatar avatar-md rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden">
-              <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+              <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
             </div>
             <!-- Active status indicator -->
             <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -46,7 +46,7 @@
       {% capture child_class %}dropdown-item d-flex align-items-center text-body {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
       {% capture child_content %}
         {% if child.icon %}
-          {% uj_icon child.icon, "fa-md me-3" %}
+          {% omega_icon child.icon, "fa-md me-3" %}
         {% endif %}
         <span>{{ child.label }}</span>
       {% endcapture %}

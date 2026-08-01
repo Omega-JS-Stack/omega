@@ -151,7 +151,7 @@ progress_items:
     <div class="classy-statgrid__cell">
       <div class="classy-statgrid__label">
         <span class="classy-micro">{{ card.title }}</span>
-        {% uj_icon card.icon, "fa-sm" %}
+        {% omega_icon card.icon, "fa-sm" %}
       </div>
       <div class="classy-statgrid__value">{{ card.value }}</div>
       <span class="badge bg-{{ card.change_type }}-subtle text-{{ card.change_type }}">{{ card.change }}</span>
@@ -170,7 +170,7 @@ progress_items:
           {% for activity in resolved.recent_activity %}
             <div class="classy-activity__row">
               <span class="classy-icon-chip classy-icon-chip--neutral">
-                {% uj_icon activity.icon, "fa-sm" %}
+                {% omega_icon activity.icon, "fa-sm" %}
               </span>
               <div class="classy-activity__body">
                 <div class="classy-activity__title">{{ activity.title }}</div>
@@ -195,12 +195,12 @@ progress_items:
             {% if _style == 'primary' %}{% assign _style = 'adaptive' %}{% endif %}
             {% if action.href %}
               <a href="{{ action.href }}" class="btn btn-{{ _style }}">
-                {% uj_icon action.icon, "fa-sm me-2" %}
+                {% omega_icon action.icon, "fa-sm me-2" %}
                 {{ action.label }}
               </a>
             {% else %}
               <button class="btn btn-{{ _style }}">
-                {% uj_icon action.icon, "fa-sm me-2" %}
+                {% omega_icon action.icon, "fa-sm me-2" %}
                 {{ action.label }}
               </button>
             {% endif %}
@@ -229,4 +229,4 @@ progress_items:
   </div>
 </div>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

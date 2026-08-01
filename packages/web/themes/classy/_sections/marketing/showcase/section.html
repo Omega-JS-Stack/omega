@@ -21,7 +21,7 @@
             {% assign object_position = args.image_object_position | default: "center" %}
             <div class="card overflow-hidden ratio ratio-{{ ratio }}">
               {% capture image_style %}object-position: {{ object_position }};{% endcapture %}
-              {% uj_image item.image, class="w-100 h-100 object-fit-cover", style=image_style, alt=item.title %}
+              {% omega_image item.image, class="w-100 h-100 object-fit-cover", style=image_style, alt=item.title %}
             </div>
           </div>
           <div class="{{ text_col_class }}" data-omega-reveal>

@@ -12,13 +12,13 @@ Most of this is already built into the layers — tokens carry contrast, the mot
 
 - `docs/shared/theming.md` — the `--omega-*` token contract (light + dark values ship together), the one-status-hue rule, the motion library and its resilience rules.
 - `docs/web/sections.md` — the section/component contract: what a section owns and how its markup composes.
-- `docs/shared/icons.md` — the one icon mechanism (`fa-*` markup, `uj_icon` inlining).
+- `docs/shared/icons.md` — the one icon mechanism (`fa-*` markup, `omega_icon` inlining).
 - `packages/web/core/css/motion/_index.scss` and `packages/web/core/css/tokens/_index.scss` — the two sheets the checks below refer to.
 
 ## The checklist
 
 1. **Landmarks and heading order.** The document shell and blueprint layouts own `header`/`nav`/`main`/`footer` — a section never opens a second `main`. Sections start at h2 beneath the page's single h1, and levels do not skip.
-2. **Every image has an `alt`.** Content images describe; decorative ones take `alt=""`. Lazy images keep it too — the theme idiom is `src="{{ site.uj.placeholder.src }}" data-lazy="@src …" alt="…"`, and the `alt` is not optional in the copy.
+2. **Every image has an `alt`.** Content images describe; decorative ones take `alt=""`. Lazy images keep it too — the theme idiom is `src="{{ site.omega.placeholder.src }}" data-lazy="@src …" alt="…"`, and the `alt` is not optional in the copy.
 3. **Every control has a name.** Inputs get a real `<label>` (or `aria-label` where the design has no visible label); an icon-only button gets an `aria-label`, because an `fa-*` glyph contributes no text. Links say where they go — no bare "here".
 4. **Color comes from tokens, never raw hex.** `var(--omega-*)` in markup and scss. Status meaning uses only `--omega-ok` / `--omega-warn` / `--omega-danger` (with their `-rgb` twins when a translucency utility needs them). A raw hex is both a theming break and an untested contrast.
 5. **Contrast holds in BOTH modes.** Token values ship as light/dark pairs and `data-bs-theme` flips them, so a pairing checked in one mode is half-checked. Ink-on-surface and accent-on-surface are the two that bite.

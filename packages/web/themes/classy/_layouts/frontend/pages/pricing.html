@@ -144,7 +144,7 @@ faqs:
             <p class="text-muted mb-4">We're putting the finishing touches on our plans. Reach out and we'll get you set up in the meantime.</p>
             <div>
               <a href="/contact" class="btn btn-adaptive btn-lg px-4">
-                {% uj_icon "envelope", "me-2" %}
+                {% omega_icon "envelope", "me-2" %}
                 Contact us
               </a>
             </div>
@@ -233,11 +233,11 @@ faqs:
                     <span>No credit card required</span>
                   {% else %}
                     {% if _default_annual and plan.prices.annually > 0 %}
-                      {% capture _initial_billing %}Billed ${{ plan.prices.annually | uj_commaify }} annually{% endcapture %}
+                      {% capture _initial_billing %}Billed ${{ plan.prices.annually | omega_commaify }} annually{% endcapture %}
                     {% else %}
-                      {% capture _initial_billing %}Billed ${{ plan.prices.monthly | uj_commaify }} monthly{% endcapture %}
+                      {% capture _initial_billing %}Billed ${{ plan.prices.monthly | omega_commaify }} monthly{% endcapture %}
                     {% endif %}
-                    <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | uj_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | uj_commaify }} annually">
+                    <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | omega_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | omega_commaify }} annually">
                       {{ _initial_billing }}
                     </span>
                     {% if resolved.pricing.price_per_unit.enabled %}
@@ -254,12 +254,12 @@ faqs:
                   <ul class="classy-price-card__features">
                     {% for feature in plan.commonFeatures %}
                       <li>
-                        <span class="classy-price-card__check text-success">{% uj_icon "check", "fa-sm" %}</span>
+                        <span class="classy-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
                         <span>
                           {% if feature.value == 'Unlimited' %}
                             Unlimited
                           {% elsif feature.value and feature.value != true %}
-                            {{ feature.value | uj_commaify }}
+                            {{ feature.value | omega_commaify }}
                           {% endif %}
                           {% iftruthy feature.definition %}
                             <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
@@ -283,12 +283,12 @@ faqs:
                     <ul class="classy-price-card__features">
                       {% for feature in plan.extraFeatures %}
                         <li>
-                          <span class="classy-price-card__check text-success">{% uj_icon "check", "fa-sm" %}</span>
+                          <span class="classy-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
                           <span>
                             {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
                               {{ feature.value }}
                             {% elsif feature.value and feature.value != true %}
-                              {{ feature.value | uj_commaify }}
+                              {{ feature.value | omega_commaify }}
                             {% endif %}
                             {% iftruthy feature.definition %}
                               <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
@@ -323,7 +323,7 @@ faqs:
                       {% else %}
                         Get started
                       {% endif %}
-                      <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+                      <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
                     </a>
                   {% endiftruthy %}
                   {% iffalsy plan.url %}
@@ -333,7 +333,7 @@ faqs:
                       {% else %}
                         Get started
                       {% endif %}
-                      <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+                      <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
                     </button>
                   {% endiffalsy %}
                 </div>
@@ -343,7 +343,7 @@ faqs:
         </div>
 
         <p class="small text-center classy-quiet mb-0" data-omega-reveal>
-          <span class="classy-guarantee-icon me-1">{% uj_icon "shield-halved" %}</span>
+          <span class="classy-guarantee-icon me-1">{% omega_icon "shield-halved" %}</span>
           {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
         </p>
 
@@ -368,12 +368,12 @@ faqs:
           <ul class="classy-band__features">
             {% for feature in _enterprise.features %}
               <li>
-                <span class="classy-band__check text-success">{% uj_icon "check", "fa-sm" %}</span>
+                <span class="classy-band__check text-success">{% omega_icon "check", "fa-sm" %}</span>
                 <span>
                   {% if feature.value == 'Unlimited' %}
                     Unlimited
                   {% elsif feature.value and feature.value != true %}
-                    {{ feature.value | uj_commaify }}
+                    {{ feature.value | omega_commaify }}
                   {% endif %}
                   {% iftruthy feature.definition %}
                     <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
@@ -391,7 +391,7 @@ faqs:
       <div class="classy-band__actions">
         <a href="{{ _enterprise.url }}" class="btn btn-outline-adaptive fw-semibold omega-hover-nudge" data-plan-enterprise="{{ _enterprise.id }}">
           Contact us
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       </div>
     </div>
@@ -418,7 +418,7 @@ faqs:
 
             <div class="classy-price-card__price">
               <span class="classy-price-card__currency">$</span>
-              <span class="classy-price-card__amount">{{ product.price | uj_commaify }}</span>
+              <span class="classy-price-card__amount">{{ product.price | omega_commaify }}</span>
               <span class="classy-price-card__per">one-time</span>
             </div>
 
@@ -430,12 +430,12 @@ faqs:
               <ul class="classy-price-card__features">
                 {% for feature in product.features %}
                   <li>
-                    <span class="classy-price-card__check text-success">{% uj_icon "check", "fa-sm" %}</span>
+                    <span class="classy-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
                     <span>
                       {% if feature.value == 'Unlimited' %}
                         Unlimited
                       {% elsif feature.value and feature.value != true %}
-                        {{ feature.value | uj_commaify }}
+                        {{ feature.value | omega_commaify }}
                       {% endif %}
                       {% iftruthy feature.definition %}
                         <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
@@ -452,7 +452,7 @@ faqs:
             <div class="d-grid classy-price-card__cta">
               <button class="btn btn-adaptive fw-semibold omega-hover-nudge" data-plan-id="{{ product.id }}" data-plan-type="one-time">
                 Buy now
-                <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+                <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
               </button>
             </div>
           </div>
@@ -475,7 +475,7 @@ faqs:
       <div class="d-md-none">
         <small class="text-muted">
           <span class="me-2">Swipe to see more</span>
-          {% uj_icon "arrow-right", "fa-sm" %}
+          {% omega_icon "arrow-right", "fa-sm" %}
         </small>
       </div>
     </div>
@@ -508,13 +508,13 @@ faqs:
                 {% assign _cell = feature.values[plan.id] %}
                 <td>
                   {% if _cell == true %}
-                    <span class="classy-compare__yes text-success">{% uj_icon "circle-check", "fa-md" %}</span>
+                    <span class="classy-compare__yes text-success">{% omega_icon "circle-check", "fa-md" %}</span>
                   {% elsif _cell == 'Unlimited' %}
                     Unlimited
                   {% elsif _cell %}
-                    {{ _cell | uj_commaify }}
+                    {{ _cell | omega_commaify }}
                   {% else %}
-                    <span class="classy-compare__no">{% uj_icon "circle-xmark", "fa-md" %}</span>
+                    <span class="classy-compare__no">{% omega_icon "circle-xmark", "fa-md" %}</span>
                   {% endif %}
                 </td>
               {% endfor %}
@@ -538,7 +538,7 @@ faqs:
           {% iftruthy item.show_stars %}
             <div class="mt-1" style="color: var(--omega-accent);">
               {% for i in (1..5) %}
-                {% uj_icon "star", "fa-xs" %}
+                {% omega_icon "star", "fa-xs" %}
               {% endfor %}
             </div>
           {% endiftruthy %}
@@ -573,11 +573,11 @@ faqs:
           <div class="classy-fragment pb-5">
             <span class="classy-micro classy-fragment__label">How billing behaves</span>
             <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "arrows-rotate", "fa-xs" %}</span>
+              <span class="classy-fragment__msg-mark">{% omega_icon "arrows-rotate", "fa-xs" %}</span>
               <span>Switch plans anytime, <strong>prorated</strong> automatically</span>
             </div>
             <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "rotate-left", "fa-xs" %}</span>
+              <span class="classy-fragment__msg-mark">{% omega_icon "rotate-left", "fa-xs" %}</span>
               <span>Changed your mind? <strong>Refunded.</strong></span>
             </div>
           </div>
@@ -609,4 +609,4 @@ faqs:
 </section>
 {% endiftruthy %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

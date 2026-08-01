@@ -36,7 +36,7 @@ client:
           data-action="pay-card"
           data-omega-bind="@show checkout.paymentMethods.card"
           hidden>
-    {% uj_icon "credit-card", "me-2 fa-lg" %}
+    {% omega_icon "credit-card", "me-2 fa-lg" %}
     <span class="fw-semibold">Credit/Debit</span>
   </button>
 
@@ -58,7 +58,7 @@ client:
           data-action="pay-apple-pay"
           data-omega-bind="@show checkout.paymentMethods.applePay"
           hidden>
-    {% uj_icon "apple", "me-2 fa-lg" %}
+    {% omega_icon "apple", "me-2 fa-lg" %}
     <span class="fw-semibold">Apple Pay</span>
   </button>
 
@@ -81,7 +81,7 @@ client:
           data-action="pay-crypto"
           data-omega-bind="@show checkout.paymentMethods.crypto"
           hidden>
-    {% uj_icon "bitcoin", "me-2 fa-lg" %}
+    {% omega_icon "bitcoin", "me-2 fa-lg" %}
     <span class="fw-semibold">Crypto</span>
   </button>
 
@@ -96,12 +96,12 @@ client:
     <div class="col-12 col-md-8 col-lg-6 col-xl-5">
       <div class="classy-form-panel text-center" role="alert">
         <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg classy-checkout__error-glyph mb-3">
-          {% uj_icon "triangle-exclamation", "fa-md" %}
+          {% omega_icon "triangle-exclamation", "fa-md" %}
         </span>
         <h1 class="classy-display classy-display--section mb-2">Something went <em>wrong</em></h1>
         <p class="classy-quiet mb-4" data-omega-bind="@text checkout.error.message"></p>
         <button class="btn btn-adaptive omega-hover-nudge" onclick="window.location.reload()">
-          {% uj_icon "rotate-right", "fa-sm me-2" %}
+          {% omega_icon "rotate-right", "fa-sm me-2" %}
           Try again
         </button>
       </div>
@@ -119,13 +119,13 @@ client:
     </div>
     <div class="d-flex align-items-center gap-3">
       <a href="/" class="classy-checkout__brand">
-        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} logo" width="24" height="24">
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} logo" width="24" height="24">
         <span class="fw-semibold d-none d-sm-inline">{{ site.brand.name }}</span>
       </a>
       {% if jekyll.environment == "development" %}
       <!-- Dev Tools Toggle -->
       <div id="checkout-dev-panel" class="dropdown" hidden>
-        <button id="checkout-dev-toggle" class="btn btn-outline-adaptive btn-sm classy-checkout__dev-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">{% uj_icon "gear", "fa-sm" %}</button>
+        <button id="checkout-dev-toggle" class="btn btn-outline-adaptive btn-sm classy-checkout__dev-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">{% omega_icon "gear", "fa-sm" %}</button>
         <div id="checkout-dev-body" class="dropdown-menu dropdown-menu-end shadow-lg small p-0" style="width:280px;">
           <div class="p-3">
             <div class="fw-bold mb-3 text-primary">Dev Tools</div>
@@ -190,17 +190,17 @@ client:
             <span class="classy-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@show checkout">
               <span data-omega-bind="@text checkout.product.name">--</span> &middot; <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
             </span>
-            {% uj_icon "chevron-down", "fa-xs classy-checkout__rowtoggle-chev" %}
+            {% omega_icon "chevron-down", "fa-xs classy-checkout__rowtoggle-chev" %}
           </button>
 
           <div id="collapse-billing" class="collapse d-lg-block">
             <div class="classy-panel-head classy-checkout__panel-head">
               <h2 class="classy-checkout__panel-title d-none d-lg-flex mb-0">
-                <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "calendar-days", "fa-sm" %}</span>
+                <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "calendar-days", "fa-sm" %}</span>
                 Billing cycle
               </h2>
               <a href="/pricing" class="classy-checkout__quiet-link small ms-auto">
-                {% uj_icon "arrow-left", "fa-xs me-1" %}Change plan
+                {% omega_icon "arrow-left", "fa-xs me-1" %}Change plan
               </a>
             </div>
 
@@ -276,7 +276,7 @@ client:
               <!-- Subscription note (default: money-back guarantee, replaced by trial if eligible) -->
               <div class="classy-checkout__note mt-3"
                    data-omega-bind="@show !checkout.trial.show">
-                <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "shield-halved", "fa-sm" %}</span>
+                <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "shield-halved", "fa-sm" %}</span>
                 <span>Backed by our 7-day money-back guarantee.</span>
               </div>
 
@@ -284,7 +284,7 @@ client:
               <div class="classy-checkout__note classy-checkout__note--ok mt-3"
                    data-omega-bind="@show checkout.trial.show"
                    hidden>
-                <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "gift", "fa-sm" %}</span>
+                <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "gift", "fa-sm" %}</span>
                 <span data-omega-bind="@text checkout.trial.message"></span>
               </div>
             </div>
@@ -298,13 +298,13 @@ client:
                   data-bs-toggle="collapse" data-bs-target="#collapse-account" aria-expanded="false">
             <span class="classy-micro">Account</span>
             <span class="classy-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text auth.user.email">&nbsp;</span>
-            {% uj_icon "chevron-down", "fa-xs classy-checkout__rowtoggle-chev" %}
+            {% omega_icon "chevron-down", "fa-xs classy-checkout__rowtoggle-chev" %}
           </button>
 
           <div id="collapse-account" class="collapse d-lg-block">
             <div class="classy-panel-head classy-checkout__panel-head">
               <h2 class="classy-checkout__panel-title d-none d-lg-flex mb-0">
-                <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "user", "fa-sm" %}</span>
+                <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "user", "fa-sm" %}</span>
                 Account
               </h2>
               <a href="#" id="switch-account" class="classy-checkout__quiet-link small ms-auto">Switch account</a>
@@ -319,10 +319,10 @@ client:
         <div class="classy-checkout__panel d-none d-lg-block" data-omega-reveal>
           <div class="classy-panel-head classy-checkout__panel-head">
             <h2 class="classy-checkout__panel-title mb-0">
-              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "credit-card", "fa-sm" %}</span>
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "credit-card", "fa-sm" %}</span>
               Payment
             </h2>
-            <span class="classy-quiet small">{% uj_icon "lock", "fa-xs me-1" %}Encrypted</span>
+            <span class="classy-quiet small">{% omega_icon "lock", "fa-xs me-1" %}Encrypted</span>
           </div>
           <div class="d-grid gap-2 omega-binding-skeleton" data-omega-bind="@show checkout.paymentMethods">
             {{ payment_buttons_content }}
@@ -336,7 +336,7 @@ client:
           <div class="classy-checkout__summary" data-omega-reveal>
             <div class="classy-checkout__summary-head d-none d-lg-flex">
               <span class="classy-micro">Order summary</span>
-              <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="classy-checkout__mark filter-adaptive" alt="">
+              <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="classy-checkout__mark filter-adaptive" alt="">
             </div>
 
             <!-- Product identity: what you get, on what cadence -->
@@ -355,13 +355,13 @@ client:
 
               <!-- Discount Messages -->
               <div class="mt-2 classy-quiet small" data-omega-bind="@show checkout.discount.loading" hidden>
-                {% uj_icon "clock", "me-1" %} Checking code...
+                {% omega_icon "clock", "me-1" %} Checking code...
               </div>
               <div class="mt-2 classy-checkout__row-ok small" data-omega-bind="@show checkout.discount.success" hidden>
-                {% uj_icon "check-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
+                {% omega_icon "check-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
               </div>
               <div class="mt-2 classy-checkout__row-bad small" data-omega-bind="@show checkout.discount.error" hidden>
-                {% uj_icon "times-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
+                {% omega_icon "times-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
               </div>
             </div>
 
@@ -422,15 +422,15 @@ client:
 
   <!-- Trust foot + help — one quiet line each, shared by both breakpoints -->
   <div class="classy-checkout__trust mt-3 mt-lg-4">
-    <span>{% uj_icon "lock", "fa-xs" %} SSL encrypted</span>
-    <span>{% uj_icon "shield-halved", "fa-xs" %} 7-day money-back guarantee</span>
-    <span>{% uj_icon "handshake", "fa-xs" %} Secure payments</span>
+    <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
+    <span>{% omega_icon "shield-halved", "fa-xs" %} 7-day money-back guarantee</span>
+    <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
   </div>
   <div class="text-center mt-1 mt-lg-3">
     <a href="javascript:;" class="classy-checkout__quiet-link small" id="checkout-help-button">
-      {% uj_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
+      {% omega_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
     </a>
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

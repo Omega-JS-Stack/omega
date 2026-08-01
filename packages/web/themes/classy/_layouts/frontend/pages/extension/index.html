@@ -144,12 +144,12 @@ cta:
       </a>
       <!-- Shown until detection resolves (and forever without JS / no listing) -->
       <a id="extension-hero-fallback" class="btn btn-adaptive btn-lg classy-dl-hero__btn" href="#browsers">
-        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
+        {% omega_icon "puzzle-piece", "fa-sm me-2" %}
         See supported browsers
       </a>
       <a class="btn btn-outline-adaptive btn-lg omega-hover-nudge" href="#browsers">
         All browsers
-        <span class="omega-nudge ms-2">{% uj_icon "arrow-down", "fa-sm" %}</span>
+        <span class="omega-nudge ms-2">{% omega_icon "arrow-down", "fa-sm" %}</span>
       </a>
     </div>
 
@@ -171,14 +171,14 @@ cta:
 
         <div class="col-sm-6 col-lg-4 d-flex" data-omega-reveal>
           <div class="classy-dl-card omega-hover-lift" data-download-card data-browser="{{ browser.id }}">
-            <span class="classy-dl-card__mark">{% uj_logo browser.logo, "brandmarks" %}</span>
+            <span class="classy-dl-card__mark">{% omega_logo browser.logo, "brandmarks" %}</span>
             <h3 class="classy-dl-card__name">{{ browser.name }}</h3>
             <p class="classy-dl-card__req classy-quiet small">{{ browser.description }}</p>
 
             <div class="classy-dl-card__actions">
               {% iftruthy config_url %}
                 <a href="{{ config_url }}" class="btn btn-adaptive w-100" data-install="true" target="_blank" rel="noopener">
-                  {% uj_icon "puzzle-piece", "fa-sm me-2" %}
+                  {% omega_icon "puzzle-piece", "fa-sm me-2" %}
                   {{ browser.action | default: "Install" }}
                 </a>
               {% endiftruthy %}
@@ -208,7 +208,7 @@ cta:
         {% for step in resolved.setup.steps %}
           <div class="classy-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon step.icon, "fa-sm" %}</span>
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon step.icon, "fa-sm" %}</span>
               <strong>{{ forloop.index }}. {{ step.title }}</strong>
             </span>
             <span class="classy-rowlist__meta">{{ step.description }}</span>
@@ -231,7 +231,7 @@ cta:
         {% for feature in resolved.features.items %}
           <div class="classy-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon feature.icon, "fa-sm" %}</span>
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon feature.icon, "fa-sm" %}</span>
               <strong>{{ feature.title }}</strong>
             </span>
             <span class="classy-rowlist__meta">{{ feature.description }}</span>
@@ -248,4 +248,4 @@ cta:
 <!-- ═══ CTA band ═══ -->
 {% section "marketing/cta", data: resolved.cta %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

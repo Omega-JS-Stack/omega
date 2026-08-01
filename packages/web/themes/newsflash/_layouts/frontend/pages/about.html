@@ -41,7 +41,7 @@ story:
   - year: "2023"
     title: "Award season"
     description: "Recognized for independent journalism with multiple industry awards, and the corrections page stays proudly public"
-  - year: "{{ site.uj.date.year }}"
+  - year: "{{ site.omega.date.year }}"
     title: "Today"
     description: "Millions of readers, one unchanged standard: report it right, write it sharp"
 
@@ -94,7 +94,7 @@ testimonials:
   superheadline:
     icon: "megaphone"
     text: "From our readers"
-  headline: "Readers {% uj_icon \"heart\", \"text-danger\" %} "
+  headline: "Readers {% omega_icon \"heart\", \"text-danger\" %} "
   headline_accent: "{{ site.brand.name }}"
   subheadline: "What the morning-coffee crowd says about us"
   items:
@@ -182,7 +182,7 @@ team_cta:
       <div class="col-lg-6" data-lazy="@class animation-slide-up">
         <div class="card h-100 bg-primary text-white p-4 p-md-5 text-center">
           <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle bg-white text-primary mb-3 mx-auto">
-            {% uj_icon resolved.mission.icon %}
+            {% omega_icon resolved.mission.icon %}
           </span>
           <h3 class="h3 mb-3">{{ resolved.mission.title }}</h3>
           <p class="fs-5 mb-0">{{ resolved.mission.description }}</p>
@@ -192,7 +192,7 @@ team_cta:
       <div class="col-lg-6" data-lazy="@class animation-slide-up">
         <div class="card h-100 p-4 p-md-5 text-center">
           <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-warning mb-3 mx-auto">
-            {% uj_icon resolved.vision.icon %}
+            {% omega_icon resolved.vision.icon %}
           </span>
           <h3 class="h3 mb-3">{{ resolved.vision.title }}</h3>
           <p class="fs-5 text-body-secondary mb-0">{{ resolved.vision.description }}</p>
@@ -214,7 +214,7 @@ team_cta:
       {% for stat in resolved.stats.items %}
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="stat-num">{{ stat.number }}</div>
-          <div class="fw-bold">{% uj_icon stat.icon, "me-2 text-primary" %}{{ stat.label }}</div>
+          <div class="fw-bold">{% omega_icon stat.icon, "me-2 text-primary" %}{{ stat.label }}</div>
         </div>
       {% endfor %}
     </div>
@@ -234,7 +234,7 @@ team_cta:
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="card h-100 p-4">
             <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
-              {% uj_icon value.icon %}
+              {% omega_icon value.icon %}
             </span>
             <h3 class="h5 mb-2">{{ value.title }}</h3>
             <p class="text-body-secondary mb-0">{{ value.description }}</p>
@@ -275,4 +275,4 @@ team_cta:
 <!-- Team CTA — the dark big-read band (shared marketing/cta, nf override) -->
 {% section "marketing/cta", data: resolved.team_cta, section_class: "pt-0" %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

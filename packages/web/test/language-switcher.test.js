@@ -109,10 +109,10 @@ test('html: hrefs and labels are escaped — a query-string permalink stays vali
 test('html: every row carries its flag BEFORE the name, fetched by its own code', () => {
   const html = switcherHtml(languageEntries(makeLinks(EN_ES_FR), 'en'));
 
-  assert.equal(html.match(/<img class="uj-language-flag"/g).length, 3, 'one flag per language row');
+  assert.equal(html.match(/<img class="omega-language-flag"/g).length, 3, 'one flag per language row');
   assert.match(
     html,
-    /<img class="uj-language-flag" data-omega-language-flag src="\/assets\/fa\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
+    /<img class="omega-language-flag" data-omega-language-flag src="\/assets\/fa\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
     'the flag precedes the label, from the emitted core set, at the row\'s own hreflang code',
   );
   assert.ok(!html.includes('alt="Español"'), 'the flag is decorative — the label beside it already names the language');
@@ -171,9 +171,9 @@ test('built classy footer ships the empty mount, hidden, with no build-time lang
   const html = pages.get('/blog');
 
   assert.match(html, /data-omega-language-switcher/, 'the footer carries the mount');
-  assert.match(html, /<div class="dropup uj-language-dropdown" data-omega-language-switcher hidden>/, 'hidden until the DOM proves a second language exists');
+  assert.match(html, /<div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>/, 'hidden until the DOM proves a second language exists');
   assert.match(html, /<ul class="dropdown-menu" data-omega-language-list><\/ul>/, 'the list ships EMPTY — the client fills it from hreflang');
-  assert.ok(!html.includes('uj-language-dropdown-item'), 'the old build-time row (which named configured, not produced, languages) is gone');
+  assert.ok(!html.includes('omega-language-dropdown-item'), 'the old build-time row (which named configured, not produced, languages) is gone');
 });
 
 test('every theme gets the mount — the footer include is classy\'s, the base layer of every chain', async () => {

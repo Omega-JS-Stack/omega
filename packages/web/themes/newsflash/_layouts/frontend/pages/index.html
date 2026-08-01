@@ -161,12 +161,12 @@ cta:
         <div class="d-flex flex-wrap gap-3">
           {% iftruthy resolved.hero.primary_button %}
             <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-primary btn-lg">
-              {% uj_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
+              {% omega_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
             </a>
           {% endiftruthy %}
           {% iftruthy resolved.hero.secondary_button %}
             <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-dark btn-lg">
-              {% uj_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
+              {% omega_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
             </a>
           {% endiftruthy %}
         </div>
@@ -179,14 +179,14 @@ cta:
           <a href="{{ site.url }}{{ featured.url }}" class="hero-art d-block position-relative text-decoration-none text-body">
             <span class="badge bg-body-tertiary hero-art-chip">Featured</span>
             <div class="art-frame shadow">
-              {%- uj_post featured.post.id, "image-tag", class="w-100" -%}
+              {%- omega_post featured.post.id, "image-tag", class="w-100" -%}
             </div>
             <div class="mt-3">
               {% if featured.post.categories[0] %}
-                <span class="kicker mb-1">{{ featured.post.categories[0] | uj_title_case }}</span>
+                <span class="kicker mb-1">{{ featured.post.categories[0] | omega_title_case }}</span>
               {% endif %}
               <h2 class="h4 mb-1">{{ featured.post.title }}</h2>
-              {% capture featured_rt %}{% uj_readtime featured.content %}{% endcapture %}
+              {% capture featured_rt %}{% omega_readtime featured.content %}{% endcapture %}
               {% component "news/byline", author: featured.post.author, date: featured.date | date: "%b %d, %Y", readtime: featured_rt %}
             </div>
           </a>
@@ -213,8 +213,8 @@ cta:
       <div class="row g-4">
         {% for post in site.posts offset: 1 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
-            {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | uj_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+            {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
+            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
           </div>
         {% endfor %}
       </div>
@@ -245,17 +245,17 @@ cta:
           {% for post in site.posts offset: 4 limit: 5 %}
             <a href="{{ site.url }}{{ post.url }}" class="feed-item" data-lazy="@class animation-slide-up">
               <div class="art-frame">
-                {%- uj_post post.post.id, "image-tag", class="w-100" -%}
+                {%- omega_post post.post.id, "image-tag", class="w-100" -%}
               </div>
               <div>
                 {% if post.post.categories[0] %}
-                  <span class="kicker mb-1">{{ post.post.categories[0] | uj_title_case }}</span>
+                  <span class="kicker mb-1">{{ post.post.categories[0] | omega_title_case }}</span>
                 {% endif %}
                 <h3 class="h4 my-2">{{ post.post.title }}</h3>
                 {% iftruthy post.post.description %}
                   <p class="text-body-secondary mb-2">{{ post.post.description }}</p>
                 {% endiftruthy %}
-                {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
+                {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
                 {% component "news/byline", author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
               </div>
             </a>
@@ -316,8 +316,8 @@ cta:
       <div class="row g-4">
         {% for post in site.posts offset: 14 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
-            {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | uj_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+            {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
+            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
           </div>
         {% endfor %}
       </div>
@@ -330,4 +330,4 @@ cta:
 <!-- ============================================ -->
 {% section "marketing/cta", data: resolved.cta, section_class: "cta" %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

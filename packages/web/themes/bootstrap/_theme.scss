@@ -1,11 +1,11 @@
 // =============================================================================
-// UJ Bootstrap Theme
+// Omega Bootstrap Theme
 // =============================================================================
 // Base Bootstrap theme with universal overrides.
-// All UJ themes that extend Bootstrap inherit these utilities.
+// All omega themes that extend Bootstrap inherit these utilities.
 
 // Import Bootstrap
 @use './scss/bootstrap.scss' as *;
 
-// Import UJ universal overrides
+// Import the omega universal overrides
 @use './overrides' as *;

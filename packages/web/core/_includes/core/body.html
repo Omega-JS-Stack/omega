@@ -9,7 +9,7 @@
   hidden>
   <span class="main-alert-close">&times;</span>
   <div>
-    {% uj_icon "warning", "fa-bounce me-2" %}
+    {% omega_icon "warning", "fa-bounce me-2" %}
     You are using an outdated browser that our site <strong>DOES NOT</strong> support. Please <a href="https://www.google.com/chrome" rel="nofollow" target="_blank">click here</a> to update your browser.
   </div>
 </div>
@@ -19,7 +19,7 @@
   hidden>
   <span class="main-alert-close">&times;</span>
   <div>
-    {% uj_icon "warning", "fa-bounce me-2" %}
+    {% omega_icon "warning", "fa-bounce me-2" %}
     There is a <strong>problem with your payment method</strong>. To continue using <strong>{{ site.brand.name }}</strong>, please <a href="/dashboard/account#billing" target="_blank">update your payment method</a>.
   </div>
 </div>
@@ -43,7 +43,7 @@
     {%- for icon in icons -%}
       {%- assign icon_name = icon.name | default: icon -%}
       <div data-icon="{{ icon_name }}">
-        {% uj_icon icon_name, "" %}
+        {% omega_icon icon_name, "" %}
       </div>
     {%- endfor -%}
   </div>

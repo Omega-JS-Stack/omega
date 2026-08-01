@@ -21,12 +21,12 @@
   <div class="omega-shell__topbar-start">
     <!-- Drawer toggle (mobile) -->
     <button class="btn-icon d-xl-none" type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar" aria-label="Toggle navigation">
-      {% uj_icon "bars", "fa-md" %}
+      {% omega_icon "bars", "fa-md" %}
     </button>
 
     <!-- Rail collapse toggle (desktop) -->
     <button class="btn-icon d-none d-xl-inline-flex" type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar" aria-label="Toggle sidebar">
-      {% uj_icon "table-columns", "fa-sm" %}
+      {% omega_icon "table-columns", "fa-sm" %}
     </button>
 
     <!-- Breadcrumb trail -->
@@ -46,7 +46,7 @@
           {% endif %}
         {% endfor %}
       {% else %}
-        <span>{{ resolved.theme.header.title.content | default: resolved.meta.title | uj_liquify }}</span>
+        <span>{{ resolved.theme.header.title.content | default: resolved.meta.title | omega_liquify }}</span>
       {% endif %}
 
       {% iftruthy data.status.label %}
@@ -62,7 +62,7 @@
   {% if data.search %}
     <div class="classy-topbar__center">
       <form class="classy-search" action="{{ data.search.action | default: '/search' }}" method="get" role="search">
-        {% uj_icon "magnifying-glass", "fa-sm" %}
+        {% omega_icon "magnifying-glass", "fa-sm" %}
         <input
           type="search"
           name="{{ data.search.name | default: 'q' }}"
@@ -83,7 +83,7 @@
         <div class="dropdown">
           {% capture notif_icon %}{{ action.icon | default: "bell" }}{% endcapture %}
           <button class="btn-icon position-relative" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false" aria-label="{{ action.label | default: 'Notifications' }}">
-            {% uj_icon notif_icon, "fa-sm" %}
+            {% omega_icon notif_icon, "fa-sm" %}
             {% if action.badge %}
               <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill {{ action.badge.class | default: 'bg-danger' }}">
                 {{ action.badge.text }}
@@ -113,7 +113,7 @@
                       <div class="d-flex">
                         {% if notification.icon %}
                           <span class="classy-icon-chip classy-icon-chip--neutral me-3 flex-shrink-0">
-                            {% uj_icon notification.icon, "fa-sm" %}
+                            {% omega_icon notification.icon, "fa-sm" %}
                           </span>
                         {% endif %}
                         <div class="flex-fill">
@@ -162,7 +162,7 @@
         <div class="dropdown">
           <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
             {% if action.icon %}
-              {% uj_icon action.icon, "fa-sm me-2" %}
+              {% omega_icon action.icon, "fa-sm me-2" %}
             {% endif %}
             <span>{{ action.label }}</span>
           </button>
@@ -173,7 +173,7 @@
               {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
               {% capture child_content %}
                 {% if child.icon %}
-                  {% uj_icon child.icon, "fa-sm me-2" %}
+                  {% omega_icon child.icon, "fa-sm me-2" %}
                 {% endif %}
                 <span>{{ child.label }}</span>
               {% endcapture %}
@@ -205,7 +205,7 @@
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         {% capture action_content %}
           {% if action.icon %}
-            {% uj_icon action.icon, "fa-sm me-2" %}
+            {% omega_icon action.icon, "fa-sm me-2" %}
           {% endif %}
           <span>{{ action.label }}</span>
         {% endcapture %}

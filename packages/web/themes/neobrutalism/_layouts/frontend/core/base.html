@@ -19,8 +19,8 @@ theme:
 {% endunless %}
 
 <!-- Main Content -->
-<main id="main-content" class="flex-fill {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
-  {{ content | uj_content_format }}
+<main id="main-content" class="flex-fill {{ resolved.theme.main.class | omega_liquify }}" aria-label="Main content">
+  {{ content | omega_content_format }}
 </main>
 
 <!-- Footer (controlled by page/layout front matter) -->

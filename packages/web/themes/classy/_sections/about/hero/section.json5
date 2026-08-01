@@ -21,7 +21,7 @@
     description: 'The people and stubborn opinions behind {{ site.brand.name }}.',
     image: '',
     image_alt: '',
-    placeholder: '{{ site.uj.placeholder.src }}',
+    placeholder: '{{ site.omega.placeholder.src }}',
   },
 
   demo: [

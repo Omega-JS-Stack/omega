@@ -13,23 +13,23 @@ import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggl
 
 import omega from '@omega.js/client';
 
-// Ultimate Jekyll Manager Module
+// Global web module
 export default async function ({ manager, options } = {}) {
   // Add Manager to global scope for easy access in modules
   // Removed because @omega.js/client is singleton and can be imported directly in modules, so no need to attach it to window
   // window.Manager = manager;
 
-  // Initialize the UJ library on omega for programmatic access to UJ features
-  // This allows other modules to call omega.uj().showExitPopup(), etc.
-  const ujLibrary = {};
-  omega.uj = function() {
-    return ujLibrary;
+  // Initialize the web library on omega for programmatic access to its features
+  // This allows other modules to call omega.library().showExitPopup(), etc.
+  const omegaLibrary = {};
+  omega.library = function() {
+    return omegaLibrary;
   };
   // Also expose the internal object for modules to register their functions
-  omega._ujLibrary = ujLibrary;
+  omega._library = omegaLibrary;
 
   // Log
-  console.log('Global module loaded successfully (assets/js/ultimate-jekyll-manager.js)');
+  console.log('Global module loaded successfully (assets/js/main.js)');
 
   // Initialize fixed modules synchronously (already loaded via static imports)
   // initializeModule({ manager, options });

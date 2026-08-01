@@ -7,9 +7,8 @@ sitemap:
 meta:
   index: false
 ---
-{% capture url %}{{ resolved.redirect.url | default: site.url | uj_liquify }}{% endcapture %}
+{% capture url %}{{ resolved.redirect.url | default: site.url | omega_liquify }}{% endcapture %}
 {% capture querystring %}{{ resolved.redirect.querystring }}{% endcapture %}
-{% capture modifier %}{{ resolved.redirect.modifier | default: "" }}{% endcapture %}
 
 <!-- Self-contained, token-driven — no page css bundle on redirect URLs -->
 <style>
@@ -89,7 +88,7 @@ meta:
   <div class="omega-redirect">
     <!-- Brand mark -->
     <a class="omega-redirect__mark" href="/" aria-label="{{ site.brand.name }}">
-      <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }}"/>
+      <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }}"/>
     </a>
 
     <!-- Header -->
@@ -106,14 +105,14 @@ meta:
     <div class="d-grid gap-2 d-sm-block text-center">
       <a id="home-button" class="btn btn-outline-adaptive mb-2 mb-sm-0 me-sm-2" href="/">
         <span class="d-inline-flex align-items-center">
-          {% uj_icon "house", "fa-sm me-2" %}
+          {% omega_icon "house", "fa-sm me-2" %}
           Return home
         </span>
       </a>
       <noscript>
         <a id="redirect-button" class="btn btn-adaptive mb-2 mb-sm-0" href="{{ url }}">
           <span class="d-inline-flex align-items-center">
-            {% uj_icon "arrow-right", "fa-sm me-2" %}
+            {% omega_icon "arrow-right", "fa-sm me-2" %}
             Take me there
           </span>
         </a>
@@ -126,10 +125,9 @@ meta:
 <div id="redirect-config" style="display: none;"
   data-url="{{ url }}"
   data-querystring="{{ querystring }}"
-  data-modifier="{{ modifier }}"
   data-site-url="{{ site.url }}"
   data-environment="{{ jekyll.environment }}">
 </div>
 
 <!-- Load redirect module script -->
-<script type="text/javascript" src="{{ '/assets/js/modules/redirect.bundle.js' | uj_cachebreak }}" async></script>
+<script type="text/javascript" src="{{ '/assets/js/modules/redirect.bundle.js' | omega_cachebreak }}" async></script>

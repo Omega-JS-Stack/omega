@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- [#44](../../issues/44) — The legacy `uj` prefixes are gone: filters and tags are `omega_*`, globals are `site.omega.*`, classes and schema ids are `omega-*`, auth flags are `window.__OMEGA_*`, and the page library is `omega.library()`. No aliases — `omega migrate` renames a legacy consumer's spellings, and a guard test fails any surface reintroducing one.
+
+### Removed
+- [#44](../../issues/44) — The redirect layout's `modifier` lane and its only entry, `search-cse`, are gone. Nothing supplied a modifier value: no page, config key, or doc reached it, so the layout, the data attribute, and the resolver went together.
 
 ## [0.15.0] (2026-08-01)
 ### Changed

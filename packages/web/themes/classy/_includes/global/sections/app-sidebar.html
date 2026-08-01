@@ -20,11 +20,11 @@
   <!-- Brand lockup -->
   {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
   {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
-  {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
+  {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
 
   <a href="{{ logo_href }}" class="classy-side__brand">
     {% iftruthy logo_src %}
-      <img src="{{ logo_src | uj_cachebreak }}" alt="{{ logo_text }} Logo" class="{{ data.logo.class | default: 'filter-adaptive' }}"/>
+      <img src="{{ logo_src | omega_cachebreak }}" alt="{{ logo_text }} Logo" class="{{ data.logo.class | default: 'filter-adaptive' }}"/>
     {% endiftruthy %}
     {% iftruthy logo_text %}
       <span class="omega-shell__label">{{ logo_text }}</span>
@@ -33,7 +33,7 @@
 
   <!-- Project selector (optional module) -->
   {% if data.selector.enabled %}
-    {% capture selector_name %}{{ data.selector.name | uj_liquify }}{% endcapture %}
+    {% capture selector_name %}{{ data.selector.name | omega_liquify }}{% endcapture %}
     {% capture selector_initial %}{% if data.selector.initial %}{{ data.selector.initial }}{% else %}{{ selector_name | slice: 0 }}{% endif %}{% endcapture %}
     <div class="dropdown">
       <button class="classy-side__selector" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Switch project">
@@ -41,10 +41,10 @@
         <span class="omega-shell__label">
           <span class="classy-side__selector-name d-block">{{ selector_name }}</span>
           {% iftruthy data.selector.env %}
-            <span class="classy-side__selector-env d-block">{{ data.selector.env | uj_liquify }}</span>
+            <span class="classy-side__selector-env d-block">{{ data.selector.env | omega_liquify }}</span>
           {% endiftruthy %}
         </span>
-        <span class="classy-side__selector-chevron">{% uj_icon "arrows-up-down", "fa-xs" %}</span>
+        <span class="classy-side__selector-chevron">{% omega_icon "arrows-up-down", "fa-xs" %}</span>
       </button>
       {% if data.selector.dropdown %}
         <ul class="dropdown-menu">
@@ -54,8 +54,8 @@
             {% else %}
               <li>
                 <a class="dropdown-item" href="{{ item.href | default: '#' }}">
-                  {% if item.icon %}{% uj_icon item.icon, "fa-sm me-2" %}{% endif %}
-                  {{ item.label | uj_liquify }}
+                  {% if item.icon %}{% omega_icon item.icon, "fa-sm me-2" %}{% endif %}
+                  {{ item.label | omega_liquify }}
                 </a>
               </li>
             {% endif %}
@@ -94,10 +94,10 @@
         <li>
           <button class="classy-side__item {% if dropdown_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
             {% if link.icon %}
-              <span class="classy-side__icon">{% uj_icon link.icon, "fa-sm" %}</span>
+              <span class="classy-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
             {% endif %}
             <span class="omega-shell__label">{{ link.label }}</span>
-            <span class="classy-side__chevron">{% uj_icon "chevron-right", "fa-xs" %}</span>
+            <span class="classy-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
           </button>
           <div class="collapse {% if dropdown_has_active %}show{% endif %}" id="{{ link_id }}">
             <ul class="classy-side__children">
@@ -117,10 +117,10 @@
                   <li>
                     <button class="classy-side__item {% if nested_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
                       {% if child.icon %}
-                        <span class="classy-side__icon">{% uj_icon child.icon, "fa-sm" %}</span>
+                        <span class="classy-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
                       {% endif %}
                       <span class="omega-shell__label">{{ child.label }}</span>
-                      <span class="classy-side__chevron">{% uj_icon "chevron-right", "fa-xs" %}</span>
+                      <span class="classy-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
                     </button>
                     <div class="collapse {% if nested_has_active %}show{% endif %}" id="{{ nested_id }}">
                       <ul class="classy-side__children">
@@ -132,7 +132,7 @@
                             <li>
                               <a href="{{ grandchild.href }}" class="classy-side__item {{ grandchild_active }}">
                                 {% if grandchild.icon %}
-                                  <span class="classy-side__icon">{% uj_icon grandchild.icon, "fa-sm" %}</span>
+                                  <span class="classy-side__icon">{% omega_icon grandchild.icon, "fa-sm" %}</span>
                                 {% endif %}
                                 <span class="omega-shell__label">{{ grandchild.label }}</span>
                               </a>
@@ -149,7 +149,7 @@
                     {% iftruthy child.href %}
                       <a href="{{ child.href }}" class="classy-side__item {{ child_active }}" {{ child_attributes }}>
                         {% if child.icon %}
-                          <span class="classy-side__icon">{% uj_icon child.icon, "fa-sm" %}</span>
+                          <span class="classy-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
                         {% endif %}
                         <span class="omega-shell__label">{{ child.label }}</span>
                         {% if child.badge %}
@@ -160,7 +160,7 @@
                     {% iffalsy child.href %}
                       <button type="button" class="classy-side__item {% if child.class %}{{ child.class }}{% endif %}" {{ child_attributes }}>
                         {% if child.icon %}
-                          <span class="classy-side__icon">{% uj_icon child.icon, "fa-sm" %}</span>
+                          <span class="classy-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
                         {% endif %}
                         <span class="omega-shell__label">{{ child.label }}</span>
                       </button>
@@ -179,7 +179,7 @@
           {% iftruthy link.href %}
             <a href="{{ link.href }}" class="classy-side__item {{ link_active }}" {{ link_attributes }}>
               {% if link.icon %}
-                <span class="classy-side__icon">{% uj_icon link.icon, "fa-sm" %}</span>
+                <span class="classy-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
               {% endif %}
               <span class="omega-shell__label">{{ link.label }}</span>
               {% if link.badge %}
@@ -190,7 +190,7 @@
           {% iffalsy link.href %}
             <button type="button" class="classy-side__item" {{ link_attributes }}>
               {% if link.icon %}
-                <span class="classy-side__icon">{% uj_icon link.icon, "fa-sm" %}</span>
+                <span class="classy-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
               {% endif %}
               <span class="omega-shell__label">{{ link.label }}</span>
             </button>
@@ -210,7 +210,7 @@
         <div class="d-flex align-items-center justify-content-between mb-2">
           <span class="classy-chip">Sponsored</span>
           <a href="/pricing" class="classy-footer__link" data-omega-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
-            {% uj_icon "xmark", "fa-xs" %}
+            {% omega_icon "xmark", "fa-xs" %}
           </a>
         </div>
         {% section "verts/unit", type: "in-article", size: "rectangle" %}
@@ -223,14 +223,14 @@
     <!-- User row -->
     <div class="classy-side__user" data-omega-bind="@show auth.user" hidden>
       <span class="avatar avatar-sm rounded-circle overflow-hidden d-inline-flex flex-shrink-0">
-        <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+        <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
       </span>
       <span class="omega-shell__label flex-grow-1 overflow-hidden">
         <span class="classy-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.displayName">User</span>
         <span class="classy-side__user-email d-block text-truncate" data-omega-bind="@text auth.user.email">email@example.com</span>
       </span>
       <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">
-        {% uj_icon "gear", "fa-sm" %}
+        {% omega_icon "gear", "fa-sm" %}
       </a>
     </div>
   </div>

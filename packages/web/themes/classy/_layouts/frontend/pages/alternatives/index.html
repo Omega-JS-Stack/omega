@@ -80,13 +80,13 @@ cta:
       {% iftruthy resolved.hero.primary_button.text %}
         <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.primary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endiftruthy %}
       {% iftruthy resolved.hero.secondary_button.text %}
         <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.secondary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endiftruthy %}
     </div>
@@ -118,7 +118,7 @@ cta:
                 <span>{{ site.brand.name }} vs {{ item.alternative.competitor.name }}</span>
                 <span class="classy-rowlist__meta">
                   {{ resolved.alternatives.view_comparison }}
-                  {% uj_icon "arrow-right", "fa-xs ms-2" %}
+                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
                 </span>
               </a>
             {% endfor %}
@@ -149,7 +149,7 @@ cta:
           {% for prop in resolved.value_props.items %}
             <div class="classy-rowlist__item" data-omega-reveal>
               <span class="d-inline-flex align-items-center gap-3">
-                <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon prop.icon, "fa-sm" %}</span>
+                <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon prop.icon, "fa-sm" %}</span>
                 <strong>{{ prop.title }}</strong>
               </span>
               <span class="classy-rowlist__meta">{{ prop.description }}</span>
@@ -169,4 +169,4 @@ cta:
   {% section "marketing/cta", data: resolved.cta %}
 {% endiftruthy %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

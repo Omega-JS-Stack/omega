@@ -31,7 +31,7 @@ newsletter_cta:
       <div class="classy-masthead__actions" data-omega-reveal>
         {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
         <div class="classy-blog-search">
-          <span class="classy-blog-search__icon">{% uj_icon "search", "fa-sm" %}</span>
+          <span class="classy-blog-search__icon">{% omega_icon "search", "fa-sm" %}</span>
           <label for="blog-search" class="visually-hidden">Search posts</label>
           <input
             type="search"
@@ -50,7 +50,7 @@ newsletter_cta:
     {% for post in site.posts %}
       {% if categories.size >= 6 %}{% break %}{% endif %}
       {% for category in post.post.categories %}
-        {% assign category_fixed = category | uj_title_case %}
+        {% assign category_fixed = category | omega_title_case %}
         {% unless categories contains category_fixed %}
           {% assign categories = categories | push: category_fixed %}
         {% endunless %}
@@ -102,20 +102,20 @@ newsletter_cta:
             {%- assign _mono_source = _featured.post.categories[0] | default: _featured.post.title -%}
             <span class="classy-featured-post__monogram" aria-hidden="true">{{ _mono_source | slice: 0 | upcase }}</span>
           {%- elsif _featured.post.image -%}
-            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ _featured.post.image }}" alt="{{ _featured.post.title }}">
+            <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ _featured.post.image }}" alt="{{ _featured.post.title }}">
           {%- else -%}
-            {%- uj_post _featured.post.id, "image-tag", class="" -%}
+            {%- omega_post _featured.post.id, "image-tag", class="" -%}
           {%- endif -%}
         </a>
         <div class="classy-featured-post__body">
           <div class="classy-post-card__eyebrow">
             {% if _featured.post.categories[0] %}
-              <a href="/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | uj_title_case }}</a>
+              <a href="/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | omega_title_case }}</a>
               <span>·</span>
             {% endif %}
             <time datetime="{{ _featured.date | date_to_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
             <span>·</span>
-            <span>{% uj_readtime _featured.content %} min read</span>
+            <span>{% omega_readtime _featured.content %} min read</span>
           </div>
           <h2 class="classy-featured-post__title">
             <a href="{{ _featured.url }}">{{ _featured.post.title }}</a>
@@ -126,7 +126,7 @@ newsletter_cta:
           <div class="mt-2">
             <a href="{{ _featured.url }}" class="btn btn-outline-adaptive btn-sm omega-hover-nudge">
               Read the story
-              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-xs" %}</span>
+              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-xs" %}</span>
             </a>
           </div>
         </div>
@@ -150,14 +150,14 @@ newsletter_cta:
           {% if paginator.previous_page %}
             <li class="page-item">
               <a class="page-link" href="{{ paginator.previous_page_path }}" aria-label="Previous page">
-                {% uj_icon "chevron-left", "fa-xs" %}
+                {% omega_icon "chevron-left", "fa-xs" %}
                 <span class="d-none d-sm-inline ms-1">Previous</span>
               </a>
             </li>
           {% else %}
             <li class="page-item disabled">
               <span class="page-link">
-                {% uj_icon "chevron-left", "fa-xs" %}
+                {% omega_icon "chevron-left", "fa-xs" %}
                 <span class="d-none d-sm-inline ms-1">Previous</span>
               </span>
             </li>
@@ -207,14 +207,14 @@ newsletter_cta:
             <li class="page-item">
               <a class="page-link" href="{{ paginator.next_page_path }}" aria-label="Next page">
                 <span class="d-none d-sm-inline me-1">Next</span>
-                {% uj_icon "chevron-right", "fa-xs" %}
+                {% omega_icon "chevron-right", "fa-xs" %}
               </a>
             </li>
           {% else %}
             <li class="page-item disabled">
               <span class="page-link">
                 <span class="d-none d-sm-inline me-1">Next</span>
-                {% uj_icon "chevron-right", "fa-xs" %}
+                {% omega_icon "chevron-right", "fa-xs" %}
               </span>
             </li>
           {% endif %}
@@ -235,4 +235,4 @@ newsletter_cta:
 
 <!-- ═══ Newsletter CTA band ═══ -->
 {% section "marketing/newsletter-cta", data: resolved.newsletter_cta, section_class: "pt-0" %}
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

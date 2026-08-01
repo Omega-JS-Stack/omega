@@ -47,6 +47,6 @@
 // and loads LAST on its page — that's the slot that outranks core page css)
 @import 'css/pages/auth';
 
-// Universal Bootstrap overrides (shared across all UJ themes)
+// Universal Bootstrap overrides (shared across all omega themes)
 // Must come AFTER Bootstrap is loaded via config to use @extend
 @import '../bootstrap/overrides';

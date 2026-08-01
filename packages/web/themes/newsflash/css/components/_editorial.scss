@@ -78,7 +78,7 @@
   overflow: hidden;
   background: var(--omega-surface-2);
 
-  // uj_post image-tags render as <picture><img>. The wrapper must fill the
+  // omega_post image-tags render as <picture><img>. The wrapper must fill the
   // frame or the img's percentage height resolves against the auto-height
   // picture instead — leaving a blank strip inside the frame.
   picture {

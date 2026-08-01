@@ -25,10 +25,10 @@ export default function () {
     setupExitIntentDetection();
   });
 
-  // Register showExitPopup on the UJ library for programmatic access
-  // Usage: omega.uj().showExitPopup()
+  // Register showExitPopup on the omega library for programmatic access
+  // Usage: omega.library().showExitPopup()
 
-  omega._ujLibrary.showExitPopup = showExitPopup;
+  omega._library.showExitPopup = showExitPopup;
 
   function updateModalContent($modal, effectiveConfig) {
     // Update title

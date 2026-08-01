@@ -7,7 +7,7 @@ layout: frontend/core/cover
     <div class="classy-auth__card">
       <!-- Logo -->
       <div class="classy-auth__brand">
-        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
@@ -29,7 +29,7 @@ layout: frontend/core/cover
         <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
           {{ initializing_spinner }}
           <span class="button-text">Send reset link</span>
-          <span class="omega-nudge ms-2">{% uj_icon "paper-plane", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "paper-plane", "fa-sm" %}</span>
         </button>
       </form>
 
@@ -49,4 +49,4 @@ layout: frontend/core/cover
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

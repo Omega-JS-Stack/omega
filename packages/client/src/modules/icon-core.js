@@ -2,7 +2,7 @@
  * icon-core — the ONE place Font Awesome icon semantics live (C4 cp108).
  *
  * Pure functions, zero runtime assumptions: no DOM, no fs, no transport.
- * Web's build-time `uj_icon` tag (@omega.js/template-kit) and
+ * Web's build-time `omega_icon` tag (@omega.js/template-kit) and
  * @omega.js/desktop's main-process icon server both consume THIS module, so
  * lookup rules and rendered SVG markup can never drift between surfaces
  * again. File reading stays with each consumer (build tags read at build

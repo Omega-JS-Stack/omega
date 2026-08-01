@@ -27,7 +27,7 @@ test('W8 + W11: og:locale/hreflang carry the default language; quoted brand stri
   assert.ok(!html.includes('property="og:locale" content=""'), 'og:locale never empty');
   assert.ok(!html.includes('hreflang=""'), 'no invalid empty hreflang annotation');
 
-  const match = html.match(/<script id="uj-schema-brand"[^>]*>([\s\S]*?)<\/script>/);
+  const match = html.match(/<script id="omega-schema-brand"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'brand schema block present');
   const schema = JSON.parse(match[1]);
   assert.equal(schema.description, 'Mini "quoted" \\ brand', 'quote and backslash survive escaping intact');
@@ -40,7 +40,7 @@ test('W16 (Ian 2026-07-23): synthesized aggregateRating count is seeded into 10k
   });
   const html = pages.get('/blog');
 
-  const match = html.match(/<script id="uj-schema-software-application"[^>]*>([\s\S]*?)<\/script>/);
+  const match = html.match(/<script id="omega-schema-software-application"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'SoftwareApplication schema block present when enabled');
   const schema = JSON.parse(match[1]);
   const count = Number(schema.aggregateRating.ratingCount);

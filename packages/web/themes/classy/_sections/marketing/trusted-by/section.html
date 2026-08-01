@@ -8,14 +8,14 @@
           {% for logo in args.logos %}
             <div class="omega-marquee__item">
               {% if logo.src %}
-                <img src="{{ logo.src | uj_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
+                <img src="{{ logo.src | omega_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
               {% elsif logo.logo %}
                 <span class="classy-logos__mark" role="img" aria-label="{{ logo.name }}">
-                  {% uj_logo logo.logo, "combomarks" %}
+                  {% omega_logo logo.logo, "combomarks" %}
                 </span>
               {% elsif logo.icon %}
                 <span class="classy-logos__lockup">
-                  {% uj_icon logo.icon %}
+                  {% omega_icon logo.icon %}
                   <span>{{ logo.name }}</span>
                 </span>
               {% else %}

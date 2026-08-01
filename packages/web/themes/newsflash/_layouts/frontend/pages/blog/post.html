@@ -61,7 +61,7 @@ newsletter:
       <div class="col-xl-9 col-lg-10 col-md-12 col-12">
         <header class="text-center mb-4" data-lazy="@class animation-slide-up">
           {% if resolved.post.categories[0] %}
-            <span class="kicker mb-3">{{ resolved.post.categories[0] | uj_title_case }}</span>
+            <span class="kicker mb-3">{{ resolved.post.categories[0] | omega_title_case }}</span>
           {% else %}
             <span class="kicker mb-3">Dispatch</span>
           {% endif %}
@@ -71,14 +71,14 @@ newsletter:
         <!-- Byline row -->
         <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-5" data-lazy="@class animation-slide-up">
           <div class="d-flex align-items-center">
-            <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none me-2">
+            <a href="{%- omega_member resolved.post.author, "url" -%}" class="text-decoration-none me-2">
               <div class="avatar avatar-md">
-                {%- uj_member resolved.post.author, "image-tag", class="rounded-circle" -%}
+                {%- omega_member resolved.post.author, "image-tag", class="rounded-circle" -%}
               </div>
             </a>
             <div class="text-start">
-              <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold d-block">
-                {%- uj_member resolved.post.author, "name" -%}
+              <a href="{%- omega_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold d-block">
+                {%- omega_member resolved.post.author, "name" -%}
               </a>
               <span class="text-body-secondary small">
                 {% iftruthy resolved.author_section.author_position %}
@@ -90,7 +90,7 @@ newsletter:
           </div>
           <div class="vr d-none d-sm-block"></div>
           <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary">{% uj_readtime content %} min read</span>
+            <span class="badge bg-primary">{% omega_readtime content %} min read</span>
             <div data-social-share
                   data-platforms=""
                   data-title=""
@@ -108,7 +108,7 @@ newsletter:
     <div class="row justify-content-center">
       <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-lazy="@class animation-slide-up">
         <div class="art-frame article-hero shadow">
-          {%- uj_post resolved.post.id, "image-tag", class="w-100 blog-post-image" -%}
+          {%- omega_post resolved.post.id, "image-tag", class="w-100 blog-post-image" -%}
         </div>
       </div>
     </div>
@@ -116,7 +116,7 @@ newsletter:
     <!-- Body — drop cap, serif crossheads, volt marks -->
     <div class="row justify-content-center mb-3">
       <div class="blog-post-content col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
-        {{ content | uj_content_format }}
+        {{ content | omega_content_format }}
       </div>
     </div>
 
@@ -140,14 +140,14 @@ newsletter:
         <div class="tag-row d-flex flex-wrap gap-2 pt-4">
           {% assign tags = '' | split: ',' %}
             {% for tag in resolved.post.tags %}
-              {% assign tag_fixed = tag | uj_title_case %}
+              {% assign tag_fixed = tag | omega_title_case %}
 
               {% unless tags contains tag_fixed %}
                 {% assign tags = tags | push: tag_fixed %}
               {% endunless %}
             {% endfor %}
           {% for tag in tags %}
-            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm">{% uj_icon "tag", "me-1" %}{{ tag }}</a>
+            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm">{% omega_icon "tag", "me-1" %}{{ tag }}</a>
           {% endfor %}
         </div>
       </div>
@@ -160,16 +160,16 @@ newsletter:
           <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
             <div class="d-flex">
               <div class="flex-shrink-0">
-                <a href="{% uj_member resolved.post.author, "url" %}">
+                <a href="{% omega_member resolved.post.author, "url" %}">
                   <div class="avatar avatar-lg">
-                    {% uj_member resolved.post.author, "image-tag", class="rounded-circle" %}
+                    {% omega_member resolved.post.author, "image-tag", class="rounded-circle" %}
                   </div>
                 </a>
               </div>
               <div class="ms-3">
-                <a href="{% uj_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
+                <a href="{% omega_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
                   <div class="h5 mb-0">
-                    {%- uj_member resolved.post.author, "name" -%}
+                    {%- omega_member resolved.post.author, "name" -%}
                   </div>
                 </a>
                 {% iftruthy resolved.author_section.author_position %}
@@ -177,8 +177,8 @@ newsletter:
                     {{ resolved.author_section.author_position }}
                   </div>
                 {% endiftruthy %}
-                <a href="{% uj_member resolved.post.author, "url" %}" class="small fw-bold text-decoration-none">
-                  More from this author {% uj_icon "arrow-right", "ms-1" %}
+                <a href="{% omega_member resolved.post.author, "url" %}" class="small fw-bold text-decoration-none">
+                  More from this author {% omega_icon "arrow-right", "ms-1" %}
                 </a>
               </div>
             </div>
@@ -218,8 +218,8 @@ newsletter:
           {% if post.id != resolved.post.id %}
             {% assign count = count | plus: 1 %}
             <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
-              {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
-              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | uj_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+              {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
+              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
             </div>
           {% endif %}
         {% endif %}

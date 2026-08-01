@@ -15,7 +15,7 @@
           {% assign demo_btn_class = demo.options.button.class | default: "btn-adaptive" %}
           <button type="submit" class="btn {{ demo_btn_class }} btn-lg text-nowrap flex-shrink-0">
             {% iftruthy demo.options.button.icon %}
-              {% uj_icon demo.options.button.icon, "me-2" %}
+              {% omega_icon demo.options.button.icon, "me-2" %}
             {% endiftruthy %}
             {{ demo.options.button.text }}
           </button>
@@ -41,7 +41,7 @@
         <a class="classy-hero__badge" href="{{ args.badge.href }}" data-omega-reveal>
           <span class="classy-dot"></span>
           {{ args.badge.text }}
-          {% uj_icon "arrow-right", "fa-xs" %}
+          {% omega_icon "arrow-right", "fa-xs" %}
         </a>
       {% else %}
         <div data-omega-reveal>
@@ -74,7 +74,7 @@
       {% iftruthy args.primary_button.text %}
         <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ args.primary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endiftruthy %}
       {% iftruthy args.command %}
@@ -85,7 +85,7 @@
       {% if args.secondary_button.enabled != false and args.secondary_button.text %}
         <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ args.secondary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endif %}
     </div>
@@ -93,7 +93,7 @@
     {% if args.meta and args.meta.size > 0 %}
       <div class="classy-hero__meta" data-omega-reveal>
         {% for item in args.meta %}
-          <span>{% uj_icon "check", "text-success fa-xs me-1" %}{{ item }}</span>
+          <span>{% omega_icon "check", "text-success fa-xs me-1" %}{{ item }}</span>
         {% endfor %}
       </div>
     {% endif %}

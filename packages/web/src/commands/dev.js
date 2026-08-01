@@ -459,7 +459,7 @@ function devCleanUrls(outDir) {
 /**
  * Dev builds link to THIS server, never the live site (legacy _config_dev.yml
  * url-override parity): site.url is the one root every absolute-URL surface
- * derives from — canonicals/og tags, uj_external, absolute_url, redirect
+ * derives from — canonicals/og tags, omega_external, absolute_url, redirect
  * pages, nav — so pointing it at the local origin keeps every click in dev.
  * @param {object} siteData - the loaded site global (mutated)
  * @param {number} port - the resolved dev-server port

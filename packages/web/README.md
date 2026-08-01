@@ -150,7 +150,7 @@ see the harness README for the honest before/after numbers.
   index, `/.well-known/security.txt`) — default pages like any other, so a
   consumer file at the same URL overrides. sitemap.xml and pages.json emit
   entries in URL byte order (deterministic across builds). JSON outputs are
-  valid by construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
+  valid by construction (`omega_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.adsense.client` or an
   honest comment.
 - `defaults/sample-posts/**`, `sample-team/**`, `sample-updates/**` — the
@@ -290,7 +290,9 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   `payment` at the top level; the legacy `web_manager` blob renamed to the
   `client` client-settings key + presentation
   sections + build settings under `targets.web`), the codemod rule table over
-  `src/**` templates, seed `main.js` removal (the core main + boot runtime
+  `src/**` templates (starting with `legacy-prefix`: `uj_*` tags/filters →
+  `omega_*`, `site.uj` → `site.omega`, `uj-*` classes → `omega-*` — #44 retired
+  those spellings with no aliases), seed `main.js` removal (the core main + boot runtime
   replace it), the `@use 'omega:main' with (…)` rewrite for theme-variable
   customization (the layered sass importer skips the requesting file, so a
   consumer main.scss configures the layers below it), page-css self-@use
@@ -366,7 +368,7 @@ properties, and motion respects `prefers-reduced-motion`.
 [core/js/core/app-shell.js](core/js/core/app-shell.js) drives it
 declaratively (`[data-shell-toggle="collapse|drawer"]`,
 `[data-shell-dismiss]`, Escape closes the drawer, `aria-expanded` synced)
-and exposes `omega.uj().appShell`. The full contract markup is documented
+and exposes `omega.library().appShell`. The full contract markup is documented
 at the top of the sheet; theme layouts emit it (one tree — no duplicated
 mobile nav like classy's offcanvas). Because the state attributes are
 stamped at runtime, `purgeCss` safelists `/omega-shell/`. Classy keeps its

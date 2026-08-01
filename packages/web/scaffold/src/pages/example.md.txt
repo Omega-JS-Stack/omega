@@ -73,7 +73,7 @@ items:
 {% comment %} Slots pass finished MARKUP where a string won't do. {% endcomment %}
 {% section "marketing/hero" %}
   {% slot demo_html %}
-    <div class="my-demo">{% uj_icon "rocket" %} {{ site.brand.name }}</div>
+    <div class="my-demo">{% omega_icon "rocket" %} {{ site.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ────────────────────────────────────────────────────────────────────────────

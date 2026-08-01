@@ -174,7 +174,7 @@ test('posts: Jekyll filename convention, readtime, taxonomy links', () => {
   const html = pages.get('/blog/first-post');
   assert.ok(html, 'date stripped from URL (fileSlug)');
   assert.ok(html.includes('First post'), 'post.title');
-  assert.ok(/[1-9]\d* min read/.test(html), 'uj_readtime');
+  assert.ok(/[1-9]\d* min read/.test(html), 'omega_readtime');
   assert.ok(html.includes('/blog/tags/growth-hacks'), 'tag link slugified (real /tags/ URLs)');
 });
 
@@ -254,8 +254,8 @@ test('admin verts card serves at /admin/verts (docs/web/ads-system.md phase 3)',
   assert.ok(/<input type="url"[^>]*name="vert\.image"/.test(verts), 'image is a URL field');
 });
 
-test('template-kit tags render inside Eleventy (uj_icon, urlmatches nav)', () => {
-  assert.ok(pages.get('/').includes('data-icon='), 'uj_icon SVGs render');
+test('template-kit tags render inside Eleventy (omega_icon, urlmatches nav)', () => {
+  assert.ok(pages.get('/').includes('data-icon='), 'omega_icon SVGs render');
   assert.ok(pages.get('/').includes('navbar'), 'nav include renders from the packaged nav.json data');
 });
 

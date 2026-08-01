@@ -67,13 +67,13 @@ function normalize(url, text) {
     .replace(/<lastBuildDate>[^<]+<\/lastBuildDate>/g, '<lastBuildDate>X</lastBuildDate>')
     .replace(/<pubDate>[^<]+<\/pubDate>/g, '<pubDate>X</pubDate>')
     .replace(/<lastmod>[^<]+<\/lastmod>/g, '<lastmod>X</lastmod>')
-    // uj_logo instance ids are `name-<build-global counter>-<original id>` in
+    // omega_logo instance ids are `name-<build-global counter>-<original id>` in
     // id=/url(#/href="# homes — the counter value depends on page render
     // order, which legitimately shifts when a URL moves from virtual default
     // to consumer file. Ids stay internally consistent per page.
     .replace(/(id="|url\(#|href="#)([a-z0-9-]+?)-\d+-/g, '$1$2-N-')
     // A materialized page's body passes through the blueprint's
-    // `{{ content | uj_content_format }}` wrap, which frames it with one
+    // `{{ content | omega_content_format }}` wrap, which frames it with one
     // extra newline each side vs the in-layout render. Blank-line runs are
     // the ONLY sanctioned delta — anything beyond whitespace still fails.
     .replace(/\n[\t ]*(?:\n[\t ]*)+/g, '\n');

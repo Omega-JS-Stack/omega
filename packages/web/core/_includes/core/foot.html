@@ -10,7 +10,7 @@
         <div class="p-4 p-md-5 text-center">
           <!-- Icon -->
           <div class="mb-4">
-            <span class="animation-hand-wave d-inline-block">{% uj_icon "hand", "fa-2xl" %}</span>
+            <span class="animation-hand-wave d-inline-block">{% omega_icon "hand", "fa-2xl" %}</span>
           </div>
 
           <!-- Title -->
@@ -36,7 +36,7 @@
           <div class="d-flex flex-column align-items-center">
             <a href="/" class="modal-exit-button btn btn-adaptive btn-lg px-5 mb-1" data-bs-dismiss="modal">
               <span class="modal-exit-button-text">Show me more</span>
-              {% uj_icon "arrow-right", "fa-sm ms-2" %}
+              {% omega_icon "arrow-right", "fa-sm ms-2" %}
             </a>
             <a href="#" class="modal-exit-dismiss btn btn-link text-decoration-none small" data-bs-dismiss="modal">
               Maybe later
@@ -65,13 +65,13 @@
               {% if _exit_avatar_count > 0 %}
                 {% for avatar in _exit_avatars %}
                   <span class="modal-exit-avatar avatar avatar-sm rounded-circle overflow-hidden{% unless forloop.last %} me-n2{% endunless %}">
-                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ avatar }}" alt="">
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ avatar }}" alt="">
                   </span>
                 {% endfor %}
               {% else %}
                 {% for i in (1..4) %}
                   <span class="modal-exit-avatar avatar avatar-sm rounded-circle{% unless forloop.last %} me-n2{% endunless %}">
-                    {% uj_icon "user", "fa-xs" %}
+                    {% omega_icon "user", "fa-xs" %}
                   </span>
                 {% endfor %}
               {% endif %}
@@ -90,7 +90,7 @@
     runtime: "web",
     environment: "{{ jekyll.environment }}",
     dev: {{ jekyll.dev | jsonify }},
-    buildTime: {{ site.uj.cache_breaker | default: 0 }},
+    buildTime: {{ site.omega.cache_breaker | default: 0 }},
     brand: {{ resolved.brand | jsonify }},
     advertising: {{ resolved.advertising | jsonify }},
     // Company layer (verts source: 'company' resolves company.url → api URL)
@@ -243,12 +243,12 @@
 {% assign breadcrumbs = page.url | split: "/" %}
 {% assign breadcrumbs-size = breadcrumbs | size | minus: 1 %}
 {% assign breadcrumb-url = site.url %}
-<script id="uj-schema-breadcrumbs" type="application/ld+json">
+<script id="omega-schema-breadcrumbs" type="application/ld+json">
   {
     {% if breadcrumbs-size > -1 %}
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
-      "name": "{{ site.brand.name | uj_json_escape }}",
+      "name": "{{ site.brand.name | omega_json_escape }}",
     {% endif %}
     "itemListElement": [
       {%- for breadcrumb in breadcrumbs -%}
@@ -259,7 +259,7 @@
             "position": {{ forloop.index | minus: 1 }},
             "item": {
               "@id": "{{ breadcrumb-url }}",
-              "name": "{{ breadcrumb | uj_json_escape }}"
+              "name": "{{ breadcrumb | omega_json_escape }}"
             }
           }{% unless forloop.last %},{% endunless %}
         {%- endunless -%}
@@ -269,22 +269,22 @@
 </script>
 
 <!-- Schema - Brand -->
-<script id="uj-schema-brand" type="application/ld+json">
+<script id="omega-schema-brand" type="application/ld+json">
   {
     "@context": "http://schema.org",
     "@type": "{{ site.brand.type }}",
     "@id": "{{ site.url }}#{{ site.brand.type }}",
     "url": "{{ site.url }}",
-    "name": "{{ site.brand.name | uj_json_escape }}",
-    "description": "{{ site.brand.description | uj_json_escape }}",
-    "logo": "{% uj_external site.brand.images.brandmark %}",
+    "name": "{{ site.brand.name | omega_json_escape }}",
+    "description": "{{ site.brand.description | omega_json_escape }}",
+    "logo": "{% omega_external site.brand.images.brandmark %}",
     "sameAs": [
       {%- for social in site.socials -%}
         {% assign platform = social[0] %}
         {% assign username = social[1] %}
 
         {%- iftruthy username -%}
-          "{% uj_social platform %}",
+          "{% omega_social platform %}",
         {%- endiftruthy -%}
       {%- endfor -%}
 
@@ -298,10 +298,10 @@
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "Customer Support",
-      "email": "{{ site.brand.contact.email | uj_json_escape }}",
+      "email": "{{ site.brand.contact.email | omega_json_escape }}",
       "url": "{{ site.url }}/contact"
     },
-    "telephone": "{{ site.brand.contact.phone | uj_json_escape }}",
+    "telephone": "{{ site.brand.contact.phone | omega_json_escape }}",
     "areaServed": {
       "@type": "Place",
       "name": "Worldwide"
@@ -330,13 +330,13 @@
 </script>
 
 <!-- Schema - Website -->
-<script id="uj-schema-website" type="application/ld+json">
+<script id="omega-schema-website" type="application/ld+json">
   {
     "@context": "http://schema.org",
     "@type": "WebSite",
     "@id": "{{ site.url }}#WebSite",
     "url": "{{ site.url }}",
-    "name": "{{ site.brand.name | uj_json_escape }}",
+    "name": "{{ site.brand.name | omega_json_escape }}",
     "potentialAction": {
       "@type": "SearchAction",
       {%- comment -%} The blog index IS the site's search surface: it reads ?q= on load {%- endcomment -%}
@@ -351,21 +351,21 @@
 
 <!-- Schema - BlogPosting -->
 {%- iftruthy resolved.post.id -%}
-  <script id="uj-schema-blog" type="application/ld+json">
+  <script id="omega-schema-blog" type="application/ld+json">
     {
       "@context": "http://schema.org",
       "@type": "BlogPosting",
       "@id": "{{ site.url }}{{ page.url }}#BlogPosting",
       "url": "{{ site.url }}{{ page.url }}",
-      "name": "{{ resolved.post.title | uj_liquify | uj_json_escape }}",
-      "description": "{{ resolved.post.description | uj_liquify | uj_json_escape }} ",
-      "headline": "{{ resolved.post.title | uj_liquify | uj_json_escape }}",
+      "name": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
+      "description": "{{ resolved.post.description | omega_liquify | omega_json_escape }} ",
+      "headline": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
       "datePublished": "{{ page.date | date_to_xmlschema }}",
       "dateModified": "{{ site.time | date_to_xmlschema }}",
       "author": {
         "@type": "Person",
-        "name": "{%- uj_member resolved.post.author, "name" -%}",
-        "url": "{%- uj_member resolved.post.author, "url" -%}#Person"
+        "name": "{%- omega_member resolved.post.author, "name" -%}",
+        "url": "{%- omega_member resolved.post.author, "url" -%}#Person"
       },
       "publisher": {
         "@id": "{{ site.url }}#{{ resolved.brand.type }}"
@@ -378,7 +378,7 @@
       },
       "image": {
         "@type": "ImageObject",
-        "url": "{{ site.url }}{%- uj_post resolved.post.id, "image" -%}"
+        "url": "{{ site.url }}{%- omega_post resolved.post.id, "image" -%}"
       },
       "inLanguage": "{{ site.translation.default |  default: 'en' }}"
     }
@@ -387,16 +387,16 @@
 
 <!-- Schema - Person -->
 {%- iftruthy resolved.member.id -%}
-  <script id="uj-schema-person" type="application/ld+json">
+  <script id="omega-schema-person" type="application/ld+json">
     {
       "@context": "http://schema.org",
       "@type": "Person",
-      "@id": "{%- uj_member resolved.member.id, "url" -%}#Person",
-      "url": "{%- uj_member resolved.member.id, "url" -%}",
-      "name": "{%- uj_member resolved.member.id, "name" -%}",
+      "@id": "{%- omega_member resolved.member.id, "url" -%}#Person",
+      "url": "{%- omega_member resolved.member.id, "url" -%}",
+      "name": "{%- omega_member resolved.member.id, "name" -%}",
       "image": {
         "@type": "ImageObject",
-        "url": "{{ site.url }}{%- uj_member resolved.member.id, "image" -%}"
+        "url": "{{ site.url }}{%- omega_member resolved.member.id, "image" -%}"
       },
       "jobTitle": "Blog Author",
       "worksFor": {
@@ -410,7 +410,7 @@
           {% assign username = social[1] %}
 
           {%- iftruthy username -%}
-            "{% uj_social platform %}",
+            "{% omega_social platform %}",
           {%- endiftruthy -%}
         {%- endfor -%}
       ]
@@ -421,14 +421,14 @@
 
 <!-- Schema - Product -->
 {%- if page-is-product == true -%}
-  <script id="uj-schema-product" type="application/ld+json">
+  <script id="omega-schema-product" type="application/ld+json">
     {
       "@context": "http://schema.org",
       "@type": "Product",
       "@id": "{{ site.url }}{{ page.url }}#Product",
       "url": "{{ site.url }}{{ page.url }}",
-      "name": "{{ resolved.product.title | uj_liquify }}",
-      "description": "{{ resolved.product.description | uj_liquify }}",
+      "name": "{{ resolved.product.title | omega_liquify }}",
+      "description": "{{ resolved.product.description | omega_liquify }}",
       "image": [
         "{{ site.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
       ],
@@ -451,22 +451,22 @@
 {%- iftruthy resolved.schema.software_application.enabled -%}
   {% assign sa = resolved.schema.software_application %}
   {% assign sa-hash-seed = sa.hash_seed | default: site.url %}
-  {% assign sa-rating-rand = sa-hash-seed | uj_hash: 2 %}
+  {% assign sa-rating-rand = sa-hash-seed | omega_hash: 2 %}
   {% if sa-rating-rand == 0 %}
     {% assign sa-rating-value = "4.8" %}
   {% else %}
     {% assign sa-rating-value = "4.9" %}
   {% endif %}
   {% comment %} Seeded 10k-30k (Ian 2026-07-23: keep synthesized, just not as high) {% endcomment %}
-  {% assign sa-review-count = sa-hash-seed | uj_hash: 20000 | plus: 10000 %}
-  <script id="uj-schema-software-application" type="application/ld+json">
+  {% assign sa-review-count = sa-hash-seed | omega_hash: 20000 | plus: 10000 %}
+  <script id="omega-schema-software-application" type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "@id": "{{ site.url }}{{ page.url }}#SoftwareApplication",
       "url": "{{ site.url }}{{ page.url }}",
       "name": "{{ sa.name | default: site.brand.name }}",
-      "description": "{{ sa.description | default: resolved.meta.description | uj_liquify }}",
+      "description": "{{ sa.description | default: resolved.meta.description | omega_liquify }}",
       "applicationCategory": "{{ sa.application_category | default: 'WebApplication' }}",
       "operatingSystem": "{{ sa.operating_system | default: 'Web-based' }}",
       "offers": {
@@ -481,7 +481,7 @@
       "publisher": {
         "@id": "{{ site.url }}#{{ site.brand.type }}"
       },
-      "image": "{% uj_external site.brand.images.brandmark %}",
+      "image": "{% omega_external site.brand.images.brandmark %}",
       {% iftruthy sa.features %}
       "featureList": {{ sa.features | jsonify }},
       {% endiftruthy %}
@@ -498,14 +498,14 @@
 
 <!-- Schema - ContactPage -->
 {%- if page.url == "/contact" -%}
-  <script id="uj-schema-contact" type="application/ld+json">
+  <script id="omega-schema-contact" type="application/ld+json">
     {
       "@context": "http://schema.org",
       "@type": "ContactPage",
       "@id": "{{ site.url }}{{ page.url }}#ContactPage",
       "url": "{{ site.url }}{{ page.url }}",
-      "name": "{{ resolved.meta.title | uj_liquify }}",
-      "description": "{{ resolved.meta.description | uj_liquify }}",
+      "name": "{{ resolved.meta.title | omega_liquify }}",
+      "description": "{{ resolved.meta.description | omega_liquify }}",
       "mainEntity": {
         "@type": "Organization",
         "@id": "{{ site.url }}#{{ site.brand.type }}"
@@ -527,7 +527,7 @@
     {% assign faq_size = faq_items | size %}
   {% endif %}
   {% if faq_size > 0 %}
-    <script id="uj-schema-faq-page" type="application/ld+json">
+    <script id="omega-schema-faq-page" type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "FAQPage",
@@ -536,10 +536,10 @@
           {%- for item in faq_items -%}
             {
               "@type": "Question",
-              "name": "{{ item.question | uj_liquify | uj_json_escape }}",
+              "name": "{{ item.question | omega_liquify | omega_json_escape }}",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "{{ item.answer | uj_liquify | uj_json_escape }}"
+                "text": "{{ item.answer | omega_liquify | omega_json_escape }}"
               }
             }{% unless forloop.last %},{% endunless %}
           {%- endfor -%}

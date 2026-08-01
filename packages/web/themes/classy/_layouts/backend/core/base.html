@@ -36,8 +36,8 @@ client:
   {% endunless %}
 
   <!-- Main Content -->
-  <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
-    {{ content | uj_content_format }}
+  <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.theme.main.class | omega_liquify }}" aria-label="Main content">
+    {{ content | omega_content_format }}
   </main>
 
   <!-- Drawer scrim (mobile) -->

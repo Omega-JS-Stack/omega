@@ -1,5 +1,5 @@
 /**
- * variable-resolver.js — argument parsing + variable resolution for uj_* tags.
+ * variable-resolver.js — argument parsing + variable resolution for omega_* tags.
  *
  * Ported from jekyll-uj-powertools lib/helpers/variable_resolver.rb (READ-ONLY
  * reference repo). Engine-neutral: variable lookup goes through a `lookup(path)`

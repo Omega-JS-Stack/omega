@@ -1,7 +1,7 @@
 {
   "name": "@omega.js/template-kit",
   "version": "0.1.0",
-  "description": "The uj_* template filters/tags as plain engine-neutral JS + registerLiquid() adapter + Jekyll-compat filter pack — ported from jekyll-uj-powertools for the SSG bake-off and @omega.js/web (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "description": "The omega_* template filters/tags as plain engine-neutral JS + registerLiquid() adapter + Jekyll-compat filter pack — ported from jekyll-uj-powertools for the SSG bake-off and @omega.js/web (private workspace package, vendored/bundled into frameworks at prepare time)",
   "private": true,
   "main": "./src/index.js",
   "exports": {

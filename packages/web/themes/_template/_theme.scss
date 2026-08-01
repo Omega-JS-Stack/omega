@@ -1,6 +1,6 @@
 // <Theme Name> — SCSS entry point
 // Import order matters: config (loads Bootstrap with your tokens) → root vars →
-// your styles → universal Bootstrap overrides (shared across all UJ themes).
+// your styles → universal Bootstrap overrides (shared across all omega themes).
 
 // Forward config so consuming projects can override your !default tokens
 @forward 'config';
@@ -23,6 +23,6 @@
 // Your theme's styles (add base/layout/component partials as you grow)
 @import 'css/components/components';
 
-// Universal Bootstrap overrides shared by every UJ theme
+// Universal Bootstrap overrides shared by every omega theme
 // (avatars, color-shades, soft-colors, spacing, etc.). Must come AFTER Bootstrap.
 @import '../bootstrap/overrides';

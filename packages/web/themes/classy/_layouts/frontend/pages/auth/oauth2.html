@@ -7,7 +7,7 @@ layout: frontend/core/cover
     <div class="classy-auth__card text-center">
       <!-- Logo -->
       <div class="classy-auth__brand">
-        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
       </div>
 
       <!-- Loading State -->
@@ -35,7 +35,7 @@ layout: frontend/core/cover
           </div>
           <div class="text-center mb-0">
             <a id="return-button" href="/dashboard/account#connections" class="btn btn-adaptive">
-              {% uj_icon "arrow-left", "fa-sm me-2" %}<span class="button-text">Return to account</span>
+              {% omega_icon "arrow-left", "fa-sm me-2" %}<span class="button-text">Return to account</span>
             </a>
           </div>
         </div>
@@ -51,4 +51,4 @@ layout: frontend/core/cover
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

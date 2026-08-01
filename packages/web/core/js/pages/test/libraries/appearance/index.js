@@ -41,7 +41,7 @@ function initDebugPanel() {
 
   // Update function
   function updateDebug() {
-    const appearance = omega.uj().appearance;
+    const appearance = omega.library().appearance;
 
     // Saved preference via API
     const saved = appearance.get();
@@ -108,7 +108,7 @@ function initDebugPanel() {
  * Initialize programmatic control buttons
  */
 function initControls() {
-  const appearance = omega.uj().appearance;
+  const appearance = omega.library().appearance;
 
   // Toggle button
   document.getElementById('btn-toggle').addEventListener('click', () => {
@@ -210,5 +210,5 @@ function initEventLog() {
   // Initial log entry
   addLogEntry('Appearance test page loaded');
   addLogEntry(`Initial theme: "${document.documentElement.getAttribute('data-bs-theme')}"`);
-  addLogEntry(`Saved preference: ${omega.uj().appearance.get() || '(none)'}`);
+  addLogEntry(`Saved preference: ${omega.library().appearance.get() || '(none)'}`);
 }

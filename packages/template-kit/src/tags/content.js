@@ -1,5 +1,5 @@
 /**
- * content.js — the content/metadata uj tags.
+ * content.js — the content/metadata omega_ tags.
  *
  * Ported from jekyll-uj-powertools lib/tags/{readtime,fake_comments,external,
  * social,language,translation_url}.rb. Engine-neutral renderers (see
@@ -35,8 +35,8 @@ function resolveContent(ctx, markup) {
   return resolveInput(ctx.lookup, markup);
 }
 
-// {% uj_readtime %} / {% uj_readtime page.description %} — minutes at 269 wpm, min 1
-const ujReadtime = {
+// {% omega_readtime %} / {% omega_readtime page.description %} — minutes at 269 wpm, min 1
+const omegaReadtime = {
   block: false,
   render(ctx, markup) {
     const content = resolveContent(ctx, markup.trim());
@@ -47,8 +47,8 @@ const ujReadtime = {
   },
 };
 
-// {% uj_fake_comments %} — deterministic pseudo comment count (words % 13)
-const ujFakeComments = {
+// {% omega_fake_comments %} — deterministic pseudo comment count (words % 13)
+const omegaFakeComments = {
   block: false,
   render(ctx, markup) {
     const content = resolveContent(ctx, markup.trim());
@@ -59,8 +59,8 @@ const ujFakeComments = {
   },
 };
 
-// {% uj_external path %} — absolutize a path against site.url (pass through full URLs)
-const ujExternal = {
+// {% omega_external path %} — absolutize a path against site.url (pass through full URLs)
+const omegaExternal = {
   block: false,
   render(ctx, markup) {
     let path = resolveInput(ctx.lookup, markup.trim());
@@ -75,8 +75,8 @@ const ujExternal = {
   },
 };
 
-// {% uj_social platform %} — profile URL from page.resolved.socials.{platform}
-const ujSocial = {
+// {% omega_social platform %} — profile URL from page.resolved.socials.{platform}
+const omegaSocial = {
   block: false,
   render(ctx, markup) {
     const platform = resolveInput(ctx.lookup, markup.trim()) || markup.trim();
@@ -93,8 +93,8 @@ const ujSocial = {
   },
 };
 
-// {% uj_language "es" %} / {% uj_language code, "native" %} — language name lookup
-const ujLanguage = {
+// {% omega_language "es" %} / {% omega_language code, "native" %} — language name lookup
+const omegaLanguage = {
   block: false,
   render(ctx, markup) {
     const parts = parseArguments(markup);
@@ -115,9 +115,9 @@ const ujLanguage = {
   },
 };
 
-// {% uj_translation_url lang, page.url %} — language-prefixed URL honoring
+// {% omega_translation_url lang, page.url %} — language-prefixed URL honoring
 // site.translation { default, languages, exclude }
-const ujTranslationUrl = {
+const omegaTranslationUrl = {
   block: false,
   render(ctx, markup) {
     const parts = parseArguments(markup);
@@ -164,4 +164,4 @@ function pageExcluded(normalizedPath, excludes) {
   return excludes.some((exclude) => normalizedPath === exclude || normalizedPath.startsWith(`${exclude}/`));
 }
 
-module.exports = { ujReadtime, ujFakeComments, ujExternal, ujSocial, ujLanguage, ujTranslationUrl, stripHtml };
+module.exports = { omegaReadtime, omegaFakeComments, omegaExternal, omegaSocial, omegaLanguage, omegaTranslationUrl, stripHtml };

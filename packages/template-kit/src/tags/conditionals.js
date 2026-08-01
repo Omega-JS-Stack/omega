@@ -1,5 +1,5 @@
 /**
- * conditionals.js — the conditional/control-flow uj tags.
+ * conditionals.js — the conditional/control-flow omega_ tags.
  *
  * Ported from jekyll-uj-powertools lib/tags/{iftruthy,iffalsy,iffile,urlmatches}.rb.
  * Each tag is an engine-neutral renderer: `ctx` carries { lookup, page, site }

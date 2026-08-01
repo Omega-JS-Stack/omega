@@ -15,9 +15,9 @@
         {% unless resolved.theme.header.title.enabled == false %}
           <h1 class="page-title mb-0 d-flex align-items-center {{ resolved.theme.header.title.class }}">
             {% if resolved.theme.header.title.icon %}
-              <span class="classy-icon-chip classy-icon-chip--neutral me-2">{% uj_icon resolved.theme.header.title.icon, "fa-sm" %}</span>
+              <span class="classy-icon-chip classy-icon-chip--neutral me-2">{% omega_icon resolved.theme.header.title.icon, "fa-sm" %}</span>
             {% endif %}
-            {{- resolved.theme.header.title.content | default: resolved.meta.title | uj_liquify -}}
+            {{- resolved.theme.header.title.content | default: resolved.meta.title | omega_liquify -}}
           </h1>
         {% endunless %}
       </div>
@@ -46,7 +46,7 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false">
                       {% if action.icon %}
-                        {% uj_icon action.icon, "fa-sm me-2" %}
+                        {% omega_icon action.icon, "fa-sm me-2" %}
                       {% endif %}
                       {{ action.label }}
                     </button>
@@ -58,7 +58,7 @@
                           <li>
                             <a class="dropdown-item" href="{{ item.href | default: '#' }}">
                               {% if item.icon %}
-                                {% uj_icon item.icon, "fa-sm me-2" %}
+                                {% omega_icon item.icon, "fa-sm me-2" %}
                               {% endif %}
                               {{ item.label }}
                             </a>
@@ -73,7 +73,7 @@
                   {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
                   {% capture action_content %}
                     {% if action.icon %}
-                      {% uj_icon action.icon, "fa-sm me-2" %}
+                      {% omega_icon action.icon, "fa-sm me-2" %}
                     {% endif %}
                     {{ action.label }}
                   {% endcapture %}

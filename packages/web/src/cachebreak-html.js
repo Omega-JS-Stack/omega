@@ -2,13 +2,13 @@
  * Build-time image cache-breaker — every LOCAL <img>/<source> URL in
  * rendered HTML gets ?cb=<build stamp> so image edits show up on rebuilds
  * without busting on every request. One stamp per build process, shared
- * with the uj_cachebreak filter and (via site.uj.cache_breaker) the runtime
+ * with the omega_cachebreak filter and (via site.omega.cache_breaker) the runtime
  * lazy-loader.
  *
  * Local = site-relative or bare-relative URLs. External (http/https,
  * protocol-relative), data:/blob:, and empty srcs pass through; URLs that
  * already carry a cb param keep the value they have (an explicit
- * uj_cachebreak or author value wins).
+ * omega_cachebreak or author value wins).
  */
 
 const IMG_TAG_PATTERN = /<(?:img|source)\b[^>]*>/gi;

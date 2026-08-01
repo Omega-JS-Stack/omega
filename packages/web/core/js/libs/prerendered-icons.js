@@ -6,10 +6,10 @@ import omega from '@omega.js/client';
 
 /**
  * Get pre-rendered icon by name from frontmatter icon system.
- * Drop-in replacement for uj_icon in JavaScript contexts.
+ * Drop-in replacement for omega_icon in JavaScript contexts.
  *
  * @param {string} iconName - Name of the icon to retrieve (matches data-icon attribute)
- * @param {string} [classes] - CSS classes for the <i> wrapper (e.g. "fa-md me-2"), like uj_icon's second argument.
+ * @param {string} [classes] - CSS classes for the <i> wrapper (e.g. "fa-md me-2"), like omega_icon's second argument.
  * @returns {string} Icon HTML or empty string if not found
  *
  * @example
@@ -18,7 +18,7 @@ import omega from '@omega.js/client';
  * // No size class
  * getPrerenderedIcon('apple');
  *
- * // With size + classes (same as {% uj_icon "robot", "fa-md me-2" %})
+ * // With size + classes (same as {% omega_icon "robot", "fa-md me-2" %})
  * getPrerenderedIcon('robot', 'fa-md me-2');
  */
 export function getPrerenderedIcon(iconName, classes) {

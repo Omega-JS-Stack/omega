@@ -55,7 +55,7 @@ export default function () {
       // window where Firebase shows user=<about-to-be-deleted-account> would trigger the
       // policy-based redirect to /account (or authReturnUrl) BEFORE the user sees the
       // inline error on /signin. Flag is cleared at the end of reverseAccidentalSignup.
-      if (window.__UJM_REVERSING_SIGNUP) {
+      if (window.__OMEGA_REVERSING_SIGNUP) {
         logger.warn('Skipping state-change processing — reverse-signup in progress');
         return;
       }
@@ -63,7 +63,7 @@ export default function () {
       // Same courtesy for custom-token sign-ins (libs/auth/session-params.js):
       // that handler owns the post-signin navigation (authReturnUrl), and this
       // listener's authenticated-default redirect must not race it.
-      if (window.__UJM_CUSTOM_TOKEN_SIGNIN) {
+      if (window.__OMEGA_CUSTOM_TOKEN_SIGNIN) {
         logger.warn('Skipping state-change processing — custom-token sign-in owns navigation');
         return;
       }

@@ -24,7 +24,7 @@
     },
     image: '',
     image_alt: '',
-    placeholder: '{{ site.uj.placeholder.src }}',
+    placeholder: '{{ site.omega.placeholder.src }}',
   },
 
   demo: [

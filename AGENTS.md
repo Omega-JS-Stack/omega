@@ -43,7 +43,7 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 | `@omega.js/devkit` | Internal: shared build-time internals (logger, local linking, CLI router, prompts, deploy/update executors), vendored into every framework | [docs/devkit/index.md](docs/devkit/index.md) |
 | `@omega.js/config` | Internal: the omega.json5 loader, schema, merge, validator | [docs/shared/config.md](docs/shared/config.md) |
 | `@omega.js/account` | Internal: user/account schema + subscription resolution, shared by backend and client | [packages/account/src](packages/account/src) |
-| `@omega.js/template-kit` | Internal: the `uj_*` template filters/tags as engine-neutral JS | [docs/web/template-kit.md](docs/web/template-kit.md) |
+| `@omega.js/template-kit` | Internal: the `omega_*` template filters/tags as engine-neutral JS | [docs/web/template-kit.md](docs/web/template-kit.md) |
 
 ## The map — brands
 

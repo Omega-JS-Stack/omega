@@ -124,7 +124,7 @@ test('#44: every affirmation-check site wears text-success and nothing else', ()
     const source = fs.readFileSync(path.join(PKG, rel), 'utf8');
     assert.ok(!source.includes('omega-check'), `${rel} dropped the retired seam class`);
 
-    const calls = source.split('\n').filter((line) => line.includes(`uj_icon "${icon}"`));
+    const calls = source.split('\n').filter((line) => line.includes(`omega_icon "${icon}"`));
     assert.ok(calls.length > 0, `${rel} still renders its ${icon}`);
     for (const call of calls) {
       assert.ok(call.includes('text-success'), `${rel} check takes its ink from the bridge: ${call.trim()}`);

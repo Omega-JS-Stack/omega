@@ -28,14 +28,14 @@ hero:
     {% assign category_counts = '' | split: ',' %}
     {% for post in site.posts %}
       {% for category in post.post.categories %}
-        {% assign category_fixed = category | uj_title_case %}
+        {% assign category_fixed = category | omega_title_case %}
         {% unless categories contains category_fixed %}
           {% assign categories = categories | push: category_fixed %}
           {% comment %} Count posts for this category {% endcomment %}
           {% assign count = 0 %}
           {% for p in site.posts %}
             {% for c in p.post.categories %}
-              {% assign c_fixed = c | uj_title_case %}
+              {% assign c_fixed = c | omega_title_case %}
               {% if c_fixed == category_fixed %}
                 {% assign count = count | plus: 1 %}
                 {% break %}
@@ -54,8 +54,8 @@ hero:
             <a href="/blog/categories/{{ category | slugify }}" class="classy-rowlist__item classy-rowlist__item--link" data-omega-reveal>
               <span>{{ category }}</span>
               <span class="classy-rowlist__meta">
-                {{ category_counts[forloop.index0] }} {{ category_counts[forloop.index0] | uj_pluralize: 'post', 'posts' }}
-                {% uj_icon "arrow-right", "fa-xs ms-2" %}
+                {{ category_counts[forloop.index0] }} {{ category_counts[forloop.index0] | omega_pluralize: 'post', 'posts' }}
+                {% omega_icon "arrow-right", "fa-xs ms-2" %}
               </span>
             </a>
           {% endfor %}
@@ -67,11 +67,11 @@ hero:
       <div class="row justify-content-center">
         <div class="col-lg-6 text-center" data-omega-reveal>
           <div class="py-5">
-            <span class="classy-icon-chip classy-icon-chip--neutral mb-3">{% uj_icon "folder-open", "fa-sm" %}</span>
+            <span class="classy-icon-chip classy-icon-chip--neutral mb-3">{% omega_icon "folder-open", "fa-sm" %}</span>
             <h2 class="h5">No categories yet</h2>
             <p class="text-muted">Check back soon for categorized content.</p>
             <a href="/blog" class="btn btn-adaptive">
-              {% uj_icon "arrow-left", "fa-sm me-2" %}
+              {% omega_icon "arrow-left", "fa-sm me-2" %}
               Back to blog
             </a>
           </div>
@@ -81,4 +81,4 @@ hero:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

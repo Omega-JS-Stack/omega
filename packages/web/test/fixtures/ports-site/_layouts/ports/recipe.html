@@ -47,9 +47,9 @@ meta:
               <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
                 {% for i in (1..5) %}
                   {% if i <= recipe.rating %}
-                    {% uj_icon "star", "text-warning" %}
+                    {% omega_icon "star", "text-warning" %}
                   {% else %}
-                    {% uj_icon "star", "text-body-tertiary" %}
+                    {% omega_icon "star", "text-body-tertiary" %}
                   {% endif %}
                 {% endfor %}
               </div>
@@ -77,7 +77,7 @@ meta:
 
           <!-- Jump to Recipe Button -->
           <a href="#recipe-card" class="btn btn-primary btn-lg px-5 py-3 fw-semibold">
-            {% uj_icon "arrow-down", "me-2" %}
+            {% omega_icon "arrow-down", "me-2" %}
             Jump to Recipe
           </a>
         </div>
@@ -92,7 +92,7 @@ meta:
     <div class="row justify-content-center">
       <div class="col-lg-8 col-md-10" data-lazy="@class animation-slide-up">
         <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow">
-          {% uj_image recipe_image, class="w-100 object-fit-cover", alt=recipe.title %}
+          {% omega_image recipe_image, class="w-100 object-fit-cover", alt=recipe.title %}
         </div>
       </div>
     </div>
@@ -142,7 +142,7 @@ meta:
             <!-- Recipe Image in Card -->
             <div class="mb-4">
               <div class="mx-auto rounded-3 overflow-hidden shadow" style="max-width: 200px;">
-                {% uj_image recipe_image, class="w-100", alt=recipe.title %}
+                {% omega_image recipe_image, class="w-100", alt=recipe.title %}
               </div>
             </div>
 
@@ -153,9 +153,9 @@ meta:
             <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
               {% for i in (1..5) %}
                 {% if i <= recipe.rating %}
-                  {% uj_icon "star", "text-warning" %}
+                  {% omega_icon "star", "text-warning" %}
                 {% else %}
-                  {% uj_icon "star", "opacity-50" %}
+                  {% omega_icon "star", "opacity-50" %}
                 {% endif %}
               {% endfor %}
             </div>
@@ -164,13 +164,13 @@ meta:
             <!-- Action Buttons -->
             <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
               <button class="btn btn-adaptive btn-sm" onclick="window.print()">
-                {% uj_icon "print", "me-1" %} Print
+                {% omega_icon "print", "me-1" %} Print
               </button>
               <button class="btn btn-adaptive btn-sm recipe-save-btn">
-                {% uj_icon "bookmark", "me-1" %} Save
+                {% omega_icon "bookmark", "me-1" %} Save
               </button>
               <button class="btn btn-adaptive btn-sm recipe-rate-btn">
-                {% uj_icon "star", "me-1" %} Rate
+                {% omega_icon "star", "me-1" %} Rate
               </button>
             </div>
 
@@ -216,7 +216,7 @@ meta:
               </div>
               <div class="col-4">
                 <small class="d-block opacity-75">Author</small>
-                <a href="{%- uj_member recipe.author, 'url' -%}" class="fw-semibold text-decoration-underline text-body">{%- uj_member recipe.author, "name" -%}</a>
+                <a href="{%- omega_member recipe.author, 'url' -%}" class="fw-semibold text-decoration-underline text-body">{%- omega_member recipe.author, "name" -%}</a>
               </div>
             </div>
 
@@ -233,7 +233,7 @@ meta:
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" id="cookModeToggle">
                 <label class="form-check-label fw-semibold" for="cookModeToggle" id="cookModeLabel">
-                  {% uj_icon "pot-food", "me-1" %}
+                  {% omega_icon "pot-food", "me-1" %}
                   Cook Mode
                 </label>
               </div>
@@ -246,7 +246,7 @@ meta:
             <!-- Ingredients Section -->
             <div class="mb-5">
               <h3 class="h4 fw-bold mb-4">
-                {% uj_icon "basket-shopping", "me-2 text-primary" %}
+                {% omega_icon "basket-shopping", "me-2 text-primary" %}
                 Ingredients
               </h3>
 
@@ -273,7 +273,7 @@ meta:
             <!-- Instructions Section -->
             <div class="mb-5">
               <h3 class="h4 fw-bold mb-4">
-                {% uj_icon "list-ol", "me-2 text-primary" %}
+                {% omega_icon "list-ol", "me-2 text-primary" %}
                 Instructions
               </h3>
 
@@ -296,7 +296,7 @@ meta:
             {% iftruthy recipe.notes %}
             <div class="mb-0">
               <h3 class="h4 fw-bold mb-4">
-                {% uj_icon "lightbulb", "me-2 text-primary" %}
+                {% omega_icon "lightbulb", "me-2 text-primary" %}
                 Notes
               </h3>
 
@@ -332,7 +332,7 @@ meta:
           <h2 class="h3 fw-bold mb-3">Looking for more?</h2>
           <p class="text-body-secondary mb-4">Explore our full collection of recipes or browse other categories.</p>
           <a href="/recipes" class="btn btn-warning px-4 py-2 fw-semibold">
-            {% uj_icon "grid", "me-2" %}
+            {% omega_icon "grid", "me-2" %}
             View all recipes
           </a>
         </div>
@@ -344,7 +344,7 @@ meta:
 <!-- Floating Jump to Recipe Button -->
 <div id="floating-recipe-btn" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 d-none" style="z-index: 1040;">
   <a href="#recipe-card" class="btn btn-primary btn-lg btn-glow px-5 py-3 fw-semibold rounded-pill">
-    {% uj_icon "arrow-down", "me-2" %}
+    {% omega_icon "arrow-down", "me-2" %}
     Jump to Recipe
   </a>
 </div>
@@ -352,9 +352,9 @@ meta:
 <!-- Schema - Recipe -->
 {%- capture recipe_yield -%}{{ recipe.servings.amount }} {{ recipe.servings.unit | default: 'servings' }}{%- endcapture -%}
 {%- capture recipe_calories -%}{{ recipe.calories }} calories{%- endcapture -%}
-{%- capture author_name -%}{%- uj_member recipe.author, "name" -%}{%- endcapture -%}
-{%- capture author_url -%}{%- uj_member recipe.author, "url" -%}{%- endcapture -%}
-<script id="uj-schema-recipe" type="application/ld+json">
+{%- capture author_name -%}{%- omega_member recipe.author, "name" -%}{%- endcapture -%}
+{%- capture author_url -%}{%- omega_member recipe.author, "url" -%}{%- endcapture -%}
+<script id="omega-schema-recipe" type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "Recipe",

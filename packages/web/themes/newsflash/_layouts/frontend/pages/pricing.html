@@ -100,7 +100,7 @@ cta:
 <!-- ============================================ -->
 <section class="pb-4">
   <div class="container text-center" data-lazy="@class animation-slide-up">
-    <span class="kicker mb-3">{% uj_icon "tag", "me-1" %}Pricing</span>
+    <span class="kicker mb-3">{% omega_icon "tag", "me-1" %}Pricing</span>
     <h1 class="display-4 my-3">
       {{ resolved.hero.headline | default: "The right plans," }}
       <span class="text-accent">{{ resolved.hero.headline_accent | default: "for the right price" }}</span>
@@ -119,7 +119,7 @@ cta:
         <p class="mb-0 text-body-secondary">We're putting the finishing touches on our plans. Reach out and we'll get you set up in the meantime.</p>
       </div>
       <a href="/contact" class="btn btn-primary btn-lg fw-bold flex-shrink-0">
-        {% uj_icon "envelope", "me-2" %}Contact us
+        {% omega_icon "envelope", "me-2" %}Contact us
       </a>
     </div>
   </div>
@@ -144,7 +144,7 @@ cta:
     {% endif %}
 
     <p class="text-center fw-medium mb-5">
-      {% uj_icon "shield-halved", "me-1 text-success" %}
+      {% omega_icon "shield-halved", "me-1 text-success" %}
       {{ resolved.pricing.guarantee | default: "Every paid membership backed by a 7-day money-back guarantee" }}
     </p>
 
@@ -207,11 +207,11 @@ cta:
               No credit card required
             {% else %}
               {% if _default_annual and plan.prices.annually > 0 %}
-                {% capture _initial_billing %}Billed ${{ plan.prices.annually | uj_commaify }} annually{% endcapture %}
+                {% capture _initial_billing %}Billed ${{ plan.prices.annually | omega_commaify }} annually{% endcapture %}
               {% else %}
-                {% capture _initial_billing %}Billed ${{ plan.prices.monthly | uj_commaify }} monthly{% endcapture %}
+                {% capture _initial_billing %}Billed ${{ plan.prices.monthly | omega_commaify }} monthly{% endcapture %}
               {% endif %}
-              <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | uj_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | uj_commaify }} annually">
+              <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | omega_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | omega_commaify }} annually">
                 {{ _initial_billing }}
               </span>
             {% endif %}
@@ -219,11 +219,11 @@ cta:
 
           {% if plan.free %}
             <p class="pricing-plan-guarantee">
-              {% uj_icon "rocket", "me-1 text-success" %}Upgrade any time
+              {% omega_icon "rocket", "me-1 text-success" %}Upgrade any time
             </p>
           {% else %}
             <p class="pricing-plan-guarantee">
-              {% uj_icon "shield-halved", "me-1 text-success" %}{{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
+              {% omega_icon "shield-halved", "me-1 text-success" %}{{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
             </p>
           {% endif %}
 
@@ -234,9 +234,9 @@ cta:
             <ul class="pricing-plan-features">
               {% for feature in plan.commonFeatures %}
                 <li>
-                  <span class="pricing-plan-feature-icon">{% uj_icon feature.icon, "fa-sm" %}</span>
+                  <span class="pricing-plan-feature-icon">{% omega_icon feature.icon, "fa-sm" %}</span>
                   <span>
-                    {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | uj_commaify }}{% endif %}
+                    {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | omega_commaify }}{% endif %}
                     {% iftruthy feature.definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>{% endiftruthy %}
                     {% iffalsy feature.definition %}{{ feature.name }}{% endiffalsy %}
                   </span>
@@ -259,9 +259,9 @@ cta:
               <ul class="pricing-plan-features">
                 {% for feature in plan.extraFeatures %}
                   <li>
-                    <span class="pricing-plan-feature-icon">{% uj_icon feature.icon, "fa-sm" %}</span>
+                    <span class="pricing-plan-feature-icon">{% omega_icon feature.icon, "fa-sm" %}</span>
                     <span>
-                      {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | uj_commaify }}{% endif %}
+                      {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | omega_commaify }}{% endif %}
                       {% iftruthy feature.definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>{% endiftruthy %}
                       {% iffalsy feature.definition %}{{ feature.name }}{% endiffalsy %}
                     </span>
@@ -295,9 +295,9 @@ cta:
           <ul class="pricing-plan-features enterprise-panel-features">
             {% for feature in _enterprise.features %}
               <li>
-                <span class="pricing-plan-feature-icon">{% uj_icon "check", "fa-sm" %}</span>
+                <span class="pricing-plan-feature-icon">{% omega_icon "check", "fa-sm" %}</span>
                 <span>
-                  {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | uj_commaify }}{% endif %}
+                  {% if feature.value == 'Unlimited' or feature.value == '24/7' %}{{ feature.value }}{% elsif feature.value and feature.value != true %}{{ feature.value | omega_commaify }}{% endif %}
                   {% iftruthy feature.definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>{% endiftruthy %}
                   {% iffalsy feature.definition %}{{ feature.name }}{% endiffalsy %}
                 </span>
@@ -307,7 +307,7 @@ cta:
         {% endif %}
       </div>
       <a href="{{ _enterprise.url }}" class="btn btn-primary btn-lg fw-bold flex-shrink-0" data-plan-enterprise="{{ _enterprise.id }}">
-        {% uj_icon "envelope", "me-2" %}Contact us
+        {% omega_icon "envelope", "me-2" %}Contact us
       </a>
     </div>
   </div>
@@ -331,7 +331,7 @@ cta:
           <p class="pricing-plan-tagline kicker">{{ product.tagline }}</p>
 
           <div class="pricing-plan-price">
-            <span class="pricing-plan-currency">$</span><span class="pricing-plan-amount">{{ product.price | uj_commaify }}</span><span class="pricing-plan-per">once</span>
+            <span class="pricing-plan-currency">$</span><span class="pricing-plan-amount">{{ product.price | omega_commaify }}</span><span class="pricing-plan-per">once</span>
           </div>
 
           <div class="d-grid mb-3">
@@ -341,7 +341,7 @@ cta:
           </div>
 
           <p class="pricing-plan-guarantee">
-            {% uj_icon "circle-check", "text-success me-1" %}Yours forever, pay once
+            {% omega_icon "circle-check", "text-success me-1" %}Yours forever, pay once
           </p>
 
           {% if product.features.size > 0 %}
@@ -349,9 +349,9 @@ cta:
             <ul class="pricing-plan-features">
               {% for feature in product.features %}
                 <li>
-                  <span class="pricing-plan-feature-icon">{% uj_icon feature.icon, "fa-sm" %}</span>
+                  <span class="pricing-plan-feature-icon">{% omega_icon feature.icon, "fa-sm" %}</span>
                   <span>
-                    {% if feature.value == 'Unlimited' %}Unlimited{% elsif feature.value and feature.value != true %}{{ feature.value | uj_commaify }}{% endif %}
+                    {% if feature.value == 'Unlimited' %}Unlimited{% elsif feature.value and feature.value != true %}{{ feature.value | omega_commaify }}{% endif %}
                     {{ feature.name }}
                   </span>
                 </li>
@@ -424,4 +424,4 @@ cta:
 <!-- ============================================ -->
 {% section "marketing/cta", data: resolved.cta, section_class: "pt-0" %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

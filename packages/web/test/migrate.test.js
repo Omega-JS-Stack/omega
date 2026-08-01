@@ -48,6 +48,21 @@ test('rules: page.resolved, includes, canonical, page props, analytics spelling'
   assert.strictEqual(edits.length, 5, 'one edit recorded per changed line per rule');
 });
 
+test('rules: legacy uj_ tags/filters and site.uj globals become omega_ / site.omega', () => {
+  const input = [
+    '{% uj_icon "rocket", "fa-fw" %}{{ title | uj_title_case }}',
+    '<img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ image }}">',
+    '<span class="uj-password-show"></span>',
+    'A path like /assets/uj_legacy.png stays a path',
+  ].join('\n');
+  const { text } = applyRules(input, 'unit.html');
+  const lines = text.split('\n');
+  assert.strictEqual(lines[0], '{% omega_icon "rocket", "fa-fw" %}{{ title | omega_title_case }}');
+  assert.strictEqual(lines[1], '<img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ image }}">');
+  assert.strictEqual(lines[2], '<span class="omega-password-show"></span>');
+  assert.strictEqual(lines[3], 'A path like /assets/uj_legacy.png stays a path', 'only known names rename');
+});
+
 test('rules: bracket layouts rewritten only on layout lines', () => {
   const input = [
     'layout: themes/[ site.theme.id ]/frontend/core/base',
@@ -76,12 +91,12 @@ test('rules: false-positive guards — filenames, valid page props, manual props
 });
 
 test('rules: tag-arg hoist scoped to the tag span', () => {
-  const input = '<a title="{{ t }}">{% uj_icon "{{ stat.icon }} fa-2x" %}</a>';
+  const input = '<a title="{{ t }}">{% omega_icon "{{ stat.icon }} fa-2x" %}</a>';
   const { text } = applyRules(input, 'unit.html');
   const lines = text.split('\n');
-  assert.strictEqual(lines[0].trim(), '{% capture uj_migrate_arg_1 %}{{ stat.icon }} fa-2x{% endcapture %}');
+  assert.strictEqual(lines[0].trim(), '{% capture omega_migrate_arg_1 %}{{ stat.icon }} fa-2x{% endcapture %}');
   assert.ok(lines[1].includes('title="{{ t }}"'), 'HTML attribute interpolation untouched');
-  assert.ok(lines[1].includes('{% uj_icon uj_migrate_arg_1 %}'), 'tag arg replaced with the capture var');
+  assert.ok(lines[1].includes('{% omega_icon omega_migrate_arg_1 %}'), 'tag arg replaced with the capture var');
 });
 
 // ---------------------------------------------------------------------------
@@ -102,9 +117,9 @@ function realEngine() {
 
 test('semantic: hoisted tag arg renders identically to a literal quoted arg', async () => {
   const engine = realEngine();
-  const { text } = applyRules('{% uj_icon "{{ stat.icon }} text-primary" %}', 'semantic.html');
+  const { text } = applyRules('{% omega_icon "{{ stat.icon }} text-primary" %}', 'semantic.html');
   const rewritten = await engine.parseAndRender(text, { stat: { icon: 'star' } });
-  const literal = await engine.parseAndRender('{% uj_icon "star text-primary" %}', {});
+  const literal = await engine.parseAndRender('{% omega_icon "star text-primary" %}', {});
   assert.strictEqual(rewritten.trim(), literal.trim(), 'capture hoist ≡ literal arg (the upstream silent no-op is fixed forward)');
   assert.ok(rewritten.includes('data-icon="star text-primary"'), 'interpolation actually happened');
 });
@@ -146,7 +161,7 @@ test('lint: Jekyll-only tags error, unknown filters warn, known names pass', () 
   const findings = lintText([
     '{% post_url 2020-01-01-hello %}',
     '{% assign related = site.posts | where_exp: "p", "p.url" | limit: 3 %}',
-    '{% uj_icon "star" %} {{ title | uj_title_case | markdownify }}',
+    '{% omega_icon "star" %} {{ title | omega_title_case | markdownify }}',
     '{% iftruthy site.brand %}x{% endiftruthy %}',
   ].join('\n'), 'lint.html');
   assert.ok(findings.some((finding) => finding.check === 'jekyll-only-tag' && finding.line === 1), 'post_url flagged');

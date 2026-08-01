@@ -270,7 +270,7 @@ async function buildAssets(options) {
 
     // ---- Legacy module bundles: <layer>/js/modules/*.js → the FIXED URL
     // /assets/js/modules/<name>.bundle.js. The redirect layout scripts these
-    // directly (uj_cachebreak query param), so they are never content-hashed
+    // directly (omega_cachebreak query param), so they are never content-hashed
     // and carry no manifest key. Standalone IIFEs — no boot stub, no shared
     // chunk — so modules here must not import @omega.js/client (a second
     // inlined client copy would break the cross-bundle singleton).

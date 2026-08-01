@@ -13,8 +13,8 @@
       <div class="classy-footer__brand">
         {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
         {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
-        {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
-        {% capture logo_description %}{{ data.logo.description | default: site.brand.description | uj_liquify }}{% endcapture %}
+        {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
+        {% capture logo_description %}{{ data.logo.description | default: site.brand.description | omega_liquify }}{% endcapture %}
         {% assign logo_description = logo_description | strip %}
         {% comment %} A data value that LIQUIFIES to empty (e.g. '{{ site.meta.description }}' with no meta.description set) still needs the brand fallback — `default:` only sees the raw string {% endcomment %}
         {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = site.brand.description %}{% endif %}
@@ -22,7 +22,7 @@
 
         <a class="classy-nav__brand" href="{{ logo_href }}">
           {% if logo_src and logo_src != '' and logo_src != 'null' %}
-            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.5rem; width: auto;"/>
+            <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.5rem; width: auto;"/>
           {% endif %}
           {% if logo_text and logo_text != '' and logo_text != 'null' %}
             <span>{{ logo_text }}</span>
@@ -41,8 +41,8 @@
             {% endif %}
             {% for social in social_list %}
               {% iftruthy social %}
-                <a href="{% uj_social social %}" class="classy-footer__social-link" aria-label="{{ social | capitalize }}">
-                  {% uj_icon social, "fa-sm" %}
+                <a href="{% omega_social social %}" class="classy-footer__social-link" aria-label="{{ social | capitalize }}">
+                  {% omega_icon social, "fa-sm" %}
                 </a>
               {% endiftruthy %}
             {% endfor %}
@@ -82,7 +82,7 @@
       {% if data.copyright.enabled %}
         <span class="classy-footer__copyright">
           {% if data.copyright.text %}
-            {{ data.copyright.text | uj_liquify }}
+            {{ data.copyright.text | omega_liquify }}
           {% else %}
             {% comment %} A sub-brand credits its parent (brand.company), linked
             when company.url names one — no parent configured (or a company that
@@ -94,9 +94,9 @@
               {% else %}
                 {% capture parent_mark %}{{ parent_company }}{% endcapture %}
               {% endif %}
-              © {{ site.uj.date.year }} {{ site.brand.name }} by {{ parent_mark }}. All rights reserved.
+              © {{ site.omega.date.year }} {{ site.brand.name }} by {{ parent_mark }}. All rights reserved.
             {% else %}
-              © {{ site.uj.date.year }} {{ site.brand.name }}. All rights reserved.
+              © {{ site.omega.date.year }} {{ site.brand.name }}. All rights reserved.
             {% endif %}
           {% endif %}
         </span>
@@ -104,7 +104,7 @@
 
       {% comment %} Framework attribution — a constant, never brand config {% endcomment %}
       <span class="classy-footer__powered">
-        {% uj_icon "bolt", "fa-sm" %}
+        {% omega_icon "bolt", "fa-sm" %}
         <span>Powered by <a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a></span>
       </span>
 
@@ -122,9 +122,9 @@
              are stitched post-translation and name only the languages actually
              PRODUCED for this page, so the menu can never offer a copy that was
              never written. Fewer than two languages → this block stays hidden. -->
-        <div class="dropup uj-language-dropdown" data-omega-language-switcher hidden>
+        <div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>
           <button class="classy-footer__pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            {% uj_icon "language", "fa-sm" %}
+            {% omega_icon "language", "fa-sm" %}
             <span>Language</span>
           </button>
           <ul class="dropdown-menu" data-omega-language-list></ul>
@@ -132,9 +132,9 @@
 
         <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->
         <div class="classy-footer__seg" role="group" aria-label="Appearance" data-omega-segmented>
-          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% uj_icon "sun", "fa-sm" %}</button>
-          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% uj_icon "moon", "fa-sm" %}</button>
-          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% uj_icon "circle-half-stroke", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% omega_icon "sun", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% omega_icon "moon", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% omega_icon "circle-half-stroke", "fa-sm" %}</button>
         </div>
       </div>
     </div>

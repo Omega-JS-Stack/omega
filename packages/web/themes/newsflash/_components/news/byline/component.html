@@ -1,12 +1,12 @@
 {% comment %}
-  The newsflash byline — author (looked up via uj_member from the id in
+  The newsflash byline — author (looked up via omega_member from the id in
   args.author) · pre-formatted date · readtime. Callers capture the readtime
-  ({% capture rt %}{% uj_readtime post.content %}{% endcapture %}) — the tag
+  ({% capture rt %}{% omega_readtime post.content %}{% endcapture %}) — the tag
   needs the post content, which never rides args. p_class carries the
   variant (default = the tile form; the lead splash passes its own).
 {% endcomment %}
 <p class="{{ args.p_class }}">
-  <b class="text-body">{%- uj_member args.author, "name" -%}</b>
+  <b class="text-body">{%- omega_member args.author, "name" -%}</b>
   · {{ args.date }}
   · {{ args.readtime }} min read
 </p>

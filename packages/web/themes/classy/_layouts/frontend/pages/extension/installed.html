@@ -54,15 +54,15 @@ steps:
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% uj_icon "shield", "fa-sm" %}
+                  {% omega_icon "shield", "fa-sm" %}
                 </button>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% uj_icon "bookmark", "fa-sm" %}
+                  {% omega_icon "bookmark", "fa-sm" %}
                 </button>
                 <!-- Puzzle piece - highlighted -->
                 <div class="extension-puzzle-target position-relative">
                   <button type="button" class="btn btn-sm btn-primary">
-                    {% uj_icon "puzzle-piece", "fa-sm" %}
+                    {% omega_icon "puzzle-piece", "fa-sm" %}
                   </button>
                   <div class="click-indicator position-absolute top-50 start-50">
                     <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
@@ -91,7 +91,7 @@ steps:
                 <div class="extension-dropdown-header d-flex align-items-center justify-content-between p-2 border-bottom bg-body-secondary">
                   <span class="small fw-bold">Extensions</span>
                   <button type="button" class="btn btn-sm p-0 opacity-50" disabled>
-                    {% uj_icon "gear", "fa-sm" %}
+                    {% omega_icon "gear", "fa-sm" %}
                   </button>
                 </div>
                 <!-- Extension list -->
@@ -99,23 +99,23 @@ steps:
                   <!-- Other extension (dimmed) -->
                   <div class="extension-dropdown-item d-flex align-items-center gap-3 p-2 rounded opacity-50">
                     <div class="extension-item-icon bg-body-secondary rounded p-1 d-flex align-items-center justify-content-center">
-                      {% uj_icon "shield", "fa-xs" %}
+                      {% omega_icon "shield", "fa-xs" %}
                     </div>
                     <span class="small flex-grow-1">AdBlocker</span>
                     <button type="button" class="btn btn-sm p-1" disabled>
-                      {% uj_icon "thumbtack", "fa-xs text-muted" %}
+                      {% omega_icon "thumbtack", "fa-xs text-muted" %}
                     </button>
                   </div>
                   <!-- Our extension (highlighted with pin click) -->
                   <div class="extension-dropdown-item d-flex align-items-center gap-3 p-2 rounded bg-primary bg-opacity-10 border border-primary">
                     <div class="extension-item-icon rounded p-1 d-flex align-items-center justify-content-center">
-                      <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-brandmark" alt="{{ site.brand.name }}"/>
+                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-brandmark" alt="{{ site.brand.name }}"/>
                     </div>
                     <span class="small flex-grow-1 fw-bold">{{ site.brand.name }}</span>
                     <!-- Pin button - highlighted with click animation -->
                     <div class="extension-pin-target position-relative">
                       <button type="button" class="btn btn-sm btn-primary p-1">
-                        {% uj_icon "thumbtack", "fa-xs" %}
+                        {% omega_icon "thumbtack", "fa-xs" %}
                       </button>
                       <div class="click-indicator position-absolute top-50 start-50">
                         <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
@@ -148,19 +148,19 @@ steps:
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% uj_icon "shield", "fa-sm" %}
+                  {% omega_icon "shield", "fa-sm" %}
                 </button>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% uj_icon "bookmark", "fa-sm" %}
+                  {% omega_icon "bookmark", "fa-sm" %}
                 </button>
                 <!-- Our extension - now pinned! -->
                 <div class="extension-pinned-target position-relative">
                   <button type="button" class="btn btn-sm btn-primary animation-flex">
-                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-toolbar-brandmark" alt="{{ site.brand.name }}"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-toolbar-brandmark" alt="{{ site.brand.name }}"/>
                   </button>
                 </div>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% uj_icon "puzzle-piece", "fa-sm" %}
+                  {% omega_icon "puzzle-piece", "fa-sm" %}
                 </button>
               </div>
             </div>
@@ -172,11 +172,11 @@ steps:
         <!-- Slideshow Navigation -->
         <div class="steps-slideshow-nav">
           <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-            {% uj_icon "chevron-left", "me-1" %} Back
+            {% omega_icon "chevron-left", "me-1" %} Back
           </button>
           <div class="steps-dots"></div>
           <button type="button" class="btn btn-adaptive btn-sm step-next">
-            <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+            <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
           </button>
         </div>
       </div>
@@ -185,11 +185,11 @@ steps:
       <div class="text-center mt-4" data-omega-reveal>
         <a href="/" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
           Start using {{ site.brand.name }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       </div>
     </div>
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

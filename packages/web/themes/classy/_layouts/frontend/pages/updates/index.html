@@ -78,7 +78,7 @@ updates:
 
                   <span class="classy-timeline__more small">
                     {{ resolved.updates.view_details }}
-                    {% uj_icon "arrow-right", "fa-xs ms-1" %}
+                    {% omega_icon "arrow-right", "fa-xs ms-1" %}
                   </span>
                 </div>
               </article>
@@ -100,16 +100,16 @@ updates:
   <div class="container">
     <div class="d-flex justify-content-center align-items-center gap-3 classy-quiet small flex-wrap" data-omega-reveal>
       <a href="/status" class="text-decoration-none">
-        {% uj_icon "signal", "fa-xs me-1" %}
+        {% omega_icon "signal", "fa-xs me-1" %}
         System status
       </a>
       <span>•</span>
       <a href="/blog" class="text-decoration-none">
-        {% uj_icon "newspaper", "fa-xs me-1" %}
+        {% omega_icon "newspaper", "fa-xs me-1" %}
         The blog
       </a>
     </div>
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

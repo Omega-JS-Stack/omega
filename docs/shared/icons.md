@@ -23,7 +23,7 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 |-------|------|--------------|
 | `icon-core` | `@omega.js/client/modules/icon-core.js` | Pure semantics: name/style validation, `parseIconClasses` (FA's family × weight class model), candidate lookup order (style dir → brands fallback), SVG root attributes, alias mapping, the package preference order (`PACKAGES`) |
 | `icon-renderer` | `@omega.js/client/modules/icon-renderer.js` | The ONE browser auto-render: scan + MutationObserver (insertions AND class changes), render/re-render/clear, caching. Transport-injected — callers pass one `resolve(name, style) → Promise<svg\|null>` |
-| Build-time inlining | `@omega.js/template-kit` `uj_icon` | Static template icons inlined into the HTML at build (zero runtime cost); same icon-core semantics |
+| Build-time inlining | `@omega.js/template-kit` `omega_icon` | Static template icons inlined into the HTML at build (zero runtime cost); same icon-core semantics |
 | Asset chain + emission | `@omega.js/devkit/icons` (build-side, ONE impl for web + extension) + desktop `lib/fontawesome.js` `_resolveRoots()` (runtime) | Best-first roots: `OMEGA_FONTAWESOME_ROOT` → brand's `@fortawesome/fontawesome-pro` → `@fortawesome/fontawesome-free` floor (always last — a partial brand set never loses icons/aliases a lower rung has). `emitIcons` ships the merged set to a build output's `assets/fa/<style>/<name>.svg` (~25MB with Pro; hosting deploys diff by hash, browsers fetch only icons actually used) |
 
 ## Per-target transport (the only non-shared line)
@@ -37,7 +37,7 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 
 Country flags are the one non-FA set riding this channel: web's
 `core/icons/flags/<country>.svg` ships with the emitted set (to
-`assets/fa/flags/`), inlined at build time by `{% uj_icon <language> %}`
+`assets/fa/flags/`), inlined at build time by `{% omega_icon <language> %}`
 through template-kit's language→country map. `src/language-flags.js` also
 writes language-named copies into their own namespace
 (`assets/fa/flags/lang/en.svg` = the us flag — language and country codes
@@ -91,7 +91,7 @@ future FA families work with zero framework changes.
 
 ## When to use what (web)
 
-- **`{% uj_icon rocket %}`** — static template content: inlined at build,
+- **`{% omega_icon rocket %}`** — static template content: inlined at build,
   zero runtime fetch, purge-safe. Prefer for chrome/layout icons.
 - **`<i class="fa-solid fa-rocket">`** — anything dynamic, JS-driven, or
   authored in markdown/HTML fragments: rendered by the shared watcher.
@@ -99,7 +99,7 @@ future FA families work with zero framework changes.
   never a package dependency, so a Pro-only name in a packaged theme, core
   layout, or default page renders the tagged fallback in every consumer that
   does not own Pro — and the consumer cannot fix it (the chain has no
-  consumer-local icon dir). Stock chrome must build with zero `uj_icon`
+  consumer-local icon dir). Stock chrome must build with zero `omega_icon`
   warnings; a brand's OWN pages are free to use whatever its set resolves.
 
 ## Testing

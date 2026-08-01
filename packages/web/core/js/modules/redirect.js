@@ -1,6 +1,6 @@
 /**
  * Redirect Module
- * Handles intelligent redirects with querystring forwarding, custom modifiers, and development mode delays.
+ * Handles intelligent redirects with querystring forwarding and development mode delays.
  * Configuration is passed via data attributes on a #redirect-config element.
  */
 // Relative, not the __main_assets__ alias: modules/ builds in the legacy IIFE
@@ -22,7 +22,6 @@ const performRedirect = () => {
   const config = {
     url: $redirectConfig.getAttribute('data-url'),
     querystring: $redirectConfig.getAttribute('data-querystring'),
-    modifier: $redirectConfig.getAttribute('data-modifier'),
     siteUrl: $redirectConfig.getAttribute('data-site-url'),
     environment: $redirectConfig.getAttribute('data-environment')
   };
@@ -39,26 +38,6 @@ const performRedirect = () => {
   // Parse URLs
   const currentUrl = new URL(window.location.href);
   const siteUrl = new URL(config.siteUrl);
-
-  // Named modifier lookup (safe alternative to eval/new Function)
-  const MODIFIERS = {
-    'search-cse': (url) => {
-      const q = url.searchParams.get('q');
-      url.searchParams.set('q', `site:${window.location.origin} ${q}`);
-      return url;
-    },
-  };
-
-  // Resolve modifier by name
-  let modifierFunction = (url) => url;
-  if (config.modifier && config.modifier !== '""' && config.modifier !== '') {
-    const modifierName = config.modifier.trim();
-    if (MODIFIERS[modifierName]) {
-      modifierFunction = MODIFIERS[modifierName];
-    } else {
-      logger.warn('Unknown modifier:', modifierName);
-    }
-  }
 
   // Determine redirect delay — slow in any non-production environment (development OR
   // testing) so the redirect is observable; near-instant in production.
@@ -104,21 +83,12 @@ const performRedirect = () => {
     logger.log('Forwarded fragment:', currentUrl.hash);
   }
 
-  // Apply modifier function
-  let finalUrl;
-  try {
-    const modifiedUrl = modifierFunction(redirectUrl);
-    finalUrl = modifiedUrl instanceof URL ? modifiedUrl.toString() : modifiedUrl;
-  } catch (error) {
-    logger.error('Modifier function threw an error:', error);
-    finalUrl = redirectUrl.toString();
-  }
+  const finalUrl = redirectUrl.toString();
 
   // Log redirect details
   console.group(logger.tag, 'Configuration');
   console.log('Original URL:', config.url);
   console.log('Querystring forwarding:', shouldForwardQuerystring);
-  console.log('Modifier:', config.modifier);
   console.log('Environment:', config.environment);
   console.log('Delay:', `${timeout}ms`);
   console.log('Final URL:', finalUrl);

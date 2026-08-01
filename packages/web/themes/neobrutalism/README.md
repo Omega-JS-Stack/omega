@@ -1,12 +1,12 @@
 # Neobrutalism Theme
 
-A bold, high-contrast UJM theme built on the neobrutalist design language:
+A bold, high-contrast omega theme built on the neobrutalist design language:
 **pure-ink borders, hard offset shadows (no blur), zero border-radius, chunky
 grotesk display type, and flat saturated color blocks.** Buttons and cards
 "press" into the page on interaction. Full light + dark mode support.
 
 > See [`docs/themes.md`](../../../../docs/themes.md) for how the theme system
-> works and how to author your own theme (inside UJM or in a consumer project).
+> works and how to author your own theme (inside @omega.js/web or in a consumer project).
 
 ## Use it
 

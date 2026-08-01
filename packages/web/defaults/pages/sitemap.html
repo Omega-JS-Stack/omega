@@ -25,7 +25,7 @@ sitemap:
     {%- else %}
     <loc>{{ site.url }}{{ item.url }}</loc>
     {%- endif %}
-    <lastmod>{{ item.data.sitemap.lastmod | default: site.uj.date.iso }}</lastmod>
+    <lastmod>{{ item.data.sitemap.lastmod | default: site.omega.date.iso }}</lastmod>
     <changefreq>{{ item.data.sitemap.changefreq | default: 'weekly' }}</changefreq>
     {%- if item.url == '/' %}
     <priority>1.0</priority>

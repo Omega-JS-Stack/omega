@@ -50,9 +50,9 @@ export async function handleCustomTokenSignin() {
     // This handler owns the post-signin navigation. Without the flag, the
     // core/auth.js listener races us on the same state-change and can win
     // with its authenticated-default redirect ('/' instead of authReturnUrl).
-    // Same pattern as __UJM_REVERSING_SIGNUP; no clear needed on success —
+    // Same pattern as __OMEGA_REVERSING_SIGNUP; no clear needed on success —
     // the page navigates away.
-    window.__UJM_CUSTOM_TOKEN_SIGNIN = true;
+    window.__OMEGA_CUSTOM_TOKEN_SIGNIN = true;
 
     const { getAuth, signInWithCustomToken } = await import('@firebase/auth');
     const auth = getAuth();
@@ -71,7 +71,7 @@ export async function handleCustomTokenSignin() {
     return true;
   } catch (error) {
     // Failed sign-in: hand navigation control back to the core listener
-    window.__UJM_CUSTOM_TOKEN_SIGNIN = false;
+    window.__OMEGA_CUSTOM_TOKEN_SIGNIN = false;
 
     omega.sentry().captureException(new Error('Custom token sign-in error', { cause: error }));
     logger.error('Custom token sign-in failed:', error);

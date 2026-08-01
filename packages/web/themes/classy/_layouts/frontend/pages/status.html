@@ -83,7 +83,7 @@ build_info:
     <div id="status-banner" class="status-banner classy-status-strip bg-success" data-omega-reveal>
       <div class="d-flex align-items-center gap-3">
         <span class="status-indicator d-inline-flex">
-          {% uj_icon "circle-check", "status-icon fs-4" %}
+          {% omega_icon "circle-check", "status-icon fs-4" %}
         </span>
         <h2 id="status-text" class="classy-status-strip__text mb-0">{{ resolved.status.overall.operational }}</h2>
       </div>
@@ -105,7 +105,7 @@ build_info:
             <div class="d-flex align-items-center justify-content-between mb-2">
               <div class="d-flex align-items-center gap-2">
                 <span class="service-status-dot" data-service-status="{{ service.id }}">
-                  {% uj_icon "circle-check", "text-success" %}
+                  {% omega_icon "circle-check", "text-success" %}
                 </span>
                 {% iftruthy service.url %}
                   <a href="{{ service.url }}" class="fw-semibold text-body text-decoration-none">{{ service.name }}</a>
@@ -178,7 +178,7 @@ build_info:
           <div class="mt-3">
             <a href="{{ resolved.incidents.history_url }}" class="text-decoration-none small">
               {{ resolved.incidents.show_history_link }}
-              {% uj_icon "arrow-right", "fa-xs ms-1" %}
+              {% omega_icon "arrow-right", "fa-xs ms-1" %}
             </a>
           </div>
         {% endiftruthy %}
@@ -226,7 +226,7 @@ build_info:
           required
         >
         <button type="submit" class="btn btn-adaptive text-nowrap flex-shrink-0">
-          {% uj_icon "paper-plane", "fa-sm me-2" %}
+          {% omega_icon "paper-plane", "fa-sm me-2" %}
           <span class="button-text">{{ resolved.updates.button.text }}</span>
         </button>
       </form>
@@ -255,7 +255,7 @@ build_info:
           <div class="col-md-6">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "clock", "fa-sm" %}
+                {% omega_icon "clock", "fa-sm" %}
               </span>
               <div>
                 <div class="classy-micro mb-1">Last build</div>
@@ -268,7 +268,7 @@ build_info:
           <div class="col-md-6">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "server", "fa-sm" %}
+                {% omega_icon "server", "fa-sm" %}
               </span>
               <div>
                 <div class="classy-micro mb-1">Environment</div>
@@ -281,7 +281,7 @@ build_info:
           <div class="col-md-6">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "tag", "fa-sm" %}
+                {% omega_icon "tag", "fa-sm" %}
               </span>
               <div>
                 <div class="classy-micro mb-1">Version</div>
@@ -294,7 +294,7 @@ build_info:
           <div class="col-md-6">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "palette", "fa-sm" %}
+                {% omega_icon "palette", "fa-sm" %}
               </span>
               <div>
                 <div class="classy-micro mb-1">Theme</div>
@@ -307,7 +307,7 @@ build_info:
           <div class="col-12">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "box", "fa-sm" %}
+                {% omega_icon "box", "fa-sm" %}
               </span>
               <div class="flex-grow-1">
                 <div class="classy-micro mb-2">Package versions</div>
@@ -322,7 +322,7 @@ build_info:
           <div class="col-12">
             <div class="d-flex align-items-start gap-3">
               <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                {% uj_icon "code-branch", "fa-sm" %}
+                {% omega_icon "code-branch", "fa-sm" %}
               </span>
               <div>
                 <div class="classy-micro mb-1">Repository</div>
@@ -336,7 +336,7 @@ build_info:
 
       <!-- Error state -->
       <div id="build-info-error" class="d-none text-center classy-quiet py-3">
-        {% uj_icon "circle-exclamation", "fs-3 mb-2 text-warning opacity-75" %}
+        {% omega_icon "circle-exclamation", "fs-3 mb-2 text-warning opacity-75" %}
         <p class="mb-0">Unable to load build information</p>
       </div>
     </div>
@@ -348,11 +348,11 @@ build_info:
   <div class="container">
     <div class="d-flex justify-content-center align-items-center gap-3 classy-quiet small flex-wrap" data-omega-reveal>
       <a href="/updates" class="text-decoration-none">
-        {% uj_icon "rocket", "fa-xs me-1" %}
+        {% omega_icon "rocket", "fa-xs me-1" %}
         View updates
       </a>
     </div>
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

@@ -51,21 +51,21 @@ theme:
           <div class="classy-legal__rail-foot">
             {% iftruthy site.brand.contact.email %}
               <a class="classy-legal__rail-link" href="mailto:{{ site.brand.contact.email }}">
-                {% uj_icon "envelope", "fa-xs me-2" %}Questions? Email us
+                {% omega_icon "envelope", "fa-xs me-2" %}Questions? Email us
               </a>
             {% endiftruthy %}
             <button type="button" class="classy-legal__rail-link" data-legal-print>
-              {% uj_icon "print", "fa-xs me-2" %}Print this page
+              {% omega_icon "print", "fa-xs me-2" %}Print this page
             </button>
           </div>
         </div>
       </aside>
 
       <article class="classy-legal__doc classy-prose" data-legal-doc>
-        {{ content | uj_content_format }}
+        {{ content | omega_content_format }}
 
         <footer class="classy-legal__doc-foot classy-quiet small">
-          © {{ site.uj.date.year }} {{ company }}. This document governs {{ site.brand.name }}.
+          © {{ site.omega.date.year }} {{ company }}. This document governs {{ site.brand.name }}.
         </footer>
       </article>
     </div>

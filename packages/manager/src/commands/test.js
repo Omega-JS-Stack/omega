@@ -8,12 +8,12 @@
  *   omega test routes/x       → project filter, forwarded to every app
  *                               (apps with no matching tests no-op)
  *   omega test web:pages/     → ONLY the web app — its framework suite, scoped
- *   omega test em:            → ONLY the desktop app's framework suite
+ *   omega test desktop:       → ONLY the desktop app's framework suite
  *
  * Universal targets (bare paths, `framework:`/`omega:`/`mgr:`, `full:`,
  * `project:`/`brand:`) forward to every app verbatim; per-framework ids
- * (FRAMEWORK_IDS: `web:`/`ujm:`, `backend:`, `desktop:`/`em:`,
- * `extension:`/`bxm:`) route to the app owning that framework. Unknown
+ * (FRAMEWORK_IDS: `web:`, `backend:`, `desktop:`, `extension:`) route to
+ * the app owning that framework — the legacy short ids are retired. Unknown
  * prefixes warn and are dropped; if nothing valid remains, every app runs
  * bare (scope.js parity). Flags are NOT fanned out — flagged runs
  * (--layer, --extended) are app-level invocations; run them from the app.
@@ -147,7 +147,7 @@ module.exports = async (options) => {
       continue;
     }
 
-    console.log(chalk.cyan(`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — omega test ${run.args.join(' ')}`.trimEnd() + ' ───'));
+    console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — omega test ${run.args.join(' ')}`.trimEnd()} ───`));
     const result = await runCommand(process.execPath, [run.binPath, 'test', ...run.args], run.app.path);
 
     summary.push({ name: run.app.name, ok: result.success, detail: result.error });

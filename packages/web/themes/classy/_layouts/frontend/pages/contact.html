@@ -78,12 +78,12 @@ faqs:
         <div class="mb-5">
           {% for method in resolved.contact_methods %}
             <a href="{{ method.link }}" class="classy-channel" data-omega-reveal>
-              <span class="classy-icon-chip">{% uj_icon method.icon, "fa-sm" %}</span>
+              <span class="classy-icon-chip">{% omega_icon method.icon, "fa-sm" %}</span>
               <span class="classy-channel__body">
                 <span class="classy-channel__title d-block">{{ method.title }}</span>
                 <span class="classy-channel__desc d-block">{{ method.description }}</span>
               </span>
-              <span class="classy-channel__arrow">{% uj_icon "arrow-right", "fa-sm" %}</span>
+              <span class="classy-channel__arrow">{% omega_icon "arrow-right", "fa-sm" %}</span>
             </a>
           {% endfor %}
         </div>
@@ -193,7 +193,7 @@ faqs:
           <div class="d-flex flex-wrap align-items-center gap-3">
             <button type="submit" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
               Send message
-              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
             </button>
           </div>
         </form>
@@ -207,4 +207,4 @@ faqs:
   {% section "marketing/faq", data: resolved.faqs %}
 {% endif %}
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

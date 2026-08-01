@@ -15,8 +15,8 @@ client:
     enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | uj_liquify }}**{% endcapture %}
-{% capture breadcrumb %}{{ resolved.meta.breadcrumb | uj_liquify }}{% endcapture %}
+{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 ### Effective date: <span class="text-primary">8th of April, 2017</span>
 <hr>

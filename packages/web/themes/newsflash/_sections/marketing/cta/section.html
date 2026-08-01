@@ -16,7 +16,7 @@
         {% iftruthy args.superheadline.text %}
           <span class="kicker mb-3">
             {% iftruthy args.superheadline.icon %}
-              {% uj_icon args.superheadline.icon, "me-1" %}
+              {% omega_icon args.superheadline.icon, "me-1" %}
             {% endiftruthy %}
             {{ args.superheadline.text }}
           </span>
@@ -34,7 +34,7 @@
           {% iftruthy args.primary_button.text %}
             <a href="{{ args.primary_button.href }}" class="btn btn-warning btn-lg">
               {% iftruthy args.primary_button.icon %}
-                {% uj_icon args.primary_button.icon, "me-2" %}
+                {% omega_icon args.primary_button.icon, "me-2" %}
               {% endiftruthy %}
               {{ args.primary_button.text }}
             </a>
@@ -45,7 +45,7 @@
           {% iftruthy args.secondary_button.text %}
             <a href="{{ args.secondary_button.href }}" class="btn btn-outline-light btn-lg">
               {% iftruthy args.secondary_button.icon %}
-                {% uj_icon args.secondary_button.icon, "me-2" %}
+                {% omega_icon args.secondary_button.icon, "me-2" %}
               {% endiftruthy %}
               {{ args.secondary_button.text }}
             </a>

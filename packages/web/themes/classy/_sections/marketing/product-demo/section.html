@@ -20,7 +20,7 @@
               aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
             >
               {% iftruthy tab.icon %}
-                {% uj_icon tab.icon, "fa-sm me-2" %}
+                {% omega_icon tab.icon, "fa-sm me-2" %}
               {% endiftruthy %}
               {{ tab.label }}
             </button>
@@ -42,7 +42,7 @@
             <div class="d-flex flex-wrap justify-content-center gap-3 gap-md-4 mb-4">
               {% for feature in tab.features %}
                 <div class="d-flex align-items-center">
-                  {% uj_icon "check", "text-success me-2" %}
+                  {% omega_icon "check", "text-success me-2" %}
                   <span>{{ feature }}</span>
                 </div>
               {% endfor %}
@@ -51,7 +51,7 @@
             <!-- Video Player -->
             <div class="card overflow-hidden">
               <div class="ratio ratio-16x9">
-                {% uj_video tab.video, class="w-100 d-block object-fit-cover border-0", style="", controls="false", loop="true", autoplay="true", playsinline="true", muted="true", preload="metadata" %}
+                {% omega_video tab.video, class="w-100 d-block object-fit-cover border-0", style="", controls="false", loop="true", autoplay="true", playsinline="true", muted="true", preload="metadata" %}
               </div>
             </div>
           </div>

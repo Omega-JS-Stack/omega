@@ -92,7 +92,7 @@ app:
   <div class="omega-launch">
     <!-- Brand mark -->
     <span class="omega-launch__mark">
-      <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+      <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
     </span>
 
     <!-- Header -->
@@ -108,7 +108,7 @@ app:
     <!-- Error Alert (Hidden by default) -->
     <div id="error-alert" class="alert alert-warning mb-4 text-start" role="alert" hidden>
       <div class="d-flex align-items-center">
-        {% uj_icon "triangle-exclamation", "me-2" %}
+        {% omega_icon "triangle-exclamation", "me-2" %}
         <div>
           <strong>App not installed?</strong><br>
           <small>Download {{ site.brand.name }} for your platform below.</small>
@@ -119,11 +119,11 @@ app:
     <!-- Action Buttons -->
     <div class="d-grid gap-2 d-sm-block">
       <a id="launch-button" href="{{ resolved.app.protocol }}" class="btn btn-adaptive mb-2 mb-sm-0 me-sm-2">
-        {% uj_icon "rocket", "fa-sm me-2" %}
+        {% omega_icon "rocket", "fa-sm me-2" %}
         <span>Launch app</span>
       </a>
       <a id="download-button" href="/download" class="btn btn-outline-adaptive mb-2 mb-sm-0">
-        {% uj_icon "download", "fa-sm me-2" %}
+        {% omega_icon "download", "fa-sm me-2" %}
         <span>Download app</span>
       </a>
     </div>
@@ -138,4 +138,4 @@ app:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

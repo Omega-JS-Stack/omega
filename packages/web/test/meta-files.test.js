@@ -6,7 +6,7 @@
  * at the same URL suppress them like any other default page).
  *
  * Correctness upgrades over legacy pinned here: JSON outputs are VALID BY
- * CONSTRUCTION (uj_json_escape + first-flag commas — legacy's trailing-comma
+ * CONSTRUCTION (omega_json_escape + first-flag commas — legacy's trailing-comma
  * bug when the last item was skipped is impossible), and the machine files
  * exclude each other (legacy pages.json listed robots.txt as a search hit).
  */

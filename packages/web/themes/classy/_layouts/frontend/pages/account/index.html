@@ -178,7 +178,7 @@ badges:
                 href="#{{ section.id }}"
                 data-section="{{ section.id }}"
                 role="tab">
-                <span class="classy-side__icon">{% uj_icon section.icon, "fa-sm" %}</span>
+                <span class="classy-side__icon">{% omega_icon section.icon, "fa-sm" %}</span>
                 <span>{{ section.name }}</span>
               </a>
             </li>
@@ -213,7 +213,7 @@ badges:
               <div id="avatar-container" class="me-3 position-relative d-flex align-items-center">
                 <!-- Avatar always available from getUser() -->
                 <div class="avatar avatar-lg rounded-circle overflow-hidden border">
-                  <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
+                  <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
                 </div>
                 <!-- Active status indicator -->
                 <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -230,7 +230,7 @@ badges:
             <div id="role-badges" class="mt-2 d-flex gap-2 flex-wrap">
               {% for badge in resolved.badges %}
                 <span id="badge-{{ badge.id }}" class="{{ badge.chip_class }} {% unless badge.always_visible %}d-none{% endunless %}">
-                  {% uj_icon badge.icon, "fa-sm" %}
+                  {% omega_icon badge.icon, "fa-sm" %}
                   {{ badge.name }}
                 </span>
               {% endfor %}
@@ -240,7 +240,7 @@ badges:
           <!-- Account Details Section -->
           <div class="card mb-3">
             <div class="card-header">
-              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "id-card", "fa-md me-2" %} Account details</h6>
+              <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "id-card", "fa-md me-2" %} Account details</h6>
             </div>
             <div class="card-body">
               <!-- Email and UID Fields Row -->
@@ -261,7 +261,7 @@ badges:
                   <div class="input-group">
                     <input type="text" class="form-control font-monospace" id="uid-input" name="auth.uid" readonly>
                     <button type="button" class="btn btn-outline-adaptive" id="copy-uid-btn">
-                      {% uj_icon "copy", "me-2" %}
+                      {% omega_icon "copy", "me-2" %}
                       <span class="button-text d-none d-sm-inline">Copy</span>
                     </button>
                   </div>
@@ -273,7 +273,7 @@ badges:
           <!-- Personal Information Section -->
           <div class="card mb-3">
             <div class="card-header">
-              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "user-pen", "fa-md me-2" %} Personal information</h6>
+              <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "user-pen", "fa-md me-2" %} Personal information</h6>
             </div>
             <div class="card-body">
               <!-- Name Fields Row -->
@@ -309,7 +309,7 @@ badges:
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label for="country-select" class="form-label small text-muted">Country</label>
-                  <select class="form-select" id="country-select" name="personal.location.country" autocomplete="country" data-uj-no-translate>
+                  <select class="form-select" id="country-select" name="personal.location.country" autocomplete="country" data-omega-no-translate>
                     <option value="">Select country</option>
                     <option value="AF">Afghanistan</option>
                     <option value="AL">Albania</option>
@@ -520,7 +520,7 @@ badges:
                 <div class="col-md-6">
                   <label for="phone-input" class="form-label small text-muted">Phone</label>
                   <div class="input-group">
-                    <select class="form-select flex-shrink-1" id="phone-country-code" name="personal.telephone.countryCode" autocomplete="tel-country-code" style="max-width: 140px;" data-uj-no-translate>
+                    <select class="form-select flex-shrink-1" id="phone-country-code" name="personal.telephone.countryCode" autocomplete="tel-country-code" style="max-width: 140px;" data-omega-no-translate>
                       <option value="+1">+1 (USA/CAN)</option>
                       <option value="+7">+7 (RUS/KAZ)</option>
                       <option value="+20">+20 (EGY)</option>
@@ -731,7 +731,7 @@ badges:
               <!-- Save Button -->
               <div class="mt-3 d-grid d-sm-block">
                 <button type="submit" class="btn btn-adaptive">
-                  {% uj_icon "floppy-disk", "me-2" %}
+                  {% omega_icon "floppy-disk", "me-2" %}
                   <span class="button-text">Save changes</span>
                 </button>
               </div>
@@ -747,7 +747,7 @@ badges:
         <!-- Sign-in Methods Section -->
         <div class="card mb-3">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "key", "fa-md me-2" %} Sign-in methods</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "key", "fa-md me-2" %} Sign-in methods</h6>
           </div>
           <div class="card-body">
             <p class="text-muted mb-0">Manage how you sign in to your account. You can connect multiple methods for added convenience and security.</p>
@@ -758,10 +758,10 @@ badges:
                   <div class="d-flex align-items-center">
                     <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 {% iftruthy method.icon %}text-muted{% endiftruthy %} fa fa-3xl">
                       {% iftruthy method.icon %}
-                        {% uj_icon method.icon, "fa-3xl" %}
+                        {% omega_icon method.icon, "fa-3xl" %}
                       {% endiftruthy %}
                       {% iftruthy method.logo %}
-                        <img src="{{ method.logo | uj_cachebreak }}" class="object-fit-contain" alt="{{ method.name }} Logo"/>
+                        <img src="{{ method.logo | omega_cachebreak }}" class="object-fit-contain" alt="{{ method.name }} Logo"/>
                       {% endiftruthy %}
                     </div>
                     <div>
@@ -774,18 +774,18 @@ badges:
                       <input type="hidden" name="method" value="{{ method.id }}">
                       {% if method.id == "password" %}
                         <button type="submit" class="btn btn-adaptive btn-sm" data-action="change">
-                          {% uj_icon "key", "me-1" %}
+                          {% omega_icon "key", "me-1" %}
                           <span class="button-text">Change</span>
                         </button>
                       {% else %}
                         <!-- Connect button -->
                         <button type="submit" class="btn btn-adaptive btn-sm" data-action="connect">
-                          {% uj_icon "link", "me-1" %}
+                          {% omega_icon "link", "me-1" %}
                           <span class="button-text">Connect</span>
                         </button>
                         <!-- Disconnect button (hidden by default) -->
                         <button type="submit" class="btn btn-sm btn-outline-danger d-none" data-action="disconnect">
-                          {% uj_icon "unlink", "me-1" %}
+                          {% omega_icon "unlink", "me-1" %}
                           <span class="button-text">Disconnect</span>
                         </button>
                       {% endif %}
@@ -810,11 +810,11 @@ badges:
 
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "desktop", "fa-md me-2" %} Active sessions</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "desktop", "fa-md me-2" %} Active sessions</h6>
             <form id="signout-all-sessions-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
               <input type="hidden" name="action" value="signout-all">
               <button type="submit" class="btn btn-outline-danger btn-sm">
-                {% uj_icon "right-from-bracket", "me-1" %}
+                {% omega_icon "right-from-bracket", "me-1" %}
                 <span class="button-text">
                   Sign out<span class="d-none d-md-inline"> of all sessions</span>
                 </span>
@@ -838,7 +838,7 @@ badges:
         <!-- Generate Signin Link (advanced) -->
         <div id="generate-signin-link-trigger" class="text-center">
           <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="modal" data-bs-target="#generate-signin-link-modal">
-            {% uj_icon "link", "fa-xs me-1" %}
+            {% omega_icon "link", "fa-xs me-1" %}
             Generate signin link
           </button>
         </div>
@@ -849,7 +849,7 @@ badges:
             <div class="modal-content border border-danger">
               <div class="modal-header">
                 <h5 class="modal-title text-danger" id="generate-signin-link-title">
-                  {% uj_icon "triangle-exclamation", "fa-lg me-2" %}
+                  {% omega_icon "triangle-exclamation", "fa-lg me-2" %}
                   Generate signin link
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -879,14 +879,14 @@ badges:
                 <!-- Result view (hidden until generated) -->
                 <div id="generate-signin-link-result" class="d-none">
                   <div class="alert alert-warning small mb-3">
-                    {% uj_icon "clock", "me-1" %}
+                    {% omega_icon "clock", "me-1" %}
                     This link expires in <strong>1 hour</strong>. Use it immediately and do not share it.
                   </div>
                   <label for="signin-link-output" class="form-label small text-muted mb-1">Your signin link:</label>
                   <div class="input-group">
                     <input type="text" class="form-control font-monospace small" id="signin-link-output" readonly>
                     <button type="button" class="btn btn-outline-adaptive" id="signin-link-copy-btn">
-                      {% uj_icon "copy", "me-1" %}
+                      {% omega_icon "copy", "me-1" %}
                       <span class="button-text">Copy</span>
                     </button>
                   </div>
@@ -894,7 +894,7 @@ badges:
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-adaptive" id="signin-link-generate-btn" disabled>
-                  {% uj_icon "key", "me-1" %}
+                  {% omega_icon "key", "me-1" %}
                   <span class="button-text">Generate link</span>
                 </button>
               </div>
@@ -909,7 +909,7 @@ badges:
 
         <div class="card">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "link", "fa-md me-2" %} Manage connections</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "link", "fa-md me-2" %} Manage connections</h6>
           </div>
           <div class="card-body">
             <p class="text-muted mb-0">Connect your external accounts to access additional features.</p>
@@ -932,7 +932,7 @@ badges:
                   <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
                     <div class="d-flex align-items-center">
                       <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 fa fa-3xl">
-                        <img src="{{ connection.logo | uj_cachebreak }}" class="object-fit-contain" alt="{{ connection.name }} Logo"/>
+                        <img src="{{ connection.logo | omega_cachebreak }}" class="object-fit-contain" alt="{{ connection.name }} Logo"/>
                       </div>
                       <div>
                         <h6 class="mb-0">{{ connection.name }}</h6>
@@ -945,12 +945,12 @@ badges:
                           <input type="hidden" name="provider" value="{{ connection.id }}">
                           <!-- Connect button -->
                           <button type="submit" class="btn btn-sm btn-adaptive" data-action="connect">
-                            {% uj_icon "link", "fa-sm" %}
+                            {% omega_icon "link", "fa-sm" %}
                             <span class="button-text">Connect</span>
                           </button>
                           <!-- Disconnect button (hidden by default) -->
                           <button type="submit" class="btn btn-sm btn-outline-danger d-none" data-action="disconnect">
-                            {% uj_icon "unlink", "fa-sm" %}
+                            {% omega_icon "unlink", "fa-sm" %}
                             <span class="button-text">Disconnect</span>
                           </button>
                         </form>
@@ -973,7 +973,7 @@ badges:
         <div class="card mb-3">
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h6 class="mb-0 d-inline-flex align-items-center">
-              {% uj_icon "credit-card", "fa-md me-2" %}
+              {% omega_icon "credit-card", "fa-md me-2" %}
               <span><span data-omega-bind="@text billing.plan.name" class="omega-binding-skeleton">Current</span>&nbsp;plan</span>
             </h6>
             <span class="classy-status omega-binding-skeleton" data-omega-bind="@attr class billing.status.badgeClass">
@@ -1013,7 +1013,7 @@ badges:
             <div class="mb-3">
               <!-- Suspended (payment issue) alert -->
               <div class="alert alert-danger d-flex align-items-start" data-omega-bind="@show billing.alerts.suspended" hidden>
-                <span class="me-2 flex-shrink-0">{% uj_icon "triangle-exclamation", "fa-md" %}</span>
+                <span class="me-2 flex-shrink-0">{% omega_icon "triangle-exclamation", "fa-md" %}</span>
                 <div>
                   <strong>Payment failed</strong>
                   <p class="mb-0 small">Your payment method was declined. Please update your payment method to keep your subscription active.</p>
@@ -1022,7 +1022,7 @@ badges:
 
               <!-- Cancellation pending alert -->
               <div class="alert alert-warning d-flex align-items-start" data-omega-bind="@show billing.alerts.cancelling" hidden>
-                <span class="me-2 flex-shrink-0">{% uj_icon "clock", "fa-md" %}</span>
+                <span class="me-2 flex-shrink-0">{% omega_icon "clock", "fa-md" %}</span>
                 <div>
                   <strong>Cancellation scheduled</strong>
                   <p class="mb-0 small">Your subscription will end on <strong data-omega-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, you can reactivate through billing management.</p>
@@ -1031,7 +1031,7 @@ badges:
 
               <!-- Free trial alert -->
               <div class="alert alert-success d-flex align-items-start" data-omega-bind="@show billing.alerts.trialing" hidden>
-                <span class="me-2 flex-shrink-0">{% uj_icon "circle-check", "fa-md" %}</span>
+                <span class="me-2 flex-shrink-0">{% omega_icon "circle-check", "fa-md" %}</span>
                 <div>
                   <strong>Free trial</strong>
                   <p class="mb-0 small" data-omega-bind="@show billing.alerts.trialHasEndDate" hidden>You're on a free trial that ends on <strong data-omega-bind="@text billing.alerts.trialEndDate"></strong>. You won't be charged until your trial ends.</p>
@@ -1043,15 +1043,15 @@ badges:
             <!-- Action Buttons -->
             <div class="d-grid d-sm-flex gap-2">
               <button id="upgrade-plan-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.upgrade" hidden>
-                {% uj_icon "crown", "me-2" %}
+                {% omega_icon "crown", "me-2" %}
                 <span class="button-text">Upgrade plan</span>
               </button>
               <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.change" hidden>
-                {% uj_icon "arrow-right-arrow-left", "me-2" %}
+                {% omega_icon "arrow-right-arrow-left", "me-2" %}
                 <span class="button-text">Change plan</span>
               </button>
               <button id="manage-billing-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.manage" hidden>
-                {% uj_icon "credit-card", "me-2" %}
+                {% omega_icon "credit-card", "me-2" %}
                 <span class="button-text">Manage billing</span>
               </button>
             </div>
@@ -1061,7 +1061,7 @@ badges:
         <!-- Usage Metrics Card -->
         <div class="card mb-3">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-line", "fa-md me-2" %} Usage</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "chart-line", "fa-md me-2" %} Usage</h6>
           </div>
           <div class="card-body">
             <div id="usage-metrics-container">
@@ -1073,7 +1073,7 @@ badges:
         <!-- Cancel Subscription (only visible for paid users) -->
         <div id="cancel-subscription-trigger" class="text-center" data-omega-bind="@show billing.buttons.cancel" hidden>
           <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
-            {% uj_icon "xmark", "fa-xs me-1" %}
+            {% omega_icon "xmark", "fa-xs me-1" %}
             Cancel subscription
           </button>
         </div>
@@ -1081,7 +1081,7 @@ badges:
         <div class="collapse" id="cancel-subscription-accordion">
           <div class="card card-form-border border-danger mt-4">
             <div class="card-header">
-              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "ban", "fa-md me-2" %} Cancel your subscription</h6>
+              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% omega_icon "ban", "fa-md me-2" %} Cancel your subscription</h6>
             </div>
             <div class="card-body">
               <p class="card-text small text-muted">
@@ -1118,13 +1118,13 @@ badges:
                 <div class="row g-2">
                   <div class="col-12 col-md-6 order-md-2">
                     <button type="submit" class="btn btn-outline-adaptive w-100" id="cancel-subscription-btn">
-                      {% uj_icon "ban", "fa-sm me-2" %}
+                      {% omega_icon "ban", "fa-sm me-2" %}
                       <span class="button-text">Cancel subscription</span>
                     </button>
                   </div>
                   <div class="col-12 col-md-6 order-md-1">
                     <button type="button" class="btn btn-adaptive w-100" id="keep-plan-btn" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion">
-                      {% uj_icon "circle-check", "fa-sm me-2" %}
+                      {% omega_icon "circle-check", "fa-sm me-2" %}
                       <span>Keep my plan</span>
                     </button>
                   </div>
@@ -1142,7 +1142,7 @@ badges:
         <!-- Referral Code Card -->
         <div class="card mb-3">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "share-nodes", "fa-md me-2" %} Your referral code</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "share-nodes", "fa-md me-2" %} Your referral code</h6>
           </div>
           <div class="card-body">
             <p class="card-text text-muted">Share your referral code with friends to earn rewards.</p>
@@ -1151,7 +1151,7 @@ badges:
               <div class="input-group">
                 <input type="text" class="form-control font-monospace" id="referral-code-input" readonly value="Loading..." aria-label="Your referral code">
                 <button type="button" class="btn btn-outline-adaptive" id="copy-referral-code-btn">
-                  {% uj_icon "copy", "me-2" %}
+                  {% omega_icon "copy", "me-2" %}
                   <span class="button-text d-none d-sm-inline">Copy</span>
                 </button>
               </div>
@@ -1165,14 +1165,14 @@ badges:
           <div class="classy-statgrid__cell">
             <div class="classy-statgrid__label">
               <span class="classy-micro">Total referrals</span>
-              {% uj_icon "user-plus", "fa-sm" %}
+              {% omega_icon "user-plus", "fa-sm" %}
             </div>
             <h3 class="classy-statgrid__value mb-0" id="total-referrals">0</h3>
           </div>
           <div class="classy-statgrid__cell">
             <div class="classy-statgrid__label">
               <span class="classy-micro">This month</span>
-              {% uj_icon "calendar", "fa-sm" %}
+              {% omega_icon "calendar", "fa-sm" %}
             </div>
             <h3 class="classy-statgrid__value mb-0" id="recent-referrals">0</h3>
           </div>
@@ -1183,7 +1183,7 @@ badges:
           <div class="accordion-item">
             <h2 class="accordion-header" id="referrals-list-heading">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referrals-list-collapse" aria-expanded="false" aria-controls="referrals-list-collapse">
-                <span class="me-2">{% uj_icon "users", "fa-sm" %}</span>
+                <span class="me-2">{% omega_icon "users", "fa-sm" %}</span>
                 View referral details
                 <span class="classy-chip ms-2" id="referrals-badge">0</span>
               </button>
@@ -1208,9 +1208,9 @@ badges:
 
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "users", "fa-md me-2" %} Team members</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "users", "fa-md me-2" %} Team members</h6>
             <button class="btn btn-adaptive btn-sm" id="invite-team-member-btn">
-              {% uj_icon "user-plus", "me-2" %}
+              {% omega_icon "user-plus", "me-2" %}
               <span class="button-text">
                 Invite<span class="d-none d-md-inline"> team member</span>
               </span>
@@ -1238,7 +1238,7 @@ badges:
 
         <div class="card">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "envelope", "fa-md me-2" %} Email preferences</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "envelope", "fa-md me-2" %} Email preferences</h6>
           </div>
           <div class="card-body">
             <form id="marketing-emails-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -1251,7 +1251,7 @@ badges:
                 </label>
               </div>
               <button type="submit" class="btn btn-adaptive">
-                {% uj_icon "floppy-disk", "me-2" %}
+                {% omega_icon "floppy-disk", "me-2" %}
                 <span class="button-text">Save preferences</span>
               </button>
             </form>
@@ -1259,7 +1259,7 @@ badges:
         </div>
         <div class="card mt-3">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "bell", "fa-md me-2" %} Push notifications</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "bell", "fa-md me-2" %} Push notifications</h6>
             <span id="push-notification-status"><span class="classy-chip">Checking...</span></span>
           </div>
           <div class="card-body">
@@ -1267,20 +1267,20 @@ badges:
 
             <form id="push-subscribe-form" novalidate data-form-state="initializing" onsubmit="return false" style="display:none">
               <button type="submit" class="btn btn-adaptive btn-sm" id="push-subscribe-btn">
-                {% uj_icon "bell", "me-1" %}
+                {% omega_icon "bell", "me-1" %}
                 <span class="button-text">Enable push notifications</span>
               </button>
             </form>
 
             <div class="mt-3 pt-3 border-top">
               <a class="small text-muted text-decoration-none d-flex align-items-center" data-bs-toggle="collapse" href="#push-token-details" role="button" aria-expanded="false">
-                {% uj_icon "code", "fa-xs me-1" %} Token details
+                {% omega_icon "code", "fa-xs me-1" %} Token details
               </a>
               <div class="collapse mt-2" id="push-token-details">
                 <div class="input-group input-group-sm">
                   <input type="text" class="form-control font-monospace bg-body-tertiary" id="push-token-value" readonly value="No token" style="font-size: 0.65rem;">
                   <button type="button" class="btn btn-outline-adaptive" id="copy-push-token-btn">
-                    {% uj_icon "copy" %}
+                    {% omega_icon "copy" %}
                   </button>
                 </div>
               </div>
@@ -1296,10 +1296,10 @@ badges:
         <!-- API Key Card -->
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "key", "fa-md me-2" %} Your API key</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "key", "fa-md me-2" %} Your API key</h6>
             <form id="reset-api-key-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
               <button type="submit" class="btn btn-outline-danger btn-sm" id="reset-api-key-btn">
-                {% uj_icon "rotate", "me-1" %}
+                {% omega_icon "rotate", "me-1" %}
                 <span class="button-text">
                   Reset<span class="d-none d-md-inline"> API key</span>
                 </span>
@@ -1315,7 +1315,7 @@ badges:
               <div class="input-group">
                 <input type="text" class="form-control font-monospace" id="api-key-input" readonly value="Loading...">
                 <button type="button" class="btn btn-outline-adaptive" id="copy-api-key-btn">
-                  {% uj_icon "copy", "me-2" %}
+                  {% omega_icon "copy", "me-2" %}
                   <span class="button-text d-none d-sm-inline">Copy</span>
                 </button>
               </div>
@@ -1324,7 +1324,7 @@ badges:
             <!-- Reset API Key -->
             <div class="alert alert-warning d-flex align-items-center" role="alert">
               <div class="me-3">
-                {% uj_icon "triangle-exclamation", "fa-2xl" %}
+                {% omega_icon "triangle-exclamation", "fa-2xl" %}
               </div>
               <div class="flex-grow-1">
                 <strong>Warning:</strong> Resetting your API key will invalidate the current key. Any applications using the old key will stop working.
@@ -1336,7 +1336,7 @@ badges:
         <!-- MCP Integration Card -->
         <div class="card" data-brand-id="{{ site.brand.id }}" id="mcp-card">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "plug", "fa-md me-2" %} MCP integration</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "plug", "fa-md me-2" %} MCP integration</h6>
           </div>
           <div class="card-body">
             <p class="card-text text-muted mb-3">Connect AI assistants to your account using the Model Context Protocol. Paste the URL below into your preferred AI tool.</p>
@@ -1347,7 +1347,7 @@ badges:
               <div class="input-group">
                 <input type="text" class="form-control font-monospace" id="mcp-url-input" readonly data-mcp-url value="Loading...">
                 <button type="button" class="btn btn-outline-adaptive" id="copy-mcp-url-btn">
-                  {% uj_icon "copy", "me-2" %}
+                  {% omega_icon "copy", "me-2" %}
                   <span class="button-text d-none d-sm-inline">Copy</span>
                 </button>
               </div>
@@ -1391,7 +1391,7 @@ badges:
                     <li class="mb-2">Open your terminal and run:
                       <div class="input-group mt-1 mb-1">
                         <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-claude" readonly data-mcp-cmd="claude" value="Loading...">
-                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-claude">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-claude">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li class="mb-2">This will trigger an OAuth flow to connect Claude to your account.</li>
@@ -1413,7 +1413,7 @@ badges:
                     <li class="mb-2">Select <strong>New MCP Server</strong> and paste:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-cursor" data-mcp-cmd="cursor"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-cursor">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-cursor">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                   </ol>
@@ -1433,7 +1433,7 @@ badges:
                     <li class="mb-2">Add to your <code>settings.json</code>:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-vscode" data-mcp-cmd="vscode"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-vscode">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-vscode">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li>Save the file and restart VS Code.</li>
@@ -1445,7 +1445,7 @@ badges:
                     <li class="mb-2">Open your terminal and run:
                       <div class="input-group mt-1 mb-1">
                         <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-codex" readonly data-mcp-cmd="codex" value="Loading...">
-                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-codex">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-codex">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li>The MCP server will be available next time you run <code>codex</code>.</li>
@@ -1457,14 +1457,14 @@ badges:
                     <li class="mb-2">Edit <code>~/.gemini/settings.json</code> and add the HTTP MCP server configuration:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-gemini" data-mcp-cmd="gemini"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-gemini">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-gemini">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li class="mb-2">Save the file and restart Gemini CLI.</li>
                     <li class="mb-2">Authenticate by running:
                       <div class="input-group mt-1 mb-1">
                         <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-gemini-auth" readonly data-mcp-cmd="gemini-auth" value="Loading...">
-                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-gemini-auth">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-gemini-auth">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li>This will open a browser window to complete the OAuth flow.</li>
@@ -1476,14 +1476,14 @@ badges:
                     <li class="mb-2">Edit <code>~/.config/opencode/opencode.json</code> and add the remote MCP server configuration:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-opencode" data-mcp-cmd="opencode"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-opencode">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-opencode">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li class="mb-2">Save the file and restart OpenCode.</li>
                     <li class="mb-2">Authenticate by running:
                       <div class="input-group mt-1 mb-1">
                         <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-opencode-auth" readonly data-mcp-cmd="opencode-auth" value="Loading...">
-                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-opencode-auth">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-opencode-auth">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li>This will open a browser window to complete the OAuth flow.</li>
@@ -1497,7 +1497,7 @@ badges:
                     <li class="mb-2">Select <strong>Add Server</strong> and paste:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-windsurf" data-mcp-cmd="windsurf"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-windsurf">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-windsurf">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                   </ol>
@@ -1509,7 +1509,7 @@ badges:
                     <li class="mb-2">Add the MCP server configuration:
                       <div class="position-relative mt-1">
                         <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-zed" data-mcp-cmd="zed"><code>Loading...</code></pre>
-                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-zed">{% uj_icon "copy" %}</button>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-zed">{% omega_icon "copy" %}</button>
                       </div>
                     </li>
                     <li>Restart Zed to activate the server.</li>
@@ -1549,7 +1549,7 @@ badges:
         <!-- Info card (always shown) -->
         <div class="card mb-4">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "file-export", "fa-md me-2" %} Data request policy</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "file-export", "fa-md me-2" %} Data request policy</h6>
           </div>
           <div class="card-body">
             <p class="card-text small text-muted">
@@ -1595,7 +1595,7 @@ badges:
           <div class="card">
             <div class="card-header">
               <h6 class="mb-0 d-inline-flex align-items-center">
-                {% uj_icon "clock", "fa-md me-2" %}
+                {% omega_icon "clock", "fa-md me-2" %}
                 <span id="data-request-status-title">Request status</span>
               </h6>
             </div>
@@ -1604,7 +1604,7 @@ badges:
               <div id="data-request-download" class="d-none">
                 <form id="data-request-download-form" data-form-state="initializing" onsubmit="return false">
                   <button type="submit" class="btn btn-adaptive btn-sm" id="data-request-download-btn">
-                    {% uj_icon "download", "fa-sm me-2" %}
+                    {% omega_icon "download", "fa-sm me-2" %}
                     <span class="button-text">Download your data</span>
                   </button>
                 </form>
@@ -1612,7 +1612,7 @@ badges:
               <div id="data-request-cancel" class="d-none">
                 <form id="data-request-cancel-form" data-form-state="initializing" onsubmit="return false">
                   <button type="submit" class="btn btn-adaptive btn-sm" id="data-request-cancel-btn">
-                    {% uj_icon "rotate-left", "fa-sm me-2" %}
+                    {% omega_icon "rotate-left", "fa-sm me-2" %}
                     <span class="button-text">Request withdrawal</span>
                   </button>
                 </form>
@@ -1626,7 +1626,7 @@ badges:
           <div class="collapse" id="data-request-form-accordion">
             <div class="card card-form-border border-primary mt-4">
               <div class="card-header">
-                <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "file-export", "fa-md me-2" %} Confirm data request</h6>
+                <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "file-export", "fa-md me-2" %} Confirm data request</h6>
               </div>
               <div class="card-body">
                 <form id="data-request-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -1658,13 +1658,13 @@ badges:
                   <div class="row g-2">
                     <div class="col-12 col-md-6 order-md-2">
                       <button type="submit" class="btn btn-outline-adaptive w-100" id="data-request-submit-btn">
-                        {% uj_icon "file-export", "fa-sm me-2" %}
+                        {% omega_icon "file-export", "fa-sm me-2" %}
                         <span class="button-text">Submit data request</span>
                       </button>
                     </div>
                     <div class="col-12 col-md-6 order-md-1">
                       <a href="/dashboard/account" class="btn btn-adaptive w-100">
-                        {% uj_icon "arrow-left", "fa-sm me-2" %}
+                        {% omega_icon "arrow-left", "fa-sm me-2" %}
                         <span>Return to profile</span>
                       </a>
                     </div>
@@ -1682,7 +1682,7 @@ badges:
 
         <div class="card mb-4">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "trash", "fa-md me-2" %} Account deletion policy</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% omega_icon "trash", "fa-md me-2" %} Account deletion policy</h6>
           </div>
           <div class="card-body">
             <p class="card-text small text-muted">
@@ -1726,7 +1726,7 @@ badges:
         <div class="collapse" id="delete-form-accordion">
           <div class="card card-form-border border-danger mt-4">
             <div class="card-header">
-              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "trash", "fa-md me-2" %} Confirm account deletion</h6>
+              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% omega_icon "trash", "fa-md me-2" %} Confirm account deletion</h6>
             </div>
             <div class="card-body">
               <form id="delete-account-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -1758,13 +1758,13 @@ badges:
                 <div class="row g-2">
                   <div class="col-12 col-md-6 order-md-2">
                     <button type="submit" class="btn btn-outline-adaptive w-100" id="delete-account-btn">
-                      {% uj_icon "trash", "fa-sm me-2" %}
+                      {% omega_icon "trash", "fa-sm me-2" %}
                       <span class="button-text">Delete my account permanently</span>
                     </button>
                   </div>
                   <div class="col-12 col-md-6 order-md-1">
                     <a href="/dashboard/account" class="btn btn-adaptive w-100" id="cancel-delete-btn">
-                      {% uj_icon "arrow-left", "fa-sm me-2" %}
+                      {% omega_icon "arrow-left", "fa-sm me-2" %}
                       <span>Return to profile</span>
                     </a>
                   </div>
@@ -1782,7 +1782,7 @@ badges:
         <!-- Refund policy info card -->
         <div class="card mb-4">
           <div class="card-header">
-            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "rotate-left", "fa-md me-2" %} Refund policy</h6>
+            <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "rotate-left", "fa-md me-2" %} Refund policy</h6>
           </div>
           <div class="card-body">
             <p class="card-text small text-muted">
@@ -1831,7 +1831,7 @@ badges:
             <div id="refund-ineligible" class="d-none">
               <hr>
               <div class="d-flex align-items-start text-warning">
-                <span class="me-2 flex-shrink-0">{% uj_icon "triangle-exclamation", "fa-md" %}</span>
+                <span class="me-2 flex-shrink-0">{% omega_icon "triangle-exclamation", "fa-md" %}</span>
                 <div>
                   <strong>Not eligible for refund</strong>
                   <p class="mb-0 small text-muted">To request a refund, you must first cancel your subscription. Refunds are only available for cancelled or pending-cancellation subscriptions. You can cancel your subscription from the <a href="#billing">billing section</a> of your account.</p>
@@ -1851,7 +1851,7 @@ badges:
         <div class="collapse" id="refund-form-accordion">
           <div class="card card-form-border border-primary mt-4">
             <div class="card-header">
-              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "rotate-left", "fa-md me-2" %} Confirm refund request</h6>
+              <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "rotate-left", "fa-md me-2" %} Confirm refund request</h6>
             </div>
             <div class="card-body">
               <form id="refund-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -1885,13 +1885,13 @@ badges:
                 <div class="row g-2">
                   <div class="col-12 col-md-6 order-md-2">
                     <button type="submit" class="btn btn-outline-adaptive w-100" id="refund-submit-btn">
-                      {% uj_icon "rotate-left", "fa-sm me-2" %}
+                      {% omega_icon "rotate-left", "fa-sm me-2" %}
                       <span class="button-text">Request refund</span>
                   </button>
                 </div>
                 <div class="col-12 col-md-6 order-md-1">
                   <a href="#billing" class="btn btn-adaptive w-100">
-                    {% uj_icon "arrow-left", "fa-sm me-2" %}
+                    {% omega_icon "arrow-left", "fa-sm me-2" %}
                     <span>Return to billing</span>
                   </a>
                 </div>

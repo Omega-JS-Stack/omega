@@ -11,8 +11,8 @@ client:
     enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | uj_liquify }}**{% endcapture %}
-{% capture breadcrumb %}{{ resolved.meta.breadcrumb | uj_liquify }}{% endcapture %}
+{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 <p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
@@ -102,7 +102,7 @@ To submit a data request, visit your account page here: [{{ site.url }}/account]
 ## Acceptance of This Policy
 Use of our site signifies your acceptance of this policy. If you do not accept the policy then please do not use this site. When registering, we will further request your explicit acceptance of the privacy policy.
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}
 
 ## How to Contact Us:
 You can contact us at: [{{ site.url }}/contact]({{ site.url }}/contact).

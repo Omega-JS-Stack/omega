@@ -35,11 +35,11 @@ meta:
     {%- unless first %},{% endunless -%}{%- assign first = false %}
   {
     "url": "{{ site.url }}{{ item.url }}",
-    "title": "{{ entry_title | default: '' | uj_json_escape }}",
-    "desc": "{{ entry_desc | default: '' | uj_json_escape }}",
-    "breadcrumb": "{{ entry_breadcrumb | default: '' | uj_json_escape }}",
-    "category": "{{ entry_category | default: '' | uj_json_escape }}",
-    "type": "{{ page_type | default: '' | uj_json_escape }}"
+    "title": "{{ entry_title | default: '' | omega_json_escape }}",
+    "desc": "{{ entry_desc | default: '' | omega_json_escape }}",
+    "breadcrumb": "{{ entry_breadcrumb | default: '' | omega_json_escape }}",
+    "category": "{{ entry_category | default: '' | omega_json_escape }}",
+    "type": "{{ page_type | default: '' | omega_json_escape }}"
   }
   {%- endfor %}
 ]

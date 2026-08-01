@@ -1,17 +1,17 @@
 <!-- Meta Variables -->
 {% assign page-viewport = "width=device-width, initial-scale=1.0, user-scalable=yes, shrink-to-fit=no" %}
 {%- iftruthy resolved.meta.viewport -%}
-  {% assign page-viewport = resolved.meta.viewport | uj_liquify %}
+  {% assign page-viewport = resolved.meta.viewport | omega_liquify %}
 {% endiftruthy %}
 
 {% assign page-referrer = "strict-origin-when-cross-origin" %}
 {%- iftruthy resolved.meta.referrer -%}
-  {% assign page-referrer = resolved.meta.referrer | uj_liquify %}
+  {% assign page-referrer = resolved.meta.referrer | omega_liquify %}
 {%- endiftruthy -%}
 
 {% assign page-keywords = "" %}
 {%- iftruthy resolved.meta.keywords -%}
-  {% assign page-keywords = resolved.meta.keywords | uj_liquify %}
+  {% assign page-keywords = resolved.meta.keywords | omega_liquify %}
 {%- endiftruthy -%}
 
 {% assign favicon-path = site.url | append: "/assets/images/favicon" %}
@@ -27,24 +27,24 @@
 <!-- Assign Default Dynamic Variables -->
 <!-- (Page asset lookups are computed by the engine: pageAssets.css / pageAssets.themeCss / pageAssets.js
      resolve this page's content-hashed bundles from the asset manifest.) -->
-{% assign page-title = resolved.meta.title | uj_liquify %}
-{% assign page-description = resolved.meta.description | uj_liquify %}
-{% assign page-image = resolved.meta.image | uj_liquify %}
+{% assign page-title = resolved.meta.title | omega_liquify %}
+{% assign page-description = resolved.meta.description | omega_liquify %}
+{% assign page-image = resolved.meta.image | omega_liquify %}
 {% assign page-og-type = "website" %}
 
 <!-- Assign Post Dynamic Variables -->
 {%- iftruthy resolved.post.id -%}
-  {% assign page-title = resolved.post.title | uj_liquify %}
-  {% assign page-description = resolved.post.description | uj_liquify %}
-  {% capture page-image %}{%- uj_post resolved.post.id, "image" -%}{% endcapture %}
+  {% assign page-title = resolved.post.title | omega_liquify %}
+  {% assign page-description = resolved.post.description | omega_liquify %}
+  {% capture page-image %}{%- omega_post resolved.post.id, "image" -%}{% endcapture %}
   {% assign page-og-type = "article" %}
 {% endiftruthy %}
 
 <!-- Assign Member Dynamic Variables -->
 {%- iftruthy resolved.member.id -%}
-  {% assign page-title = resolved.member.name | uj_liquify %}
-  {% assign page-description = resolved.member.description | uj_liquify %}
-  {% capture page-image %}{%- uj_member resolved.member.id, "image" -%}{% endcapture %}
+  {% assign page-title = resolved.member.name | omega_liquify %}
+  {% assign page-description = resolved.member.description | omega_liquify %}
+  {% capture page-image %}{%- omega_member resolved.member.id, "image" -%}{% endcapture %}
   {% assign page-og-type = "profile" %}
 {% endiftruthy %}
 
@@ -56,7 +56,7 @@
 {% if page-image == '' or page-image == 'null' %}{% assign page-image = site.brand.images.social | default: site.brand.images.brandmark %}{% endif %}
 
 <!-- Resolve Image -->
-{% capture page-image %}{% uj_external page-image %}{% endcapture %}
+{% capture page-image %}{% omega_external page-image %}{% endcapture %}
 
 {% capture page-ie-script %}
   <style media="screen">
@@ -110,7 +110,7 @@
 <meta name="MobileOptimized" content="320"/>
 <meta name="generator" content="OMEGA"/>
 <meta name="author" content="{{ site.brand.name }}"/>
-<meta name="copyright" content="{{ site.characters.copyright }} {{ site.uj.date.year }} {{ site.brand.name }}">
+<meta name="copyright" content="{{ site.characters.copyright }} {{ site.omega.date.year }} {{ site.brand.name }}">
 
 <!-- Referrer -->
 <meta name="referrer" content="{{ page-referrer }}"/>
@@ -127,7 +127,7 @@
 <!-- Web app manifest (part of the minted favicon set — static-assets channel;
      no minted set → no link, a virgin brand serves zero dangling refs) -->
 {% if assetManifest.favicons %}
-  <link rel="manifest" href="{{ favicon-path | append: '/site.webmanifest' | uj_cachebreak }}"/>
+  <link rel="manifest" href="{{ favicon-path | append: '/site.webmanifest' | omega_cachebreak }}"/>
 {% endif %}
 
 <!-- Title -->
@@ -177,10 +177,10 @@
 <!-- Favicon — exactly the minted set (manager assets service → .omega/assets/favicon,
      bridged to /assets/images/favicon by the static-assets channel) -->
 {% if assetManifest.favicons %}
-  <link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | uj_cachebreak }}"/>
-  <link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | uj_cachebreak }}"/>
-  <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | uj_cachebreak }}"/>
-  <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | uj_cachebreak }}"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | omega_cachebreak }}"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | omega_cachebreak }}"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | omega_cachebreak }}"/>
+  <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | omega_cachebreak }}"/>
 {% endif %}
 <meta name="theme-color" content="{{ resolved.favicon.theme-color }}"/>
 
@@ -240,7 +240,7 @@
 </noscript>
 
 <!-- Theme - Injected head -->
-{{ resolved.theme.head.content | uj_content_format }}
+{{ resolved.theme.head.content | omega_content_format }}
 
 <!-- Page - Injected head -->
-{{ resolved.head.content | uj_content_format }}
+{{ resolved.head.content | omega_content_format }}

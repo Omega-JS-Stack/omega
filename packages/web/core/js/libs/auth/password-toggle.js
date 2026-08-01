@@ -26,8 +26,8 @@ export function setupPasswordToggle() {
     $passwordInput.type = newType;
 
     // Toggle icon visibility
-    const $showIcon = $button.querySelector('.uj-password-show');
-    const $hideIcon = $button.querySelector('.uj-password-hide');
+    const $showIcon = $button.querySelector('.omega-password-show');
+    const $hideIcon = $button.querySelector('.omega-password-hide');
 
     if (!$showIcon || !$hideIcon) {
       return;

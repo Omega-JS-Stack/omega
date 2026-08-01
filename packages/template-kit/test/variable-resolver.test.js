@@ -2,7 +2,7 @@
  * variable-resolver.test.js — argument parsing + variable resolution, direct.
  *
  * register-liquid.test.js proves the resolver reaches real tag markup; this
- * suite pins the rules the uj_* tags are written against: typed literals
+ * suite pins the rules the omega_* tags are written against: typed literals
  * evaluate before any scope lookup, in BOTH lanes (max_width=640 is the number
  * 640, not a missing path or its own text), preferLiteral keeps bare words as
  * text unless the context has them, quote-aware splitting survives commas

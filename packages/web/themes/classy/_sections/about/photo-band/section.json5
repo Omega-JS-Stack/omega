@@ -7,7 +7,7 @@
   },
 
   defaults: {
-    placeholder: '{{ site.uj.placeholder.src }}',
+    placeholder: '{{ site.omega.placeholder.src }}',
     items: [
       { src: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80', alt: 'The team working around one table', caption: 'Shipping week, every week', wide: true },
       { src: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80', alt: 'Two teammates pairing on a laptop', caption: 'Pairing beats meetings' },

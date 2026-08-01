@@ -300,7 +300,7 @@ test('wave 5: the faq union — duo + center variants, converged ids, dom_id kno
   const alt = pages.get('/alternatives/acme-growth');
   assert.ok(alt, 'alternative page built');
   assert.ok(alt.includes('classy-section-head--center'), 'variant: "center" renders the stacked shell');
-  assert.ok(alt.includes('How long does a MiniCo migration take?'), 'call-site liquification replaced the explicit uj_liquify');
+  assert.ok(alt.includes('How long does a MiniCo migration take?'), 'call-site liquification replaced the explicit omega_liquify');
   assert.ok(alt.includes('<em>switching</em>'), 'accent em renders in the center head');
   // The multi-instance knob rides the body-call lane on the demo page.
   const demo = pages.get('/sections-demo');
@@ -325,7 +325,7 @@ test('wave 6: heading/masthead — the first REAL component serves the interior-
   const terms = pages.get('/terms');
   assert.ok(terms.includes('>Legal</span>') && terms.includes('classy-legal__sub classy-quiet'), 'legal head converges with its own knobs');
   const alt = pages.get('/alternatives/acme-growth');
-  assert.ok(alt.includes('<em>Acme Growth</em>'), 'component args liquify at call site (the dropped uj_liquify)');
+  assert.ok(alt.includes('<em>Acme Growth</em>'), 'component args liquify at call site (the dropped omega_liquify)');
 });
 
 test('wave 7: heading/section-head — nested composition (sections call it) + layout heads', async () => {
@@ -337,7 +337,7 @@ test('wave 7: heading/section-head — nested composition (sections call it) + l
   const hero = pages.get('/test/components/hero-demo-input');
   assert.ok(hero.includes('Everything you need.'), 'bento head (plain-string superheadline) survives');
   const alt = pages.get('/alternatives/acme-growth');
-  assert.ok(alt.includes('<em>compare</em>'), 'alternative comparison accent liquifies without the dropped uj_liquify');
+  assert.ok(alt.includes('<em>compare</em>'), 'alternative comparison accent liquifies without the dropped omega_liquify');
   const post = pages.get('/blog/first-post');
   assert.ok(post.includes('Related <em>posts</em>'), 'related-posts head: em-in-string headline through the guarded h2');
   // The pricing one-time/comparison bands are catalog-gated and the mini

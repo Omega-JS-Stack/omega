@@ -49,11 +49,11 @@ suggested_pages:
       <!-- Primary Actions -->
       <div class="d-grid gap-2 d-sm-block text-center mb-4">
         <a href="{{ site.url }}" class="btn btn-adaptive btn-lg mb-2 mb-sm-0 me-sm-2">
-          {% uj_icon "house", "me-2" %}
+          {% omega_icon "house", "me-2" %}
           Back to home
         </a>
         <button class="btn btn-outline-dark btn-lg mb-2 mb-sm-0" onclick="window.history.back()">
-          {% uj_icon "arrow-left", "me-2" %}
+          {% omega_icon "arrow-left", "me-2" %}
           Go back
         </button>
       </div>
@@ -63,7 +63,7 @@ suggested_pages:
         <div class="text-center mb-4">
           {% for suggestion in resolved.suggested_pages %}
             <a href="{{ suggestion.link }}" class="btn btn-outline-dark btn-sm me-1 mb-2" title="{{ suggestion.description }}">
-              {% uj_icon suggestion.icon, "me-1" %}{{ suggestion.title }}
+              {% omega_icon suggestion.icon, "me-1" %}{{ suggestion.title }}
             </a>
           {% endfor %}
         </div>
@@ -81,4 +81,4 @@ suggested_pages:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

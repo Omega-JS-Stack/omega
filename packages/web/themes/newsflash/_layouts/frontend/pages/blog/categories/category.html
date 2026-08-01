@@ -64,7 +64,7 @@ hero:
       <div class="row g-4 mb-5">
         {% for post in filtered_posts %}
           <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
-            {% capture rt %}{% uj_readtime post.content %}{% endcapture %}
+            {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
             {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: resolved.category.name, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
           </div>
         {% endfor %}
@@ -80,10 +80,10 @@ hero:
     <!-- Back to the desks -->
     <div class="text-center" data-lazy="@class animation-slide-up">
       <a href="{{ site.url }}/blog/categories" class="btn btn-outline-dark">
-        {% uj_icon "arrow-left", "me-2" %}All desks
+        {% omega_icon "arrow-left", "me-2" %}All desks
       </a>
     </div>
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

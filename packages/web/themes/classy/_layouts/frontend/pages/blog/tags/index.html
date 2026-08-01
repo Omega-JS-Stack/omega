@@ -28,14 +28,14 @@ hero:
     {% assign tag_counts = '' | split: ',' %}
     {% for post in site.posts %}
       {% for tag in post.post.tags %}
-        {% assign tag_fixed = tag | uj_title_case %}
+        {% assign tag_fixed = tag | omega_title_case %}
         {% unless tags contains tag_fixed %}
           {% assign tags = tags | push: tag_fixed %}
           {% comment %} Count posts for this tag {% endcomment %}
           {% assign count = 0 %}
           {% for p in site.posts %}
             {% for t in p.post.tags %}
-              {% assign t_fixed = t | uj_title_case %}
+              {% assign t_fixed = t | omega_title_case %}
               {% if t_fixed == tag_fixed %}
                 {% assign count = count | plus: 1 %}
                 {% break %}
@@ -67,7 +67,7 @@ hero:
             <h2 class="h5">No tags yet</h2>
             <p class="text-muted">Check back soon for tagged content.</p>
             <a href="/blog" class="btn btn-adaptive">
-              {% uj_icon "arrow-left", "fa-sm me-2" %}
+              {% omega_icon "arrow-left", "fa-sm me-2" %}
               Back to blog
             </a>
           </div>
@@ -77,4 +77,4 @@ hero:
   </div>
 </section>
 
-{{ content | uj_content_format }}
+{{ content | omega_content_format }}

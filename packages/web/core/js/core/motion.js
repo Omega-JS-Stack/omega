@@ -12,8 +12,8 @@ import { createMotion } from '@omega.js/client/modules/motion.js';
 export default () => {
   const motion = createMotion();
 
-  // Register on UJ library for programmatic access (omega.uj().motion.scan(el))
-  omega._ujLibrary.motion = motion;
+  // Register on the omega library for programmatic access (omega.library().motion.scan(el))
+  omega._library.motion = motion;
 
   motion.start();
 

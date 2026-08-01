@@ -39,7 +39,7 @@ async function developmentRebuild(complete) {
     return complete();
   }
 
-  // Execute uj setup again
+  // Execute omega setup again
   const checks = [
     '--check-manager=false',
     '--check-node=false',

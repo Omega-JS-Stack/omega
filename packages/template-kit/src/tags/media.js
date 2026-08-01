@@ -1,5 +1,5 @@
 /**
- * media.js — the media uj tags (icon, logo, image, video).
+ * media.js — the media omega_ tags (icon, logo, image, video).
  *
  * Ported from jekyll-uj-powertools lib/tags/{icon,logo,image,video}.rb.
  * Icon/logo SVG loading is directory-injectable via the adapter options
@@ -61,8 +61,8 @@ function readFileIfExists(filePath) {
   }
 }
 
-// {% uj_icon name %} / {% uj_icon name, "css classes" %}
-const ujIcon = {
+// {% omega_icon name %} / {% omega_icon name, "css classes" %}
+const omegaIcon = {
   block: false,
   render(ctx, markup) {
     const parts = parseArguments(markup);
@@ -139,7 +139,7 @@ function aliasFor(aliasFile, iconName) {
 function defaultIconWithWarning(iconName, dirs) {
   if (iconName && dirs.length && !warnedIcons.has(iconName)) {
     warnedIcons.add(iconName);
-    console.warn(`[@omega.js/template-kit:media] uj_icon: no SVG found for "${iconName}" — rendering the default icon`);
+    console.warn(`[@omega.js/template-kit:media] omega_icon: no SVG found for "${iconName}" — rendering the default icon`);
   }
   return tagMissing(DEFAULT_ICON, iconName);
 }
@@ -177,9 +177,9 @@ function normalizeFlagSvg(svg) {
   return svg.replace(/<svg([^>]*)>/, (match, attrs) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, '')}>`);
 }
 
-// {% uj_logo name %} / {% uj_logo name, type, color %} — inline SVG with
+// {% omega_logo name %} / {% omega_logo name, type, color %} — inline SVG with
 // instance-unique ID prefixing so repeated logos don't collide
-const ujLogo = {
+const omegaLogo = {
   block: false,
   render(ctx, markup) {
     const parts = parseArguments(markup);
@@ -207,7 +207,7 @@ function loadLogo(ctx, logoName, type, color) {
   if (!svg) {
     if (!warnedIcons.has(`logo:${logoName}`)) {
       warnedIcons.add(`logo:${logoName}`);
-      console.warn(`[@omega.js/template-kit:media] uj_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
+      console.warn(`[@omega.js/template-kit:media] omega_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
     }
     svg = tagMissing(DEFAULT_ICON, `logo:${logoName}`);
   }
@@ -241,7 +241,7 @@ function prefixSvgIds(svgContent, prefix) {
 }
 
 /**
- * Build the responsive image HTML for a source + options (shared by uj_image
+ * Build the responsive image HTML for a source + options (shared by omega_image
  * and the member/post image-tag properties).
  * @param {string} src
  * @param {object} options - alt/class/style/width/height/max_width/webp/loading
@@ -347,8 +347,8 @@ function buildExternalImage(src, options) {
   return html;
 }
 
-// {% uj_image "/path.png", alt="...", max_width="640" %}
-const ujImage = {
+// {% omega_image "/path.png", alt="...", max_width="640" %}
+const omegaImage = {
   block: false,
   render(ctx, markup) {
     const args = parseArguments(markup);
@@ -360,8 +360,8 @@ const ujImage = {
   },
 };
 
-// {% uj_video "/path.mp4", autoplay="true", ... %}
-const ujVideo = {
+// {% omega_video "/path.mp4", autoplay="true", ... %}
+const omegaVideo = {
   block: false,
   render(ctx, markup) {
     const args = parseArguments(markup);
@@ -470,10 +470,10 @@ function getVideoMimeType(extension) {
 }
 
 module.exports = {
-  ujIcon,
-  ujLogo,
-  ujImage,
-  ujVideo,
+  omegaIcon,
+  omegaLogo,
+  omegaImage,
+  omegaVideo,
   buildImageHtml,
   DEFAULT_ICON,
   IMAGE_PLACEHOLDER,

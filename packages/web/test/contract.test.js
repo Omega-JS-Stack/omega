@@ -117,7 +117,7 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
 });
 
 // #86: consumers cannot fix stock-chrome icon misses, so a Pro-only icon name
-// in packaged markup must break the build lane. uj_icon (template-kit media.js)
+// in packaged markup must break the build lane. omega_icon (template-kit media.js)
 // tags every unresolved name onto its fallback triangle.
 test('#86: no stock page ships a missing-icon marker', () => {
   for (const theme of THEMES) {

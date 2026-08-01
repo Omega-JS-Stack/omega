@@ -87,12 +87,12 @@ both-forms error applies to the YAML remainder only):
 ```liquid
 {% section "marketing/hero", data: resolved.hero %}
   {% slot demo_html %}
-    <div class="my-wild-demo">{% uj_icon "rocket" %} {{ site.brand.name }}</div>
+    <div class="my-wild-demo">{% omega_icon "rocket" %} {{ site.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ```
 
-Slot content renders in the CALLER's scope (site vars, page captures, `uj_*`
+Slot content renders in the CALLER's scope (site vars, page captures, `omega_*`
 tags all work) and reaches the section as a finished-HTML string arg —
 schema type `html` — merged OUTERMOST (over defaults ← data ← named) and
 NEVER re-rendered: it merges after call-site liquification, so literal
@@ -293,7 +293,7 @@ never render) and deleting the file returns the URL to the packaged default.
   through frontmatter args over `resolved.*`, and everything keeps flowing.
 
 The `{% composition %}` wrap is tri-state, byte-parity with the
-`{{ content | uj_content_format }}` line it replaces in the layout:
+`{{ content | omega_content_format }}` line it replaces in the layout:
 
 | Page state | Renders |
 |---|---|
@@ -353,10 +353,10 @@ instances across index/blog/category/tag/related) nests `news/byline`
 its `p_class` knob, feed items, and the hero cover). Posts stay out of
 args entirely — raw post objects can never ride call-site liquification
 (no circularity guard; content strings may carry literal braces). The
-pattern: `uj_post`/`uj_member` are scope-independent (injected site
+pattern: `omega_post`/`omega_member` are scope-independent (injected site
 adapter), so components own image/name lookups from plain id args;
 readtime pre-captures at the call site; kickers pass display-ready with
-`| default: "" | uj_title_case` so absence suppresses instead of
+`| default: "" | omega_title_case` so absence suppresses instead of
 rendering "Undefined". Override #2 (cp217): `marketing/newsletter-cta` —
 the vermilion slab — is the inherit lane's first consumer: newsflash
 markup (adds `headline_accent` + the `narrow` post-column knob), classy's

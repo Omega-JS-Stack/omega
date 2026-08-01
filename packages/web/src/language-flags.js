@@ -1,7 +1,7 @@
 /**
  * Language flag aliases for the client-side switcher (#129).
  *
- * The retired footer dropdown drew its flags at BUILD time (`{% uj_icon <lang> %}`
+ * The retired footer dropdown drew its flags at BUILD time (`{% omega_icon <lang> %}`
  * → template-kit's tryLoadFlag → the core flag set via the language→country
  * map). The switcher renders in the BROWSER from the page's own hreflang tags,
  * so no build-time lookup can run for it — but the flag set already ships:

@@ -17,8 +17,8 @@ sitemap:
     {%- unless first %},{% endunless -%}{%- assign first = false %}
   {
     "url": "{{ post.url }}",
-    "title": "{{ post.data.post.title | strip_html | uj_json_escape }}",
-    "desc": "{{ post.data.post.description | default: '' | strip_html | truncate: 180 | uj_json_escape }}",
+    "title": "{{ post.data.post.title | strip_html | omega_json_escape }}",
+    "desc": "{{ post.data.post.description | default: '' | strip_html | truncate: 180 | omega_json_escape }}",
     "date": "{{ post.date | date: '%Y-%m-%d' }}",
     "categories": {% if post.data.post.categories %}{{ post.data.post.categories | json }}{% else %}[]{% endif %},
     "tags": {% if post.data.post.tags %}{{ post.data.post.tags | json }}{% else %}[]{% endif %}

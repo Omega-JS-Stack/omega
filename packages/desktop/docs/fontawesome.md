@@ -22,7 +22,7 @@ renderer bootstrap. No `initialize()` options, no imports.
 Icon SEMANTICS — valid names/styles, candidate lookup order (requested style,
 then the brands fallback), the injected root attributes, and alias mapping —
 live in **`@omega.js/client/modules/icon-core.js`**, the SAME module
-@omega.js/web's build-time `uj_icon` tag uses. Desktop and web can never
+@omega.js/web's build-time `omega_icon` tag uses. Desktop and web can never
 drift on how an icon name resolves or what the served SVG looks like.
 
 ## How it works

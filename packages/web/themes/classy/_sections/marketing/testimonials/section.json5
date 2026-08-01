@@ -9,9 +9,9 @@
 
   defaults: {
     // Lazy-avatar placeholder frame (previously a hardcoded
-    // {{ site.uj.placeholder.src }} read in markup — now an arg, per
+    // {{ site.omega.placeholder.src }} read in markup — now an arg, per
     // context-freeness).
-    placeholder: '{{ site.uj.placeholder.src }}',
+    placeholder: '{{ site.omega.placeholder.src }}',
   },
 
   // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
