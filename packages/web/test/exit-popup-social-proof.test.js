@@ -1,13 +1,19 @@
 /**
  * The exit popup's social proof (#44 item 21) — the "Join 10k+ happy
- * subscribers!" line renders its face stack again. Default: four neutral
- * slots, because the framework ships no photos and never hotlinks one. A
- * brand supplies real faces through client.exitPopup.config.avatars, and
- * those render as lazy images with decorative alt text.
+ * subscribers!" line renders its face stack again. Default: the four real
+ * portraits the framework now SHIPS (legacy UJM hotlinked them from
+ * i.pravatar.cc; they live in core/images/exit-popup and bridge to
+ * /assets/images/core). A brand replaces them through
+ * client.exitPopup.config.avatars, and an explicit empty list falls back to
+ * neutral glyph slots.
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const { test } = require('node:test');
 
+const { PATHS } = require('../src/paths.js');
+const { resolveStaticDirs } = require('../src/static-assets.js');
 const { buildWith, miniData } = require('./lib/build.js');
 
 /** The social-proof row markup out of a rendered page. */
@@ -19,13 +25,51 @@ function socialProof(html) {
   return html.slice(start, html.indexOf('</div>', end));
 }
 
-test('unconfigured: four neutral slots stand beside the subscriber line', async () => {
-  const pages = await buildWith(miniData, {}, 'exit-popup-neutral');
+test('unconfigured: the four shipped portraits stand beside the subscriber line', async () => {
+  const pages = await buildWith(miniData, {}, 'exit-popup-default');
   const block = socialProof(pages.get('/'));
 
   assert.equal((block.match(/modal-exit-avatar/g) || []).length, 4, 'four faces, like the legacy row');
   assert.equal((block.match(/me-n2/g) || []).length, 3, 'every slot but the last overlaps the next');
-  assert.ok(!block.includes('<img'), 'nothing invented: no image without a configured source');
+  for (const n of [1, 2, 3, 4]) {
+    assert.ok(
+      block.includes(`data-lazy="@src /assets/images/core/exit-popup/subscriber-${n}.jpg"`),
+      `face ${n} lazy-loads the shipped photo`,
+    );
+  }
+  assert.equal((block.match(/alt=""/g) || []).length, 4, 'decorative: the line carries the meaning');
+  assert.ok(!block.includes('data-icon="user"'), 'real photos, not glyph slots');
+
+  // The framework never hotlinks — every default face is a local path
+  assert.ok(!/data-lazy="@src https?:/.test(block), 'no external image URL, ever');
+});
+
+test('the shipped portraits exist on disk and reach the built site', () => {
+  for (const n of [1, 2, 3, 4]) {
+    const file = path.join(PATHS.core, 'images', 'exit-popup', `subscriber-${n}.jpg`);
+    assert.ok(fs.existsSync(file), `${file} ships with the package`);
+  }
+
+  // The static channel carries core/images to the URL the include references
+  const core = resolveStaticDirs({ brandRoot: null, imagesDir: path.join(PATHS.core, 'nope') })
+    .find((entry) => entry.dest === 'assets/images/core');
+  assert.ok(core, 'core images are a static-copy entry');
+  assert.equal(core.src, path.join(PATHS.core, 'images'));
+});
+
+test('an explicit empty list falls back to neutral glyph slots', async () => {
+  const pages = await buildWith(
+    {
+      ...miniData,
+      client: { ...miniData.client, exitPopup: { config: { avatars: [] } } },
+    },
+    {},
+    'exit-popup-neutral',
+  );
+  const block = socialProof(pages.get('/'));
+
+  assert.equal((block.match(/modal-exit-avatar/g) || []).length, 4, 'the row keeps its four slots');
+  assert.ok(!block.includes('<img'), 'opting out of faces means no image');
   assert.ok(block.includes('data-icon="user"'), 'a neutral glyph fills the empty slot');
 });
 

@@ -4,7 +4,8 @@
  * Owns the in-memory inventory cache (one Firestore read per instance per
  * TTL interval — Ian's ruling: runtime serving stays cheap), the selection
  * scoring pipeline (eligibility → contextual match score → weighted random),
- * and the self-contained vert unit HTML renderer.
+ * and the mapping of a stored vert onto the shared unit-document renderer in
+ * @omega.js/client (this package holds no unit template of its own).
  */
 
 const BATCH_SIZE = 500;
@@ -85,17 +86,6 @@ function isHttpUrl(input) {
   } catch (e) {
     return false;
   }
-}
-
-/**
- * Escape a string for safe insertion into HTML text/attribute context.
- */
-function escapeHtml(input) {
-  return `${input || ''}`
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 /**
@@ -341,148 +331,63 @@ async function getVertById(Manager, id, options) {
 }
 
 /**
- * Render the self-contained vert unit page (inline CSS/JS only — no external
- * requests). Reports its rendered height via origin-checked postMessage
- * ('omega-vert:set-dimensions'), forwards clicks as 'omega-vert:click', and
- * links point at the redirect route. NO self-refresh timers — the HOST
- * owns the lifecycle (rotation, staleness recovery).
+ * Render the self-contained vert unit page.
+ *
+ * The document itself comes from the ONE renderer in @omega.js/client
+ * (`modules/vert-document.js`) — the same function the client's terminal
+ * promo lane calls, so a served vert and the built-in promo are the same
+ * markup, css, and script contract. This function only maps the stored vert
+ * shape onto the renderer's options; no template lives here.
+ *
+ * Node >=22 (the declared engines floor and the pinned Functions runtime)
+ * loads the client's ESM module through require() directly.
  */
-function renderVertUnit(options) {
+async function renderVertUnit(options) {
+  const { renderVertDocument } = require('@omega.js/client/modules/vert-document.js');
   const vert = options.vert || {};
-  const theme = options.theme === 'dark' || options.theme === 'light'
-    ? options.theme
-    : '';
-  const width = parseInt(options.width, 10) || 0;
-  const height = parseInt(options.height, 10) || 0;
-  // Origin-checked postMessage: when the parent origin is known (computed by
-  // the serve route via normalizeOrigin — port-preserving), messages only
-  // ever go to that origin.
-  const targetOrigin = options.parentOrigin || '*';
 
-  const image = isHttpUrl(vert.image)
-    ? `<img class="omega-vert-image" src="${escapeHtml(vert.image)}" alt="">`
-    : '';
-  const description = vert.description
-    ? `<p class="omega-vert-description">${escapeHtml(vert.description)}</p>`
-    : '';
-  const button = vert.button
-    ? `<span class="omega-vert-button">${escapeHtml(vert.button)}</span>`
-    : '';
-  const footer = vert.footer
-    ? `<footer class="omega-vert-footer">${escapeHtml(vert.footer)}</footer>`
-    : '';
+  return renderVertDocument({
+    id: vert.id || '',
+    href: options.redirectUrl,
+    title: vert.title,
+    description: vert.description,
+    button: vert.button,
+    // The stored footer is the unit's muted label ('Sponsored by X'); the
+    // renderer falls back to a plain 'Sponsored' when a vert carries none
+    label: vert.footer,
+    imageUrl: isHttpUrl(vert.image) ? vert.image : '',
+    theme: options.theme,
+    width: options.width,
+    height: options.height,
+    // Origin-checked postMessage: when the parent origin is known (computed by
+    // the serve route via normalizeOrigin — port-preserving), messages only
+    // ever go to that origin.
+    targetOrigin: options.parentOrigin || '*',
+  });
+}
 
-  return `<!DOCTYPE html>
-<html lang="en"${theme ? ` data-theme="${theme}"` : ''}>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>Sponsored</title>
-  <style>
-    :root {
-      --omega-vert-bg: #ffffff;
-      --omega-vert-border: #e2e2e2;
-      --omega-vert-text: #1a1a1a;
-      --omega-vert-muted: #6b6b6b;
-      --omega-vert-accent: #1a1a1a;
-      --omega-vert-accent-text: #ffffff;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --omega-vert-bg: #1a1a1a;
-        --omega-vert-border: #333333;
-        --omega-vert-text: #eeeeee;
-        --omega-vert-muted: #999999;
-        --omega-vert-accent: #eeeeee;
-        --omega-vert-accent-text: #1a1a1a;
-      }
-    }
-    :root[data-theme="light"] {
-      --omega-vert-bg: #ffffff;
-      --omega-vert-border: #e2e2e2;
-      --omega-vert-text: #1a1a1a;
-      --omega-vert-muted: #6b6b6b;
-      --omega-vert-accent: #1a1a1a;
-      --omega-vert-accent-text: #ffffff;
-    }
-    :root[data-theme="dark"] {
-      --omega-vert-bg: #1a1a1a;
-      --omega-vert-border: #333333;
-      --omega-vert-text: #eeeeee;
-      --omega-vert-muted: #999999;
-      --omega-vert-accent: #eeeeee;
-      --omega-vert-accent-text: #1a1a1a;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: transparent; }
-    body { font-family: -apple-system, system-ui, sans-serif; }
-    .omega-vert {
-      display: block;
-      background: var(--omega-vert-bg);
-      border: 1px solid var(--omega-vert-border);
-      border-radius: 8px;
-      color: var(--omega-vert-text);
-      overflow: hidden;
-      text-decoration: none;
-      ${width ? `max-width: ${width}px;` : ''}
-      ${height ? `max-height: ${height}px;` : ''}
-    }
-    .omega-vert-image { display: block; width: 100%; height: auto; }
-    .omega-vert-content { padding: 12px 14px; }
-    .omega-vert-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
-    .omega-vert-description { font-size: 13px; color: var(--omega-vert-muted); line-height: 1.4; margin-top: 4px; }
-    .omega-vert-button {
-      display: inline-block;
-      background: var(--omega-vert-accent);
-      color: var(--omega-vert-accent-text);
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 6px 12px;
-      margin-top: 10px;
-    }
-    .omega-vert-footer { font-size: 11px; color: var(--omega-vert-muted); padding: 0 14px 10px; }
-  </style>
-</head>
-<body>
-  <a class="omega-vert" id="omega-vert" href="${escapeHtml(options.redirectUrl)}" target="_blank" rel="noopener noreferrer sponsored">
-    ${image}
-    <div class="omega-vert-content">
-      <h1 class="omega-vert-title">${escapeHtml(vert.title)}</h1>
-      ${description}
-      ${button}
-    </div>
-    ${footer}
-  </a>
-  <script>
-    (function () {
-      var TARGET_ORIGIN = ${JSON.stringify(targetOrigin)};
-      var VERT_ID = ${JSON.stringify(vert.id || '')};
+/**
+ * Build a vert's click destination: its stored link tagged with the vert UTM
+ * set. The tagging itself lives in the ONE helper both lanes share
+ * (@omega.js/client's `modules/vert-document.js` — the client's promo lane
+ * tags its own link with the same function), so existing params on an
+ * advertiser's URL win here exactly as they do there.
+ *
+ * Node >=22 (the declared engines floor and the pinned Functions runtime)
+ * loads the client's ESM module through require() directly.
+ *
+ * @param {object} vert - the stored vert ({ id, link })
+ * @param {string} [parentHost] - the referring host (utm_source)
+ * @returns {string} the tagged destination URL
+ */
+function buildClickDestination(vert, parentHost) {
+  const { applyVertUtm, UTM_MEDIUM } = require('@omega.js/client/modules/vert-document.js');
 
-      function post(message) {
-        if (!window.parent || window.parent === window) return;
-        window.parent.postMessage(message, TARGET_ORIGIN);
-      }
-
-      function reportDimensions() {
-        var doc = document.documentElement;
-        post({ type: 'omega-vert:set-dimensions', id: VERT_ID, width: doc.scrollWidth, height: doc.scrollHeight });
-      }
-
-      window.addEventListener('load', reportDimensions);
-
-      if (window.ResizeObserver) {
-        new ResizeObserver(reportDimensions).observe(document.documentElement);
-      }
-
-      document.getElementById('omega-vert').addEventListener('click', function () {
-        post({ type: 'omega-vert:click', id: VERT_ID });
-      });
-    })();
-  </script>
-</body>
-</html>`;
+  return applyVertUtm(vert.link, {
+    source: parentHost,
+    medium: UTM_MEDIUM,
+    campaign: vert.id,
+  });
 }
 
 module.exports = {
@@ -490,7 +395,6 @@ module.exports = {
   normalizeHost,
   normalizeOrigin,
   isHttpUrl,
-  escapeHtml,
   getWeight,
   getVertTags,
   parseTags,
@@ -503,4 +407,5 @@ module.exports = {
   resetInventoryCache,
   getVertById,
   renderVertUnit,
+  buildClickDestination,
 };

@@ -20,6 +20,7 @@ const { SERVICE_ORDER, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
 const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { readState, writeState, writeRunOutput } = require('./lib/state.js');
+const { formatDuration } = require('./lib/duration.js');
 const { runPreflight } = require('./lib/preflight.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
@@ -201,7 +202,17 @@ async function runManage(startDir, options = {}) {
         ...(gate.missingEnv.length > 0 ? { missingEnv: gate.missingEnv } : {}),
       };
     } else {
+      const startedAt = Date.now();
       result = await runService(serviceName, brand, brandState, options);
+      // Wall time for the services that actually ran — the gated branches
+      // above step aside instantly, so timing them is noise
+      result.durationMs = Date.now() - startedAt;
+      // Printed only for the services that did work — a service that stepped
+      // aside already said so on its own line, and 20 `⏱ 0ms` lines under a
+      // mostly-skipping walk is noise (the run record keeps every number)
+      if (result.status !== 'skipped') {
+        console.log(`    ${chalk.dim(`⏱ ${formatDuration(result.durationMs)}`)}`);
+      }
     }
     results[serviceName] = result;
 
@@ -225,6 +236,8 @@ async function runManage(startDir, options = {}) {
   writeRunOutput(brandRoot, RUN_TIMESTAMP, brand.id, Object.entries(results).map(([service, result]) => ({
     service,
     status: result.status,
+    // Absent for services the preflight gated aside — they never ran
+    ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
     output: result.output ?? null,
     error: result.error ?? null,
     // Machine-readable WHY for skips — the pipeline command asserts on it

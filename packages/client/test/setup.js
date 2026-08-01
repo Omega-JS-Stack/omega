@@ -6,6 +6,7 @@ global.window = {
     search: '',
     origin: 'http://localhost:3000',
     protocol: 'http:',
+    hostname: 'localhost',
   },
   screen: {
     width: 1920,
@@ -104,7 +105,10 @@ global.document = {
   createTextNode: (text) => ({ nodeValue: text }),
   documentElement: {
     dataset: {},
-    setAttribute: () => {},
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    getAttribute(name) { return this.attributes[name] ?? null; },
+    removeAttribute(name) { delete this.attributes[name]; },
     appendChild: () => {},
   },
   head: {

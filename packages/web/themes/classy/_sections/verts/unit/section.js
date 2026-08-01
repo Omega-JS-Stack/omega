@@ -4,7 +4,8 @@
  * ladder — AdSense when configured
  * (script-load failure IS the adblock detector) → the in-house/company
  * fallback lane (sandboxed iframe, origin-validated postMessage, host-owned
- * rotation + staleness recovery) → no-fill collapse. One implementation
+ * rotation + staleness recovery) → the built-in OMEGA promo (a unit never
+ * renders empty). One implementation
  * across web/desktop/extension (the data-omega-vert vocabulary). Paying users
  * never see the unit: the host carries the standard
  * `@hide auth.resolved.active` binding.

@@ -75,9 +75,10 @@ before(async () => {
   });
 });
 
-test('resolveStaticDirs: mint bridge first, consumer images last, missing sources dropped', () => {
+test('resolveStaticDirs: core images first, mint bridge next, consumer images last, missing sources dropped', () => {
   const dirs = resolveStaticDirs({ brandRoot, imagesDir: path.join(brandRoot, 'consumer-images') });
   assert.deepStrictEqual(dirs.map((entry) => entry.dest), [
+    'assets/images/core', // framework-shipped pictures (exit-popup faces)
     'assets/images/favicon',
     'assets/images/brand/brandmark.svg',
     'assets/images/brand/brandmark.png',
@@ -85,12 +86,16 @@ test('resolveStaticDirs: mint bridge first, consumer images last, missing source
     'assets/images', // consumer layer LAST — it wins collisions
   ]);
 
-  // No brand root (standalone consumer without a mint) → consumer layer only
+  // No brand root (standalone consumer without a mint) → core + consumer layer
   const bare = resolveStaticDirs({ brandRoot: null, imagesDir: path.join(brandRoot, 'consumer-images') });
-  assert.deepStrictEqual(bare.map((entry) => entry.dest), ['assets/images']);
+  assert.deepStrictEqual(bare.map((entry) => entry.dest), ['assets/images/core', 'assets/images']);
 
-  // Nothing exists → empty (a brand with no minted assets builds clean)
-  assert.deepStrictEqual(resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), imagesDir: path.join(brandRoot, 'nope2') }), []);
+  // No brand assets at all → the framework's own images still ship
+  assert.deepStrictEqual(
+    resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), imagesDir: path.join(brandRoot, 'nope2') })
+      .map((entry) => entry.dest),
+    ['assets/images/core'],
+  );
 });
 
 test('static channel ships the minted set and the consumer layer wins collisions', () => {

@@ -4,7 +4,8 @@
  * #11: every "you get this" tick (homepage hero meta, signup benefits, plan
  * features, comparison yes cells, product-demo, alternatives) reads the shared
  * `--omega-check` slot through the `.omega-check` utility — never a per-page
- * color. Status green (--omega-ok) stays for state feedback.
+ * color. The slot rides the theme's success green (--omega-ok), so a check and
+ * a success glyph on the same page are never two different greens.
  *
  * #10: the plan-feature check is a one-line-tall box so the glyph centers on
  * the FIRST line of its feature text instead of drifting off the baseline.
@@ -35,12 +36,17 @@ function compileBundle(theme) {
 test('#11: the check ink is ONE token consumed by ONE class', () => {
   const css = compileBundle('classy');
 
-  assert.match(css, /--omega-check: var\(--omega-accent\)/, 'the slot rides the accent (blue by default)');
+  assert.match(css, /--omega-check: var\(--omega-ok\)/, "the slot rides the theme's success green");
   assert.match(css, /\.omega-check\s*\{\s*color: var\(--omega-check\);?\s*\}/, 'the utility reads the slot');
   assert.ok(
     css.indexOf('.omega-check') > css.indexOf('.classy-price-card__check'),
     'the utility lands after the theme so it wins ties',
   );
+
+  // The two greens Ian caught side by side on /pricing: the plan check (the
+  // slot) and the money-back shield must resolve to the SAME hue.
+  const guarantee = css.match(/\.classy-guarantee-icon\s*\{[^}]*\}/)[0];
+  assert.match(guarantee, /color: var\(--omega-ok\)/, 'the guarantee shield reads the same success hue as the check slot');
 });
 
 test('#11: no check site re-colors its own tick', () => {

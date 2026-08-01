@@ -7,10 +7,11 @@
  *
  * Looks the vert up by id and 302s to ITS stored link only — never to a
  * caller-supplied URL. Unknown id (or a vert without a valid http(s) link)
- * → 404. UTM params: utm_source=<parent host, if given>, utm_medium=vert,
- * utm_campaign=<vertId>.
+ * → 404. UTM params: utm_source=<parent host, if given>,
+ * utm_medium=omega-vert, utm_campaign=<vertId> — added by the shared tagger,
+ * so any param the advertiser already put on the link wins.
  */
-const { getVertById, normalizeHost, isHttpUrl } = require('../utils.js');
+const { getVertById, normalizeHost, isHttpUrl, buildClickDestination } = require('../utils.js');
 
 module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
@@ -22,19 +23,12 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
   }
 
   const parentHost = normalizeHost(settings.parent);
-  const url = new URL(vert.link);
-
-  if (parentHost) {
-    url.searchParams.set('utm_source', parentHost);
-  }
-
-  url.searchParams.set('utm_medium', 'vert');
-  url.searchParams.set('utm_campaign', vert.id);
+  const destination = await buildClickDestination(vert, parentHost);
 
   // Track the click server-side (Analytics lane — no gtag inside the frame)
   analytics.event('verts/redirect', { action: 'click', vertId: vert.id, parent: parentHost });
 
-  ctx.log('verts/redirect: Redirecting', { vertId: vert.id, url: url.toString() });
+  ctx.log('verts/redirect: Redirecting', { vertId: vert.id, url: destination });
 
-  return ctx.redirect(url.toString());
+  return ctx.redirect(destination);
 };

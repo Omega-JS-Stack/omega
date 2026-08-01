@@ -1,5 +1,5 @@
 {
-  description: 'About hero — the dotgrid statement with the facts rail: masthead heading on the left, a 2-col count-up facts grid on the right. The layout bridges the page\'s hero words via data: and the facts rail via facts:.',
+  description: 'About hero — the dotgrid statement with the facts rail: masthead heading on the left, a 2-col count-up facts grid on the right. Supply image: and the band flips to the PHOTO LEAD: the picture opens the page, the masthead rides it on a scrim, and the facts run as a 4-col rail beneath. No image = the statement layout, unchanged. The layout bridges the page\'s hero words via data: and the facts rail via facts:.',
 
   args: {
     eyebrow: 'string', // masthead eyebrow fallback; a superheadline.text arg (legacy key) wins over it
@@ -8,6 +8,9 @@
     headline_accent: 'string',
     description: 'string',
     facts: 'array', // [{ label, number }] — the right-rail count-up grid; absent = statement only
+    image: 'string', // the lead photo; unset = the statement layout (no frame, no hole)
+    image_alt: 'string', // what the photo SHOWS — content imagery, never decoration
+    placeholder: 'string', // first-paint img src swapped by the lazy loader
   },
 
   defaults: {
@@ -16,6 +19,9 @@
     headline: 'We make complex things <em>feel simple</em>',
     headline_accent: '',
     description: 'The people and stubborn opinions behind {{ site.brand.name }}.',
+    image: '',
+    image_alt: '',
+    placeholder: '{{ site.uj.placeholder.src }}',
   },
 
   demo: [
@@ -23,6 +29,19 @@
     {
       label: 'With facts rail',
       args: {
+        facts: [
+          { number: '2017', label: 'Founded' },
+          { number: '50+', label: 'Team members' },
+          { number: '1M+', label: 'Happy customers' },
+          { number: '120+', label: 'Countries' },
+        ],
+      },
+    },
+    {
+      label: 'Photo lead',
+      args: {
+        image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=1600',
+        image_alt: 'The team working around one table in the studio',
         facts: [
           { number: '2017', label: 'Founded' },
           { number: '50+', label: 'Team members' },

@@ -39,8 +39,9 @@ const results = [];
 for (const dir of testable) {
   const name = path.relative(ROOT, dir);
   console.log(`\n━━━ ${name} ━━━`);
+  const startedAt = Date.now();
   const run = spawnSync('npm', ['test'], { cwd: dir, stdio: 'inherit', shell: false });
-  results.push({ name, code: run.status ?? 1 });
+  results.push({ name, code: run.status ?? 1, seconds: Math.round((Date.now() - startedAt) / 1000) });
 }
 
 console.log('\n━━━ workspace test summary ━━━');
@@ -48,7 +49,7 @@ let failed = false;
 for (const result of results) {
   const ok = result.code === 0;
   if (!ok) failed = true;
-  console.log(`  ${ok ? '✓' : '✗'} ${result.name}${ok ? '' : ` (exit ${result.code})`}`);
+  console.log(`  ${ok ? '✓' : '✗'} ${result.name}${ok ? '' : ` (exit ${result.code})`} [${result.seconds}s]`);
 }
 
 process.exit(failed ? 1 : 0);

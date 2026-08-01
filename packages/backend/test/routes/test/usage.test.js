@@ -283,10 +283,17 @@ module.exports = {
       async run({ assert, firestore, state, accounts }) {
         const afterDoc = await firestore.get(`users/${accounts.basic.uid}`);
 
+        // The daily cron resets monthly counters on the 1st BY DESIGN
+        // (reset-usage.js), and the functions process may sit in a different
+        // timezone than this test process, so on a month boundary in either
+        // calendar a reset-to-zero is the correct outcome too
+        const boundary = new Date().getDate() === 1 || new Date().getUTCDate() === 1;
+        const monthlyOk = afterDoc.usage.requests.monthly === state.monthlyBeforeCron
+          || (boundary && afterDoc.usage.requests.monthly === 0);
         assert.equal(
-          afterDoc.usage.requests.monthly,
-          state.monthlyBeforeCron,
-          'Monthly counter should be preserved after daily cron'
+          monthlyOk,
+          true,
+          'Monthly counter should be preserved after daily cron (or reset when the run crosses the 1st)'
         );
         assert.equal(
           afterDoc.usage.requests.total,

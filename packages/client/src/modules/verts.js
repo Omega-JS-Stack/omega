@@ -2,7 +2,7 @@
  * Verts module — the fallback-ladder ad engine shared by every surface
  * (docs/web/ads-system.md, phase 2).
  *
- * Two lanes, one implementation:
+ * Three lanes, one implementation:
  *   1. Provider lane (web only): AdSense. Script-load failure IS the adblock
  *      detector (no bait divs, no library) — blocked → straight to the
  *      fallback lane. Otherwise the <ins> is built per type and fill is
@@ -11,17 +11,41 @@
  *      in-house source's /omega/verts/serve, origin-validated postMessage with
  *      a fixed vocabulary (omega-vert:set-dimensions / omega-vert:click), and
  *      HOST-owned lifecycle — rotation timer, staleness recovery
- *      (visibilitychange/online → reload when stale), and no-fill collapse
- *      (a unit that never reports dimensions within the fill timeout hides
- *      itself and emits omega-vert:no-fill). The iframe only renders and
+ *      (visibilitychange/online → reload when stale), and no-fill teardown
+ *      (a unit that never reports dimensions within the fill timeout drops
+ *      its frame and emits omega-vert:no-fill). The iframe only renders and
  *      reports; it never refreshes itself (kills the legacy chrome-error
  *      stranding).
+ *   3. Terminal lane (all surfaces): the built-in OMEGA promo. A unit NEVER
+ *      renders empty — when every configured lane has failed (no provider /
+ *      no fill / blocked, and no reachable in-house source) the host gets a
+ *      REAL unit carrying the built-in promo: the same sandboxed iframe, the
+ *      same postMessage vocabulary, the same host-owned sizing and click
+ *      handling as the fallback lane, except the document arrives by srcdoc
+ *      instead of over the wire (zero network, ever). omega-vert:no-fill
+ *      still fires first — nothing was sold — followed by omega-vert:promo.
+ *
+ * Click tracking: analytics cannot run inside a cross-origin frame, so the
+ * legacy stack bounced every click through a top-level forward page that
+ * fired gtag before navigating. Here the frame posts omega-vert:click OUT and
+ * the HOST fires the vert_click event through this brand's own analytics —
+ * no forward page, no navigation delay. The destination carries the vert UTM
+ * set either way: the promo's link is tagged in-place here, a served vert's
+ * by the backend redirect route (both through applyVertUtm).
  *
  * Element binding (the mirrored-implementation surface): mount($el) arms one
  * host lazily near the viewport (IntersectionObserver) reading its
  * data-omega-vert* attributes; bind(root) scans [data-omega-vert] and mounts
  * every match. The web verts/unit section delegates here, and desktop/
  * extension bind the same vocabulary in phase 4 — one implementation.
+ *
+ * Theme: a unit follows the PAGE, not the OS. Mount reads `data-bs-theme` off
+ * the root element into the frame's theme (both lanes: the house serve URL's
+ * theme param and the promo document's stamp), a host's own
+ * data-omega-vert-theme pins it, and nothing set anywhere leaves the frame on
+ * its own prefers-color-scheme branch. A flip after render re-stamps the promo
+ * frames (a srcdoc assignment, no network); a house frame keeps the theme it
+ * mounted with, since re-theming it would mean re-fetching it.
  *
  * Source resolution (advertising.providers.inhouse.source):
  *   'self'    → this brand's api URL (manager.getApiUrl())
@@ -32,6 +56,15 @@
  */
 
 import { createLogger } from './logger.js';
+import {
+  renderVertDocument,
+  applyVertUtm,
+  MESSAGE_DIMENSIONS,
+  MESSAGE_CLICK,
+  OMEGA_ACCENT,
+  UTM_MEDIUM,
+  UTM_CAMPAIGN_PROMO,
+} from './vert-document.js';
 
 const logger = createLogger('verts');
 
@@ -54,18 +87,37 @@ const ADSENSE_FORMATS = {
   multiplex: { style: 'display:block', attributes: { 'data-ad-format': 'autorelaxed' }, slotKey: 'multiplexSlot' },
 };
 
-// Fixed postMessage vocabulary (matches @omega.js/backend's rendered unit)
-const MESSAGE_DIMENSIONS = 'omega-vert:set-dimensions';
-const MESSAGE_CLICK = 'omega-vert:click';
-
 // Sandbox attributes for the house iframe (legacy-proven set)
 const IFRAME_SANDBOX = 'allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation';
+
+// The promo frame is a srcdoc document, so allow-same-origin would hand it
+// THIS page's origin (and with allow-scripts that is no sandbox at all). It
+// drops out; the rest of the house set carries over verbatim.
+const PROMO_SANDBOX = IFRAME_SANDBOX.split(' ').filter((token) => token !== 'allow-same-origin').join(' ');
 
 // Lifecycle defaults — rotation OFF by default; staleness generous
 const DEFAULT_FILL_TIMEOUT = 9000;
 const DEFAULT_STALE_AFTER = 1000 * 60 * 10;
 const DEFAULT_ROTATE_INTERVAL = 0;
 const MAX_HEIGHT_CEILING = 1200;
+
+// The terminal lane: the built-in OMEGA promo. A real unit in every way the
+// fallback lane is one, with the document inlined by srcdoc: no network, no
+// external image, literal colours per theme (both modes hold, themed page or
+// not, since css variables do not cross the frame boundary).
+const PROMO_URL = 'https://omegajs.dev';
+const PROMO_ID = 'omega-promo';
+const PROMO_MIN_HEIGHT = 90;
+const PROMO_TITLE = 'Built with OMEGA';
+const PROMO_DESCRIPTION = 'The full-stack JavaScript framework for web, backend, desktop, and extensions.';
+const PROMO_BUTTON = 'Visit omegajs.dev';
+
+// The promo's thumbnail: an inline svg mark, the ONE trusted-markup value the
+// renderer ever receives (a local constant, never data)
+const PROMO_MARK = '<svg class="omega-vert-image" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+  + '<rect x="0" y="0" width="24" height="24" fill="var(--omega-vert-accent)"></rect>'
+  + '<path d="M13.2 4.5 7.6 13.1h3.4l-.9 6.4 5.8-8.8h-3.4z" fill="var(--omega-vert-accent-text)"></path>'
+  + '</svg>';
 
 /**
  * Resolve a size preset name or raw pixel value to a max-height in px.
@@ -101,6 +153,225 @@ function clampHeight(height, maxPx) {
 }
 
 /**
+ * The host page's bare hostname — every vert click's utm_source (bare, no
+ * www., matching the backend's normalizeHost).
+ * @returns {string} the hostname, or '' when there is no page
+ */
+function hostHostname() {
+  const hostname = (typeof window !== 'undefined' && window.location?.hostname) || '';
+
+  return hostname.replace(/^www\./, '');
+}
+
+/**
+ * The promo's click destination: omegajs.dev tagged with the vert UTM set
+ * through the ONE helper both lanes use.
+ * @param {string} [size] - the slot's size preset, carried as utm_content
+ * @returns {string} the tagged promo URL
+ */
+function promoHref(size) {
+  return applyVertUtm(PROMO_URL, {
+    source: hostHostname(),
+    medium: UTM_MEDIUM,
+    campaign: UTM_CAMPAIGN_PROMO,
+    content: size,
+  });
+}
+
+/**
+ * Fire the host-side click event. Analytics cannot run inside a cross-origin
+ * vert frame, so the legacy stack bounced every click through a top-level
+ * forward page that fired gtag before navigating. The frame now posts
+ * omega-vert:click OUT to the host instead, and the HOST's own analytics
+ * fires here — no forward page, no navigation delay.
+ * @param {object} manager - the client singleton
+ * @param {object} detail - { id } from the click message
+ * @param {object} options - the unit's mount options ({ size, ... })
+ * @param {string} lane - 'house' | 'promo'
+ */
+function trackClick(manager, detail, options, lane) {
+  try {
+    manager.analytics().event('vert_click', {
+      vert_id: detail.id || '',
+      vert_lane: lane,
+      vert_campaign: lane === 'promo' ? UTM_CAMPAIGN_PROMO : (detail.id || ''),
+      vert_slot: options?.size || '',
+      vert_source: hostHostname(),
+    });
+  } catch (e) {
+    logger.error('vert_click analytics error:', e);
+  }
+}
+
+/**
+ * Build the promo document the terminal frame carries: the SAME renderer the
+ * backend's serve route calls, fed the house promo data. The promo-only parts
+ * are the two things a served unit cannot share: the trusted inline-svg mark
+ * (a local constant, so the lane still makes zero network requests) and the
+ * omega indigo accent pair.
+ * @param {number|null} maxPx - the unit's resolved size in px (null = unsized)
+ * @param {string} [theme] - 'light' | 'dark' passthrough; unset follows the OS
+ * @param {string} [targetOrigin] - the host origin messages are posted to
+ * @param {string} [size] - the slot's size preset, carried as utm_content
+ * @param {number} [width] - the host's measured width in px (0 = unknown)
+ * @returns {string} a complete html document
+ */
+function buildPromoDocument(maxPx, theme, targetOrigin, size, width) {
+  return renderVertDocument({
+    id: PROMO_ID,
+    href: promoHref(size),
+    title: PROMO_TITLE,
+    description: PROMO_DESCRIPTION,
+    button: PROMO_BUTTON,
+    imageMarkup: PROMO_MARK,
+    theme,
+    width: width || 0,
+    height: maxPx || 0,
+    accent: OMEGA_ACCENT,
+    targetOrigin,
+  });
+}
+
+/**
+ * The origin the promo document posts its messages to.
+ * @returns {string} this page's origin, or '*' when it is unknown
+ */
+function promoTargetOrigin() {
+  return (typeof window !== 'undefined' && window.location?.origin) || '*';
+}
+
+/**
+ * Build the terminal promo frame: the house iframe's attribute set, with the
+ * document carried by srcdoc instead of a serve URL (no `src`, no request).
+ * @param {number|null} maxPx - the unit's resolved size in px (null = unsized)
+ * @param {string} [theme] - 'light' | 'dark' passthrough
+ * @param {string} [size] - the slot's size preset, carried as utm_content
+ * @param {number} [width] - the host's measured width in px (0 = unknown)
+ * @returns {Element} the promo iframe
+ */
+function buildPromo(maxPx, theme, size, width) {
+  const $iframe = document.createElement('iframe');
+  const targetOrigin = promoTargetOrigin();
+
+  $iframe.className = 'omega-vert-promo';
+  $iframe.setAttribute('sandbox', PROMO_SANDBOX);
+  $iframe.setAttribute('frameborder', '0');
+  $iframe.setAttribute('scrolling', 'no');
+  $iframe.setAttribute('allowtransparency', 'true');
+  $iframe.setAttribute('title', 'Sponsored');
+  $iframe.style.setProperty('display', 'block');
+  $iframe.style.setProperty('width', '100%');
+  $iframe.style.setProperty('border', '0');
+  $iframe.style.height = `${maxPx || PROMO_MIN_HEIGHT}px`;
+  $iframe.srcdoc = buildPromoDocument(maxPx, theme, targetOrigin, size, width);
+
+  return $iframe;
+}
+
+/**
+ * The terminal lane's mounted unit: the promo frame plus the same
+ * host-owned message handling a house unit has (sizing from the reported
+ * dimensions, clicks forwarded), minus everything that needs a server:
+ * no fill timer, no rotation, no staleness recovery.
+ */
+class PromoUnit {
+  /**
+   * @param {object} manager - the client singleton (analytics on click)
+   * @param {Element} $el - host element the frame mounts into
+   * @param {object} options - { size, theme } shape the frame
+   * @param {Function} emit - (name, detail) host emitter
+   */
+  constructor(manager, $el, options, emit) {
+    this.manager = manager;
+    this.$el = $el;
+    this.options = options;
+    this.emit = emit;
+    this.maxHeight = resolveSizePx(options.size);
+
+    this.destroyed = false;
+    this.$iframe = null;
+
+    this._onMessage = (event) => this.handleMessage(event);
+  }
+
+  /**
+   * Mount the frame and open the message channel.
+   * @returns {PromoUnit} this
+   */
+  load() {
+    if (this.maxHeight) {
+      this.$el.style.setProperty('max-height', `${this.maxHeight}px`, 'important');
+      this.$el.style.setProperty('overflow', 'hidden');
+    }
+
+    // The host's measured width reaches the document so the narrow-compact
+    // and skyscraper-stacking branches are decidable (0 = unknown, fluid row)
+    this.$iframe = buildPromo(this.maxHeight, this.options.theme, this.options.size, this.$el.clientWidth || 0);
+    this.$el.appendChild(this.$iframe);
+
+    window.addEventListener('message', this._onMessage);
+
+    return this;
+  }
+
+  /**
+   * A sandboxed srcdoc frame has an opaque origin, so its messages arrive as
+   * origin "null", which is worthless as a check. Identity against THIS unit's own
+   * contentWindow is the validation instead (the house lane keeps its origin
+   * check unchanged).
+   * @param {MessageEvent} event
+   */
+  handleMessage(event) {
+    if (this.destroyed || !this.$iframe?.contentWindow) {
+      return;
+    }
+
+    if (!event.source || event.source !== this.$iframe.contentWindow) {
+      return;
+    }
+
+    const message = event.data || {};
+
+    if (message.type === MESSAGE_DIMENSIONS) {
+      const height = clampHeight(message.height, this.maxHeight);
+      if (!height) {
+        return;
+      }
+
+      this.$iframe.style.height = `${height}px`;
+    } else if (message.type === MESSAGE_CLICK) {
+      // The frame's own link opens omegajs.dev (target=_blank + rel) exactly
+      // like a served unit, so the message carries the host-side work: the
+      // analytics event no in-frame tracker could ever fire
+      trackClick(this.manager, { id: message.id }, this.options, 'promo');
+      this.emit('click', { id: message.id });
+    }
+  }
+
+  /**
+   * Re-stamp the frame for a page theme flip. The promo document is inline, so
+   * this is a srcdoc assignment with zero network (the house lane has no
+   * equivalent — its document comes over the wire, so it keeps the theme it
+   * mounted with).
+   * @param {string} theme - 'light' | 'dark'; '' follows the OS again
+   */
+  setTheme(theme) {
+    if (this.destroyed || !this.$iframe || theme === this.options.theme) {
+      return;
+    }
+
+    this.options = { ...this.options, theme };
+    this.$iframe.srcdoc = buildPromoDocument(this.maxHeight, theme, promoTargetOrigin(), this.options.size, this.$el.clientWidth || 0);
+  }
+
+  /** Remove the message listener; the unit is inert afterwards. */
+  destroy() {
+    this.destroyed = true;
+    window.removeEventListener('message', this._onMessage);
+  }
+}
+
+/**
  * One mounted house/company ad unit — owns the iframe and its lifecycle.
  */
 class VertUnit {
@@ -113,11 +384,13 @@ class VertUnit {
    * @param {string} [options.size] - size preset or raw px (max-height)
    * @param {string} [options.theme] - 'light' | 'dark' passthrough
    * @param {string} [options.vertId] - pin a specific ad
-   * @param {number} [options.fillTimeout] - ms before no-fill collapse
+   * @param {number} [options.fillTimeout] - ms before the no-fill teardown
    * @param {number} [options.staleAfter] - ms before a recovery reload
    * @param {number} [options.rotateInterval] - ms between rotations (0 = off)
    * @param {Function} [options.onFill] - first successful dimension report
-   * @param {Function} [options.onNoFill] - collapse (204 / never reported)
+   * @param {Function} [options.onNoFill] - no fill (204 / never reported)
+   * @param {Function} [options.onExhausted] - teardown done; the host is free
+   *   for the terminal lane
    * @param {Function} [options.onClick] - click message from the frame
    */
   constructor(manager, $el, options = {}) {
@@ -168,6 +441,12 @@ class VertUnit {
 
     if (this.maxHeight) {
       url.searchParams.set('height', String(this.maxHeight));
+    }
+
+    // The host's measured width lets the served document decide its
+    // narrow-compact and skyscraper-stacking branches
+    if (this.$el.clientWidth) {
+      url.searchParams.set('width', String(this.$el.clientWidth));
     }
 
     if (this.options.theme) {
@@ -260,8 +539,10 @@ class VertUnit {
         this._emit('fill', { height });
       }
     } else if (message.type === MESSAGE_CLICK) {
-      // The frame's <a> navigates through the redirect route itself — the
-      // click message is optional host-side handling (telemetry, callbacks)
+      // The frame's <a> navigates through the redirect route itself (which
+      // UTM-tags the destination) — the message carries the host-side work:
+      // the analytics event no in-frame tracker could ever fire
+      trackClick(this.manager, { id: message.id }, this.options, 'house');
       this._emit('click', { id: message.id });
     }
   }
@@ -310,16 +591,24 @@ class VertUnit {
   }
 
   /**
-   * No-fill collapse: hide the host, emit, and tear down — the ladder's end.
+   * No fill: drop the frame, emit, tear down, and hand the host back to the
+   * ladder's terminal lane (onExhausted) — the unit never ends empty.
    */
   noFill() {
     if (this.destroyed) {
       return;
     }
 
-    this.$el.style.setProperty('display', 'none');
+    if (this.$iframe && typeof this.$iframe.remove === 'function') {
+      this.$iframe.remove();
+    }
+
     this._emit('no-fill', {});
     this.destroy();
+
+    if (typeof this.options.onExhausted === 'function') {
+      this.options.onExhausted();
+    }
   }
 
   /** Remove listeners and timers; the unit is inert afterwards. */
@@ -340,7 +629,7 @@ class VertUnit {
   _armFillTimer() {
     this._clearFillTimer();
     this._fillTimer = setTimeout(() => {
-      // A 204 no-fill (or a dead server) never posts dimensions — collapse
+      // A 204 no-fill (or a dead server) never posts dimensions — end the lane
       if (!this.filled) {
         this.noFill();
       }
@@ -377,6 +666,24 @@ class Verts {
     // The AdSense script loads ONCE — the cached promise keeps a rejection
     // (adblock) sticky for every later unit on the page
     this._adsenseScript = null;
+
+    // Live promo units + the one observer that re-themes them on a page flip
+    this._promoUnits = new Set();
+    this._themeObserver = null;
+  }
+
+  /**
+   * The page's current theme — the frame's theme SSOT. `data-bs-theme` on the
+   * root element is what the appearance module stamps; when it says nothing the
+   * frame follows the OS through its own prefers-color-scheme branch.
+   * @returns {string} 'light' | 'dark', or '' to follow the OS
+   */
+  pageTheme() {
+    const theme = typeof document !== 'undefined'
+      ? document.documentElement?.getAttribute('data-bs-theme')
+      : null;
+
+    return theme === 'light' || theme === 'dark' ? theme : '';
   }
 
   /**
@@ -414,9 +721,11 @@ class Verts {
   }
 
   /**
-   * Read a host element's data-omega-vert* attributes into render options.
+   * Read a host element's data-omega-vert* attributes into render options. The
+   * theme is the one option with a fallback chain: the host's own
+   * data-omega-vert-theme pin wins, else the page's theme, else the OS.
    * @param {Element} $el - element carrying the data-omega-vert vocabulary
-   * @returns {object} { type, size, vertId, tags }
+   * @returns {object} { type, size, vertId, tags, theme }
    */
   parseElementOptions($el) {
     const attr = (name) => (typeof $el.getAttribute === 'function' && $el.getAttribute(name)) || '';
@@ -425,6 +734,7 @@ class Verts {
       type: attr('data-omega-vert') || 'display',
       size: attr('data-omega-vert-size'),
       vertId: attr('data-omega-vert-id'),
+      theme: attr('data-omega-vert-theme') || this.pageTheme(),
       tags: attr('data-omega-vert-tags')
         .split(',')
         .map((tag) => tag.trim())
@@ -493,10 +803,10 @@ class Verts {
   /**
    * Run the full ladder into a host element: provider (AdSense) when
    * configured and the type is a provider type, then the fallback lane, then
-   * no-fill collapse.
+   * the terminal promo.
    * @param {Element} $el - host element
    * @param {object} [options] - VertUnit options + { type }
-   * @returns {Promise<{ lane: string, unit?: VertUnit }|null>}
+   * @returns {Promise<{ lane: string, unit?: VertUnit }>}
    */
   async render($el, options = {}) {
     const advertising = this.manager.config.advertising || {};
@@ -553,29 +863,98 @@ class Verts {
    * desktop/extension bind to (no AdSense in those surfaces).
    * @param {Element} $el - host element
    * @param {object} [options] - VertUnit options ({ source } overrides config)
-   * @returns {{ lane: string, unit: VertUnit }|null} null when no source resolves
+   * @returns {{ lane: string, unit?: VertUnit }} the terminal promo lane when
+   *   no source resolves
    */
   renderHouse($el, options = {}) {
     const source = this.resolveSource(options.source);
 
     if (!source) {
-      this._collapse($el, options);
-      return null;
+      return this._exhausted($el, options);
     }
 
     const tags = options.tags?.length
       ? options.tags
       : this.manager.config.advertising?.tags || [];
 
-    const unit = new VertUnit(this.manager, $el, { ...options, source, tags }).load();
+    // The house frame's own no-fill hands the host to the terminal lane
+    const unit = new VertUnit(this.manager, $el, {
+      ...options,
+      source,
+      tags,
+      onExhausted: () => this.renderPromo($el, options),
+    }).load();
+
     return { lane: 'house', unit };
   }
 
   /**
-   * Provider miss → the configured fallback role, or collapse.
+   * Render the terminal promo into a host: a real unit carrying the built-in
+   * promo document by srcdoc, no network. Clears whatever the failed lanes
+   * left behind and keeps the unit's reserved size.
+   * @param {Element} $el - host element
+   * @param {object} [options] - { size, theme } shape the frame; callbacks are
+   *   emitted
+   * @returns {{ lane: string, unit: PromoUnit }}
+   */
+  renderPromo($el, options = {}) {
+    if (typeof $el.replaceChildren === 'function') {
+      $el.replaceChildren();
+    }
+
+    // A previous lane may have hidden, capped or clipped the host; the promo
+    // unit re-applies its own ceiling when the slot is sized
+    $el.style.removeProperty('display');
+    $el.style.removeProperty('max-height');
+    $el.style.removeProperty('overflow');
+
+    const unit = new PromoUnit(this.manager, $el, options, (name, detail) => {
+      this._emitHost($el, options, name, detail);
+    }).load();
+
+    this._promoUnits.add(unit);
+    this._watchPageTheme();
+
+    this._emitHost($el, options, 'promo', {});
+
+    return { lane: 'promo', unit };
+  }
+
+  /**
+   * Watch the page's theme attribute once and re-stamp every live promo frame
+   * when it flips (a host that pinned its own data-omega-vert-theme keeps it).
+   * The house lane is deliberately absent: its document is a server response,
+   * so a live re-theme would be a reload.
+   */
+  _watchPageTheme() {
+    if (this._themeObserver || typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    this._themeObserver = new MutationObserver(() => {
+      const theme = this.pageTheme();
+
+      this._promoUnits.forEach((unit) => {
+        if (unit.destroyed) {
+          this._promoUnits.delete(unit);
+          return;
+        }
+
+        const pinned = typeof unit.$el?.getAttribute === 'function' && unit.$el.getAttribute('data-omega-vert-theme');
+        if (!pinned) {
+          unit.setTheme(theme);
+        }
+      });
+    });
+
+    this._themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
+  }
+
+  /**
+   * Provider miss → the configured fallback role, or the terminal lane.
    * @param {Element} $el
    * @param {object} options
-   * @returns {Promise<object|null>}
+   * @returns {Promise<object|null>|object}
    */
   _fallback($el, options) {
     const fallback = this.manager.config.advertising?.fallback;
@@ -584,13 +963,20 @@ class Verts {
       return this.renderHouse($el, options);
     }
 
-    this._collapse($el, options);
-    return null;
+    return this._exhausted($el, options);
   }
 
-  _collapse($el, options) {
-    $el.style.setProperty('display', 'none');
+  /**
+   * The ladder's end — every configured lane failed. no-fill still emits (the
+   * telemetry meaning is unchanged: nothing was sold), then the built-in promo
+   * renders so the unit is never empty.
+   * @param {Element} $el
+   * @param {object} options
+   * @returns {{ lane: string }}
+   */
+  _exhausted($el, options) {
     this._emitHost($el, options, 'no-fill', {});
+    return this.renderPromo($el, options);
   }
 
   _emitHost($el, options, name, detail) {
@@ -692,11 +1078,18 @@ class Verts {
 export default Verts;
 export {
   VertUnit,
+  PromoUnit,
   SIZE_PRESETS,
   ADSENSE_FORMATS,
+  PROMO_URL,
+  PROMO_ID,
+  promoHref,
+  buildPromo,
+  buildPromoDocument,
   MESSAGE_DIMENSIONS,
   MESSAGE_CLICK,
   IFRAME_SANDBOX,
+  PROMO_SANDBOX,
   resolveSizePx,
   clampHeight,
 };

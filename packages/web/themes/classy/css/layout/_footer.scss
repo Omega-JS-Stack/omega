@@ -109,6 +109,26 @@
     }
   }
 
+  // Framework attribution — same quiet scale as the copyright beside it
+  .classy-footer__powered {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--omega-ink-faint);
+    font-size: 0.78125rem;
+
+    a {
+      color: var(--omega-ink-muted);
+      text-decoration: none;
+      transition: color var(--omega-speed) var(--omega-ease);
+
+      &:hover,
+      &:focus-visible {
+        color: var(--omega-ink);
+      }
+    }
+  }
+
   .classy-footer__tools {
     display: flex;
     flex-wrap: wrap;
@@ -219,6 +239,29 @@
       border: 0;
       border-radius: calc(var(--omega-radius-s) - 2px);
       box-shadow: none;
+    }
+  }
+
+  // Below lg the container (720px) can no longer hold the link columns beside
+  // the 19rem brand block, so the grid wraps. Left alone the brand keeps its
+  // 19rem basis and sits in the corner of a full-width row with ~390px of
+  // stranded space beside it — so at that breakpoint the brand takes the whole
+  // row (content height, a wider one-liner) and the columns share the next.
+  @media (max-width: 991.98px) {
+    .classy-footer__grid {
+      gap: 2.25rem;
+    }
+
+    .classy-footer__brand {
+      flex: 1 1 100%;
+    }
+
+    .classy-footer__desc {
+      max-width: 56ch;
+    }
+
+    .classy-footer__cols {
+      flex-basis: 100%;
     }
   }
 

@@ -1,14 +1,16 @@
 /**
  * Static-asset channel: images that ship to the built site VERBATIM (no
- * bundling) — the brand's minted identity set bridged from
- * <brandRoot>/.omega/assets (manager assets service output: favicons,
- * brandmark, social image), then the consumer's own src/assets/images
- * layer, copied LAST so consumer files win collisions. Entries whose
- * source doesn't exist are skipped, so a brand with no minted assets
- * builds clean. buildSite runs the copies as its 'static' phase.
+ * bundling) — the framework's own core images first, then the brand's
+ * minted identity set bridged from <brandRoot>/.omega/assets (manager
+ * assets service output: favicons, brandmark, social image), then the
+ * consumer's own src/assets/images layer, copied LAST so consumer files
+ * win collisions. Entries whose source doesn't exist are skipped, so a
+ * brand with no minted assets builds clean. buildSite runs the copies as
+ * its 'static' phase.
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { PATHS } = require('./paths.js');
 
 // <brandRoot>/.omega/assets → site paths. This is the mint contract:
 // head.html's favicon links + brand.images.{brandmark,social} config URLs
@@ -27,10 +29,16 @@ const MINT_BRIDGE = [
  * @param {object} options
  * @param {string|null} options.brandRoot - brand monorepo root (standalone apps: the app root)
  * @param {string} options.imagesDir - the consumer's src/assets/images
+ * @param {string} [options.coreDir] - the framework core layer (default: packaged core)
  * @returns {Array<{ src: string, dest: string }>}
  */
 function resolveStaticDirs(options) {
   const entries = [];
+
+  // Framework-shipped images (core/images → /assets/images/core): the
+  // packaged pictures core templates reference by fixed URL — today the
+  // exit popup's social-proof faces. First, so both brand layers win.
+  entries.push({ src: path.join(options.coreDir || PATHS.core, 'images'), dest: 'assets/images/core' });
 
   if (options.brandRoot) {
     const mintRoot = path.join(options.brandRoot, '.omega', 'assets');

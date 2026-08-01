@@ -308,6 +308,24 @@ test('the first section takes nav clearance by TYPE, so a preceding div cannot s
   assert.equal((css.match(/main > section:first-of-type/g) || []).length, 2, 'clearance set at both breakpoints');
 });
 
+test('a blog post wears the dotfield behind its masthead only, never behind the prose (#44)', () => {
+  const post = fs.readFileSync(path.join(PKG, 'themes', 'classy', '_layouts', 'frontend', 'pages', 'blog', 'post.html'), 'utf8');
+
+  // The read surface stays still: the <article> itself carries no dot grid
+  // (it wraps the prose), and the ONE dotfield band closes before the
+  // content column opens.
+  assert.match(post, /<article\{% unless/, 'the post still opens with the <article> the section rhythm names');
+  assert.ok(!/<article[^>]*classy-dotgrid/.test(post), 'no dot grid on the article — dots behind body text is the thing we fixed');
+
+  const bands = post.match(/data-omega-dotfield[ >]/g) || [];
+  assert.equal(bands.length, 1, 'exactly one dotfield band on a post');
+  assert.match(post, /<div class="classy-dotgrid" data-omega-dotfield>/, 'the band carries the same contract as every other hero');
+  assert.ok(
+    post.indexOf('<div class="classy-dotgrid" data-omega-dotfield>') < post.indexOf('blog-post-content'),
+    'the band sits above the prose column',
+  );
+});
+
 test('font preloads: newsflash emits Fraunces + Schibsted normal-latin preloads (cp198)', async () => {
   const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
   const home = pages.get('/');

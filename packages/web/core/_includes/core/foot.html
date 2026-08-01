@@ -46,10 +46,19 @@
           <hr class="my-4">
 
           <!-- Social proof: the subscriber line keeps its faces (#44 item 21).
-               Neutral slots by default (the framework ships no photos and
-               never hotlinks one); a brand supplies its own through
-               client.exitPopup.config.avatars. -->
+               Four real faces by default — the legacy UJM row hotlinked
+               i.pravatar.cc portraits; the shipped set is the same source's
+               adult portraits (img=5, 8, 16, 60 at 64px — the literal legacy
+               img=1..4 included a toddler and a shirtless smoker) and they
+               SHIP with the framework (core/images/exit-popup, bridged to
+               /assets/images/core by the static-asset channel) because the
+               framework never loads an external image at runtime. A brand
+               replaces them through client.exitPopup.config.avatars, and an
+               explicit empty list drops back to neutral glyph slots. -->
           {% assign _exit_avatars = resolved.client.exitPopup.config.avatars %}
+          {% unless _exit_avatars %}
+            {% assign _exit_avatars = "/assets/images/core/exit-popup/subscriber-1.jpg,/assets/images/core/exit-popup/subscriber-2.jpg,/assets/images/core/exit-popup/subscriber-3.jpg,/assets/images/core/exit-popup/subscriber-4.jpg" | split: "," %}
+          {% endunless %}
           {% assign _exit_avatar_count = _exit_avatars | size %}
           <div class="d-flex align-items-center justify-content-center gap-2">
             <div class="d-flex">

@@ -1,11 +1,13 @@
 // verts/unit — mechanical shell only (§7 omega:sections lane). Sizing comes
 // from the client verts module's ONE px table (inline max-height); this sheet
-// carries a neutral placeholder surface and the iframe reset, no visual
-// opinions.
+// carries the iframe reset, no visual opinions.
+//
+// The host is INVISIBLE: no background, no border, no radius, no clipping. All
+// chrome (bg, border, radius) belongs to the card inside the frame, and the
+// host collapses exactly to the frame once the document reports its height.
 .omega-vert-unit {
   position: relative;
   width: 100%;
-  overflow: hidden;
 
   iframe {
     display: block;

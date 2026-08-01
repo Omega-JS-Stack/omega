@@ -21,8 +21,7 @@ class FirestoreIndexesSyncedTest extends BaseTest {
       return true;
     }
 
-    const commands = require('../index');
-    const IndexesCommand = commands.IndexesCommand;
+    const IndexesCommand = require('../indexes');
     const indexesCmd = new IndexesCommand(self);
 
     const liveIndexes = await indexesCmd.get(tempPath, false);
@@ -101,8 +100,7 @@ class FirestoreIndexesSyncedTest extends BaseTest {
     }
 
     // Fetch live indexes
-    const commands = require('../index');
-    const IndexesCommand = commands.IndexesCommand;
+    const IndexesCommand = require('../indexes');
     const indexesCmd = new IndexesCommand(self);
     const tempPath = '_firestore.indexes.json';
     const liveIndexes = await indexesCmd.get(tempPath, false);

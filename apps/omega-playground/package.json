@@ -6,10 +6,10 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "omega-manager",
-    "dev": "omega-manager dev",
-    "deploy": "omega-manager deploy",
-    "pipeline": "omega-manager pipeline --require=analytics,disperse,update,bookmark"
+    "start": "omega",
+    "dev": "omega dev",
+    "deploy": "omega deploy",
+    "pipeline": "omega pipeline --require=analytics,disperse,update,bookmark"
   },
   "devDependencies": {
     "@omega.js/manager": "file:../../packages/manager"

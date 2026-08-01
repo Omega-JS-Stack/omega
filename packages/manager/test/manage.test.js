@@ -300,6 +300,19 @@ test('runManage: rerun is idempotent — same statuses, single gitignore entry',
   assert.equal(entries.length, 1);
 });
 
+test('runManage: a service that ran carries its wall time, in the report and the run record', async () => {
+  const root = stageBrand();
+
+  const report = await runManage(root, { service: 'workspace' });
+
+  assert.equal(typeof report.results.workspace.durationMs, 'number');
+  assert.ok(report.results.workspace.durationMs >= 0);
+
+  const runsDir = path.join(root, '.omega', 'runs');
+  const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
+  assert.equal(typeof run.services[0].durationMs, 'number');
+});
+
 test('runManage: unloadable brand config fails the workspace service and stops the run', async () => {
   const root = stageBrand({
     config: `{ brand: { id: 'x', name: 'X' }, oauth2: { clientSecret: 'oops' }, targets: { web: {} } }`,

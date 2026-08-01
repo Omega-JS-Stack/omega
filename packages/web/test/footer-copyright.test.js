@@ -52,6 +52,22 @@ test('brand.company + company.url → the parent name links the parent site', as
   );
 });
 
+test('the base row carries the framework powered-by line', async () => {
+  const pages = await buildWith(miniData, {}, 'footer-powered');
+  const html = pages.get('/');
+  const match = html.match(/class="classy-footer__powered"[^>]*>([\s\S]*?)<\/span>\s*<\/span>/);
+
+  assert.ok(match, 'the footer renders a powered-by span');
+  const line = match[1].replace(/\s+/g, ' ').trim();
+
+  assert.ok(line.includes('Powered by'), `powered line: ${line}`);
+  assert.ok(
+    line.includes('<a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a>'),
+    `linked framework site: ${line}`,
+  );
+  assert.ok(/data-icon="bolt"[^>]*><svg/.test(line), `bolt icon inlined: ${line}`);
+});
+
 test('a company that IS the brand adds no self-credit', async () => {
   const pages = await buildWith(
     { ...miniData, brand: { ...miniData.brand, company: 'MiniCo' } },

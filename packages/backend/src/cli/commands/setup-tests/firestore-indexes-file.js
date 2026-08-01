@@ -56,8 +56,7 @@ class FirestoreIndexesFileTest extends BaseTest {
         return;
       }
 
-      const commands = require('../index');
-      const IndexesCommand = commands.IndexesCommand;
+      const IndexesCommand = require('../indexes');
       const indexesCmd = new IndexesCommand(self);
 
       await indexesCmd.get(name, false);

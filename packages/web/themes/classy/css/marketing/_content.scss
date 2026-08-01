@@ -608,6 +608,97 @@
   }
 }
 
+// ── Photo lead — the picture-first page opener (about hero with an image) ───
+// Narrow: the photo on top, the words beneath it inside the same frame (a
+// scrim can't hold a headline over a phone-sized crop). Wide: the words ride
+// the picture on a bottom scrim, and the scrim REMAPS the ink tokens for its
+// own scope — a photograph looks the same in both modes, so light ink over it
+// is correct in both, and the masthead keeps reading var(--omega-ink).
+.classy-photo-lead {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-xl);
+  box-shadow: var(--omega-shadow-2);
+
+  .classy-photo-lead__img {
+    display: block;
+    width: 100%;
+    // The ratio is reserved before the lazy swap — no layout shift
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    object-position: center;
+
+    @media (min-width: 768px) {
+      aspect-ratio: 16 / 9;
+    }
+  }
+
+  .classy-photo-lead__words {
+    padding: 1.5rem 1.25rem 1.75rem;
+
+    @media (min-width: 768px) {
+      --omega-ink: #f7f7f6;
+      --omega-ink-muted: rgb(247 247 246 / 88%);
+      --omega-ink-faint: rgb(247 247 246 / 74%);
+
+      // Bootstrap's heading/body bridges resolve at :root, so the scrim
+      // re-points them at its own ink or an h1 would stay theme-dark
+      --bs-body-color: var(--omega-ink);
+      --bs-emphasis-color: var(--omega-ink);
+      --bs-heading-color: var(--omega-ink);
+
+      position: absolute;
+      inset-inline: 0;
+      bottom: 0;
+      padding: 9rem 3rem 2.5rem;
+      color: var(--omega-ink);
+      background: linear-gradient(to top, rgb(8 8 9 / 92%) 0%, rgb(8 8 9 / 78%) 34%, rgb(8 8 9 / 38%) 68%, rgb(8 8 9 / 0%) 100%);
+    }
+  }
+
+  .classy-photo-lead__sub {
+    max-width: 46ch;
+    margin: 1rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    color: var(--omega-ink-muted);
+  }
+}
+
+// The facts rail under the photo lead (the split layout keeps it beside)
+.classy-photo-lead__facts {
+  margin-top: 1.5rem;
+}
+
+// A picture-led opener needs nav clearance, not the statement band's runway:
+// the photo IS the breathing room, so the first screenful stays image + words
+main > section.classy-photo-lead-band:first-of-type {
+  padding-top: 6rem;
+
+  @media (min-width: 992px) {
+    padding-top: 7rem;
+  }
+}
+
+// ── Aside photo — a picture at the head of a duo aside (about letter) ───────
+.classy-aside-photo {
+  margin: 1.25rem 0 0;
+  overflow: hidden;
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  background: var(--omega-surface-2);
+
+  img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+  }
+}
+
 // ── Duo — generic asymmetric section: label/head column + body column ───────
 // Column split overridable per use: style="--classy-duo-cols: 5fr 7fr;"
 .classy-duo {
@@ -986,6 +1077,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    // Pin the width to the grid track: with aspect-ratio + min-height and an
+    // auto width, the media derives its width from its height (22rem × 16/9 =
+    // 39.1rem) and spills past the 7fr track, painting under the text column
+    width: 100%;
     aspect-ratio: 16 / 9;
     background: var(--omega-surface-2);
     border: 1px solid var(--omega-line);
@@ -1163,10 +1258,8 @@
   }
 }
 
-// ── Ad units — sit quietly in the hairline language ──────────────────────────
-.omega-vert-unit {
-  border-radius: var(--omega-radius-l);
-}
+// Ad units carry NO theme chrome: the card inside the frame owns bg, border
+// and radius, so a theme radius here only clips the card's own corners.
 
 // ============================================
 // Photo band — the about page's life-in-pictures collage: one wide tile

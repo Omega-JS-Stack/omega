@@ -102,6 +102,12 @@
         </span>
       {% endif %}
 
+      {% comment %} Framework attribution — a constant, never brand config {% endcomment %}
+      <span class="classy-footer__powered">
+        {% uj_icon "bolt", "fa-sm" %}
+        <span>Powered by <a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a></span>
+      </span>
+
       <div class="classy-footer__tools">
         {% if data.legal.enabled %}
           <nav class="classy-footer__legal" aria-label="Legal">

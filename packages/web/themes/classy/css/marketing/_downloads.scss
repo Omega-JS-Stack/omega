@@ -202,18 +202,6 @@
   margin: 0;
 }
 
-// "Download started" — a designed row, not an alert box
-.classy-dl-modal__started {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  margin-bottom: 1.5rem;
-  padding: 0.875rem 1rem;
-  background: var(--omega-surface-2);
-  border: 1px solid var(--omega-line);
-  border-radius: var(--omega-radius-m);
-}
-
 // Command panes (Linux steps) — same stage as the illustrations
 .classy-dl-modal__pane {
   background: var(--omega-surface-2);
@@ -232,11 +220,11 @@
   }
 }
 
+// One sentence, so it sets as one sentence: flex would make every word its own
+// item and open a gap between them (Ian QA).
 .classy-dl-modal__help {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
   padding: 0.75rem 1rem;
+  line-height: 1.5;
   font-size: 0.875rem;
   color: var(--omega-ink-muted);
   background: var(--omega-surface-2);

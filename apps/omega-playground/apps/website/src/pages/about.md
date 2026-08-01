@@ -1,7 +1,9 @@
 ---
 # ═══ Paperloom about page (fiction voice — see index.md header for the
-# 2026-07-19 rebrand rationale). Same bands as before: hero + facts, letter,
-# timeline with era labels, principles, team CTA. Meta-only frontmatter.
+# 2026-07-19 rebrand rationale). Picture-first: the studio photo leads, the
+# desk sits beside the letter, the table band breaks the read. Then the
+# familiar bands: timeline with era labels, principles, team CTA. Meta-only
+# frontmatter.
 layout: blueprint/about
 permalink: /about
 ---
@@ -10,6 +12,8 @@ permalink: /about
 headline: "Writing deserves <em>a quiet room</em>"
 headline_accent: ""
 description: "Why {{ site.brand.name }} exists, and the small stubborn ideas holding it together."
+image: "/assets/images/about/office.jpg"
+image_alt: "Writers at long wooden desks in a plant-filled studio, one of them writing in a notebook by a window"
 facts:
   - number: "3"
     label: "Places to write"
@@ -22,6 +26,8 @@ facts:
 {% endsection %}
 <!-- ═══ The letter: mission & vision ═══ -->
 {% section "about/letter" %}
+image: "/assets/images/about/desk.jpg"
+image_alt: "An open notebook and fountain pen beside a laptop and a cup of coffee on a sunlit wooden desk"
 mission:
   title: "Our mission"
   description: "Give every writer one calm, trustworthy home for their words: capture anywhere, shape it at the desk, publish with pride, so the time goes into the <em>writing</em>, never the filing."
@@ -49,6 +55,14 @@ items:
   - year: "Next"
     title: "Shelves for everyone"
     description: "Shared journals, small-press publishing, and a library that grows old gracefully with you"
+{% endsection %}
+<!-- ═══ The table: one wide photo between the history and the principles ═══ -->
+{% section "about/photo-band" %}
+items:
+  - src: "/assets/images/about/team.jpg"
+    alt: "Four people talking and laughing around a wooden table with notebooks, mugs, and a laptop"
+    caption: "One table, one library"
+    wide: true
 {% endsection %}
 <!-- ═══ Principles ═══ -->
 {% section "about/principles" %}

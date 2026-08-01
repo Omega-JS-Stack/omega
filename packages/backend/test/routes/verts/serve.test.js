@@ -175,7 +175,9 @@ module.exports = {
         assert.equal(response.status, 200, 'Serve should return 200');
         assert.ok(body.includes('data-theme="dark"'), 'Theme pin should render on the page');
         assert.ok(body.includes('max-width: 300px'), 'Width hint should apply');
-        assert.ok(body.includes('max-height: 250px'), 'Height hint should apply');
+        // Content-sized contract: the card carries NO baked height (the HOST
+        // clamps to the preset); height feeds only the compact/stacked branches
+        assert.equal(body.includes('max-height'), false, 'The card is content-sized, never height-capped in the document');
       },
     },
   ],

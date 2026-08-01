@@ -33,8 +33,10 @@ const RESPONSIVE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 const FORMAT_VERSION = 1;
 // Top-level dist/assets/images subtrees that stay verbatim: the minted
 // favicon set is an exact-name contract (head.html links each file) with
-// fixed-purpose sizes — variants would be pure dead weight
-const EXEMPT_DIRS = new Set(['favicon']);
+// fixed-purpose sizes — variants would be pure dead weight, and the
+// framework's own core images are the same deal (fixed URLs, already
+// avatar-sized)
+const EXEMPT_DIRS = new Set(['favicon', 'core']);
 
 /**
  * The output plan for one source image: 8 variants, each with its final
@@ -189,12 +191,9 @@ async function processImages(options) {
     }
   }
 
-  log(
-    `imagemin: ${result.processed} processed, ${result.fromCache} from cache`
-    + ` → ${result.outputs} outputs (${formatBytes(result.sizeBefore)} source → ${formatBytes(result.sizeAfter)} shipped)`
-    + (result.failed ? `, ${result.failed} failed` : '')
-    + (result.pruned ? `, ${result.pruned} stale cache entries pruned` : '')
-  );
+  const failedNote = result.failed ? `, ${result.failed} failed` : '';
+  const prunedNote = result.pruned ? `, ${result.pruned} stale cache entries pruned` : '';
+  log(`imagemin: ${result.processed} processed, ${result.fromCache} from cache → ${result.outputs} outputs (${formatBytes(result.sizeBefore)} source → ${formatBytes(result.sizeAfter)} shipped)${failedNote}${prunedNote}`);
 
   return result;
 }

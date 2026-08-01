@@ -32,7 +32,7 @@ module.exports = {
         assert.equal(location.origin + location.pathname, 'https://shop.example/product', 'Location should be the STORED link');
         assert.equal(location.searchParams.get('ref'), 'house', 'Existing query params should survive');
         assert.equal(location.searchParams.get('utm_source'), 'site.example', 'utm_source should be the parent host');
-        assert.equal(location.searchParams.get('utm_medium'), 'vert', 'utm_medium should be vert');
+        assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should be omega-vert');
         assert.equal(location.searchParams.get('utm_campaign'), 'redirect-a', 'utm_campaign should be the vert id');
       },
     },
@@ -48,7 +48,7 @@ module.exports = {
         const location = new URL(response.headers.get('location'));
 
         assert.equal(location.searchParams.get('utm_source'), null, 'utm_source should be absent without a parent');
-        assert.equal(location.searchParams.get('utm_medium'), 'vert', 'utm_medium should still be vert');
+        assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should still be omega-vert');
       },
     },
 

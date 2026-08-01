@@ -2,11 +2,15 @@
 layout: frontend/core/base
 
 # Hero — the statement (headline carries the whole sentence; a legacy
-# headline_accent still lands as the italic tail)
+# headline_accent still lands as the italic tail). Point image at a photo and
+# the band flips to the picture-first lead, words riding the scrim; unset
+# keeps the statement layout.
 hero:
   headline: "We make complex things <em>feel simple</em>"
   headline_accent: ""
   description: "The people and stubborn opinions behind {{ site.brand.name }}."
+  image: ""
+  image_alt: ""
 
 # Mission & Vision — rendered as the editorial letter
 mission:
@@ -18,6 +22,12 @@ vision:
   title: "Our vision"
   description: "A world where powerful tools feel effortless, where anyone can build, launch, and grow without wrestling the machinery. That's the product we <em>refuse to stop</em> working toward."
   icon: "lightbulb"
+
+# The letter's aside photo — point image at your own picture and it sits at
+# the head of the aside beside the statements; unset renders no frame.
+letter:
+  image: ""
+  image_alt: ""
 
 # Story Timeline Section
 story:
@@ -115,7 +125,7 @@ team_cta:
 {% composition %}
 {% section "about/hero", data: resolved.hero, facts: resolved.stats.items %}
 <!-- ═══ The letter — mission & vision as editorial statements ═══ -->
-{% section "about/letter", mission: resolved.mission, vision: resolved.vision %}
+{% section "about/letter", data: resolved.letter, mission: resolved.mission, vision: resolved.vision %}
 <!-- ═══ The journey — sticky head + timeline ═══ -->
 {% section "about/timeline", data: resolved.story %}
 <!-- ═══ Life in pictures — photo band (gallery: false kills it) ═══ -->

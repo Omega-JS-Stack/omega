@@ -10,6 +10,54 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('auth:oauth');
 
+// The one-shot marker that says "this tab left for an OAuth redirect". Written
+// before signInWithRedirect, read on the way back: a return with no redirect
+// result means the credential never made it home, which is loud, not silent.
+const REDIRECT_PENDING_KEY = 'omega:authRedirectPending';
+
+/**
+ * Popup or redirect? Redirect is the default (it survives strict popup
+ * blockers and mobile webviews), with three cases that MUST use the popup:
+ *
+ *   - `?authPopup=true` — the manual override
+ *   - inside an iframe — a top-level redirect is not ours to make
+ *   - development — auth points at the Firebase emulator, whose OAuth handler
+ *     hands the credential back through sessionStorage on the EMULATOR's
+ *     origin (`http://localhost:9099`). Chrome partitions third-party storage
+ *     by top-level site, so the SDK's iframe on the site's origin
+ *     (`https://localhost:4000`) reads a different, empty partition and
+ *     getRedirectResult() resolves null forever — the return leg dead-ends.
+ *     The popup relays the event through `window.opener`, which is not
+ *     partitioned, so the emulator flow completes.
+ */
+export function shouldUseAuthPopup() {
+  return new URL(window.location.href).searchParams.get('authPopup') === 'true'
+    || window !== window.top
+    || omega.isDevelopment();
+}
+
+// Storage denial (privacy modes, blocked third-party contexts) is an expected
+// external condition, not our bug: the marker degrades to "no redirect was
+// pending", which is exactly the pre-marker behavior.
+function markPendingRedirect() {
+  try {
+    window.sessionStorage.setItem(REDIRECT_PENDING_KEY, String(Date.now()));
+  } catch (e) {
+    logger.warn('Could not mark the pending redirect:', e.message);
+  }
+}
+
+function takePendingRedirect() {
+  try {
+    const pending = window.sessionStorage.getItem(REDIRECT_PENDING_KEY) !== null;
+    window.sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+
+    return pending;
+  } catch (e) {
+    return false;
+  }
+}
+
 /**
  * Google's signInWithPopup/Redirect auto-creates accounts. If a user lands on
  * /signin with a Google account that doesn't exist yet, Firebase creates one
@@ -71,6 +119,10 @@ export async function reverseAccidentalSignup(ctx, newUser) {
 export async function handleRedirectResult(ctx) {
   const url = new URL(window.location.href);
 
+  // Read the marker first: this page load either follows a redirect we started
+  // or it doesn't, and every path below consumes the answer exactly once.
+  const hadPendingRedirect = takePendingRedirect();
+
   // Resolve the redirect result — either from Firebase or a dev simulation
   let result, additionalUserInfo;
   const simulateRedirect = url.searchParams.get('_dev_simulateRedirect');
@@ -105,8 +157,17 @@ export async function handleRedirectResult(ctx) {
     // Log results for debugging
     logger.log('Redirect result:', result);
 
-    // If no result, return false to indicate no redirect was processed
+    // If no result, return false to indicate no redirect was processed.
+    // A tab that LEFT for an OAuth redirect must come back with a credential:
+    // nothing means the provider handler never handed the event back, and the
+    // page must say so instead of quietly presenting an empty form again.
     if (!result || !result.user) {
+      if (hadPendingRedirect) {
+        logger.error('Returned from an OAuth redirect with no result');
+        omega.sentry().captureException(new Error('OAuth redirect returned no result'));
+        ctx.formManager.showError('Sign-in did not complete. Please try again.');
+      }
+
       return false;
     }
 
@@ -218,24 +279,6 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
         throw new Error(`Unsupported provider: ${providerName}`);
     }
 
-    /* @dev-only:start */
-    {
-      // Show warning in dev mode when using redirect
-      if (!ctx.useAuthPopup) {
-        omega.utilities().showNotification(
-          'OAuth redirect may fail in development. Use localhost:4000 or add ?authPopup=true to the URL',
-          {
-            type: 'warning',
-            timeout: 10000, // Show for 10 seconds
-          }
-        );
-
-        // Wait
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-    /* @dev-only:end */
-
     // Use popup if query parameter is set, otherwise use redirect
     if (ctx.useAuthPopup) {
       try {
@@ -274,6 +317,7 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
           logger.log('Popup failed, falling back to redirect:', popupError.code);
 
           // Fallback to redirect
+          markPendingRedirect();
           await signInWithRedirect(auth, provider);
           // Note: This will redirect the user away from the page
           // The handleRedirectResult function will handle the result when they return
@@ -285,11 +329,17 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
     } else {
       // Use redirect by default
       logger.log('Using redirect for authentication');
+      markPendingRedirect();
       await signInWithRedirect(auth, provider);
       // Note: This will redirect the user away from the page
       // The handleRedirectResult function will handle the result when they return
     }
   } catch (error) {
+    // A rejected signInWithRedirect never left the page — clear the pending
+    // marker so the next plain load does not report a redirect that was
+    // never in flight
+    takePendingRedirect();
+
     // Only capture unexpected errors to Sentry
     if (!isUserError(error.code)) {
       omega.sentry().captureException(new Error('OAuth provider sign-in error', { cause: error }));

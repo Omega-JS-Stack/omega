@@ -292,7 +292,7 @@ async function main() {
       const location = new URL(response.headers.get('location'));
       assert.equal(location.origin + location.pathname, 'https://digest.buildtools.example/subscribe', 'redirect must land on the STORED link (never a caller-supplied url)');
       assert.equal(location.searchParams.get('utm_source'), 'dailybuild.omegajs.dev', 'utm_source should be the parent host');
-      assert.equal(location.searchParams.get('utm_medium'), 'vert', 'utm_medium should be vert');
+      assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should be omega-vert');
       assert.equal(location.searchParams.get('utm_campaign'), 'devnews-digest', 'utm_campaign should be the vert id');
 
       const unknown = await fetch(`${base}/omega/verts/redirect?id=no-such-vert`, { redirect: 'manual' });

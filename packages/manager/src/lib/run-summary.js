@@ -10,6 +10,8 @@
 
 const chalk = require('chalk').default;
 
+const { formatDuration } = require('./duration.js');
+
 class RunSummary {
   constructor() {
     this.entries = [];
@@ -40,7 +42,7 @@ class RunSummary {
    * Print full summary (always)
    */
   printSummary() {
-    const elapsed = this._formatDuration(Date.now() - this.startTime);
+    const elapsed = formatDuration(Date.now() - this.startTime);
     const hasErrors = this.hasErrors();
 
     // Gather stats
@@ -231,28 +233,6 @@ class RunSummary {
     }
 
     return items;
-  }
-
-  /**
-   * Format milliseconds into a human-readable duration
-   */
-  _formatDuration(ms) {
-    const seconds = Math.floor(ms / 1000);
-
-    if (seconds < 60) {
-      return `${seconds}s`;
-    }
-
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-
-    if (minutes < 60) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
-
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
   }
 
   /**

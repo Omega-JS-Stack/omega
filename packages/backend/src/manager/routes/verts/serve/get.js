@@ -44,7 +44,7 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   ctx.log('verts/serve: Serving vert', { vertId: vert.id, parent: parentHost, tags });
 
-  const html = renderVertUnit({
+  const html = await renderVertUnit({
     vert,
     redirectUrl: redirectUrl.toString(),
     // Port-preserving origin from the RAW parent param — normalizeHost strips

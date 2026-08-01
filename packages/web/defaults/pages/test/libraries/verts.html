@@ -17,7 +17,7 @@ meta:
   labeled slot showing the exact tag that produced it. Dev-only (noindex +
   the /test sitemap exclusion). No fake providers: the units run the real
   ladder for THIS site's advertising config, so an unconfigured brand shows
-  the natural collapse and a configured one shows real fills.
+  the terminal OMEGA promo and a configured one shows real fills.
 {% endcomment %}
 
 <section>
@@ -39,7 +39,7 @@ meta:
         {% endiftruthy %}
         {% iffalsy site.advertising %}
           <p class="mb-1 small">This build carries no <code>advertising</code> key, so auto placements (blog posts, the blog feed, the dashboard rail) emit nothing at all.</p>
-          <p class="mb-0 small text-muted">The hand-authored units below still mount and show their natural no-fill collapse, which is the behavior worth seeing here.</p>
+          <p class="mb-0 small text-muted">The hand-authored units below still mount and land on the built-in OMEGA promo: the terminal lane that keeps a unit from ever rendering empty.</p>
         {% endiffalsy %}
       </div>
 

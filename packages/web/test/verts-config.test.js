@@ -167,6 +167,6 @@ test('/test/libraries/verts shows every format and size preset, config state lab
 
   const off = await buildWith(miniData, {}, 'verts-testpage-off');
   const bare = off.get('/test/libraries/verts');
-  assert.ok(bare.includes('data-omega-vert="display"'), 'hand-authored units still render unconfigured (the natural collapse is the point)');
+  assert.ok(bare.includes('data-omega-vert="display"'), 'hand-authored units still render unconfigured (the terminal promo lane is the point)');
   assert.ok(bare.includes('no <code>advertising</code> key'), 'the page says so');
 });

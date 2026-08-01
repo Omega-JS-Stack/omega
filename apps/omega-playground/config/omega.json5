@@ -55,6 +55,13 @@
     },
   },
 
+  // The parent named by brand.company — ITW Creative Works is the real-world
+  // entity behind this rehearsal brand. Public-by-design; the footer
+  // copyright links the parent name through it.
+  company: {
+    url: "https://itwcreativeworks.com",
+  },
+
   // Brand repo (github service: repo + Pages; the admin/post CMS routes
   // commit to the same repo). No `repo` slug — the derivation defaults
   // resolve it: name = brand.id (omega-playground), owner = org. The repo
@@ -70,19 +77,6 @@
         shared: true,
         private: false,
       },
-    },
-  },
-
-  // Download endpoints (site.download[platform][type]) — drive the /download
-  // cards + the detection hero. Playground points at the repo's releases hub
-  // until real release assets exist (releases stay GATED); ios/android are
-  // deliberately absent so the store band demos the notify-me flow.
-  download: {
-    mac: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
-    windows: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
-    linux: {
-      debian: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
-      snap: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
     },
   },
 
@@ -134,6 +128,17 @@
     provider: "sentry",
     dsn: null,
     org: "itw-creative-works",
+  },
+
+  // Shared ITW AdSense account (from legacy omega-manager — one pub id
+  // account-wide). The service reports Google's approval state read-only.
+  // Rekeyed cp268: provider-neutral advertising section (client = ca-pub-…).
+  advertising: {
+    providers: {
+      adsense: {
+        client: "ca-pub-7372939085773564",
+      },
+    },
   },
 
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
@@ -197,7 +202,7 @@
           { id: "seats", name: "Writers on your team", icon: "users", value: 10, definition: "People who can write in your shared library at the same time." },
           { id: "review", name: "Draft review & approvals", icon: "pen-nib", value: true, definition: "Send a draft for review, collect comments, publish once it's approved." },
         ],
-        stripe: { productId: null },
+        stripe: { productId: "prod_UzOGM0st0zRSbc" },
         paypal: { productId: null },
         chargebee: { itemId: null, legacyPlanIds: [] },
       },
@@ -239,17 +244,6 @@
     // service skips deliberately instead of asking for a publication.
     newsletter: {
       enabled: false,
-    },
-  },
-
-  // Shared ITW AdSense account (from legacy omega-manager — one pub id
-  // account-wide). The service reports Google's approval state read-only.
-  // Rekeyed cp268: provider-neutral advertising section (client = ca-pub-…).
-  advertising: {
-    providers: {
-      adsense: {
-        client: "ca-pub-7372939085773564",
-      },
     },
   },
 
@@ -315,6 +309,19 @@
       "forgot", "recover", "reset", "reset-password", "change-password",
       "token", "join", "cancel", "refund",
     ],
+  },
+
+  // Download endpoints (site.download[platform][type]) — drive the /download
+  // cards + the detection hero. Playground points at the repo's releases hub
+  // until real release assets exist (releases stay GATED); ios/android are
+  // deliberately absent so the store band demos the notify-me flow.
+  download: {
+    mac: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    windows: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    linux: {
+      debian: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+      snap: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+    },
   },
 
   // Key presence = target enabled; the value is that target's type-wide

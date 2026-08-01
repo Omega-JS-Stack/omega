@@ -42,7 +42,6 @@
   "13d6ff07b8a5": "Repositorio",
   "8ed348e9fa6c": "No se pudo cargar la información de compilación",
   "37f4a67d00bd": " Ver actualizaciones ",
-  "4f8865abeddb": "•",
   "c9f53fcaaef5": "Desarrollado por ",
   "7d9eb7acb13e": "Cerrar",
   "daf49b368ec2": "¡Oferta especial solo para ti!",
@@ -117,11 +116,14 @@
   "7af1cb70490d": "Tema del sistema",
   "dd167905de0d": "Versión",
   "efb52e7172b7": "Tema",
-  "fdce0c5e5a56": " © 2026 Paperloom by ITW Creative Works. Todos los derechos reservados. ",
   "6e310b667fad": "Sitio web principal y páginas de destino",
   "2cae27405670": "Endpoints de la API REST",
   "25ee52bb8992": "Panel de usuario y gestión de cuentas",
   "d29cbe1f66dc": "Red de distribución de contenido",
   "6af2a0eebdee": "Nada programado. Sin interrupciones planificadas.",
-  "4552f34f9d3e": "Un hogar tranquilo para tu escritura: notas, borradores y páginas terminadas que te acompañan del navegador al escritorio."
+  "4552f34f9d3e": "Un hogar tranquilo para tu escritura: notas, borradores y páginas terminadas que te acompañan del navegador al escritorio.",
+  "083e097e70c8": " © 2026 Paperloom by ",
+  "f1662704b127": ". Todos los derechos reservados. ",
+  "d7beda5ef479": "ITW Creative Works",
+  "e6bc8b482e42": "omegajs.dev"
 }

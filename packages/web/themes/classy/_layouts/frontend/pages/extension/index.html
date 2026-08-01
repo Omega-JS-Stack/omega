@@ -15,12 +15,6 @@ hero:
 
 # Downloads Section
 downloads:
-  superheadline:
-    icon: "puzzle-piece"
-    text: "Extension"
-  headline: "Your browser is"
-  headline_accent: "covered"
-  subheadline: "Real support for the browsers people actually use."
   loading:
     headline: "Detecting browser"
     description: "Determining your browser..."
@@ -168,10 +162,9 @@ cta:
 <!-- ═══ Browser grid: real marks, buttons in hand ═══ -->
 <section id="browsers" class="pt-5">
   <div class="container">
-    <div class="classy-section-head text-center mx-auto mb-5" data-omega-reveal>
-      {% component "heading/section-head", superheadline: resolved.downloads.superheadline.text, headline: resolved.downloads.headline, headline_accent: resolved.downloads.headline_accent, sub: resolved.downloads.subheadline %}
-    </div>
-
+    <!-- The visible section-head is gone (Ian QA); the h2 stays for heading
+         order — the cards' h3 names need a parent level under the h1 -->
+    <h2 class="visually-hidden">Supported browsers</h2>
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
       {% for browser in resolved.downloads.browsers %}
         {% assign config_url = site.extension[browser.id] %}

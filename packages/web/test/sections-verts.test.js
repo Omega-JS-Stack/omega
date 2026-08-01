@@ -86,6 +86,35 @@ test('verts/unit: section.js delegates WHOLLY to the shared client verts module 
   assert.ok(!js.includes('createElement'), 'no DOM construction in the section — the module owns the iframe');
 });
 
+test('verts/unit: the host paints NO chrome — the card inside the frame owns bg, border, radius', () => {
+  const scss = fs.readFileSync(path.join(CLASSY, '_sections', 'verts', 'unit', 'section.scss'), 'utf8');
+  const chrome = /(background|border|border-radius|box-shadow|overflow)\s*:/;
+
+  // Only the iframe reset (display/width/border: 0) may declare anything
+  const hostBlock = scss.slice(scss.indexOf('.omega-vert-unit {'), scss.indexOf('iframe {'));
+  assert.ok(!chrome.test(hostBlock), 'the unit host declares no surface and no clipping');
+
+  // A theme sheet radius clips the card's own corners — none may exist
+  const offenders = [];
+  const scan = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        scan(full);
+      } else if (entry.name.endsWith('.scss')) {
+        const contents = fs.readFileSync(full, 'utf8');
+        const block = contents.match(/\.omega-vert-unit\s*\{[^}]*\}/g) || [];
+        if (block.some((rule) => chrome.test(rule))) {
+          offenders.push(path.relative(PKG, full));
+        }
+      }
+    }
+  };
+  [path.join(CLASSY, 'css'), path.join(NEWSFLASH, 'css')].forEach(scan);
+
+  assert.deepEqual(offenders, [], 'no theme sheet dresses the vert host');
+});
+
 // ─── the legacy is retired (step 5) ─────────────────────────────────────────
 
 test('spec step 5 taken: legacy vert.js, popupads.js + adunits includes are GONE', () => {

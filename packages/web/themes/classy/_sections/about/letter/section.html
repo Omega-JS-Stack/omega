@@ -4,6 +4,12 @@
       <div class="classy-duo__aside" data-omega-reveal>
         <span class="classy-micro">{{ args.aside_label }}</span>
 
+        {% if args.image != blank %}
+          <figure class="classy-aside-photo" data-omega-reveal>
+            <img src="{{ args.placeholder }}" data-lazy="@src {{ args.image }}" alt="{{ args.image_alt }}"/>
+          </figure>
+        {% endif %}
+
         <!-- A living ops feed, not a paragraph -->
         <div class="classy-object position-relative pe-4 mt-4 d-none d-lg-block">
           <div class="classy-fragment pb-5">

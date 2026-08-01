@@ -7,6 +7,12 @@
   color: var(--omega-ink-faint);
   display: inline-flex;
   justify-content: center;
+
+  // Terminal state: a face that can't load (file missing, offline) drops out
+  // and the slot's neutral disc stands — the row never shows a broken image.
+  img.lazy-error {
+    display: none;
+  }
 }
 
 // Simple wave animation for the hand icon

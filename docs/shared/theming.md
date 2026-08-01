@@ -198,11 +198,12 @@ inherits them:
   loads after the theme forward, so it outranks a theme's own chip rules.
 - **`.omega-check`** (`core/css/core/_utilities.scss`): the ONE ink for every
   affirmation tick — plan features, benefit lists, hero meta, comparison
-  "yes" cells. It reads `--omega-check`, which rides `--omega-accent` (blue by
-  default), so the check follows the brand ramp and dark mode everywhere at
-  once. The class goes on the icon OR its wrapper; a call site NEVER re-colors
-  a check (#11). Status green (`--omega-ok`) stays for state feedback — an
-  affirmation is not a status.
+  "yes" cells. It reads `--omega-check`, which rides `--omega-ok` (the success
+  hue), so every tick and every status green agree in both modes (Ian's QA
+  ruling 2026-07-31, superseding #11's accent-ride: a green brand color put
+  the accent ramp and the status green side by side as two near-miss greens).
+  The class goes on the icon OR its wrapper; a call site NEVER re-colors a
+  check (#11's call-site rule stands).
 - **`.omega-interactive`** (`core/css/motion/_index.scss`): the whole-surface
   click affordance — the surface warms on hover AND `:focus-visible`, an
   accent ring on focus, an accent-subtle tint on press. `--lift` adds the

@@ -121,33 +121,25 @@ function parseColor(ctx, value) {
   return [parts[0], parts[1], parts[2]];
 }
 
-// Dotfield rainbow ramp: fixed saturation/lightness so the spectrum reads as
-// ONE continuous gradient (not per-dot confetti); hue comes from grid
-// position + time. Q/P are the hue-to-rgb intermediates for that fixed S/L.
-const RAINBOW_S = 0.68;
-const RAINBOW_L = 0.58;
-const RAINBOW_Q = RAINBOW_L < 0.5 ? RAINBOW_L * (1 + RAINBOW_S) : RAINBOW_L + RAINBOW_S - (RAINBOW_L * RAINBOW_S);
-const RAINBOW_P = (2 * RAINBOW_L) - RAINBOW_Q;
+// Dotfield rainbow ramp: the classy card ring's hand-mixed PASTEL stops, in
+// order, so the dots sweep the exact colors of the gradient ring (Ian
+// 2026-07-31 — a generic HSL rainbow reads wrong). Mirrored from
+// `@omega.js/web` themes/classy/css/base/_utilities.scss
+// (--classy-gradient-stops); packages/web/test/rainbow-pin.test.js holds the
+// two lists equal. Last stop repeats the first so the sweep wraps seamlessly.
+const RAINBOW_STOPS = ['#f2d478', '#f2a288', '#f094c2', '#bd97f2', '#88b4f2', '#7fd9cf', '#a5e08c', '#f2d478'];
+const RAINBOW_RGB = RAINBOW_STOPS.map((hex) => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+]);
+const RAINBOW_SEGMENTS = RAINBOW_RGB.length - 1;
 
 /**
- * One channel of the fixed-S/L hue→rgb conversion.
- * @param {number} t - hue offset (turns)
- * @returns {number} channel 0-1
- */
-function hueChannel(t) {
-  let tn = t;
-  if (tn < 0) tn += 1;
-  if (tn > 1) tn -= 1;
-  if (tn < 1 / 6) return RAINBOW_P + ((RAINBOW_Q - RAINBOW_P) * 6 * tn);
-  if (tn < 1 / 2) return RAINBOW_Q;
-  if (tn < 2 / 3) return RAINBOW_P + ((RAINBOW_Q - RAINBOW_P) * ((2 / 3) - tn) * 6);
-  return RAINBOW_P;
-}
-
-/**
- * Rainbow color for a dotfield dot: hue advances along the grid diagonal
- * (one full spectrum ≈ 1.25 container widths) and drifts with time (a full
- * cycle every ~20s), so every dot samples one moving gradient.
+ * Rainbow color for a dotfield dot: the palette position advances along the
+ * grid diagonal (one full sweep ≈ 1.25 container widths) and drifts with time
+ * (a full cycle every ~20s), so every dot samples one moving gradient. The
+ * position lands inside a stop pair and blends the two per channel.
  * @param {number} x - dot x within the field (px)
  * @param {number} y - dot y within the field (px)
  * @param {number} width - field width (px)
@@ -156,10 +148,15 @@ function hueChannel(t) {
  * @returns {number[]} [r, g, b] channels 0-255
  */
 function rainbowColor(x, y, width, t, out = []) {
-  const hue = (((((x + (y * 0.35)) / (Math.max(width, 1) * 1.25)) + (t * 0.05)) % 1) + 1) % 1;
-  out[0] = Math.round(hueChannel(hue + (1 / 3)) * 255);
-  out[1] = Math.round(hueChannel(hue) * 255);
-  out[2] = Math.round(hueChannel(hue - (1 / 3)) * 255);
+  const pos = (((((x + (y * 0.35)) / (Math.max(width, 1) * 1.25)) + (t * 0.05)) % 1) + 1) % 1;
+  const scaled = pos * RAINBOW_SEGMENTS;
+  const index = Math.min(Math.floor(scaled), RAINBOW_SEGMENTS - 1);
+  const blend = scaled - index;
+  const from = RAINBOW_RGB[index];
+  const to = RAINBOW_RGB[index + 1];
+  out[0] = Math.round(from[0] + ((to[0] - from[0]) * blend));
+  out[1] = Math.round(from[1] + ((to[1] - from[1]) * blend));
+  out[2] = Math.round(from[2] + ((to[2] - from[2]) * blend));
   return out;
 }
 

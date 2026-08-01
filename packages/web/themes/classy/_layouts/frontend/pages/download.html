@@ -14,14 +14,6 @@ hero:
 
 # Downloads Section
 downloads:
-  superheadline:
-    icon: "download"
-    text: "Download"
-  headline: "Every platform,"
-  headline_accent: "first-class"
-  # Intentionally empty — the intro above the platform cards is ONE line (the
-  # hero description); a second lead-in here just repeats it.
-  subheadline: ""
   supported_platforms:
     - "Windows"
     - "macOS"
@@ -200,10 +192,9 @@ cta:
 <!-- ═══ Desktop: three cards, buttons in hand ═══ -->
 <section id="platforms" class="pt-5">
   <div class="container">
-    <div class="classy-section-head text-center mx-auto mb-5" data-omega-reveal>
-      {% component "heading/section-head", superheadline: resolved.downloads.superheadline.text, headline: resolved.downloads.headline, headline_accent: resolved.downloads.headline_accent, sub: resolved.downloads.subheadline %}
-    </div>
-
+    <!-- The visible section-head is gone (Ian QA); the h2 stays for heading
+         order — the cards' h3 names need a parent level under the h1 -->
+    <h2 class="visually-hidden">Desktop downloads</h2>
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="90">
       {% for platform in resolved.downloads.platforms %}
         {% if platform.id == 'ios' or platform.id == 'android' %}{% continue %}{% endif %}
@@ -423,14 +414,6 @@ cta:
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-4">
-        <div class="classy-dl-modal__started" role="status">
-          <span class="classy-icon-chip omega-check">{% uj_icon "circle-check", "fa-sm" %}</span>
-          <div>
-            <strong>Download started</strong>
-            <p class="classy-quiet small mb-0">Your download should begin automatically.</p>
-          </div>
-        </div>
-
         <!-- Windows Instructions -->
         <div class="platform-instructions" data-platform="windows" hidden>
           <div class="steps-slideshow">
@@ -793,12 +776,8 @@ cta:
         </div>
 
         <div class="classy-dl-modal__help mt-4" role="note">
-          {% uj_icon "lightbulb", "fa-sm" %}
-          <strong>Need help?</strong> Please <a href="/contact">contact support</a>.
+          {% uj_icon "lightbulb", "fa-sm me-2" %}<strong>Need help?</strong> Please <a href="/contact">contact support</a>.
         </div>
-      </div>
-      <div class="modal-footer border-0 pt-0">
-        <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal">{% uj_icon "check", "fa-sm me-2" %}Got it!</button>
       </div>
     </div>
   </div>

@@ -181,6 +181,20 @@ hr {
     opacity: 0.6;
   }
 
+  .classy-footer__powered {
+    color: var(--nf-panel-color);
+    opacity: 0.6;
+
+    a {
+      color: var(--nf-panel-color);
+
+      &:hover,
+      &:focus-visible {
+        color: var(--nf-volt);
+      }
+    }
+  }
+
   .classy-footer__legal a {
     color: var(--nf-panel-color);
     opacity: 0.78;

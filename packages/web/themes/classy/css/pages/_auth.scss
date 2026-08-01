@@ -180,6 +180,14 @@
     }
   }
 
+  // "Forgot password?" beside the password label — the accent link color the
+  // rest of the card uses (Bootstrap's .form-text would paint it muted gray),
+  // at helper-text size
+  .classy-auth__forgot {
+    font-size: 0.875em;
+    font-weight: 600;
+  }
+
   .classy-auth__foot {
     margin-top: 1.5rem;
     text-align: center;

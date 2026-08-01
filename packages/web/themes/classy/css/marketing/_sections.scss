@@ -562,7 +562,7 @@
   // Included/absent marks: filled-circle check, muted filled-circle X — state
   // told by mark + color, readable in both themes. The check's ink is the
   // shared `.omega-check` slot (#11 unified every affirmation check on
-  // --omega-check; it superseded the 2026-07-16 green for this mark).
+  // --omega-check, which itself rides the theme's success green).
   .classy-compare__no {
     color: var(--omega-ink-faint);
     opacity: 0.7;

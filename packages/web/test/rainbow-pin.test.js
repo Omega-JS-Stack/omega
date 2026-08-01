@@ -1,9 +1,9 @@
 /**
- * ONE rainbow formula (Ian 2026-07-31) — the classy ring samples the ramp in
- * CSS every 45°, the omega dotfield samples it continuously in canvas
- * (`@omega.js/client` motion.js). The fixed saturation/lightness live in both
- * languages, so nothing but a test can keep them equal: change the ramp in
- * both places or in neither.
+ * ONE rainbow palette (Ian 2026-07-31) — the classy ring paints the hand-mixed
+ * pastel stops as a conic gradient, and the omega dotfield sweeps the SAME
+ * stops in canvas (`@omega.js/client` motion.js), blending between adjacent
+ * ones. The palette lives in both languages, so nothing but a test can keep
+ * them equal: change the stops in both places or in neither.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -16,37 +16,34 @@ const UTILITIES = path.join(PKG, 'themes', 'classy', 'css', 'base', '_utilities.
 const MOTION = path.join(PKG, '..', 'client', 'src', 'modules', 'motion.js');
 
 /**
- * Pull one number out of a source file, normalized to a 0-1 fraction (the
- * SCSS side writes percentages, the JS side fractions).
+ * Pull an ordered hex list out of a source file.
  * @param {string} source - file contents
- * @param {RegExp} pattern - matcher with the number as group 1
+ * @param {RegExp} pattern - matcher with the hex list as group 1
  * @param {string} label - what is being read (assertion message)
- * @returns {number} the value as a fraction
+ * @returns {string[]} the hexes, lowercased, in source order
  */
-function readRatio(source, pattern, label) {
+function readStops(source, pattern, label) {
   const match = source.match(pattern);
   assert.ok(match, `${label} not found — the rainbow pin needs updating with the code it pins`);
-  const value = Number(match[1]);
-  return match[0].includes('%') ? value / 100 : value;
+  const hexes = match[1].match(/#[0-9a-fA-F]{6}/g) || [];
+  return hexes.map((hex) => hex.toLowerCase());
 }
 
-test('the rainbow ramp is ONE formula: scss and canvas carry the same S/L', () => {
+test('the rainbow palette is ONE list: the classy ring and the dotfield carry the same stops', () => {
   const scss = fs.readFileSync(UTILITIES, 'utf8');
   const motion = fs.readFileSync(MOTION, 'utf8');
 
-  const scssS = readRatio(scss, /\$classy-rainbow-s:\s*([\d.]+)%/, '$classy-rainbow-s');
-  const scssL = readRatio(scss, /\$classy-rainbow-l:\s*([\d.]+)%/, '$classy-rainbow-l');
-  const jsS = readRatio(motion, /const RAINBOW_S = ([\d.]+);/, 'RAINBOW_S');
-  const jsL = readRatio(motion, /const RAINBOW_L = ([\d.]+);/, 'RAINBOW_L');
+  const scssStops = readStops(scss, /--classy-gradient-stops:\s*([^;]+);/, '--classy-gradient-stops');
+  const jsStops = readStops(motion, /const RAINBOW_STOPS = \[([^\]]+)\]/, 'RAINBOW_STOPS');
 
-  assert.strictEqual(scssS, 0.68, '$classy-rainbow-s is the 68% ramp');
-  assert.strictEqual(scssL, 0.58, '$classy-rainbow-l is the 58% ramp');
-  assert.strictEqual(
-    jsS, scssS,
-    'motion.js RAINBOW_S drifted from $classy-rainbow-s — the ring and the dotfield are the same ramp: change both or neither',
+  assert.deepStrictEqual(
+    scssStops,
+    ['#f2d478', '#f2a288', '#f094c2', '#bd97f2', '#88b4f2', '#7fd9cf', '#a5e08c', '#f2d478'],
+    'the hand-mixed pastel ramp: butter → coral → pink → lavender → periwinkle → aqua → soft green, first stop repeated so the wrap is seamless',
   );
-  assert.strictEqual(
-    jsL, scssL,
-    'motion.js RAINBOW_L drifted from $classy-rainbow-l — the ring and the dotfield are the same ramp: change both or neither',
+  assert.deepStrictEqual(
+    jsStops,
+    scssStops,
+    'motion.js RAINBOW_STOPS drifted from --classy-gradient-stops — the ring and the dotfield are the same palette: change both or neither',
   );
 });

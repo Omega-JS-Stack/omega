@@ -41,54 +41,62 @@ newsletter:
 {% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
 
 <!-- ═══ Article — left-aligned editorial header (bronn pattern) ═══ -->
-<article class="classy-dotgrid"{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-xl-9 col-lg-10 col-12">
-        <header data-omega-reveal-stagger="80">
-          <!-- Mono breadcrumb -->
-          <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
-            <a href="/blog">Blog</a>
-            {% if resolved.post.categories[0] %}
-              <span>/</span>
-              <a href="/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | uj_title_case }}</a>
-            {% endif %}
-          </div>
-
-          <h1 class="classy-display classy-display--page" data-omega-reveal>{{ resolved.post.title }}</h1>
-
-          {% iftruthy resolved.post.description %}
-            <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.post.description }}</p>
-          {% endiftruthy %}
-
-          <!-- Hairline + mono byline row -->
-          {%- capture _author_name -%}{%- uj_member resolved.post.author, "name" -%}{%- endcapture -%}
-          <div class="d-flex align-items-center gap-3 flex-wrap mt-4 pt-4 hairline-top" data-omega-reveal>
-            {% if _author_name != '' %}
-              <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-post-card__avatar">
-                {%- uj_member resolved.post.author, "image-tag", class="" -%}
-              </a>
-            {% else %}
-              <span class="classy-post-card__avatar classy-post-card__avatar--fallback" aria-hidden="true">
-                {% uj_icon "pen-nib", "fa-xs" %}
-              </span>
-            {% endif %}
-            <div class="classy-post-card__eyebrow">
-              {% if _author_name != '' %}
-                <a href="{%- uj_member resolved.post.author, "url" -%}">{{ _author_name }}</a>
-              {% else %}
-                <span>{{ site.brand.name }}</span>
+<article{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
+  {% comment %} Dotfield band: the animated dots sit behind the post masthead
+    ONLY — the read surface below stays plain, so nothing moves behind body
+    text. Same contract as every other page's hero (classy-dotgrid +
+    data-omega-dotfield). {% endcomment %}
+  <div class="classy-dotgrid" data-omega-dotfield>
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-xl-9 col-lg-10 col-12">
+          <header data-omega-reveal-stagger="80">
+            <!-- Mono breadcrumb -->
+            <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
+              <a href="/blog">Blog</a>
+              {% if resolved.post.categories[0] %}
+                <span>/</span>
+                <a href="/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | uj_title_case }}</a>
               {% endif %}
-              <span>·</span>
-              <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
-              <span>·</span>
-              <span>{% uj_readtime content %} min read</span>
             </div>
-          </div>
-        </header>
+
+            <h1 class="classy-display classy-display--page" data-omega-reveal>{{ resolved.post.title }}</h1>
+
+            {% iftruthy resolved.post.description %}
+              <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.post.description }}</p>
+            {% endiftruthy %}
+
+            <!-- Hairline + mono byline row -->
+            {%- capture _author_name -%}{%- uj_member resolved.post.author, "name" -%}{%- endcapture -%}
+            <div class="d-flex align-items-center gap-3 flex-wrap mt-4 pt-4 hairline-top" data-omega-reveal>
+              {% if _author_name != '' %}
+                <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-post-card__avatar">
+                  {%- uj_member resolved.post.author, "image-tag", class="" -%}
+                </a>
+              {% else %}
+                <span class="classy-post-card__avatar classy-post-card__avatar--fallback" aria-hidden="true">
+                  {% uj_icon "pen-nib", "fa-xs" %}
+                </span>
+              {% endif %}
+              <div class="classy-post-card__eyebrow">
+                {% if _author_name != '' %}
+                  <a href="{%- uj_member resolved.post.author, "url" -%}">{{ _author_name }}</a>
+                {% else %}
+                  <span>{{ site.brand.name }}</span>
+                {% endif %}
+                <span>·</span>
+                <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
+                <span>·</span>
+                <span>{% uj_readtime content %} min read</span>
+              </div>
+            </div>
+          </header>
+        </div>
       </div>
     </div>
+  </div>
 
+  <div class="container">
     {% comment %} Hero media honors the post.image contract: false → no hero
     (the title IS the hero); a string → that image; absent → legacy id-path {% endcomment %}
     {% unless resolved.post.image == false %}

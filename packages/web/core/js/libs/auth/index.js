@@ -15,7 +15,7 @@
 // Libraries
 import omega from '@omega.js/client';
 import { initializeSigninForm, initializeSignupForm, initializeResetForm } from '__main_assets__/js/libs/auth/forms.js';
-import { handleRedirectResult } from '__main_assets__/js/libs/auth/oauth.js';
+import { handleRedirectResult, shouldUseAuthPopup } from '__main_assets__/js/libs/auth/oauth.js';
 import { handleAuthSignout, handleCustomTokenSignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -27,7 +27,7 @@ export default function () {
   // popup-vs-redirect choice, passed explicitly to every flow that needs it.
   const ctx = {
     formManager: null,
-    useAuthPopup: new URL(window.location.href).searchParams.get('authPopup') === 'true' || window !== window.top,
+    useAuthPopup: shouldUseAuthPopup(),
   };
 
   // Handle DOM ready
