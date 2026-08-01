@@ -234,7 +234,7 @@
 
       // The check is a one-line-tall box so the glyph centers on the FIRST
       // line of its feature text (the old baseline + magic margin drifted as
-      // soon as a feature wrapped). Ink comes from `.omega-check`.
+      // soon as a feature wrapped). Ink comes from Bootstrap's `.text-success`.
       .classy-price-card__check {
         display: inline-flex;
         align-items: center;
@@ -271,11 +271,11 @@
 }
 
 // Billing toggle — segmented ink control.
-// The track is the RAISED surface: --omega-surface-2 sits a hair off
-// --omega-ground in light mode, so the control disappeared into the page.
-// --omega-surface + the strong hairline separates it from the ground in BOTH
-// modes, and the selected segment inverts to the recessed surface-2 (the
-// footer's appearance control re-skins its thumb the same way).
+// The track is the RAISED surface: --omega-surface + the strong hairline lift
+// it off the page in BOTH modes, and the selected segment inverts to the
+// recessed surface-2 (the footer's appearance control re-skins its thumb the
+// same way). The platform rail below is the other reading of the same control:
+// a recessed track with a raised selected segment.
 .classy-billing-toggle {
   display: inline-flex;
   padding: 0.25rem;
@@ -329,7 +329,10 @@
 }
 
 // Platform rail — the download page's segmented selector (Bootstrap tab
-// machinery underneath: .active is stamped by tab JS / platform detection)
+// machinery underneath: .active is stamped by tab JS / platform detection).
+// The recessed track sits straight on the page ground, so it reads only
+// because surface-2 is a real well now (#152); the selected segment is the
+// raised white surface on top of it.
 .classy-platform-rail {
   display: inline-flex;
   flex-wrap: wrap;
@@ -560,9 +563,9 @@
 
 .classy-compare {
   // Included/absent marks: filled-circle check, muted filled-circle X — state
-  // told by mark + color, readable in both themes. The check's ink is the
-  // shared `.omega-check` slot (#11 unified every affirmation check on
-  // --omega-check, which itself rides the theme's success green).
+  // told by mark + color, readable in both themes. The check's ink is
+  // Bootstrap's `.text-success`, which the root bridge points at --omega-ok,
+  // so every affirmation tick and every status green are the same green.
   .classy-compare__no {
     color: var(--omega-ink-faint);
     opacity: 0.7;

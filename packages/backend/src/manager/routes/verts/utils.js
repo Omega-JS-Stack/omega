@@ -8,6 +8,8 @@
  * @omega.js/client (this package holds no unit template of its own).
  */
 
+const { BRAND_ID_PATTERN } = require('@omega.js/config');
+
 const BATCH_SIZE = 500;
 const CACHE_TTL = 5 * 60 * 1000; // ~5 minutes
 
@@ -70,6 +72,23 @@ function normalizeOrigin(input) {
   } catch (e) {
     return '';
   }
+}
+
+/**
+ * Normalize a requesting brand's id (the `brand` param the client sends with
+ * every impression, and it becomes utm_source on the click). Only a real config
+ * slug survives (`brand.id`'s own pattern), so a caller-supplied value can
+ * never write arbitrary text onto an advertiser's destination URL.
+ * Returns '' when unusable.
+ */
+function normalizeBrandId(input) {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  const raw = input.trim().toLowerCase();
+
+  return BRAND_ID_PATTERN.test(raw) ? raw : '';
 }
 
 /**
@@ -376,15 +395,20 @@ async function renderVertUnit(options) {
  * Node >=22 (the declared engines floor and the pinned Functions runtime)
  * loads the client's ESM module through require() directly.
  *
+ * utm_source is the HOST brand's own id (the `brand` param the client sends
+ * with the impression and the serve route stamps on this redirect URL), with
+ * the parent host as the fallback when no id came along.
+ *
  * @param {object} vert - the stored vert ({ id, link })
- * @param {string} [parentHost] - the referring host (utm_source)
+ * @param {string} [parentHost] - the referring host (utm_source fallback)
+ * @param {string} [brandId] - the host brand's id (utm_source)
  * @returns {string} the tagged destination URL
  */
-function buildClickDestination(vert, parentHost) {
+function buildClickDestination(vert, parentHost, brandId) {
   const { applyVertUtm, UTM_MEDIUM } = require('@omega.js/client/modules/vert-document.js');
 
   return applyVertUtm(vert.link, {
-    source: parentHost,
+    source: brandId || parentHost,
     medium: UTM_MEDIUM,
     campaign: vert.id,
   });
@@ -394,6 +418,7 @@ module.exports = {
   CACHE_TTL,
   normalizeHost,
   normalizeOrigin,
+  normalizeBrandId,
   isHttpUrl,
   getWeight,
   getVertTags,

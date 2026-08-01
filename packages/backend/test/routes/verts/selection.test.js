@@ -7,7 +7,7 @@
  *
  * Run: npx omega test backend:routes/verts/selection
  */
-const { isEligible, filterEligible, scoreVert, weightedPick, selectVert, normalizeHost, parseTags } = require('../../../src/manager/routes/verts/utils.js');
+const { isEligible, filterEligible, scoreVert, weightedPick, selectVert, normalizeHost, normalizeBrandId, parseTags } = require('../../../src/manager/routes/verts/utils.js');
 
 function makeAd(id, overrides) {
   return {
@@ -35,6 +35,18 @@ module.exports = {
         assert.equal(normalizeHost('example.com:8080'), 'example.com', 'Port should strip');
         assert.equal(normalizeHost(''), '', 'Empty should stay empty');
         assert.equal(normalizeHost(null), '', 'Null should stay empty');
+      },
+    },
+
+    {
+      name: 'normalize-brand-id-keeps-only-config-slugs',
+      async run({ assert }) {
+        assert.equal(normalizeBrandId('Daily-Build'), 'daily-build', 'A real slug should lowercase through');
+        assert.equal(normalizeBrandId(' omega.js '), 'omega.js', 'Surrounding whitespace should trim');
+        assert.equal(normalizeBrandId('utm spam&x=1'), '', 'Free text should never reach an advertiser URL');
+        assert.equal(normalizeBrandId('9lives'), '', 'A slug starts with a letter');
+        assert.equal(normalizeBrandId(''), '', 'Empty should stay empty');
+        assert.equal(normalizeBrandId(null), '', 'Null should stay empty');
       },
     },
 

@@ -125,7 +125,7 @@ social_signup:
       <div>
         {% for benefit in resolved.benefits %}
           <div class="classy-auth__aside-row">
-            {% uj_icon "check", "omega-check fa-sm" %}
+            {% uj_icon "check", "text-success fa-sm" %}
             <span><strong>{{ benefit.title }}</strong>: {{ benefit.description }}</span>
           </div>
         {% endfor %}

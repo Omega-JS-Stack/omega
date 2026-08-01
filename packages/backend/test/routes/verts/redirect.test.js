@@ -23,7 +23,7 @@ module.exports = {
           weight: 1,
         });
 
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&parent=site.example`, { redirect: 'manual' });
+        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&parent=site.example&brand=site-brand`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Redirect should 302');
 
@@ -31,14 +31,28 @@ module.exports = {
 
         assert.equal(location.origin + location.pathname, 'https://shop.example/product', 'Location should be the STORED link');
         assert.equal(location.searchParams.get('ref'), 'house', 'Existing query params should survive');
-        assert.equal(location.searchParams.get('utm_source'), 'site.example', 'utm_source should be the parent host');
+        assert.equal(location.searchParams.get('utm_source'), 'site-brand', 'utm_source should be the host brand id');
         assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should be omega-vert');
         assert.equal(location.searchParams.get('utm_campaign'), 'redirect-a', 'utm_campaign should be the vert id');
       },
     },
 
     {
-      name: 'no-parent-omits-utm-source',
+      name: 'no-brand-falls-back-to-the-parent-host',
+      timeout: 30000,
+      async run({ assert }) {
+        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&parent=site.example`, { redirect: 'manual' });
+
+        assert.equal(response.status, 302, 'Redirect should 302');
+
+        const location = new URL(response.headers.get('location'));
+
+        assert.equal(location.searchParams.get('utm_source'), 'site.example', 'utm_source should fall back to the parent host');
+      },
+    },
+
+    {
+      name: 'no-brand-and-no-parent-omits-utm-source',
       timeout: 30000,
       async run({ assert }) {
         const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a`, { redirect: 'manual' });
@@ -47,7 +61,7 @@ module.exports = {
 
         const location = new URL(response.headers.get('location'));
 
-        assert.equal(location.searchParams.get('utm_source'), null, 'utm_source should be absent without a parent');
+        assert.equal(location.searchParams.get('utm_source'), null, 'utm_source should be absent without a brand id or a parent');
         assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should still be omega-vert');
       },
     },

@@ -98,7 +98,7 @@ const STYLES = `
 .omega-devbar__who {
   padding: 0.5rem 0.625rem;
   font-size: 0.8125rem;
-  background: var(--omega-surface-2, #f6f6f5);
+  background: var(--omega-surface-2, #ececeb);
   border: 1px solid var(--omega-line, #e8e8e6);
   border-radius: 8px;
   word-break: break-all;
@@ -115,7 +115,7 @@ const STYLES = `
   border-radius: 8px;
   cursor: pointer;
 }
-.omega-devbar__btn:hover { background: var(--omega-surface-2, #f6f6f5); }
+.omega-devbar__btn:hover { background: var(--omega-surface-2, #ececeb); }
 .omega-devbar__btn[data-busy="true"] { opacity: 0.55; pointer-events: none; }
 .omega-devbar__note { font-size: 0.6875rem; color: var(--omega-ink-faint, #a1a19e); }
 `;

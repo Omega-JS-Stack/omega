@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- [#44](../../issues/44) — Every affirmation tick now wears Bootstrap's `text-success`, bridged to `--omega-ok` in each theme, and the `.omega-check` utility plus its `--omega-check` token are gone. One success green, one vocabulary for it.
+- [#152](../../issues/152) — Light-mode `--omega-surface-2` is a visible well at `#ececeb`, not the `#f6f6f5` that sat one point off the page ground. Components painting it straight on the page, the download page's platform rail among them, are readable in light mode again.
+- [#44](../../issues/44) — A vert click's `utm_source` is the host brand's own `brand.id` on both lanes, not the page's domain. The parent host stays the targeting input and the fallback, and an advertiser's own tags still win.
+- [#44](../../issues/44) — The verts test page gains a narrow sidebar rail demo (a skyscraper slot in a 160px column, where the card stacks) and a Reload button on every demo slot that re-mounts that unit.
+- [#44](../../issues/44) — A configured `cloud.config.authDomain` must be the brand's own host, which self-hosts `/__/auth/*` for redirect sign-in. A `*.firebaseapp.com` value or any other host fails validation, naming both. Emulator-only `demo-*` projects are exempt.
+
+### Fixed
+- [#44](../../issues/44) — A blog post's dot band opens the page like every other hero: the nav clearance moves from the article to the band itself, so the dots run up behind the transparent nav instead of starting below it and reading detached.
 
 ## [0.14.0] (2026-07-31)
 ### Added

@@ -19,7 +19,7 @@
  * at prepare time, never published on its own.
  */
 
-const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
+const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN } = require('./schema.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
@@ -129,4 +129,5 @@ module.exports = {
   SHARED_SECTIONS,
   SHARED_SCHEMA,
   TARGET_SCHEMAS,
+  BRAND_ID_PATTERN,
 };

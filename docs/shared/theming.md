@@ -14,8 +14,7 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    `surface-2`, `ink`, `ink-muted`, `ink-faint`, `line`, `line-strong`), the
    accent family (`accent`, `-hover`, `-active`, `-subtle`, `-ink`, `-ring`),
    status (`ok`/`warn`/`danger`, each with an `-rgb` channel twin — see
-   "One status hue site-wide" below), the affirmation check (`check` — rides the
-   accent; see below), the categorical ramp (`chart-1`…`chart-6` —
+   "One status hue site-wide" below), the categorical ramp (`chart-1`…`chart-6` —
    series-1 rides the accent, the rest are CVD-validated muted hues, cool half
    before warm), shadows
    (`shadow-1`/`shadow-2`), shape (`radius-xs/s/m/l/xl`), motion (`speed`,
@@ -33,6 +32,30 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    fallback layer). classy v2's `css/base/_root.scss` bridges Bootstrap's CSS
    variables onto the tokens, so every Bootstrap component follows the theme,
    the brand ramp, and consumer overrides with zero recompilation.
+
+## The three surface tiers (and which way elevation runs)
+
+`--omega-ground` is the page, `--omega-surface` is a card lifted off it, and
+`--omega-surface-2` is the second tier: table heads, chips, code blocks, hover
+fills, receipt panels, segmented tracks. The tiers move in OPPOSITE directions
+per mode, and a component may not assume one of them: dark elevates by getting
+LIGHTER (`#0d0d0e` ground → `#151516` surface → `#1d1d1f` surface-2), light
+elevates with white plus a shadow and recesses by getting DARKER (`#f5f5f4`
+ground → `#ffffff` surface → `#ececeb` surface-2, the well).
+
+Light surface-2 shipped at `#f6f6f5`, one point off the ground, so every
+component that painted it directly on the page was invisible in light mode and
+correct in dark ([#152](https://github.com/Omega-JS-Stack/omega/issues/152)).
+The value is now a real well: readable on the ground AND inside a white card,
+still lighter than `--omega-line`. Its Bootstrap twins move with it:
+`$classy-surface-2-light` (compile-time `$body-secondary-bg`) and
+`--bs-secondary-bg-rgb` in classy's root bridge.
+
+Two readings of a segmented control are both sanctioned, and both work in both
+modes: a RAISED track (surface + `--omega-line-strong` + `shadow-1`, selected
+segment recessed to surface-2, the billing toggle) or a RECESSED track
+(surface-2 straight on the ground, selected segment raised to white, the
+platform rail).
 
 ## brand.color → the accent ramps
 
@@ -196,14 +219,6 @@ inherits them:
   surfaces: a chart series and the badge naming the same thing are the same
   color. Which name falls in which slot is the page's business. The sheet
   loads after the theme forward, so it outranks a theme's own chip rules.
-- **`.omega-check`** (`core/css/core/_utilities.scss`): the ONE ink for every
-  affirmation tick — plan features, benefit lists, hero meta, comparison
-  "yes" cells. It reads `--omega-check`, which rides `--omega-ok` (the success
-  hue), so every tick and every status green agree in both modes (Ian's QA
-  ruling 2026-07-31, superseding #11's accent-ride: a green brand color put
-  the accent ramp and the status green side by side as two near-miss greens).
-  The class goes on the icon OR its wrapper; a call site NEVER re-colors a
-  check (#11's call-site rule stands).
 - **`.omega-interactive`** (`core/css/motion/_index.scss`): the whole-surface
   click affordance — the surface warms on hover AND `:focus-visible`, an
   accent ring on focus, an accent-subtle tint on press. `--lift` adds the
@@ -229,6 +244,15 @@ companions at the tokens, AFTER Bootstrap compiles, so `bg-success`,
 the /status page's "all systems operational" and the uptime bars beneath it
 were two different greens in dark mode until this landed
 ([#13](https://github.com/Omega-JS-Stack/omega/issues/13)).
+
+Affirmation ticks ride that same bridge: every "you get this" check (plan
+features, benefit lists, hero meta, comparison "yes" cells, signup benefits)
+wears Bootstrap's `.text-success` on the icon or its wrapper, and nothing else.
+There is no framework class for it: the `.omega-check`/`--omega-check` seam
+was deleted (Ian's ruling 2026-07-31, #44) because it computed exactly
+`.text-success`: a concept Bootstrap already names is expressed through
+Bootstrap's hook, and `omega-*` is only for concepts Bootstrap has no name for.
+A call site NEVER paints a check its own color (#11's call-site rule stands).
 
 **A theme that re-values a status hue MUST re-value its `-rgb` twin** (only
 newsflash does today) or the two drift apart again. `test/tokens.test.js` pins

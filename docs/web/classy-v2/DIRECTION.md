@@ -36,6 +36,8 @@ Light (warm paper):
 Dark (neutral charcoal, de-blued):
 `ground #0d0d0e · surface #151516 · surface-2 #1d1d1f · ink #ebebea · muted #9f9fa0 · faint #6c6c6e · line #262628 · line-strong #333336`
 
+Amendment (2026-07-31, [#152](https://github.com/Omega-JS-Stack/omega/issues/152)): light `surface-2` re-valued `#f6f6f5` to `#ececeb` — the draft value was one point off the ground and invisible when painted on it; light elevation recesses, so the second tier goes darker. Reasoning and the twins that move with it: `docs/shared/theming.md` "The three surface tiers".
+
 Accent (single hue, from `brand.color`; light/dark variants; derived hover/subtle/ring via color-mix in the comps — production derives via composeBrandTokens):
 default (playground) `#2563eb` light / `#5484ef` dark (draft-1 "ocean" — Ian retired the draft-2 purple 2026-07-16) · `accent-ink` = white on light, near-black on dark.
 

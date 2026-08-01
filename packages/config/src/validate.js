@@ -14,6 +14,9 @@
  *     present entry must be an object ({} = enabled with defaults) OR an
  *     array of id'd instance entries (multi-instance targets: ids required,
  *     dir-safe, unique per type; >1 backend instance is a WARNING)
+ *   - `cloud.config.authDomain`, when set, must be the brand's OWN host (the
+ *     resolved instance url, else brand.url): a firebaseapp.com value or a
+ *     mismatch is an error, and demo-* (emulator-only) projects are exempt
  *   - retired keys are always errors (see retired-keys.js) — a name that was
  *     renamed outright reads as nothing at all, so it fails loudly instead of
  *     losing its settings silently
@@ -26,6 +29,10 @@ const { findSecretKeys } = require('./secrets.js');
 const { findRetiredKeys } = require('./retired-keys.js');
 const { isPlainObject } = require('./merge.js');
 const { INSTANCE_ID_PATTERN } = require('./instances.js');
+const { isDemoProject } = require('./demo.js');
+
+// Firebase's own default authDomain shape: a third-party host by definition
+const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
 
 function getPath(obj, dottedPath) {
   if (!obj) return undefined;
@@ -116,6 +123,74 @@ function runSchema(config, schema) {
 }
 
 /**
+ * The host this (resolved) config's brand lives on. An instance entry's own
+ * `url` is already merged to the top level by the target chain, and it wins
+ * over the brand-shared `brand.url`, the same precedence
+ * instances.resolveInstanceUrl uses.
+ * @param {object} config - The resolved config object.
+ * @returns {string} The lowercase hostname, or '' when no URL is known.
+ */
+function resolvedBrandHost(config) {
+  const url = getPath(config, 'url') || getPath(config, 'brand.url');
+
+  if (typeof url !== 'string' || !url) {
+    return '';
+  }
+
+  try {
+    return new URL(url.includes('://') ? url : `https://${url}`).hostname.toLowerCase();
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * authDomain must be the brand's OWN host (cp268). Firebase's default
+ * `<project>.firebaseapp.com` is a third-party host: under browser storage
+ * partitioning its redirect sign-in loses the session, which is why the web
+ * build self-hosts Firebase's `/__/auth/*` helper files on the brand domain.
+ *
+ * demo-* projects are exempt because they are emulator-only (no real GCP project
+ * exists), so no redirect sign-in ever leaves the emulator.
+ * @param {object} config - The resolved config object.
+ * @returns {string[]} Errors; empty when the config passes.
+ */
+function validateAuthDomain(config) {
+  const authDomain = getPath(config, 'cloud.config.authDomain');
+
+  if (typeof authDomain !== 'string' || !authDomain.trim()) {
+    return [];
+  }
+
+  if (isDemoProject(getPath(config, 'cloud.config.projectId'))) {
+    return [];
+  }
+
+  const value = authDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+  if (FIREBASE_AUTH_DOMAIN.test(value)) {
+    return [
+      `config.cloud.config.authDomain "${authDomain}" is a firebaseapp.com domain, but it must be this brand's own host, `
+      + `which self-hosts /__/auth/* so redirect sign-in survives browser storage partitioning `
+      + `(docs/shared/config.md → "authDomain is the brand's own host")`,
+    ];
+  }
+
+  const brandHost = resolvedBrandHost(config);
+
+  // No URL anywhere: nothing to compare against, and brand.url is optional
+  if (!brandHost || value === brandHost) {
+    return [];
+  }
+
+  return [
+    `config.cloud.config.authDomain "${authDomain}" is not this brand's host "${brandHost}": `
+    + `authDomain must be the host the site is served from, which self-hosts /__/auth/* `
+    + `(docs/shared/config.md → "authDomain is the brand's own host")`,
+  ];
+}
+
+/**
  * Validate a resolved config: shared schema + optional target refinements +
  * targets-key sanity + secret-shaped-key detection.
  * @param {object} config - The resolved config object.
@@ -184,6 +259,9 @@ function validateConfig(config, options) {
       }
     });
   }
+
+  // ─── authDomain is the brand's own host (cp268) ────────────────────────
+  validateAuthDomain(config).forEach((error) => errors.push(error));
 
   // ─── retired keys (#142) ───────────────────────────────────────────────
   findRetiredKeys(config).forEach(({ path, replacement, why }) => {

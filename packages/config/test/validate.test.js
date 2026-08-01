@@ -204,6 +204,73 @@ test('secret-shaped keys are validation errors', () => {
   assert.ok(errors.some((e) => e.includes('config.payment.processors.stripe.apiSecret looks like a secret')));
 });
 
+// ─── validateConfig: authDomain is the brand's own host (cp268) ───
+
+test('an authDomain equal to the brand host passes (the playground shape)', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://playground.omegajs.dev' },
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'playground.omegajs.dev' } },
+  });
+
+  assert.deepStrictEqual(errors, []);
+});
+
+test('a firebaseapp.com authDomain hard-fails, naming the self-hosted requirement', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://playground.omegajs.dev' },
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'omegajs-playground.firebaseapp.com' } },
+  });
+
+  assert.strictEqual(errors.length, 1);
+  assert.ok(errors[0].includes('config.cloud.config.authDomain'));
+  assert.ok(errors[0].includes('firebaseapp.com'));
+  assert.ok(errors[0].includes('/__/auth/*'), 'the message says self-hosting is the requirement');
+});
+
+test('an authDomain on another host fails, naming both values', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://playground.omegajs.dev' },
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'auth.other.example' } },
+  });
+
+  assert.strictEqual(errors.length, 1);
+  assert.ok(errors[0].includes('auth.other.example'), 'the configured value');
+  assert.ok(errors[0].includes('playground.omegajs.dev'), 'the brand host');
+});
+
+test("an instance's own url wins over brand.url for the host comparison", () => {
+  const base = {
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://playground.omegajs.dev' },
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'admin.omegajs.dev' } },
+  };
+
+  // The target chain merges the instance entry to the top level, so its `url`
+  // is the resolved brand host for THIS app
+  assert.deepStrictEqual(validateConfig({ ...base, url: 'https://admin.omegajs.dev' }, { target: 'web' }).errors, []);
+  assert.strictEqual(validateConfig(base, { target: 'web' }).errors.length, 1, 'without the instance url it is a mismatch');
+});
+
+test('an absent authDomain passes, and a demo-* project is exempt', () => {
+  const absent = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://sandbox-brand.example.com' },
+    cloud: { provider: 'firebase', config: { projectId: 'demo-sandbox-brand' } },
+  });
+  assert.deepStrictEqual(absent.errors, []);
+
+  // demo-* is emulator-only: no real project, no redirect sign-in
+  const demo = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, url: 'https://sandbox-brand.example.com' },
+    cloud: { provider: 'firebase', config: { projectId: 'demo-sandbox-brand', authDomain: 'demo-sandbox-brand.firebaseapp.com' } },
+  });
+  assert.deepStrictEqual(demo.errors, []);
+});
+
 // ─── validateConfig: retired keys (#142) ───
 
 test('a retired key is an error wherever it sits — shared level and inside a target', () => {

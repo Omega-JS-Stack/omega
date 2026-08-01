@@ -501,7 +501,7 @@ describe('Verts Module', () => {
       const { unit } = mountPromo({ size: 'rectangle' });
       const doc = unit.$iframe.srcdoc;
       // The destination is the UTM-tagged promo url, escaped for the attribute
-      const href = vertsModule.promoHref('rectangle').replace(/&/g, '&amp;');
+      const href = vertsModule.promoHref('rectangle', 'test').replace(/&/g, '&amp;');
 
       assert(doc.startsWith('<!DOCTYPE html>'), 'a complete document');
       assert(doc.includes('Built with OMEGA'));
@@ -593,10 +593,10 @@ describe('Verts Module', () => {
     it('the promo document IS the shared renderer, fed the house promo data', async () => {
       const { renderVertDocument, OMEGA_ACCENT } = await import('../src/modules/vert-document.js');
 
-      const promo = vertsModule.buildPromoDocument(250, 'dark', 'https://host.example');
+      const promo = vertsModule.buildPromoDocument(250, 'dark', 'https://host.example', '', 0, 'test');
       const direct = renderVertDocument({
         id: vertsModule.PROMO_ID,
-        href: vertsModule.promoHref(),
+        href: vertsModule.promoHref('', 'test'),
         title: 'Built with OMEGA',
         description: 'The full-stack JavaScript framework for web, backend, desktop, and extensions.',
         button: 'Visit omegajs.dev',
@@ -747,10 +747,10 @@ describe('Verts Module', () => {
     }
 
     it('tags the promo destination with the vert utm set, slot as utm_content', () => {
-      const href = promoHrefOf(vertsModule.buildPromo(90, '', 'leaderboard').srcdoc);
+      const href = promoHrefOf(vertsModule.buildPromo(90, '', 'leaderboard', 0, 'test').srcdoc);
 
       assert.strictEqual(href.origin + href.pathname, 'https://omegajs.dev/');
-      assert.strictEqual(href.searchParams.get('utm_source'), 'localhost', 'the host page hostname');
+      assert.strictEqual(href.searchParams.get('utm_source'), 'test', 'the host brand id');
       assert.strictEqual(href.searchParams.get('utm_medium'), 'omega-vert');
       assert.strictEqual(href.searchParams.get('utm_campaign'), 'omega-promo');
       assert.strictEqual(href.searchParams.get('utm_content'), 'leaderboard');
@@ -762,6 +762,55 @@ describe('Verts Module', () => {
 
       assert.strictEqual(href.searchParams.get('utm_content'), null);
       assert.strictEqual(href.searchParams.get('utm_medium'), 'omega-vert');
+    });
+
+    it('a mounted promo tags utm_source with the HOST brand id, not the host page', () => {
+      const $host = makeHost();
+      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const href = promoHrefOf(result.unit.$iframe.srcdoc);
+
+      assert.strictEqual(href.searchParams.get('utm_source'), 'test', 'the config brand.id');
+      result.unit.destroy();
+    });
+
+    it('a brand with no id falls back to the host page hostname', () => {
+      const saved = getManager().config.brand;
+      getManager().config.brand = { name: 'No Id' };
+
+      const $host = makeHost();
+      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const href = promoHrefOf(result.unit.$iframe.srcdoc);
+
+      assert.strictEqual(href.searchParams.get('utm_source'), 'localhost', 'the parent host fallback');
+      result.unit.destroy();
+      getManager().config.brand = saved;
+    });
+
+    it('the house serve URL carries the brand id, so the redirect route tags the same source', () => {
+      const $host = makeHost();
+      const { unit } = getManager().verts().renderHouse($host, {
+        source: 'https://verts.example.com',
+        fillTimeout: 60000,
+      });
+
+      const serve = new URL(unit.$iframe.src);
+      assert.strictEqual(serve.searchParams.get('brand'), 'test', 'the config brand.id');
+      unit.destroy();
+    });
+
+    it('a brand with no id sends no brand param, so the backend falls back to the parent host', () => {
+      const saved = getManager().config.brand;
+      getManager().config.brand = { name: 'No Id' };
+
+      const $host = makeHost();
+      const { unit } = getManager().verts().renderHouse($host, {
+        source: 'https://verts.example.com',
+        fillTimeout: 60000,
+      });
+
+      assert.strictEqual(new URL(unit.$iframe.src).searchParams.get('brand'), null);
+      unit.destroy();
+      getManager().config.brand = saved;
     });
 
     it('the promo click message fires the host-side analytics event', () => {

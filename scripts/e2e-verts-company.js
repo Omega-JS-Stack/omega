@@ -284,14 +284,14 @@ async function main() {
 
     await step('redirect 302s only to the stored link (+ UTM), fail-closed', async () => {
       const response = await fetch(
-        `${base}/omega/verts/redirect?id=devnews-digest&parent=dailybuild.omegajs.dev&url=https://evil.example/hijack`,
+        `${base}/omega/verts/redirect?id=devnews-digest&parent=dailybuild.omegajs.dev&brand=daily-build&url=https://evil.example/hijack`,
         { redirect: 'manual' },
       );
       assert.equal(response.status, 302, `redirect should 302 (got ${response.status})`);
 
       const location = new URL(response.headers.get('location'));
       assert.equal(location.origin + location.pathname, 'https://digest.buildtools.example/subscribe', 'redirect must land on the STORED link (never a caller-supplied url)');
-      assert.equal(location.searchParams.get('utm_source'), 'dailybuild.omegajs.dev', 'utm_source should be the parent host');
+      assert.equal(location.searchParams.get('utm_source'), 'daily-build', 'utm_source should be the host brand id');
       assert.equal(location.searchParams.get('utm_medium'), 'omega-vert', 'utm_medium should be omega-vert');
       assert.equal(location.searchParams.get('utm_campaign'), 'devnews-digest', 'utm_campaign should be the vert id');
 

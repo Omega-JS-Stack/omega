@@ -2,7 +2,8 @@
  * GET /omega/verts/serve - Serve a house vert unit (public)
  *
  * Query params:
- *   parent — the requesting page's host (eligibility + postMessage origin + UTM source)
+ *   parent — the requesting page's host (eligibility + postMessage origin + UTM source fallback)
+ *   brand  — the requesting brand's id (becomes the click's utm_source)
  *   tags   — comma-separated contextual tags (targeting match input)
  *   width  — optional unit width hint (px)
  *   height — optional unit height hint (px)
@@ -15,11 +16,12 @@
  * (inline CSS/JS, postMessage reporting, no self-refresh — the host owns the
  * lifecycle), or 204 on no fill.
  */
-const { getInventory, selectVert, normalizeHost, normalizeOrigin, parseTags, renderVertUnit } = require('../utils.js');
+const { getInventory, selectVert, normalizeHost, normalizeOrigin, normalizeBrandId, parseTags, renderVertUnit } = require('../utils.js');
 
 module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   const parentHost = normalizeHost(settings.parent);
+  const brandId = normalizeBrandId(settings.brand);
   const tags = parseTags(settings.tags);
 
   // Select from the cached inventory
@@ -37,6 +39,12 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   if (parentHost) {
     redirectUrl.searchParams.set('parent', parentHost);
+  }
+
+  // The host brand's id rides through to the click: the redirect route tags
+  // the stored link with it as utm_source (parent host is the fallback)
+  if (brandId) {
+    redirectUrl.searchParams.set('brand', brandId);
   }
 
   // Track the view server-side (Analytics lane — no gtag inside the frame)

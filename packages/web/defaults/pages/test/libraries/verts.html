@@ -119,6 +119,22 @@ meta:
         </div>
       </div>
 
+      <!-- ── Narrow rail ────────────────────────────────────────────────── -->
+      <h2 class="h4 mb-3">Narrow rail</h2>
+      <p class="text-muted mb-3">A real sidebar rail: a 264px column (the app shell sidebar width) with the skyscraper preset. The card stacks (image on top) because the slot is narrower than the media row needs.</p>
+
+      <div class="card p-3 mb-5">
+        <div class="small text-muted mb-2"><code>&#123;% section "verts/unit", type: "display", size: "skyscraper" %&#125;</code> in a 264px column</div>
+        <div class="d-flex gap-3">
+          <div style="width: 264px; flex: 0 0 264px;">
+            {% section "verts/unit", type: "display", size: "skyscraper" %}
+          </div>
+          <div class="flex-grow-1">
+            <p class="mb-0"><strong>Rail context</strong>: this column stands in for page content beside the rail, so the unit renders at the width a real sidebar gives it. The host measures its own width and passes it to the document, which is what flips the card from the media row to the stacked layout.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Big spacing so the next unit starts well below the fold -->
       <div class="vh-50"></div>
 

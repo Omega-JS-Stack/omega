@@ -31,6 +31,15 @@ test('blog [slug].js rides the modern verts lane — config-gated, module-delega
   assert.ok(slug.includes('[data-omega-verts="false"]'), 'the per-post opt-out stops the mid-article lane too');
 });
 
+test('the verts test page carries a per-slot reload that tears the unit down first', () => {
+  const page = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'test', 'libraries', 'verts', 'index.js'), 'utf8');
+
+  assert.ok(page.includes('.omega-vert-unit'), 'every demo slot gets the control');
+  assert.ok(page.includes('unit.destroy()'), 'the live unit is destroyed, not just orphaned');
+  assert.ok(page.includes('__omegaVertMounted = false'), 'the mount latch clears so the element re-mounts');
+  assert.ok(page.includes('omega.verts().mount'), 're-init runs through the public verts API');
+});
+
 test('packaged content speaks advertising.providers.* only', () => {
   const files = [
     ['core/_includes/core/head.html', 'advertising.providers.adsense.client'],
@@ -161,6 +170,11 @@ test('/test/libraries/verts shows every format and size preset, config state lab
   // The tag that produced each slot is printed beside it (raw, never rendered)
   assert.ok(html.includes('&#123;% section "verts/unit", type: "display" %&#125;'), 'labels show the literal tag (entity-escaped so it never re-renders)');
   assert.ok(html.includes('ca-pub-TEST123'), 'the config state is spelled out for QA');
+
+  // The narrow sidebar rail: a skyscraper slot in a real 264px column (the app
+  // shell sidebar width), where the card stacks instead of running as a media row
+  assert.ok(html.includes('width: 264px'), 'the rail demo is a real narrow column');
+  assert.ok(html.includes('Narrow rail'), 'the rail demo is labeled like the other examples');
 
   // Dev-only: the /test tree stays out of the index
   assert.ok(html.includes('noindex'), 'noindex like the rest of /test');

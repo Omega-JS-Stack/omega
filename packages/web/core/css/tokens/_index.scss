@@ -20,6 +20,16 @@
 // Type presets: `data-omega-type` on <html> re-pairs the font tokens
 // (mix is the default pairing — serif marketing display over sans UI).
 //
+// Surface-2 moves in OPPOSITE directions per mode, on purpose (#152): dark
+// elevates by getting lighter (#1d1d1f over the #0d0d0e ground), light
+// elevates with white + shadow and RECESSES by getting darker. It shipped at
+// #f6f6f5, one point off the light ground, so anything painting it directly
+// on the page was invisible in light mode and correct in dark. #ececeb sits
+// between the ground and the hairline in the warm-neutral ramp: a visible well
+// on the ground AND on a white card, still nowhere near --omega-line-strong.
+// Its Bootstrap twins (`$classy-surface-2-light`, `--bs-secondary-bg-rgb` in
+// classy's root bridge) carry the same value and move with it.
+//
 // Status hues ship in PAIRS: `--omega-ok` and `--omega-ok-rgb` (same for
 // warn/danger). Bootstrap's translucency utilities paint from
 // `rgba(var(--bs-success-rgb), …)`, which no var() can feed a hex to, so each
@@ -31,7 +41,7 @@
 @mixin light-tokens {
   --omega-ground: #f5f5f4;
   --omega-surface: #ffffff;
-  --omega-surface-2: #f6f6f5;
+  --omega-surface-2: #ececeb; // the light well: RECESSED off the ground, never a second white
   --omega-ink: #1a1a19;
   --omega-ink-muted: #6d6d6c;
   --omega-ink-faint: #a1a19e;
@@ -112,15 +122,6 @@
   // Default = the "mix" pairing (serif marketing, sans app).
   --omega-font-marketing: var(--omega-font-serif);
   --omega-font-display: var(--omega-font-ui);
-
-  // Affirmation checks ride the theme's success hue — ONE slot for every tick
-  // mark that says "you get this": plan features, benefit lists, hero meta,
-  // comparison "yes" cells. It rode the accent until the brand ramp and
-  // --omega-ok landed side by side on /pricing as two different greens (the
-  // guarantee shield vs the plan check); a check reads as success, so the
-  // status green owns it and a theme re-values ONE token to move every tick.
-  // Consumed through the `.omega-check` utility (core/css/core/_utilities.scss).
-  --omega-check: var(--omega-ok);
 
   // Chart series-1 rides the accent; 2–6 are the CVD-validated categorical
   // ramp above (cool half first, warm half after — what keeps two vocabularies

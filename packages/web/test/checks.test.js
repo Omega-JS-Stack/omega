@@ -1,11 +1,12 @@
 /**
- * Affirmation checks — ONE ink, ONE alignment rule (#10, #11).
+ * Affirmation checks: ONE ink, ONE alignment rule (#10, #11, #44).
  *
- * #11: every "you get this" tick (homepage hero meta, signup benefits, plan
- * features, comparison yes cells, product-demo, alternatives) reads the shared
- * `--omega-check` slot through the `.omega-check` utility — never a per-page
- * color. The slot rides the theme's success green (--omega-ok), so a check and
- * a success glyph on the same page are never two different greens.
+ * #44 (Ian 2026-07-31): the `.omega-check` seam is GONE. Every "you get this"
+ * tick (homepage hero meta, signup benefits, plan features, comparison yes
+ * cells, product-demo, alternatives) wears Bootstrap's `.text-success`, which
+ * every theme's root bridge points at --omega-ok, so a check and a status
+ * glyph on the same page are never two different greens and the framework
+ * ships no second vocabulary for a concept Bootstrap already names.
  *
  * #10: the plan-feature check is a one-line-tall box so the glyph centers on
  * the FIRST line of its feature text instead of drifting off the baseline.
@@ -33,23 +34,23 @@ function compileBundle(theme) {
   }).css;
 }
 
-test('#11: the check ink is ONE token consumed by ONE class', () => {
+test('#44: the check seam is gone, the ink is Bootstrap success bridged to --omega-ok', () => {
   const css = compileBundle('classy');
 
-  assert.match(css, /--omega-check: var\(--omega-ok\)/, "the slot rides the theme's success green");
-  assert.match(css, /\.omega-check\s*\{\s*color: var\(--omega-check\);?\s*\}/, 'the utility reads the slot');
-  assert.ok(
-    css.indexOf('.omega-check') > css.indexOf('.classy-price-card__check'),
-    'the utility lands after the theme so it wins ties',
-  );
+  assert.ok(!css.includes('--omega-check'), 'the check token is gone, no second slot for the success hue');
+  assert.ok(!css.includes('.omega-check'), 'the check utility is gone, no parallel class for text-success');
 
-  // The two greens Ian caught side by side on /pricing: the plan check (the
-  // slot) and the money-back shield must resolve to the SAME hue.
+  // The bridge is what makes a tick the theme's green in BOTH modes (#13).
+  assert.match(css, /--bs-success: var\(--omega-ok\)/, 'the root bridge points Bootstrap success at the token');
+  assert.match(css, /--bs-success-rgb: var\(--omega-ok-rgb\)/, 'the channel twin rides the token too');
+
+  // The two greens Ian caught side by side on /pricing: the plan check (now
+  // .text-success) and the money-back shield must resolve to the SAME hue.
   const guarantee = css.match(/\.classy-guarantee-icon\s*\{[^}]*\}/)[0];
-  assert.match(guarantee, /color: var\(--omega-ok\)/, 'the guarantee shield reads the same success hue as the check slot');
+  assert.match(guarantee, /color: var\(--omega-ok\)/, 'the guarantee shield reads the same success hue as a tick');
 });
 
-test('#11: no check site re-colors its own tick', () => {
+test('#11: no check site paints its own tick a local color', () => {
   const css = compileBundle('classy');
 
   assert.ok(!/\.classy-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green');
@@ -94,20 +95,21 @@ const CATALOG = {
   ],
 };
 
-test('#11: the check surfaces stamp the shared class — plan features, comparison, signup', async () => {
+test('#44: the check surfaces stamp text-success on plan features, comparison, signup', async () => {
   const pages = await buildWith({ ...miniData, payment: CATALOG });
 
   const pricing = pages.get('/pricing');
   assert.ok(pricing, '/pricing built');
-  assert.match(pricing, /classy-price-card__check omega-check/, 'plan-feature checks carry the shared class');
-  assert.match(pricing, /classy-compare__yes omega-check/, 'comparison yes-marks carry the shared class');
+  assert.match(pricing, /classy-price-card__check text-success/, 'plan-feature checks carry the success class');
+  assert.match(pricing, /classy-compare__yes text-success/, 'comparison yes-marks carry the success class');
+  assert.ok(!pricing.includes('omega-check'), 'no page still stamps the retired seam class');
 
   const signup = pages.get('/signup');
   assert.ok(signup, '/signup built');
-  assert.match(signup, /class="fa omega-check fa-sm"/, 'signup benefit checks carry the shared class');
+  assert.match(signup, /class="fa text-success fa-sm"/, 'signup benefit checks carry the success class');
 });
 
-test('#11: the affirmation-check sites keep no local color override', () => {
+test('#44: every affirmation-check site wears text-success and nothing else', () => {
   const affirmationSites = [
     ['themes/classy/_layouts/frontend/pages/pricing.html', 'check'],
     ['themes/classy/_layouts/frontend/pages/auth/signup.html', 'check'],
@@ -120,10 +122,13 @@ test('#11: the affirmation-check sites keep no local color override', () => {
 
   for (const [rel, icon] of affirmationSites) {
     const source = fs.readFileSync(path.join(PKG, rel), 'utf8');
+    assert.ok(!source.includes('omega-check'), `${rel} dropped the retired seam class`);
+
     const calls = source.split('\n').filter((line) => line.includes(`uj_icon "${icon}"`));
     assert.ok(calls.length > 0, `${rel} still renders its ${icon}`);
     for (const call of calls) {
-      assert.ok(!/text-success|text-primary/.test(call), `${rel} check keeps no local color: ${call.trim()}`);
+      assert.ok(call.includes('text-success'), `${rel} check takes its ink from the bridge: ${call.trim()}`);
+      assert.ok(!/text-primary|text-info|style="color/.test(call), `${rel} check keeps no local color: ${call.trim()}`);
     }
   }
 });

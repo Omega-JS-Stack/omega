@@ -76,7 +76,7 @@ module.exports = {
       async run({ assert, firestore }) {
         await seedAds(firestore);
 
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&vertId=serve-open`);
+        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&brand=site-brand&vertId=serve-open`);
         const body = await response.text();
 
         assert.equal(response.status, 200, 'Serve should return 200');
@@ -87,6 +87,7 @@ module.exports = {
         assert.ok(body.includes('omega-vert:set-dimensions'), 'Unit should report dimensions via postMessage');
         assert.ok(body.includes('omega-vert:click'), 'Unit should forward clicks via postMessage');
         assert.ok(body.includes('/omega/verts/redirect?id=serve-open'), 'Click link should point at the redirect route');
+        assert.ok(body.includes('brand=site-brand'), 'The redirect URL should carry the host brand id (the click utm_source)');
         assert.ok(body.includes('https://site.example'), 'postMessage should target the parent origin (origin-checked)');
         assert.ok(!body.includes('setInterval') && !body.includes('setTimeout'), 'Unit must have NO self-refresh timers (host owns lifecycle)');
         assert.ok(!body.includes('<script src') && !body.includes('<link'), 'Unit must be self-contained (no external scripts/styles)');

@@ -34,13 +34,18 @@ const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // shared section; `theme` is project-owned but shared-shaped.)
 const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
 
+// brand.id's slug rule — the ONE home for the pattern. Anything that gates a
+// caller-supplied brand id (the backend verts routes' normalizeBrandId) imports
+// this instead of copying the regex.
+const BRAND_ID_PATTERN = /^[a-z][a-z0-9+\-.]*$/;
+
 const SHARED_SCHEMA = [
   // ── brand ────────────────────────────────────────────────────────────────
   {
     path:        'brand.id',
     type:        'string',
     required:    true,
-    match:       /^[a-z][a-z0-9+\-.]*$/,
+    match:       BRAND_ID_PATTERN,
     description: 'URL-scheme-safe slug. Drives deep-link schemes, default appIds, repo names. Lowercase, starts with a letter, alnum/+/-/.',
   },
   {
@@ -820,4 +825,4 @@ const TARGET_SCHEMAS = {
   mobile: [],
 };
 
-module.exports = { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS };
+module.exports = { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN };

@@ -5,6 +5,7 @@ const { fields: f } = require('../../../helpers/schema-zod.js');
 
 module.exports = () => f.object({
   parent: f.string({ default: '' }),
+  brand: f.string({ default: '' }),
   tags: f.string({ default: '' }),
   width: f.multi(['string', 'number'], { default: '' }),
   height: f.multi(['string', 'number'], { default: '' }),

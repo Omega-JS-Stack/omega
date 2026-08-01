@@ -308,6 +308,24 @@ test('the first section takes nav clearance by TYPE, so a preceding div cannot s
   assert.equal((css.match(/main > section:first-of-type/g) || []).length, 2, 'clearance set at both breakpoints');
 });
 
+test("a blog post hands its nav clearance to the dot band, so the dots open the page like every other hero (#44)", () => {
+  const css = sass.compile(path.join(PKG, 'themes', 'classy', 'css', 'layout', '_general.scss'), {
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  // Ian's screenshot ruling (2026-07-31): held by the <article>, the band
+  // started 10rem down and the dots read detached from the nav.
+  const band = 'main > article:first-of-type:has(> .classy-dotgrid:first-child)';
+  assert.ok(css.includes(`${band} {\n  padding-top: 0;`), 'the article gives up the clearance');
+  assert.ok(css.includes(`${band} > .classy-dotgrid:first-child`), 'the band takes it instead');
+
+  // Same numbers as every other opener, at both breakpoints (one mixin).
+  const openerClearance = css.match(/padding-top: 10rem;/g) || []; // the breakout utility's !important twin is a different rule
+  const openerClearanceLg = css.match(/padding-top: 12rem;/g) || [];
+  assert.equal(openerClearance.length, 2, 'the section opener and the post band clear the nav by the same 10rem');
+  assert.equal(openerClearanceLg.length, 2, 'and by the same 12rem at ≥992px');
+});
+
 test('a blog post wears the dotfield behind its masthead only, never behind the prose (#44)', () => {
   const post = fs.readFileSync(path.join(PKG, 'themes', 'classy', '_layouts', 'frontend', 'pages', 'blog', 'post.html'), 'utf8');
 

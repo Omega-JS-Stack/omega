@@ -187,7 +187,7 @@ alternative:
                     </th>
                     <td class="text-center">
                       {% if feature.ours.value == true %}
-                        {% uj_icon "circle-check", "omega-check" %}
+                        {% uj_icon "circle-check", "text-success" %}
                       {% elsif feature.ours.value == false %}
                         {% uj_icon "circle-xmark", "text-muted opacity-25" %}
                       {% else %}
@@ -196,7 +196,7 @@ alternative:
                     </td>
                     <td class="text-center">
                       {% if feature.theirs.value == true %}
-                        {% uj_icon "circle-check", "omega-check" %}
+                        {% uj_icon "circle-check", "text-success" %}
                       {% elsif feature.theirs.value == false %}
                         {% uj_icon "circle-xmark", "text-muted opacity-25" %}
                       {% else %}

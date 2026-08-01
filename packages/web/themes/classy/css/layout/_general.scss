@@ -6,6 +6,17 @@
 // Every frontend page is a stack of <section>s (blog posts open with an
 // <article>); the first one absorbs the fixed-nav height so backgrounds run
 // flush behind the transparent nav.
+
+// The opener's clearance: 4rem of fixed nav plus hero breathing room. One
+// home, because a blog post hands the same value to its masthead band below.
+@mixin nav-clearance {
+  padding-top: 10rem;
+
+  @media (min-width: 992px) {
+    padding-top: 12rem;
+  }
+}
+
 main {
   > section,
   > article {
@@ -24,12 +35,22 @@ main {
     // swallow the clearance the hero needs (the page JS names the same
     // element when it pushes the banner down)
     &:first-of-type {
-      padding-top: 10rem; // 4rem nav clearance + hero breathing room
       transition: padding-top var(--omega-speed-slow) var(--omega-ease); // promo-banner push-down glides
 
-      @media (min-width: 992px) {
-        padding-top: 12rem;
-      }
+      @include nav-clearance;
+    }
+  }
+
+  // A blog post opens with its dotfield masthead INSIDE the <article>, so the
+  // clearance has to travel one level down: held by the <article>, the band
+  // starts below the nav and its dots read detached from it (Ian 2026-07-31).
+  // On the band, the dots run up behind the transparent nav, giving a post
+  // the same opener every other page has.
+  > article:first-of-type:has(> .classy-dotgrid:first-child) {
+    padding-top: 0;
+
+    > .classy-dotgrid:first-child {
+      @include nav-clearance;
     }
   }
 }

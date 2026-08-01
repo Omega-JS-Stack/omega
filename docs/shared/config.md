@@ -268,6 +268,13 @@ Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../../_attic/p
 (`TARGET_SCHEMAS[target]`), run against the RESOLVED config. `brand.id` (URL-scheme-safe
 slug) and `brand.name` are the only universally required fields.
 
+**authDomain is the brand's own host** (cp268): when `cloud.config.authDomain` is set it
+must equal the resolved brand host: the instance's own `url` when it has one, else
+`brand.url`. A `*.firebaseapp.com` value hard-fails (self-hosted `/__/auth/*` on the brand
+host is what keeps redirect sign-in working under browser storage partitioning; the web
+build emits those helper files), and any other mismatch fails naming both values. Absent
+passes, and `demo-*` (emulator-only) projects are exempt.
+
 ## Tri-state provisioning values (#33)
 
 Provisioning-flow keys (org, billing account, service/agent ids — anything a manage

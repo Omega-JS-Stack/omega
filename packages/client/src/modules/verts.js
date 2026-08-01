@@ -164,14 +164,28 @@ function hostHostname() {
 }
 
 /**
+ * The utm_source every vert click carries: the HOST brand's own id from its
+ * omega config (brand.id), with the parent host as the fallback when no id is
+ * available. The house lane carries the same value to the backend as the serve
+ * URL's `brand` param, so both lanes tag with one identity.
+ * @param {object} manager - the client singleton
+ * @returns {string} the brand id, or the host page's hostname
+ */
+function utmSource(manager) {
+  return manager?.config?.brand?.id || hostHostname();
+}
+
+/**
  * The promo's click destination: omegajs.dev tagged with the vert UTM set
  * through the ONE helper both lanes use.
  * @param {string} [size] - the slot's size preset, carried as utm_content
+ * @param {string} [source] - utm_source (the brand id); the host page's
+ *   hostname when absent
  * @returns {string} the tagged promo URL
  */
-function promoHref(size) {
+function promoHref(size, source) {
   return applyVertUtm(PROMO_URL, {
-    source: hostHostname(),
+    source: source || hostHostname(),
     medium: UTM_MEDIUM,
     campaign: UTM_CAMPAIGN_PROMO,
     content: size,
@@ -214,12 +228,14 @@ function trackClick(manager, detail, options, lane) {
  * @param {string} [targetOrigin] - the host origin messages are posted to
  * @param {string} [size] - the slot's size preset, carried as utm_content
  * @param {number} [width] - the host's measured width in px (0 = unknown)
+ * @param {string} [source] - utm_source (the brand id); the host page's
+ *   hostname when absent
  * @returns {string} a complete html document
  */
-function buildPromoDocument(maxPx, theme, targetOrigin, size, width) {
+function buildPromoDocument(maxPx, theme, targetOrigin, size, width, source) {
   return renderVertDocument({
     id: PROMO_ID,
-    href: promoHref(size),
+    href: promoHref(size, source),
     title: PROMO_TITLE,
     description: PROMO_DESCRIPTION,
     button: PROMO_BUTTON,
@@ -247,9 +263,11 @@ function promoTargetOrigin() {
  * @param {string} [theme] - 'light' | 'dark' passthrough
  * @param {string} [size] - the slot's size preset, carried as utm_content
  * @param {number} [width] - the host's measured width in px (0 = unknown)
+ * @param {string} [source] - utm_source (the brand id); the host page's
+ *   hostname when absent
  * @returns {Element} the promo iframe
  */
-function buildPromo(maxPx, theme, size, width) {
+function buildPromo(maxPx, theme, size, width, source) {
   const $iframe = document.createElement('iframe');
   const targetOrigin = promoTargetOrigin();
 
@@ -263,7 +281,7 @@ function buildPromo(maxPx, theme, size, width) {
   $iframe.style.setProperty('width', '100%');
   $iframe.style.setProperty('border', '0');
   $iframe.style.height = `${maxPx || PROMO_MIN_HEIGHT}px`;
-  $iframe.srcdoc = buildPromoDocument(maxPx, theme, targetOrigin, size, width);
+  $iframe.srcdoc = buildPromoDocument(maxPx, theme, targetOrigin, size, width, source);
 
   return $iframe;
 }
@@ -287,6 +305,8 @@ class PromoUnit {
     this.options = options;
     this.emit = emit;
     this.maxHeight = resolveSizePx(options.size);
+    // The click tag's identity: this brand's own id (host fallback)
+    this.utmSource = utmSource(manager);
 
     this.destroyed = false;
     this.$iframe = null;
@@ -306,7 +326,7 @@ class PromoUnit {
 
     // The host's measured width reaches the document so the narrow-compact
     // and skyscraper-stacking branches are decidable (0 = unknown, fluid row)
-    this.$iframe = buildPromo(this.maxHeight, this.options.theme, this.options.size, this.$el.clientWidth || 0);
+    this.$iframe = buildPromo(this.maxHeight, this.options.theme, this.options.size, this.$el.clientWidth || 0, this.utmSource);
     this.$el.appendChild(this.$iframe);
 
     window.addEventListener('message', this._onMessage);
@@ -361,7 +381,7 @@ class PromoUnit {
     }
 
     this.options = { ...this.options, theme };
-    this.$iframe.srcdoc = buildPromoDocument(this.maxHeight, theme, promoTargetOrigin(), this.options.size, this.$el.clientWidth || 0);
+    this.$iframe.srcdoc = buildPromoDocument(this.maxHeight, theme, promoTargetOrigin(), this.options.size, this.$el.clientWidth || 0, this.utmSource);
   }
 
   /** Remove the message listener; the unit is inert afterwards. */
@@ -428,6 +448,15 @@ class VertUnit {
 
     if (typeof window !== 'undefined' && window.location?.host) {
       url.searchParams.set('parent', window.location.host);
+    }
+
+    // The click tag's identity travels with the impression: the serve route
+    // stamps it on the redirect URL, and the redirect route tags the stored
+    // link with it (the parent host stays the targeting input, and the
+    // fallback when this brand carries no id)
+    const brandId = this.manager?.config?.brand?.id;
+    if (brandId) {
+      url.searchParams.set('brand', brandId);
     }
 
     const tags = this.options.tags || [];
@@ -885,6 +914,10 @@ class Verts {
       onExhausted: () => this.renderPromo($el, options),
     }).load();
 
+    // The host keeps a handle on its live unit, so a re-mount can tear the
+    // old one down first (its listeners and timers outlive the DOM otherwise)
+    $el.__omegaVertUnit = unit;
+
     return { lane: 'house', unit };
   }
 
@@ -912,6 +945,7 @@ class Verts {
       this._emitHost($el, options, name, detail);
     }).load();
 
+    $el.__omegaVertUnit = unit;
     this._promoUnits.add(unit);
     this._watchPageTheme();
 
