@@ -117,8 +117,20 @@ function makeFormManager() {
   return { errors, showError: (m) => errors.push(m), showSuccess: () => {}, ready: () => {} };
 }
 
-test('oauth: development uses the popup — the emulator redirect leg cannot come home', async () => {
+test('oauth: development runs the redirect flow too — the dev server proxies the emulator same-origin (#156)', async () => {
   const { module } = await load({ development: true });
+
+  assert.strictEqual(module.shouldUseAuthPopup(), false);
+});
+
+test('oauth: ?authPopup=true still forces the popup in development', async () => {
+  const { module } = await load({ development: true, href: 'https://localhost:4000/signin?authPopup=true' });
+
+  assert.strictEqual(module.shouldUseAuthPopup(), true);
+});
+
+test('oauth: an iframed development auth page still uses the popup', async () => {
+  const { module } = await load({ development: true, top: { name: 'parent' } });
 
   assert.strictEqual(module.shouldUseAuthPopup(), true);
 });

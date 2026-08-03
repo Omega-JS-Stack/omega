@@ -127,13 +127,13 @@ const META_TOOLS = [
   {
     name: 'router__list_upstreams',
     description:
-      'List all upstream MCP servers registered with the router, including their on-disk enabled state, per-session active state, and cached tool count.',
+      'List all upstream MCP servers registered with the router, including their on-disk enabled state, locked state, per-session active state, and cached tool count.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'router__enable_upstream',
     description:
-      'Activate an upstream for THIS chat session only. The upstream must be enabled on disk (via `omega-mcp enable <name>`). Adds its tools to the visible tool list. Optional env vars apply to the child process for this session (e.g. a debug port); passing env restarts a running child so the values take effect.',
+      'Activate an upstream for THIS chat session only. The upstream must be enabled on disk (via `omega-mcp enable <name>`) and not locked (an upstream with "locked": true in its overlay config refuses to activate, and there is no override from here). Adds its tools to the visible tool list. Optional env vars apply to the child process for this session (e.g. a debug port); passing env restarts a running child so the values take effect.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,6 +188,7 @@ const callMetaTool = async (name, args) => {
       name: upstream.name,
       enabled_on_disk: upstream.enabled_on_disk,
       default: upstream.default,
+      locked: upstream.locked,
       active_this_session: session[upstream.name].active,
       spawned: session[upstream.name].client != null,
       tool_count: upstream.tools.length,
@@ -200,13 +201,14 @@ const callMetaTool = async (name, args) => {
     const target = args?.name;
     const upstream = upstreams[target];
     if (!upstream) return errorResult(`Unknown upstream: ${target}`);
-    if (!upstream.enabled_on_disk) {
-      // `omega-mcp enable <target>` may have flipped the overlay since router
-      // startup — re-read the LAYERED state so the "then call this tool again"
-      // retry can succeed.
-      const fresh = registry.loadUpstream(target);
-      if (fresh && fresh.enabled_on_disk) Object.assign(upstream, fresh);
-    }
+    // The overlay may have changed since router startup (an enable flip, a
+    // lock written mid-session) — re-read the LAYERED state so the "then call
+    // this tool again" retry succeeds and a fresh lock is honored even on an
+    // upstream that was already enabled on disk.
+    const fresh = registry.loadUpstream(target);
+    if (fresh) Object.assign(upstream, fresh);
+    // A lock outranks the disabled hint: there is no force path from a chat.
+    if (upstream.locked) return errorResult(registry.lockedRefusal(target));
     if (!upstream.enabled_on_disk) {
       return errorResult(
         `Upstream "${target}" is disabled on disk. Run \`omega-mcp enable ${target}\` from the shell to make it available, then call this tool again.`,

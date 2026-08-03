@@ -529,10 +529,11 @@ class Manager {
     // page content in automated flows.
     if (this.isDevelopment()) {
       const ports = this._devPorts();
-      firebaseLogger.log(`Connecting to emulators (auth :${ports.auth}, firestore :${ports.firestore})`);
+      const authEmulatorUrl = this._authEmulatorUrl();
+      firebaseLogger.log(`Connecting to emulators (auth ${authEmulatorUrl}, firestore :${ports.firestore})`);
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
-      connectAuthEmulator(this._firebaseAuth, `http://localhost:${ports.auth}`, { disableWarnings: true });
+      connectAuthEmulator(this._firebaseAuth, authEmulatorUrl, { disableWarnings: true });
       connectFirestoreEmulator(this._firebaseFirestore, 'localhost', ports.firestore);
       firebaseLogger.log('Emulators connected');
     }
@@ -607,6 +608,23 @@ class Manager {
 
   _devPorts() {
     return { ...DEV_PORT_FALLBACKS, ...this._providedDevPorts() };
+  }
+
+  // Where the auth emulator answers FROM THE BROWSER'S POINT OF VIEW (#156).
+  // A surface whose dev server proxies the emulator under its own origin says
+  // so with `dev.authEmulatorProxy` — and then the emulator URL must be that
+  // origin, so the OAuth handler and the SDK's helper iframe are first-party
+  // and the redirect credential survives storage partitioning. Every other
+  // surface (desktop, extension, a page with no proxy) keeps talking straight
+  // to the emulator's own port.
+  // Origin only, never a path: connectAuthEmulator() discards any path on the
+  // URL it is handed, so the proxy has to be mounted at the site root.
+  _authEmulatorUrl() {
+    if (this.config.dev?.authEmulatorProxy && typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+
+    return `http://localhost:${this._devPorts().auth}`;
   }
 
   getFunctionsUrl(environment) {

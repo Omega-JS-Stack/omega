@@ -57,13 +57,31 @@ test('agents-md: resolveImportLine walks up to a hoisted install and falls back 
   fs.mkdirSync(brand, { recursive: true });
   assert.equal(resolveImportLine(brand), IMPORT_LINE);
 
-  // Hoisted two levels up (in-repo brand shape) → upward relative path
-  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js'), { recursive: true });
+  // Hoisted two levels up (in-repo brand shape) → upward relative path.
+  // A scope only counts with a real install inside (#153), so the fixture
+  // carries a manager entry.
+  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
   assert.equal(resolveImportLine(brand), `@../../${GUIDE_SUBPATH}`);
 
   // Brand-local install wins over the hoisted one
-  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js'), { recursive: true });
+  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js', 'manager'), { recursive: true });
   assert.equal(resolveImportLine(brand), IMPORT_LINE);
+});
+
+test('agents-md: an empty local @omega.js dir never wins the scope walk (#153)', () => {
+  const { resolveImportLine, GUIDE_SUBPATH } = require('../src/lib/agents-md.js');
+  const { monorepo, brand } = linkFixture();
+
+  // The dangling shape: the app two levels down carries an EMPTY local
+  // @omega.js dir while the hoisted brand-root scope holds the real install.
+  const app = path.join(brand, 'apps', 'website');
+  fs.mkdirSync(path.join(app, 'node_modules', '@omega.js'), { recursive: true });
+
+  assert.equal(resolveImportLine(app), `@../../${GUIDE_SUBPATH}`, 'the empty local dir is skipped for the hoisted scope');
+
+  assert.equal(ensureGuideLink(app), 'created', 'the link lands in the scope the import points at');
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(monorepo, 'AGENTS.md')));
 });
 
 test('agents-md: a legacy manager-package import heals to the scope path', () => {

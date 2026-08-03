@@ -73,6 +73,19 @@ test('{"enabled": false} alone turns a bundled default off', () => {
   assert.equal(alpha.command, 'npx');
 });
 
+test('{"locked": true} surfaces on the entry and defaults to false', () => {
+  const layers = fixture({ alpha: DEFAULT }, { alpha: { enabled: false, locked: true }, beta: DEFAULT });
+  assert.equal(registry.loadUpstream('alpha', layers).locked, true);
+  assert.equal(registry.loadUpstream('beta', layers).locked, false);
+});
+
+test('the locked refusal names the field and the escape hatch', () => {
+  const message = registry.lockedRefusal('alpha');
+  assert.match(message, /"alpha" is locked/);
+  assert.match(message, /locked: true/);
+  assert.match(message, /omega-mcp enable alpha --force/);
+});
+
 test('a malformed overlay config is skipped loudly and the rest of the registry survives', () => {
   const layers = fixture({ alpha: DEFAULT, gamma: DEFAULT }, { alpha: '{ not json' });
   const upstreams = registry.loadUpstreams(layers);

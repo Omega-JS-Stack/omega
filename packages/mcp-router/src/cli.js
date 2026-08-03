@@ -55,6 +55,7 @@ Usage: omega-mcp <command> [name] [args...]
 Commands:
   list, ls              List all upstream servers, status, and cached tool counts
   enable, on <name>     Enable an upstream (auto-refreshes schema cache)
+                        --force overrides a "locked": true upstream
   disable, off <name>   Disable an upstream
   add <name> <cmd> ...  Add a private upstream (auto-refreshes schema cache)
   remove, rm <name>     Remove a private upstream (bundled defaults: disable instead)
@@ -78,6 +79,10 @@ Architecture:
   "on-demand" upstreams require Claude to call router__enable_upstream before
   their tools become visible — useful for noisy servers.
 
+  An overlay entry may also carry "locked": true. A locked upstream refuses
+  every enable: this CLI's (unless you pass --force) and the per-chat
+  router__enable_upstream, which has no override. Disable and remove stay open.
+
 Examples:
   omega-mcp list
   omega-mcp enable chrome-devtools-extension
@@ -98,8 +103,13 @@ async function run(argv, options = {}) {
   const out = options.out || ((line) => console.log(line));
   const err = options.err || ((line) => console.error(line));
 
-  const command = argv[0];
-  const name = argv[1];
+  // `--force` is a flag on the command, never part of an added upstream's own
+  // command line, so it is stripped for the command/name positions only, and
+  // `add` keeps reading the RAW argv for the command it is being handed.
+  const force = argv.includes('--force');
+  const positional = argv.filter((arg) => arg !== '--force');
+  const command = positional[0];
+  const name = positional[1];
 
   /**
    * Best-effort cache refresh — report failure but never abort the caller.
@@ -118,11 +128,17 @@ async function run(argv, options = {}) {
   };
 
   if ((command === 'enable' || command === 'on' || command === 'disable' || command === 'off') && name) {
-    if (!registry.loadUpstream(name, layers)) {
+    const upstream = registry.loadUpstream(name, layers);
+    if (!upstream) {
       err(`Server "${name}" not found`);
       return 1;
     }
     const enabled = command === 'enable' || command === 'on';
+    // A lock guards WAKING an upstream only: disable stays open.
+    if (enabled && upstream.locked && !force) {
+      err(registry.lockedRefusal(name));
+      return 1;
+    }
     registry.patchOverlayEntry(name, { enabled }, layers);
     out(`${enabled ? 'Enabled' : 'Disabled'} ${name}`);
     if (enabled) await tryRefresh(name);
@@ -177,9 +193,10 @@ async function run(argv, options = {}) {
     for (const upstream of Object.values(registry.loadUpstreams(layers))) {
       const status = upstream.enabled_on_disk ? '\x1b[32m●\x1b[0m' : '\x1b[90m○\x1b[0m';
       const mode = upstream.default === 'on-demand' ? ' [on-demand]' : '';
+      const locked = upstream.locked ? ' [locked]' : '';
       const source = upstream.bundled ? (upstream.overlaid ? ' (bundled, overridden)' : ' (bundled)') : ' (yours)';
       const tools = upstream.tools.length ? ` (${upstream.tools.length} tools cached)` : ' (no cache)';
-      out(`  ${status} ${upstream.name}${mode}${source}${tools}`);
+      out(`  ${status} ${upstream.name}${mode}${locked}${source}${tools}`);
     }
     out('');
     return 0;

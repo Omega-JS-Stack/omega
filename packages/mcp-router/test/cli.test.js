@@ -43,6 +43,10 @@ function harness() {
 }
 
 const overlayOf = (context, name) => JSON.parse(fs.readFileSync(path.join(context.overlayDir, name, 'config.json'), 'utf8'));
+const writeOverlay = (context, name, config) => {
+  fs.mkdirSync(path.join(context.overlayDir, name), { recursive: true });
+  fs.writeFileSync(path.join(context.overlayDir, name, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+};
 const bundledOf = (context, name) => JSON.parse(fs.readFileSync(path.join(context.bundledDir, name, 'config.json'), 'utf8'));
 
 test('disable writes {enabled: false} to the overlay and leaves the bundled default alone', async () => {
@@ -66,6 +70,45 @@ test('enable on an unknown upstream fails', async () => {
   assert.equal(await run(['enable', 'ghost'], context), 1);
   assert.deepEqual(context.errors, ['Server "ghost" not found']);
   assert.equal(fs.existsSync(path.join(context.overlayDir, 'ghost')), false);
+});
+
+test('enable on a locked upstream refuses, names the field, and leaves the overlay alone', async () => {
+  const context = harness();
+  writeOverlay(context, 'alpha', { enabled: false, locked: true });
+  assert.equal(await run(['enable', 'alpha'], context), 1);
+  assert.match(context.errors.join('\n'), /"alpha" is locked \(locked: true/);
+  assert.match(context.errors.join('\n'), /omega-mcp enable alpha --force/);
+  assert.deepEqual(overlayOf(context, 'alpha'), { enabled: false, locked: true });
+});
+
+test('enable --force overrides the lock and the lock survives the flip', async () => {
+  const context = harness();
+  writeOverlay(context, 'alpha', { enabled: false, locked: true });
+  assert.equal(await run(['enable', 'alpha', '--force'], context), 0);
+  assert.deepEqual(overlayOf(context, 'alpha'), { enabled: true, locked: true });
+  assert.equal(context.lines[0], 'Enabled alpha');
+});
+
+test('disable on a locked upstream is allowed', async () => {
+  const context = harness();
+  writeOverlay(context, 'alpha', { enabled: true, locked: true });
+  assert.equal(await run(['disable', 'alpha'], context), 0);
+  assert.deepEqual(overlayOf(context, 'alpha'), { enabled: false, locked: true });
+});
+
+test('remove on a locked private upstream is allowed', async () => {
+  const context = harness();
+  writeOverlay(context, 'mine', { enabled: false, locked: true, command: 'node', args: ['m.js'] });
+  assert.equal(await run(['rm', 'mine'], context), 0);
+  assert.equal(fs.existsSync(path.join(context.overlayDir, 'mine')), false);
+});
+
+test('add over an existing locked entry refuses, so nothing writes enabled: true', async () => {
+  const context = harness();
+  writeOverlay(context, 'mine', { enabled: false, locked: true, command: 'node', args: ['m.js'] });
+  assert.equal(await run(['add', 'mine', 'node', ECHO_SERVER], context), 1);
+  assert.match(context.errors.join('\n'), /already exists/);
+  assert.deepEqual(overlayOf(context, 'mine'), { enabled: false, locked: true, command: 'node', args: ['m.js'] });
 });
 
 test('add writes a private upstream to the overlay and caches its real tool schema', async () => {
@@ -141,6 +184,13 @@ test('list shows every layer with its source and state', async () => {
   assert.match(listed, /alpha \(bundled\) \(1 tools cached\)/);
   assert.match(listed, /beta \(bundled, overridden\) \(no cache\)/);
   assert.match(listed, /echo \(yours\) \(2 tools cached\)/);
+});
+
+test('list marks a locked upstream', async () => {
+  const context = harness();
+  writeOverlay(context, 'alpha', { enabled: false, locked: true });
+  assert.equal(await run(['ls'], context), 0);
+  assert.match(context.lines.join('\n'), /alpha \[locked\] \(bundled, overridden\)/);
 });
 
 test('help is the no-command default and names the CLI', async () => {

@@ -23,8 +23,8 @@ An `on-demand` upstream stays invisible until a session asks for it — that is 
 
 ## The meta-tools (per session, from inside the client)
 
-- `router__list_upstreams` — every upstream, its on-disk enabled state, whether it is active in this session, and its cached tool count.
-- `router__enable_upstream {name, env?}` — activate for THIS session. `env` sets vars on the child (passing it restarts a running child so they take effect).
+- `router__list_upstreams` — every upstream, its on-disk enabled state, whether it is locked, whether it is active in this session, and its cached tool count.
+- `router__enable_upstream {name, env?}` — activate for THIS session, unless the upstream is locked. `env` sets vars on the child (passing it restarts a running child so they take effect).
 - `router__disable_upstream {name}` — deactivate and stop the child. Disk is untouched.
 - `router__refresh_upstream {name}` — spawn once, re-read the tool list, and cache it.
 
@@ -45,6 +45,12 @@ The merge is **shallow and field-level**: an overlay entry's top-level keys win 
 // ~/.omega/mcp-router/servers/playwright/config.json
 { "enabled": true, "default": "on-demand", "command": "npx", "args": ["-y", "@playwright/mcp@latest", "--isolated"] }
 ```
+```jsonc
+// ~/.omega/mcp-router/servers/playwright/config.json
+{ "enabled": false, "locked": true }  // stays off: every enable is refused, `--force` is the only way past
+```
+
+`"locked": true` holds an upstream off. `omega-mcp enable` refuses it (exit 1, naming the field) unless you pass `--force`, and the per-chat `router__enable_upstream` refuses it with no override at all. Disabling, removing, and refreshing a locked upstream stay allowed: the lock is against waking it, not against turning it off.
 
 A name that only exists in the overlay is simply a private upstream of yours. Nothing you do forks the defaults, and an upgrade of this package never clobbers your overrides.
 
@@ -56,6 +62,7 @@ A name that only exists in the overlay is simply a private upstream of yours. No
 omega-mcp list                              # every upstream, its source (bundled / yours), state, tool count
 omega-mcp enable chrome-devtools-extension  # writes {"enabled": true} to your overlay, then caches the schema
 omega-mcp disable chrome-devtools           # writes {"enabled": false}
+omega-mcp enable playwright --force         # the only way past a {"locked": true} entry
 omega-mcp add my-server npx -y my-mcp@latest
 omega-mcp remove my-server                  # a bundled default cannot be removed — disable it instead
 omega-mcp refresh chrome-devtools           # re-fetch and cache the tool schemas

@@ -23,6 +23,7 @@
  * monorepo's src→dist watch, then runs the normal dev loop (master plan §8).
  */
 const fs = require('node:fs');
+const http = require('node:http');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
@@ -231,7 +232,7 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      eleventyConfig.setServerOptions(devServerOptions(paths.out));
+      eleventyConfig.setServerOptions(devServerOptions(paths.out, devPorts.auth));
       registerTemplateWatchTargets(eleventyConfig, { consumerDir: paths.src, activeTheme });
       return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
@@ -239,7 +240,7 @@ module.exports = async function (options) {
         activeTheme,
         assetManifest: manifest,
         environment: 'development',
-        dev: { ports: devPorts },
+        dev: { ports: devPorts, authEmulatorProxy: true },
       });
     },
   });
@@ -296,12 +297,17 @@ function resolveAssetThemeLayers(paths, activeTheme) {
  * straight into the out dir, so the server chokidars those trees too — css
  * changes hot-swap without a full reload, js changes reload the page. Kills
  * the "refresh the browser" hand step.
+ *
+ * The auth-emulator proxy goes FIRST: it owns whole URL prefixes and answers
+ * them itself, so it must run before the clean-URL rewriter gets a chance to
+ * treat one as a page path.
  * @param {string} outDir
+ * @param {number} [authPort] - the auth emulator port to proxy (classic 9099)
  * @returns {object} setServerOptions() payload
  */
-function devServerOptions(outDir) {
+function devServerOptions(outDir, authPort) {
   return {
-    middleware: [devCleanUrls(outDir), devImageFallback(outDir)],
+    middleware: [devAuthEmulator(authPort || CLASSIC_PORTS.auth), devCleanUrls(outDir), devImageFallback(outDir)],
     watch: [
       path.join(outDir, 'assets', 'css'),
       path.join(outDir, 'assets', 'js'),
@@ -408,6 +414,95 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
       eleventyConfig.addWatchTarget(form, { resetConfig: true });
     }
   }
+}
+
+/**
+ * Serve the Firebase auth emulator THROUGH the site origin (#156) — the dev
+ * counterpart of the self-hosted /__/auth/* helpers a production build ships
+ * (src/firebase-auth-helpers.js).
+ *
+ * The emulator's OAuth handler hands a redirect credential back by writing
+ * `firebase:redirectEvent:*` into sessionStorage on ITS OWN origin, and the
+ * SDK's helper iframe reads it back from there. Served on the emulator's port,
+ * that origin is a third party to the site, and browser storage partitioning
+ * gives the iframe a different, empty partition — the return leg dead-ends.
+ * Proxied here, handler and iframe are both first-party to the site, so they
+ * share one partition and signInWithRedirect completes in dev exactly as it
+ * does in production.
+ *
+ * The prefixes are the emulator's whole surface, mounted at the site ROOT
+ * because connectAuthEmulator() discards any path on the URL it is given
+ * (@firebase/auth: "Always replace path with /") — a sub-path mount is not
+ * available to us. `/emulator/*` covers the handler, the helper iframe and the
+ * out-of-band action links; the two googleapis.com prefixes are the REST
+ * surface, which the SDK addresses as `<emulator origin>/<apiHost><path>`.
+ * None of them can collide with a page URL.
+ * @param {number} authPort
+ * @returns {function} connect-style middleware
+ */
+function devAuthEmulator(authPort) {
+  const prefixes = ['/emulator', '/identitytoolkit.googleapis.com', '/securetoken.googleapis.com'];
+
+  // Hop-by-hop framing headers belong to THIS connection, not the upstream's —
+  // copying them makes Node chunk a body it is already re-chunking.
+  const skipHeaders = new Set(['connection', 'keep-alive', 'transfer-encoding']);
+
+  // setHeader + statusCode, never writeHead. Eleventy's dev server wraps `res`
+  // to inject its live-reload script (eleventy-dev-server/server/wrapResponse):
+  // a writeHead carrying a text/html content-type is DEFERRED into a replay
+  // queue, but a piped Buffer write flushes the real headers first, and the
+  // replay then throws ERR_HTTP_HEADERS_SENT and takes the whole dev server
+  // down. Going through setHeader keeps that queue empty. It also keeps the
+  // wrapper's html transform off the emulator's pages — the live-reload script
+  // has no business inside the OAuth handler.
+  const answer = (res, status, headers) => {
+    res.statusCode = status;
+    for (const [name, value] of Object.entries(headers)) {
+      if (!skipHeaders.has(name.toLowerCase())) {
+        res.setHeader(name, value);
+      }
+    }
+  };
+
+  // The emulator deliberately binds 127.0.0.1 only, while the site listens on
+  // every interface — proxying for a LAN client would silently remove that
+  // safety property and hand the emulator's whole REST surface to the network.
+  const isLoopback = (address) => address === '::1'
+    || (address || '').startsWith('127.')
+    || (address || '').startsWith('::ffff:127.');
+
+  return (req, res, next) => {
+    const pathname = (req.url || '').split('?')[0];
+
+    if (!prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+      return next();
+    }
+    if (!isLoopback(req.socket?.remoteAddress)) {
+      return next();
+    }
+
+    const upstream = http.request({
+      host: '127.0.0.1',
+      port: authPort,
+      method: req.method,
+      path: req.url,
+      headers: { ...req.headers, host: `127.0.0.1:${authPort}` },
+    }, (upstreamRes) => {
+      answer(res, upstreamRes.statusCode, upstreamRes.headers);
+      upstreamRes.pipe(res);
+    });
+
+    // A website-only dev session (no emulator suite running) is an expected
+    // external condition, not our bug: answer the auth call with a 502 that
+    // names the port instead of hanging the request.
+    upstream.on('error', (error) => {
+      logger.error(`Auth emulator proxy: ${pathname} → :${authPort} failed (${error.message})`);
+      answer(res, 502, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end(Buffer.from(`Auth emulator on port ${authPort} is not reachable`));
+    });
+
+    return req.pipe(upstream);
+  };
 }
 
 /**

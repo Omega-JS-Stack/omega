@@ -50,7 +50,13 @@ function isImportLine(line) {
 function findScope(brandRoot) {
   for (const prefix of SCOPE_PREFIXES) {
     const scopeDir = join(brandRoot, prefix, 'node_modules', '@omega.js');
-    if (jetpack.exists(scopeDir) === 'dir') {
+    if (jetpack.exists(scopeDir) !== 'dir') continue;
+    // Only a scope that can back the import counts: the map link is already
+    // there, or the manager package is present for ensureGuideLink to resolve
+    // it. An empty dir from a partial install would leave the import dangling
+    // while the real scope sits a level up (#153).
+    if (jetpack.exists(join(scopeDir, 'AGENTS.md')) !== false
+      || jetpack.exists(join(scopeDir, 'manager')) !== false) {
       return { prefix, scopeDir };
     }
   }

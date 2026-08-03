@@ -105,6 +105,7 @@ function normalize(name, config, sources) {
     name,
     enabled_on_disk: config.enabled === true,
     default: config.default === 'on-demand' ? 'on-demand' : 'auto',
+    locked: config.locked === true,
     command: config.command,
     args: config.args || [],
     env: config.env || {},
@@ -191,6 +192,18 @@ function patchOverlayEntry(name, patch, options) {
 }
 
 /**
+ * The one refusal message for a locked upstream, shared by every caller that
+ * flips `enabled` on: the CLI and the router's meta-tool say the same thing.
+ *
+ * @param {string} name - Upstream name
+ * @returns {string} The refusal, naming the field and the shell escape hatch
+ */
+function lockedRefusal(name) {
+  return `Upstream "${name}" is locked (locked: true in its overlay config.json) and will not be enabled. `
+    + `Remove that field to unlock it, or run \`omega-mcp enable ${name} --force\` from the shell.`;
+}
+
+/**
  * Delete an overlay entry — a bundled default under the same name comes back.
  *
  * @param {string} name - Upstream name
@@ -213,6 +226,7 @@ module.exports = {
   loadUpstreams,
   isBundled,
   readOverlayEntry,
+  lockedRefusal,
   patchOverlayEntry,
   removeOverlayEntry,
 };

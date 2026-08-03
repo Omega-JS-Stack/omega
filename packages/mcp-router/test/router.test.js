@@ -52,6 +52,10 @@ before(async () => {
     'fixture-auto': { enabled: true, command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
     'fixture-ondemand': { enabled: true, default: 'on-demand', command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
     'fixture-off': { enabled: false, command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
+    'fixture-locked': { enabled: false, locked: true, command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
+    // Enabled on disk but on-demand (inactive) — the mid-session lock test
+    // writes locked: true into this entry while the router is live.
+    'fixture-midlock': { enabled: true, default: 'on-demand', command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
   };
   for (const [name, config] of Object.entries(entries)) {
     fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
@@ -89,6 +93,7 @@ test('router__list_upstreams reports every layer with its disk and session state
     name: 'fixture-auto',
     enabled_on_disk: true,
     default: 'auto',
+    locked: false,
     active_this_session: true,
     spawned: false,
     tool_count: 2,
@@ -96,6 +101,7 @@ test('router__list_upstreams reports every layer with its disk and session state
   });
   assert.equal(byName['fixture-ondemand'].active_this_session, false, 'on-demand upstreams start inactive');
   assert.equal(byName['fixture-off'].enabled_on_disk, false);
+  assert.equal(byName['fixture-locked'].locked, true, 'the locked state is visible from inside a chat');
 
   // The shipped defaults are present and each one was turned off by its
   // single-key overlay — the layering, end to end through a real process.
@@ -132,6 +138,24 @@ test('an upstream disabled on disk cannot be activated, and says how to fix it',
   const result = await callMeta('router__enable_upstream', { name: 'fixture-off' });
   assert.equal(result.isError, true);
   assert.match(result.text, /omega-mcp enable fixture-off/);
+});
+
+test('a locked upstream cannot be activated from inside the chat', async () => {
+  const result = await callMeta('router__enable_upstream', { name: 'fixture-locked' });
+  assert.equal(result.isError, true);
+  assert.match(result.text, /"fixture-locked" is locked \(locked: true/);
+  assert.equal((await toolNames()).some((tool) => tool.startsWith('fixture-locked__')), false);
+});
+
+test('a lock written mid-session is honored for an already-enabled upstream', async () => {
+  const configPath = path.join(overlayDir, 'fixture-midlock', 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  fs.writeFileSync(configPath, `${JSON.stringify({ ...config, locked: true }, null, 2)}\n`);
+
+  const result = await callMeta('router__enable_upstream', { name: 'fixture-midlock' });
+  assert.equal(result.isError, true);
+  assert.match(result.text, /"fixture-midlock" is locked \(locked: true/);
+  assert.equal((await toolNames()).some((tool) => tool.startsWith('fixture-midlock__')), false);
 });
 
 test('an on-disk enable is picked up without restarting the router', async () => {

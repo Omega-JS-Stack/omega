@@ -1,4 +1,5 @@
-// OAuth provider flows: popup-first sign-in with redirect fallback, the
+// OAuth provider flows: redirect-first sign-in (popup only for iframes and
+// the ?authPopup=true override), the
 // returning-redirect result processor, and the accidental-signup reversal
 // (Google auto-creates accounts during signin attempts).
 
@@ -17,23 +18,24 @@ const REDIRECT_PENDING_KEY = 'omega:authRedirectPending';
 
 /**
  * Popup or redirect? Redirect is the default (it survives strict popup
- * blockers and mobile webviews), with three cases that MUST use the popup:
+ * blockers and mobile webviews), with two cases that MUST use the popup:
  *
  *   - `?authPopup=true` — the manual override
  *   - inside an iframe — a top-level redirect is not ours to make
- *   - development — auth points at the Firebase emulator, whose OAuth handler
- *     hands the credential back through sessionStorage on the EMULATOR's
- *     origin (`http://localhost:9099`). Chrome partitions third-party storage
- *     by top-level site, so the SDK's iframe on the site's origin
- *     (`https://localhost:4000`) reads a different, empty partition and
- *     getRedirectResult() resolves null forever — the return leg dead-ends.
- *     The popup relays the event through `window.opener`, which is not
- *     partitioned, so the emulator flow completes.
+ *
+ * Development is NOT one of them any more (#156). It used to be: the Firebase
+ * emulator's OAuth handler hands the credential back through sessionStorage on
+ * the origin it is served from, and on the emulator's own port that origin is a
+ * third party to the site, so browser storage partitioning gave the SDK's
+ * helper iframe an empty partition and getRedirectResult() resolved null
+ * forever. `omega dev` now proxies the emulator under the SITE origin — the
+ * same same-origin trick production gets from the self-hosted /__/auth/*
+ * helpers — so the redirect leg comes home in dev too, and dev runs the flow
+ * users actually run.
  */
 export function shouldUseAuthPopup() {
   return new URL(window.location.href).searchParams.get('authPopup') === 'true'
-    || window !== window.top
-    || omega.isDevelopment();
+    || window !== window.top;
 }
 
 // Storage denial (privacy modes, blocked third-party contexts) is an expected

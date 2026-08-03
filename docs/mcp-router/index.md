@@ -40,8 +40,8 @@ Everything the router says goes to **stderr** — stdout is the MCP wire.
 
 | Tool | What it does |
 |---|---|
-| `router__list_upstreams` | Every upstream with `enabled_on_disk`, `default`, `active_this_session`, `spawned`, `tool_count`, `last_error` |
-| `router__enable_upstream {name, env?}` | Activate for this session. `env` values are per-session vars for the child; passing them restarts a running child. Re-reads the LAYERED disk state first, so an `omega-mcp enable` from the shell lands without a router restart |
+| `router__list_upstreams` | Every upstream with `enabled_on_disk`, `default`, `locked`, `active_this_session`, `spawned`, `tool_count`, `last_error` |
+| `router__enable_upstream {name, env?}` | Activate for this session. `env` values are per-session vars for the child; passing them restarts a running child. Re-reads the LAYERED disk state first, so an `omega-mcp enable` from the shell lands without a router restart. A `locked` upstream is refused, with no override from inside a chat |
 | `router__disable_upstream {name}` | Deactivate and stop the child. Disk untouched, env override cleared |
 | `router__refresh_upstream {name}` | Spawn once, re-read the tool list, cache it **to the overlay** |
 
@@ -69,6 +69,12 @@ Bundled defaults inside the package, then the user's overlay at `~/.omega/mcp-ro
 - A full entry under a new name adds a private upstream.
 
 **Every write lands in the overlay** — the CLI's enable/disable/add/remove/refresh and the router's `router__refresh_upstream` alike. The bundled dir is inside `node_modules` for a consumer, and nothing edits `node_modules`. `omega-mcp remove` on a bundled-only name refuses and points at `disable`; on a name that has both layers it drops your overrides and the default returns.
+
+### Locking an upstream off
+
+`{"locked": true}` in an overlay entry refuses the enable flip wherever it happens: `omega-mcp enable <name>` exits non-zero naming the field, `router__enable_upstream` returns the same refusal to the chat, and `omega-mcp add` over that name refuses as it does over any existing entry (it would write `enabled: true`). The one override is `omega-mcp enable <name> --force`, deliberately a shell-only escape hatch: a chat cannot force a locked upstream awake. The lock survives the forced flip, so the next enable refuses again.
+
+Locking guards WAKING, not turning off: `omega-mcp disable` and `omega-mcp remove` stay open on a locked entry, and a schema `refresh` never touches `enabled`. `omega-mcp list` marks a locked upstream `[locked]` and `router__list_upstreams` carries `locked` per row.
 
 Secrets live in `~/.omega/mcp-router/.env` and reach a command as `${NAME}`. Only that strict form is substituted; `${VAR:-default}` and `${VAR:+…}` pass through for a shell to expand. `${MCP_ROUTER_ROOT}` is reserved for the package root and resolves before any lookup.
 

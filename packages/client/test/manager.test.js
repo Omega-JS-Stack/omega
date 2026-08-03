@@ -166,6 +166,28 @@ describe('Dev ports (N7)', () => {
     assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5443');
   });
 
+  it('should point the auth emulator at the SITE origin when the dev server proxies it (#156)', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { auth: 9099 }, authEmulatorProxy: true },
+    });
+    // Same-origin is the whole point: the OAuth handler's sessionStorage and
+    // the SDK's helper iframe land in the page's own storage partition
+    assert.strictEqual(Manager._authEmulatorUrl(), 'http://localhost:3000');
+  });
+
+  it('should point the auth emulator at its own port when no proxy is declared', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { auth: 9199 } },
+    });
+    assert.strictEqual(Manager._authEmulatorUrl(), 'http://localhost:9199');
+  });
+
   it('should keep the classic assumptions when no map is provided', async () => {
     const Manager = getManager();
     await Manager.initialize({

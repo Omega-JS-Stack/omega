@@ -7,6 +7,7 @@
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const http = require('node:http');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
@@ -144,11 +145,11 @@ test('merges live sibling maps, skips own app dir and dead pids, empty without b
   assert.deepEqual(readSiblingPorts(standalone), {});
 });
 
-test('devServerOptions: clean-url + image fallback middleware + live-reload watch on the built asset trees', () => {
+test('devServerOptions: auth-emulator proxy + clean-url + image fallback middleware + live-reload watch on the built asset trees', () => {
   const { devServerOptions } = require('../src/commands/dev.js');
   const options = devServerOptions('/tmp/site-out');
 
-  assert.equal(options.middleware.length, 2);
+  assert.equal(options.middleware.length, 3);
   assert.ok(options.middleware.every((fn) => typeof fn === 'function'));
   // The dev server chokidars the OUT-dir asset trees our watcher rebuilds
   // into — css changes hot-swap, js changes reload; no hand refresh
@@ -166,7 +167,7 @@ test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to fla
   fs.writeFileSync(path.join(out, 'updates', 'v1.0.0.html'), 'x');
   fs.writeFileSync(path.join(out, 'real.txt'), 'x');
 
-  const middleware = devServerOptions(out).middleware[0];
+  const middleware = devServerOptions(out).middleware[1];
   const rewritten = (url) => {
     const req = { url };
     middleware(req, {}, () => {});
@@ -180,6 +181,96 @@ test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to fla
   assert.equal(rewritten('/real.txt'), '/real.txt', 'real files pass through');
   assert.equal(rewritten('/missing'), '/missing', 'no .html candidate — untouched');
   assert.equal(rewritten('/%E0%A4%A'), '/%E0%A4%A', 'malformed percent-escape falls through instead of throwing URIError (wave-3 W6)');
+});
+
+test('devAuthEmulator middleware: the emulator surface answers on the SITE origin, everything else falls through (#156)', async () => {
+  const { devServerOptions } = require('../src/commands/dev.js');
+
+  // A real stand-in emulator on a real socket — the proxy is plumbing, and
+  // plumbing is only proven by traffic actually arriving
+  const seen = [];
+  const emulator = http.createServer((req, res) => {
+    seen.push(req.url);
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(`emulator:${req.url}`);
+  });
+  await new Promise((resolve) => emulator.listen({ port: 0, host: '127.0.0.1' }, resolve));
+  const emulatorPort = emulator.address().port;
+
+  // A real site server with the middleware in front, so a fall-through is a
+  // real fall-through — and `res` goes through ELEVENTY'S OWN wrapper, the one
+  // that defers a text/html writeHead into a replay queue to inject its
+  // live-reload script. Proxying with writeHead + pipe crashes the whole dev
+  // server on that replay (ERR_HTTP_HEADERS_SENT), and a bare http server
+  // never sees it — the wrapper is the contract this middleware must satisfy.
+  const wrapResponse = require('@11ty/eleventy-dev-server/server/wrapResponse.js');
+  const middleware = devServerOptions('/tmp/site-out', emulatorPort).middleware[0];
+  const site = http.createServer((req, res) => middleware(req, wrapResponse(res, (html) => `${html}<!--livereload-->`), () => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('site');
+  }));
+  await new Promise((resolve) => site.listen({ port: 0, host: '127.0.0.1' }, resolve));
+  const sitePort = site.address().port;
+
+  // Timeout, because the wrapper regression this pins does not answer wrong —
+  // it kills the response and hangs the request
+  const get = async (url) => {
+    const response = await fetch(`http://127.0.0.1:${sitePort}${url}`, { signal: AbortSignal.timeout(5000) });
+    return { status: response.status, body: await response.text() };
+  };
+
+  // The OAuth handler and the helper iframe: BOTH first-party now, which is
+  // the whole point — they share one storage partition with the page
+  assert.deepEqual(await get('/emulator/auth/handler?apiKey=k&providerId=google.com'), {
+    status: 200,
+    body: 'emulator:/emulator/auth/handler?apiKey=k&providerId=google.com',
+  });
+  assert.deepEqual(await get('/emulator/auth/iframe?apiKey=k&appName=%5BDEFAULT%5D'), {
+    status: 200,
+    body: 'emulator:/emulator/auth/iframe?apiKey=k&appName=%5BDEFAULT%5D',
+  });
+
+  // The REST surface the SDK addresses as <emulator origin>/<apiHost><path>
+  assert.equal((await get('/identitytoolkit.googleapis.com/v1/accounts:lookup?key=k')).body,
+    'emulator:/identitytoolkit.googleapis.com/v1/accounts:lookup?key=k');
+  assert.equal((await get('/securetoken.googleapis.com/v1/token?key=k')).body,
+    'emulator:/securetoken.googleapis.com/v1/token?key=k');
+
+  // Out-of-band action links ride the same prefix
+  assert.equal((await get('/emulator/action?mode=verifyEmail')).body, 'emulator:/emulator/action?mode=verifyEmail');
+
+  // Page URLs are untouched — no prefix can collide with one, including a
+  // near-miss that merely starts with the same letters. Their HTML still gets
+  // the wrapper's live-reload injection; the emulator's pages above do not.
+  assert.equal((await get('/signin')).body, 'site<!--livereload-->');
+  assert.equal((await get('/emulator-notes')).body, 'site<!--livereload-->');
+  assert.equal(seen.length, 5, 'only the emulator surface was proxied');
+
+  // A website-only dev session (no emulator) gets a named 502, not a hang
+  await new Promise((resolve) => emulator.close(resolve));
+  const dead = await get('/emulator/auth/handler?apiKey=k&providerId=google.com');
+  assert.equal(dead.status, 502);
+  assert.match(dead.body, new RegExp(`port ${emulatorPort}`));
+
+  await new Promise((resolve) => site.close(resolve));
+});
+
+test('devAuthEmulator middleware: a non-loopback client never reaches the emulator (#156)', () => {
+  const { devServerOptions } = require('../src/commands/dev.js');
+  const middleware = devServerOptions('/tmp/site-out', 9099).middleware[0];
+
+  // The emulator binds loopback only, on purpose; the site listens on every
+  // interface. A LAN client hitting the proxied surface must fall through to
+  // the normal 404 instead of being bridged to the emulator.
+  let fellThrough = false;
+  const req = {
+    url: '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=k',
+    method: 'POST',
+    headers: {},
+    socket: { remoteAddress: '192.168.86.42' },
+  };
+  middleware(req, {}, () => { fellThrough = true; });
+  assert.equal(fellThrough, true, 'a LAN client falls through, the emulator stays loopback-only');
 });
 
 test('applyDevSiteUrl: dev builds link to the local origin, never the live site', () => {
