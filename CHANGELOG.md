@@ -4,15 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.17.0] (2026-08-02)
 ### Added
-- [#157](../../issues/157) — An mcp-router overlay entry can carry `locked: true`: that upstream refuses every enable, from `omega-mcp enable` (non-zero, naming the field) and from `router__enable_upstream` (no override). `--force` is the shell-only escape hatch; disable, remove, and refresh stay open, and both listings show the state.
+- [#157](../../issues/157) [`0ce69247`](../../commit/0ce69247) Thanks [@ianwieds]! — An mcp-router overlay entry can carry `locked: true`: that upstream refuses every enable, from `omega-mcp enable` (non-zero, naming the field) and from `router__enable_upstream` (no override). `--force` is the shell-only escape hatch; disable, remove, and refresh stay open, and both listings show the state.
 
 ### Changed
-- [#156](../../issues/156) — Provider sign-in runs the redirect flow in development, as it does in production. `omega dev` serves the auth emulator through the site origin, so its OAuth handler and helper iframe are first-party and the returning credential survives storage partitioning. The popup now covers only iframed pages and `?authPopup=true`.
+- [#156](../../issues/156) [`0ce69247`](../../commit/0ce69247) Thanks [@ianwieds]! — Provider sign-in runs the redirect flow in development, as it does in production. `omega dev` serves the auth emulator through the site origin, so its OAuth handler and helper iframe are first-party and the returning credential survives storage partitioning. The popup now covers only iframed pages and `?authPopup=true`.
 
 ### Fixed
-- [#153](../../issues/153) — The agents-md service no longer dangles a brand's map import: the scope walk skips an empty local `node_modules/@omega.js/` directory (a partial-install leftover) and lands on the hoisted scope that actually holds the install, so the import it writes always resolves.
+- [#153](../../issues/153) [`0ce69247`](../../commit/0ce69247) Thanks [@ianwieds]! — The agents-md service no longer dangles a brand's map import: the scope walk skips an empty local `node_modules/@omega.js/` directory (a partial-install leftover) and lands on the hoisted scope that actually holds the install, so the import it writes always resolves.
 
 ## [0.16.0] (2026-08-01)
 ### Changed
