@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+### Added
+- [#155](../../issues/155) — A real-browser e2e lane, `npm run test:flows`, drives the crucial user flows against the full local stack: the Google picker's redirect leg, the password forms, checkout to its confirmation, the vert ladder, and the account page. It boots its own emulator and `omega dev` on fresh ports.
+
+### Fixed
+- [#154](../../issues/154) — Classy's default about and pricing pages no longer hotlink Unsplash: the about photo band and section photo demos ride a placeholder set shipped in `core/images/placeholder`, and the pricing testimonials wear their initial badge. A guard test fails any packaged theme that hotlinks an image host.
+
 ## [0.17.0] (2026-08-02)
 ### Added
 - [#157](../../issues/157) [`0ce69247`](../../commit/0ce69247) Thanks [@ianwieds]! — An mcp-router overlay entry can carry `locked: true`: that upstream refuses every enable, from `omega-mcp enable` (non-zero, naming the field) and from `router__enable_upstream` (no override). `--force` is the shell-only escape hatch; disable, remove, and refresh stay open, and both listings show the state.

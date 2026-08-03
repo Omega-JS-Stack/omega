@@ -32,8 +32,8 @@
     {
       label: 'With the aside photo',
       args: {
-        image: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&q=80&w=800',
-        image_alt: 'A notebook and coffee on a wooden desk',
+        image: '/assets/images/core/placeholder/photo-3.jpg',
+        image_alt: 'Placeholder artwork in soft green tones',
       },
     },
   ],

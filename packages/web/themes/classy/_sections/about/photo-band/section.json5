@@ -8,10 +8,12 @@
 
   defaults: {
     placeholder: '{{ site.omega.placeholder.src }}',
+    // The framework never loads an external image at runtime: the default
+    // band rides the placeholder set shipped in core/images/placeholder.
     items: [
-      { src: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80', alt: 'The team working around one table', caption: 'Shipping week, every week', wide: true },
-      { src: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80', alt: 'Two teammates pairing on a laptop', caption: 'Pairing beats meetings' },
-      { src: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&q=80', alt: 'A notebook and coffee on a desk', caption: 'Plans in pencil' },
+      { src: '/assets/images/core/placeholder/photo-1.jpg', alt: 'Placeholder artwork in warm amber tones', caption: 'Shipping week, every week', wide: true },
+      { src: '/assets/images/core/placeholder/photo-2.jpg', alt: 'Placeholder artwork in cool blue tones', caption: 'Pairing beats meetings' },
+      { src: '/assets/images/core/placeholder/photo-3.jpg', alt: 'Placeholder artwork in soft green tones', caption: 'Plans in pencil' },
     ],
   },
 

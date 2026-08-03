@@ -54,19 +54,22 @@ story:
     description: "Continuing to push boundaries and build the future of business technology"
 
 # Photo band — life in pictures (gallery: false kills it). Placeholder
-# imagery ships by default; point src at your own photos. wide: true spans
-# the grid; the wide tile loads via @bg, stills via responsive @srcset.
+# imagery SHIPS with the framework (core/images/placeholder, bridged to
+# /assets/images/core by the static-asset channel) because the framework
+# never loads an external image at runtime; point src at your own photos.
+# wide: true spans the grid; the wide tile loads via @bg, stills via
+# responsive @srcset.
 gallery:
   items:
-  - src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80"
-    alt: "The team working around one table"
+  - src: "/assets/images/core/placeholder/photo-1.jpg"
+    alt: "Placeholder artwork in warm amber tones"
     caption: "Shipping week, every week"
     wide: true
-  - src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80"
-    alt: "Two teammates pairing on a laptop"
+  - src: "/assets/images/core/placeholder/photo-2.jpg"
+    alt: "Placeholder artwork in cool blue tones"
     caption: "Pairing beats meetings"
-  - src: "https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&q=80"
-    alt: "A notebook and coffee on a desk"
+  - src: "/assets/images/core/placeholder/photo-3.jpg"
+    alt: "Placeholder artwork in soft green tones"
     caption: "Plans in pencil"
 
 # Company facts — the hero rail (numbers count up on reveal)
