@@ -26,7 +26,10 @@ the plugin a consumer brand enables from its node_modules — minus the plugin's
 `packages/mcp-router`, which is not in the publish set
 ([#144](https://github.com/Omega-JS-Stack/omega/issues/144))). All of it is
 generated and gitignored; `node --test scripts/vendor-docs.test.js` packs all
-six for real and asserts the tarball listings. Contract:
+six for real and asserts the tarball listings. A vendor failure ABORTS the
+prepare: every publishable sets `preparePackage.hooks.afterBlocking: true`
+(prepare-package 2.2.0, [#38](https://github.com/Omega-JS-Stack/omega/issues/38)),
+so a tarball can never build missing its vendored internals. Contract:
 [agent-docs.md](agent-docs.md).
 
 ## Pre-flight (any day, no GO needed)

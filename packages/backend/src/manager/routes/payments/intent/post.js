@@ -18,7 +18,12 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     return ctx.respond('Authentication required', { code: 401 });
   }
 
-  // Verify reCAPTCHA (skip during automated tests)
+  // Verify reCAPTCHA (skip during automated tests). verify() owns the whole
+  // decision: no RECAPTCHA_SECRET_KEY configured → pass (unkeyed brands are a
+  // sanctioned population; cp257: keys are optional and per-brand); secret +
+  // missing/bad token → fail. No pre-check here: an empty-token 403 before
+  // verify() would permanently reject every checkout from a brand that never
+  // configured reCAPTCHA. Same shape as routes/marketing/contact/post.js.
   if (!ctx.isTesting()) {
     const recaptchaToken = settings.verification?.['g-recaptcha-response'];
     const recaptchaValid = await recaptcha.verify(recaptchaToken);

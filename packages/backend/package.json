@@ -58,7 +58,8 @@
     "type": "copy",
     "hooks": {
       "before": "node scripts/update-disposable-domains.js",
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "afterBlocking": true
     }
   },
   "dependencies": {
@@ -115,7 +116,7 @@
     "@omega.js/account": "*",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
-    "prepare-package": "^2.1.0"
+    "prepare-package": "^2.2.0"
   },
   "peerDependencies": {
     "firebase-admin": "^13.10.0",

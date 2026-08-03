@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ---
 # [Unreleased]
 
+### Changed
+- Remote scripts are now opt-in: the remote-execution lane initializes only when a brand sets `remoteScripts.enabled: true` in config; otherwise it stays inert with a log line. The https-only gate on the resolved script URL (loopback excepted) still applies.
+
 ### Added
 - Ads auto-bind (ads-system phase 4): renderers bind every `[data-omega-ad]` element (present at init or inserted later) to `@omega.js/client`'s ads module with the type pinned `'house'` — desktop surfaces only ever serve the house/company inventory, never AdSense. Bound hosts are marked `data-omega-ad-bound="house"`. See [docs/ads.md](docs/ads.md).
 

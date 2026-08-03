@@ -50,7 +50,8 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "afterBlocking": true
     }
   },
   "dependencies": {
@@ -84,7 +85,7 @@
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
     "@omega.js/template-kit": "*",
-    "prepare-package": "^2.1.0"
+    "prepare-package": "^2.2.0"
   },
   "engines": {
     "node": ">=22"

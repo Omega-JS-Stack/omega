@@ -35,7 +35,8 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "afterBlocking": true
     }
   },
   "notes": {
@@ -51,6 +52,6 @@
   "devDependencies": {
     "@omega.js/account": "*",
     "@omega.js/devkit": "*",
-    "prepare-package": "^2.1.0"
+    "prepare-package": "^2.2.0"
   }
 }

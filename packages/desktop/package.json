@@ -53,7 +53,8 @@
     "type": "copy",
     "replace": {},
     "hooks": {
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "afterBlocking": true
     }
   },
   "omega": {
@@ -130,7 +131,7 @@
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "firebase-admin": "^13.9.0",
-    "prepare-package": "^2.1.0"
+    "prepare-package": "^2.2.0"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.0",
