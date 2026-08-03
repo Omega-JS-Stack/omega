@@ -10,7 +10,7 @@ member:
   name: Jordan Reyes
   position: CEO
   excerpt: "Jordan sets the direction and still reviews every release note before it ships."
-  image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80"
+  image: "/assets/images/core/placeholder/photo-2.jpg"
   location: Austin, TX
   joined: 2019-03-04
   links:

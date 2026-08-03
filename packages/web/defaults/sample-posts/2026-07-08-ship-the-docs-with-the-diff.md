@@ -4,7 +4,7 @@ post:
   title: "Ship the docs with the diff"
   description: "Documentation written 'later' is documentation written never. The only docs that stay true are the ones that travel in the same commit as the change."
   id: 9000011
-  image: "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-3.jpg"
   categories: ["Company"]
   tags: ["culture", "engineering", "docs"]
 ---

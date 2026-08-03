@@ -10,7 +10,7 @@ member:
   name: Avery Quinn
   position: Founding Engineer
   excerpt: "Avery built the first prototype in a weekend and has been un-building it properly ever since."
-  image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80"
+  image: "/assets/images/core/placeholder/photo-1.jpg"
   location: Portland, OR
   joined: 2019-06-17
   links:

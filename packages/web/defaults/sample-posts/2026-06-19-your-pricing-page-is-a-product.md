@@ -4,7 +4,7 @@ post:
   title: "Your pricing page is a product"
   description: "It gets more skeptical traffic than anything else you ship, and most teams treat it like a brochure. Treat it like a product instead."
   id: 9000009
-  image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-1.jpg"
   categories: ["Product"]
   tags: ["product", "business"]
 ---

@@ -206,8 +206,10 @@ another page's words.
   (`static-assets.js`) — or the surface carries none and its designed
   fallback renders (e.g. the testimonial initial badge). No theme or section
   default may point at a third-party image host; the guard test
-  `packages/web/test/external-images.test.js` fails the retired hosts on the
-  whole theme layer ([#154](https://github.com/Omega-JS-Stack/omega/issues/154)).
+  `packages/web/test/external-images.test.js` fails the retired hosts across
+  the whole theme layer and `defaults/`
+  ([#154](https://github.com/Omega-JS-Stack/omega/issues/154),
+  [#158](https://github.com/Omega-JS-Stack/omega/issues/158)).
 - **Dev loop**: theme-layer section edits are covered by the theme-root
   watchers; consumer `src/_sections`/`_components` have their own watch
   entries — scss changes hot-swap css, js changes rebuild + reload.

@@ -110,6 +110,17 @@ test('static channel ships the minted set and the consumer layer wins collisions
   assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'hero.png'), 'utf8'), 'consumer-hero');
 });
 
+test('the shipped favicon.ico mirrors to the site root (#161: the browser probes /favicon.ico)', () => {
+  const root = path.join(OUT, 'favicon.ico');
+  assert.ok(fs.existsSync(root), 'root favicon.ico shipped');
+  assert.strictEqual(fs.readFileSync(root, 'utf8'), 'consumer-ico', 'the root copy is the collision winner');
+
+  // No favicon set shipped → nothing lands at the root
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-static-bare-'));
+  copyStaticAssets({ staticDirs: [], outDir: bare });
+  assert.ok(!fs.existsSync(path.join(bare, 'favicon.ico')), 'no set, no root favicon');
+});
+
 test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
   const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
 

@@ -4,7 +4,7 @@ post:
   title: "Write release notes people actually read"
   description: "Bug fixes and performance improvements is a shrug in text form. A better template, in three parts."
   id: 9000005
-  image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-3.jpg"
   categories: ["Guides"]
   tags: ["writing", "process"]
 ---

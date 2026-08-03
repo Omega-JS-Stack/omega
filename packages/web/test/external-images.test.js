@@ -7,12 +7,10 @@
  * the framework (core/images/*, bridged to /assets/images/core) or the page
  * carries none at all.
  *
- * Scope is the theme layer, where the default pages and section defaults
- * live. Prose elsewhere may still name the hosts (the admin editor's URL
- * input placeholder, cachebreak's external-URL unit fixture) — those load
- * nothing. defaults/sample-posts and defaults/sample-team still hotlink for
- * real and sit outside this walk: that cleanup is #158, which also widens
- * this guard to cover defaults/.
+ * Scope is the theme layer plus the defaults layer (#158), where the default
+ * pages, section defaults, and the sample posts/team members live. Prose
+ * elsewhere may still name the hosts (the admin editor's URL input
+ * placeholder, cachebreak's external-URL unit fixture) — those load nothing.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -20,7 +18,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const PKG = path.resolve(__dirname, '..');
-const THEMES = path.join(PKG, 'themes');
+const SCAN_ROOTS = [path.join(PKG, 'themes'), path.join(PKG, 'defaults')];
 
 // Hotlink hosts the framework has already retired once.
 const BANNED = [/images\.unsplash\.com/, /i\.pravatar\.cc/];
@@ -46,10 +44,10 @@ function walk(dir) {
   return files;
 }
 
-test('#154: no packaged theme hotlinks an image host', () => {
+test('#154: no packaged theme or default hotlinks an image host', () => {
   const sightings = [];
 
-  for (const file of walk(THEMES)) {
+  for (const file of SCAN_ROOTS.flatMap(walk)) {
     const text = fs.readFileSync(file, 'utf8');
     for (const pattern of BANNED) {
       if (!pattern.test(text)) continue;
@@ -58,12 +56,12 @@ test('#154: no packaged theme hotlinks an image host', () => {
     }
   }
 
-  assert.deepStrictEqual(sightings, [], `theme imagery is hotlinked again:\n${sightings.join('\n')}`);
+  assert.deepStrictEqual(sightings, [], `packaged imagery is hotlinked again:\n${sightings.join('\n')}`);
 });
 
 test('#154: the placeholder imagery the defaults point at ships with the package', () => {
   const referenced = [];
-  for (const file of walk(THEMES)) {
+  for (const file of SCAN_ROOTS.flatMap(walk)) {
     const text = fs.readFileSync(file, 'utf8');
     referenced.push(...[...text.matchAll(/\/assets\/images\/core\/(\S+?\.jpg)/g)].map((match) => match[1]));
   }

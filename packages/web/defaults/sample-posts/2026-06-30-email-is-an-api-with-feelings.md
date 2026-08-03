@@ -4,7 +4,7 @@ post:
   title: "Email is an API with feelings"
   description: "Transactional email is the only interface your product has that lands in someone else's house. Design it like you mean it."
   id: 9000010
-  image: "https://images.unsplash.com/photo-1596526131083-e8c633c948d2?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-2.jpg"
   categories: ["Design"]
   tags: ["design", "product", "email"]
 ---

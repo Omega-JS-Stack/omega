@@ -4,7 +4,7 @@ post:
   title: "Naming things: a survival guide"
   description: "The two hard problems in computer science are cache invalidation, naming things, and off-by-one errors. This post is about the middle one."
   id: 9000008
-  image: "https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-3.jpg"
   categories: ["Guides"]
   tags: ["guides", "engineering", "culture"]
 ---

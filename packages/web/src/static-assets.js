@@ -7,6 +7,9 @@
  * win collisions. Entries whose source doesn't exist are skipped, so a
  * brand with no minted assets builds clean. buildSite runs the copies as
  * its 'static' phase.
+ *
+ * The copies also mirror the shipped favicon.ico to the site ROOT, because
+ * browsers probe /favicon.ico with no link tag involved (#161).
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -68,11 +71,12 @@ function hasFaviconSet(staticDirs) {
 
 /**
  * Copy the resolved entries into the build output, in order (later entries
- * overwrite earlier ones — that's the consumer-wins contract).
+ * overwrite earlier ones — that's the consumer-wins contract), then mirror
+ * the shipped favicon.ico to the site root.
  * @param {object} options
  * @param {Array<{ src: string, dest: string }>} [options.staticDirs]
  * @param {string} options.outDir
- * @returns {{ copied: number }}
+ * @returns {{ copied: number, rootFavicon: boolean }}
  */
 function copyStaticAssets(options) {
   let copied = 0;
@@ -82,7 +86,25 @@ function copyStaticAssets(options) {
     copied += 1;
   }
 
-  return { copied };
+  return { copied, rootFavicon: mirrorRootFavicon(options.outDir) };
+}
+
+/**
+ * Mirror the shipped favicon set's .ico to <outDir>/favicon.ico. Browsers
+ * probe /favicon.ico directly (no link tag), so the built site answers it in
+ * dev and in production alike. Sourced from the COPIED set, so the
+ * consumer-wins collision result is what lands at the root; no set shipped,
+ * nothing to mirror.
+ * @param {string} outDir
+ * @returns {boolean} Whether a root favicon.ico was written.
+ */
+function mirrorRootFavicon(outDir) {
+  const shipped = path.join(outDir, 'assets', 'images', 'favicon', 'favicon.ico');
+  if (jetpack.exists(shipped) !== 'file') return false;
+
+  jetpack.copy(shipped, path.join(outDir, 'favicon.ico'), { overwrite: true });
+
+  return true;
 }
 
 module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet };

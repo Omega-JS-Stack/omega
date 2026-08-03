@@ -10,7 +10,7 @@ member:
   name: Riley Nakamura
   position: Support Lead
   excerpt: "Riley answers faster than the status page and remembers every customer by name."
-  image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=800&q=80"
+  image: "/assets/images/core/placeholder/photo-3.jpg"
   location: Seattle, WA
   joined: 2021-08-02
   links:

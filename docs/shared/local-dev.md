@@ -42,7 +42,7 @@ Brand-level sources are not read by the apps directly; most of them are **redist
 | You edited | What moves it | When it lands |
 |---|---|---|
 | `assets/logo/*.svg`, `assets/templates/*.psd` | assets service → derived variants in the gitignored `.omega/assets/`, mtime-diffed (only stale outputs regenerate) | a manage cycle: restart `omega dev`, or run `npx omega` in the brand |
-| `.omega/assets/*` (the derived set) | the web build's static channel copies them into the site as `assets/images/brand/*` + `assets/images/favicon` (`packages/web/src/static-assets.js`) | the web build's `static` phase — the dev server copies at BOOT, no watcher, so a restart picks them up |
+| `.omega/assets/*` (the derived set) | the web build's static channel copies them into the site as `assets/images/brand/*` + `assets/images/favicon`, and mirrors the shipped `favicon.ico` to the site root so the browser's `/favicon.ico` probe resolves (`packages/web/src/static-assets.js`) | the web build's `static` phase — the dev server copies at BOOT, no watcher, so a restart picks them up |
 | brand `.env`, signing certs | disperse service → each app's gitignored `.env` and certs dir | a manage cycle (same as above) |
 | `config/omega.json5` (brand or app) | nothing — apps read it directly, there is no mirror to disperse | the reading process's own reload (a dev-server restart is always enough) |
 | an app's own `src/` | that app's watcher | live |

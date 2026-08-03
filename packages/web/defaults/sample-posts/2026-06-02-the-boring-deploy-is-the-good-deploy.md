@@ -4,7 +4,7 @@ post:
   title: "The boring deploy is the good deploy"
   description: "If shipping to production raises your heart rate, the process is telling you something. Here's what it takes to make deploys a non-event."
   id: 9000007
-  image: "https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-2.jpg"
   categories: ["Engineering"]
   tags: ["engineering", "deploys"]
 ---

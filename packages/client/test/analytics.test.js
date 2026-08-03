@@ -1,7 +1,7 @@
 const { describe, it } = require('node:test');
 const fs = require('fs');
 const path = require('path');
-const { assert } = require('./helpers.js');
+const { assert, getManager, TEST_CONFIG } = require('./helpers.js');
 
 const SOURCE_PATH = path.join(__dirname, '..', 'src', 'modules', 'analytics.js');
 const SOURCE = fs.readFileSync(SOURCE_PATH, 'utf8');
@@ -125,6 +125,81 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
     } finally {
       global.fetch = realFetch;
       delete global.localStorage;
+    }
+  });
+
+});
+
+describe('Analytics on web (#159: gtag delegation)', () => {
+
+  it('web events delegate to the page gtag; the Measurement Protocol stays off web', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    const calls = [];
+    const fetchCalls = [];
+    const realFetch = global.fetch;
+    global.window.gtag = (...args) => calls.push(args);
+    global.fetch = (url) => {
+      fetchCalls.push(url);
+      return Promise.resolve({ ok: true });
+    };
+
+    try {
+      const web = new Analytics({
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      });
+
+      // No measurement id, no secret: the gtag config is page-side (web core
+      // foot.html emits it), and the api_secret must never reach a page
+      web.init({ projectId: 'proj-x' });
+      assert.strictEqual(web.initialized, true, 'web initializes without an id or a secret');
+      assert.strictEqual(calls.length, 0, 'the page gtag config already fired the page_view, so no second one');
+
+      web.event('vert-click!', { vert_id: 'omega-promo', vert_lane: 'promo' });
+
+      assert.strictEqual(fetchCalls.length, 0, 'web must never post to the Measurement Protocol');
+      assert.strictEqual(calls.length, 1, 'the event reaches the page gtag');
+      const [command, name, params] = calls[0];
+      assert.strictEqual(command, 'event');
+      assert.strictEqual(name, 'vert_click', 'the name normalizes through analytics-core');
+      assert.strictEqual(params.vert_id, 'omega-promo', 'caller params ride along');
+      assert.strictEqual(params.page_location, global.window.location.href, 'page data merges in');
+
+      // A secret handed in anyway is dropped on the floor, never stored
+      const withSecret = new Analytics({
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      });
+      withSecret.init({ id: 'G-TESTONLY', secret: 'test-secret' });
+      assert.strictEqual(withSecret.secret, null, 'the api_secret is never read on web');
+
+      // gtag absent (analytics unconfigured) → logged no-op, never a throw
+      delete global.window.gtag;
+      web.event('vert_click');
+      assert.strictEqual(fetchCalls.length, 0, 'a missing gtag never falls back to the fetch path');
+    } finally {
+      global.fetch = realFetch;
+      delete global.window.gtag;
+    }
+  });
+
+  it('the manager initializes web analytics with no provider config (the vert_click chain)', async () => {
+    const Manager = getManager();
+
+    const calls = [];
+    global.window.gtag = (...args) => calls.push(args);
+
+    try {
+      await Manager.initialize(TEST_CONFIG);
+      assert.strictEqual(Manager.analytics().initialized, true, 'web analytics initializes on a brand with no google id');
+
+      Manager.analytics().event('vert_click', { vert_lane: 'promo' });
+      const events = calls.filter((entry) => entry[0] === 'event' && entry[1] === 'vert_click');
+      assert.strictEqual(events.length, 1, 'vert_click reaches gtag through the manager');
+      assert.strictEqual(events[0][2].vert_lane, 'promo');
+    } finally {
+      delete global.window.gtag;
     }
   });
 

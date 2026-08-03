@@ -21,6 +21,18 @@ describe('Manager Methods', () => {
     assert.strictEqual(Manager.isValidRedirectUrl('http://localhost:3000/page'), true);
   });
 
+  it('should validate path-relative redirect URLs against the page origin (#160)', async () => {
+    const Manager = getManager();
+    await Manager.initialize(TEST_CONFIG);
+    assert.strictEqual(Manager.isValidRedirectUrl('/pricing'), true);
+    assert.strictEqual(Manager.isValidRedirectUrl('/dashboard/account?tab=billing'), true);
+    // Absolute same-host keeps working, cross-host stays rejected in both forms
+    assert.strictEqual(Manager.isValidRedirectUrl('http://localhost:3000/pricing'), true);
+    assert.strictEqual(Manager.isValidRedirectUrl('https://evil.com/pricing'), false);
+    assert.strictEqual(Manager.isValidRedirectUrl('//evil.com/pricing'), false);
+    assert.strictEqual(Manager.isValidRedirectUrl('not-a-url'), false);
+  });
+
   it('should reject redirect URLs for unknown hosts', () => {
     assert.strictEqual(getManager().isValidRedirectUrl('http://evil.com'), false);
   });

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+### Fixed
+- [#158](../../issues/158) — The sample posts and sample team members ship their imagery: the header and portrait pictures ride the `core/images/placeholder` set instead of hotlinking Unsplash, and the guard test now walks `defaults/` alongside the theme layer.
+- [#161](../../issues/161) — The built site answers the browser's `/favicon.ico` probe: the static channel mirrors the shipped `assets/images/favicon/favicon.ico` to the site root, in dev and in production builds alike.
+- [#159](../../issues/159) — Analytics events fire on web instead of being dropped: the client hands each event to the page's own `gtag` (the Measurement Protocol stays on extension and desktop, so the api_secret never reaches a page), which is what makes the host-side `vert_click` reach GA4.
+- [#160](../../issues/160) — A relative `authReturnUrl` such as `/pricing` is honored instead of silently falling back to the policy default: redirect validation resolves a path-relative value against the page origin before the same-host check.
+
 ## [0.18.0] (2026-08-02)
 ### Added
 - [#155](../../issues/155) [`47db79ea`](../../commit/47db79ea) Thanks [@ianwieds]! — A real-browser e2e lane, `npm run test:flows`, drives the crucial user flows against the full local stack: the Google picker's redirect leg, the password forms, checkout to its confirmation, the vert ladder, and the account page. It boots its own emulator and `omega dev` on fresh ports.

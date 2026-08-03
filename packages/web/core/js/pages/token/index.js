@@ -72,7 +72,7 @@ export default function () {
           updateStatus('Redirecting to Claude...');
 
           setTimeout(() => {
-            updateStatus('If you were not redirected, <a href="' + omega.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
+            updateStatus(`If you were not redirected, <a href="${omega.utilities().escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
           }, 3000);
 
           window.location.href = redirectUrl;
@@ -90,7 +90,7 @@ export default function () {
         if (authReturnUrl) {
           // Redirect to return URL with token
           updateStatus('Redirecting...');
-          const returnUrl = new URL(authReturnUrl);
+          const returnUrl = new URL(authReturnUrl, window.location.origin);
           returnUrl.searchParams.set('authToken', token);
 
           // LEGACY: Add the legacy payload shape for old desktop app deep links
@@ -102,7 +102,7 @@ export default function () {
 
           // Show retry button after a delay in case the redirect was cancelled (e.g. custom protocol dialog)
           setTimeout(() => {
-            updateStatus('If you were not redirected, <a href="' + omega.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
+            updateStatus(`If you were not redirected, <a href="${omega.utilities().escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
           }, 3000);
 
           window.location.href = redirectUrl;

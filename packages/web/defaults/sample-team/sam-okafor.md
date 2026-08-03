@@ -10,7 +10,7 @@ member:
   name: Sam Okafor
   position: Design Lead
   excerpt: "Sam owns the type scale, the spacing scale, and every opinion about both."
-  image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80"
+  image: "/assets/images/core/placeholder/photo-1.jpg"
   location: Chicago, IL
   joined: 2020-01-13
   links:

@@ -4,7 +4,7 @@ post:
   title: "The case for one config"
   description: "Why every surface of this product reads from a single source of truth, and what that buys you in practice."
   id: 9000004
-  image: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1600&q=80"
+  image: "/assets/images/core/placeholder/photo-2.jpg"
   categories: ["Product"]
   tags: ["product", "architecture"]
 ---

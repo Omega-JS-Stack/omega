@@ -593,6 +593,24 @@ async function main() {
       return authPage.url().replace(siteUrl, '');
     });
 
+    await step('a RELATIVE authReturnUrl is honored the same as the absolute form (#160)', async () => {
+      const destination = '/pricing';
+      await authPage.goto(`${siteUrl}/signin?authSignout=true`, { waitUntil: 'networkidle2' });
+      await waitForAuthForm(authPage);
+
+      await authPage.goto(`${siteUrl}/signin?authReturnUrl=${encodeURIComponent(destination)}`, { waitUntil: 'networkidle2' });
+      await waitForAuthForm(authPage);
+      await clickElement(authPage, 'button[data-provider="google.com"]');
+      await pickGoogleAccount(authPage, persona('googleTwo'));
+
+      await authPage.waitForFunction(
+        (wanted) => window.location.pathname === wanted,
+        { timeout: 60000 },
+        destination,
+      );
+      return authPage.url().replace(siteUrl, '');
+    });
+
     await step('an empty OAuth return fails LOUDLY instead of showing a blank form', async () => {
       const emptyReturnPage = await newPage(browser, 'empty-return', consoleLog);
       activePage = emptyReturnPage;
@@ -750,6 +768,15 @@ async function main() {
         for (const name of ['no-fill', 'promo', 'fill', 'click']) {
           $host.addEventListener(`omega-vert:${name}`, (event) => window.__flowsVertEvents.push({ name, detail: event.detail }));
         }
+
+        // The playground carries no google analytics id, so web core foot.html
+        // emits its no-op gtag stub and no dataLayer with it. Stand the
+        // configured branch's recorder up in its place (the same
+        // `dataLayer.push(arguments)` foot.html writes), so the host-side
+        // vert_click lands exactly where a configured brand would see it (#159).
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+
         $host.scrollIntoView({ block: 'center' });
       });
 
@@ -809,6 +836,28 @@ async function main() {
       const click = await vertPage.evaluate(() => window.__flowsVertEvents.find((entry) => entry.name === 'click'));
       assert.equal(click.detail.id, 'omega-promo', `the host should receive the promo click (got ${click.detail.id})`);
       return `${url.origin}${url.pathname} + 4 utm params`;
+    });
+
+    await step('the click fires vert_click through the page gtag', async () => {
+      // Web's analytics transport is the page's own gtag (#159), so a fired
+      // event is a dataLayer entry: ['event', 'vert_click', params].
+      await vertPage.waitForFunction(
+        () => (window.dataLayer || []).some((entry) => entry[0] === 'event' && entry[1] === 'vert_click'),
+        { timeout: 30000 },
+      );
+
+      const params = await vertPage.evaluate(() => {
+        const entry = Array.from(window.dataLayer)
+          .map((item) => Array.from(item))
+          .find((item) => item[0] === 'event' && item[1] === 'vert_click');
+        return entry[2];
+      });
+
+      assert.equal(params.vert_id, 'omega-promo', `vert_click should carry the promo id (got ${params.vert_id})`);
+      assert.equal(params.vert_lane, 'promo', `vert_click should carry the promo lane (got ${params.vert_lane})`);
+      assert.equal(params.vert_slot, 'rectangle', `vert_click should carry the slot preset (got ${params.vert_slot})`);
+      assert.ok(params.page_location, 'the event should carry the page data the analytics module merges in');
+      return `vert_click ${params.vert_id} (${params.vert_lane}/${params.vert_slot})`;
     });
 
     await vertPage.close();

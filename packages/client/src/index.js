@@ -156,11 +156,15 @@ class Manager {
       // Initialize Analytics when the google provider is configured
       // (canonical shape: analytics.providers.google.{id,secret} — C4 cp106a;
       // projectId feeds the cross-surface uuidv5 identity namespace)
+      // Web is the exception: its transport is the page's own gtag, so there
+      // is no id or secret to require here (#159): the api_secret must never
+      // reach a page at all.
       const googleAnalytics = this.config.analytics?.providers?.google;
-      if (googleAnalytics?.id && googleAnalytics?.secret) {
+      const isWebRuntime = this._utilities.getRuntime() === 'web';
+      if (isWebRuntime || (googleAnalytics?.id && googleAnalytics?.secret)) {
         this._analytics.init({
-          id: googleAnalytics.id,
-          secret: googleAnalytics.secret,
+          id: googleAnalytics?.id || null,
+          secret: googleAnalytics?.secret,
           projectId: this._resolveFirebaseConfig()?.projectId || this.config.brand?.id || null,
         });
       } else {
@@ -682,8 +686,18 @@ class Manager {
 
   isValidRedirectUrl(url) {
     try {
-      const returnUrlObject = new URL(decodeURIComponent(url));
       const currentUrlObject = new URL(window.location.href);
+      const decoded = decodeURIComponent(url);
+
+      // Path-relative values ('/pricing') resolve against the page origin so they
+      // reach the checks below as an absolute URL instead of throwing and falling
+      // back to the policy default. Only a leading '/' counts: anything else must
+      // parse as an absolute URL on its own, so garbage ('not-a-url') still fails.
+      // A protocol-relative value ('//evil.com') resolves to its own host and is
+      // then rejected by the same-host check, exactly like the absolute form.
+      const returnUrlObject = decoded.startsWith('/')
+        ? new URL(decoded, currentUrlObject.origin)
+        : new URL(decoded);
 
       // Loopback returns (RFC 8252 §7.3) are valid while the SITE runs in development:
       // native apps (Electron Manager) can't OS-register their custom scheme in dev, so

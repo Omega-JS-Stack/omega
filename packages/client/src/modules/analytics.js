@@ -4,7 +4,7 @@ import { createLogger } from './logger.js';
 const logger = createLogger('analytics');
 
 // Supported runtimes for analytics
-const SUPPORTED_RUNTIMES = ['browser-extension', 'electron'];
+const SUPPORTED_RUNTIMES = ['browser-extension', 'electron', 'web'];
 
 // Raw per-install device id (a plain UUID) — client_id derives from it
 const DEVICE_ID_KEY = '_omega_device_id';
@@ -30,6 +30,11 @@ class Analytics {
     return SUPPORTED_RUNTIMES.includes(this.runtime);
   }
 
+  // Web's transport is the page's own gtag, never the Measurement Protocol
+  _isWeb() {
+    return this.runtime === 'web';
+  }
+
   // Initialize analytics
   init(config = {}) {
     // Store config
@@ -38,7 +43,6 @@ class Analytics {
     // Get runtime
     this.runtime = this.manager.utilities().getRuntime();
 
-    // TODO: Add web runtime support
     if (!this._isSupported()) {
       logger.log(`Runtime "${this.runtime}" not supported yet, skipping`);
       return;
@@ -58,11 +62,15 @@ class Analytics {
     // Canonical handoff: analytics.providers.google.{id,secret} + the
     // brand's projectId for the cross-surface identity namespace
     this.measurementId = config.measurementId || config.id;
-    this.secret = config.secret;
     this.projectId = config.projectId || null;
 
-    // Skip if no measurement ID
-    if (!this.measurementId) {
+    // The Measurement Protocol api_secret is never read on web: the page's
+    // gtag is the transport there, and the secret must never reach a page.
+    this.secret = this._isWeb() ? null : config.secret;
+
+    // Skip if no measurement ID. Web has none to require, since the gtag
+    // config is page-side (emitted by web core foot.html)
+    if (!this.measurementId && !this._isWeb()) {
       logger.log('No measurement ID provided, skipping initialization');
       return;
     }
@@ -75,13 +83,16 @@ class Analytics {
     this.clientId = this._getClientId();
 
     // Log initialization
-    logger.log(`Initializing with measurement ID: ${this.measurementId}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
+    logger.log(`Initializing with measurement ID: ${this.measurementId || 'page-side gtag'}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
 
     // Mark as initialized
     this.initialized = true;
 
-    // Send initial pageview
-    this.event('page_view');
+    // Send initial pageview, never on web: the page's own gtag config
+    // already fired one and a second would double-count
+    if (!this._isWeb()) {
+      this.event('page_view');
+    }
   }
 
   // Stable per-install device id, hashed into the project namespace so the
@@ -120,7 +131,6 @@ class Analytics {
 
   // Track an event
   event(eventName, params = {}) {
-    // TODO: Add web runtime support
     if (!this._isSupported()) {
       return;
     }
@@ -146,8 +156,25 @@ class Analytics {
     // Log event
     logger.log(`Event: ${name}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
 
-    // Send via Measurement Protocol (fetch)
-    this._sendViaFetch(name, eventParams);
+    // Transport split: web hands the event to the page's gtag; the
+    // Measurement Protocol stays exclusive to the runtimes that have no page
+    // of their own to carry a gtag config
+    if (this._isWeb()) {
+      this._sendViaGtag(name, eventParams);
+    } else {
+      this._sendViaFetch(name, eventParams);
+    }
+  }
+
+  // Send event via the page's gtag (web). Web core foot.html emits the gtag
+  // config, and a no-op gtag stub when the brand has no analytics configured
+  _sendViaGtag(eventName, params = {}) {
+    if (typeof window.gtag !== 'function') {
+      logger.log('No gtag on the page, event not sent');
+      return;
+    }
+
+    window.gtag('event', eventName, params);
   }
 
   // Send event via Measurement Protocol (fetch)
@@ -230,7 +257,8 @@ class Analytics {
   // Set user properties — GA4 wraps each value as { value } — merged into
   // every subsequent event's user_properties block
   setUserProperties(properties = {}) {
-    // TODO: Add web runtime support
+    // TODO: web stores but never sends these (only the MP payload reads them);
+    // wiring gtag("set", ...) is open — see #159
     if (!this._isSupported()) {
       return;
     }
@@ -245,7 +273,8 @@ class Analytics {
   // Set user ID — raw uid in, uuidv5 out (the same value desktop/backend
   // emit for this uid). Without a namespace the raw uid is never sent.
   setUserId(userId) {
-    // TODO: Add web runtime support
+    // TODO: web stores but never sends these (only the MP payload reads them);
+    // wiring gtag("set", ...) is open — see #159
     if (!this._isSupported()) {
       return;
     }
