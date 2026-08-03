@@ -4,13 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.18.2] (2026-08-03)
 ### Fixed
-- [#38](../../issues/38) — A vendor after-hook failure now aborts the prepare flow instead of warning and continuing: prepare-package 2.2.0 adds an opt-in `hooks.afterBlocking` flag, and all six publishables set it, so a package can no longer build a tarball missing its vendored internals.
-- [#17](../../issues/17) — The payments/intent 403-before-verify finding was verified stale: the route never carried the empty-token pre-check (the cp265 review generalized the contact route's defect to checkout incorrectly). A guard comment now pins that verify() owns the whole decision.
+- [#38](../../issues/38) [`69377340`](../../commit/69377340) Thanks [@ianwieds]! — A vendor after-hook failure now aborts the prepare flow instead of warning and continuing: prepare-package 2.2.0 adds an opt-in `hooks.afterBlocking` flag, and all six publishables set it, so a package can no longer build a tarball missing its vendored internals.
+- [#17](../../issues/17) [`69377340`](../../commit/69377340) Thanks [@ianwieds]! — The payments/intent 403-before-verify finding was verified stale: the route never carried the empty-token pre-check (the cp265 review generalized the contact route's defect to checkout incorrectly). A guard comment now pins that verify() owns the whole decision.
 
 ### Changed
-- [#22](../../issues/22) — The desktop package's own CHANGELOG records the remote-scripts opt-in flip under Unreleased, so the entry ships with the package at first publish.
+- [#22](../../issues/22) [`69377340`](../../commit/69377340) Thanks [@ianwieds]! — The desktop package's own CHANGELOG records the remote-scripts opt-in flip under Unreleased, so the entry ships with the package at first publish.
 
 ## [0.18.1] (2026-08-03)
 ### Fixed
