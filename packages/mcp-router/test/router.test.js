@@ -56,6 +56,10 @@ before(async () => {
     // Enabled on disk but on-demand (inactive) — the mid-session lock test
     // writes locked: true into this entry while the router is live.
     'fixture-midlock': { enabled: true, default: 'on-demand', command: 'node', args: [ECHO_SERVER], tools: FIXTURE_TOOLS },
+    // Points at a command that does not exist, and carries no cached tools.
+    // The mid-session command test rewrites it to `node` while the router is
+    // live, so only a re-read of disk can make the refresh spawn succeed.
+    'fixture-recommand': { enabled: true, default: 'on-demand', command: 'no-such-binary-omega', args: [ECHO_SERVER], tools: [] },
   };
   for (const [name, config] of Object.entries(entries)) {
     fs.mkdirSync(path.join(overlayDir, name), { recursive: true });
@@ -167,6 +171,21 @@ test('an on-disk enable is picked up without restarting the router', async () =>
   assert.equal(result.isError, false);
   assert.ok((await toolNames()).includes('fixture-off__echo'));
   await callMeta('router__disable_upstream', { name: 'fixture-off' });
+});
+
+test('a command re-pointed mid-session is what refresh spawns', async () => {
+  const configPath = path.join(overlayDir, 'fixture-recommand', 'config.json');
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  fs.writeFileSync(configPath, `${JSON.stringify({ ...config, command: 'node' }, null, 2)}\n`);
+
+  const result = await callMeta('router__refresh_upstream', { name: 'fixture-recommand' });
+  assert.equal(result.isError, false, result.text);
+  assert.match(result.text, /Refreshed "fixture-recommand" — 2 tools/);
+
+  // The tools came from the child the NEW command started: the entry booted
+  // with an empty cache, so nothing else could have supplied them.
+  const cached = JSON.parse(fs.readFileSync(configPath, 'utf8')).tools;
+  assert.deepEqual(cached.map((tool) => tool.name), ['echo', 'ping']);
 });
 
 test('an unknown upstream is an error, not a crash', async () => {

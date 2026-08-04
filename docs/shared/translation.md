@@ -51,6 +51,22 @@ without the SDK gets a hard error naming the package and that install command,
 never a silent skip. The `chatgpt` provider needs no SDK at all (native fetch
 plus `OPENAI_API_KEY`).
 
+**The manage cycle provisions it (#168).** Nobody types that install in a
+managed brand: the manager's workspace service reconciles it like every other
+brand file. A web app whose RESOLVED config translates with the `claude`
+provider gets `@anthropic-ai/claude-agent-sdk` written into its package.json
+`dependencies` (at the range `@omega.js/web` declares as its optional peer,
+read from the installed web package), followed by one `npm install` at the
+brand root. Converge-to-config, so: already declared (in `dependencies` or
+`devDependencies`) = zero-mutation no-op that never overwrites a
+consumer-chosen spec, `--dry-run` plans without writing, translation off or
+provider `chatgpt` leaves the app untouched, and turning translation back OFF
+never REMOVES the dep (uninstalling on a config flip is riskier than leaving
+it). Only web apps are provisioned, since backend and extension declare the
+SDK as a real dependency of the framework. The loud error above stays the backstop
+for hand-managed brands (`packages/manager/src/services/workspace/ensure/translation-sdk.js`,
+pinned by `packages/manager/test/workspace-translation-sdk.test.js`).
+
 ## Engine protocol (`@omega.js/devkit/translate`)
 
 `translateStrings({ strings, language, languageName, brand, extraRules, send })`

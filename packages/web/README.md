@@ -320,10 +320,12 @@ inline AFTER the bundles so the brand wins the cascade. No/invalid color
 → the sheet's neutral placeholder stands. Token VALUES are C3 scaffolding
 until Ian's direction notes land; the names + plumbing are the contract.
 
-The categorical ramp (`--omega-chart-1`…`-6`) serves two surfaces from one
+The categorical ramp (`--omega-chart-1`…`-6`) serves three surfaces from one
 palette: chart series ([core/js/libs/charts.js](core/js/libs/charts.js) — the
 framework's Chart.js, lazily split into its own chunk, so a chartless page
-pays nothing) and the `.omega-tone-<n>` / `.omega-badge-tone` chips
+pays nothing), diagram slots ([core/js/libs/graph.js](core/js/libs/graph.js) —
+the framework's mermaid on the same terms, mapped onto its `cScale`/`pie`
+slots) and the `.omega-tone-<n>` / `.omega-badge-tone` chips
 ([core/css/core/_tones.scss](core/css/core/_tones.scss)), so the same thing is
 the same color wherever it appears. A surface that means a STATUS passes the
 status tokens instead (`colors: ['var(--omega-ok)', …]`) — semantics beat

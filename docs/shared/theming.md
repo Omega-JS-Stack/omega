@@ -232,6 +232,16 @@ status tokens explicitly instead (`colors: ['var(--omega-ok)', …]` — the
 helper's `resolveColor` reads them off the live sheet); the admin dashboard's
 plan doughnut is the reference case ([#74](https://github.com/Omega-JS-Stack/omega/issues/74)).
 
+Graphs read the same ramp again: `core/js/libs/graph.js` (`graphTheme()`) maps
+`--omega-chart-1…6` onto mermaid's per-item slots (`cScale0…5` and `pie1…6`),
+and the rest of a diagram off `--omega-ink`, `--omega-surface`/`--omega-surface-2`,
+`--omega-line` and `--omega-accent` — the accent is the node outline, the one
+place the brand color lands in a diagram
+([#169](https://github.com/Omega-JS-Stack/omega/issues/169)). Mermaid paints
+with literal colors, so every token is resolved before it is handed over, and
+the read happens at draw time: like charts, a light/dark flip lands on the next
+redraw and nothing listens for it.
+
 ## One status hue site-wide
 
 `--omega-ok` / `--omega-warn` / `--omega-danger` are the ONLY greens, ambers

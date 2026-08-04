@@ -48,11 +48,20 @@ for (const [name, upstream] of Object.entries(upstreams)) {
 
 // ---------- Lazy spawn ----------
 
+// How long a cold spawn gets to finish the MCP handshake. A child that
+// corrupts the stdio wire never answers initialize, and an unbounded connect
+// would leave `spawning` pending: every later call would await that dead
+// promise and die at the caller's own tool timeout, for the rest of the
+// session. The deadline bounds it so the NEXT call spawns fresh.
+// MCP_ROUTER_SPAWN_TIMEOUT_MS is the test seam, alongside the two in paths.js.
+const SPAWN_TIMEOUT_MS = Number(process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS) || 30000;
+
 /**
  * Spawn one upstream's child process and connect a proxy client to it.
  *
  * @param {string} name - Upstream name
  * @returns {Promise<void>} Resolves once the client is connected
+ * @throws {Error} When the handshake does not finish within SPAWN_TIMEOUT_MS
  */
 const spawnUpstream = async (name) => {
   const upstream = upstreams[name];
@@ -77,7 +86,36 @@ const spawnUpstream = async (name) => {
     }
   };
 
-  await client.connect(transport);
+  const connected = client.connect(transport);
+  // The deadline below abandons this promise; the SDK settles it much later
+  // (its own request timeout). Promise.race already attaches a rejection
+  // handler, so this explicit catch is documentation of the abandonment,
+  // not crash protection.
+  connected.catch(() => {});
+
+  let deadline;
+  try {
+    await Promise.race([
+      connected,
+      new Promise((_, reject) => {
+        deadline = setTimeout(
+          () => reject(new Error(`handshake did not finish within ${SPAWN_TIMEOUT_MS}ms`)),
+          SPAWN_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (err) {
+    // Terminate the child so a stuck handshake leaves nothing behind, and
+    // record the failure for router__list_upstreams. Rejecting is what clears
+    // `spawning` (the caller's .finally), so the next call spawns fresh.
+    await transport.close().catch(() => {});
+    session[name].lastError = err.message;
+    log('error', `Spawn of upstream "${name}" failed: ${err.message}`);
+    throw err;
+  } finally {
+    clearTimeout(deadline);
+  }
+
   session[name].client = client;
   session[name].transport = transport;
   log('info', `Spawned upstream "${name}" (pid=${transport.pid})`);
@@ -247,6 +285,11 @@ const callMetaTool = async (name, args) => {
     const target = args?.name;
     const upstream = upstreams[target];
     if (!upstream) return errorResult(`Unknown upstream: ${target}`);
+    // The config may have changed since router startup (a re-pointed command,
+    // new args), so re-read the LAYERED state: the spawn below must use what
+    // is on disk NOW, which is the whole point of refreshing without a restart.
+    const fresh = registry.loadUpstream(target);
+    if (fresh) Object.assign(upstream, fresh);
     try {
       // Spawn a one-shot client to fetch tools (don't disturb running session client).
       const spawn = resolveSpawn(upstream);

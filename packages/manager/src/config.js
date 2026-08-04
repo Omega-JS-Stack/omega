@@ -624,6 +624,7 @@ const OPERATIONS = {
     { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
+    { name: 'translation-sdk', ensure: true }, // Translating web apps declare + install @anthropic-ai/claude-agent-sdk (#168)
   ],
 
   github: [
