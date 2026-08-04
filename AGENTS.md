@@ -89,7 +89,7 @@ Single config format everywhere: shared sections (brand, cloud, analytics, payme
 - [brands.md](docs/shared/brands.md) — brand topology, history, the local era
 - [rulings.md](docs/shared/rulings.md) — standing rulings from the retired board era
 
-`docs/<framework>/` — each framework's guide (`index.md`) plus its deep docs. Web carries the extra set: [sections.md](docs/web/sections.md) (the sections & components contract), [omega-sections-spec.md](docs/web/omega-sections-spec.md) (the ratified architecture spec), [template-kit.md](docs/web/template-kit.md), [classy-v2/DIRECTION.md](docs/web/classy-v2/DIRECTION.md) (the locked visual spec), [ads-system.md](docs/web/ads-system.md) (the ratified vert/ads architecture).
+`docs/<framework>/` — each framework's guide (`index.md`) plus its deep docs. Web carries the extra set: [sections.md](docs/web/sections.md) (the sections & components contract), [omega-sections-spec.md](docs/web/omega-sections-spec.md) (the ratified architecture spec), [template-kit.md](docs/web/template-kit.md), [libs.md](docs/web/libs.md) (the `core/js/libs/` inventory and the `__main_assets__` import idiom), [classy-v2/DIRECTION.md](docs/web/classy-v2/DIRECTION.md) (the locked visual spec), [ads-system.md](docs/web/ads-system.md) (the ratified vert/ads architecture).
 
 ## Project state
 

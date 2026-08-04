@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#163](../../issues/163) — The web package's shared JS modules have an inventory: `docs/web/libs.md` documents every `core/js/libs/` module, the `__main_assets__` import idiom, and the rule that consumers import the framework helpers and never name the underlying library.
+
+### Fixed
+- [#164](../../issues/164) — Enabling firestore point-in-time recovery no longer fails with "Operation does not exist": the PITR PATCH answers with an already-finished operation that firestore purges immediately, so the manager stops polling a finished operation and surfaces an embedded operation error directly.
+- [#170](../../issues/170) — `router__refresh_upstream`'s one-shot connect runs on the same 30s deadline as a cold spawn and terminates its child on any connect failure, instead of hanging the call for the SDK's 60s and leaking the child.
+- [#171](../../issues/171) — Packing `@omega.js/manager` passes the vendor guard again: the SDK its vendored translation module can lazily require is declared as an optional peerDependency, mirroring the web package.
 
 ## [0.20.0] (2026-08-03)
 ### Added

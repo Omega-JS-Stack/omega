@@ -52,9 +52,48 @@ for (const [name, upstream] of Object.entries(upstreams)) {
 // corrupts the stdio wire never answers initialize, and an unbounded connect
 // would leave `spawning` pending: every later call would await that dead
 // promise and die at the caller's own tool timeout, for the rest of the
-// session. The deadline bounds it so the NEXT call spawns fresh.
+// session. The deadline bounds it so the NEXT call spawns fresh. It bounds
+// router__refresh_upstream's one-shot connect too, on the same budget.
 // MCP_ROUTER_SPAWN_TIMEOUT_MS is the test seam, alongside the two in paths.js.
 const SPAWN_TIMEOUT_MS = Number(process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS) || 30000;
+
+/**
+ * Connect a client over its transport, bounded by SPAWN_TIMEOUT_MS.
+ *
+ * The deadline abandons a connect the SDK has not settled (the SDK's own
+ * request timeout answers much later); Promise.race already attaches the
+ * rejection handler, so the explicit catch on `connected` only documents the
+ * abandonment. On ANY rejection the transport is closed — a stuck handshake,
+ * or one that lands after the deadline, would otherwise leave its child
+ * running for the rest of the session — then the rejection is rethrown.
+ *
+ * @param {Client} client - Proxy client to connect
+ * @param {StdioClientTransport} transport - Transport whose child is terminated on failure
+ * @returns {Promise<void>} Resolves once the handshake lands
+ * @throws {Error} When the handshake does not finish within SPAWN_TIMEOUT_MS
+ */
+const connectWithDeadline = async (client, transport) => {
+  const connected = client.connect(transport);
+  connected.catch(() => {});
+
+  let deadline;
+  try {
+    await Promise.race([
+      connected,
+      new Promise((_, reject) => {
+        deadline = setTimeout(
+          () => reject(new Error(`handshake did not finish within ${SPAWN_TIMEOUT_MS}ms`)),
+          SPAWN_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (err) {
+    await transport.close().catch(() => {});
+    throw err;
+  } finally {
+    clearTimeout(deadline);
+  }
+};
 
 /**
  * Spawn one upstream's child process and connect a proxy client to it.
@@ -86,34 +125,15 @@ const spawnUpstream = async (name) => {
     }
   };
 
-  const connected = client.connect(transport);
-  // The deadline below abandons this promise; the SDK settles it much later
-  // (its own request timeout). Promise.race already attaches a rejection
-  // handler, so this explicit catch is documentation of the abandonment,
-  // not crash protection.
-  connected.catch(() => {});
-
-  let deadline;
   try {
-    await Promise.race([
-      connected,
-      new Promise((_, reject) => {
-        deadline = setTimeout(
-          () => reject(new Error(`handshake did not finish within ${SPAWN_TIMEOUT_MS}ms`)),
-          SPAWN_TIMEOUT_MS,
-        );
-      }),
-    ]);
+    await connectWithDeadline(client, transport);
   } catch (err) {
-    // Terminate the child so a stuck handshake leaves nothing behind, and
-    // record the failure for router__list_upstreams. Rejecting is what clears
-    // `spawning` (the caller's .finally), so the next call spawns fresh.
-    await transport.close().catch(() => {});
+    // The helper terminated the child; record the failure for
+    // router__list_upstreams. Rejecting is what clears `spawning` (the
+    // caller's .finally), so the next call spawns fresh.
     session[name].lastError = err.message;
     log('error', `Spawn of upstream "${name}" failed: ${err.message}`);
     throw err;
-  } finally {
-    clearTimeout(deadline);
   }
 
   session[name].client = client;
@@ -302,7 +322,11 @@ const callMetaTool = async (name, args) => {
         stderr: 'inherit',
       });
       const client = new Client({ name: 'mcp-router-refresh', version: '1.0.0' }, { capabilities: {} });
-      await client.connect(transport);
+
+      // Same deadline and cleanup as the cold spawn; the outer catch answers
+      // the caller.
+      await connectWithDeadline(client, transport);
+
       const result = await client.listTools();
       await client.close();
 

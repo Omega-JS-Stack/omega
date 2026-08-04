@@ -78,7 +78,7 @@ Registering the router with a client is not this CLI's job: the omega Claude plu
 | `OMEGA_EXTENSION_PATH` | The unpacked extension directory `chrome-devtools-extension` loads |
 | `MCP_ROUTER_SERVERS_DIR` | Overrides the overlay servers dir (tests, power users) |
 | `MCP_ROUTER_ENV_FILE` | Overrides the overlay `.env` path |
-| `MCP_ROUTER_SPAWN_TIMEOUT_MS` | How long a cold spawn gets to finish the MCP handshake before it is given up on (default `30000`) |
+| `MCP_ROUTER_SPAWN_TIMEOUT_MS` | How long a cold spawn (or a `router__refresh_upstream` one-shot) gets to finish the MCP handshake before it is given up on (default `30000`) |
 
 ### Placeholders
 

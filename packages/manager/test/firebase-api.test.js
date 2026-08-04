@@ -105,3 +105,40 @@ test('undeleteCustomDomain: a restored claim pending verification is pending too
 
   assert.equal(result.pending, true);
 });
+
+test('enableFirestorePITR: a done-on-arrival operation is never polled (#164)', async () => {
+  // Recorded live (2026-08-03, omegajs-playground): the PITR PATCH answers
+  // with a FINISHED operation (done: true, the updated Database embedded) and
+  // Firestore purges the operation record immediately — a GET on its name
+  // 404s "Operation does not exist" from the very first poll, both for real
+  // state changes and no-op updates.
+  const api = stubbedApi((url, options) => {
+    if (options.method === 'PATCH') {
+      return {
+        name: 'projects/fixture-proj/databases/(default)/operations/BhADso3t2BAG08XIuQgMChAa',
+        metadata: { '@type': 'type.googleapis.com/google.firestore.admin.v1.UpdateDatabaseMetadata' },
+        done: true,
+        response: { '@type': 'type.googleapis.com/google.firestore.admin.v1.Database', name: 'projects/fixture-proj/databases/(default)' },
+      };
+    }
+    const error = new Error('Google API Error: Operation does not exist');
+    error.status = 'NOT_FOUND';
+    throw error;
+  });
+
+  const result = await api.enableFirestorePITR('fixture-proj');
+
+  assert.equal(result.done, true);
+  assert.equal(api.calls.length, 1, 'the PATCH is the only request — nothing polls a purged operation');
+});
+
+test('enableFirestorePITR: a done-on-arrival operation carrying an error still throws it', async () => {
+  const api = stubbedApi(() => ({
+    name: 'projects/fixture-proj/databases/(default)/operations/BhADso3t2BAG08XIuQgMChAa',
+    done: true,
+    error: { message: 'update rejected' },
+  }));
+
+  await assert.rejects(api.enableFirestorePITR('fixture-proj'), /Operation failed: update rejected/);
+  assert.equal(api.calls.length, 1, 'the failure comes from the PATCH response itself, never a poll');
+});

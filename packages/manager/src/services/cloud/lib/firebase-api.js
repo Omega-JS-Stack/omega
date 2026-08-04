@@ -463,7 +463,16 @@ class FirebaseAPI {
       }),
     });
 
-    if (response.name?.includes('operations')) {
+    // Firestore answers this PATCH with an already-finished operation
+    // (done: true, the updated Database embedded) and purges the operation
+    // record immediately — polling its name 404s "Operation does not exist"
+    // from the first attempt (#164, recorded live 2026-08-03). Poll only a
+    // genuinely unfinished operation, and surface a finished one's error the
+    // way the poller would have.
+    if (response.done && response.error) {
+      throw new Error(`Operation failed: ${response.error.message}`);
+    }
+    if (!response.done && response.name?.includes('operations')) {
       await this.waitForOperation(response.name, FIRESTORE_API_BASE);
     }
 

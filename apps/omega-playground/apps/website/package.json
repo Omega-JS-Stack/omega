@@ -3,7 +3,8 @@
   "private": true,
   "description": "OMEGA web app",
   "dependencies": {
-    "@omega.js/web": "file:../../../../packages/web"
+    "@omega.js/web": "file:../../../../packages/web",
+    "@anthropic-ai/claude-agent-sdk": ">=0.2"
   },
   "scripts": {
     "setup": "omega setup",

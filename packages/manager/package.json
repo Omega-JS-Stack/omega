@@ -57,6 +57,14 @@
     "ws": "^8.21.0",
     "yargs": "^18.0.0"
   },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": ">=0.2"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@omega.js/account": "*",
     "@omega.js/config": "*",
