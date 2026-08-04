@@ -5,13 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.20.0] (2026-08-03)
 ### Added
-- [#169](../../issues/169) — `@omega.js/web` draws diagrams the way it draws charts: `core/js/libs/graph.js` owns mermaid behind `loadGraph`/`graphSlot`/`drawGraph`, lazily loaded into its own chunk so a page with no diagram pays nothing, and themed off the live `--omega-*` tokens.
-- [#168](../../issues/168) — The manage cycle provisions the translation SDK: a web app whose resolved config enables translation with the `claude` provider gets `@anthropic-ai/claude-agent-sdk` written into its package.json and installed, converge-to-config (declared already = no-op, dry run plans, disable never uninstalls).
+- [#169](../../issues/169) [`e1539dd1`](../../commit/e1539dd1) Thanks [@ianwieds]! — `@omega.js/web` draws diagrams the way it draws charts: `core/js/libs/graph.js` owns mermaid behind `loadGraph`/`graphSlot`/`drawGraph`, lazily loaded into its own chunk so a page with no diagram pays nothing, and themed off the live `--omega-*` tokens.
+- [#168](../../issues/168) [`e1539dd1`](../../commit/e1539dd1) Thanks [@ianwieds]! — The manage cycle provisions the translation SDK: a web app whose resolved config enables translation with the `claude` provider gets `@anthropic-ai/claude-agent-sdk` written into its package.json and installed, converge-to-config (declared already = no-op, dry run plans, disable never uninstalls).
 
 ### Fixed
-- [#166](../../issues/166) — `router__refresh_upstream` re-reads the upstream's layered config from disk before spawning, so a `command` edited mid-session is what refresh actually runs, matching `router__enable_upstream`.
-- [#167](../../issues/167) — A child that corrupts the stdio handshake no longer wedges its mcp-router upstream for the whole session: `spawnUpstream` races `client.connect` against a 30s deadline, terminates the child, records the error, and the next call spawns fresh.
+- [#166](../../issues/166) [`e1539dd1`](../../commit/e1539dd1) Thanks [@ianwieds]! — `router__refresh_upstream` re-reads the upstream's layered config from disk before spawning, so a `command` edited mid-session is what refresh actually runs, matching `router__enable_upstream`.
+- [#167](../../issues/167) [`e1539dd1`](../../commit/e1539dd1) Thanks [@ianwieds]! — A child that corrupts the stdio handshake no longer wedges its mcp-router upstream for the whole session: `spawnUpstream` races `client.connect` against a 30s deadline, terminates the child, records the error, and the next call spawns fresh.
 
 ## [0.19.0] (2026-08-03)
 ### Changed
