@@ -53,7 +53,8 @@ for (const [name, upstream] of Object.entries(upstreams)) {
 // would leave `spawning` pending: every later call would await that dead
 // promise and die at the caller's own tool timeout, for the rest of the
 // session. The deadline bounds it so the NEXT call spawns fresh. It bounds
-// router__refresh_upstream's one-shot connect too, on the same budget.
+// router__refresh_upstream's one-shot connect AND its tools/list read too, on
+// the same budget.
 // MCP_ROUTER_SPAWN_TIMEOUT_MS is the test seam, alongside the two in paths.js.
 const SPAWN_TIMEOUT_MS = Number(process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS) || 30000;
 
@@ -328,14 +329,15 @@ const callMetaTool = async (name, args) => {
       await connectWithDeadline(client, transport);
 
       // A child that finishes the handshake can still fail the tools/list read
-      // (an error answer, or a stall that hits the SDK's request timeout).
+      // (an error answer, or a stall). The read carries the router's own budget
+      // because the SDK would otherwise hold the caller for its 60s default.
       // connectWithDeadline is done with the transport by then, so nothing else
       // would close it and the one-shot child would run for the rest of the
       // session. The success path closes through the client instead, so the
       // transport is never closed twice.
       let result;
       try {
-        result = await client.listTools();
+        result = await client.listTools(undefined, { timeout: SPAWN_TIMEOUT_MS });
       } catch (err) {
         await transport.close().catch(() => {});
         throw err;
