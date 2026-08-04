@@ -1,6 +1,6 @@
 {
   "name": "omega",
-  "version": "0.20.3",
+  "version": "0.20.4",
   "description": "OMEGA monorepo — @omega.js framework packages, shared internals, and sandbox apps",
   "private": true,
   "workspaces": [
