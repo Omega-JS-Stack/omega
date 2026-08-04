@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.20.3] (2026-08-04)
 ### Fixed
-- [#173](../../issues/173) — `router__refresh_upstream`'s tools/list read runs on the router's own 30s spawn budget instead of the SDK's 60s default, so a stalled upstream fails the refresh at the shorter deadline with the child terminated and the failure in `last_error`.
+- [#173](../../issues/173) [`51c4d107`](../../commit/51c4d107) Thanks [@ianwieds]! — `router__refresh_upstream`'s tools/list read runs on the router's own 30s spawn budget instead of the SDK's 60s default, so a stalled upstream fails the refresh at the shorter deadline with the child terminated and the failure in `last_error`.
 
 ## [0.20.2] (2026-08-03)
 ### Fixed
