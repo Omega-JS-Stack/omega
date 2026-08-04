@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Fixed
+- [#174](../../issues/174) — `omega-mcp refresh` runs the same guarded one-shot as `router__refresh_upstream`: the connect deadline, the bounded tools/list read, and the failure cleanup now live in one shared helper both surfaces call, so the CLI no longer hangs indefinitely on a stalled upstream.
 
 ## [0.20.3] (2026-08-04)
 ### Fixed

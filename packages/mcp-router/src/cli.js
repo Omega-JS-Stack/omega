@@ -12,6 +12,11 @@
 
 const registry = require('./lib/registry.js');
 const { resolveSpawn } = require('./lib/env.js');
+// The one-shot spawn-connect-list-close the router's own refresh runs, so this
+// CLI carries the same deadline, read budget, and failure cleanup. The helper
+// requires the SDK only once that path is reached, so commands that don't need
+// it (list, help) still work even when node_modules is missing.
+const { listToolsOnce } = require('./lib/oneshot.js');
 
 /**
  * Spawn an upstream once, read its tool list, and cache it to the overlay.
@@ -25,28 +30,15 @@ async function fetchAndCacheSchema(name, layers) {
   if (!upstream) throw new Error(`Server "${name}" not found`);
   if (!upstream.command) throw new Error(`Server "${name}" has no command`);
 
-  // Lazy-require the SDK so commands that don't need it (list, help) still
-  // work even when node_modules is missing.
-  const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-  const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
-
   const spawn = resolveSpawn(upstream);
-  const transport = new StdioClientTransport({
+  const tools = await listToolsOnce({
     command: spawn.command,
     args: spawn.args,
     env: { ...process.env, ...spawn.env },
-    stderr: 'inherit',
   });
-  const client = new Client({ name: 'mcp-router-refresh', version: '1.0.0' }, { capabilities: {} });
 
-  await client.connect(transport);
-  try {
-    const result = await client.listTools();
-    registry.patchOverlayEntry(name, { tools: result.tools }, layers);
-    return result.tools.length;
-  } finally {
-    await client.close();
-  }
+  registry.patchOverlayEntry(name, { tools }, layers);
+  return tools.length;
 }
 
 const HELP = `

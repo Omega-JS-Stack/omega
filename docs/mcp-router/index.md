@@ -11,7 +11,7 @@ An MCP client loads every declared server eagerly: each one's full tool schema e
 The router collapses that to one declaration:
 
 - **Tool lists come from a cache.** Each upstream's schemas live in its `config.json`, so listing tools costs no processes.
-- **Children are lazy.** Nothing spawns until a `<upstream>__<tool>` call arrives; concurrent cold calls share ONE in-flight spawn, and a cold spawn is bounded by a deadline (30s) so a child that never finishes the handshake fails that one call instead of wedging the upstream for the session. `router__refresh_upstream`'s one-shot spawn runs on the same deadline, on the connect AND on the tools/list read after it (so a stalled read fails on the router's budget instead of the SDK's 60s default), and terminates its child on any failure.
+- **Children are lazy.** Nothing spawns until a `<upstream>__<tool>` call arrives; concurrent cold calls share ONE in-flight spawn, and a cold spawn is bounded by a deadline (30s) so a child that never finishes the handshake fails that one call instead of wedging the upstream for the session. `router__refresh_upstream`'s one-shot spawn runs on the same deadline, on the connect AND on the tools/list read after it (so a stalled read fails on the router's budget instead of the SDK's 60s default), and terminates its child on any failure. `omega-mcp refresh` runs that one-shot through the SAME helper, so both refresh surfaces carry the same deadlines and the same cleanup rather than two copies that drift.
 - **Visibility is per session.** `on-demand` upstreams stay out of the tool list until a session enables them, and a session's enable/disable never touches disk.
 
 ## Architecture
@@ -26,8 +26,9 @@ client ──stdio──> router ──┬──> chrome-devtools           (npx
 
 | File | Concern |
 |---|---|
-| [src/router.js](../../packages/mcp-router/src/router.js) | The MCP server: the layered registry at startup, per-session state, lazy spawn + dedup + the spawn deadline, the meta-tools, `<upstream>__<tool>` dispatch, SIGKILL grace on shutdown |
+| [src/router.js](../../packages/mcp-router/src/router.js) | The MCP server: the layered registry at startup, per-session state, lazy spawn + dedup, the meta-tools, `<upstream>__<tool>` dispatch, SIGKILL grace on shutdown |
 | [src/cli.js](../../packages/mcp-router/src/cli.js) | `omega-mcp` — list/enable/disable/add/remove/refresh, all writing the overlay |
+| [src/lib/oneshot.js](../../packages/mcp-router/src/lib/oneshot.js) | The connect deadline every spawn runs under, and the one-shot spawn-connect-list-close both refresh surfaces share, plus the `MCP_ROUTER_SPAWN_TIMEOUT_MS` seam |
 | [src/lib/registry.js](../../packages/mcp-router/src/lib/registry.js) | The layered registry: bundled + overlay, the shallow merge, the overlay-only write path |
 | [src/lib/env.js](../../packages/mcp-router/src/lib/env.js) | `.env` loading and `${NAME}` interpolation, including the reserved `${MCP_ROUTER_ROOT}` |
 | [src/lib/paths.js](../../packages/mcp-router/src/lib/paths.js) | Where the layers are, plus the two `MCP_ROUTER_*` env seams |
@@ -43,7 +44,7 @@ Everything the router says goes to **stderr** — stdout is the MCP wire.
 | `router__list_upstreams` | Every upstream with `enabled_on_disk`, `default`, `locked`, `active_this_session`, `spawned`, `tool_count`, `last_error` |
 | `router__enable_upstream {name, env?}` | Activate for this session. `env` values are per-session vars for the child; passing them restarts a running child. Re-reads the LAYERED disk state first, so an `omega-mcp enable` from the shell lands without a router restart. A `locked` upstream is refused, with no override from inside a chat |
 | `router__disable_upstream {name}` | Deactivate and stop the child. Disk untouched, env override cleared |
-| `router__refresh_upstream {name}` | Spawn once, re-read the tool list, cache it **to the overlay**. Re-reads the LAYERED disk state first, so a command or args edited mid-session is what gets spawned. The one-shot spawn carries the same deadline as a cold spawn, on the connect and on the tools/list read after it; any failure terminates the child before the error comes back and lands in `last_error`, which the next successful refresh clears |
+| `router__refresh_upstream {name}` | Spawn once, re-read the tool list, cache it **to the overlay**. Re-reads the LAYERED disk state first, so a command or args edited mid-session is what gets spawned. The one-shot spawn carries the same deadline as a cold spawn, on the connect and on the tools/list read after it, through the same helper `omega-mcp refresh` runs; any failure terminates the child before the error comes back and lands in `last_error`, which the next successful refresh clears |
 
 A tool-list-changed notification follows each of them, so the client re-lists.
 
@@ -100,7 +101,7 @@ There are no other native MCP declarations anywhere in the plugin — anything e
 
 ## Tests
 
-`npm test` in [packages/mcp-router](../../packages/mcp-router) (node:test): registry layering, env interpolation, both launchers against fixture caches and injected spawn seams, the CLI against fixture layer dirs (with a real fixture MCP server behind `refresh`), a bundled-config sanity pass, a router e2e that connects the real SDK client to a real router process over stdio against the REAL bundled defaults plus a fixture overlay, a spawn-deadline e2e that calls a fixture upstream which never finishes the handshake (its deadline shrunk through `MCP_ROUTER_SPAWN_TIMEOUT_MS`) and proves the next call spawns a fresh child, a refresh-deadline e2e that drives the same fixture through `router__refresh_upstream` and proves the one-shot child is gone when the error comes back, a refresh-cleanup e2e whose fixture handshakes and then fails the tools/list read, proving the child is terminated, the failure lands in `last_error`, and a later successful refresh clears it, and a refresh-timeout e2e whose fixture handshakes and then stalls on that read, proving the refresh answers on the router's budget rather than the SDK's default. No upstream child is ever started by the suite except the fixture servers.
+`npm test` in [packages/mcp-router](../../packages/mcp-router) (node:test): registry layering, env interpolation, both launchers against fixture caches and injected spawn seams, the CLI against fixture layer dirs (with a real fixture MCP server behind `refresh`), a bundled-config sanity pass, a router e2e that connects the real SDK client to a real router process over stdio against the REAL bundled defaults plus a fixture overlay, a spawn-deadline e2e that calls a fixture upstream which never finishes the handshake (its deadline shrunk through `MCP_ROUTER_SPAWN_TIMEOUT_MS`) and proves the next call spawns a fresh child, a refresh-deadline e2e that drives the same fixture through `router__refresh_upstream` and proves the one-shot child is gone when the error comes back, a refresh-cleanup e2e whose fixture handshakes and then fails the tools/list read, proving the child is terminated, the failure lands in `last_error`, and a later successful refresh clears it, a refresh-timeout e2e whose fixture handshakes and then stalls on that read, proving the refresh answers on the router's budget rather than the SDK's default, and a unit pass on the shared one-shot helper (fake client/transport pairs: the success path closes once, either failure closes the transport before rethrowing, and the read is handed the router's budget). No upstream child is ever started by the suite except the fixture servers.
 
 ## Noted gaps
 

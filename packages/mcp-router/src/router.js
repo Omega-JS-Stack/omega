@@ -24,6 +24,7 @@ const {
 
 const { log } = require('./lib/log.js');
 const { resolveSpawn } = require('./lib/env.js');
+const { connectWithDeadline, listToolsOnce } = require('./lib/oneshot.js');
 const registry = require('./lib/registry.js');
 
 // ---------- Upstream registry (from disk) ----------
@@ -48,60 +49,12 @@ for (const [name, upstream] of Object.entries(upstreams)) {
 
 // ---------- Lazy spawn ----------
 
-// How long a cold spawn gets to finish the MCP handshake. A child that
-// corrupts the stdio wire never answers initialize, and an unbounded connect
-// would leave `spawning` pending: every later call would await that dead
-// promise and die at the caller's own tool timeout, for the rest of the
-// session. The deadline bounds it so the NEXT call spawns fresh. It bounds
-// router__refresh_upstream's one-shot connect AND its tools/list read too, on
-// the same budget.
-// MCP_ROUTER_SPAWN_TIMEOUT_MS is the test seam, alongside the two in paths.js.
-const SPAWN_TIMEOUT_MS = Number(process.env.MCP_ROUTER_SPAWN_TIMEOUT_MS) || 30000;
-
-/**
- * Connect a client over its transport, bounded by SPAWN_TIMEOUT_MS.
- *
- * The deadline abandons a connect the SDK has not settled (the SDK's own
- * request timeout answers much later); Promise.race already attaches the
- * rejection handler, so the explicit catch on `connected` only documents the
- * abandonment. On ANY rejection the transport is closed — a stuck handshake,
- * or one that lands after the deadline, would otherwise leave its child
- * running for the rest of the session — then the rejection is rethrown.
- *
- * @param {Client} client - Proxy client to connect
- * @param {StdioClientTransport} transport - Transport whose child is terminated on failure
- * @returns {Promise<void>} Resolves once the handshake lands
- * @throws {Error} When the handshake does not finish within SPAWN_TIMEOUT_MS
- */
-const connectWithDeadline = async (client, transport) => {
-  const connected = client.connect(transport);
-  connected.catch(() => {});
-
-  let deadline;
-  try {
-    await Promise.race([
-      connected,
-      new Promise((_, reject) => {
-        deadline = setTimeout(
-          () => reject(new Error(`handshake did not finish within ${SPAWN_TIMEOUT_MS}ms`)),
-          SPAWN_TIMEOUT_MS,
-        );
-      }),
-    ]);
-  } catch (err) {
-    await transport.close().catch(() => {});
-    throw err;
-  } finally {
-    clearTimeout(deadline);
-  }
-};
-
 /**
  * Spawn one upstream's child process and connect a proxy client to it.
  *
  * @param {string} name - Upstream name
  * @returns {Promise<void>} Resolves once the client is connected
- * @throws {Error} When the handshake does not finish within SPAWN_TIMEOUT_MS
+ * @throws {Error} When the handshake does not finish within the spawn deadline
  */
 const spawnUpstream = async (name) => {
   const upstream = upstreams[name];
@@ -312,44 +265,25 @@ const callMetaTool = async (name, args) => {
     const fresh = registry.loadUpstream(target);
     if (fresh) Object.assign(upstream, fresh);
     try {
-      // Spawn a one-shot client to fetch tools (don't disturb running session client).
+      // Spawn a one-shot client to fetch tools (don't disturb running session
+      // client). The helper is the same one `omega-mcp refresh` runs, so both
+      // surfaces carry the same deadline, read budget, and failure cleanup; the
+      // outer catch answers the caller.
       const spawn = resolveSpawn(upstream);
-      const transport = new StdioClientTransport({
+      const tools = await listToolsOnce({
         command: spawn.command,
         args: spawn.args,
         // The session override applies here too — without it a refresh of an
         // upstream that only starts with the override (Electron port) fails.
         env: { ...process.env, ...spawn.env, ...(session[target].envOverride || {}) },
-        stderr: 'inherit',
       });
-      const client = new Client({ name: 'mcp-router-refresh', version: '1.0.0' }, { capabilities: {} });
-
-      // Same deadline and cleanup as the cold spawn; the outer catch answers
-      // the caller.
-      await connectWithDeadline(client, transport);
-
-      // A child that finishes the handshake can still fail the tools/list read
-      // (an error answer, or a stall). The read carries the router's own budget
-      // because the SDK would otherwise hold the caller for its 60s default.
-      // connectWithDeadline is done with the transport by then, so nothing else
-      // would close it and the one-shot child would run for the rest of the
-      // session. The success path closes through the client instead, so the
-      // transport is never closed twice.
-      let result;
-      try {
-        result = await client.listTools(undefined, { timeout: SPAWN_TIMEOUT_MS });
-      } catch (err) {
-        await transport.close().catch(() => {});
-        throw err;
-      }
-      await client.close();
       session[target].lastError = null;
 
       // The cache lands in the OVERLAY — the bundled dir is read-only.
-      registry.patchOverlayEntry(target, { tools: result.tools });
-      upstream.tools = result.tools;
+      registry.patchOverlayEntry(target, { tools });
+      upstream.tools = tools;
       await server.sendToolListChanged();
-      return textResult(`Refreshed "${target}" — ${result.tools.length} tools cached to ${overlayDir}/${target}/config.json.`);
+      return textResult(`Refreshed "${target}" — ${tools.length} tools cached to ${overlayDir}/${target}/config.json.`);
     } catch (err) {
       // Same record as a failed spawn: without it router__list_upstreams shows
       // a clean upstream after a refresh that failed.
