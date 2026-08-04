@@ -51,6 +51,19 @@ module.exports = async function ensureBilling(context) {
     };
   }
 
+  // A failed READ is not a Spark verdict (#56): getProjectBillingInfo() turns
+  // every failure (auth timeout, permission denied, disabled API) into null,
+  // and a live run announced "on the Spark plan" right after its auth attempt
+  // timed out. "Could not check" and "checked: Spark" are separate outputs.
+  if (!billingInfo) {
+    console.log(`      ${chalk.yellow('⚠')} Could not check the billing plan ${chalk.dim('(the billing API read failed: unauthenticated, no permission, or the API is off)')}`);
+    console.log(`      ${chalk.dim('→')} Rerun once Google auth succeeds: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/usage/details`)}`);
+    return {
+      status: 'warned',
+      output: { billing: { error: 'billing plan unknown: could not check (the billing API read failed)' } },
+    };
+  }
+
   // Tri-state (#33): false = the user chose Spark — a clean state, not a warning
   if (brandConfig.cloud?.billingAccount === false) {
     console.log(`      ${chalk.dim('⊘ Billing opted out (cloud.billingAccount: false) — staying on the Spark plan')}`);

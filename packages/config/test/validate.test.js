@@ -83,6 +83,26 @@ test("parent accepts 'self', a URL string, or the deliberate false opt-out — u
   assert.ok(errors.some((e) => e.includes('config.parent has wrong type') && e.includes('string|boolean')));
 });
 
+test('auth.signup.maxPerIpPerDay is a positive integer (backend rule, #133)', () => {
+  const opts = { target: 'backend' };
+
+  // A brand raising the per-IP cap (shared NAT/CGNAT/VPN egress)
+  assert.deepStrictEqual(validateConfig({ ...VALID, auth: { signup: { maxPerIpPerDay: 25 } } }, opts).errors, []);
+  // Absent = the framework default (2) applies
+  assert.deepStrictEqual(validateConfig(VALID, opts).errors, []);
+
+  for (const value of [0, -1, 2.5]) {
+    const { errors } = validateConfig({ ...VALID, auth: { signup: { maxPerIpPerDay: value } } }, opts);
+    assert.ok(
+      errors.some((e) => e.includes('config.auth.signup.maxPerIpPerDay')),
+      `${value} must fail validation; the cap is a positive integer`,
+    );
+  }
+
+  const { errors } = validateConfig({ ...VALID, auth: { signup: { maxPerIpPerDay: '2' } } }, opts);
+  assert.ok(errors.some((e) => e.includes('config.auth.signup.maxPerIpPerDay has wrong type') && e.includes('integer')));
+});
+
 test('match/enum only run on present values — null/empty ids are silent', () => {
   const { errors } = validateConfig({
     ...VALID,
@@ -365,6 +385,15 @@ test('required-as-function receives the full config', () => {
 
   assert.deepStrictEqual(runSchema({ analytics: { enabled: false } }, schema), []);
   assert.strictEqual(runSchema({ analytics: { enabled: true } }, schema).length, 1);
+});
+
+test('integer type + min bound: only whole numbers at or above the bound pass', () => {
+  const schema = [{ path: 'limits.perDay', type: 'integer', min: 1 }];
+
+  assert.deepStrictEqual(runSchema({ limits: { perDay: 1 } }, schema), []);
+  assert.deepStrictEqual(runSchema({ limits: { perDay: 99 } }, schema), []);
+  assert.strictEqual(runSchema({ limits: { perDay: 1.5 } }, schema).length, 1);
+  assert.match(runSchema({ limits: { perDay: 0 } }, schema)[0], /limits\.perDay 0 is below the minimum 1/);
 });
 
 test('a throwing required() rule surfaces as a named error, never silent-optional', () => {

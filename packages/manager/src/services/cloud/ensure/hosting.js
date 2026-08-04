@@ -202,12 +202,13 @@ async function ensureApiDomain(context, zone, apiDomain) {
     try {
       if (status.deleted) {
         console.log(`      Restoring deleted domain: ${chalk.cyan(fullDomain)}...`);
-        await api.undeleteCustomDomain(projectId, projectId, fullDomain);
-        console.log(`      ${chalk.green('✓')} Restored domain`);
+        const claim = await api.undeleteCustomDomain(projectId, projectId, fullDomain);
+        console.log(`      ${chalk.green('✓')} Restored domain${claim?.pending ? chalk.dim(' (claim pending DNS verification)') : ''}`);
       } else {
         console.log(`      Adding domain: ${chalk.cyan(fullDomain)}...`);
-        await api.createCustomDomain(projectId, projectId, fullDomain);
-        console.log(`      ${chalk.green('✓')} Added domain to Firebase`);
+        // A claim still running is pending DNS verification, a normal state (#56)
+        const claim = await api.createCustomDomain(projectId, projectId, fullDomain);
+        console.log(`      ${chalk.green('✓')} Added domain to Firebase${claim?.pending ? chalk.dim(' (claim pending DNS verification)') : ''}`);
       }
     } catch (error) {
       if (!error.message?.includes('already exists')) {

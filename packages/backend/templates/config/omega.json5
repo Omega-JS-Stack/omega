@@ -180,6 +180,14 @@
         user: '',
         repo: '',
       },
+      auth: {
+        signup: {
+          // Signups allowed per client IP per day. The beforeUserCreated guard
+          // blocks the rest. Raise it when your audience shares egress (NAT/CGNAT,
+          // VPNs, offices, campuses), where one IP fronts many real people.
+          maxPerIpPerDay: 2,
+        },
+      },
       marketing: {
         campaigns: {
           enabled: true,

@@ -41,6 +41,16 @@ prompt instead of the CLI persona, and NO `maxTurns` cap (a plain reply
 already counts as the final turn — `maxTurns: 1` reports `error_max_turns`
 even though the text arrived).
 
+**Enabling translation on web means installing the SDK (#37).** `@omega.js/web`
+does NOT ship `@anthropic-ai/claude-agent-sdk`: translation is opt-in and the
+SDK is heavy, so a web brand that turns it on installs it in the app itself
+(`npm install @anthropic-ai/claude-agent-sdk`); `@omega.js/extension` still
+declares it. The SDK is lazy-required at the first claude call, so a brand
+without translation never pays for it, and a brand that enabled translation
+without the SDK gets a hard error naming the package and that install command,
+never a silent skip. The `chatgpt` provider needs no SDK at all (native fetch
+plus `OPENAI_API_KEY`).
+
 ## Engine protocol (`@omega.js/devkit/translate`)
 
 `translateStrings({ strings, language, languageName, brand, extraRules, send })`

@@ -5,8 +5,9 @@
  *
  *   {
  *     path:        'brand.id',            // dot-path into the RESOLVED config
- *     type:        'string' | 'boolean' | 'number' | 'array' | 'object',
+ *     type:        'string' | 'boolean' | 'number' | 'integer' | 'array' | 'object',
  *     required:    true | false | (config) => bool,
+ *     min:         Number,                // only checked when value present + number
  *     match:       RegExp,                // only checked when value present + string
  *     enum:        [...],                 // only checked when value present
  *     description: 'What the field drives.',
@@ -651,6 +652,13 @@ const TARGET_SCHEMAS = {
       type:        'object',
       required:    false,
       description: 'GDPR/CCPA data-request query definitions.',
+    },
+    {
+      path:        'auth.signup.maxPerIpPerDay',
+      type:        'integer',
+      required:    false,
+      min:         1,
+      description: 'Signups allowed per client IP per day (beforeUserCreated blocks the rest). Default 2. Raise it when the audience shares egress (NAT/CGNAT/VPN, offices, campuses).',
     },
   ],
 

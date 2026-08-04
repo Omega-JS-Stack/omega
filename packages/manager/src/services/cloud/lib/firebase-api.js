@@ -21,6 +21,9 @@ const RESOURCE_MANAGER_V3 = 'https://cloudresourcemanager.googleapis.com/v3';
 const FIRESTORE_API_BASE = 'https://firestore.googleapis.com/v1';
 const CLOUD_BILLING_API_BASE = 'https://cloudbilling.googleapis.com/v1';
 
+// Poll budget for a hosting domain claim (see settleDomainClaim)
+const DOMAIN_CLAIM_POLL = { maxAttempts: 3, delayMs: 1000, pendingOk: true };
+
 class FirebaseAPI {
   constructor(options = {}) {
     // GOOGLE_SCOPES (the manager-wide union) — one consent covers every
@@ -38,7 +41,15 @@ class FirebaseAPI {
   }
 
   /**
-   * Poll a long-running operation until it completes
+   * Poll a long-running operation until it completes.
+   *
+   * A spent poll budget is not proof of failure (#56): some Google operations
+   * stay RUNNING for as long as the outside world takes to catch up, and a
+   * hosting domain claim waiting on DNS verification is the normal case, not
+   * an error. Callers whose operation can legitimately outlive the budget
+   * pass `pendingOk` and get `{ pending: true, operationName }` back; every
+   * other caller keeps the hard timeout. An operation that reports an error
+   * is terminal either way.
    */
   async waitForOperation(operationName, apiBase, options = {}) {
     const maxAttempts = options.maxAttempts || 30;
@@ -55,6 +66,10 @@ class FirebaseAPI {
       }
 
       await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    if (options.pendingOk) {
+      return { pending: true, operationName };
     }
 
     throw new Error('Operation timed out');
@@ -553,11 +568,7 @@ class FirebaseAPI {
       body: JSON.stringify({}),
     });
 
-    if (response.name?.includes('operations')) {
-      await this.waitForOperation(response.name, FIREBASE_HOSTING_API_BASE);
-    }
-
-    return response;
+    return this.settleDomainClaim(response);
   }
 
   async undeleteCustomDomain(projectId, siteId, domainName) {
@@ -567,11 +578,23 @@ class FirebaseAPI {
       body: JSON.stringify({}),
     });
 
-    if (response.name?.includes('operations')) {
-      await this.waitForOperation(response.name, FIREBASE_HOSTING_API_BASE);
+    return this.settleDomainClaim(response);
+  }
+
+  /**
+   * Wait on a domain claim's operation, briefly. The claim only completes once
+   * DNS verification lands (hours away, normally), so the budget is short: long
+   * enough to surface an operation that fails outright, then the claim is
+   * reported PENDING (#56) and hosting's own verification poller takes over.
+   */
+  async settleDomainClaim(response) {
+    if (!response.name?.includes('operations')) {
+      return response;
     }
 
-    return response;
+    const outcome = await this.waitForOperation(response.name, FIREBASE_HOSTING_API_BASE, DOMAIN_CLAIM_POLL);
+
+    return outcome?.pending ? { ...response, pending: true } : response;
   }
 
   /**

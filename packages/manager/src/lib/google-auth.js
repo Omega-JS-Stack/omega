@@ -37,9 +37,54 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/adsense.readonly',
 ];
 
+// How long a printed consent url stays clickable (the loopback listener's life)
+const AUTH_WINDOW_MS = 300000;
+
+// How often the open flow reprints its url (see startAuthUrlReprint)
+const AUTH_REPRINT_MS = 60000;
+
+// This run's consent sessions, keyed by (client id, token store, scopes).
+// Every service shares the token store, so a run that starts with an empty
+// one would otherwise open a NEW browser flow per service, each minting a
+// fresh loopback url and killing the previous listener (#56: three urls in
+// six minutes, and the human was still reading the first). Concurrent and
+// later callers join the session already open, or the one that already
+// failed; a session that SUCCEEDS drops out (its tokens are in the shared
+// store from then on, so nothing reaches here until a token goes bad, and
+// that case deserves a real re-consent).
+const authSessions = new Map();
+
 /** The ONE brand-local token store every Google service shares. */
 function googleTokenStorePath(brandRoot) {
   return join(brandRoot, '.omega', 'auth', 'google-tokens.json');
+}
+
+/**
+ * Keep the LIVE consent url in view: reprint it on a stable line every
+ * intervalMs until the flow settles (#56). A run's other output scrolls the
+ * url away, and a human reading the log clicks the first link they see, which
+ * by then belongs to a dead listener.
+ *
+ * @param {string} url - The url the open flow is waiting on
+ * @param {Object} [options] - intervalMs, expiresAt (ms epoch), log (sink)
+ * @returns {Function} stop - Clears the timer; call on settle.
+ */
+function startAuthUrlReprint(url, options = {}) {
+  const intervalMs = options.intervalMs || AUTH_REPRINT_MS;
+  const log = options.log || console.log;
+  const { expiresAt } = options;
+
+  const timer = setInterval(() => {
+    const minutesLeft = expiresAt ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 60000)) : null;
+    log('');
+    log(`  ${chalk.dim('→')} Still waiting for Google consent${minutesLeft === null ? '' : ` (~${minutesLeft} min left)`}. This is the live url; any earlier one is dead:`);
+    log(`  ${chalk.cyan(url)}`);
+  }, intervalMs);
+  // Never hold the event loop open on the reprint alone (the loopback server
+  // is what keeps a waiting run alive)
+  timer.unref();
+
+  return () => clearInterval(timer);
 }
 
 class GoogleOAuth2Client {
@@ -144,7 +189,28 @@ class GoogleOAuth2Client {
       }
     }
 
-    return await this.performOAuth2Flow();
+    return await this.authorizeOnce();
+  }
+
+  /**
+   * Join this run's consent session for these credentials, or open it (#56).
+   * One session per run: see the authSessions comment above.
+   */
+  authorizeOnce() {
+    const key = [this.clientId, this.tokenStorePath, this.scopes.join(' ')].join('|');
+    const open = authSessions.get(key);
+
+    if (open) {
+      return open;
+    }
+
+    const session = this.performOAuth2Flow();
+    authSessions.set(key, session);
+    // Release the slot on success only; the caller's own await owns the
+    // rejection, so the catch here just keeps this branch from surfacing one.
+    session.then(() => authSessions.delete(key)).catch(() => {});
+
+    return session;
   }
 
   async refreshAccessToken() {
@@ -195,8 +261,10 @@ class GoogleOAuth2Client {
 
     // The Enter-gate keypress listener must tear down however the flow
     // settles (Enter pressed, URL clicked directly, timeout, error) — a
-    // pending listener holds stdin and zombies the process at exit.
+    // pending listener holds stdin and zombies the process at exit. The
+    // url reprint tears down on the same settle.
     let disarm = null;
+    let stopReprint = null;
 
     const flow = new Promise((resolve, reject) => {
       // RFC 8252 §7.3 loopback: bind an EPHEMERAL port (listen(0)) and read
@@ -309,6 +377,8 @@ class GoogleOAuth2Client {
           console.log(`  ${chalk.dim('→')} Opening your browser... (use the URL above if nothing appears)`);
         }
         console.log('');
+
+        stopReprint = startAuthUrlReprint(authUrl.toString(), { expiresAt: Date.now() + AUTH_WINDOW_MS });
       });
 
       // Timeout after 5 minutes (was 2 — humans relaying URLs need slack,
@@ -318,7 +388,7 @@ class GoogleOAuth2Client {
       const timeout = setTimeout(() => {
         server.close();
         reject(new Error('Authentication timed out'));
-      }, 300000);
+      }, AUTH_WINDOW_MS);
       timeout.unref();
       server.on('close', () => clearTimeout(timeout));
     });
@@ -326,6 +396,9 @@ class GoogleOAuth2Client {
     return flow.finally(() => {
       if (disarm) {
         disarm();
+      }
+      if (stopReprint) {
+        stopReprint();
       }
     });
   }
@@ -411,4 +484,4 @@ class GoogleOAuth2Client {
   }
 }
 
-module.exports = { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath };
+module.exports = { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint };

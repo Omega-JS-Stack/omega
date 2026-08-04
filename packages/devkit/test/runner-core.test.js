@@ -241,6 +241,15 @@ test('framework boot/ suites are excluded for consumers but run in self-test mod
   const selftest = await quiet(() => withCwd(path.join(root, 'selftest'), () => createRunner(config).run()));
   assert.equal(selftest.result.passed, 2);
   assert.equal(bootCalls, 1);
+
+  // A consumer asking for the boot layer explicitly is told WHY nothing ran
+  // instead of getting silence (#56 item 17b's residual friction).
+  const bootAsk = await quiet(() => withCwd(path.join(root, 'consumer'), () => createRunner(config).run({ target: 'framework:', layer: 'boot' })));
+  assert.equal(bootAsk.result.passed, 0);
+  assert.ok(
+    bootAsk.lines.some((line) => line.includes('self-test only')),
+    'the boot-layer silence carries its explanation',
+  );
   fs.rmSync(root, { recursive: true, force: true });
 });
 

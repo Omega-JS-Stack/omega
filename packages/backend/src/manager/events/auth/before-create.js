@@ -1,9 +1,8 @@
 const { isDisposable } = require('../../libraries/email/validation.js');
-const { runAuthHook } = require('./utils.js');
+const { runAuthHook, resolveSignupLimit } = require('./utils.js');
 
 const ERROR_TOO_MANY_ATTEMPTS = 'Unable to create account at this time. Please try again later.';
 const ERROR_DISPOSABLE_EMAIL = 'This email domain is not allowed. Please use a different email address.';
-const MAX_SIGNUPS_PER_DAY = 2;
 
 /**
  * beforeUserCreated - Disposable email blocking + IP rate limiting
@@ -58,12 +57,13 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   });
 
   const signups = usage.getUsage('signups');
+  const maxSignupsPerDay = resolveSignupLimit(Manager.config);
 
-  ctx.log(`beforeCreate: Rate limit check for ${ipAddress}: ${signups}/${MAX_SIGNUPS_PER_DAY}`);
+  ctx.log(`beforeCreate: Rate limit check for ${ipAddress}: ${signups}/${maxSignupsPerDay}`);
 
   // Block if too many signups from this IP
-  if (signups >= MAX_SIGNUPS_PER_DAY) {
-    ctx.error(`beforeCreate: Too many signups from ${ipAddress} (${signups}/${MAX_SIGNUPS_PER_DAY})`);
+  if (signups >= maxSignupsPerDay) {
+    ctx.error(`beforeCreate: Too many signups from ${ipAddress} (${signups}/${maxSignupsPerDay})`);
 
     throw new functions.auth.HttpsError('resource-exhausted', ERROR_TOO_MANY_ATTEMPTS);
   }

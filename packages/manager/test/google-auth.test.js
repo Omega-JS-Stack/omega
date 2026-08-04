@@ -10,7 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath } = require('../src/lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint } = require('../src/lib/google-auth.js');
 
 function tmpStore(tokens) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-google-auth-'));
@@ -104,6 +104,88 @@ test('google-auth: saveTokens records the granted scopes', () => {
   const written = JSON.parse(fs.readFileSync(storePath, 'utf8'));
   assert.deepEqual(written.scopes, GOOGLE_SCOPES);
   assert.equal(written.access_token, 'a');
+});
+
+// ═══ One consent session per run + the stable-line reprint (#56: the live
+// run burned three loopback urls in six minutes, and the human was still
+// reading the first one, dead by the time it was clicked) ═══
+
+/** A client whose browser flow is the injected fake (the one network seam). */
+function flowClient(storePath, flow) {
+  class TestClient extends GoogleOAuth2Client {
+    performOAuth2Flow() {
+      return flow();
+    }
+  }
+  return new TestClient({ clientId: 'x', clientSecret: 'y', scopes: GOOGLE_SCOPES, tokenStorePath: storePath });
+}
+
+test('google-auth: concurrent callers join ONE consent session per run (#56)', async () => {
+  const storePath = tmpStore(null);
+  let flows = 0;
+  const releases = [];
+  const flow = () => {
+    flows += 1;
+    return new Promise((resolve) => { releases.push(resolve); });
+  };
+
+  const pending = Promise.all([
+    flowClient(storePath, flow).getAccessToken(),
+    flowClient(storePath, flow).getAccessToken(),
+  ]);
+  await new Promise(setImmediate);
+  // Assert BEFORE releasing: a regression to two flows must fail here, not
+  // strand the first promise and time the whole file out.
+  assert.equal(flows, 1, 'the second service joined the open session instead of minting another url');
+  releases.forEach((release) => release('fresh-token'));
+
+  assert.deepEqual(await pending, ['fresh-token', 'fresh-token']);
+});
+
+test('google-auth: a failed consent session is not replaced by a new url later in the run (#56)', async () => {
+  const storePath = tmpStore(null);
+  let flows = 0;
+  const flow = () => {
+    flows += 1;
+    return Promise.reject(new Error('Authentication timed out'));
+  };
+
+  await assert.rejects(flowClient(storePath, flow).getAccessToken(), /Authentication timed out/);
+  await assert.rejects(flowClient(storePath, flow).getAccessToken(), /Authentication timed out/);
+
+  assert.equal(flows, 1, 'the next service reports the same dead session, it does not open a second one');
+});
+
+test('google-auth: a completed session releases the run slot so a token gone bad can re-consent', async () => {
+  const storePath = tmpStore(null);
+  let flows = 0;
+  const flow = () => {
+    flows += 1;
+    return Promise.resolve(`token-${flows}`);
+  };
+
+  assert.equal(await flowClient(storePath, flow).getAccessToken(), 'token-1');
+  assert.equal(await flowClient(storePath, flow).getAccessToken(), 'token-2');
+});
+
+test('google-auth: the consent url reprints on a stable line while the flow is open (#56)', async () => {
+  const lines = [];
+  const stop = startAuthUrlReprint('https://accounts.google.com/o/oauth2/v2/auth?client_id=x', {
+    intervalMs: 10,
+    expiresAt: Date.now() + 300_000,
+    log: (line) => lines.push(line),
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  stop();
+  const printedWhileOpen = lines.length;
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.ok(printedWhileOpen >= 2, `reprinted while waiting (got ${printedWhileOpen} lines)`);
+  const printed = lines.join('\n');
+  assert.match(printed, /accounts\.google\.com\/o\/oauth2\/v2\/auth\?client_id=x/, 'reprints the live url');
+  assert.match(printed, /min left/, 'says how long the url has');
+  assert.equal(lines.length, printedWhileOpen, 'stops the moment the flow settles');
 });
 
 // ═══ Permission-seam diagnostics (2026-07-19 live find: the manage identity

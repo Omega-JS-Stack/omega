@@ -88,6 +88,12 @@ function createRunner(config) {
 
     if (sources.framework.length === 0 && sources.project.length === 0) {
       console.log(chalk.gray('  No test files found.'));
+    } else if (options.layer === 'boot'
+      && results.passed + results.failed + results.skipped === 0) {
+      // Explain the silence: framework boot/ suites are excluded from consumer
+      // discovery (they assert on the framework's own fixture consumer), so a
+      // consumer asking for the boot layer with no suites of their own runs nothing.
+      console.log(chalk.gray('  No boot tests ran. Framework boot suites are self-test only; write yours under test/boot/.'));
     }
 
     reportResults(results, Date.now() - startTime);
@@ -203,7 +209,7 @@ function createRunner(config) {
 
     if (mod.skip) {
       const reason = typeof mod.skip === 'string' ? mod.skip : '';
-      console.log(chalk.yellow(`    ○ ${mod.description || rel}`) + chalk.gray(` (skipped${reason ? ': ' + reason : ''})`));
+      console.log(`${chalk.yellow(`    ○ ${mod.description || rel}`)}${chalk.gray(` (skipped${reason ? `: ${reason}` : ''})`)}`);
       const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
       results.skipped += count;
       return;
@@ -234,7 +240,7 @@ function createRunner(config) {
 
       if (t.skip) {
         const reason = typeof t.skip === 'string' ? t.skip : '';
-        console.log(chalk.yellow(`      ○ ${name}`) + chalk.gray(` (skipped${reason ? ': ' + reason : ''})`));
+        console.log(`${chalk.yellow(`      ○ ${name}`)}${chalk.gray(` (skipped${reason ? `: ${reason}` : ''})`)}`);
         results.skipped += 1;
         continue;
       }
@@ -336,7 +342,7 @@ function createRunner(config) {
   function reportResults(results, durationMs) {
     const total = results.passed + results.failed + results.skipped;
     console.log('');
-    console.log('  ' + chalk.bold('Results'));
+    console.log(`  ${chalk.bold('Results')}`);
     console.log(`    ${chalk.green(`${results.passed} passing`)}`);
     if (results.failed > 0)  console.log(`    ${chalk.red(`${results.failed} failing`)}`);
     if (results.skipped > 0) console.log(`    ${chalk.yellow(`${results.skipped} skipped`)}`);
@@ -362,7 +368,7 @@ function createRunner(config) {
         const partNoExt = pathPart.replace(/\.js$/, '').replace(/\.test$/, '');
         return rel.startsWith(pathPart)
           || relNoExt === partNoExt
-          || relNoExt.startsWith(partNoExt + '/')
+          || relNoExt.startsWith(`${partNoExt}/`)
           || rel.includes(pathPart);
       });
     });

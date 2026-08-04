@@ -248,6 +248,36 @@ test('resolveTranslationSettings: defaults + gating', () => {
   assert.throws(() => resolveTranslationSettings({ translation: { languages: ['nope'] } }), /nope/);
 });
 
+test('claude provider fails loud when the Agent SDK is not installed', async () => {
+  // #37: web no longer ships the SDK as a runtime dependency, so an app that
+  // enabled translation without installing it must hit a named, actionable
+  // error (never a silent skip). The resolution is stubbed, not uninstalled.
+  const Module = require('node:module');
+  const original = Module._resolveFilename;
+  Module._resolveFilename = function (request, ...rest) {
+    if (request === '@anthropic-ai/claude-agent-sdk') {
+      const error = new Error(`Cannot find module '${request}'`);
+      error.code = 'MODULE_NOT_FOUND';
+      throw error;
+    }
+    return original.call(this, request, ...rest);
+  };
+
+  try {
+    await assert.rejects(
+      resolveProvider({ provider: 'claude' }).send({ system: 's', user: 'u' }),
+      (e) => {
+        assert.match(e.message, /@anthropic-ai\/claude-agent-sdk/, 'the error names the package');
+        assert.match(e.message, /npm install @anthropic-ai\/claude-agent-sdk/, 'the error carries the install command');
+        assert.match(e.message, /opt-in and the SDK is heavy/, 'the error says why it is not bundled');
+        return true;
+      }
+    );
+  } finally {
+    Module._resolveFilename = original;
+  }
+});
+
 test('claude provider surfaces SDK error results immediately — a failed call never hangs the build', async () => {
   const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
   require.cache[sdkPath] = {

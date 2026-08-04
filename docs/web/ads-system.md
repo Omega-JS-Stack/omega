@@ -43,7 +43,7 @@ advertising: {
 ```
 
 - Shared-section key, overridable per target. Key presence enables; no keys = no ads anywhere.
-- `source: 'company'` resolves through the config company layer to the parent's api URL — sub-brands inherit the parent inventory with one word. `'self'` serves the brand's own inventory. **No hard company requirement** (Ian): a brand alone is fully functional.
+- `source: 'company'` resolves through the config company layer to the parent's api URL — sub-brands inherit the parent inventory with one word. `'self'` serves the brand's own inventory. **No hard company requirement** (Ian): a brand alone is fully functional. In DEV mode every source resolves the local stack, `company.url` included — dev makes no live server hits (ratified, [#34](https://github.com/Omega-JS-Stack/omega/issues/34); the mechanism note lives in [docs/shared/config.md](../shared/config.md)).
 - Legacy `advertising.<provider>` flat shape already converts via the existing migrate lane (`advertising.providers.*`).
 
 ## House inventory — a backend module (modern replacement for the Jekyll-file verts)

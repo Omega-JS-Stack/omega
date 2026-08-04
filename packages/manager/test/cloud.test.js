@@ -485,6 +485,30 @@ test('billing: Spark plan with no cloud.billingAccount warns instead of linking'
   assert.ok(result.output.billing.needsInteractive.includes('billing account'));
 });
 
+test('billing: an unreadable billing API says "could not check", never announces Spark (#56)', async () => {
+  const handler = require('../src/services/cloud/ensure/billing.js');
+  // getProjectBillingInfo() swallows every read failure into null (the live
+  // run's auth attempt timed out), so the step knows nothing about the plan.
+  const api = fakeFirebase({ getProjectBillingInfo: null });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await handler(handlerContext(brandConfig(), api));
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(result.status, 'warned');
+  assert.equal(api.mutations().length, 0);
+  assert.match(result.output.billing.error, /could not check/i);
+  const printed = lines.join('\n');
+  assert.match(printed, /Could not check the billing plan/);
+  assert.ok(!printed.includes('Spark plan (free tier)'), 'never states a plan it did not read');
+});
+
 test('billing: cloud.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
   const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });

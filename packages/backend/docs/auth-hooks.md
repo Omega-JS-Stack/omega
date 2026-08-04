@@ -4,7 +4,7 @@ Auth hooks let consumer projects inject custom logic into @omega.js/backend's au
 
 | Hook | File | Behavior |
 |------|------|----------|
-| `before-create` | `hooks/auth/before-create.js` | Runs after @omega.js/backend's disposable email + rate limit checks. **Can throw `HttpsError` to block signup.** |
+| `before-create` | `hooks/auth/before-create.js` | Runs after @omega.js/backend's disposable email + rate limit checks (the per-IP daily cap is `targets.backend.auth.signup.maxPerIpPerDay`, default 2). **Can throw `HttpsError` to block signup.** |
 | `before-signin` | `hooks/auth/before-signin.js` | Runs after @omega.js/backend's activity update. **Can throw `HttpsError` to block sign-in.** |
 | `on-create` | `hooks/auth/on-create.js` | Runs after @omega.js/backend creates the user doc. **Non-blocking** — errors are caught and logged. |
 | `on-delete` | `hooks/auth/on-delete.js` | Runs after @omega.js/backend deletes the user doc. **Non-blocking** — errors are caught and logged. |

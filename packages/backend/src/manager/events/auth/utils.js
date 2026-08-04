@@ -2,6 +2,25 @@ const jetpack = require('fs-jetpack');
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+const DEFAULT_MAX_SIGNUPS_PER_DAY = 2;
+
+/**
+ * Resolve the per-IP daily signup cap the beforeUserCreated guard enforces.
+ *
+ * Config home: targets.backend.auth.signup.maxPerIpPerDay, which the config
+ * loader overlays at the top level like every other target key. The value is a
+ * positive integer (@omega.js/config hard-fails anything else), so a value that
+ * still arrives broken keeps the framework default instead of leaving the guard
+ * running unprotected.
+ *
+ * @param {object} config - The resolved config (Manager.config).
+ * @returns {number} Signups allowed per client IP per day.
+ */
+function resolveSignupLimit(config) {
+  const limit = config?.auth?.signup?.maxPerIpPerDay;
+
+  return Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_MAX_SIGNUPS_PER_DAY;
+}
 
 /**
  * Retry a function up to maxRetries times with exponential backoff
@@ -71,4 +90,4 @@ async function runAuthHook(eventName, args) {
   ctx.log(`${eventName}: Consumer hook completed`);
 }
 
-module.exports = { retryWrite, runAuthHook, MAX_RETRIES };
+module.exports = { retryWrite, runAuthHook, resolveSignupLimit, MAX_RETRIES, DEFAULT_MAX_SIGNUPS_PER_DAY };

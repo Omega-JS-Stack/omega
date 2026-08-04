@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+### Changed
+- [#115](../../issues/115) — The `framework:` test scope is declared local-era only, and `docs/shared/testing.md` now says so: web's framework suite requires the unbuilt `src/` tree and dev dependencies a published install never receives, so shipping `test/` in the tarball would not make it runnable.
+- [#37](../../issues/37) — `@omega.js/web` no longer ships `@anthropic-ai/claude-agent-sdk` as a runtime dependency, so a brand install stops pulling a heavy SDK it never uses. A brand that enables translation installs the SDK itself, and the claude provider fails loud with the install command when it is absent.
+- [#133](../../issues/133) — The backend's signup guard reads its per-IP daily cap from config instead of a hardcoded 2: `targets.backend.auth.signup.maxPerIpPerDay` (positive integer, default 2) lets a brand whose users share egress (NAT/CGNAT, VPNs, offices) raise the limit that was blocking legitimate signups.
+
+### Fixed
+- [#56](../../issues/56) — Interactive Google consent is ONE session per run: concurrent and later services join the open flow (or the one that already failed) instead of minting a fresh loopback url each time, and the open flow reprints its live url every minute.
+- [#56](../../issues/56) — The billing step stops announcing a plan it never read: a failed billing API read (unauthenticated, no permission, API off) reports "could not check the billing plan" and warns, distinct from a checked Spark verdict.
+- [#56](../../issues/56) — A hosting custom-domain claim waiting on DNS verification reports as pending instead of failing with "Operation timed out": the long-operation poller separates a terminal failure from a known-pending state.
+- [#56](../../issues/56) — A consumer test run asking for the boot layer with nothing to run explains itself (framework boot suites are self-test only; consumers write theirs under `test/boot/`) instead of ending silent.
+
 ## [0.18.2] (2026-08-03)
 ### Fixed
 - [#38](../../issues/38) [`69377340`](../../commit/69377340) Thanks [@ianwieds]! — A vendor after-hook failure now aborts the prepare flow instead of warning and continuing: prepare-package 2.2.0 adds an opt-in `hooks.afterBlocking` flag, and all six publishables set it, so a package can no longer build a tarball missing its vendored internals.

@@ -50,7 +50,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
     web:       { /* @omega.js/web settings — defined in Phase 2 */ },
-    backend:   { parent, github, reviews, marketing, blog, dataRequest },
+    backend:   { parent, github, auth: { signup: { maxPerIpPerDay } }, reviews, marketing, blog, dataRequest },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, remoteScripts, restartManager },
     extension: { /* near-empty at launch */ },
@@ -137,7 +137,7 @@ targets: {
   merge. Public credentials (`publishableKey`, `clientId`, `cloud.config.apiKey`) pass by
   design.
 - **The legacy `targets` ARRAY form throws** — `targets` is an object keyed by target name.
-- Schema findings (required/type/match/enum) come back as `errors`, not throws — build-time
+- Schema findings (required/type/min/match/enum) come back as `errors`, not throws — build-time
   audit throws on them, boot warns/fails per framework policy.
 
 ## The .env cascade (secrets) — D15
@@ -233,7 +233,10 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   resolves runtime global → chrome `dev.ports` → classic defaults; its dev `getApiUrl`
   speaks plain http to a mapped `hosting` (the emulator serves http), https to a mapped
   `https` (`mgr serve`'s mkcert proxy), and keeps the classic
-  `https://localhost:5002` serve assumption when no map was provided.
+  `https://localhost:5002` serve assumption when no map was provided. Dev mode
+  resolves the LOCAL stack for every source, including `source: 'company'` —
+  `company.url` is a production concept, and dev deliberately makes no live server
+  hits (ratified, Ian 2026-08-03, [#34](https://github.com/Omega-JS-Stack/omega/issues/34)).
 - **Website port (cp89)** — `omega dev` allocates through the same model: classic
   **4000** (pre-N7 it defaulted to 8080, colliding with the SAME brand's firestore
   emulator), bump when taken, `--port` flag or config `ports.website` pins; publishes

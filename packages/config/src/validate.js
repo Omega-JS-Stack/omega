@@ -96,6 +96,7 @@ function runSchema(config, schema) {
           case 'string':  return typeof value === 'string';
           case 'boolean': return typeof value === 'boolean';
           case 'number':  return typeof value === 'number' && Number.isFinite(value);
+          case 'integer': return Number.isInteger(value);
           case 'array':   return Array.isArray(value);
           case 'object':  return isPlainObject(value);
           default:        return true;
@@ -105,6 +106,12 @@ function runSchema(config, schema) {
         errors.push(`config.${rule.path} has wrong type — got ${Array.isArray(value) ? 'array' : typeof value}, expected ${rule.type}`);
         continue;          // skip secondary checks if the type is wrong
       }
+    }
+
+    // ─── Min check (numbers) ────────────────────────────────────────────────
+    if (typeof rule.min === 'number' && typeof value === 'number' && value < rule.min) {
+      const why = rule.description ? ` — ${rule.description}` : '';
+      errors.push(`config.${rule.path} ${value} is below the minimum ${rule.min}${why}`);
     }
 
     // ─── Match check (strings) ──────────────────────────────────────────────

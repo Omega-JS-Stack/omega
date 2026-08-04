@@ -6,9 +6,12 @@
  *   provider.send({ system, user }) → Promise<{ text, usage }>
  * where usage is { input, output } token counts (zeros when unreported).
  *
- * The Agent SDK is lazy-required so it resolves from the CONSUMING framework
- * package (@omega.js/web, @omega.js/extension declare the dependency) — devkit
- * itself stays dependency-free here.
+ * The Agent SDK is lazy-required, so it is only touched when a claude call
+ * actually happens, and devkit itself stays dependency-free here. It resolves
+ * from whoever installed it: @omega.js/extension declares it, @omega.js/web
+ * does NOT (#37: translation is opt-in and the SDK is heavy, so a web brand
+ * that enables translation installs it in the app). When it is absent, the
+ * call fails loud with the install command instead of skipping translation.
  */
 
 const PROVIDERS = ['claude', 'chatgpt'];
@@ -55,7 +58,7 @@ async function sendClaude(model, message) {
   try {
     ({ query } = require('@anthropic-ai/claude-agent-sdk'));
   } catch (e) {
-    throw new Error('The claude translation provider needs @anthropic-ai/claude-agent-sdk (ships with the framework package) and a local Claude Code install/auth — or set translation.provider to "chatgpt".');
+    throw new Error('The claude translation provider needs @anthropic-ai/claude-agent-sdk, which is not installed here. Translation is opt-in and the SDK is heavy, so the framework does not bundle it: install it in this app with `npm install @anthropic-ai/claude-agent-sdk` (it also needs a local Claude Code install/auth), or set translation.provider to "chatgpt".');
   }
 
   let text = '';
