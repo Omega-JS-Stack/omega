@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Fixed
+- [#172](../../issues/172) — `router__refresh_upstream` no longer leaks its one-shot child when the tools/list read fails after a successful handshake: the transport is closed, the failure lands in `last_error` like a failed spawn's, and the next successful refresh clears it.
 
 ## [0.20.1] (2026-08-03)
 ### Added

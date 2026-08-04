@@ -327,8 +327,21 @@ const callMetaTool = async (name, args) => {
       // the caller.
       await connectWithDeadline(client, transport);
 
-      const result = await client.listTools();
+      // A child that finishes the handshake can still fail the tools/list read
+      // (an error answer, or a stall that hits the SDK's request timeout).
+      // connectWithDeadline is done with the transport by then, so nothing else
+      // would close it and the one-shot child would run for the rest of the
+      // session. The success path closes through the client instead, so the
+      // transport is never closed twice.
+      let result;
+      try {
+        result = await client.listTools();
+      } catch (err) {
+        await transport.close().catch(() => {});
+        throw err;
+      }
       await client.close();
+      session[target].lastError = null;
 
       // The cache lands in the OVERLAY — the bundled dir is read-only.
       registry.patchOverlayEntry(target, { tools: result.tools });
@@ -336,6 +349,10 @@ const callMetaTool = async (name, args) => {
       await server.sendToolListChanged();
       return textResult(`Refreshed "${target}" — ${result.tools.length} tools cached to ${overlayDir}/${target}/config.json.`);
     } catch (err) {
+      // Same record as a failed spawn: without it router__list_upstreams shows
+      // a clean upstream after a refresh that failed.
+      session[target].lastError = err.message;
+      log('error', `Refresh of upstream "${target}" failed: ${err.message}`);
       return errorResult(`Refresh failed for "${target}": ${err.message}`);
     }
   }
