@@ -13,6 +13,7 @@ SCSS-based, theme-pluggable, with a load-path system that lets consumer SCSS ref
 | `core/_initialize.scss` | Base resets (box-sizing, body defaults) |
 | `core/_utilities.scss` | Utility classes (`.shadow-lg`, `.text-truncate`, spacing, color, etc.) |
 | `core/_animations.scss` | Keyframe animations + transition mixins |
+| `core/_fontawesome.scss` | Icon presentation: the square glyph-centered box, the `fa-2xs`…`fa-6xl` size scale, `fa-spin`/`fa-bounce`/`fa-beat`. Vendored VERBATIM from @omega.js/web at prepare (package.json `omega.vendorAssets`), never hand-edited here. See [shared/icons.md](shared/icons.md) |
 
 ## Per-component styles
 

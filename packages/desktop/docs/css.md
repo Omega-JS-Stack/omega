@@ -28,6 +28,10 @@ Compiles to `dist/assets/css/main.bundle.css` (Bootstrap + classy theme + your g
 
 The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omega.js/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override — see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block. See [themes.md](themes.md) for the full variable reference.
 
+## Icon presentation
+
+Icon CSS is ONE sheet for every omega target, vendored from @omega.js/web at prepare (package.json `omega.vendorAssets` → `dist/assets/css/core/_fontawesome.scss`) and loaded by the `omega-desktop` entry. It ships the square glyph-centered box every rendered `<i>` gets, the `fa-2xs`…`fa-6xl` size scale, and the `fa-spin` / `fa-bounce` / `fa-beat` utilities (each parked under `prefers-reduced-motion`). Nothing to import and nothing to hand-fix. See [shared/icons.md](shared/icons.md).
+
 ## App shell
 
 Dashboard/admin windows use the `.omega-shell` layout — a sidebar + topbar + main grid with a collapsible desktop rail and a mobile drawer. Two layers ship, both vendored from @omega.js/web at prepare: the MECHANICS (`dist/assets/css/shell/_index.scss` — the grid, region geometry, states, and the `--omega-shell-*` tokens, loaded by the `omega-desktop` entry before the theme) and the theme's SKIN (`dist/assets/themes/<theme-id>/css/layout/_shell.scss`, layered over it). Nothing to import — `@use 'omega-desktop'` gets both.

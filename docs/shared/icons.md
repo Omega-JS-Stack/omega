@@ -89,18 +89,37 @@ compose with weights exactly like FA markup: `fa-sharp fa-light fa-play`
 duotone-solid). Style validation is by path-safe shape, not a whitelist —
 future FA families work with zero framework changes.
 
-## Animation (web)
+## The sheet (one home, every surface)
 
-`.fa-spin` turns an icon one full rotation a second, linear, forever. It
-is Font Awesome's own class name, so the muscle memory carries over, and
-it rides either kind of icon:
+Icon PRESENTATION is one sheet:
+`packages/web/core/css/core/_custom-font-awesome.scss`. It owns the box, the
+size scale and the animation utilities, and it is deliberately self-contained
+(plain css, its own `$fa-sizes` map, its own keyframes) so the other targets
+take it verbatim instead of hand-writing a second copy that drifts.
+
+Desktop and extension VENDOR it at prepare through their package.json
+`omega.vendorAssets`, the same channel that carries the `--omega-*` tokens and
+the shell mechanics: it lands at `dist/assets/css/core/_fontawesome.scss` and
+the `omega-desktop` / `omega-extension` entries `@use` it. Nothing to import in
+a consumer project, and no second sheet to keep in sync (#183).
+
+## Animation
+
+`.fa-spin` turns an icon one full rotation a second, linear, forever;
+`.fa-bounce` hops it; `.fa-beat` swells it. All three are Font Awesome's own
+class names, so the muscle memory carries over, and each rides either kind of
+icon:
 
 ```html
 <i class="fa-solid fa-spinner fa-spin"></i>   <!-- rendered at runtime -->
 {% omega_icon spinner, "fa-spin" %}           <!-- inlined at build -->
 ```
 
-Under `prefers-reduced-motion: reduce` the animation is dropped and the
+The keyframes are ours, not FA's: FA's own are built on a stack of
+custom-property knobs the sheet does not ship, so each utility gets a minimal
+implementation under FA's name.
+
+Under `prefers-reduced-motion: reduce` every one of them is dropped and the
 icon parks, the same deal every looping effect in the motion library
 makes.
 
@@ -110,9 +129,9 @@ instead of a point down on the text baseline. Nothing to hand-fix, and no
 class to remember: the box keys on the hooks the renderers stamp
 themselves.
 
-Both live in `@omega.js/web`'s own icon sheet: desktop ships its own sheet
-without the box or `.fa-spin`, and extension ships none, so neither surface
-carries these rules yet (#183 tracks the parity).
+The 12 size classes (`fa-2xs` … `fa-6xl`) are the sheet's `$fa-sizes` map, and
+`icon-core`'s modifier list carries the same roster, so a size class never
+reads as an icon name.
 
 ## When to use what (web)
 
@@ -129,7 +148,8 @@ carries these rules yet (#183 tracks the parity).
 
 ## Testing
 
-- `packages/client/test/icon-core.test.js` — parsing/validation.
+- `packages/client/test/icon-core.test.js` — parsing/validation, plus the
+  12-size roster the modifier list must carry.
 - `packages/desktop/src/test/suites/{main,renderer}/fontawesome.test.js` —
   the real-DOM proof of the SHARED renderer (insert, re-class, clear,
   Pro-adaptive assertions) + main's root chain and IPC sanitization.
@@ -137,7 +157,10 @@ carries these rules yet (#183 tracks the parity).
   `packages/devkit/test/icons.test.js` — chain resolution + emission merge
   (the shared build-side impl).
 - `packages/web/test/icons.test.js` — the compiled icon sheet: the square
-  box on both renderer hooks, `.fa-spin`, its reduced-motion branch.
+  box on both renderer hooks, `.fa-spin` / `.fa-bounce` / `.fa-beat`, their
+  reduced-motion branch, and the size roster derived from `$fa-sizes`.
+- `packages/{desktop,extension}/src/test/suites/build/icon-sheet.test.js`:
+  the vendored copy lands, and the entry compiles the box + the park.
 - Live consumer proof: the playground extension build emits the full
   merged set (Pro included via the brand `.env`) and compiles the watcher
   into all four page bundles.

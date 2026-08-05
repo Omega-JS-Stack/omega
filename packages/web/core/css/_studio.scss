@@ -168,6 +168,14 @@ body:has(#studio:not([hidden])) {
   }
 }
 
+// The record pulse rests fully opaque, which is the button's own opacity, so
+// parking it leaves the recording state at its most legible frame.
+@media (prefers-reduced-motion: reduce) {
+  .studio-record-btn.recording {
+    animation: none;
+  }
+}
+
 @keyframes studio-pulse-record {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }

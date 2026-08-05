@@ -27,6 +27,12 @@
 @use 'core/_utilities' as *;
 @use 'core/_animations' as *;
 
+// Icon presentation (#183): the square glyph-centered box, the size scale and
+// the spin/bounce/beat utilities, vendored VERBATIM from @omega.js/web's one
+// icon sheet at prepare (package.json `omega.vendorAssets`), same channel as
+// the tokens and shell sheets above. Never hand-written here.
+@use 'core/_fontawesome' as *;
+
 // Import component-specific styles
 @use '_component-specific' as *;
 

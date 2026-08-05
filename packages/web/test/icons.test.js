@@ -66,5 +66,40 @@ test('#180: .fa-spin turns once per second, from center, and parks for reduced m
 
   const reduced = css.slice(css.indexOf('prefers-reduced-motion: reduce'));
   assert.match(reduced, /prefers-reduced-motion: reduce/, 'the reduced-motion branch exists');
-  assert.match(reduced, /\.fa-spin \{\s*animation: none/, 'the icon parks instead of spinning');
+  assert.match(reduced, /\.fa-spin,[^{]*\{\s*animation: none/, 'the icon parks instead of spinning');
+});
+
+test('#183: fa-bounce and fa-beat are implemented, not silent no-ops, and park too', () => {
+  const { css } = compileIconSheet();
+
+  // Both are already in core markup (core/_includes/core/body.html's
+  // outdated-browser and payment-issue alerts), where they rendered nothing
+  // until this sheet grew its own keyframes.
+  assert.match(css, /@keyframes fa-bounce \{[^@]*translateY\(-0\.25em\)/, 'a bounce actually moves the glyph');
+  assert.match(css, /\.fa-bounce \{[^}]*animation: fa-bounce 1s ease-in-out infinite/s);
+
+  assert.match(css, /@keyframes fa-beat \{[^@]*scale\(1\.25\)/, 'a beat actually swells the glyph');
+  assert.match(css, /\.fa-beat \{[^}]*animation: fa-beat 1s ease-in-out infinite/s);
+  assert.match(css, /\.fa-beat \{[^}]*transform-origin: center/s, 'the swell grows from the glyph center');
+
+  const reduced = css.slice(css.indexOf('prefers-reduced-motion: reduce'));
+  for (const utility of ['fa-spin', 'fa-bounce', 'fa-beat']) {
+    assert.match(reduced, new RegExp(`\\.${utility}[,\\s]`), `${utility} parks under reduced motion, like every looping effect`);
+  }
+  assert.match(reduced, /animation: none/);
+});
+
+test('#183: the sheet ships all 12 sizes the client renderer treats as modifiers', () => {
+  // Derived from the sheet's OWN $fa-sizes map through Sass, so drift is caught
+  // from either side: this literal is the same roster
+  // packages/client/test/icon-core.test.js pins MODIFIER_REGEX against, and a
+  // size that ships here without landing there parses as an icon NAME.
+  const probe = sass.compileString(
+    "@use 'sass:map';\n@use 'core/custom-font-awesome' as fa;\n.roster { content: '#{map.keys(fa.$fa-sizes)}'; }",
+    { loadPaths: [path.join(PKG, 'core', 'css')] },
+  ).css;
+
+  const roster = probe.match(/\.roster \{\s*content: "([^"]+)"/)[1].split(', ');
+
+  assert.deepEqual(roster, ['2xs', 'xs', 'sm', 'base', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl']);
 });

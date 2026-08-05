@@ -92,6 +92,15 @@
   }
 }
 
+// Parked, the pointer sits at its untransformed spot beside the puzzle button
+// and the pulse ring keeps the authored opacity: 0 it starts and ends on.
+@media (prefers-reduced-motion: reduce) {
+  .extension-puzzle-target .click-indicator .pointer-icon,
+  .extension-puzzle-target .click-indicator .click-pulse {
+    animation: none;
+  }
+}
+
 @keyframes puzzle-mouse-move {
   // Start off-screen (bottom-right)
   0% {
@@ -140,6 +149,14 @@
     .click-pulse {
       animation: pin-click-pulse 2.5s ease-out infinite;
     }
+  }
+}
+
+// Same resting frames as the puzzle step above.
+@media (prefers-reduced-motion: reduce) {
+  .extension-pin-target .click-indicator .pointer-icon,
+  .extension-pin-target .click-indicator .click-pulse {
+    animation: none;
   }
 }
 

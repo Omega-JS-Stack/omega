@@ -62,6 +62,22 @@ describe('icon-core', () => {
     assert.strictEqual(parse('btn btn-primary'), null);
   });
 
+  it('#183: every size class the shared sheet ships parses as a modifier, not a name', () => {
+    const parse = (classes) => core.parseIconClasses(classes.split(' '));
+
+    // The literal roster of @omega.js/web's icon sheet $fa-sizes map, which
+    // packages/web/test/icons.test.js pins from the sheet side, so a size
+    // added to one side without the other fails a test either way. A size
+    // missing here reads as an icon NAME and the renderer hunts for a glyph
+    // called '4xl' instead of sizing the real one.
+    const SIZES = ['2xs', 'xs', 'sm', 'base', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl'];
+
+    for (const size of SIZES) {
+      assert.deepStrictEqual(parse(`fa-solid fa-${size} fa-rocket`), { name: 'rocket', style: 'solid' }, `fa-${size} is a modifier`);
+      assert.strictEqual(parse(`fa-solid fa-${size}`), null, `fa-${size} alone names no icon`);
+    }
+  });
+
   it('candidate order is requested style first, then the brands fallback', () => {
     assert.deepStrictEqual(core.candidateRelPaths('apple', 'solid'), ['solid/apple.svg', 'brands/apple.svg']);
     assert.deepStrictEqual(core.candidateRelPaths('github', 'brands'), ['brands/github.svg']);

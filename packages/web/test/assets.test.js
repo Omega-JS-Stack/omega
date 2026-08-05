@@ -10,12 +10,21 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test } = require('node:test');
+const { after, test } = require('node:test');
 const { buildAssets, purgeCss, resolvePageAsset } = require('../src/assets.js');
 
 const PKG = path.resolve(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
-const OUT = path.join(PKG, '.omega', 'assets-test-out');
+// #182: several tests here clear their out dir mid-run to count freshly built
+// files, so the dir belongs to THIS process. A fixed path let a second suite
+// run (parallel agent, second terminal) wipe the first one's assets mid-flight.
+const OUT = path.join(PKG, '.omega', `assets-test-out-${process.pid}`);
+const ONLY_OUT = path.join(PKG, '.omega', `assets-only-out-${process.pid}`);
+
+after(() => {
+  fs.rmSync(OUT, { recursive: true, force: true });
+  fs.rmSync(ONLY_OUT, { recursive: true, force: true });
+});
 
 /**
  * Run buildAssets for a theme layer chain.
@@ -293,7 +302,7 @@ test('PurgeCSS strips selectors unused by the rendered HTML', async () => {
 });
 
 test('only-half rebuilds (dev watcher narrowing): css writes no js, js writes no css', async () => {
-  const outDir = path.join(PKG, '.omega', 'assets-only-out');
+  const outDir = ONLY_OUT;
   fs.rmSync(outDir, { recursive: true, force: true });
   const themeRoots = [path.join(PKG, 'themes', 'classy')];
   const base = {

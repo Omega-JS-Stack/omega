@@ -72,6 +72,11 @@
       },
       {
         "package": "@omega.js/web",
+        "from": "core/css/core/_custom-font-awesome.scss",
+        "to": "assets/css/core/_fontawesome.scss"
+      },
+      {
+        "package": "@omega.js/web",
         "from": "core/js/core/app-shell.js",
         "to": "assets/js/core/app-shell.js"
       },

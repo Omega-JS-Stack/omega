@@ -79,6 +79,10 @@ own **prod dependency** so the set ships inside the asar.
 
 ## Notes
 
+- **The icon CSS is not desktop's.** The box, the size scale and the
+  `fa-spin`/`fa-bounce`/`fa-beat` utilities ride ONE sheet vendored from
+  @omega.js/web at prepare (see [css.md](css.md#icon-presentation)). Fix icon
+  presentation there, never here.
 - **Unknown names render nothing** — the `<i>` stays empty (marked
   `data-omega-fa`). If you need a fallback, resolve through
   `window.desktop.fontawesome.get()` and swap yourself.

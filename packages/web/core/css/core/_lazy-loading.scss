@@ -52,6 +52,15 @@ img[data-lazy] {
   min-height: 100px; // Default minimum height for loading state
 }
 
+// The loop only slides background-position, and the gradient is twice the box
+// wide, so dropping the animation parks the placeholder on its own band at the
+// default position. No resting state to restate.
+@media (prefers-reduced-motion: reduce) {
+  .lazy-loading {
+    animation: none;
+  }
+}
+
 // Dark theme overrides
 [data-bs-theme="dark"] .lazy-loading {
   --lazy-color-1: rgba(255, 255, 255, 0.03);

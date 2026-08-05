@@ -40,6 +40,15 @@
   // display: inline-block;
 }
 
+// Same deal as the lazy-loading shimmer: the loop only slides
+// background-position across a gradient twice the box wide, so the parked
+// skeleton keeps its authored fill at the default position.
+@media (prefers-reduced-motion: reduce) {
+  .omega-binding-skeleton {
+    animation: none;
+  }
+}
+
 // Dark theme overrides
 [data-bs-theme="dark"] .omega-binding-skeleton {
   --binding-color-1: rgba(255, 255, 255, 0.03);

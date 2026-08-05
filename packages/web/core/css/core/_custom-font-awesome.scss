@@ -1,5 +1,11 @@
 // Core Font Awesome Customizations
 // Extended icon sizing and display utilities
+//
+// This sheet is the ONE home of icon presentation across every target (#183).
+// It is deliberately self-contained (plain css, its own $fa-sizes map, its own
+// keyframes) so @omega.js/desktop and @omega.js/extension can vendor it
+// verbatim at prepare through their package.json `omega.vendorAssets`, the same
+// channel the tokens and shell sheets ride. Anything web-only stays out.
 
 // ============================================
 // Size Scale Configuration
@@ -95,8 +101,45 @@ i[data-omega-fa] {
   transform-origin: center;
 }
 
+// fa-bounce and fa-beat are in core markup already (core/_includes/core/body.html
+// alerts), so they get the same deal as fa-spin: Font Awesome's utility name,
+// our own minimal keyframes under that same name. FA's own keyframes are built
+// on a stack of custom-property knobs we do not ship, and copying them would
+// drag that config surface in for two alert icons.
+@keyframes fa-bounce {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-0.25em);
+  }
+}
+
+.fa-bounce {
+  animation: fa-bounce 1s ease-in-out infinite;
+}
+
+@keyframes fa-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+.fa-beat {
+  animation: fa-beat 1s ease-in-out infinite;
+  transform-origin: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fa-spin {
+  .fa-spin,
+  .fa-bounce,
+  .fa-beat {
     animation: none;
   }
 }

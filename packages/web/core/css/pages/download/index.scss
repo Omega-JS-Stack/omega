@@ -94,6 +94,16 @@
   }
 }
 
+// Parked, the pointer keeps its untransformed position, which is the frame the
+// loop spends most of its time on (cursor arrived on the file), and the pulse
+// ring keeps its authored opacity: 0. The illustration reads as a still.
+@media (prefers-reduced-motion: reduce) {
+  .click-indicator .pointer-icon,
+  .click-indicator .click-pulse {
+    animation: none;
+  }
+}
+
 @keyframes mouse-move {
   0% {
     transform: translate(60px, -20px);
@@ -158,6 +168,15 @@
     background: linear-gradient(90deg, var(--omega-accent) 0%, var(--omega-accent-hover) 100%);
     border-radius: var(--omega-radius-pill);
     animation: install-progress 3s ease-in-out infinite;
+  }
+}
+
+// The fill authors no width, so dropping the loop hands the block its auto
+// width: the full bar, which is the loop's own end frame and the honest static
+// reading of an install illustration.
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar-container .progress-fill {
+    animation: none;
   }
 }
 
@@ -236,6 +255,15 @@
   }
 }
 
+// The drag rests at its untransformed origin (the app icon, before the drag),
+// and the pulse ring keeps its authored opacity: 0.
+@media (prefers-reduced-motion: reduce) {
+  .drag-indicator .pointer-icon,
+  .drag-indicator .click-pulse {
+    animation: none;
+  }
+}
+
 @keyframes mouse-drag {
   0%, 10% {
     transform: translate(0, 0);
@@ -282,6 +310,15 @@
 
   .click-pulse {
     animation: folder-click-pulse 3s ease-in-out infinite;
+  }
+}
+
+// Same resting frames as the click indicator above: pointer on target, ring
+// invisible at its authored opacity.
+@media (prefers-reduced-motion: reduce) {
+  .folder-click-target .pointer-icon,
+  .folder-click-target .click-pulse {
+    animation: none;
   }
 }
 
