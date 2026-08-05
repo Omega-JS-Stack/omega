@@ -4,7 +4,7 @@ service cloud.firestore {
     // Custom rules
     // ...
 
-    // ========== OMEGA Rules (v6.2.0) ==========
+    // ========== OMEGA Rules (v1.0.0) ==========
     // Lock by default
     match /{document=**} {
       allow read, write: if isAdmin();

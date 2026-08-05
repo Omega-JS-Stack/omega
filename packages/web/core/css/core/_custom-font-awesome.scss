@@ -24,12 +24,42 @@ $fa-sizes: (
 // Base Icon Styles
 // ============================================
 
-.fa {
+// A rendered icon is a SQUARE, glyph-centered box (#180). Both renderers
+// stamp their own hook on the <i> they fill: the runtime one sets
+// data-omega-fa (@omega.js/client icon-renderer), the build-time one emits
+// class="fa" (@omega.js/template-kit omega_icon) — never a class an author
+// has to remember. Without the box the 1em svg sits on the text baseline
+// and any transform orbits a point below the glyph (the spin wobble).
+// Both branches qualify with `i` so the box outranks the vertical-align in
+// the size classes below.
+i.fa,
+i[data-omega-fa] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em; // Font Awesome's own baseline offset
+  flex-shrink: 0;
+
   svg, img {
     width: 1em;
     height: 1em;
-    vertical-align: -0.125em;
   }
+}
+
+// The child sizing itself stays UNQUALIFIED, exactly as it was before the box
+// arrived: non-`i` markup wears `.fa` as a plain wrapper (the account page's
+// provider logos are `div.fa fa-3xl`) and still owes its glyph 1em. The offset
+// rides along for that case only — inside the flex box above a flex item
+// ignores vertical-align.
+.fa svg,
+.fa img,
+[data-omega-fa] svg,
+[data-omega-fa] img {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
 }
 
 // ============================================
@@ -41,5 +71,32 @@ $fa-sizes: (
     font-size: $size;
     line-height: 1;
     vertical-align: baseline;
+  }
+}
+
+// ============================================
+// Animation
+// ============================================
+
+// Font Awesome's own utility name and its own keyframes name, so the muscle
+// memory (and the icon-core modifier list, which already skips `fa-spin`)
+// carries over. The square box above is what makes the turn centered.
+@keyframes fa-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fa-spin {
+  animation: fa-spin 1s linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-spin {
+    animation: none;
   }
 }

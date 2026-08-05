@@ -179,9 +179,5 @@
     'plan-action-btn',
     'platform-instructions',
     'pointer-icon',
-
-    // Pre-existing oddity: a deliberately-parked padding class in the
-    // account layout (underscore keeps it out of the css); pinned as-is.
-    '_px-3',
   ],
 }

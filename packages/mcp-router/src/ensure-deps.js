@@ -6,10 +6,14 @@
  * installs the package's own dependencies once — a no-op whenever they
  * already resolve (dev checkouts with the monorepo installed, every launch
  * after the first).
+ *
+ * This file runs BEFORE node_modules exists, so everything it requires — and
+ * everything those files require — must stay builtin-only.
  */
 
 const path = require('node:path');
 
+const { resolveBin } = require('./lib/env.js');
 const { log } = require('./lib/log.js');
 
 const PKG_ROOT = path.join(__dirname, '..');
@@ -36,11 +40,17 @@ function ensureDeps(options = {}) {
     log('info', 'first launch from a bare checkout — installing dependencies…');
   }
 
+  // The bare name would need a PATH the router may not have (same reason the
+  // spawn shapes resolve theirs); win32 still needs the shell to run a .cmd,
+  // and quoting keeps the default `C:\Program Files\nodejs` install working.
+  const shell = process.platform === 'win32';
+  const npm = resolveBin('npm');
+
   // stdout stays 'ignore' — this process's stdout is the MCP wire.
-  const result = spawnSync('npm', ['install', '--omit=dev', '--no-fund', '--no-audit'], {
+  const result = spawnSync(shell ? `"${npm}"` : npm, ['install', '--omit=dev', '--no-fund', '--no-audit'], {
     cwd: pkgRoot,
     stdio: ['ignore', 'ignore', 'inherit'],
-    shell: process.platform === 'win32',
+    shell,
   });
 
   if (result.status !== 0) {

@@ -89,6 +89,31 @@ compose with weights exactly like FA markup: `fa-sharp fa-light fa-play`
 duotone-solid). Style validation is by path-safe shape, not a whitelist —
 future FA families work with zero framework changes.
 
+## Animation (web)
+
+`.fa-spin` turns an icon one full rotation a second, linear, forever. It
+is Font Awesome's own class name, so the muscle memory carries over, and
+it rides either kind of icon:
+
+```html
+<i class="fa-solid fa-spinner fa-spin"></i>   <!-- rendered at runtime -->
+{% omega_icon spinner, "fa-spin" %}           <!-- inlined at build -->
+```
+
+Under `prefers-reduced-motion: reduce` the animation is dropped and the
+icon parks, the same deal every looping effect in the motion library
+makes.
+
+The rendered icon `<i>` is a square `1em` box with the glyph centered in
+it, so a spin (or any other transform) turns about the glyph's own center
+instead of a point down on the text baseline. Nothing to hand-fix, and no
+class to remember: the box keys on the hooks the renderers stamp
+themselves.
+
+Both live in `@omega.js/web`'s own icon sheet: desktop ships its own sheet
+without the box or `.fa-spin`, and extension ships none, so neither surface
+carries these rules yet (#183 tracks the parity).
+
 ## When to use what (web)
 
 - **`{% omega_icon rocket %}`** — static template content: inlined at build,
@@ -108,8 +133,11 @@ future FA families work with zero framework changes.
 - `packages/desktop/src/test/suites/{main,renderer}/fontawesome.test.js` —
   the real-DOM proof of the SHARED renderer (insert, re-class, clear,
   Pro-adaptive assertions) + main's root chain and IPC sanitization.
-- `packages/devkit/test/fontawesome-roots.test.js` + `test/icons.test.js` —
-  chain resolution + emission merge (the shared build-side impl).
+- `packages/devkit/test/fontawesome-roots.test.js` +
+  `packages/devkit/test/icons.test.js` — chain resolution + emission merge
+  (the shared build-side impl).
+- `packages/web/test/icons.test.js` — the compiled icon sheet: the square
+  box on both renderer hooks, `.fa-spin`, its reduced-motion branch.
 - Live consumer proof: the playground extension build emits the full
   merged set (Pro included via the brand `.env`) and compiles the watcher
   into all four page bundles.

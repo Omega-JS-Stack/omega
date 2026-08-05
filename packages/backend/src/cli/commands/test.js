@@ -9,6 +9,8 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { readPortsFile } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
+// The rules SCHEMA version — setup.js owns it, this is the second generator.
+const { RULES_VERSION } = require('./setup');
 
 class TestCommand extends BaseCommand {
   async execute() {
@@ -274,7 +276,7 @@ class TestCommand extends BaseCommand {
       client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/fixture%40${projectId}.iam.gserviceaccount.com`,
     };
     try {
-      fs.writeFileSync(saPath, JSON.stringify(serviceAccount, null, 2) + '\n');
+      fs.writeFileSync(saPath, `${JSON.stringify(serviceAccount, null, 2)}\n`);
     } catch (e) {
       this.logWarning(`Could not write fixture service-account.json: ${e.message}`);
     }
@@ -290,8 +292,7 @@ class TestCommand extends BaseCommand {
    */
   ensureFixtureRules(fixture) {
     const template = jetpack.read(path.resolve(__dirname, '..', '..', '..', 'templates', 'firestore.rules'));
-    const version = require('../../../package.json').version;
-    jetpack.write(path.join(fixture, 'firestore.rules'), template.replace('(v0.0.0)', `(v${version})`));
+    jetpack.write(path.join(fixture, 'firestore.rules'), template.replace('(v0.0.0)', `(v${RULES_VERSION})`));
   }
 
   /**

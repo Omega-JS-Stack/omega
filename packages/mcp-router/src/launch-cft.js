@@ -17,6 +17,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const { resolveBin } = require('./lib/env.js');
 const { log } = require('./lib/log.js');
 
 const MCP_PACKAGE = 'chrome-devtools-mcp@1.4.0';
@@ -158,8 +159,11 @@ function main(options = {}) {
   }
 
   // win32 has no directly spawnable `npx` — it is npx.cmd, which Node only
-  // runs through a shell.
-  const child = spawnFn('npx', buildArgs(executable, env), { stdio: 'inherit', env, shell: process.platform === 'win32' });
+  // runs through a shell; quoting keeps the resolved absolute path working
+  // from the default `C:\Program Files\nodejs` install.
+  const shell = process.platform === 'win32';
+  const npx = resolveBin('npx');
+  const child = spawnFn(shell ? `"${npx}"` : npx, buildArgs(executable, env), { stdio: 'inherit', env, shell });
   child.on('exit', (code, signal) => exit(signal ? 1 : code ?? 0));
   return undefined;
 }

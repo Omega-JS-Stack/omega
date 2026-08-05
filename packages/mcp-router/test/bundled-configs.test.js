@@ -41,11 +41,21 @@ for (const name of EXPECTED) {
   });
 }
 
-test('the electron upstream leaves its shell default for the shell to expand', () => {
+test('the electron upstream carries its port default as a placeholder the router resolves', () => {
   const upstream = registry.loadUpstream('chrome-devtools-electron', BUNDLED_ONLY);
-  assert.equal(upstream.command, 'sh');
-  assert.match(upstream.args[1], /\$\{OMEGA_CDP_PORT:-9222\}/);
-  assert.equal(upstream.args[1].includes('EM_CDP_PORT'), false, 'the legacy port fallback is gone');
+  assert.equal(upstream.command, 'npx');
+  const browserUrl = upstream.args.find((arg) => arg.startsWith('--browserUrl='));
+  assert.equal(browserUrl, '--browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222}');
+  assert.equal(upstream.args.join(' ').includes('EM_CDP_PORT'), false, 'the legacy port fallback is gone');
+});
+
+test('no bundled upstream launches through a shell', () => {
+  // A shell command bypasses resolveBin entirely (Omega-JS-Stack/omega#178) and
+  // hands the child's argv to a word-splitter nobody audits.
+  for (const name of EXPECTED) {
+    const upstream = registry.loadUpstream(name, BUNDLED_ONLY);
+    assert.equal(['sh', 'bash', 'zsh', 'cmd', 'cmd.exe', 'powershell'].includes(upstream.command), false, `${name} launches through a shell`);
+  }
 });
 
 test('the launcher upstreams point at scripts this package ships, via the reserved placeholder', () => {

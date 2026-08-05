@@ -82,7 +82,7 @@ Registering the router with a client is not this CLI's job: the omega Claude plu
 
 ### Placeholders
 
-An upstream's `command`, `args`, and `env` may carry `${NAME}` placeholders, resolved from `~/.omega/mcp-router/.env` first and then the environment — so a token lives in the `.env`, never in a config file. **Only the strict `${NAME}` form is substituted**: shell forms like `${VAR:-default}` inside an `sh -c` string pass through untouched for the shell to expand at spawn time.
+An upstream's `command`, `args`, and `env` may carry `${NAME}` placeholders, resolved from `~/.omega/mcp-router/.env` first and then the environment — so a token lives in the `.env`, never in a config file. **`${NAME:-default}` takes the same lookups** and falls back to the literal default when they all miss, so an optional value needs no `sh -c` wrapper around the command; other shell forms (`${VAR:+…}`) pass through untouched.
 
 One name is reserved: **`${MCP_ROUTER_ROOT}`** always resolves to this package's root directory, before any `.env` or environment lookup. It is how a bundled upstream points at a launcher script the package ships with, wherever the package is installed.
 

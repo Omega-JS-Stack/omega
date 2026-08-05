@@ -11,6 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { findChromeForTesting, buildArgs, byVersionDesc, main } = require('../src/launch-cft.js');
+const { resolveBin } = require('../src/lib/env.js');
 
 // One version directory per platform shape, exactly as puppeteer lays it out.
 const SHAPES = {
@@ -105,7 +106,7 @@ test('OMEGA_EXTENSION_PATH adds the load-extension pair', () => {
   ]);
 });
 
-test('main spawns npx with the built argv and forwards the child exit code', () => {
+test('main spawns the resolved npx with the built argv and forwards the child exit code', () => {
   const calls = [];
   const exits = [];
   main({
@@ -118,7 +119,8 @@ test('main spawns npx with the built argv and forwards the child exit code', () 
     },
   });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, 'npx');
+  // win32 spawns through a shell, where the absolute path needs its quotes.
+  assert.equal(calls[0].command, process.platform === 'win32' ? `"${resolveBin('npx')}"` : resolveBin('npx'));
   assert.equal(calls[0].options.stdio, 'inherit');
   assert.deepEqual(calls[0].args, buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/ext' }));
   assert.deepEqual(exits, [3]);

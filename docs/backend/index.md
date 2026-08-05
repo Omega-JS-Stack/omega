@@ -88,6 +88,8 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `version` | Print @omega.js/backend version |
 | `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1. The listing is GENERATED from the same command table the dispatcher reads (`src/cli/command-table.js`) — it cannot drift from what actually dispatches |
 
+`setup` also regenerates the OMEGA-managed block in `firestore.rules` and `database.rules.json`; the `(vX.Y.Z)` stamp in that block's header marker is `RULES_VERSION` in `src/cli/commands/setup.js`, a rules SCHEMA version that bumps only when generated rule semantics change (never the package version).
+
 See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.md) and [docs/cli-logs.md](../../packages/backend/docs/cli-logs.md) for full flag references.
 
 ## Dependency Resolution

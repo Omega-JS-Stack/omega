@@ -10,12 +10,9 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
-const { buildSite } = require('../src/build.js');
+const { buildTheme, themeOutDir } = require('./lib/contract-build.js');
 
 const PKG = path.resolve(__dirname, '..');
-const ROOT = path.resolve(PKG, '..', '..');
-const SITE = path.join(__dirname, 'fixtures', 'contract-site');
-const siteData = JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8'));
 
 const THEMES = ['classy', 'neobrutalism', 'newsflash'];
 const builds = {};
@@ -27,19 +24,16 @@ const builds = {};
  * @returns {string}
  */
 function page(theme, rel) {
-  return fs.readFileSync(path.join(PKG, '.omega', `contract-${theme}`, rel), 'utf8');
+  return fs.readFileSync(path.join(themeOutDir(theme), rel), 'utf8');
 }
 
+// One process per theme (#179): Eleventy's layout cache is a module singleton
+// that outlives the instance, so same-process theme builds share the FIRST
+// theme's layouts. See test/lib/contract-build.js.
 before(async () => {
-  for (const theme of THEMES) {
-    builds[theme] = await buildSite({
-      consumerDir: SITE,
-      siteData: { ...siteData, theme: { id: theme } },
-      outDir: path.join(PKG, '.omega', `contract-${theme}`),
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      skipPurge: true, // purge is pinned in assets.test.js; contract pins rendering
-    });
-  }
+  await Promise.all(THEMES.map(async (theme) => {
+    builds[theme] = await buildTheme(theme);
+  }));
 });
 
 test('every theme builds the full default page set for a bare consumer', () => {
@@ -63,13 +57,33 @@ test('every theme builds the full default page set for a bare consumer', () => {
   );
 });
 
+// #179: every assertion here used to be theme-agnostic, so the suite stayed
+// green while the neobrutalism and newsflash outputs rendered CLASSY pages:
+// Eleventy's module-singleton layout cache served the first build's layouts to
+// the other two. Each homepage carries its own layout's signature markup, so a
+// returning leak fails here instead of shipping wrong fixtures.
+test('#179: every theme renders its OWN homepage layout (no cross-build layout-cache leak)', () => {
+  const markers = {
+    classy: 'omega-hero', // no own index layout: the base marketing/hero section
+    neobrutalism: 'neo-hero', // its own index layout
+    newsflash: 'newsflash-hero', // its own index layout
+  };
+  for (const theme of THEMES) {
+    const html = page(theme, 'index.html');
+    assert.ok(html.includes(markers[theme]), `${theme}: homepage missing its own markup (${markers[theme]})`);
+    for (const other of THEMES.filter((id) => id !== theme)) {
+      assert.ok(!html.includes(markers[other]), `${theme}: homepage rendered ${other} markup (${markers[other]})`);
+    }
+  }
+});
+
 test('key default pages land at their real URLs', () => {
   for (const rel of [
     '404.html', 'about.html', 'pricing.html', 'signin.html',
     'contact.html', 'blog.html', 'terms.html', 'team.html',
     'careers.html', 'payment/checkout.html', 'admin.html', 'dashboard/account.html',
   ]) {
-    assert.ok(fs.existsSync(path.join(PKG, '.omega', 'contract-classy', rel)), `classy builds ${rel}`);
+    assert.ok(fs.existsSync(path.join(themeOutDir('classy'), rel)), `classy builds ${rel}`);
   }
 });
 
@@ -121,7 +135,7 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
 // tags every unresolved name onto its fallback triangle.
 test('#86: no stock page ships a missing-icon marker', () => {
   for (const theme of THEMES) {
-    const outDir = path.join(PKG, '.omega', `contract-${theme}`);
+    const outDir = themeOutDir(theme);
     const misses = [];
     for (const entry of fs.readdirSync(outDir, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.html')) continue;
@@ -165,7 +179,7 @@ test('dispersal-era section markers are DEAD: no packaged template carries `### 
 
 test('no unresolved Liquid syntax leaks into any built page', () => {
   for (const theme of THEMES) {
-    const outDir = path.join(PKG, '.omega', `contract-${theme}`);
+    const outDir = themeOutDir(theme);
     const leaks = [];
     for (const entry of fs.readdirSync(outDir, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.html')) continue;
@@ -185,7 +199,7 @@ test('#16: no LEGACY click-trigger class survives in built output (html/css/js)'
   // class no longer has a handler behind it.
   const legacy = ['auth-signout-btn', 'auth-signin-btn', 'uj-password-toggle'];
   for (const theme of THEMES) {
-    const outDir = path.join(PKG, '.omega', `contract-${theme}`);
+    const outDir = themeOutDir(theme);
     const offenders = [];
     for (const entry of fs.readdirSync(outDir, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !/\.(html|css|js)$/.test(entry.name)) continue;

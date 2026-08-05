@@ -131,6 +131,12 @@
   animation: flex 1.5s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animation-flex {
+    animation: none;
+  }
+}
+
 // ============================================
 // Movement Animations
 // ============================================
@@ -148,6 +154,12 @@
   animation: bounce 3s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animation-bounce {
+    animation: none;
+  }
+}
+
 @keyframes pulse-right {
   0%, 100% {
     transform: translateX(0);
@@ -161,6 +173,14 @@
 
 .animation-pulse-right {
   animation: pulse-right 1.5s ease-in-out infinite;
+}
+
+// The loop rests half-faded; parked, the element keeps its own opacity, which
+// is the readable state for a cue that no longer moves.
+@media (prefers-reduced-motion: reduce) {
+  .animation-pulse-right {
+    animation: none;
+  }
 }
 
 // ============================================
@@ -178,6 +198,12 @@
 
 .animation-spin {
   animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animation-spin {
+    animation: none;
+  }
 }
 
 @keyframes wiggle {
@@ -207,6 +233,12 @@
   animation: wiggle 1.5s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animation-wiggle {
+    animation: none;
+  }
+}
+
 // ============================================
 // Effect Animations
 // ============================================
@@ -219,6 +251,12 @@
 
 .animation-pulse {
   animation: pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animation-pulse {
+    animation: none;
+  }
 }
 
 @keyframes shimmer {
@@ -235,6 +273,17 @@
 
 .animation-shimmer {
   animation: shimmer 3s ease-out infinite alternate;
+}
+
+// Only utility whose park needs a resting state: the loop drives
+// background-position, so dropping it hands the element back its authored
+// position. Restate the loop's own rest frame so an oversized gradient parks
+// on its band instead of off it.
+@media (prefers-reduced-motion: reduce) {
+  .animation-shimmer {
+    animation: none;
+    background-position: 0 50%;
+  }
 }
 
 @keyframes gradient-shimmer {

@@ -2,7 +2,7 @@
 
 The one MCP endpoint an omega session pays for. A single stdio MCP server that proxies many upstream MCP servers, serves their tool schemas from a disk cache, and spawns an upstream's child process only when a tool call actually needs it.
 
-**Published package, latched private** until the publish proving checkpoint ([docs/shared/publishing.md](../shared/publishing.md)). Provenance: the engine graduated from a personal dotfiles checkout ([#75](https://github.com/Omega-JS-Stack/omega/issues/75)) and was depersonalized on the way in — no absolute paths, `npx`/`node` from PATH, `OMEGA_*` env names.
+**Published package, latched private** until the publish proving checkpoint ([docs/shared/publishing.md](../shared/publishing.md)). Provenance: the engine graduated from a personal dotfiles checkout ([#75](https://github.com/Omega-JS-Stack/omega/issues/75)) and was depersonalized on the way in — no absolute paths in a config, bare `npx`/`node` commands, `OMEGA_*` env names. A bare `node`/`npm`/`npx` is resolved at spawn time to the absolute binary beside the router's own node (`process.execPath`); PATH is only the fallback when no sibling exists.
 
 ## Why a router at all
 
@@ -18,7 +18,7 @@ The router collapses that to one declaration:
 
 ```
 client ──stdio──> router ──┬──> chrome-devtools           (npx chrome-devtools-mcp, isolated)
-                           ├──> chrome-devtools-electron  (sh -c, attaches to $OMEGA_CDP_PORT)
+                           ├──> chrome-devtools-electron  (npx chrome-devtools-mcp, attaches to $OMEGA_CDP_PORT)
                            ├──> chrome-devtools-extension (node src/launch-cft.js)
                            ├──> omega-extension           (node src/launch-omega-extension.js)
                            └──> …your overlay upstreams
@@ -30,7 +30,7 @@ client ──stdio──> router ──┬──> chrome-devtools           (npx
 | [src/cli.js](../../packages/mcp-router/src/cli.js) | `omega-mcp` — list/enable/disable/add/remove/refresh, all writing the overlay |
 | [src/lib/oneshot.js](../../packages/mcp-router/src/lib/oneshot.js) | The connect deadline every spawn runs under, and the one-shot spawn-connect-list-close both refresh surfaces share, plus the `MCP_ROUTER_SPAWN_TIMEOUT_MS` seam |
 | [src/lib/registry.js](../../packages/mcp-router/src/lib/registry.js) | The layered registry: bundled + overlay, the shallow merge, the overlay-only write path |
-| [src/lib/env.js](../../packages/mcp-router/src/lib/env.js) | `.env` loading and `${NAME}` interpolation, including the reserved `${MCP_ROUTER_ROOT}` |
+| [src/lib/env.js](../../packages/mcp-router/src/lib/env.js) | `.env` loading, `${NAME}` / `${NAME:-default}` interpolation including the reserved `${MCP_ROUTER_ROOT}`, and the bare `node`/`npm`/`npx` bin resolution every spawn shape goes through |
 | [src/lib/paths.js](../../packages/mcp-router/src/lib/paths.js) | Where the layers are, plus the two `MCP_ROUTER_*` env seams |
 | [src/launch-cft.js](../../packages/mcp-router/src/launch-cft.js) | Finds the newest Chrome for Testing in puppeteer's cache (platform-aware) and execs the MCP server against it |
 | [src/launch-omega-extension.js](../../packages/mcp-router/src/launch-omega-extension.js) | Resolves `@omega.js/manager` from its main export and runs its `extension/mcp-server/index.js` |
@@ -53,7 +53,7 @@ A tool-list-changed notification follows each of them, so the client re-lists.
 | Name | Command | Default | Notes |
 |---|---|---|---|
 | `chrome-devtools` | `npx -y chrome-devtools-mcp@1.4.0 --isolated --acceptInsecureCerts --usage-statistics=false` | auto | The session's private Chrome, throwaway profile |
-| `chrome-devtools-electron` | `sh -c "exec npx … --browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222}"` | auto | Attaches to a running omega desktop dev app. The `${VAR:-default}` is the SHELL's — the router deliberately leaves it alone |
+| `chrome-devtools-electron` | `npx -y chrome-devtools-mcp@1.4.0 --browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222} --usage-statistics=false` | auto | Attaches to a running omega desktop dev app. No shell: the router expands the `${NAME:-default}` itself, so the command still goes through bin resolution |
 | `chrome-devtools-extension` | `node ${MCP_ROUTER_ROOT}/src/launch-cft.js` | on-demand | Chrome for Testing + the unpacked extension at `$OMEGA_EXTENSION_PATH`; 34 tools, hence on-demand |
 | `omega-extension` | `node ${MCP_ROUTER_ROOT}/src/launch-omega-extension.js` | auto | The manager's extension automation server |
 
@@ -77,7 +77,7 @@ Bundled defaults inside the package, then the user's overlay at `~/.omega/mcp-ro
 
 Locking guards WAKING, not turning off: `omega-mcp disable` and `omega-mcp remove` stay open on a locked entry, and a schema `refresh` never touches `enabled`. `omega-mcp list` marks a locked upstream `[locked]` and `router__list_upstreams` carries `locked` per row.
 
-Secrets live in `~/.omega/mcp-router/.env` and reach a command as `${NAME}`. Only that strict form is substituted; `${VAR:-default}` and `${VAR:+…}` pass through for a shell to expand. `${MCP_ROUTER_ROOT}` is reserved for the package root and resolves before any lookup.
+Secrets live in `~/.omega/mcp-router/.env` and reach a command as `${NAME}`. `${NAME:-default}` runs the same lookups and takes the literal default when they all miss, which is how an upstream carries an optional value without a shell wrapper; other shell forms (`${VAR:+…}`) pass through untouched. `${MCP_ROUTER_ROOT}` is reserved for the package root and resolves before any lookup.
 
 Three seams exist for tests and power users: `MCP_ROUTER_SERVERS_DIR` (overlay servers dir), `MCP_ROUTER_ENV_FILE` (the `.env`), and `MCP_ROUTER_SPAWN_TIMEOUT_MS` (the spawn deadline, cold spawns and refresh alike, default 30000).
 

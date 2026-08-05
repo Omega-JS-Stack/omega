@@ -17,6 +17,12 @@ const { omegaAllRulesRegex } = require('./setup-tests/helpers.js');
 // is Firebase's to provide, the laptop only has to meet the floor.
 const frameworkPackage = require('../../../package.json');
 
+// The version stamped into every generated rules block's open marker. This is
+// the rules SCHEMA version and bumps ONLY when the generated rule semantics
+// change, never with the package version. Tying it to the package version made
+// every release rewrite every consumer's rules files and dirty their tree.
+const RULES_VERSION = '1.0.0';
+
 class SetupCommand extends BaseCommand {
   async execute() {
     const self = this.main;
@@ -105,8 +111,8 @@ class SetupCommand extends BaseCommand {
 
     // Load the rules files (reads from @omega.js/backend's own templates/, not consumer files)
     this.getRulesFile();
-    // Version rides in the block's open marker: `// ========== OMEGA Rules (v6.2.0) ==========`
-    self.default.rulesVersionRegex = new RegExp(`========== OMEGA Rules \\(v${self.default.version.replace(/\./g, '\\.')}\\) ==========`);
+    // The rules SCHEMA version rides in the block's open marker: `// ========== OMEGA Rules (v1.0.0) ==========`
+    self.default.rulesVersionRegex = new RegExp(`========== OMEGA Rules \\(v${RULES_VERSION.replace(/\./g, '\\.')}\\) ==========`);
 
     // Resolve project info — safe now, scaffoldConfigs guarantees these exist.
     self.projectId = self.firebaseRC.projects.default;
@@ -155,10 +161,10 @@ class SetupCommand extends BaseCommand {
 
   getRulesFile() {
     const self = this.main;
-    self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('(v0.0.0)', `(v${self.default.version})`);
+    self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('(v0.0.0)', `(v${RULES_VERSION})`);
     self.default.firestoreRulesCore = self.default.firestoreRulesWhole.match(omegaAllRulesRegex)[0];
 
-    self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('(v0.0.0)', `(v${self.default.version})`);
+    self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('(v0.0.0)', `(v${RULES_VERSION})`);
     self.default.databaseRulesCore = self.default.databaseRulesWhole.match(omegaAllRulesRegex)[0];
   }
 
@@ -446,3 +452,4 @@ function hasContent(object) {
 }
 
 module.exports = SetupCommand;
+module.exports.RULES_VERSION = RULES_VERSION;

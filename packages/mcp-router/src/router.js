@@ -60,7 +60,7 @@ const spawnUpstream = async (name) => {
   const upstream = upstreams[name];
   if (!upstream) throw new Error(`Unknown upstream: ${name}`);
 
-  const spawn = resolveSpawn(upstream);
+  const spawn = resolveSpawn(upstream, session[name].envOverride || {});
   const transport = new StdioClientTransport({
     command: spawn.command,
     args: spawn.args,
@@ -269,7 +269,7 @@ const callMetaTool = async (name, args) => {
       // client). The helper is the same one `omega-mcp refresh` runs, so both
       // surfaces carry the same deadline, read budget, and failure cleanup; the
       // outer catch answers the caller.
-      const spawn = resolveSpawn(upstream);
+      const spawn = resolveSpawn(upstream, session[target].envOverride || {});
       const tools = await listToolsOnce({
         command: spawn.command,
         args: spawn.args,

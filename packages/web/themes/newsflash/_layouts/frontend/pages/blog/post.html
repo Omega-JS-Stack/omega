@@ -54,7 +54,7 @@ newsletter:
 {% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
 
 <!-- Article Header & Content -->
-<article class="pt-8"{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
+<article{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
   <div class="container">
     <!-- Article head — centered editorial opening -->
     <div class="row justify-content-center">
