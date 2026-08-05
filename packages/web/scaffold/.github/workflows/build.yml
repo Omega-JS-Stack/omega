@@ -20,6 +20,9 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   NODE_VERSION: '{{ versions.node }}'
   NODE_ENV: 'production'
+  # Generated from the brand's .env cascade by `omega setup` — one line per
+  # published Actions secret. Regenerated every setup; edit .env, not this.
+  {{ githubSecrets }}
 
 jobs:
   build:

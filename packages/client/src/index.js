@@ -787,37 +787,17 @@ class Manager {
     }
 
     try {
-      // Try new path first, then fallback to legacy path
-      const paths = ['/build.json', '/@output/build/build.json'];
-      let data = null;
-      let response = null;
-
-      for (const path of paths) {
-        try {
-          response = await fetch(`${path}?cb=${Date.now()}`);
-          if (response.ok) {
-            data = await response.json();
-            break;
-          }
-        } catch (e) {
-          // Continue to next path
-        }
+      const response = await fetch(`/build.json?cb=${Date.now()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch build.json (${response.status})`);
       }
 
-      if (!data) {
-        throw new Error('Failed to fetch build.json from any path');
-      }
-
-      // Extract timestamp - support both new format (data.timestamp) and legacy format (data['npm-build'].timestamp)
-      let buildTimeLive;
-      if (data.timestamp) {
-        buildTimeLive = new Date(data.timestamp);
-      } else if (data?.['npm-build']?.timestamp) {
-        buildTimeLive = new Date(data['npm-build'].timestamp);
-      } else {
+      const data = await response.json();
+      if (!data.timestamp) {
         throw new Error('No timestamp found in build.json');
       }
 
+      const buildTimeLive = new Date(data.timestamp);
       const buildTimeCurrent = new Date(this.config.buildTime);
 
       // Add 1 hour to current build time to account for npm build process

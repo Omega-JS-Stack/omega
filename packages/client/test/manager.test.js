@@ -210,4 +210,39 @@ describe('Dev ports (N7)', () => {
     assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5002');
     assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
   });
+
+  it('should version-check /build.json only — the retired npm-build shape carries no timestamp (#148)', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'production',
+      buildTime: '2020-01-01T00:00:00.000Z',
+    });
+
+    const urls = [];
+    const originalFetch = global.fetch;
+    const originalReload = global.window.location.reload;
+    let reloads = 0;
+    global.window.location.reload = () => { reloads++; };
+
+    try {
+      // The retired shape: fetched, parsed, and rejected — no /@output/ probe
+      global.fetch = async (url) => {
+        urls.push(url);
+        return { ok: true, json: async () => ({ 'npm-build': { timestamp: new Date(Date.now() + 86400000).toISOString() } }) };
+      };
+      await Manager._checkVersion();
+      assert.strictEqual(urls.length, 1, 'exactly one path is probed');
+      assert.ok(urls[0].startsWith('/build.json?cb='), '/build.json is the one path');
+      assert.strictEqual(reloads, 0, 'the retired key never reloads the page');
+
+      // The current shape: a newer timestamp reloads
+      global.fetch = async () => ({ ok: true, json: async () => ({ timestamp: new Date(Date.now() + 86400000).toISOString() }) });
+      await Manager._checkVersion();
+      assert.strictEqual(reloads, 1, 'a newer build.json timestamp reloads');
+    } finally {
+      global.fetch = originalFetch;
+      global.window.location.reload = originalReload;
+    }
+  });
 });

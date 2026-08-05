@@ -1,5 +1,5 @@
 /**
- * `omega-manager onboard` — the brand-creation wizard: collect the brand's
+ * `omega onboard` — the brand-creation wizard: collect the brand's
  * identity (flags win, prompts fill the gaps in a TTY, derivation covers the
  * rest), scaffold the plan-§0 brand-monorepo skeleton, prove the config
  * loads, then optionally hand off to manage.
@@ -332,8 +332,9 @@ function ensureGitRepo(brandRoot, brandName) {
 /** Run manage in the new brand exactly as a user would — a real child process. */
 function spawnManage(brandRoot) {
   return new Promise((resolve) => {
-    const bin = path.join(__dirname, '..', 'bin', 'omega-manager');
-    const child = spawn(process.execPath, [bin], { cwd: brandRoot, stdio: 'inherit' });
+    // cli-run.js self-executes when spawned as main (no separate bin).
+    const entry = path.join(__dirname, 'cli-run.js');
+    const child = spawn(process.execPath, [entry], { cwd: brandRoot, stdio: 'inherit' });
     child.on('close', (code) => resolve(code ?? 1));
     child.on('error', () => resolve(1));
   });

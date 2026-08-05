@@ -1,9 +1,10 @@
 /**
- * run() — the omega-manager bin body, shared by bin/omega-manager and the
- * omega-bin brand-root dispatch ('@omega.js/manager/cli'): at a brand root,
- * every framework's `omega` bin hands over here so brand-level commands
- * (`omega test`, `omega manage`) fan out over apps/* instead of guessing
- * one framework.
+ * run() — the manager CLI body, reached through the omega-bin brand-root
+ * dispatch ('@omega.js/manager/cli'): at a brand root, every framework's
+ * `omega` bin hands over here so brand-level commands (`omega test`,
+ * `omega manage`) fan out over apps/* instead of guessing one framework.
+ * The company orchestrator spawns this file directly as its per-brand
+ * child entry (there is no separate bin).
  */
 // Value-less flags must be declared boolean — otherwise yargs treats the next
 // positional as the flag's VALUE (mirrors the framework bins).
@@ -27,3 +28,5 @@ async function run() {
 }
 
 module.exports = { run, BOOLEAN_FLAGS };
+
+if (require.main === module) run();

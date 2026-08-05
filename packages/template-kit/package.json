@@ -8,6 +8,7 @@
     ".": "./src/index.js",
     "./filters": "./src/filters.js",
     "./tags": "./src/tags.js",
+    "./tags/media": "./src/tags/media.js",
     "./jekyll-compat": "./src/jekyll-compat.js",
     "./register-liquid": "./src/register-liquid.js",
     "./variable-resolver": "./src/variable-resolver.js"

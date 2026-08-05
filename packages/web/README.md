@@ -67,7 +67,12 @@ npx omega migrate --check   # full report (config + codemod preview + lint), zer
 npx omega translate         # translate dist/ into translation.languages (committed cache;
                             #   `omega build` runs it automatically when enabled — see
                             #   docs/shared/translation.md in the Omega repo)
-# audit: explicit not-ported-yet stub (subsystem rides a later checkpoint)
+npx omega audit            # production build → dist/ served on an ephemeral port →
+                           #   Lighthouse on the home page; report-only
+npx omega audit /pricing --min-performance=90
+                           # extra pages as args; --min-<category> arms the gate
+                           #   (performance/accessibility/best-practices/seo) —
+                           #   any score under its minimum exits 1
 
 npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme contract + translate
 ```
@@ -84,8 +89,10 @@ see the harness README for the honest before/after numbers.
 
 | Module | Owns |
 |--------|------|
-| [engine.js](src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, generalized legacy layout aliases, frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
+| [engine.js](src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
 | [collections.js](src/collections.js) | posts / alternatives / team / updates collections + blog taxonomy aggregation (deterministic date-desc, slug tie-break order) |
+| [markdown-images.js](src/markdown-images.js) | Markdown `![alt](src)` renders through template-kit's `buildImageHtml` (the `omega_image` builder — one image-markup SSOT): responsive `<picture>` + lazy placeholder for local raster images, the plain lazy `<img>` lane for external or non-raster sources. `@post/<file>` resolves to `/assets/images/blog/post-<post.id>/<file>`; used off a post it FAILS the build naming the file. Note: feeds embed the rendered (lazy) markup, so feed readers see the placeholder — legacy parity |
+| [limit-collections.js](src/limit-collections.js) | Dev-mode collection sampling (`targets.web.dev.limitCollections`, the jekyll-uj-powertools limit-collections successor): first-N in collection order, or a random sample with `randomize: true`; the sampled-out documents are skipped before render, so they cost no pages, collection entries or taxonomy terms. Development builds only, loud on every build; the config is validated in production too, where nothing is ever sampled |
 | [layouts.js](src/layouts.js) | Layered layout delivery, zero copying: virtual templates (build) / symlink farm (dev, watchable) |
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) — over `collectProviders()`, which keeps every layer that provides a path (what the override map reports as shadowed) |
 | [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/fa/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code — the language→country map stays `@omega.js/template-kit`'s |
@@ -227,9 +234,10 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 - **Blueprint dispatch, plain names** — `layout: blueprint/pricing` →
   (core) blueprint carries the page-type defaults → `layout:
   frontend/pages/pricing` resolves through the theme layers (active wins,
-  base fills). The legacy bracket idiom (`themes/[ site.theme.id ]/…`) and
-  hardcoded `themes/<id>/…` prefixes are ALIASED for every layout in the map
-  — migrated content uses plain names, the B4 codemod rewrites the rest.
+  base fills). Plain names are the ONLY accepted form: the legacy bracket
+  idiom (`themes/[ site.theme.id ]/…`) and hardcoded `themes/<id>/…` prefixes
+  fail the build loudly — the B4 codemod rewrites them at migration
+  (#148 removed the alias table).
 - **Includes layering** — LiquidJS `root:` array over consumer `_includes`
   first, then theme layers, then core — EXISTING dirs only — with
   `jekyllInclude: true` and `cache: true` (without the parsed-template cache,
@@ -430,9 +438,9 @@ original, so build-time markup resolves in dev too.
 2. `{{ }}` inside QUOTED tag args is a silent no-op (upstream Jekyll too) —
    `{% capture %}` hoist.
 3. Include paths must not lead with `/` (resolves outside LiquidJS roots).
-4. Layout values resolve BEFORE preprocessors — legacy bracket layouts are an
-   `addLayoutAlias` table (generalized over the layout map), not a data
-   transform. `layout: none` must be dropped entirely (`null` breaks layout
+4. Layout values resolve BEFORE preprocessors — a legacy bracket layout is a
+   loud missing-layout error (the codemod rewrites it; nothing aliases it).
+   `layout: none` must be dropped entirely (`null` breaks layout
    chains, `none` is a missing-layout error).
 5. Same-process multi-builds need `setUseTemplateCache(false)` (tests only;
    the CLI is per-process).
@@ -472,9 +480,8 @@ latent copies) AND forward in consumer files by the codemod.
 
 `omega verify --against <jekyll-dist>` parity harness (B5 — the per-site
 migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
-is its first job) · audit subsystem port (command exists as an explicit
-not-ported-yet stub — translate shipped in cp96) · UJM-setup extras (CNAME, firebase auth
-handler fetch, GitHub secret publishing, post dedupe) · named css
+is its first job) · the audit's HTML/spelling half (`omega audit` ports the
+Lighthouse pass; the legacy html-validate + spellcheck sweep is still out) · UJM-setup post dedupe · named css
 bundles, full icon set (B-phase pipeline) · engine consumption of
 `targets.web.collections`/`defaults`/`generators` (migrate carries the config;
 custom collections land with the sweet-saucy wave) · dev-loop re-render

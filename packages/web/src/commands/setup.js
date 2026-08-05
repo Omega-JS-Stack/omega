@@ -5,14 +5,17 @@
  *      marker merges for .gitignore/.env/AGENTS.md, omega.json5 seed,
  *      Ruby-free CI workflow). No page copying: default pages are virtual.
  *   3. Sync package.json scripts to the omega commands
+ *   4. Publish the .env cascade's keys as GitHub Actions repo secrets, which
+ *      the workflow block scaffolded in step 2 consumes (--no-secrets opts out)
  *
  * UJM-setup features that arrive with later checkpoints: CNAME generation,
- * firebase auth handler fetch, GitHub secret publishing, post dedupe.
+ * firebase auth handler fetch, post dedupe.
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const { scaffoldDefaults, NODE_VERSION } = require('../scaffold.js');
+const { publishEnvSecrets } = require('../github-secrets.js');
 
 const logger = new Logger('omega:setup');
 const pkg = require('../../package.json');
@@ -56,6 +59,14 @@ module.exports = async function (options) {
   if (JSON.stringify(projectPkg) !== before || !jetpack.exists(projectPkgPath)) {
     jetpack.write(projectPkgPath, `${JSON.stringify(projectPkg, null, 2)}\n`);
     logger.log('Synced package.json scripts');
+  }
+
+  // ---- Publish .env keys as GitHub Actions secrets (#189)
+  // yargs turns `--no-secrets` into `secrets: false`.
+  if (options.secrets === false) {
+    logger.log('Skipping secret publication (--no-secrets)');
+  } else {
+    publishEnvSecrets({ appDir: root, logger });
   }
 
   logger.log('Setup complete');

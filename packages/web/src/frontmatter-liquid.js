@@ -1,8 +1,7 @@
 /**
  * Frontmatter-value Liquid rendering (cached) — the Eleventy home for
  * jekyll-uj-powertools' variable_resolver behavior: corpus frontmatter carries
- * `{{ site.* }}` refs in values ("… - {{ site.brand.name }}") and the legacy
- * bracket hack in layout values (`themes/[ site.theme.id ]/frontend/core/base`).
+ * `{{ site.* }}` refs in values ("… - {{ site.brand.name }}").
  *
  * Site-only values render against the CONSTANT site global and cache by raw
  * source — across 1030 posts most frontmatter templates repeat. Per-page
@@ -21,9 +20,6 @@ const DEFAULT_SKIP = new Set([
   'content', 'site', 'assetManifest', 'eleventyComputed', 'resolved',
   'sectionLibrary',
 ]);
-
-// Legacy bracket refs ([ site.theme.id ] → {{ site.theme.id }})
-const BRACKET_RE = /\[\s*(site\.[a-zA-Z0-9_.]+)\s*\]/g;
 
 // Per-page refs: `page.*` (the real sweet-saucy recipe meta) and `resolved.*`
 // (layout defaults templating on the merged cascade — cover's align knob,
@@ -44,7 +40,7 @@ function createFrontmatterResolver(options) {
   const cache = new Map();
 
   /**
-   * Render a single frontmatter string value (bracket refs + Liquid), cached.
+   * Render a single frontmatter string value (Liquid), cached.
    * Per-page values (PER_PAGE_RE: `page.*` recipe meta, `resolved.*` layout
    * defaults) render UNCACHED against `extraScope`; site-only values are
    * build-constant and cache by raw source.
@@ -59,14 +55,12 @@ function createFrontmatterResolver(options) {
       // cascade is merged; rendering here would empty the refs (no scope)
       // and mutate layout objects SHARED across pages.
       if (!extraScope) return value;
-      const source = value.replace(BRACKET_RE, '{{ $1 }}');
-      return engine.parseAndRenderSync(source, { ...scope, ...extraScope });
+      return engine.parseAndRenderSync(value, { ...scope, ...extraScope });
     }
 
     if (cache.has(value)) return cache.get(value);
 
-    // Legacy bracket refs first ([ site.theme.id ] → {{ site.theme.id }})
-    let rendered = value.replace(BRACKET_RE, '{{ $1 }}');
+    let rendered = value;
     if (rendered.includes('{{') || rendered.includes('{%')) {
       rendered = engine.parseAndRenderSync(rendered, scope);
     }
@@ -77,7 +71,7 @@ function createFrontmatterResolver(options) {
 
   /**
    * Deep-walk a frontmatter data object, rendering every string value that
-   * contains Liquid or bracket refs, in place. Top-level keys in `skip` are
+   * contains Liquid refs, in place. Top-level keys in `skip` are
    * left alone — the caller passes the engine-machinery keys (collections,
    * pagination, permalink, globals…): Eleventy renders dynamic permalinks
    * itself, and machinery subtrees contain other templates' raw content.
@@ -112,7 +106,7 @@ function createFrontmatterResolver(options) {
   }
 
   function maybeRender(value, extraScope) {
-    return (value.includes('{{') || value.includes('[ site.')) ? render(value, extraScope) : value;
+    return value.includes('{{') ? render(value, extraScope) : value;
   }
 
   /**

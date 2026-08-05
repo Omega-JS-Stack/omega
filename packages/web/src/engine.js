@@ -18,10 +18,12 @@ const { toSiteGlobal } = require('@omega.js/config/site-global');
 const Logger = require('@omega.js/devkit/logger');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
+const { applyMarkdownImages } = require('./markdown-images.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
+const { applyCollectionLimits } = require('./limit-collections.js');
 const { resolvePageAsset } = require('./assets.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet, hasOwnContent } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
@@ -194,7 +196,12 @@ function configureOmega(eleventyConfig, options) {
 
 
   // ---- template-kit on Eleventy's own Liquid instance
+  // This instance backs template-kit's `markdown` filter; Eleventy keeps its
+  // own for .md templates. BOTH get the optimized image renderer (#193) so a
+  // markdown image is the same markup wherever the markdown is rendered.
   const md = markdownIt({ html: true });
+  applyMarkdownImages(md);
+  eleventyConfig.amendLibrary('md', applyMarkdownImages);
   const collectionsHolder = new Map();
 
   // site.posts / site.team / site.updates / site.alternatives are Jekyll's
@@ -286,30 +293,6 @@ function configureOmega(eleventyConfig, options) {
     eleventyConfig.setIncludesDirectory(path.relative(options.consumerDir, options.farmDir));
   } else {
     registerVirtualLayouts(eleventyConfig, layoutMap);
-  }
-
-  // ---- Legacy bracket-layout hack → alias table. Layout values are resolved
-  // BEFORE preprocessors run (Template #getData vs getTemplates), so this
-  // cannot be a data transform — every layer-resolved layout name gets its
-  // legacy spellings aliased (`themes/[ site.theme.id ]/frontend/pages/X`,
-  // plus hardcoded `themes/<id>/X`). Migrated content uses the plain names;
-  // the migration codemod (B4) rewrites the legacy idioms away permanently.
-  // Packaged ids + the active id — a consumer-local theme (C3 tier 2) is
-  // not under themesDir, but its legacy spellings must alias all the same.
-  const themeIds = [...new Set([
-    activeTheme,
-    ...fs.readdirSync(themesDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name),
-  ])];
-  for (const rel of layoutMap.keys()) {
-    const plain = rel.replace(/\.[a-z]+$/, '');
-    const spellings = [
-      `themes/[ site.theme.id ]/${plain}`,
-      `themes/[site.theme.id]/${plain}`,
-      ...themeIds.map((id) => `themes/${id}/${plain}`),
-    ];
-    for (const from of spellings) eleventyConfig.addLayoutAlias(from, rel);
   }
 
   // ---- Frontmatter Liquid + collection tagging
@@ -537,6 +520,17 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Collections: posts, alternatives, team, blog taxonomy
   registerCollections(eleventyConfig, collectionsHolder);
+
+  // ---- Dev-mode collection limiting (#190): a brand with thousands of posts
+  // samples them locally so the dev build stays fast — the sampled-out
+  // documents never enter the build at all. The config is validated in EVERY
+  // environment (a typo must fail `omega build` too), but only a development
+  // build samples: a shipped site is always the whole site.
+  applyCollectionLimits(eleventyConfig, {
+    consumerDir: options.consumerDir,
+    limits: site.dev && site.dev.limitCollections,
+    environment: options.environment,
+  });
 
   // ---- Default pages: virtual templates unless the consumer owns the URL
   const consumerUrls = scanConsumerPermalinks(options.consumerDir);

@@ -29,7 +29,7 @@ This project consumes **@omega.js/web**, the OMEGA web framework (Eleventy 3 + L
 npm start           # omega dev: dev server (Eleventy watch + asset rebuild)
 npm run build       # omega build: production build → dist/
 npm test            # omega test: production build + smoke checks + test/
-npm run deploy      # omega deploy: build → `npu sync --message='Deploy'`
+npm run deploy      # omega deploy: commit + push, then dispatch the build workflow (CI publishes)
 npx omega setup     # re-scaffold defaults + sync package.json scripts
 npx omega clean     # remove dist/ and .omega/
 ```

@@ -12,7 +12,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 
 `node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. Published installs get the framework DOCS vendored into each package already (below); the top-level map itself is not vendored yet, so the link still resolves only through a local-era install — vendoring the map and retargeting the link is [#144](https://github.com/Omega-JS-Stack/omega/issues/144).
 
-(The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short; heals scrub any legacy copy.)
+(The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short. Heals no longer scrub legacy copies (#148): a leftover marker or retired import line is consumer content, removed by hand per [breaking-changes.md](breaking-changes.md).)
 
 - The import path is **relative** (portable to any machine). For hoisted installs (the in-repo test brands are npm workspaces of this monorepo) the ensure step walks up and writes the correct depth, e.g. `@../../node_modules/@omega.js/AGENTS.md`.
 - The service resolves the monorepo through the installed manager package's real path (the local-era `file:` symlink), so the link always lands on the LIVE top-level map — framework edits are instantly visible to every brand session.

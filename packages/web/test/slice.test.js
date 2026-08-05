@@ -54,12 +54,49 @@ before(async () => {
   pages = await buildMini();
 });
 
-test('theme-base bracket layout aliases into the real chain (root → classy base)', () => {
+test('plain layout name resolves through the real chain (root → classy base)', () => {
   const html = pages.get('/');
   assert.ok(html.includes('data-theme-id="classy"'), 'core/root chrome present with active theme id');
   assert.ok(html.includes('<nav class="navbar'), 'classy nav include rendered');
   assert.ok(html.includes('Grow faster with MiniCo'), 'body Liquid rendered against site global');
   assert.ok(html.includes('<title>MiniCo - Home of Mini</title>'), 'frontmatter {{ site.meta.title }} rendered');
+});
+
+test('a bracket layout value no longer resolves — the build fails loudly (#148)', async () => {
+  // The alias table that accepted `themes/[ site.theme.id ]/…` spellings is
+  // gone: plain layout names are the one form, and the migrate codemod
+  // (`omega migrate`, bracket-layout rule) is the sanctioned converter.
+  const os = require('node:os');
+  const legacy = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bracket-site-'));
+  try {
+    fs.mkdirSync(path.join(legacy, 'pages'), { recursive: true });
+    fs.writeFileSync(
+      path.join(legacy, 'pages', 'index.html'),
+      '---\nlayout: themes/[ site.theme.id ]/frontend/core/base\npermalink: /\n---\n<p>legacy</p>\n',
+    );
+
+    const Eleventy = require('@11ty/eleventy').default;
+    const elev = new Eleventy(legacy, path.join(PKG, '.omega', 'test-out-bracket'), {
+      quietMode: true,
+      configPath: false,
+      config: (eleventyConfig) => {
+        eleventyConfig.setUseTemplateCache(false);
+        return configureOmega(eleventyConfig, {
+          consumerDir: legacy,
+          siteData,
+          farmDir: path.join(PKG, '.omega', 'layout-farm'),
+          assetManifest: {
+            js: { main: '/assets/js/main-TEST.js', pages: {} },
+            css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          },
+        });
+      },
+    });
+
+    await assert.rejects(() => elev.toJSON(), /Problem creating an Eleventy Layout/);
+  } finally {
+    fs.rmSync(legacy, { recursive: true, force: true });
+  }
 });
 
 test('meta-only page: layout voice renders, meta consumed, body appended (no content lane)', () => {

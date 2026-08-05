@@ -1,7 +1,7 @@
 /**
- * Workspace `scripts` ensure op + the package-scripts heal lib — the retired
- * `omega-manager` bin name heals to `omega` inside root script VALUES (args
- * preserved), a `deploy` script is guaranteed, nothing else is ever touched,
+ * Workspace `scripts` ensure op + the package-scripts heal lib — a `deploy`
+ * script is guaranteed, nothing else is ever touched (the retired
+ * `omega-manager` bin name is no longer rewritten: brands edit it by hand),
  * and a converged file rewrites nothing (idempotence proven by bytes).
  */
 const test = require('node:test');
@@ -11,7 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const scriptsOp = require('../src/services/workspace/ensure/scripts.js');
-const { healScriptValue, healPackageScripts, DEPLOY_SCRIPT } = require('../src/lib/package-scripts.js');
+const { healPackageScripts, DEPLOY_SCRIPT } = require('../src/lib/package-scripts.js');
 
 function tmpBrand(pkg) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-ws-scripts-'));
@@ -27,46 +27,34 @@ function readPkg(root) {
 
 // ─── The heal lib (pure) ─────────────────────────────────────────────────────
 
-test('healScriptValue: only the LEADING bin token heals — plain, npx, args preserved', () => {
-  assert.equal(healScriptValue('omega-manager'), 'omega');
-  assert.equal(healScriptValue('omega-manager dev'), 'omega dev');
-  assert.equal(healScriptValue('npx omega-manager'), 'npx omega');
-  assert.equal(healScriptValue('omega-manager pipeline --require=analytics,disperse,update,bookmark'),
-    'omega pipeline --require=analytics,disperse,update,bookmark');
-  // NOT the bin token: mid-command mentions and longer names stay verbatim
-  assert.equal(healScriptValue('echo omega-manager done'), 'echo omega-manager done');
-  assert.equal(healScriptValue('omega-managerx build'), 'omega-managerx build');
-});
-
-test('healPackageScripts: renames legacy values, adds deploy when absent, keeps an existing deploy', () => {
+test('healPackageScripts: adds deploy when absent, keeps an existing deploy, never rewrites a value', () => {
   const healed = healPackageScripts({ scripts: { start: 'omega-manager', build: 'echo hi' } });
-  assert.deepEqual(healed.scripts, { start: 'omega', build: 'echo hi', deploy: DEPLOY_SCRIPT });
-  assert.deepEqual(healed.renamed, ['start']);
+  assert.deepEqual(healed.scripts, { start: 'omega-manager', build: 'echo hi', deploy: DEPLOY_SCRIPT },
+    'the retired bin name is left verbatim — no value healing');
   assert.equal(healed.added, true);
-  assert.equal(healed.changed, true);
 
   const kept = healPackageScripts({ scripts: { start: 'omega', deploy: 'my-own-deploy' } });
   assert.equal(kept.scripts.deploy, 'my-own-deploy', 'an existing deploy script is never overwritten');
-  assert.equal(kept.changed, false);
+  assert.equal(kept.added, false);
 });
 
 // ─── The ensure op ───────────────────────────────────────────────────────────
 
-test('scripts op: heals the Ian-reported shape — three renames + deploy added, other keys untouched', async () => {
+test('scripts op: adds the deploy script, leaves every other value verbatim', async () => {
   const root = tmpBrand({
     name: 'omegajs.dev',
     private: true,
     workspaces: ['apps/*'],
     scripts: {
-      start: 'omega-manager',
-      dev: 'omega-manager dev',
-      pipeline: 'omega-manager pipeline --require=analytics,disperse,update,bookmark',
+      start: 'omega',
+      dev: 'omega dev',
+      pipeline: 'omega pipeline --require=analytics,disperse,update,bookmark',
     },
     devDependencies: { '@omega.js/manager': '*' },
   });
 
   const result = await scriptsOp({ brandRoot: root });
-  assert.deepEqual(result.output.scripts, { renamed: ['start', 'dev', 'pipeline'], added: true });
+  assert.deepEqual(result.output.scripts, { added: true });
 
   const pkg = readPkg(root);
   assert.deepEqual(pkg.scripts, {
@@ -89,7 +77,7 @@ test('scripts op: converged file is a no-op — null return, byte-identical byte
   const before = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
 
   // Heal then rerun — the second pass changes nothing (idempotence)
-  const healRoot = tmpBrand({ name: 'y', scripts: { start: 'omega-manager' } });
+  const healRoot = tmpBrand({ name: 'y', scripts: { start: 'omega' } });
   await scriptsOp({ brandRoot: healRoot });
   const healedBytes = fs.readFileSync(path.join(healRoot, 'package.json'), 'utf8');
   assert.equal(await scriptsOp({ brandRoot: healRoot }), null);
@@ -99,7 +87,7 @@ test('scripts op: converged file is a no-op — null return, byte-identical byte
 });
 
 test('scripts op: dry run plans and writes nothing', async () => {
-  const root = tmpBrand({ name: 'x', scripts: { start: 'omega-manager' } });
+  const root = tmpBrand({ name: 'x', scripts: { start: 'omega' } });
   const before = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
 
   const result = await scriptsOp({ brandRoot: root, options: { dryRun: true } });

@@ -180,7 +180,8 @@ module.exports = async (argv = {}) => {
   console.log(`  Core:    ${[...CORE_SERVICES, ...requireExtra].join(', ')}\n`);
 
   const started = Date.now();
-  const bin = path.join(__dirname, '..', '..', 'bin', 'omega-manager');
+  // cli-run.js self-executes when spawned as main (no separate bin).
+  const bin = path.join(__dirname, '..', 'cli-run.js');
 
   // Non-interactive by construction: stdin detached AND the explicit env
   // switch (google-auth counts stdout-TTY as a watching human — the env

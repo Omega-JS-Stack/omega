@@ -86,6 +86,7 @@ Single config format everywhere: shared sections (brand, cloud, analytics, payme
 - [theming.md](docs/shared/theming.md) — the `--omega-*` design-system contract, shell chrome, motion
 - [translation.md](docs/shared/translation.md) — the AI translation engine + config-driven cache
 - [agent-docs.md](docs/shared/agent-docs.md) — the agent-docs chain: thin pointers here, the brand chain in consumers
+- [breaking-changes.md](docs/shared/breaking-changes.md) — the legacy→OMEGA breaking-changes register: what changed shape, and the by-hand migration step for each
 - [brands.md](docs/shared/brands.md) — brand topology, history, the local era
 - [rulings.md](docs/shared/rulings.md) — standing rulings from the retired board era
 

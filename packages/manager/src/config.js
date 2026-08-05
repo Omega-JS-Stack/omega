@@ -25,7 +25,8 @@
  * sendgrid→campaigns, beehiiv→newsletter, sentry→monitoring. Provider
  * STRINGS in config (cloud.provider: 'firebase', marketing.campaigns
  * .provider: 'sendgrid', …) are unchanged — the service is the role, the
- * provider is a value. Legacy state keys migrate on read (lib/state.js).
+ * provider is a value. State uses the role keys only — a legacy service-name
+ * key in .omega/state.json is ignored (docs/shared/breaking-changes.md).
  */
 
 // =============================================================================

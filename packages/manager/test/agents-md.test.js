@@ -14,8 +14,6 @@ const path = require('node:path');
 
 const {
   IMPORT_LINE,
-  LEGACY_GUIDE_SUBPATH,
-  LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   ensureAgentsMd,
   ensureClaudePointer,
@@ -84,15 +82,16 @@ test('agents-md: an empty local @omega.js dir never wins the scope walk (#153)',
   assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(monorepo, 'AGENTS.md')));
 });
 
-test('agents-md: a legacy manager-package import heals to the scope path', () => {
+test('agents-md: a pre-2026-07-27 manager-package import is consumer content, not an import', () => {
   const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@${LEGACY_GUIDE_SUBPATH}\n\n# Notes survive\n`);
+  const legacyImport = '@node_modules/@omega.js/manager/AGENTS.md';
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${legacyImport}\n\n# Notes survive\n`);
 
   assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const lines = read(dir, 'AGENTS.md').split('\n');
-  assert.equal(lines[0], IMPORT_LINE, 'the legacy manager-package target rewritten to the scope path');
-  assert.ok(!read(dir, 'AGENTS.md').includes(LEGACY_GUIDE_SUBPATH), 'no legacy target remains');
-  assert.match(read(dir, 'AGENTS.md'), /# Notes survive/);
+  const content = read(dir, 'AGENTS.md');
+  assert.equal(content.split('\n')[0], IMPORT_LINE, 'the current import goes to line 1');
+  assert.ok(content.includes(legacyImport), 'the retired target is left alone — edit it by hand');
+  assert.match(content, /# Notes survive/);
 });
 
 // ─── ensureGuideLink ─────────────────────────────────────────────────────────
@@ -162,27 +161,14 @@ test('agents-md: missing AGENTS.md is created — import first, then a short bra
   assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'present');
 });
 
-test('agents-md: a correct import with a legacy marker below still heals (present requires cruft-free)', () => {
+test('agents-md: a cp244 marker comment under a correct import is consumer content — present, untouched', () => {
   const dir = tmpdir();
-  const legacyMarker = `${LEGACY_MARKER_PREFIX} … -->`;
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n${legacyMarker}\n\n# Notes\n`);
+  const legacyMarker = '<!-- ^ OMEGA framework agent guide — maintained by `npm start`; keep this import first. -->';
+  const content = `${IMPORT_LINE}\n${legacyMarker}\n\n# Notes\n`;
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
 
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const content = read(dir, 'AGENTS.md');
-  assert.ok(!content.includes('<!--'));
   assert.equal(ensureAgentsMd(dir, 'X'), 'present');
-});
-
-test('agents-md: healing scrubs the legacy cp244 marker comment', () => {
-  const dir = tmpdir();
-  const legacyMarker = `${LEGACY_MARKER_PREFIX} — maintained by \`npm start\`; keep this import first. -->`;
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@../../${IMPORT_LINE.slice(1)}\n${legacyMarker}\n\n# Notes survive\n`);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const content = read(dir, 'AGENTS.md');
-  assert.equal(content.split('\n')[0], IMPORT_LINE);
-  assert.ok(!content.includes('<!--'), 'legacy marker gone');
-  assert.match(content, /# Notes survive/);
+  assert.equal(read(dir, 'AGENTS.md'), content, 'the marker is never scrubbed — delete it by hand');
 });
 
 test('agents-md: existing file without the import is healed in place — content preserved, import at line 1', () => {

@@ -10,3 +10,7 @@ post:
 ---
 
 Alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima.
+
+![The mini hero](@post/hero.jpg "Mini hero")
+
+[![The mini chart](/assets/images/mini/chart.png)](/pricing)

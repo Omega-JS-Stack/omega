@@ -33,13 +33,14 @@ const { readRawConfig, discoverBrands, stampCompanyMarker } = require('./lib/com
 const { ensureOmegaIgnored } = require('./lib/gitignore.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
-const BIN_PATH = path.join(__dirname, '..', 'bin', 'omega-manager');
+// Per-brand children run the CLI entry directly — cli-run.js self-executes
+// when spawned as main.
+const CHILD_ENTRY = path.join(__dirname, 'cli-run.js');
 
 /**
  * Strip ANSI escape codes (for the log-file tee).
  */
 function stripAnsi(text) {
-  // eslint-disable-next-line no-control-regex
   return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
 }
 
@@ -76,7 +77,7 @@ function runBrandChild(brand, childArgs, { stream, logPath }) {
     jetpack.dir(path.dirname(logPath));
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });
 
-    const child = spawn(process.execPath, [BIN_PATH, ...childArgs], {
+    const child = spawn(process.execPath, [CHILD_ENTRY, ...childArgs], {
       cwd: brand.root,
       // Children pipe their output — keep chalk colors when the parent's
       // terminal has them (the log tee strips ANSI either way)
@@ -106,7 +107,7 @@ function runBrandChild(brand, childArgs, { stream, logPath }) {
 
     child.on('error', (error) => {
       logStream.end();
-      resolve({ code: -1, output: buffered + `\nFailed to spawn manage for ${brand.id}: ${error.message}\n` });
+      resolve({ code: -1, output: `${buffered}\nFailed to spawn manage for ${brand.id}: ${error.message}\n` });
     });
   });
 }
@@ -188,7 +189,7 @@ async function runCompany(companyRoot, options = {}, childArgs = [], deps = {}) 
   console.log(chalk.bold.cyan('🏢 Omega Manager — company workspace'));
   console.log('');
   console.log(chalk.cyan('━'.repeat(70)));
-  console.log(`  ${chalk.bold.white(raw.brand?.name || path.basename(companyRoot))} ${chalk.dim('@ ' + new Date().toLocaleTimeString())}`);
+  console.log(`  ${chalk.bold.white(raw.brand?.name || path.basename(companyRoot))} ${chalk.dim(`@ ${new Date().toLocaleTimeString()}`)}`);
   console.log(chalk.cyan('━'.repeat(70)));
   console.log(`  ${chalk.dim('Root:')}     ${companyRoot}`);
   console.log(`  ${chalk.dim('Brands:')}   ${discovered.map((b) => b.enabled ? b.id : chalk.yellow(`${b.id} (disabled)`)).join(', ')}`);

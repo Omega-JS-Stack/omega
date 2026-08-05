@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#148](../../issues/148) — The breaking-changes register: `docs/shared/breaking-changes.md` documents every contract that changed shape from the legacy frameworks, one lineage section each plus cross-cutting, with the by-hand migration step per row and the deliberate external compatibilities that remain.
+- [#191](../../issues/191) — `omega audit` runs a full production build, serves `dist/` on an ephemeral port, and scores the home page plus any page-path arguments with Lighthouse in headless Chrome. Report-only until `--min-<category>` arms the gate; a score under its minimum exits non-zero.
+- [#189](../../issues/189) — `omega setup` publishes the app's resolved `.env` cascade to the brand repo's GitHub Actions secrets (`@omega.js/devkit/actions-secrets`, the `gh` CLI, values on stdin, never logged) and regenerates the scaffolded workflow's env block from the same keys. `--no-secrets` opts out; CI, no keys, no remote, or a foreign remote skip loudly.
+- [#193](../../issues/193) — Markdown images render optimized: `![alt](src)` in a post or page goes through the same builder as `omega_image` (responsive picture, lazy placeholder), and `@post/<file>` resolves to the post's own image directory — off a post it fails the build loudly.
+- [#190](../../issues/190) — Dev-mode collection sampling: `targets.web.dev.limitCollections` ({ posts: 50, randomize: true }) keeps N documents per collection in a development build and drops the rest before they render. Production never samples, every sampled build says so, and an unknown collection name fails the build.
+
+### Removed
+- [#148](../../issues/148) — No framework accepts a superseded form at runtime anymore: the manager stops migrating old state keys, healing retired AGENTS.md imports and `omega-manager` scripts, and shipping its vestigial `omega-manager` bin; web drops bracket frontmatter refs and layout aliases (unmigrated layouts fail loudly); the client version check reads only current `build.json`.
 
 ## [0.22.3] (2026-08-05)
 ### Added

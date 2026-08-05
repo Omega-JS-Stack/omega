@@ -16,28 +16,19 @@ const jetpack = require('fs-jetpack');
 
 const GUIDE_SUBPATH = 'node_modules/@omega.js/AGENTS.md';
 const IMPORT_LINE = `@${GUIDE_SUBPATH}`;
-// The pre-2026-07-27 chain imported the guide shipped inside the manager
-// package — heals rewrite it to the scope path.
-const LEGACY_GUIDE_SUBPATH = 'node_modules/@omega.js/manager/AGENTS.md';
-// cp244 shipped a verbose marker comment under the import; Ian culled it
-// (2026-07-20: keep it short) — heals scrub any legacy copy by prefix.
-const LEGACY_MARKER_PREFIX = '<!-- ^ OMEGA framework agent guide';
-const LEGACY_SKELETON_LINE = 'Everything below the import is yours — the framework never rewrites it.';
 const CLAUDE_POINTER = '@AGENTS.md';
 
 const SCOPE_PREFIXES = ['', '../', '../../', '../../../'];
 
 /**
- * Is this line an import of the framework guide (any relative depth,
- * current or legacy target)?
+ * Is this line an import of the framework guide (any relative depth)?
  *
  * @param {string} line - A single file line
  * @returns {boolean}
  */
 function isImportLine(line) {
   const trimmed = line.trim();
-  return trimmed.startsWith('@')
-    && (trimmed.endsWith(GUIDE_SUBPATH) || trimmed.endsWith(LEGACY_GUIDE_SUBPATH));
+  return trimmed.startsWith('@') && trimmed.endsWith(GUIDE_SUBPATH);
 }
 
 /**
@@ -136,8 +127,7 @@ function renderAgentsMd(brandName, importLine = IMPORT_LINE) {
 /**
  * Ensure the brand-root AGENTS.md exists with the framework import as its
  * first line. Existing consumer content is preserved verbatim; a stray copy
- * of the import lower in the file (current or legacy target) is removed when
- * healing (no duplicates).
+ * of the import lower in the file is removed when healing (no duplicates).
  *
  * @param {string} brandRoot - Absolute brand monorepo root
  * @param {string} brandName - Display name used when creating fresh
@@ -154,20 +144,15 @@ function ensureAgentsMd(brandRoot, brandName) {
   }
 
   const lines = existing.split('\n');
-  const hasCruft = lines.some((line, i) => (i > 0 && isImportLine(line))
-    || line.trim().startsWith(LEGACY_MARKER_PREFIX)
-    || line.trim() === LEGACY_SKELETON_LINE);
+  const hasCruft = lines.some((line, i) => i > 0 && isImportLine(line));
 
   if (lines[0].trim() === importLine && !hasCruft) {
     return 'present';
   }
 
-  // Heal: the resolved import goes to the top; drop any stray/stale-depth/
-  // legacy-target import copy and any legacy marker comment so heals never
-  // stack cruft
-  const body = lines.filter((line) => !isImportLine(line)
-    && !line.trim().startsWith(LEGACY_MARKER_PREFIX)
-    && line.trim() !== LEGACY_SKELETON_LINE);
+  // Heal: the resolved import goes to the top; drop any stray/stale-depth
+  // import copy so heals never stack cruft
+  const body = lines.filter((line) => !isImportLine(line));
   jetpack.write(file, [importLine, ...(body[0]?.trim() === '' ? [] : ['']), ...body].join('\n'));
   return 'healed';
 }
@@ -200,8 +185,6 @@ function ensureClaudePointer(brandRoot) {
 module.exports = {
   GUIDE_SUBPATH,
   IMPORT_LINE,
-  LEGACY_GUIDE_SUBPATH,
-  LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   isImportLine,
   findScope,

@@ -241,10 +241,11 @@ function prefixSvgIds(svgContent, prefix) {
 }
 
 /**
- * Build the responsive image HTML for a source + options (shared by omega_image
- * and the member/post image-tag properties).
+ * Build the responsive image HTML for a source + options (shared by omega_image,
+ * the member/post image-tag properties, and @omega.js/web's markdown image
+ * renderer — one image-markup SSOT).
  * @param {string} src
- * @param {object} options - alt/class/style/width/height/max_width/webp/loading
+ * @param {object} options - alt/title/class/style/width/height/max_width/webp/loading
  * @returns {string}
  */
 function buildImageHtml(src, options = {}) {
@@ -267,6 +268,7 @@ function buildImageHtml(src, options = {}) {
   html += buildOriginalSources(srcPath, extension, maxWidth, src);
 
   const alt = escapeAttr(options.alt || '');
+  const title = escapeAttr(options.title || '');
   const cssClass = escapeAttr(options.class || '');
   const style = escapeAttr(options.style || '');
   const width = escapeAttr(options.width || '');
@@ -277,6 +279,7 @@ function buildImageHtml(src, options = {}) {
   html += `data-lazy="@src ${src}"\n`;
   if (cssClass) html += `class="${cssClass}"\n`;
   html += `alt="${alt}"\n`;
+  if (title) html += `title="${title}"\n`;
   if (style) html += `style="${style}"\n`;
   if (width) html += `width="${width}"\n`;
   if (height) html += `height="${height}"\n`;
@@ -327,6 +330,7 @@ function buildOriginalSources(srcPath, extension, maxWidth, src) {
 function buildExternalImage(src, options) {
   src = escapeAttr(src);
   const alt = escapeAttr(options.alt || '');
+  const title = escapeAttr(options.title || '');
   const cssClass = escapeAttr(options.class || '');
   const style = escapeAttr(options.style || '');
   const width = escapeAttr(options.width || '');
@@ -338,6 +342,7 @@ function buildExternalImage(src, options) {
   html += ` data-lazy="@src ${src}"`;
   if (cssClass) html += ` class="${cssClass}"`;
   html += ` alt="${alt}"`;
+  if (title) html += ` title="${title}"`;
   html += ` loading="${loading}"`;
   if (style) html += ` style="${style}"`;
   if (width) html += ` width="${width}"`;
@@ -475,6 +480,7 @@ module.exports = {
   omegaImage,
   omegaVideo,
   buildImageHtml,
+  buildExternalImage,
   DEFAULT_ICON,
   IMAGE_PLACEHOLDER,
 };

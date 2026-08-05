@@ -1,10 +1,8 @@
 /**
- * Ensure the brand root package.json's scripts speak the current verb (Ian
- * 2026-07-21): legacy `omega-manager` script values heal to the `omega`
- * dispatcher (args preserved — npm scripts put node_modules/.bin on PATH,
- * so plain `omega` resolves there), and a `deploy: 'omega deploy'` script
- * exists. Script VALUES only — no other script, key, or consumer content
- * is ever touched. Idempotent: a converged file rewrites nothing.
+ * Ensure the brand root package.json carries a `deploy: 'omega deploy'`
+ * script (npm scripts put node_modules/.bin on PATH, so plain `omega`
+ * resolves there). Script VALUES only — no other script, key, or consumer
+ * content is ever touched. Idempotent: a converged file rewrites nothing.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -29,15 +27,15 @@ module.exports = async ({ brandRoot, options = {} }) => {
     return { status: 'warned', output: { scripts: 'unparseable' } };
   }
 
-  const { scripts, renamed, added, changed } = healPackageScripts(pkg);
-  if (!changed) {
-    console.log(`      ${chalk.green('✓')} Root scripts use \`omega\` (deploy script present)`);
+  const { scripts, added } = healPackageScripts(pkg);
+  if (!added) {
+    console.log(`      ${chalk.green('✓')} Root deploy script present`);
     return null;
   }
 
   if (options.dryRun) {
     return dryRunPlan(
-      `heal root scripts (${[...renamed.map((name) => `${name}: omega-manager → omega`), ...(added ? [`add deploy: '${DEPLOY_SCRIPT}'`] : [])].join(', ')})`,
+      `heal root scripts (add deploy: '${DEPLOY_SCRIPT}')`,
       { output: { scripts: 'planned' } },
     );
   }
@@ -45,12 +43,7 @@ module.exports = async ({ brandRoot, options = {} }) => {
   pkg.scripts = scripts;
   jetpack.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-  for (const name of renamed) {
-    console.log(`      ${chalk.green('✓')} Healed script \`${name}\` — omega-manager → omega (args preserved)`);
-  }
-  if (added) {
-    console.log(`      ${chalk.green('✓')} Added script \`deploy: '${DEPLOY_SCRIPT}'\``);
-  }
+  console.log(`      ${chalk.green('✓')} Added script \`deploy: '${DEPLOY_SCRIPT}'\``);
 
-  return { output: { scripts: { renamed, added } } };
+  return { output: { scripts: { added } } };
 };

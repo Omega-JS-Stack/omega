@@ -38,6 +38,8 @@ routes read the repo's `default_branch` first). All I/O is injectable
 Existing consumers converge on their next `omega setup` (both scaffold
 engines treat workflow files as framework-owned overwrites).
 
+**The secrets those workflows read come from `.env`** ([#189](https://github.com/Omega-JS-Stack/omega/issues/189)): web's `omega setup` publishes the app's resolved `.env` cascade to the brand repo's Actions secrets through `@omega.js/devkit/actions-secrets` (the `gh` CLI, values on stdin, never logged) and regenerates the workflow's env block from the same key set — one `KEY: ${{ secrets.KEY }}` line each. So a CI build has exactly the keys the laptop has, with no hand-created secrets and no hand-edited workflow. `--no-secrets` opts out; a repo-less/remote-less brand, a CI run, or a checkout that isn't the brand's own repo skips loudly. Details: [docs/web/index.md](../web/index.md).
+
 ## The verb — `omega deploy` on every target
 
 | Target | Behavior | Flags |
@@ -55,7 +57,7 @@ At a brand root the dispatcher hands `omega deploy` to `@omega.js/manager`'s dep
 - **Filters (consumed here, never forwarded)**: `--only=<target|appDir>[,…]` exact set, `--except=…` subtract. A filter matching nothing is an error — never a deploy-everything fallback.
 - **Every other flag forwards verbatim** to each app's deploy (`--dry-run`, `--direct`, `--no-sync`, `--platforms`, …). Backend-target `--only` values (`--only hosting`) are app-level — run those from `apps/backend`.
 - **A failing app stops the run** (later apps depend on it); `--continue-on-error` overrides. Any failure → exit 1.
-- **Deliberate stays deliberate**: nothing invokes the brand-root verb automatically — it is only the human-typed command (scaffolded as the brand root's `deploy` npm script; the workspace service's `scripts` op heals legacy `omega-manager` script values to `omega` and guarantees the script exists).
+- **Deliberate stays deliberate**: nothing invokes the brand-root verb automatically — it is only the human-typed command (scaffolded as the brand root's `deploy` npm script; the workspace service's `scripts` op guarantees the script exists — it mints a missing `deploy: "omega deploy"` and never rewrites script values).
 
 **Mirrored rule (Ian 2026-07-20): every deploy verb auto-detects linked local packages (`findLocalSpecs` — tree-wide, cp194) and takes its LOCAL-ARTIFACT lane**, loudly, so a linked brand ships the local framework without flags or errors; CI dispatch is only for registry-clean trees (`omega i live` restores them). Dry-runs show whichever plan would actually run. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 

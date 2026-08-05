@@ -613,6 +613,12 @@ const TARGET_SCHEMAS = {
       required:    false,
       description: 'Responsive image matrix (build-time 320/640/1024 + webp, quality 80). `enabled: false` ships images verbatim.',
     },
+    {
+      path:        'dev.limitCollections',
+      type:        'object',
+      required:    false,
+      description: "Dev-only collection sampling (#190): collection name → max documents ({ posts: 50 }), plus `randomize: true` for a random sample instead of the first N. Collection names are @omega.js/web's (posts, alternatives, team, updates) and the engine hard-fails an unknown one. Development builds only — production never samples.",
+    },
   ],
 
   // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).

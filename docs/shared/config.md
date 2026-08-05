@@ -49,7 +49,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // enabled-with-defaults. Unknown keys are validation errors. A value may
   // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
-    web:       { /* @omega.js/web settings — defined in Phase 2 */ },
+    web:       { imagemin, dev: { limitCollections } },   // dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
     backend:   { parent, github, auth: { signup: { maxPerIpPerDay } }, reviews, marketing, blog, dataRequest },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, remoteScripts, restartManager },

@@ -19,6 +19,12 @@ test('site refs render against the constant site global and cache by raw source'
   assert.strictEqual(resolver.cacheSize(), 1, 'second render served from cache');
 });
 
+test('legacy bracket refs are NOT accepted — the value renders untouched (#148)', () => {
+  const resolver = createFrontmatterResolver({ site });
+  const value = 'themes/[ site.theme.id ]/frontend/core/base';
+  assert.strictEqual(resolver.render(value), value, 'brackets are literal text — `omega migrate` is the converter');
+});
+
 test('resolved refs render against the per-page scope (layout-default templating)', () => {
   const resolver = createFrontmatterResolver({ site });
   const tpl = "d-flex align-items-{{ resolved.theme.main.align | default: 'center' }} py-5";

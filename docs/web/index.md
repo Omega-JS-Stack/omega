@@ -57,12 +57,14 @@ Long-form detail (packaged content, URL shape, service worker, design tokens, th
 
 | Module | Owns |
 |---|---|
-| [engine.js](../../packages/web/src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, legacy layout aliases, the frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
+| [engine.js](../../packages/web/src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, the frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
 | [layers.js](../../packages/web/src/layers.js) / [layouts.js](../../packages/web/src/layouts.js) | First-layer-wins file resolution across the layer chain; layered layout delivery with zero copying (virtual templates in build, a symlink farm in dev) |
 | [sections.js](../../packages/web/src/sections.js) | The section/component library: the `{% section %}` / `{% component %}` tags, json5 schemas + defaults, the `{% composition %}` page-body guard, `buildSectionLibrary()`, `collectSectionAssets()` |
 | [assets.js](../../packages/web/src/assets.js) | esbuild page modules + main bundle over the layer roots, layered sass (`omega:` importer), page css namespaces, font copy, PurgeCSS post-pass |
 | [build.js](../../packages/web/src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS, with per-phase timings (what `omega build` runs) |
 | [collections.js](../../packages/web/src/collections.js) | posts / alternatives / team / updates collections + blog taxonomy aggregation |
+| [limit-collections.js](../../packages/web/src/limit-collections.js) | Dev-mode collection sampling ([#190](https://github.com/Omega-JS-Stack/omega/issues/190)): `targets.web.dev.limitCollections` ({ posts: 50, randomize: true }) drops everything outside the sample before it renders — development builds only, never production |
+| [markdown-images.js](../../packages/web/src/markdown-images.js) | Markdown images render optimized ([#193](https://github.com/Omega-JS-Stack/omega/issues/193)): `![alt](src)` goes through the `omega_image` builder (responsive picture + lazy placeholder; plain lazy img for external/non-raster). Post authors get the `@post/<file>` shorthand for the post's own image dir — off a post it fails the build. Feeds embed the lazy markup (readers see the placeholder), legacy parity |
 | [frontmatter-liquid.js](../../packages/web/src/frontmatter-liquid.js) | Liquid inside frontmatter VALUES (cached site-scope renders; page-scoped values defer to a copy-on-write pass) |
 | [consumer.js](../../packages/web/src/consumer.js) / [consumer-scan.js](../../packages/web/src/consumer-scan.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data; permalink scan → default-page suppression |
 | [pricing.js](../../packages/web/src/pricing.js) / [brand-tokens.js](../../packages/web/src/brand-tokens.js) | `site.pricing` composed from `payment.products`; the accent ramp derived from `brand.color` |
@@ -105,7 +107,7 @@ Long-form detail (packaged content, URL shape, service worker, design tokens, th
 
 | Command | Description |
 |---|---|
-| `setup` | Scaffold/refresh consumer defaults, merge `config/omega.json5`, sync `package.json` scripts (aliases `-s`, `--setup`) |
+| `setup` | Scaffold/refresh consumer defaults, merge `config/omega.json5`, sync `package.json` scripts, publish the `.env` cascade as Actions secrets (`--no-secrets` opts out; aliases `-s`, `--setup`) |
 | `install` | `i local` links every `@omega.js/*` dep from this monorepo; `i live`/`prod` restores registry specs tree-wide (aliases `-i`, `i`) |
 | `dev` | Dev server: Eleventy watch/serve + in-place asset rebuilds, mkcert HTTPS, emulator wiring (aliases `serve`, `start`) |
 | `build` | Production build → `dist/` (alias `-b`) |
@@ -118,7 +120,7 @@ Long-form detail (packaged content, URL shape, service worker, design tokens, th
 | `purge` | Cloudflare cache purge (alias `cloudflare-purge`) |
 | `clean` | Remove `dist/` + `.omega/` (alias `-c`) |
 | `version` | Print the framework version (alias `-v`) |
-| `audit` | Explicit not-ported-yet stub — the subsystem rides a later checkpoint |
+| `audit` | Lighthouse over a production build: full build → `dist/` served on an ephemeral loopback port → the home page plus every page path argument scored. Report-only until a `--min-<category>` flag (`--min-performance=90`, `--min-accessibility`, `--min-best-practices`, `--min-seo`) arms the gate — under = loud failure + exit 1. Headless Chrome comes from `CHROME_PATH`, else puppeteer's Chrome for Testing, else a system Chrome (alias `-a`, bare form — pass page paths with the full `audit` name) |
 
 Alias table: [src/cli.js](../../packages/web/src/cli.js).
 
@@ -137,6 +139,15 @@ Alias table: [src/cli.js](../../packages/web/src/cli.js).
 - **Live-verify UI changes via CDP.** Use the `chrome-devtools` MCP tools (screenshot, click, evaluate, console) against the running dev server instead of guessing at rendered output.
 - **Signing in during dev is URL-only.** `npx omega auth:token <uid-or-email>` (the backend CLI — [docs/backend/index.md](../backend/index.md); emulator by default, `--production` explicit) mints a custom token and prints the sign-in URL; open `/signin?authCustomToken=<token>` (with an optional `&authReturnUrl=…`) and the page signs that user in, then goes to the return URL. `?authSignout=true` is the same lane in reverse. Both params are read ONLY by the auth pages — `/signin`, `/signup`, `/reset` via [session-params.js](../../packages/web/core/js/libs/auth/session-params.js) — so appending them to any other page does nothing.
 - **Provider signin runs the REDIRECT flow in dev, exactly as it does in production** ([#156](https://github.com/Omega-JS-Stack/omega/issues/156)). The auth emulator's OAuth handler hands the credential back through `sessionStorage` on the origin it is served from, so on the emulator's own port (`http://localhost:9099`) it is a third party to the site: the browser partitions that storage by top-level site, the SDK's helper iframe reads an empty partition, and `getRedirectResult()` resolves null forever. `omega dev` closes that gap by PROXYING the emulator under the site origin — `/emulator/*` plus the `identitytoolkit`/`securetoken` REST prefixes, mounted at the site root because `connectAuthEmulator()` discards any path on the URL it is given — so handler and iframe are first-party and share one partition. It is the dev counterpart of the self-hosted `/__/auth/*` helpers a production build ships. The dev server declares the proxy in the page chrome (`dev.authEmulatorProxy`) and @omega.js/client then points the emulator at `window.location.origin`. [oauth.js](../../packages/web/core/js/libs/auth/oauth.js) keeps the popup for exactly two cases: an iframed page and the `?authPopup=true` override. A redirect that comes home empty is loud, not silent: the page reports it and says so inline.
+
+## CI secrets — `.env` is the source ([#189](https://github.com/Omega-JS-Stack/omega/issues/189))
+
+`omega setup` publishes the app's resolved `.env` cascade (shell > app > brand > company) to the brand repo's **GitHub Actions secrets**, and regenerates the scaffolded workflow's env block — one `KEY: ${{ secrets.KEY }}` line per published key — so CI reads the same key set the laptop does. Nothing is hand-created and nothing is hand-edited: add the key to `.env`, re-run setup.
+
+- **Collected**: every UPPER_SNAKE key with a non-empty value in the cascade (quotes stripped; there is no non-secret exclusion list — a `.env` key IS a secret, placeholders ship commented out). A key that exists only in the shell is never published: `.env` names the key set.
+- **Transport**: the `gh` CLI (`@omega.js/devkit/actions-secrets`), values on **stdin**, never in argv and never logged. No usable `gh` fails LOUD with install/auth instructions — `--no-secrets` is the opt-out. Publishing is unconditional (the API can't report a secret's current value, so "unchanged" isn't detectable); setting the same value twice is harmless.
+- **Skips loudly** (a `[setup]` line, never silence): CI itself, an empty cascade, no git remote, or a remote that isn't the brand's own repo (`repo.providers.github` names a different one — an app inside a framework/test monorepo never arms that monorepo's Actions).
+- The workflow's `env:` block is FRAMEWORK-OWNED and rewritten every setup; `GH_TOKEN`/`NODE_VERSION`/`NODE_ENV` stay declared by the template and never duplicate into the generated region.
 
 ## Supply-Chain Security
 

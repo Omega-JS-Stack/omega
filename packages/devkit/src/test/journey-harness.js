@@ -353,7 +353,9 @@ async function runJourney(options) {
       run.brandRoot = path.join(run.tempRoot, spec.id);
       fs.mkdirSync(run.brandRoot);
 
-      const managerBin = path.join(run.monorepoRoot, 'packages', 'manager', 'bin', 'omega-manager');
+      // cli-run.js self-executes when spawned as main (the omega-manager bin
+      // was retired; #148).
+      const managerBin = path.join(run.monorepoRoot, 'packages', 'manager', 'dist', 'cli-run.js');
       await run.runToExit('onboard', process.execPath, [
         managerBin, 'onboard',
         `--id=${spec.id}`, `--url=${spec.url}`, `--targets=${spec.targets.join(',')}`,

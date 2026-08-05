@@ -15,6 +15,7 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
+const { collectEnvSecrets, renderSecretsBlock } = require('./github-secrets.js');
 const { PATHS } = require('./paths.js');
 
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
@@ -56,6 +57,19 @@ function scaffoldDefaults(options) {
   // template + JSON5 merge.
   const fileMap = { ...FILE_MAP };
   const logger = options.logger || console;
+
+  // The CI workflow's secrets env block is GENERATED per brand (#189): the
+  // keys of the app's resolved .env cascade, rendered into the template's
+  // `{{ githubSecrets }}` token. `overwrite: true` means every setup
+  // re-renders it, so the block heals like every other scaffolded default.
+  const workflow = FILE_MAP['.github/workflows/build.yml'];
+  fileMap['.github/workflows/build.yml'] = {
+    ...workflow,
+    template: {
+      ...workflow.template,
+      githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ appDir: options.outputDir }))),
+    },
+  };
   if (!resolveSeedMode(options.outputDir).standalone) {
     // Say which mode applied ([#95](https://github.com/Omega-JS-Stack/omega/issues/95)):
     // the branch below rewrites what setup scaffolds, and a silent branch made

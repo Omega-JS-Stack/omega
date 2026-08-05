@@ -15,36 +15,15 @@ const jetpack = require('fs-jetpack');
 
 const STATE_DIR = '.omega';
 
-// Service renames (cp134, Ian: service names match the config ROLE key —
-// firebase→cloud, sentry→monitoring, sendgrid→campaigns, beehiiv→newsletter).
-// Old-key state carries forward in memory; the next writeState persists the
-// new keys. Delete once every live brand has re-run.
-const LEGACY_SERVICE_KEYS = {
-  firebase: 'cloud',
-  sentry: 'monitoring',
-  sendgrid: 'campaigns',
-  beehiiv: 'newsletter',
-};
-
 function statePath(brandRoot) {
   return join(brandRoot, STATE_DIR, 'state.json');
 }
 
 /**
  * Read durable brand state (per-service keyed). Missing file → {}.
- * Pre-rename service keys migrate to their new names on read.
  */
 function readState(brandRoot) {
-  const state = jetpack.read(statePath(brandRoot), 'json') || {};
-
-  for (const [legacy, current] of Object.entries(LEGACY_SERVICE_KEYS)) {
-    if (state[legacy] && !state[current]) {
-      state[current] = state[legacy];
-      delete state[legacy];
-    }
-  }
-
-  return state;
+  return jetpack.read(statePath(brandRoot), 'json') || {};
 }
 
 /**

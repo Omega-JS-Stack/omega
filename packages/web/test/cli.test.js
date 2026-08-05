@@ -100,7 +100,13 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   const second = scaffoldDefaults({ outputDir: root, logger: quiet });
   assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), '.env custom preserved');
   assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('/my-custom-dir'), '.gitignore custom preserved');
-  assert.strictEqual(second.written.length, 0, 'no rewrites on rerun');
+  // The appended .env key regenerates the CI secrets block (#189) — that is
+  // the ONLY thing a rerun may rewrite.
+  assert.deepStrictEqual(second.written, ['.github/workflows/build.yml'], 'only the regenerated CI secrets block rewrote');
+  assert.ok(
+    fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('MY_CUSTOM_KEY: ${{ secrets.MY_CUSTOM_KEY }}'),
+    'the new .env key reached the workflow env block',
+  );
 
   // omega.json5 stabilizes after one merge cycle: run three, expect the third clean
   scaffoldDefaults({ outputDir: root, logger: quiet });
