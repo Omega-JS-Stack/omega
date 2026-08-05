@@ -5,15 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.22.0] (2026-08-04)
 ### Added
-- [#180](../../issues/180) — Rendered icons get a square glyph-centered box keyed on the renderer's own hooks, and a `.fa-spin` utility with a reduced-motion park; `docs/shared/icons.md` gains the Animation section.
+- [#180](../../issues/180) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — Rendered icons get a square glyph-centered box keyed on the renderer's own hooks, and a `.fa-spin` utility with a reduced-motion park; `docs/shared/icons.md` gains the Animation section.
 
 ### Fixed
-- [#178](../../issues/178) — The mcp-router resolves bare `npx`/`npm`/`node` to the absolute binaries beside its own node at spawn time, the interpolation understands `${NAME:-default}` so the bundled electron upstream no longer launches through a shell, and session env overrides reach placeholder resolution.
-- [#175](../../issues/175) — Backend rules files are stamped with `RULES_VERSION`, a rules schema version, instead of the package version, and every committed rules file is settled to it, so a dev boot no longer dirties the tree.
-- [#179](../../issues/179) — `contract.test.js` builds each theme in its own child process, ending Eleventy's layout-cache leak across same-process theme builds, with a marker pin that fails if any theme renders another theme's homepage.
-- [#181](../../issues/181) — Theme markup cleanup: the account page's dead `_px-3` typo is `px-3` again, the nonexistent `pt-8` is removed, and eight stale "Classy v2" header comments in `themes/base` now describe base-owned markup.
-- [#184](../../issues/184) — Every continuous `.animation-*` loop utility parks under `prefers-reduced-motion`, each at a sane resting state, with a roster-derived pin so a future unparked loop fails the suite.
+- [#178](../../issues/178) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — The mcp-router resolves bare `npx`/`npm`/`node` to the absolute binaries beside its own node at spawn time, the interpolation understands `${NAME:-default}` so the bundled electron upstream no longer launches through a shell, and session env overrides reach placeholder resolution.
+- [#175](../../issues/175) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — Backend rules files are stamped with `RULES_VERSION`, a rules schema version, instead of the package version, and every committed rules file is settled to it, so a dev boot no longer dirties the tree.
+- [#179](../../issues/179) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — `contract.test.js` builds each theme in its own child process, ending Eleventy's layout-cache leak across same-process theme builds, with a marker pin that fails if any theme renders another theme's homepage.
+- [#181](../../issues/181) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — Theme markup cleanup: the account page's dead `_px-3` typo is `px-3` again, the nonexistent `pt-8` is removed, and eight stale "Classy v2" header comments in `themes/base` now describe base-owned markup.
+- [#184](../../issues/184) [`06c93e28`](../../commit/06c93e28) Thanks [@ianwieds]! — Every continuous `.animation-*` loop utility parks under `prefers-reduced-motion`, each at a sane resting state, with a roster-derived pin so a future unparked loop fails the suite.
 
 ## [0.21.0] (2026-08-04)
 ### Changed
