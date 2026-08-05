@@ -1,0 +1,232 @@
+---
+layout: backend/core/minimal
+
+theme:
+  header:
+    title:
+      content: "Dashboard"
+      icon: "gauge-high"
+    breadcrumbs:
+      items:
+        - label: Home
+          href: /
+          icon: house
+        - label: Dashboard
+    actions:
+      items:
+        - label: New project
+          icon: plus
+          color: primary
+        - label: Reports
+          icon: chart-line
+          color: adaptive
+          dropdown:
+            - label: Sales report
+              icon: dollar-sign
+              href: /reports/sales
+            - label: Analytics report
+              icon: chart-bar
+              href: /reports/analytics
+            - divider: true
+            - label: Export all
+              icon: download
+              href: /reports/export
+
+sitemap:
+  include: false
+meta:
+  index: false
+
+stats_cards:
+  - id: "total_revenue"
+    title: "Total revenue"
+    value: "$24,300"
+    change: "+12.5%"
+    change_type: "success"
+    icon: "dollar-sign"
+
+  - id: "new_users"
+    title: "New users"
+    value: "1,423"
+    change: "+5.8%"
+    change_type: "success"
+    icon: "users"
+
+  - id: "active_projects"
+    title: "Active projects"
+    value: "14"
+    change: "2 pending"
+    change_type: "warning"
+    icon: "folder-open"
+
+  - id: "performance"
+    title: "Performance"
+    value: "89%"
+    change: "Good"
+    change_type: "info"
+    icon: "chart-line"
+
+recent_activity:
+  - id: "new_document"
+    title: "New document created"
+    description: "Project proposal for Q2 2024"
+    time: "2 hours ago"
+    icon: "file-alt"
+    icon_color: "primary"
+
+  - id: "task_completed"
+    title: "Task completed"
+    description: "Website redesign approved"
+    time: "5 hours ago"
+    icon: "check-circle"
+    icon_color: "success"
+
+  - id: "new_member"
+    title: "New team member"
+    description: "Sarah Johnson joined the team"
+    time: "1 day ago"
+    icon: "user-plus"
+    icon_color: "warning"
+
+  - id: "code_deployed"
+    title: "Code deployed"
+    description: "Version 2.4.1 released to production"
+    time: "2 days ago"
+    icon: "code-branch"
+    icon_color: "info"
+
+quick_actions:
+  - id: "create_project"
+    label: "Create new project"
+    icon: "plus"
+    style: "primary"
+    href: "#"
+
+  - id: "upload_files"
+    label: "Upload files"
+    icon: "upload"
+    style: "outline-adaptive"
+    href: "#"
+
+  - id: "invite_members"
+    label: "Invite team members"
+    icon: "users"
+    style: "outline-adaptive"
+    href: "#"
+
+  - id: "view_analytics"
+    label: "View analytics"
+    icon: "chart-bar"
+    style: "outline-adaptive"
+    href: "/analytics"
+
+  - id: "settings"
+    label: "Settings"
+    icon: "cog"
+    style: "outline-adaptive"
+    href: "/settings"
+
+progress_items:
+  - id: "project_alpha"
+    name: "Project alpha"
+    progress: 75
+    color: "primary"
+
+  - id: "website_redesign"
+    name: "Website redesign"
+    progress: 50
+    color: "info"
+
+  - id: "mobile_app"
+    name: "Mobile app"
+    progress: 90
+    color: "success"
+---
+
+<!-- Dashboard Content -->
+
+<!-- Merged stat card (App DNA: ONE card, hairline column dividers) -->
+<div class="omega-statgrid mb-4">
+  {% for card in resolved.stats_cards %}
+    <div class="omega-statgrid__cell">
+      <div class="omega-statgrid__label">
+        <span class="omega-micro">{{ card.title }}</span>
+        {% omega_icon card.icon, "fa-sm" %}
+      </div>
+      <div class="omega-statgrid__value">{{ card.value }}</div>
+      <span class="badge bg-{{ card.change_type }}-subtle text-{{ card.change_type }}">{{ card.change }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Activity & Quick Actions -->
+<div class="row g-3">
+  <!-- Recent Activity -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="omega-panel-title">Recent activity</h5>
+        <div class="omega-activity">
+          {% for activity in resolved.recent_activity %}
+            <div class="omega-activity__row">
+              <span class="omega-icon-chip omega-icon-chip--neutral">
+                {% omega_icon activity.icon, "fa-sm" %}
+              </span>
+              <div class="omega-activity__body">
+                <div class="omega-activity__title">{{ activity.title }}</div>
+                <p class="omega-activity__desc">{{ activity.description }}</p>
+              </div>
+              <span class="omega-activity__time">{{ activity.time }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="omega-panel-title">Quick actions</h5>
+        <div class="d-grid gap-2">
+          {% for action in resolved.quick_actions %}
+            {% assign _style = action.style %}
+            {% if _style == 'primary' %}{% assign _style = 'adaptive' %}{% endif %}
+            {% if action.href %}
+              <a href="{{ action.href }}" class="btn btn-{{ _style }}">
+                {% omega_icon action.icon, "fa-sm me-2" %}
+                {{ action.label }}
+              </a>
+            {% else %}
+              <button class="btn btn-{{ _style }}">
+                {% omega_icon action.icon, "fa-sm me-2" %}
+                {{ action.label }}
+              </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Overview -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="omega-panel-title">Progress overview</h5>
+        {% for item in resolved.progress_items %}
+          <div class="mb-3{% if forloop.last %} mb-0{% endif %}">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="omega-micro">{{ item.name }}</span>
+              <span class="small text-muted">{{ item.progress }}%</span>
+            </div>
+            <div class="progress" style="height: 5px;">
+              <div class="progress-bar" role="progressbar" style="width: {{ item.progress }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ content | omega_content_format }}

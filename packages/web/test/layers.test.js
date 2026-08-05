@@ -1,7 +1,7 @@
 /**
  * layers.js — the SSG-agnostic core of the theme system: first-layer-wins
  * union collection, and the theme layer chain (consumer-local themes beat
- * packaged ones, the classy base stays last in every chain).
+ * packaged ones, the base layer stays last in every chain).
  *
  * themes.test.js proves this through the real theme tree; this suite pins the
  * resolution RULES against synthetic layer dirs, where the tie-breaks and the
@@ -93,37 +93,50 @@ test('the filter applies to the RELATIVE path, before the win is recorded', (t) 
   assert.strictEqual(winners.get('page.md'), path.join(root, 'active', 'page.md'));
 });
 
-test('a theme chain is the active theme then the classy base', (t) => {
+test('a theme chain is the active theme then the base layer', (t) => {
   const root = fixture(t, {
     'themes/newsflash/main.scss': '',
-    'themes/classy/main.scss': '',
+    'themes/base/main.scss': '',
   });
   const themesDir = path.join(root, 'themes');
 
   assert.deepStrictEqual(
     resolveThemeLayers({ activeTheme: 'newsflash', themesDir }),
-    [path.join(themesDir, 'newsflash'), path.join(themesDir, 'classy')],
+    [path.join(themesDir, 'newsflash'), path.join(themesDir, 'base')],
   );
 });
 
-test('classy is the default and never appears twice in its own chain', (t) => {
-  const root = fixture(t, { 'themes/classy/main.scss': '' });
+test('classy is the default skin and rides over base like every theme', (t) => {
+  const root = fixture(t, {
+    'themes/classy/main.scss': '',
+    'themes/base/main.scss': '',
+  });
   const themesDir = path.join(root, 'themes');
 
   assert.deepStrictEqual(
     resolveThemeLayers({ activeTheme: 'classy', themesDir }),
-    [path.join(themesDir, 'classy')],
+    [path.join(themesDir, 'classy'), path.join(themesDir, 'base')],
   );
   assert.deepStrictEqual(
     resolveThemeLayers({ themesDir }),
-    [path.join(themesDir, 'classy')],
+    [path.join(themesDir, 'classy'), path.join(themesDir, 'base')],
+  );
+});
+
+test('the base layer never appears twice in its own chain', (t) => {
+  const root = fixture(t, { 'themes/base/main.scss': '' });
+  const themesDir = path.join(root, 'themes');
+
+  assert.deepStrictEqual(
+    resolveThemeLayers({ activeTheme: 'base', themesDir }),
+    [path.join(themesDir, 'base')],
   );
 });
 
 test('a consumer-local theme beats the packaged one, per layer', (t) => {
   const root = fixture(t, {
     'themes/newsflash/main.scss': '',
-    'themes/classy/main.scss': '',
+    'themes/base/main.scss': '',
     'brand/themes/newsflash/main.scss': '',
   });
   const themesDir = path.join(root, 'themes');
@@ -133,8 +146,8 @@ test('a consumer-local theme beats the packaged one, per layer', (t) => {
     resolveThemeLayers({ activeTheme: 'newsflash', consumerDir, themesDir }),
     [
       path.join(consumerDir, 'themes', 'newsflash'),
-      // classy has no local copy, so the packaged base stays.
-      path.join(themesDir, 'classy'),
+      // base has no local copy, so the packaged layer stays.
+      path.join(themesDir, 'base'),
     ],
   );
 });
@@ -142,13 +155,13 @@ test('a consumer-local theme beats the packaged one, per layer', (t) => {
 test('a consumerDir without a local copy falls back to the packaged theme', (t) => {
   const root = fixture(t, {
     'themes/newsflash/main.scss': '',
-    'themes/classy/main.scss': '',
+    'themes/base/main.scss': '',
     'brand/src/index.md': '',
   });
   const themesDir = path.join(root, 'themes');
 
   assert.deepStrictEqual(
     resolveThemeLayers({ activeTheme: 'newsflash', consumerDir: path.join(root, 'brand'), themesDir }),
-    [path.join(themesDir, 'newsflash'), path.join(themesDir, 'classy')],
+    [path.join(themesDir, 'newsflash'), path.join(themesDir, 'base')],
   );
 });

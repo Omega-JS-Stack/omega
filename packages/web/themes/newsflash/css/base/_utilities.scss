@@ -39,10 +39,74 @@ body::after {
 // ============================================
 // Accent text (headline_accent spans) — italic serif vermilion
 // ============================================
-.text-accent {
+// Fork markup wears newsflash-accent; base markup reaches the same look
+// through the .omega-display em rule below.
+.newsflash-accent {
   font-family: $nf-font-display;
   font-style: italic;
   color: var(--omega-accent);
+}
+
+// ============================================
+// Base voice re-tunes: the omega-* type vocabulary the fallthrough
+// surfaces speak (classy's typography partial is deliberately NOT imported;
+// these are the pieces base markup actually uses, in the editorial voice)
+// ============================================
+// Marketing display: optical serif (Fraunces via --omega-font-marketing),
+// accents italic vermilion (the newsflash-accent treatment on base markup).
+.omega-display {
+  font-family: var(--omega-font-marketing);
+  font-optical-sizing: auto;
+  font-weight: 550;
+  letter-spacing: -0.022em;
+  line-height: 1.06;
+
+  em,
+  i {
+    font-style: italic;
+    color: var(--omega-accent);
+  }
+}
+
+.omega-display--hero {
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  line-height: 1.04;
+}
+
+.omega-display--page {
+  font-size: clamp(2.25rem, 4.6vw, 3.375rem);
+}
+
+.omega-display--section {
+  font-size: clamp(1.875rem, 3.4vw, 2.625rem);
+  line-height: 1.08;
+}
+
+// Micro labels become the vermilion kicker voice (sans dot; the dot is the
+// fork kicker's flourish). Authored in full: classy's typography partial
+// (the usual .omega-micro home) is not imported.
+.omega-micro {
+  font-family: $font-family-sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--omega-accent);
+}
+
+// The faintest voice (footnotes, reassurance lines): same home story.
+.omega-quiet {
+  color: var(--omega-ink-faint);
+}
+
+// Serif voice on arbitrary elements (status page numbers): same home story.
+.text-marketing {
+  font-family: var(--omega-font-marketing);
+}
+
+// In-page anchors clear the sticky masthead.
+[id] {
+  scroll-margin-top: 6rem;
 }
 
 // ============================================

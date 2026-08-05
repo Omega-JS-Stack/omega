@@ -57,7 +57,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 
 // ── Sidebar internals ────────────────────────────────────────────────────────
 
-.classy-side__brand {
+.omega-side__brand {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -84,7 +84,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 }
 
 // Project selector module (optional)
-.classy-side__selector {
+.omega-side__selector {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -101,7 +101,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
     border-color: var(--omega-line-strong);
   }
 
-  .classy-side__selector-tile {
+  .omega-side__selector-tile {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -115,27 +115,27 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
     flex-shrink: 0;
   }
 
-  .classy-side__selector-name {
+  .omega-side__selector-name {
     font-size: 0.84375rem;
     font-weight: 600;
     color: var(--omega-ink);
     line-height: 1.2;
   }
 
-  .classy-side__selector-env {
+  .omega-side__selector-env {
     font-size: 0.71875rem;
     color: var(--omega-ink-faint);
     line-height: 1.2;
   }
 
-  .classy-side__selector-chevron {
+  .omega-side__selector-chevron {
     margin-inline-start: auto;
     color: var(--omega-ink-faint);
   }
 }
 
 // Section micro-labels
-.classy-side__label {
+.omega-side__label {
   display: block;
   margin: 1.125rem 0 0.375rem;
   padding-inline: 0.625rem;
@@ -148,7 +148,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 
 // Nav items — transparent border at rest so the ACTIVE state never shifts
 // geometry (binding constraint #5).
-.classy-side__item {
+.omega-side__item {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -168,7 +168,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
     background-color var(--omega-speed) var(--omega-ease),
     border-color var(--omega-speed) var(--omega-ease);
 
-  .classy-side__icon {
+  .omega-side__icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -183,7 +183,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
     color: var(--omega-ink);
     background: color-mix(in srgb, var(--omega-surface) 72%, transparent);
 
-    .classy-side__icon {
+    .omega-side__icon {
       color: var(--omega-ink-muted);
     }
   }
@@ -193,42 +193,42 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
     background: var(--omega-surface);
     border-color: var(--omega-line);
 
-    .classy-side__icon {
+    .omega-side__icon {
       color: var(--omega-accent);
     }
   }
 
-  .classy-side__chip {
+  .omega-side__chip {
     margin-inline-start: auto;
   }
 
   // Group chevron (rotates when expanded)
-  .classy-side__chevron {
+  .omega-side__chevron {
     margin-inline-start: auto;
     color: var(--omega-ink-faint);
     transition: transform var(--omega-speed) var(--omega-ease);
   }
 
-  &[aria-expanded='true'] .classy-side__chevron {
+  &[aria-expanded='true'] .omega-side__chevron {
     transform: rotate(90deg);
   }
 }
 
 // Nested group children — tree hairline under the parent icon column
-.classy-side__children {
+.omega-side__children {
   margin: 0.125rem 0 0.25rem 1.0625rem;
   padding-inline-start: 0.625rem;
   border-inline-start: 1px solid var(--omega-line);
   list-style: none;
 
-  .classy-side__item {
+  .omega-side__item {
     min-height: 1.875rem;
     font-size: 0.8125rem;
   }
 }
 
 // Sponsored slot (optional; sits above the user row)
-.classy-side__ad {
+.omega-side__ad {
   padding: 0.625rem;
   margin-top: 0.75rem;
   background: var(--omega-surface);
@@ -239,7 +239,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 }
 
 // User row (bottom)
-.classy-side__user {
+.omega-side__user {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -247,14 +247,14 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
   padding: 0.75rem 0.625rem 0;
   border-top: 1px solid var(--omega-line);
 
-  .classy-side__user-name {
+  .omega-side__user-name {
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--omega-ink);
     line-height: 1.2;
   }
 
-  .classy-side__user-email {
+  .omega-side__user-email {
     font-size: 0.71875rem;
     color: var(--omega-ink-faint);
     line-height: 1.2;
@@ -263,30 +263,30 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 
 // ── Rail collapse ────────────────────────────────────────────────────────────
 // Core hides every .omega-shell__label; classy centers what remains. Scoped
-// under __sidebar: classy-side__* is also the dialect of in-page rails (the
+// under __sidebar: omega-side__* is also the dialect of in-page rails (the
 // account section nav), which the sidebar collapse must never squish.
 
 .omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
-  .classy-side__brand,
-  .classy-side__item {
+  .omega-side__brand,
+  .omega-side__item {
     justify-content: center;
     padding-inline: 0;
   }
 
-  .classy-side__selector {
+  .omega-side__selector {
     justify-content: center;
     padding: 0.5rem 0;
   }
 
-  .classy-side__selector-chevron,
-  .classy-side__chevron,
-  .classy-side__chip,
-  .classy-side__ad,
-  .classy-side__children {
+  .omega-side__selector-chevron,
+  .omega-side__chevron,
+  .omega-side__chip,
+  .omega-side__ad,
+  .omega-side__children {
     display: none;
   }
 
-  .classy-side__user {
+  .omega-side__user {
     justify-content: center;
     padding-inline: 0;
   }
@@ -295,30 +295,30 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 // The drawer always shows at full width with labels (mirrors the core rule).
 @media (max-width: ($shell-breakpoint - 0.02px)) {
   .omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
-    .classy-side__brand,
-    .classy-side__item {
+    .omega-side__brand,
+    .omega-side__item {
       justify-content: flex-start;
       padding-inline: 0.625rem;
     }
 
-    .classy-side__selector {
+    .omega-side__selector {
       justify-content: flex-start;
       padding: 0.5rem 0.625rem;
     }
 
-    .classy-side__selector-chevron,
-    .classy-side__chevron,
-    .classy-side__chip,
-    .classy-side__ad,
-    .classy-side__children {
+    .omega-side__selector-chevron,
+    .omega-side__chevron,
+    .omega-side__chip,
+    .omega-side__ad,
+    .omega-side__children {
       display: revert;
     }
 
-    .classy-side__children {
+    .omega-side__children {
       display: block;
     }
 
-    .classy-side__user {
+    .omega-side__user {
       justify-content: flex-start;
       padding-inline: 0.625rem;
     }
@@ -327,7 +327,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 
 // ── Topbar internals ─────────────────────────────────────────────────────────
 
-.classy-topbar__crumbs {
+.omega-topbar__crumbs {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -336,7 +336,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
   color: var(--omega-ink);
   white-space: nowrap;
 
-  .classy-topbar__crumb-sep {
+  .omega-topbar__crumb-sep {
     color: var(--omega-ink-faint);
     font-weight: 400;
   }
@@ -351,7 +351,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
   }
 }
 
-.classy-topbar__center {
+.omega-topbar__center {
   display: none;
   flex: 1;
   justify-content: center;

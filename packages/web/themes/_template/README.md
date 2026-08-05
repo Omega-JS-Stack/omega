@@ -34,7 +34,7 @@ copy beats the packaged one with the same id).
 
 Unlike layouts/includes, the MAIN stylesheet does **not** fall through:
 exactly one `_theme.scss` loads — yours. The shared layouts you inherit emit
-classy's `classy-*` content vocabulary (nav, footer, marketing sections,
+classy's `omega-*` content vocabulary (nav, footer, marketing sections,
 auth/form panels — see `docs/shared/theming.md`), so a theme that doesn't restyle
 that vocabulary renders those pages structurally intact but unstyled beyond
 Bootstrap + core tokens/shell/motion. Budget for it: restyle the vocabulary

@@ -1,0 +1,115 @@
+---
+layout: frontend/core/base
+
+# ═══ /updates — reimagined 2026-07-16: a version TIMELINE (hairline spine,
+# version nodes, latest release featured) instead of a stack of identical
+# cards. Data: site.updates (update.version/title/date/summary/highlights).
+
+# Hero Section
+hero:
+  headline: "What changed, and"
+  headline_accent: "when"
+  subheadline: "Every release, its reasons, and the fine print. Newest first."
+
+# Updates Section
+updates:
+  empty_message: "No releases yet. The first one will land right here."
+  view_details: "Read the release notes"
+  latest_badge: "Latest"
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    {% component "heading/masthead", eyebrow: "Changelog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+  </div>
+</section>
+
+<!-- ═══ The timeline ═══ -->
+<section class="pt-2">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-9 col-xl-8">
+        {% if site.updates %}
+          {% assign updates = site.updates | sort: 'update.date' | reverse %}
+        {% else %}
+          {% assign updates = nil %}
+        {% endif %}
+
+        {% if updates and updates.size > 0 %}
+          <div class="omega-timeline" id="updates-list">
+            {% for item in updates %}
+              {% if item.draft and jekyll.environment == 'production' %}
+                {% continue %}
+              {% endif %}
+
+              <article class="omega-timeline__entry {% if forloop.first %}omega-timeline__entry--latest{% endif %}" data-omega-reveal>
+                <div class="omega-timeline__node" aria-hidden="true">
+                  <span class="omega-timeline__dot"></span>
+                </div>
+
+                <div class="omega-timeline__meta">
+                  <span class="omega-timeline__version font-monospace">v{{ item.update.version }}</span>
+                  {% if forloop.first %}
+                    <span class="omega-status omega-status--ok"><span class="omega-dot omega-dot--ok"></span>{{ resolved.updates.latest_badge }}</span>
+                  {% endif %}
+                  <time class="omega-quiet small" datetime="{{ item.update.date | date: '%Y-%m-%d' }}">{{ item.update.date | date: "%b %d, %Y" }}</time>
+                </div>
+
+                <div class="omega-timeline__body">
+                  <h2 class="omega-timeline__title">
+                    <a href="{{ item.url }}" class="stretched-link">
+                      {% iftruthy item.update.title %}{{ item.update.title }}{% endiftruthy %}
+                      {% iffalsy item.update.title %}Version {{ item.update.version }}{% endiffalsy %}
+                    </a>
+                  </h2>
+
+                  {% iftruthy item.update.summary %}
+                    <p class="omega-timeline__summary omega-quiet">{{ item.update.summary }}</p>
+                  {% endiftruthy %}
+
+                  {% iftruthy item.update.highlights %}
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                      {% for highlight in item.update.highlights %}
+                        <span class="omega-chip">{{ highlight.text }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endiftruthy %}
+
+                  <span class="omega-timeline__more small">
+                    {{ resolved.updates.view_details }}
+                    {% omega_icon "arrow-right", "fa-xs ms-1" %}
+                  </span>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="omega-status-empty" data-omega-reveal>
+            <span class="omega-dot"></span>
+            <span>{{ resolved.updates.empty_message }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Cross-links ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="d-flex justify-content-center align-items-center gap-3 omega-quiet small flex-wrap" data-omega-reveal>
+      <a href="/status" class="text-decoration-none">
+        {% omega_icon "signal", "fa-xs me-1" %}
+        System status
+      </a>
+      <span>•</span>
+      <a href="/blog" class="text-decoration-none">
+        {% omega_icon "newspaper", "fa-xs me-1" %}
+        The blog
+      </a>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

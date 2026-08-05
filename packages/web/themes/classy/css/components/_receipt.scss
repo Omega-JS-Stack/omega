@@ -2,21 +2,21 @@
 // (order summary) and payment confirmation (the receipt moment). Promoted
 // from the confirmation page css once checkout became the second consumer.
 
-.classy-receipt__panel {
+.omega-receipt__panel {
   background: var(--omega-surface-2);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-m);
   padding: 0.5rem 1.375rem;
 }
 
-.classy-receipt__row {
+.omega-receipt__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding-block: 0.875rem;
 
-  & + .classy-receipt__row {
+  & + .omega-receipt__row {
     border-top: 1px solid var(--omega-line);
   }
 
@@ -30,7 +30,7 @@
   }
 }
 
-.classy-receipt__total {
+.omega-receipt__total {
   font-family: var(--omega-font-marketing);
   font-size: 1.5rem;
   font-weight: 550;
@@ -38,7 +38,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.classy-receipt__note {
+.omega-receipt__note {
   padding: 0.875rem 0;
   border-top: 1px solid var(--omega-line);
   color: var(--omega-ink-muted);

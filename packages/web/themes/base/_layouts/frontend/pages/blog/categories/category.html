@@ -1,0 +1,74 @@
+---
+layout: frontend/core/base
+
+# Hero Section
+hero:
+  subheadline: "Browse all posts in this category"
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="/blog">Blog</a>
+      <span>/</span>
+      <a href="/blog/categories">Categories</a>
+      <span>/</span>
+      <span>{{ resolved.category.name }}</span>
+    </div>
+
+    {% component "heading/masthead", headline: resolved.category.name, sub: resolved.hero.subheadline %}
+  </div>
+</section>
+
+<!-- ═══ Posts grid ═══ -->
+<section class="pt-0">
+  <div class="container">
+    {% comment %} Filter posts by category (max 100) {% endcomment %}
+    {% assign category_slug = resolved.category.slug %}
+    {% assign filtered_posts = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% if filtered_posts.size >= 100 %}
+        {% break %}
+      {% endif %}
+      {% for category in post.post.categories %}
+        {% assign cat_slug = category | slugify %}
+        {% if cat_slug == category_slug %}
+          {% assign filtered_posts = filtered_posts | push: post %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="row g-4 mb-5" data-omega-reveal-stagger="60">
+      {% for post in filtered_posts %}
+        <div class="col-xl-4 col-lg-6 col-md-12" data-omega-reveal>
+          {% include frontend/components/post-card.html post=post %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if filtered_posts.size == 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6 text-center" data-omega-reveal>
+          <div class="py-5">
+            <h2 class="h5">No posts in this category</h2>
+            <p class="text-muted">Check back soon for new content.</p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Back to Categories -->
+    <div class="row justify-content-center">
+      <div class="col-12 text-center">
+        <a href="/blog/categories" class="btn btn-outline-adaptive">
+          {% omega_icon "arrow-left", "fa-sm me-2" %}
+          All categories
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

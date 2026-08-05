@@ -1,0 +1,173 @@
+---
+layout: frontend/core/base
+
+# Hero Section
+hero:
+  headline: "We'd love your"
+  headline_accent: "feedback"
+  subheadline: "Help us improve {{ site.brand.name }} by sharing your experience"
+
+# Feedback Form Section
+feedback_form:
+  superheadline:
+    icon: "face-smile"
+    text: "Your experience"
+  headline: "How would you rate <em>{{ site.brand.name }}</em>?"
+  subheadline: "Select a rating and let us know what you think."
+  ratings:
+    - id: "dislike"
+      label: "Poor"
+      image: "https://cdn.itwcreativeworks.com/assets/general/images/feedback/dislike.png"
+    - id: "neutral"
+      label: "Okay"
+      image: "https://cdn.itwcreativeworks.com/assets/general/images/feedback/neutral.png"
+    - id: "like"
+      label: "Good"
+      image: "https://cdn.itwcreativeworks.com/assets/general/images/feedback/like.png"
+    - id: "love"
+      label: "Excellent"
+      image: "https://cdn.itwcreativeworks.com/assets/general/images/feedback/love.png"
+
+# Prerender icons for JS
+prerender_icons:
+  - name: "star"
+  - name: "arrow-up-right-from-square"
+  - name: "copy"
+  - name: "check"
+---
+
+<!-- ═══ Feedback — aside head + form panel ═══ -->
+<section class="omega-dotgrid" data-omega-dotfield>
+  <div class="container">
+    <div class="omega-duo" style="--omega-duo-cols: 5fr 7fr;">
+      <!-- Aside: the ask, stated once -->
+      <div class="omega-duo__aside" data-omega-reveal-stagger="90">
+        {% component "heading/masthead", eyebrow: "Feedback", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+        <p class="small omega-quiet mt-4 mb-0" data-omega-reveal>
+          {% omega_icon "reply", "fa-xs me-1" %}
+          Every submission is read by a human, and the sharp ones shape the roadmap.
+        </p>
+      </div>
+
+      <!-- The form -->
+      <div class="omega-form-panel" data-omega-reveal>
+        <div class="mb-4">
+          <h2 class="omega-display omega-display--section mb-2">{{ resolved.feedback_form.headline }}</h2>
+          {% iftruthy resolved.feedback_form.subheadline %}
+            <p class="text-muted mb-0">{{ resolved.feedback_form.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <form id="feedback-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
+              <!-- Rating Selection -->
+              <div class="feedback-rating-group mb-4">
+                <input type="hidden" name="rating" id="feedback-rating-input" required>
+                <div class="row g-3 justify-content-center">
+                  {% for rating in resolved.feedback_form.ratings %}
+                    <div class="col-6 col-sm-3">
+                      <button type="button" class="feedback-rating-btn w-100 text-center" data-rating="{{ rating.id }}">
+                        <img src="{{ rating.image | omega_cachebreak }}" alt="{{ rating.label }}" class="feedback-rating-img mb-2" width="64" height="64" loading="eager">
+                        <span class="d-block small fw-semibold">{{ rating.label }}</span>
+                      </button>
+                    </div>
+                  {% endfor %}
+                </div>
+                <div class="invalid-feedback"></div>
+              </div>
+
+              <!-- Honeypot field (bot detection) -->
+              <div class="form-group" style="display: none;" aria-hidden="true">
+                <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+              </div>
+
+              <!-- Hidden auth fields (auto-populated via bindings) -->
+              <input type="hidden" aria-hidden="true" name="auth.user.uid" data-omega-bind="@value auth.user.uid">
+              <input type="hidden" aria-hidden="true" name="auth.user.email" data-omega-bind="@value auth.user.email">
+
+              <!-- Positive feedback? -->
+              <div class="mb-4">
+                <label for="feedback-positive" class="form-label fw-semibold">
+                  What do you like about {{ site.brand.name }}?
+                </label>
+                <textarea class="form-control form-control-lg" id="feedback-positive" name="positive" rows="2"
+                  placeholder="Tell us what you enjoy..."
+                  maxlength="2000"></textarea>
+              </div>
+
+              <!-- Negative feedback? -->
+              <div class="mb-4">
+                <label for="feedback-negative" class="form-label fw-semibold">
+                  What could we improve?
+                </label>
+                <textarea class="form-control form-control-lg" id="feedback-negative" name="negative" rows="2"
+                  placeholder="Let us know how we can do better..."
+                  maxlength="2000"></textarea>
+              </div>
+
+              <!-- Additional Comments -->
+              <div class="mb-4">
+                <label for="feedback-comments" class="form-label fw-semibold">
+                  Additional comments
+                </label>
+                <textarea class="form-control form-control-lg" id="feedback-comments" name="comments" rows="3"
+                  placeholder="Anything else you'd like to share..."
+                  maxlength="5000"></textarea>
+              </div>
+
+              <!-- Submit -->
+              <div class="d-grid">
+                <button type="submit" class="btn btn-adaptive btn-lg">
+                  {% omega_icon "paper-plane", "fa-sm me-2" %}
+                  Submit feedback
+                </button>
+              </div>
+            </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Review Prompt Modal -->
+<div class="modal fade" id="review-modal" tabindex="-1" aria-labelledby="review-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4 p-md-5">
+        <div class="mb-4">
+          <img src="{{ 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/love.png' | omega_cachebreak }}" alt="Thank you" width="72" height="72">
+        </div>
+        <h3 class="omega-display omega-display--section mb-3" id="review-modal-label">You're <em>awesome</em>!</h3>
+        <p class="text-muted mb-3">
+          We're so glad you love {{ site.brand.name }}! Share your experience on a review site to be entered to win a $100 gift card.
+        </p>
+        <div class="alert alert-warning text-start small mb-4" role="alert">
+          {% omega_icon "circle-exclamation", "me-1" %}
+          You must actually post your review to be eligible for the $100 gift card. Closing this without publishing a review won't qualify.
+        </div>
+
+        <!-- Copy-paste feedback -->
+        <div class="text-start mb-4">
+          <label class="form-label fw-semibold small text-muted">
+            Your feedback (copy and paste into your review)
+          </label>
+          <div class="position-relative">
+            <textarea id="review-modal-feedback" class="form-control" rows="4" readonly></textarea>
+            <button type="button" id="review-modal-copy" class="btn btn-sm btn-adaptive position-absolute top-0 end-0 m-2">
+              {% omega_icon "copy", "fa-sm me-1" %}
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <a id="review-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-adaptive btn-lg mb-3">
+          Post your review
+          {% omega_icon "arrow-up-right-from-square", "fa-sm ms-2" %}
+        </a>
+        <div>
+          <button type="button" class="btn btn-link text-muted" data-bs-dismiss="modal">Maybe later</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ content | omega_content_format }}

@@ -8,7 +8,7 @@
  *
  * Tier 2 — consumer-local FULL theme: `<consumer>/themes/<id>` beats the
  * packaged theme for the same id (resolveThemeLayers), its layouts win the
- * farm, and pages it doesn't cover fall through to the classy base.
+ * farm, and pages it doesn't cover fall through to the base layer.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -31,26 +31,26 @@ const THEMING = path.join(__dirname, 'fixtures', 'theming');
 
 // ─── resolveThemeLayers ──────────────────────────────────────────────────────
 
-test('resolveThemeLayers: consumer-local theme wins; packaged is the fallback; classy base always present', () => {
+test('resolveThemeLayers: consumer-local theme wins; packaged is the fallback; base always present', () => {
   const themesDir = path.join(PKG, 'themes');
 
   // mini-site ships themes/toy → consumer-local dir wins for 'toy'
   const local = resolveThemeLayers({ activeTheme: 'toy', consumerDir: MINI, themesDir });
   assert.deepEqual(local, [
     path.join(MINI, 'themes', 'toy'),
-    path.join(themesDir, 'classy'),
+    path.join(themesDir, 'base'),
   ]);
 
   // no consumer-local dir for 'newsflash' → packaged theme
   const packaged = resolveThemeLayers({ activeTheme: 'newsflash', consumerDir: MINI, themesDir });
   assert.deepEqual(packaged, [
     path.join(themesDir, 'newsflash'),
-    path.join(themesDir, 'classy'),
+    path.join(themesDir, 'base'),
   ]);
 
-  // classy active (and the default) dedups to a single layer
-  assert.deepEqual(resolveThemeLayers({ activeTheme: 'classy', consumerDir: MINI, themesDir }), [path.join(themesDir, 'classy')]);
-  assert.deepEqual(resolveThemeLayers({ themesDir }), [path.join(themesDir, 'classy')]);
+  // classy is a skin like the others (#177): it rides over base too
+  assert.deepEqual(resolveThemeLayers({ activeTheme: 'classy', consumerDir: MINI, themesDir }), [path.join(themesDir, 'classy'), path.join(themesDir, 'base')]);
+  assert.deepEqual(resolveThemeLayers({ themesDir }), [path.join(themesDir, 'classy'), path.join(themesDir, 'base')]);
 });
 
 test('the dev asset lane resolves the consumer-local theme the engine renders (#137)', () => {
@@ -66,7 +66,7 @@ test('the dev asset lane resolves the consumer-local theme the engine renders (#
   try {
     const layers = resolveAssetThemeLayers(consumerPaths(root), 'toy-theme');
 
-    assert.deepEqual(layers, [themeDir, path.join(PKG, 'themes', 'classy')]);
+    assert.deepEqual(layers, [themeDir, path.join(PKG, 'themes', 'base')]);
     // The consequence: the theme's stylesheet is what the css lane compiles.
     assert.equal(
       collectLayered(layers.map((layer) => path.join(layer, 'css')), /^main\.scss$/).get('main.scss'),
@@ -108,7 +108,7 @@ test('tier 1: consumer main.scss pulls, configures, and overrides the chain via 
 
 test('inheritance hatch: a partial theme @forwards omega:theme and inherits the classy chain (cp190)', () => {
   const partialRoot = path.join(THEMING, 'partial-theme');
-  const layers = [partialRoot, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
+  const layers = [partialRoot, path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')];
 
   const css = sass.compile(path.join(partialRoot, '_theme.scss'), {
     importers: [layeredFileImporter(layers), sectionsImporter([])],
@@ -118,15 +118,15 @@ test('inheritance hatch: a partial theme @forwards omega:theme and inherits the 
     logger: { warn: () => {}, debug: () => {} },
   }).css;
 
-  // The self-skip landed the @forward on classy — its full chain emitted
-  assert.ok(css.includes('.classy-auth'), 'classy auth vocabulary inherited');
-  assert.ok(css.includes('.classy-statgrid'), 'classy app vocabulary inherited');
+  // The self-skip landed the @forward on base, whose bridge emits classy
+  assert.ok(css.includes('.omega-auth'), 'classy auth vocabulary inherited');
+  assert.ok(css.includes('.omega-statgrid'), 'classy app vocabulary inherited');
   assert.ok(css.includes('--bs-body-bg: var(--omega-ground)'), 'classy token bridge inherited');
 
   // The partial theme's own rules land AFTER the chain so they win ties
   assert.ok(css.includes('--partial-marker'), 'partial theme rules present');
   assert.ok(
-    css.indexOf('--partial-marker') > css.lastIndexOf('.classy-statgrid'),
+    css.indexOf('--partial-marker') > css.lastIndexOf('.omega-statgrid'),
     'partial rules land after the inherited chain',
   );
 });
@@ -136,7 +136,7 @@ test('inheritance hatch: a partial theme @forwards omega:theme and inherits the 
 // The compiled main bundle for a theme root of any provenance (fixture dirs
 // included — the shipped chain always sits under it).
 function compileMain(themeRoot) {
-  const layers = [themeRoot, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
+  const layers = [themeRoot, path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')];
   return sass.compile(path.join(PKG, 'core', 'css', 'main.scss'), {
     importers: [layeredFileImporter(layers), sectionsImporter([])],
     loadPaths: layers,
@@ -151,7 +151,7 @@ test('fall-through guard: a hatchless partial theme warns and names the inherita
   const warnings = [];
   const result = checkThemeVocabulary({
     css: compileMain(themeRoot),
-    themeRoots: [themeRoot, path.join(PKG, 'themes', 'classy')],
+    themeRoots: [themeRoot, path.join(PKG, 'themes', 'base')],
     warn: (message) => warnings.push(message),
   });
 
@@ -159,12 +159,12 @@ test('fall-through guard: a hatchless partial theme warns and names the inherita
   assert.deepEqual(result, {
     theme: 'hatchless-theme',
     lane: 'hatch',
-    missing: ['.classy-auth', '.classy-statgrid', '.classy-footer'],
+    missing: ['.omega-auth', '.omega-statgrid', '.omega-footer'],
   });
 
   const block = warnings[0];
   assert.ok(block.includes('theme "hatchless-theme"'), 'names the theme');
-  assert.ok(block.includes('.classy-auth (pages/auth'), 'names the missing sentinel and its partial');
+  assert.ok(block.includes('.omega-auth (pages/auth'), 'names the missing sentinel and its partial');
   assert.ok(block.includes('inheritance hatch'), 'names the missing piece');
   assert.ok(block.includes("@forward 'omega:theme';"), 'carries the exact fix line');
   assert.ok(block.includes('themes/hatchless-theme/_theme.scss'), 'names the file to edit');
@@ -176,7 +176,7 @@ test('fall-through guard: a sibling theme with its own Bootstrap is sent to the 
   const warnings = [];
   const result = checkThemeVocabulary({
     css: compileMain(themeRoot),
-    themeRoots: [themeRoot, path.join(PKG, 'themes', 'classy')],
+    themeRoots: [themeRoot, path.join(PKG, 'themes', 'base')],
     warn: (message) => warnings.push(message),
   });
 
@@ -209,7 +209,7 @@ test('fall-through guard: every bundled theme is silent (#98)', () => {
 
 test('fall-through guard: the asset lane fires it on the real css build (#98)', async () => {
   const themeRoot = path.join(THEMING, 'hatchless-theme');
-  const themeRoots = [themeRoot, path.join(PKG, 'themes', 'classy')];
+  const themeRoots = [themeRoot, path.join(PKG, 'themes', 'base')];
   const warnings = [];
   await buildAssets({
     layers: [...themeRoots, path.join(PKG, 'core')],
@@ -228,7 +228,7 @@ test('fall-through guard: the asset lane fires it on the real css build (#98)', 
 
 // ─── Tier 2: consumer-local full theme through the engine ────────────────────
 
-test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall through to classy', async () => {
+test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall through to base', async () => {
   const pages = await buildWith(miniData, { activeTheme: 'toy' });
 
   const pricing = pages.get('/pricing');
@@ -237,10 +237,13 @@ test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall th
 
   const about = pages.get('/about');
   assert.ok(about && about.length > 0, 'pages the toy theme does not cover still render');
-  assert.ok(about.includes('<html'), 'fallback pages render through the classy base chain');
+  assert.ok(about.includes('<html'), 'fallback pages render through the base chain');
+  // #177 reverses cp200: fonts are SKIN assets, and classy left the partial
+  // theme's chain when base became the terminal layer. A theme that vendors
+  // no faces now emits no preloads; the classy faces belong to classy alone.
   assert.ok(
-    about.includes('/assets/fonts/inter-normal-latin.woff2'),
-    'toy theme vendors no fonts — preloads fall through to the classy base faces (cp200)',
+    !about.includes('/assets/fonts/inter-normal-latin.woff2'),
+    'toy theme vendors no fonts, so no skin faces preload (#177, ex-cp200)',
   );
 });
 
@@ -275,8 +278,8 @@ test('statgrid: columns come from the container, never the viewport (#69)', () =
   assert.equal(tracks.length, 1, 'one track definition, no breakpoint variant');
   assert.ok(tracks[0].includes('auto-fit'), 'intrinsic sizing fits as many cells as the container holds');
   assert.ok(
-    tracks[0].includes('var(--classy-statgrid-cols'),
-    'the --classy-statgrid-cols knob still caps the column count',
+    tracks[0].includes('var(--omega-statgrid-cols'),
+    'the --omega-statgrid-cols knob still caps the column count',
   );
 
   // Hairlines can't count columns anymore (the reflow decides how many land
@@ -315,9 +318,9 @@ test("a blog post hands its nav clearance to the dot band, so the dots open the 
 
   // Ian's screenshot ruling (2026-07-31): held by the <article>, the band
   // started 10rem down and the dots read detached from the nav.
-  const band = 'main > article:first-of-type:has(> .classy-dotgrid:first-child)';
+  const band = 'main > article:first-of-type:has(> .omega-dotgrid:first-child)';
   assert.ok(css.includes(`${band} {\n  padding-top: 0;`), 'the article gives up the clearance');
-  assert.ok(css.includes(`${band} > .classy-dotgrid:first-child`), 'the band takes it instead');
+  assert.ok(css.includes(`${band} > .omega-dotgrid:first-child`), 'the band takes it instead');
 
   // Same numbers as every other opener, at both breakpoints (one mixin).
   const openerClearance = css.match(/padding-top: 10rem;/g) || []; // the breakout utility's !important twin is a different rule
@@ -327,19 +330,19 @@ test("a blog post hands its nav clearance to the dot band, so the dots open the 
 });
 
 test('a blog post wears the dotfield behind its masthead only, never behind the prose (#44)', () => {
-  const post = fs.readFileSync(path.join(PKG, 'themes', 'classy', '_layouts', 'frontend', 'pages', 'blog', 'post.html'), 'utf8');
+  const post = fs.readFileSync(path.join(PKG, 'themes', 'base', '_layouts', 'frontend', 'pages', 'blog', 'post.html'), 'utf8');
 
   // The read surface stays still: the <article> itself carries no dot grid
   // (it wraps the prose), and the ONE dotfield band closes before the
   // content column opens.
   assert.match(post, /<article\{% unless/, 'the post still opens with the <article> the section rhythm names');
-  assert.ok(!/<article[^>]*classy-dotgrid/.test(post), 'no dot grid on the article — dots behind body text is the thing we fixed');
+  assert.ok(!/<article[^>]*omega-dotgrid/.test(post), 'no dot grid on the article — dots behind body text is the thing we fixed');
 
   const bands = post.match(/data-omega-dotfield[ >]/g) || [];
   assert.equal(bands.length, 1, 'exactly one dotfield band on a post');
-  assert.match(post, /<div class="classy-dotgrid" data-omega-dotfield>/, 'the band carries the same contract as every other hero');
+  assert.match(post, /<div class="omega-dotgrid" data-omega-dotfield>/, 'the band carries the same contract as every other hero');
   assert.ok(
-    post.indexOf('<div class="classy-dotgrid" data-omega-dotfield>') < post.indexOf('blog-post-content'),
+    post.indexOf('<div class="omega-dotgrid" data-omega-dotfield>') < post.indexOf('blog-post-content'),
     'the band sits above the prose column',
   );
 });

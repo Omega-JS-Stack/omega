@@ -24,7 +24,7 @@ const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'dataviz-test');
 
 const charts = require('../core/js/libs/charts.js');
-const ORG_CHART = path.join(PKG, 'themes', 'classy', '_components', 'data', 'org-chart');
+const ORG_CHART = path.join(PKG, 'themes', 'base', '_components', 'data', 'org-chart');
 
 /** Install a token sheet as the document's computed :root styles. */
 function stubTokens(tokens) {

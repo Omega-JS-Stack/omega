@@ -2,8 +2,8 @@
 // Drives the reading-progress bar: fills the fixed top rule as the reader
 // scrolls through the page. NOTE: [slug] wildcard filename (spec §7) — the
 // key blog/[slug] serves every /blog/<slug> post page, no frontmatter.
-export default ({ manager, options }) => {
-  const $bar = document.querySelector('.reading-progress > span');
+export default () => {
+  const $bar = document.querySelector('.newsflash-progress > span');
   if (!$bar) {
     return;
   }

@@ -197,15 +197,15 @@ function renderRow(row) {
 
   // Plan cell — accent chip for paid plans, quiet chip for basic
   const planChip = isPaid
-    ? `<span class="classy-chip classy-chip--accent">${escape(capitalize(plan))}</span>`
-    : `<span class="classy-chip">${escape(capitalize(plan))}</span>`;
+    ? `<span class="omega-chip omega-chip--accent">${escape(capitalize(plan))}</span>`
+    : `<span class="omega-chip">${escape(capitalize(plan))}</span>`;
   const subStatus = row.subscriptionStatus && isPaid
     ? `<div class="text-muted mt-1" style="font-size: 0.7rem;">${escape(row.subscriptionStatus)}</div>`
     : '';
 
   // Sign-in cell (providers + last sign-in)
   const providers = (auth?.providers || [])
-    .map((id) => `<span class="classy-chip">${escape(PROVIDER_LABELS[id] || id)}</span>`)
+    .map((id) => `<span class="omega-chip">${escape(PROVIDER_LABELS[id] || id)}</span>`)
     .join(' ');
   const lastSignIn = auth?.lastSignIn
     ? `<div class="text-muted mt-1" style="font-size: 0.7rem;">${escape(formatTimeAgo(new Date(auth.lastSignIn).getTime()))}</div>`
@@ -218,11 +218,11 @@ function renderRow(row) {
   let statusCell = '<span class="text-muted small">—</span>';
   if (auth) {
     statusCell = auth.emailVerified
-      ? '<span class="classy-status"><span class="classy-dot classy-dot--ok"></span>Verified</span>'
-      : '<span class="classy-status"><span class="classy-dot"></span>Unverified</span>';
+      ? '<span class="omega-status"><span class="omega-dot omega-dot--ok"></span>Verified</span>'
+      : '<span class="omega-status"><span class="omega-dot"></span>Unverified</span>';
 
     if (auth.disabled) {
-      statusCell += ' <span class="classy-status ms-1"><span class="classy-dot classy-dot--danger"></span>Disabled</span>';
+      statusCell += ' <span class="omega-status ms-1"><span class="omega-dot omega-dot--danger"></span>Disabled</span>';
     }
   }
 
@@ -233,7 +233,7 @@ function renderRow(row) {
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="classy-icon-chip classy-icon-chip--neutral">${getPrerenderedIcon('user', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('user', 'fa-sm')}</span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 220px;">${escape(email)}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(uid)}</div>
@@ -249,7 +249,7 @@ function renderRow(row) {
     <td class="text-muted small">${escape(createdText)}</td>
     <td>
       <div class="dropdown">
-        <button class="classy-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="User actions">
+        <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="User actions">
           ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">

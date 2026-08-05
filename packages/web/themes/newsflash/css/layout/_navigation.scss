@@ -1,12 +1,14 @@
 // Newsflash Theme — Navigation
-// The MASTHEAD (the theme's own _includes/frontend/sections/nav.html): a
-// sticky, blurred-paper bar closed by a hairline ink rule, serif brand on
-// the left, uppercase pill links in the middle, actions on the right. The
-// ticker (in base.html) sits above it in-flow and scrolls away; the
-// masthead stays. Scroll state comes from the shared motion engine
-// (data-omega-scroll-watch on the header → data-omega-scrolled).
+// The MASTHEAD, worn by the BASE nav include (header.omega-nav: the theme
+// forks no nav markup): a sticky, blurred-paper bar closed by a hairline ink
+// rule, serif brand on the left, uppercase pill links in the middle, actions
+// on the right. The ticker (core/base.html fork) sits above it in-flow and
+// scrolls away; the masthead stays. Scroll state comes from the shared
+// motion engine (data-omega-scroll-watch on the header → data-omega-scrolled).
+// Classy's _nav.scss (fixed glassy bar) is deliberately NOT imported: this
+// file owns the whole block.
 
-.masthead {
+.omega-nav {
   position: sticky;
   top: 0;
   z-index: 1030;
@@ -21,29 +23,14 @@
   }
 
   .navbar {
-    padding: 0.75rem clamp(1rem, 4vw, 3rem);
-  }
-
-  .navbar > .container-fluid {
-    padding: 0;
-  }
-
-  // Brand: the serif masthead title
-  .navbar-brand {
-    font-family: $nf-font-display;
-    font-optical-sizing: auto;
-    font-weight: 600;
-    font-size: 1.5rem;
-    letter-spacing: -0.02em;
-    color: var(--omega-ink);
-
-    .brand-logo { height: 32px; width: auto; margin-right: 0.5rem; }
+    padding-block: 0.75rem;
   }
 
   // Nav links: uppercase grotesk pills. Hover fills ink; active fills the
-  // accent. (The masthead include keeps its markup utility-free, so no
-  // !important arms race with .text-body here.)
-  .navbar-nav .nav-link {
+  // accent.
+  .omega-nav__link {
+    display: inline-flex;
+    align-items: center;
     font-weight: 700;
     font-size: 0.82rem;
     text-transform: uppercase;
@@ -53,10 +40,12 @@
     border: 0;
     border-radius: 50rem;
     color: var(--omega-ink);
+    text-decoration: none;
     background: transparent;
     transition: $nf-transition;
 
-    &:hover {
+    &:hover,
+    &:focus-visible {
       background: var(--omega-ink);
       color: var(--omega-ground);
     }
@@ -66,47 +55,76 @@
       color: var(--omega-accent-ink);
     }
   }
+
+  // Mobile collapsed menu becomes a framed paper drawer
+  @media (max-width: 991.98px) {
+    .navbar-collapse {
+      margin-top: 0.75rem;
+      margin-bottom: 0.75rem;
+      padding: 0.85rem;
+      background: var(--bs-card-bg);
+      border-radius: var(--bs-border-radius-lg);
+      @include nf-border();
+      @include nf-shadow-pop();
+    }
+
+    .omega-nav__link {
+      width: 100%;
+    }
+
+    // Actions sit under a hairline, full width, real tap targets
+    .omega-nav__mobile-actions {
+      margin-top: 0.6rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--omega-line);
+    }
+  }
 }
 
-// Mobile toggle: a pill ink-framed button
+// Brand lockup, shared by the masthead AND the footer include: the serif
+// masthead title. (Classy keeps this at root scope for the same reason.)
+.omega-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: $nf-font-display;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  color: var(--omega-ink);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--omega-ink);
+  }
+
+  img {
+    height: 32px;
+    width: auto;
+  }
+}
+
+// Mobile toggle: a pill ink-framed button (the base include renders a bars
+// icon glyph, not Bootstrap's background-image span)
 .navbar-toggler {
   border-radius: 50rem;
   padding: 0.35rem 0.6rem;
+  color: var(--omega-ink);
   background: transparent;
   @include nf-border();
   transition: $nf-transition;
 
   &:hover { background: var(--omega-surface-2); }
   &:focus { box-shadow: 0 0 0 3px var(--nf-volt); }
-
-  .navbar-toggler-icon {
-    width: 1.25em;
-    height: 1.25em;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2823,19,16,1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.5' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-  }
-
-  [data-bs-theme="dark"] & .navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242,232,217,1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.5' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-  }
-}
-
-// Mobile collapsed menu becomes a framed paper drawer
-@media (max-width: 991.98px) {
-  .navbar-collapse {
-    margin-top: 0.75rem;
-    padding: 0.85rem;
-    background: var(--bs-card-bg);
-    border-radius: var(--bs-border-radius-lg);
-    @include nf-border();
-    @include nf-shadow-pop();
-  }
 }
 
 // ============================================
-// Dropdown menus — framed paper panels
+// Dropdown menus: framed paper panels
 // ============================================
 // Doubled selector: page bundles re-emit Bootstrap's .dropdown-menu AFTER the
-// main bundle, and its `--bs-dropdown-padding-x: 0` strips the inset — the
+// main bundle, and its `--bs-dropdown-padding-x: 0` strips the inset: the
 // highlighted item pills end up pressed edge-to-edge against the panel.
 .dropdown-menu.dropdown-menu {
   background: var(--bs-card-bg);
@@ -123,7 +141,7 @@
     color: var(--bs-body-color);
 
     // !important: dropdown items (account dropdown, nav dropdowns) carry
-    // text-color utilities from the shared includes — same trap as nav links.
+    // text-color utilities from the shared includes: same trap as nav links.
     &:hover,
     &:focus {
       background: var(--omega-ink);

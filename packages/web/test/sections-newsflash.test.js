@@ -1,12 +1,11 @@
 /**
- * Newsflash section-library lane (cp213+) — builds the mini fixture with the
- * newsflash theme active (the classy-corpus tests never render newsflash
- * layouts) and pins the theme-layer conversions: the marketing/stats,
- * newsletter-cta, and cta OVERRIDES, the newsflash-specific rundown/desks
- * sections, the rule-head + lede components, and the standing fallthrough
- * doctrine — a shared id is overridden only when the band exists in the
- * theme's own design vocabulary (hero does not: lede/splash serve that role,
- * so a body-called marketing/hero deliberately resolves to the classy base).
+ * Newsflash section-library lane (cp213+, reshaped by #177 phase 2): builds
+ * the mini fixture with the newsflash theme active and pins the skin+forks
+ * model: the KEPT identity forks (rundown/desks sections, the rule-head +
+ * lede + story-card + byline components, the newsletter-cta fork with its
+ * rail variant) wear newsflash-* BEM classes, while the commodity surfaces
+ * (marketing/stats, marketing/cta, the taxonomy/about/team/pricing layouts)
+ * fall through to BASE markup (omega-* classes) restyled by scss alone.
  */
 const assert = require('node:assert');
 const path = require('node:path');
@@ -18,23 +17,25 @@ const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 const nfData = { ...miniData, theme: { id: 'newsflash' } };
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'sections-nf-test');
 
-test('cp213: newsflash index bands render through the section library', async () => {
+test('cp213/#177: newsflash index bands: kept forks in nf vocabulary, stats falls through to base', async () => {
   const pages = await buildWith(nfData);
   const home = pages.get('/test/components/hero-demo-input'); // rides the index layout
 
-  // marketing/stats override — nf vocabulary via the rule-head component
-  assert.ok(home.includes('By the numbers'), 'stats rule-head label (nf json5 default)');
-  assert.ok(home.includes('stat-num'), 'nf stroked numerals');
+  // marketing/stats fork is DELETED: the BASE band serves, and the
+  // data-omega-countup contract newsflash had dropped returns with it.
+  assert.ok(home.includes('omega-stats'), 'base stats markup serves the shared id');
+  assert.ok(home.includes('data-omega-countup'), 'the count-up contract returns');
   assert.ok(home.includes('2M+'), 'items bridged from resolved.stats');
-  assert.ok(!home.includes('classy-stats'), 'classy stats markup NOT rendered — the override won');
+  assert.ok(!home.includes('stat-num'), 'no trace of the deleted fork vocabulary');
 
-  // marketing/rundown — rule head + lede + numbered feed
+  // marketing/rundown (kept fork): rule head + lede + numbered feed, BEM
   assert.ok(home.includes('Original reporting'), 'rundown items over the data bridge');
-  assert.ok(home.includes('feed-num'), 'numbered feed cluster');
-  assert.ok(home.includes('text-accent">morning'), 'lede accent span');
+  assert.ok(home.includes('newsflash-feed__num'), 'numbered feed cluster');
+  assert.ok(home.includes('newsflash-accent">morning'), 'lede accent span');
 
-  // marketing/desks — icon cards linked to category pages
+  // marketing/desks (kept fork): icon cards linked to category pages
   assert.ok(home.includes('Read the desk'), 'desk card affordance');
+  assert.ok(home.includes('newsflash-desks__icon'), 'desk icon chip wears the BEM class');
   assert.ok(home.includes('/blog/categories/tech'), 'desk href to its category page');
 });
 
@@ -43,15 +44,18 @@ test('cp215: news/story-card + news/byline — the posts-driven tile family (com
 
   // Blog index grid: tiles render through the component (byline nested inside)
   const blog = pages.get('/blog');
-  assert.ok(blog.includes('story-card'), 'tile markup present');
+  assert.ok(blog.includes('newsflash-story-card'), 'tile markup present (BEM)');
+  assert.ok(blog.includes('newsflash-byline'), 'byline block class through the nested component');
   assert.ok(blog.includes('Mini story 17'), 'enriched posts in the grid');
   assert.ok(blog.includes('Dec 15, 2023'), 'pre-formatted date arg');
   assert.ok(blog.includes('min read'), 'captured readtime through the byline');
   assert.ok(!blog.includes('>Undefined<'), 'kicker default-guard: no "Undefined" from title-casing a missing category');
 
-  // Category page passes its own kicker (resolved.category.name, verbatim)
+  // Category pages fall through to the BASE taxonomy layout (#177 phase 2):
+  // base post-cards, no newsflash fork vocabulary.
   const growth = pages.get('/blog/categories/growth');
-  assert.ok(growth.includes('kicker mb-1">Growth<'), 'category-name kicker through the component');
+  assert.ok(growth.includes('omega-post-card'), 'base post-card include serves the category grid');
+  assert.ok(!growth.includes('newsflash-story-card'), 'no fork tile on the fallthrough page');
 
   // Index bands: top stories + more-to-chew-on tiles via the same component
   const home = pages.get('/test/components/hero-demo-input');
@@ -59,27 +63,30 @@ test('cp215: news/story-card + news/byline — the posts-driven tile family (com
   assert.ok(home.includes('Mini story 03'), 'more-to-chew-on tile (slot 17)');
 });
 
-test('cp216: rule-head/lede sweep — every newsflash band head through the components, link slot lit', async () => {
+test('cp216/#177: rule-head/lede on the kept forks; about and team fall through to base', async () => {
   const pages = await buildWith(nfData);
 
-  // The link slot (dormant since cp213) now renders live: index top-stories
-  // and blog/post related both pass link args through the component.
+  // The link slot renders live: index top-stories and blog/post related both
+  // pass link args through the rule-head component (BEM classes).
   const home = pages.get('/test/components/hero-demo-input');
   assert.ok(/Top stories<\/h2>[\s\S]{0,200}View all/.test(home), 'top-stories head links View all through the component');
+  assert.ok(home.includes('newsflash-rule-head__rule'), 'rule element wears the BEM class');
   const post = pages.get('/blog/first-post');
   assert.ok(post.includes('View all'), 'related-posts head link');
+  assert.ok(post.includes('newsflash-rule-head'), 'post band heads render through the component');
 
-  // Lede through the component on about (accent span) + composite captures
-  const about = pages.get('/about');
-  assert.ok(about.includes('text-accent'), 'about ledes render accents through heading/lede');
+  // The lede component serves the kept index bands (accent span, BEM)
+  assert.ok(home.includes('newsflash-lede'), 'lede block class on the kept bands');
 
-  // team/member: the tight join survives the component's trimmed doc comment
+  // about and team/member forks are DELETED: the base compositions serve,
+  // with no newsflash fork vocabulary anywhere on them. (/about in the mini
+  // fixture rides blueprint/index; /about-blueprint is the real about page.)
+  const about = pages.get('/about-blueprint');
+  assert.ok(about.includes('omega-display'), 'about renders the base masthead cluster');
+  assert.ok(!about.includes('newsflash-rule-head'), 'no fork heads on the fallthrough page');
   const member = pages.get('/team/avery-quinn');
-  assert.ok(member.includes('col-lg-9"><div class="section-head"'), 'trimmed-context call keeps the glued join');
-
-  // No inline section-head clusters remain in any newsflash layout — every
-  // head renders through the component (h2 + rule always adjacent).
-  assert.ok(member.includes('section-head'), 'member head renders');
+  assert.ok(member.includes('omega-person'), 'member renders the base portrait split');
+  assert.ok(!member.includes('newsflash-rule-head'), 'no fork heads on the fallthrough page');
 });
 
 test('cp217: the newsletter slab renders through the nf override — BOTH dead forms fixed', async () => {
@@ -105,40 +112,39 @@ test('cp217: the newsletter slab renders through the nf override — BOTH dead f
   assert.ok(!blog.includes('<div class="row justify-content-center"><div class="col-xl-8'), 'index stays full-width (narrow off)');
 });
 
-test('cp217: §7 inherit over the real tree — the nf override keeps classy\'s FormManager js in the bundle', () => {
+test('cp217: §7 inherit over the real tree — the nf override keeps the base FormManager js in the bundle', () => {
   const themes = path.join(__dirname, '..', 'themes');
-  const entries = collectSectionAssets([path.join(themes, 'newsflash'), path.join(themes, 'classy')]);
+  const entries = collectSectionAssets([path.join(themes, 'newsflash'), path.join(themes, 'base')]);
   const entry = entries.find((item) => item.kind === 'section' && item.id === 'marketing/newsletter-cta');
   assert.ok(entry, 'entry collected');
-  assert.ok(entry.js && entry.js.includes(`${path.sep}classy${path.sep}`), `js inherited from the classy base, got: ${entry.js}`);
+  assert.ok(entry.js && entry.js.includes(`${path.sep}base${path.sep}`), `js inherited from the base layer, got: ${entry.js}`);
   assert.equal(entry.scss, null, 'no scss on either layer — nothing invented');
 });
 
-test('cp218: the flip decision executed — marketing/cta goes native on fallthrough pages', async () => {
+test('#177: the cta fork is deleted; marketing/cta falls through to base everywhere', async () => {
   const pages = await buildWith(nfData);
 
-  // /download still falls through to the converted classy LAYOUT, but its
-  // cta band now resolves to the nf override — the dark big-read panel —
-  // and the icon keys classy's markup ignored finally render.
+  // /download (always a fallthrough layout) now gets the BASE cta band too;
+  // scss restyles omega-cta as the dark big-read slab. The fork's icon
+  // rendering goes with it (base markup ignores icon keys, accepted).
   const download = pages.get('/download');
-  assert.ok(!download.includes('classy-cta'), 'classy cta markup gone from the fallthrough page');
-  assert.ok(download.includes('cta-panel'), 'nf big-read panel serves the shared contract');
-  assert.ok(download.includes('data-icon="headset"'), 'button icon from the data renders under nf (classy ignored it)');
+  assert.ok(download.includes('omega-cta'), 'base cta markup serves the shared id');
+  assert.ok(!download.includes('cta-panel'), 'no trace of the deleted fork vocabulary');
 });
 
-test('cp218: the doctrine half that stays — body-called hero deliberately falls through to classy', async () => {
+test('cp218: the doctrine half that stays — body-called hero deliberately falls through to base', async () => {
   const pages = await buildWith(nfData);
 
   // nf composes no hero in its own vocabulary (the lede/splash family serves
   // that role), so {% section "marketing/hero" %} resolves consumer → nf →
-  // classy and the base serves. Override only what the theme's design
-  // vocabulary actually has.
+  // base and the base serves. Fork only what the theme's design vocabulary
+  // actually has.
   const demo = pages.get('/sections-demo');
-  assert.ok(demo.includes('classy-hero'), 'body-called hero falls through to the classy base');
-  assert.ok(!demo.includes('hero-title'), 'nf hero vocabulary absent — no nf hero section exists');
+  assert.ok(demo.includes('omega-hero'), 'body-called hero falls through to the base');
+  assert.ok(!demo.includes('newsflash-hero'), 'nf hero vocabulary absent — no nf hero section exists');
 });
 
-test('cp218: the rail signup card — the third dead form dies (newsletter-cta rail variant)', async () => {
+test('cp218/#177: the rail signup card: the kept newsletter-cta fork\'s rail variant', async () => {
   const pages = await buildWith(nfData);
   const home = pages.get('/test/components/hero-demo-input'); // rides the index layout
 
@@ -153,7 +159,8 @@ test('cp218: the rail signup card — the third dead form dies (newsletter-cta r
   assert.ok(home.includes('id="signup"'), 'anchor knob keeps the hero deep link');
   assert.ok(home.includes('Free forever. Unsubscribe anytime.'), 'disclaimer rides the bridge');
 
-  // The index cta band composes the same override the fallthrough pages get.
-  assert.ok(home.includes('<section class="cta">'), 'section_class knob keeps the band class');
-  assert.ok(home.includes('cta-panel'), 'big-read panel through the section');
+  // The index cta band composes the same BASE section the fallthrough pages
+  // get (the fork is deleted; scss owns the big-read look).
+  assert.ok(home.includes('omega-cta'), 'base cta band through the section');
+  assert.ok(home.includes('omega-ink-panel'), 'the band rides the ink panel scss restyles');
 });

@@ -1,0 +1,106 @@
+---
+layout: frontend/core/cover
+
+prerender_icons:
+  - name: "bell-slash"
+  - name: "bell"
+---
+
+<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
+  <div class="card">
+    <div class="card-body p-3 p-md-5">
+      <!-- Logo -->
+      <div class="text-center mb-3">
+        <div class="avatar avatar-xl">
+          <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <h1 class="omega-display omega-display--section mb-2">Email preferences</h1>
+        <p class="text-muted" id="email-preferences-description">Loading your preferences...</p>
+      </div>
+
+      <!-- Error state (hidden by default) -->
+      <div id="email-preferences-error" class="text-center" hidden>
+        <div class="alert alert-danger mb-4">
+          {% omega_icon "triangle-exclamation", "me-1" %}
+          <span id="email-preferences-error-message">Invalid or missing parameters.</span>
+        </div>
+        <a href="/" class="btn btn-outline-adaptive">
+          {% omega_icon "arrow-left", "me-1" %}
+          Back to home
+        </a>
+      </div>
+
+      <!-- Form (hidden until params are validated by JS) -->
+      <div id="email-preferences-content" hidden>
+        <!-- Email display -->
+        <div class="hairline rounded-3 p-3 mb-4 text-center">
+          <span class="omega-micro d-block mb-1">Managing preferences for</span>
+          <strong id="email-preferences-address" class="text-break"></strong>
+        </div>
+
+        <!-- Email preferences Form -->
+        <form id="email-preferences-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
+          <!-- Action selector — segmented (gliding thumb rides .active) -->
+          <div class="mb-4">
+            <div class="d-flex" role="group" aria-label="Email preference action" data-omega-segmented>
+              <button type="button" class="btn flex-fill active" data-action="unsubscribe">
+                {% omega_icon "bell-slash", "fa-sm me-1" %}
+                Unsubscribe
+              </button>
+              <button type="button" class="btn flex-fill" data-action="resubscribe">
+                {% omega_icon "bell", "fa-sm me-1" %}
+                Resubscribe
+              </button>
+            </div>
+          </div>
+
+          <!-- Info note (changes based on action) -->
+          <p class="omega-quiet small mb-4 d-flex align-items-start gap-2" id="email-preferences-info-unsubscribe">
+            <span class="omega-dot mt-1 flex-shrink-0"></span>
+            <span>You'll stop receiving emails of this type. Important account emails (receipts, security) still arrive.</span>
+          </p>
+          <p class="omega-quiet small mb-4 d-flex align-items-start gap-2" id="email-preferences-info-resubscribe" hidden>
+            <span class="omega-dot omega-dot--ok mt-1 flex-shrink-0"></span>
+            <span>You'll start receiving these emails again.</span>
+          </p>
+
+          <div class="mb-4 text-start">
+            <label for="email_confirm" class="form-label fw-semibold">
+              Confirm your email address <span class="text-danger">*</span>
+            </label>
+            <input type="email" class="form-control form-control-md" id="email_confirm" name="email_confirm"
+              placeholder="Type your email to confirm"
+              autocomplete="email"
+              autofocus
+              required>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <!-- Honeypot field (bot detection) -->
+          <div class="form-group mb-3" style="display: none;" aria-hidden="true">
+            <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+          </div>
+
+          <button type="submit" class="btn btn-adaptive w-100 mb-4" id="email-preferences-submit">
+            {% omega_icon "bell-slash", "fa-sm me-2" %}
+            <span class="button-text">Unsubscribe</span>
+          </button>
+        </form>
+
+        <!-- Back to Home -->
+        <div class="mt-3 pt-3 hairline-top text-center">
+          <a href="/" class="btn btn-outline-adaptive btn-sm">
+            {% omega_icon "arrow-left", "fa-xs me-1" %}
+            Back to home
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

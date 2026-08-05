@@ -26,12 +26,12 @@ const CANCEL_REASONS = [
 
 // Status display configuration (classy status pill: dot + label, never color alone)
 const STATUS_CONFIG = {
-  free:       { label: 'Free',      badgeClass: 'classy-status',                       dotClass: 'classy-dot classy-dot--muted' },
-  active:     { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
-  trialing:   { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
-  cancelling: { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
-  suspended:  { label: 'Suspended', badgeClass: 'classy-status classy-status--danger', dotClass: 'classy-dot classy-dot--danger' },
-  cancelled:  { label: 'Cancelled', badgeClass: 'classy-status',                       dotClass: 'classy-dot classy-dot--muted' },
+  free:       { label: 'Free',      badgeClass: 'omega-status',                       dotClass: 'omega-dot omega-dot--muted' },
+  active:     { label: 'Active',    badgeClass: 'omega-status omega-status--ok',     dotClass: 'omega-dot omega-dot--ok' },
+  trialing:   { label: 'Active',    badgeClass: 'omega-status omega-status--ok',     dotClass: 'omega-dot omega-dot--ok' },
+  cancelling: { label: 'Active',    badgeClass: 'omega-status omega-status--ok',     dotClass: 'omega-dot omega-dot--ok' },
+  suspended:  { label: 'Suspended', badgeClass: 'omega-status omega-status--danger', dotClass: 'omega-dot omega-dot--danger' },
+  cancelled:  { label: 'Cancelled', badgeClass: 'omega-status',                       dotClass: 'omega-dot omega-dot--muted' },
 };
 
 const FREQUENCY_LABELS = { daily: 'day', weekly: 'week', monthly: 'month', annually: 'year' };

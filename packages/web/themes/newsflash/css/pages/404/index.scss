@@ -1,27 +1,79 @@
 // Newsflash Theme — 404 page-specific CSS
-// The "correction notice" treatment for
-// (_layouts/themes/newsflash/frontend/pages/404.html).
-// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+// The theme forks no 404 layout: the BASE page renders (full-bleed
+// typographic moment on the dotfield, full chrome: omega-404 markup) and
+// this file dresses it editorial: stroked serif numerals, ink-framed URL
+// chip, rule-underlined trail links. The page-css lane carries the FULL
+// block styling (classy's 404 css lives in ITS page lane, not this chain).
+// Compiles standalone, so it pulls in the theme tokens + mixins via
+// loadPaths.
 @use 'config' as *;
 @import 'css/base/mixins';
 
-// Oversized stroked serif numerals
-.error-code {
+.omega-404 {
+  display: flex;
+  align-items: center;
+  min-height: calc(100vh - 12rem);
+  padding-block: 4rem;
+}
+
+// Oversized stroked serif numerals; the middle digit inks in vermilion
+.omega-404__code {
   font-family: $nf-font-display;
   font-style: italic;
   font-weight: 900;
-  font-size: clamp(5rem, 16vw, 8rem);
-  line-height: 1;
+  font-size: clamp(6rem, 18vw, 11rem);
+  letter-spacing: -0.04em;
+  line-height: 0.95;
   color: transparent;
   -webkit-text-stroke: 2px var(--omega-ink);
+
+  em {
+    font-style: italic;
+    -webkit-text-stroke-color: var(--omega-accent);
+  }
 }
 
-// The rotated "Correction" chip pinned to the notice
-.error-stamp {
-  position: absolute;
-  top: -0.85rem;
-  left: 50%;
-  transform: translateX(-50%) rotate(-3deg);
-  z-index: 1;
-  white-space: nowrap;
+.omega-404__line {
+  font-family: $nf-font-display;
+  font-size: 1.375rem;
+  color: var(--bs-secondary-color);
+  max-width: 34rem;
+  margin: 1rem auto 1.75rem;
+  text-wrap: balance;
+
+  em {
+    color: var(--omega-accent);
+  }
+}
+
+// The URL chip: a framed paper slip
+.omega-404__url {
+  background: var(--bs-card-bg);
+  border-radius: 50rem;
+  @include nf-border();
+}
+
+.omega-404__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.omega-404__trail {
+  margin-top: 2rem;
+
+  a {
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    border-bottom: 1.5px solid var(--omega-line-strong);
+    transition: $nf-transition;
+
+    &:hover {
+      color: var(--omega-accent);
+      border-bottom-color: var(--omega-accent);
+    }
+  }
 }

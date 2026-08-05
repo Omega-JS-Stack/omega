@@ -139,7 +139,7 @@ function renderRow(vert) {
     .concat(vert.targeting?.sites || [], vert.targeting?.categories || [], vert.targeting?.keywords || [])
     .filter(Boolean);
   const chips = tags.slice(0, 3)
-    .map((tag) => `<span class="classy-chip">${escape(String(tag))}</span>`)
+    .map((tag) => `<span class="omega-chip">${escape(String(tag))}</span>`)
     .join(' ');
   const overflow = tags.length > 3
     ? ` <span class="text-muted small">+${tags.length - 3}</span>`
@@ -153,14 +153,14 @@ function renderRow(vert) {
 
   // Status cell — dot + label (never color alone)
   const statusCell = enabled
-    ? '<span class="classy-status"><span class="classy-dot classy-dot--ok"></span>Enabled</span>'
-    : '<span class="classy-status"><span class="classy-dot"></span>Disabled</span>';
+    ? '<span class="omega-status"><span class="omega-dot omega-dot--ok"></span>Enabled</span>'
+    : '<span class="omega-status"><span class="omega-dot"></span>Disabled</span>';
 
   const $row = document.createElement('tr');
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="classy-icon-chip classy-icon-chip--neutral">${getPrerenderedIcon('rectangle-list', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('rectangle-list', 'fa-sm')}</span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 220px;">${escape(vert.title || 'Untitled')}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(vert.id || '')}</div>
@@ -173,7 +173,7 @@ function renderRow(vert) {
     <td>${statusCell}</td>
     <td>
       <div class="dropdown">
-        <button class="classy-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Vert actions">
+        <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Vert actions">
           ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">

@@ -2,7 +2,7 @@
 // The shared receipt vocabulary (panel/row/total/note) lives in
 // components/_receipt.scss (checkout composes the same panel).
 
-.classy-receipt__check {
+.omega-receipt__check {
   color: var(--omega-ok);
   border-color: color-mix(in srgb, var(--omega-ok) 35%, var(--omega-line));
   background: color-mix(in srgb, var(--omega-ok) 8%, var(--omega-surface));

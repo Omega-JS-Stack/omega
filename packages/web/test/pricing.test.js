@@ -281,7 +281,7 @@ test('classy: the enterprise row renders only when the catalog declares it (issu
   });
   const html = withEnterprise.get('/pricing');
 
-  assert.ok(html.includes('classy-band--enterprise'), 'its own full-width row, not a card');
+  assert.ok(html.includes('omega-band--enterprise'), 'its own full-width row, not a card');
   assert.ok(html.includes('Bindery'), 'plan name from the catalog');
   assert.ok(html.includes('for organizations that need their own terms'), 'the one-line pitch');
   assert.ok(html.includes('SSO & provisioning'), 'the feature list');
@@ -289,11 +289,14 @@ test('classy: the enterprise row renders only when the catalog declares it (issu
   assert.ok(!html.includes('data-plan-id="enterprise"'), 'never a card in the grid');
 
   const without = await buildWith({ ...miniData, payment: CATALOG });
-  assert.ok(!without.get('/pricing').includes('classy-band--enterprise'), 'no enterprise in the data → no row');
+  assert.ok(!without.get('/pricing').includes('omega-band--enterprise'), 'no enterprise in the data → no row');
 });
 
-for (const theme of ['newsflash', 'neobrutalism']) {
-  test(`${theme}: the enterprise strip is DATA too — its own idiom, same contract (issue #44 item 8)`, async () => {
+// Neither partial theme forks a pricing layout (#177 phases 2 + 3): their
+// /pricing renders the BASE page, so the enterprise strip wears the base
+// omega-band idiom and the comparison table returns with the base page.
+for (const theme of ['neobrutalism', 'newsflash']) {
+  test(`${theme}: /pricing falls through to the base page; enterprise rides the omega-band idiom (#177)`, async () => {
     const withEnterprise = await buildWith({
       ...miniData,
       payment: {
@@ -312,13 +315,14 @@ for (const theme of ['newsflash', 'neobrutalism']) {
     }, { activeTheme: theme });
     const html = withEnterprise.get('/pricing');
 
+    assert.ok(html.includes('omega-band--enterprise'), `${theme}: the base full-width row serves`);
     assert.ok(html.includes('Bindery'), `${theme}: plan name from the catalog`);
     assert.ok(html.includes('for organizations that need their own terms'), `${theme}: the one-line pitch`);
     assert.ok(html.includes('SSO & provisioning'), `${theme}: the feature list`);
     assert.ok(html.includes('data-plan-enterprise="enterprise"'), `${theme}: contact CTA (a link, not a checkout button)`);
     assert.ok(html.includes('href="/contact"'), `${theme}: the CTA points at the product url`);
     assert.ok(!html.includes('data-plan-id="enterprise"'), `${theme}: never a card in the grid`);
-    assert.ok(!html.includes('classy-band'), `${theme}: rendered in this theme's own vocabulary`);
+    assert.ok(html.includes('omega-compare'), `${theme}: the feature-comparison table returns with the base page`);
 
     // The invented copy the old always-on strip carried is gone
     assert.ok(!html.includes('Custom solutions for large organizations'), `${theme}: no fictional enterprise blurb`);

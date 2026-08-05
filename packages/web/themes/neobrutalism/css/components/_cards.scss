@@ -35,31 +35,9 @@
 }
 
 // Clickable cards press like buttons
-a.card,
-.card.nb-pressable {
+a.card {
   @include nb-press();
   text-decoration: none;
-}
-
-// Emphasis card — thicker frame + bigger shadow (use for "featured"/popular tiers)
-.card.nb-card-feature {
-  @include nb-border($nb-border-width-lg);
-  @include nb-shadow(lg);
-}
-
-// Accent-headed card: colored header strip
-@each $name, $color in (
-  blue: $nb-accent-blue,
-  pink: $nb-accent-pink,
-  yellow: $nb-accent-yellow,
-  green: $nb-accent-green,
-  purple: $nb-accent-purple,
-  orange: $nb-accent-orange,
-) {
-  .card.nb-card-#{$name} > .card-header {
-    background: var(--nb-accent-#{$name});
-    color: #111111;
-  }
 }
 
 // List groups inside cards keep hard dividers

@@ -94,12 +94,12 @@ function getRoleLabel(role) {
 // Get role badge color
 function getRoleChipClass(role) {
   const chips = {
-    owner: 'classy-chip classy-chip--ink',
-    admin: 'classy-chip classy-chip--accent',
-    member: 'classy-chip',
-    viewer: 'classy-chip'
+    owner: 'omega-chip omega-chip--ink',
+    admin: 'omega-chip omega-chip--accent',
+    member: 'omega-chip',
+    viewer: 'omega-chip'
   };
-  return chips[role] || 'classy-chip';
+  return chips[role] || 'omega-chip';
 }
 
 // Get action buttons for member

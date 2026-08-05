@@ -1,0 +1,33 @@
+{% comment %} Org chart: one root over a connected row of nodes. The
+connectors are drawn entirely by component.scss (the trunk hangs off the
+children row, the bus and its stubs off each node), so the markup is just the
+two levels — and a live page that renders the same class vocabulary from JS
+gets the same lines for free. {% endcomment %}
+<div class="omega-org-chart{% if args.class != blank %} {{ args.class }}{% endif %}">
+  {% iftruthy args.root %}
+    <div class="omega-org-chart__root">
+      <div class="card h-100">
+        <div class="card-body">
+          <p class="omega-org-chart__title mb-0">{{ args.root.title }}</p>
+          {% iftruthy args.root.sub %}<p class="omega-micro mb-0">{{ args.root.sub }}</p>{% endiftruthy %}
+          {% iftruthy args.root.meta %}<span class="omega-chip omega-badge-tone{% if args.root.tone != blank %} omega-tone-{{ args.root.tone }}{% endif %}">{{ args.root.meta }}</span>{% endiftruthy %}
+        </div>
+      </div>
+    </div>
+  {% endiftruthy %}
+  {% iftruthy args.nodes %}
+    <div class="omega-org-chart__children">
+      {% for node in args.nodes %}
+        <div class="omega-org-chart__node">
+          <div class="card h-100">
+            <div class="card-body">
+              <p class="omega-org-chart__title mb-0">{{ node.title }}</p>
+              {% iftruthy node.sub %}<p class="omega-micro mb-0">{{ node.sub }}</p>{% endiftruthy %}
+              {% iftruthy node.meta %}<span class="omega-chip omega-badge-tone{% if node.tone != blank %} omega-tone-{{ node.tone }}{% endif %}">{{ node.meta }}</span>{% endiftruthy %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endiftruthy %}
+</div>

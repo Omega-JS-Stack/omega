@@ -1,5 +1,5 @@
 {
-  description: 'The vermilion newsletter capture, two presentations — the default slab band (primary card in a full section) and variant: "rail", the compact sidebar signup card with no section wrapper (composes inside an aside). Both speak the client form-manager dialect (data-form-state; the §7 presence init binds the form). Theme-layer OVERRIDE of classy\'s band: newsflash markup, inherited behavior — classy\'s FormManager section.js keeps riding the bundle via inherit, and its DOM contract (form.newsletter-form under the data-omega-section root, .button-text) is part of this markup. SHARED band: defaults stay neutral, every caller passes its own copy.',
+  description: 'The vermilion newsletter capture, two presentations — the default slab band (primary card in a full section) and variant: "rail", the compact sidebar signup card with no section wrapper (composes inside an aside). Both speak the client form-manager dialect (data-form-state; the §7 presence init binds the form). Theme-layer FORK of the base band: newsflash markup, inherited behavior — the base layer\'s FormManager section.js keeps riding the bundle via inherit, and its DOM contract (form.newsletter-form under the data-omega-section root, .button-text) is part of this markup. SHARED band: defaults stay neutral, every caller passes its own copy.',
 
   args: {
     superheadline: 'object',
@@ -44,7 +44,7 @@
     },
   ],
 
-  // §7: this override replaces markup, not behavior — keep the base layer's
-  // section.js (classy's FormManager binding) in the bundle.
+  // §7: this fork replaces markup, not behavior — keep the base layer's
+  // section.js (the FormManager binding) in the bundle.
   inherit: ['js'],
 }

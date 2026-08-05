@@ -19,7 +19,7 @@ const INDEX_URL = '/blog/index.json';
 
 // Module
 // (The newsletter form binding moved to the section that renders it —
-// themes/classy/_sections/marketing/newsletter-cta/section.js, initialized
+// themes/base/_sections/marketing/newsletter-cta/section.js, initialized
 // by the §7 presence init on any page composing the band.)
 export default () => {
   return new Promise(async function (resolve) {

@@ -1,12 +1,12 @@
 // Newsflash Theme — Editorial Primitives
-// The cross-page newsroom vocabulary: kickers, section heads with rules, and
-// framed images. Genuinely novel UI (no Bootstrap equivalent) → universal
-// semantic class names other themes are free to style their own way.
+// The cross-page newsroom vocabulary the KEPT forks speak: kickers, rule
+// heads, framed images, story cards, feed rows. Fork markup, so the classes
+// are theme-prefixed BEM (docs/web/sections.md "Markup convention").
 
 // ============================================
 // Kicker — the uppercase vermilion micro-label above headlines
 // ============================================
-.kicker {
+.newsflash-kicker {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
@@ -28,9 +28,9 @@
 }
 
 // ============================================
-// Section head — uppercase label + full-width ink rule (+ optional link)
+// Rule head — uppercase label + full-width ink rule (+ optional link)
 // ============================================
-.section-head {
+.newsflash-rule-head {
   display: flex;
   align-items: baseline;
   gap: 1.25rem;
@@ -46,7 +46,7 @@
     margin: 0;
   }
 
-  .rule {
+  .newsflash-rule-head__rule {
     flex: 1;
     height: var(--nf-border-width);
     background: var(--omega-line-strong);
@@ -72,7 +72,7 @@
 // ============================================
 // Hairline ink border + radius; images zoom slowly when the parent
 // link/card is hovered (rule lives in _cards.scss).
-.art-frame {
+.newsflash-frame {
   border: var(--nf-border);
   border-radius: var(--bs-border-radius-lg);
   overflow: hidden;
@@ -97,16 +97,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .art-frame img { transition: none; }
-}
-
-// ============================================
-// Headline links outside cards (feed rows, hero) — same grow-rule affordance
-// ============================================
-.headline-link {
-  color: inherit;
-  text-decoration: none;
-  @include nf-underline-grow();
+  .newsflash-frame img { transition: none; }
 }
 
 // ============================================
@@ -114,7 +105,7 @@
 // ============================================
 // Framed image + kicker + serif headline + byline meta. The tile lifts and
 // its framed image zooms on hover.
-.story-card {
+.newsflash-story-card {
   display: block;
   color: inherit;
   text-decoration: none;
@@ -125,7 +116,7 @@
     transform: translateY(-5px);
   }
 
-  &:hover .art-frame img {
+  &:hover .newsflash-frame img {
     transform: scale(1.04);
   }
 
@@ -135,7 +126,7 @@
     line-height: 1.22;
   }
 
-  .art-frame {
+  .newsflash-frame {
     aspect-ratio: 16 / 10;
   }
 }
@@ -143,7 +134,7 @@
 // ============================================
 // Feed item — an editorial list row (thumb/number + headline + dek)
 // ============================================
-.feed-item {
+.newsflash-feed__item {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 1.5rem;
@@ -156,26 +147,26 @@
   &:first-child { padding-top: 0; }
   &:last-child { border-bottom: 0; }
 
-  .art-frame {
+  .newsflash-frame {
     aspect-ratio: 1 / 1;
     border-radius: var(--bs-border-radius);
   }
 }
 
-a.feed-item:hover {
+a.newsflash-feed__item:hover {
   color: inherit;
 
-  .art-frame img {
+  .newsflash-frame img {
     transform: scale(1.04);
   }
 }
 
 @media (max-width: 767.98px) {
-  .feed-item {
+  .newsflash-feed__item {
     grid-template-columns: 1fr;
     gap: 0.9rem;
 
-    .art-frame {
+    .newsflash-frame {
       aspect-ratio: 16 / 9;
     }
   }

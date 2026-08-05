@@ -4,10 +4,10 @@
 // hairlines, serif display; motion rides data-omega-* attributes.
 
 // ── Page hero — the content-page opener (lighter than the home hero) ────────
-.classy-page-hero {
+.omega-page-hero {
   text-align: center;
 
-  .classy-micro {
+  .omega-micro {
     display: block;
     margin-bottom: 0.875rem;
   }
@@ -19,7 +19,7 @@
     color: var(--omega-ink);
   }
 
-  .classy-page-hero__sub {
+  .omega-page-hero__sub {
     max-width: 40rem;
     margin: 1.125rem auto 0;
     font-size: 1.03125rem;
@@ -27,7 +27,7 @@
     color: var(--omega-ink-muted);
   }
 
-  .classy-page-hero__actions {
+  .omega-page-hero__actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -37,7 +37,7 @@
 }
 
 // ── Prose — long-form reading (blog posts, legal documents, bios) ───────────
-.classy-prose {
+.omega-prose {
   font-size: 0.9375rem;
   line-height: 1.75;
   color: var(--omega-ink-muted);
@@ -129,14 +129,14 @@
 }
 
 // ── Timeline — hairline spine + serif year markers (about page) ─────────────
-.classy-timeline {
+.omega-timeline {
   position: relative;
   max-width: 40rem;
   margin-inline: auto;
   padding-inline-start: 2rem;
   border-inline-start: 1px solid var(--omega-line-strong);
 
-  .classy-timeline__item {
+  .omega-timeline__item {
     position: relative;
     padding-bottom: 2.25rem;
 
@@ -163,7 +163,7 @@
     }
   }
 
-  .classy-timeline__year {
+  .omega-timeline__year {
     font-family: var(--omega-font-marketing);
     font-size: 1.375rem;
     font-weight: 560;
@@ -173,14 +173,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .classy-timeline__title {
+  .omega-timeline__title {
     margin-top: 0.25rem;
     font-size: 0.9375rem;
     font-weight: 650;
     color: var(--omega-ink);
   }
 
-  .classy-timeline__desc {
+  .omega-timeline__desc {
     margin: 0.25rem 0 0;
     font-size: 0.875rem;
     line-height: 1.6;
@@ -191,12 +191,12 @@
 // ── Post card — the blog grid unit ───────────────────────────────────────────
 // UNBOXED (bronn pattern): a rounded media panel, then a mono meta line,
 // serif title, and short excerpt breathing on the page — no card chrome.
-.classy-post-card {
+.omega-post-card {
   display: flex;
   flex-direction: column;
   height: 100%;
 
-  .classy-post-card__media {
+  .omega-post-card__media {
     display: block;
     aspect-ratio: 16 / 10;
     overflow: hidden;
@@ -213,7 +213,7 @@
 
     // No-media posts (post.image: false) — designed pattern panel: dotgrid
     // ground + an oversized serif monogram from the category/title
-    &.classy-post-card__media--pattern {
+    &.omega-post-card__media--pattern {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -221,11 +221,11 @@
     }
   }
 
-  &:hover .classy-post-card__media {
+  &:hover .omega-post-card__media {
     border-color: var(--omega-line-strong);
   }
 
-  .classy-post-card__monogram {
+  .omega-post-card__monogram {
     font-family: var(--omega-font-marketing);
     font-size: 3.25rem;
     font-weight: 550;
@@ -235,11 +235,11 @@
     transition: color var(--omega-speed) var(--omega-ease);
   }
 
-  &:hover .classy-post-card__monogram {
+  &:hover .omega-post-card__monogram {
     color: var(--omega-ink-muted);
   }
 
-  .classy-post-card__body {
+  .omega-post-card__body {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
@@ -247,7 +247,7 @@
     padding: 1rem 0.125rem 0;
   }
 
-  .classy-post-card__title {
+  .omega-post-card__title {
     margin: 0;
     font-family: var(--omega-font-marketing);
     font-size: 1.1875rem;
@@ -265,7 +265,7 @@
     }
   }
 
-  .classy-post-card__excerpt {
+  .omega-post-card__excerpt {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
@@ -279,7 +279,7 @@
 
 // Mono meta line: CATEGORY · DATE (post cards, featured lead, post
 // breadcrumbs, taxonomy mastheads) — root-scoped, reused everywhere
-.classy-post-card__eyebrow {
+.omega-post-card__eyebrow {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -301,7 +301,7 @@
 }
 
 // Standalone small avatar (post-page bylines) — kept out of the grid card
-.classy-post-card__avatar {
+.omega-post-card__avatar {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
@@ -316,7 +316,7 @@
   }
 
   // Author-less posts — neutral mark instead of a broken avatar
-  &.classy-post-card__avatar--fallback {
+  &.omega-post-card__avatar--fallback {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -326,7 +326,7 @@
 }
 
 // ── Person card — editorial portrait tile (team grid) ───────────────────────
-.classy-person {
+.omega-person {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -342,7 +342,7 @@
   }
 
   // 4:5 portrait — quiet grayscale until you meet them
-  .classy-person__portrait {
+  .omega-person__portrait {
     display: block;
     aspect-ratio: 4 / 5;
     background: var(--omega-surface-2);
@@ -358,18 +358,18 @@
     }
   }
 
-  &:hover .classy-person__portrait img {
+  &:hover .omega-person__portrait img {
     filter: none;
   }
 
-  .classy-person__body {
+  .omega-person__body {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     padding: 1.25rem 1.375rem 1.375rem;
   }
 
-  .classy-person__name {
+  .omega-person__name {
     margin: 0;
     font-family: var(--omega-font-marketing);
     font-size: 1.25rem;
@@ -386,18 +386,18 @@
     }
   }
 
-  .classy-person__role {
+  .omega-person__role {
     margin-top: 0.375rem;
   }
 
-  .classy-person__desc {
+  .omega-person__desc {
     margin: 0.75rem 0 0;
     font-size: 0.84375rem;
     line-height: 1.6;
     color: var(--omega-ink-muted);
   }
 
-  .classy-person__links {
+  .omega-person__links {
     display: flex;
     gap: 0.5rem;
     margin-top: auto;
@@ -406,7 +406,7 @@
 }
 
 // Standalone circular avatar (quote attributions, author boxes, member hero)
-.classy-person__avatar {
+.omega-person__avatar {
   border-radius: 50%;
   border: 1px solid var(--omega-line-strong);
   overflow: hidden;
@@ -419,7 +419,7 @@
 }
 
 // Small round icon-link (person socials, share rows)
-.classy-icon-link {
+.omega-icon-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -443,7 +443,7 @@
 }
 
 // ── Facts row — hairline-divided columns (member details, quick stats) ──────
-.classy-facts {
+.omega-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   background: var(--omega-surface);
@@ -452,10 +452,10 @@
   overflow: hidden;
 
   @media (min-width: 992px) {
-    grid-template-columns: repeat(var(--classy-facts-cols, 4), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--omega-facts-cols, 4), minmax(0, 1fr));
   }
 
-  .classy-facts__item {
+  .omega-facts__item {
     padding: 1.125rem 1.25rem;
     border-top: 1px solid var(--omega-line);
     border-inline-start: 1px solid var(--omega-line);
@@ -482,19 +482,19 @@
     }
   }
 
-  .classy-facts__label {
+  .omega-facts__label {
     display: block;
     margin-bottom: 0.25rem;
   }
 
-  .classy-facts__value {
+  .omega-facts__value {
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--omega-ink);
     overflow-wrap: anywhere;
 
     // Big serif numerals (about-hero rail, stat panels)
-    &.classy-facts__value--num {
+    &.omega-facts__value--num {
       font-family: var(--omega-font-marketing);
       font-size: 1.5rem;
       font-weight: 550;
@@ -503,7 +503,7 @@
     }
   }
 
-  .classy-facts__sub {
+  .omega-facts__sub {
     display: block;
     margin-top: 0.25rem;
     font-size: 0.75rem;
@@ -535,7 +535,7 @@
 }
 
 // ── Chip cloud — category/tag clusters ───────────────────────────────────────
-.classy-chip-cloud {
+.omega-chip-cloud {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -553,7 +553,7 @@
 }
 
 // ── Blog search — the hairline search pill ───────────────────────────────────
-.classy-blog-search {
+.omega-blog-search {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -567,13 +567,13 @@
     border-color: var(--omega-line-strong);
   }
 
-  .classy-blog-search__icon {
+  .omega-blog-search__icon {
     color: var(--omega-ink-faint);
     display: inline-flex;
     flex-shrink: 0;
   }
 
-  .classy-blog-search__input {
+  .omega-blog-search__input {
     flex: 1 1 auto;
     min-width: 0;
     border: 0;
@@ -589,7 +589,7 @@
 }
 
 // ── Hero split — asymmetric page opener: statement + side rail ──────────────
-.classy-hero-split {
+.omega-hero-split {
   display: grid;
   gap: 2.5rem;
   align-items: start;
@@ -599,7 +599,7 @@
     gap: 4rem;
   }
 
-  .classy-hero-split__sub {
+  .omega-hero-split__sub {
     max-width: 36rem;
     margin: 1.25rem 0 0;
     font-size: 1.0625rem;
@@ -614,7 +614,7 @@
 // the picture on a bottom scrim, and the scrim REMAPS the ink tokens for its
 // own scope — a photograph looks the same in both modes, so light ink over it
 // is correct in both, and the masthead keeps reading var(--omega-ink).
-.classy-photo-lead {
+.omega-photo-lead {
   position: relative;
   margin: 0;
   overflow: hidden;
@@ -623,7 +623,7 @@
   border-radius: var(--omega-radius-xl);
   box-shadow: var(--omega-shadow-2);
 
-  .classy-photo-lead__img {
+  .omega-photo-lead__img {
     display: block;
     width: 100%;
     // The ratio is reserved before the lazy swap — no layout shift
@@ -636,7 +636,7 @@
     }
   }
 
-  .classy-photo-lead__words {
+  .omega-photo-lead__words {
     padding: 1.5rem 1.25rem 1.75rem;
 
     @media (min-width: 768px) {
@@ -659,7 +659,7 @@
     }
   }
 
-  .classy-photo-lead__sub {
+  .omega-photo-lead__sub {
     max-width: 46ch;
     margin: 1rem 0 0;
     font-size: 1.0625rem;
@@ -669,13 +669,13 @@
 }
 
 // The facts rail under the photo lead (the split layout keeps it beside)
-.classy-photo-lead__facts {
+.omega-photo-lead__facts {
   margin-top: 1.5rem;
 }
 
 // A picture-led opener needs nav clearance, not the statement band's runway:
 // the photo IS the breathing room, so the first screenful stays image + words
-main > section.classy-photo-lead-band:first-of-type {
+main > section.omega-photo-lead-band:first-of-type {
   padding-top: 6rem;
 
   @media (min-width: 992px) {
@@ -684,7 +684,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Aside photo — a picture at the head of a duo aside (about letter) ───────
-.classy-aside-photo {
+.omega-aside-photo {
   margin: 1.25rem 0 0;
   overflow: hidden;
   border: 1px solid var(--omega-line);
@@ -700,17 +700,17 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Duo — generic asymmetric section: label/head column + body column ───────
-// Column split overridable per use: style="--classy-duo-cols: 5fr 7fr;"
-.classy-duo {
+// Column split overridable per use: style="--omega-duo-cols: 5fr 7fr;"
+.omega-duo {
   display: grid;
   gap: 2rem;
 
   @media (min-width: 992px) {
-    grid-template-columns: var(--classy-duo-cols, minmax(0, 4fr) minmax(0, 8fr));
+    grid-template-columns: var(--omega-duo-cols, minmax(0, 4fr) minmax(0, 8fr));
     gap: 4rem;
   }
 
-  .classy-duo__aside {
+  .omega-duo__aside {
     @media (min-width: 992px) {
       position: sticky;
       top: 6rem;
@@ -720,7 +720,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Statement — editorial letter text (big serif, italic emphasis) ──────────
-.classy-statement {
+.omega-statement {
   margin: 0;
   font-family: var(--omega-font-marketing);
   font-size: clamp(1.25rem, 2.2vw, 1.625rem);
@@ -734,13 +734,13 @@ main > section.classy-photo-lead-band:first-of-type {
     color: inherit;
   }
 
-  + .classy-statement {
+  + .omega-statement {
     margin-top: 1.5rem;
   }
 }
 
 // ── Numbered list — editorial values/principles (serif index numerals) ──────
-.classy-numbered {
+.omega-numbered {
   display: grid;
   gap: 0 3rem;
 
@@ -748,12 +748,12 @@ main > section.classy-photo-lead-band:first-of-type {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .classy-numbered__item {
+  .omega-numbered__item {
     padding: 1.5rem 0 1.625rem;
     border-top: 1px solid var(--omega-line);
   }
 
-  .classy-numbered__index {
+  .omega-numbered__index {
     display: block;
     margin-bottom: 0.875rem;
     font-family: var(--omega-font-marketing);
@@ -764,7 +764,7 @@ main > section.classy-photo-lead-band:first-of-type {
     color: var(--omega-ink-faint);
   }
 
-  .classy-numbered__title {
+  .omega-numbered__title {
     margin-bottom: 0.375rem;
     font-size: 0.984375rem;
     font-weight: 650;
@@ -772,7 +772,7 @@ main > section.classy-photo-lead-band:first-of-type {
     color: var(--omega-ink);
   }
 
-  .classy-numbered__desc {
+  .omega-numbered__desc {
     margin: 0;
     font-size: 0.875rem;
     line-height: 1.65;
@@ -781,7 +781,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Channel rows — contact methods / support routes ─────────────────────────
-.classy-channel {
+.omega-channel {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
@@ -793,12 +793,12 @@ main > section.classy-photo-lead-band:first-of-type {
     border-bottom: 1px solid var(--omega-line);
   }
 
-  .classy-channel__body {
+  .omega-channel__body {
     flex: 1 1 auto;
     min-width: 0;
   }
 
-  .classy-channel__title {
+  .omega-channel__title {
     margin-bottom: 0.125rem;
     font-size: 0.9375rem;
     font-weight: 650;
@@ -806,40 +806,40 @@ main > section.classy-photo-lead-band:first-of-type {
     color: var(--omega-ink);
   }
 
-  .classy-channel__desc {
+  .omega-channel__desc {
     margin: 0;
     font-size: 0.84375rem;
     line-height: 1.55;
     color: var(--omega-ink-muted);
   }
 
-  .classy-channel__arrow {
+  .omega-channel__arrow {
     align-self: center;
     color: var(--omega-ink-faint);
     transition: color var(--omega-speed) var(--omega-ease), transform var(--omega-speed) var(--omega-ease);
   }
 
   @media (hover: hover) {
-    &:hover .classy-channel__arrow {
+    &:hover .omega-channel__arrow {
       color: var(--omega-ink);
       transform: translateX(3px);
     }
 
-    &:hover .classy-channel__title {
+    &:hover .omega-channel__title {
       color: var(--omega-accent);
     }
   }
 }
 
 // ── Masthead — section opener with actions on the same baseline ─────────────
-.classy-masthead {
+.omega-masthead {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1.5rem 2.5rem;
 
-  .classy-masthead__actions {
+  .omega-masthead__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -848,7 +848,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Tab rail — underline tabs (blog categories, filters) ────────────────────
-.classy-tabs {
+.omega-tabs {
   display: flex;
   gap: 1.5rem;
   border-bottom: 1px solid var(--omega-line);
@@ -882,8 +882,8 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Row list — hairline-divided single-line rows (bronn "what we offer") ────
-.classy-rowlist {
-  .classy-rowlist__item {
+.omega-rowlist {
+  .omega-rowlist__item {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -900,7 +900,7 @@ main > section.classy-photo-lead-band:first-of-type {
   }
 
   // Linked rows (category indexes, offer lists)
-  a.classy-rowlist__item {
+  a.omega-rowlist__item {
     font-weight: 600;
     text-decoration: none;
     transition: color var(--omega-speed) var(--omega-ease);
@@ -908,13 +908,13 @@ main > section.classy-photo-lead-band:first-of-type {
     &:hover {
       color: var(--omega-accent);
 
-      .classy-rowlist__meta {
+      .omega-rowlist__meta {
         color: var(--omega-ink-muted);
       }
     }
   }
 
-  .classy-rowlist__meta {
+  .omega-rowlist__meta {
     flex-shrink: 0;
     font-size: 0.78125rem;
     color: var(--omega-ink-faint);
@@ -924,19 +924,19 @@ main > section.classy-photo-lead-band:first-of-type {
 
 // ── Fragments — small believable product objects for page compositions ──────
 // (bronn hero pattern: a journal-entry card + a reviewer chip, overlapped)
-.classy-fragment {
+.omega-fragment {
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
   box-shadow: var(--omega-shadow-2);
   padding: 1rem 1.125rem;
 
-  .classy-fragment__label {
+  .omega-fragment__label {
     display: block;
     margin-bottom: 0.5rem;
   }
 
-  .classy-fragment__row {
+  .omega-fragment__row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -951,7 +951,7 @@ main > section.classy-photo-lead-band:first-of-type {
       color: var(--omega-ink);
     }
 
-    .classy-fragment__num {
+    .omega-fragment__num {
       font-family: var(--omega-font-mono);
       font-size: 0.78125rem;
       color: var(--omega-ink);
@@ -960,7 +960,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // Conversation rows inside a fragment (support-chat objects)
-.classy-fragment__msg {
+.omega-fragment__msg {
   display: flex;
   align-items: flex-start;
   gap: 0.625rem;
@@ -974,7 +974,7 @@ main > section.classy-photo-lead-band:first-of-type {
     color: var(--omega-ink);
   }
 
-  .classy-fragment__msg-mark {
+  .omega-fragment__msg-mark {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -993,14 +993,14 @@ main > section.classy-photo-lead-band:first-of-type {
     }
   }
 
-  + .classy-fragment__msg {
+  + .omega-fragment__msg {
     border-top: 1px solid var(--omega-line);
   }
 }
 
 // Typing indicator (inside a fragment conversation) — three dots pulsing in
 // sequence; reduced-motion holds them steady.
-.classy-typing {
+.omega-typing {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -1011,7 +1011,7 @@ main > section.classy-photo-lead-band:first-of-type {
     height: 0.3125rem;
     border-radius: 50%;
     background: var(--omega-ink-faint);
-    animation: classy-typing 1.2s var(--omega-ease) infinite;
+    animation: omega-typing 1.2s var(--omega-ease) infinite;
 
     &:nth-child(2) {
       animation-delay: 0.15s;
@@ -1029,7 +1029,7 @@ main > section.classy-photo-lead-band:first-of-type {
   }
 }
 
-@keyframes classy-typing {
+@keyframes omega-typing {
   0%,
   60%,
   100% {
@@ -1044,7 +1044,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // Small floating status chip (pairs with a fragment card)
-.classy-fragment-chip {
+.omega-fragment-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1057,14 +1057,14 @@ main > section.classy-photo-lead-band:first-of-type {
   font-weight: 600;
   color: var(--omega-ink);
 
-  .classy-fragment-chip__sub {
+  .omega-fragment-chip__sub {
     font-weight: 500;
     color: var(--omega-ink-faint);
   }
 }
 
 // ── Featured post — the magazine lead (blog index, page 1), unboxed ─────────
-.classy-featured-post {
+.omega-featured-post {
   display: grid;
   gap: 1.25rem 2.5rem;
 
@@ -1073,7 +1073,7 @@ main > section.classy-photo-lead-band:first-of-type {
     align-items: center;
   }
 
-  .classy-featured-post__media {
+  .omega-featured-post__media {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1100,11 +1100,11 @@ main > section.classy-photo-lead-band:first-of-type {
     }
   }
 
-  &:hover .classy-featured-post__media {
+  &:hover .omega-featured-post__media {
     border-color: var(--omega-line-strong);
   }
 
-  .classy-featured-post__monogram {
+  .omega-featured-post__monogram {
     font-family: var(--omega-font-marketing);
     font-style: italic;
     font-size: 5.5rem;
@@ -1114,11 +1114,11 @@ main > section.classy-photo-lead-band:first-of-type {
     transition: color var(--omega-speed) var(--omega-ease);
   }
 
-  &:hover .classy-featured-post__monogram {
+  &:hover .omega-featured-post__monogram {
     color: var(--omega-ink-muted);
   }
 
-  .classy-featured-post__body {
+  .omega-featured-post__body {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1126,7 +1126,7 @@ main > section.classy-photo-lead-band:first-of-type {
     padding: 0 0.125rem;
   }
 
-  .classy-featured-post__title {
+  .omega-featured-post__title {
     margin: 0;
     font-family: var(--omega-font-marketing);
     font-size: clamp(1.5rem, 2.6vw, 2.125rem);
@@ -1144,14 +1144,14 @@ main > section.classy-photo-lead-band:first-of-type {
     }
   }
 
-  .classy-featured-post__desc {
+  .omega-featured-post__desc {
     margin: 0;
     font-size: 0.9375rem;
     line-height: 1.65;
     color: var(--omega-ink-muted);
   }
 
-  .classy-featured-post__meta {
+  .omega-featured-post__meta {
     display: flex;
     align-items: center;
     gap: 0.625rem;
@@ -1162,7 +1162,7 @@ main > section.classy-photo-lead-band:first-of-type {
 }
 
 // ── Band — one wide hairline row (enterprise, platform rows, promo strips) ──
-.classy-band {
+.omega-band {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1172,12 +1172,12 @@ main > section.classy-photo-lead-band:first-of-type {
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
 
-  .classy-band__body {
+  .omega-band__body {
     flex: 1 1 22rem;
     min-width: 0;
   }
 
-  .classy-band__title {
+  .omega-band__title {
     margin-bottom: 0.25rem;
     font-size: 1rem;
     font-weight: 650;
@@ -1185,7 +1185,7 @@ main > section.classy-photo-lead-band:first-of-type {
     color: var(--omega-ink);
   }
 
-  .classy-band__desc {
+  .omega-band__desc {
     margin: 0;
     font-size: 0.875rem;
     line-height: 1.6;
@@ -1194,7 +1194,7 @@ main > section.classy-photo-lead-band:first-of-type {
 
   // Feature list reads ACROSS the row (the band is wide, not tall) — the
   // enterprise row's short proof list
-  .classy-band__features {
+  .omega-band__features {
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem 1.5rem;
@@ -1213,7 +1213,7 @@ main > section.classy-photo-lead-band:first-of-type {
 
     // One-line-tall box so the glyph centers on the FIRST line of its text
     // (same rule as the price card's check)
-    .classy-band__check {
+    .omega-band__check {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1227,7 +1227,7 @@ main > section.classy-photo-lead-band:first-of-type {
     }
   }
 
-  .classy-band__actions {
+  .omega-band__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1237,17 +1237,17 @@ main > section.classy-photo-lead-band:first-of-type {
 
 // The enterprise tier wears the band under the price cards — a touch roomier
 // than a promo strip, and its name reads at plan-name size
-.classy-band--enterprise {
+.omega-band--enterprise {
   padding: 1.75rem;
   gap: 1.25rem 2.5rem;
 
-  .classy-band__title {
+  .omega-band__title {
     font-size: 1.1875rem;
   }
 }
 
 // ── Form panel — the hairline container every long form sits in ─────────────
-.classy-form-panel {
+.omega-form-panel {
   padding: 1.75rem;
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
@@ -1266,7 +1266,7 @@ main > section.classy-photo-lead-band:first-of-type {
 // (lazy @bg) + supporting stills (lazy responsive @srcset), captions as
 // glassy micro pills.
 // ============================================
-.classy-photo-band {
+.omega-photo-band {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
@@ -1276,7 +1276,7 @@ main > section.classy-photo-lead-band:first-of-type {
     gap: 1.25rem;
   }
 
-  .classy-photo-band__tile {
+  .omega-photo-band__tile {
     position: relative;
     margin: 0;
     height: 16rem;
@@ -1298,7 +1298,7 @@ main > section.classy-photo-lead-band:first-of-type {
       object-fit: cover;
     }
 
-    &.classy-photo-band__tile--wide {
+    &.omega-photo-band__tile--wide {
       @media (min-width: 992px) {
         grid-column: span 2;
         height: 22rem;
@@ -1306,7 +1306,7 @@ main > section.classy-photo-lead-band:first-of-type {
     }
   }
 
-  .classy-photo-band__caption {
+  .omega-photo-band__caption {
     position: absolute;
     left: 0.875rem;
     bottom: 0.875rem;

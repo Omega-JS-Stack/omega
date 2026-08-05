@@ -1,0 +1,169 @@
+// Neobrutalism Theme: Marketing bands
+// The BASE marketing sections (omega-* markup, structure from the classy
+// floor in _theme.scss) painted neobrutalist: the ink-framed logo marquee,
+// oversized color-block stats, and the full-bleed ink CTA panel. These
+// overlays land AFTER the floor in the bundle, so they win every collision.
+
+// ============================================
+// Trusted-by (marketing/trusted-by): ink-framed marquee strip
+// ============================================
+.omega-logos {
+  padding-block: clamp(2.5rem, 6vw, 4rem);
+
+  .container-fluid {
+    position: relative;
+    margin-inline: clamp(1rem, 4vw, 3rem);
+    width: auto;
+    padding: 2.5rem 0 1.75rem;
+    background: var(--nb-surface);
+    @include nb-border();
+    @include nb-shadow(md);
+    overflow: hidden;
+  }
+
+  // The band label: a mono ink chip pinned to the frame's top-left corner
+  .omega-micro {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-block;
+    text-align: left;
+    margin-bottom: 0;
+    background: #111111;
+    color: var(--nb-accent-yellow);
+    padding: 0.3rem 0.7rem;
+    z-index: 5;
+  }
+
+  // Full-color marks, no grayscale fade: flat and loud, filter-adaptive for
+  // dark mode legibility stays with the floor's luminance flip on hover-out.
+  .omega-marquee__item {
+    opacity: 1;
+    filter: none;
+
+    img,
+    svg {
+      height: 2rem;
+    }
+  }
+
+  .omega-logos__mark svg {
+    height: 2.25rem;
+  }
+
+  [data-bs-theme='dark'] & .omega-marquee__item:not(:hover) {
+    filter: invert(1) grayscale(1);
+  }
+}
+
+// ============================================
+// Stats (marketing/stats): oversized color-block cells
+// ============================================
+// Base cells carry no per-item color, so the accent palette rotates by
+// position: blue, pink, yellow, green, then around again.
+.omega-stats {
+  gap: 1.5rem;
+}
+
+.omega-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-inline-start: 0;
+  color: #ffffff;
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+  @include nb-press($nb-shadow-offset-lg); // press matched to the lg resting shadow
+
+  &:nth-child(4n + 1) { background: var(--nb-accent-blue); }
+  &:nth-child(4n + 2) { background: var(--nb-accent-pink); }
+  &:nth-child(4n + 3) { background: var(--nb-accent-yellow); color: #111111; }
+  &:nth-child(4n + 4) { background: var(--nb-accent-green); }
+
+  .omega-stat__num {
+    font-family: $nb-font-display;
+    font-weight: 900;
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
+    line-height: 1;
+    color: inherit;
+  }
+
+  .omega-stat__label {
+    font-weight: 800;
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+    color: inherit;
+  }
+
+  .omega-stat__sub {
+    font-family: $nb-font-mono;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    color: inherit;
+    opacity: 0.85;
+  }
+}
+
+// ============================================
+// CTA band (marketing/cta): full-bleed ink panel
+// ============================================
+.omega-cta {
+  padding: clamp(2.5rem, 6vw, 4.5rem);
+
+  &.omega-ink-panel {
+    background: #111111;
+    color: #FFFEF2;
+    border-radius: 0;
+    // Frame + offset shadow in the accent (not ink) so both read against
+    // the dark panel.
+    border: $nb-border-width-lg solid var(--nb-accent-yellow);
+    box-shadow: #{$nb-shadow-offset-lg} #{$nb-shadow-offset-lg} 0 var(--nb-accent-yellow);
+  }
+
+  .omega-micro {
+    color: var(--nb-accent-yellow);
+  }
+
+  .omega-cta__headline {
+    font-family: $nb-font-display;
+    font-weight: 900;
+    font-size: clamp(2rem, 6vw, 4rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: inherit;
+
+    em {
+      font-style: normal;
+      background: var(--nb-accent-yellow);
+      color: #111111;
+      padding: 0 0.1em;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+  }
+
+  .omega-cta__sub {
+    font-size: 1.25rem;
+    max-width: 50ch;
+    color: inherit;
+    opacity: 0.85;
+  }
+
+  // Buttons on the ink panel: the primary action goes signature yellow, the
+  // secondary reads as a light outline (an adaptive dark solid would sink
+  // into the panel).
+  .btn.btn-adaptive {
+    --bs-btn-color: #111111;
+    --bs-btn-bg: var(--nb-accent-yellow);
+  }
+
+  .btn.btn-outline-adaptive {
+    color: #FFFEF2;
+    border-color: #FFFEF2;
+
+    &:hover {
+      background: #FFFEF2;
+      color: #111111;
+    }
+  }
+}

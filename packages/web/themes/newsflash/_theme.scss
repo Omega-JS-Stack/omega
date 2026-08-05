@@ -17,14 +17,22 @@
 // Token re-value + Bootstrap bridge (--omega-* contract, light/dark)
 @import 'css/base/root';
 
-// ── The classy app/auth FLOOR (cp190) ───────────────────────────────────────
-// Fall-through surfaces (auth, dashboard/account, admin) render CLASSY
-// layouts, whose vocabulary (.classy-auth, .classy-side, .classy-statgrid,
-// .classy-table, .classy-chip, …) is deliberately TOKEN-PURE — so a full
-// sibling theme imports the partials directly and they paint through THIS
-// theme's token re-values (paper/ink/frames), no classy Bootstrap involved.
+// ── The classy FLOOR (cp190, widened for #177 phase 2) ──────────────────────
+// Fall-through surfaces render BASE markup (omega-* classes), and the
+// structural css for that vocabulary lives in classy's partials, which are
+// deliberately TOKEN-PURE, so a full sibling theme imports them directly
+// and they paint through THIS theme's token re-values (paper/ink/frames),
+// no classy Bootstrap involved. Phase 2 widened the floor beyond app/auth to
+// the marketing vocabulary (omega-cta, omega-stats, omega-price-card,
+// omega-person, omega-rowlist, omega-duo, and the rest) because newsflash
+// now renders the base 404/about/contact/pricing/team/taxonomy surfaces
+// unforked.
 // Imported EARLY on purpose: the floor sits UNDER the theme's own voice, so
 // later newsflash rules win every collision (e.g. classy's .badge base).
+// NOT imported: classy's typography (its h1-h6 element rules would beat the
+// Fraunces headings this theme sets through Bootstrap vars), layout/general
+// (fixed-nav clearance rhythm; the sticky masthead needs none), and
+// layout/nav (fixed glassy bar; the masthead re-skins .omega-nav below).
 // Partial/consumer themes take the whole-chain hatch instead
 // (`@forward 'omega:theme'` — see docs/shared/theming.md).
 @import '../classy/css/layout/shell';
@@ -33,6 +41,10 @@
 @import '../classy/css/pages/auth';
 @import '../classy/css/components/receipt';
 @import '../classy/css/components/badges';
+@import '../classy/css/base/utilities';
+@import '../classy/css/marketing/hero';
+@import '../classy/css/marketing/content';
+@import '../classy/css/marketing/sections';
 
 // Base styles
 @import 'css/base/typography';

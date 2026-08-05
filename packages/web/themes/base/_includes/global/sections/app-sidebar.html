@@ -1,0 +1,237 @@
+{% comment %}
+  Classy v2 app sidebar — shared markup for backend + admin surfaces. The
+  CALLER assigns `data` (backend/sections/sidebar.html and
+  admin/sections/sidebar.html bind their own json) before including this.
+
+  Data shape:
+    logo:     { href, src, text, class }
+    selector: { enabled, name, env, initial, dropdown: [{label, href, icon, divider}] }   (optional)
+    links:    [{ label, href, icon, badge: {text, class} }
+               | { header: true, label }
+               | { divider: true }
+               | { label, icon, dropdown: [ …links, nested dropdowns… ] }]
+    bottom:   { vert: { enabled } }                                                      (optional)
+
+  Anything textual wears .omega-shell__label so the rail collapse hides it
+  (core/css/shell). Active detection via urlmatches, including nested groups.
+{% endcomment %}
+
+<aside class="omega-shell__sidebar" id="app-sidebar">
+  <!-- Brand lockup -->
+  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+  {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
+
+  <a href="{{ logo_href }}" class="omega-side__brand">
+    {% iftruthy logo_src %}
+      <img src="{{ logo_src | omega_cachebreak }}" alt="{{ logo_text }} Logo" class="{{ data.logo.class | default: 'filter-adaptive' }}"/>
+    {% endiftruthy %}
+    {% iftruthy logo_text %}
+      <span class="omega-shell__label">{{ logo_text }}</span>
+    {% endiftruthy %}
+  </a>
+
+  <!-- Project selector (optional module) -->
+  {% if data.selector.enabled %}
+    {% capture selector_name %}{{ data.selector.name | omega_liquify }}{% endcapture %}
+    {% capture selector_initial %}{% if data.selector.initial %}{{ data.selector.initial }}{% else %}{{ selector_name | slice: 0 }}{% endif %}{% endcapture %}
+    <div class="dropdown">
+      <button class="omega-side__selector" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Switch project">
+        <span class="omega-side__selector-tile">{{ selector_initial | upcase }}</span>
+        <span class="omega-shell__label">
+          <span class="omega-side__selector-name d-block">{{ selector_name }}</span>
+          {% iftruthy data.selector.env %}
+            <span class="omega-side__selector-env d-block">{{ data.selector.env | omega_liquify }}</span>
+          {% endiftruthy %}
+        </span>
+        <span class="omega-side__selector-chevron">{% omega_icon "arrows-up-down", "fa-xs" %}</span>
+      </button>
+      {% if data.selector.dropdown %}
+        <ul class="dropdown-menu">
+          {% for item in data.selector.dropdown %}
+            {% if item.divider %}
+              <li><hr class="dropdown-divider"/></li>
+            {% else %}
+              <li>
+                <a class="dropdown-item" href="{{ item.href | default: '#' }}">
+                  {% if item.icon %}{% omega_icon item.icon, "fa-sm me-2" %}{% endif %}
+                  {{ item.label | omega_liquify }}
+                </a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- Navigation -->
+  <ul class="list-unstyled mb-0">
+    {% for link in data.links %}
+      {% if link.divider %}
+        <li class="hairline-top my-2"></li>
+      {% elsif link.header %}
+        <li><span class="omega-side__label omega-shell__label">{{ link.label }}</span></li>
+      {% elsif link.dropdown %}
+        <!-- Collapsible group (open when a descendant is active) -->
+        {% capture link_id %}sidebar-collapse-{{ forloop.index }}{% endcapture %}
+        {% assign dropdown_has_active = false %}
+        {% for child in link.dropdown %}
+          {% unless child.divider %}
+            {% if child.dropdown %}
+              {% for grandchild in child.dropdown %}
+                {% unless grandchild.divider %}
+                  {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                  {% if _check_nested == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+                {% endunless %}
+              {% endfor %}
+            {% else %}
+              {% capture _check_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+              {% if _check_active == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+        <li>
+          <button class="omega-side__item {% if dropdown_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
+            {% if link.icon %}
+              <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+            {% endif %}
+            <span class="omega-shell__label">{{ link.label }}</span>
+            <span class="omega-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
+          </button>
+          <div class="collapse {% if dropdown_has_active %}show{% endif %}" id="{{ link_id }}">
+            <ul class="omega-side__children">
+              {% for child in link.dropdown %}
+                {% if child.divider %}
+                  <li class="hairline-top my-2"></li>
+                {% elsif child.dropdown %}
+                  <!-- Nested group -->
+                  {% capture nested_id %}{{ link_id }}-nested-{{ forloop.index }}{% endcapture %}
+                  {% assign nested_has_active = false %}
+                  {% for grandchild in child.dropdown %}
+                    {% unless grandchild.divider %}
+                      {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                      {% if _check_nested == "active" %}{% assign nested_has_active = true %}{% endif %}
+                    {% endunless %}
+                  {% endfor %}
+                  <li>
+                    <button class="omega-side__item {% if nested_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
+                      {% if child.icon %}
+                        <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                      {% endif %}
+                      <span class="omega-shell__label">{{ child.label }}</span>
+                      <span class="omega-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
+                    </button>
+                    <div class="collapse {% if nested_has_active %}show{% endif %}" id="{{ nested_id }}">
+                      <ul class="omega-side__children">
+                        {% for grandchild in child.dropdown %}
+                          {% if grandchild.divider %}
+                            <li class="hairline-top my-2"></li>
+                          {% else %}
+                            {% capture grandchild_active %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                            <li>
+                              <a href="{{ grandchild.href }}" class="omega-side__item {{ grandchild_active }}">
+                                {% if grandchild.icon %}
+                                  <span class="omega-side__icon">{% omega_icon grandchild.icon, "fa-sm" %}</span>
+                                {% endif %}
+                                <span class="omega-shell__label">{{ grandchild.label }}</span>
+                              </a>
+                            </li>
+                          {% endif %}
+                        {% endfor %}
+                      </ul>
+                    </div>
+                  </li>
+                {% else %}
+                  {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                  {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                  <li>
+                    {% iftruthy child.href %}
+                      <a href="{{ child.href }}" class="omega-side__item {{ child_active }}" {{ child_attributes }}>
+                        {% if child.icon %}
+                          <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                        {% endif %}
+                        <span class="omega-shell__label">{{ child.label }}</span>
+                        {% if child.badge %}
+                          <span class="omega-chip omega-side__chip omega-shell__label {{ child.badge.class }}">{{ child.badge.text }}</span>
+                        {% endif %}
+                      </a>
+                    {% endiftruthy %}
+                    {% iffalsy child.href %}
+                      <button type="button" class="omega-side__item {% if child.class %}{{ child.class }}{% endif %}" {{ child_attributes }}>
+                        {% if child.icon %}
+                          <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                        {% endif %}
+                        <span class="omega-shell__label">{{ child.label }}</span>
+                      </button>
+                    {% endiffalsy %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+        </li>
+      {% else %}
+        <!-- Regular nav link -->
+        {% capture link_active %}{% urlmatches link.href, "active" %}{% endcapture %}
+        {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+        <li>
+          {% iftruthy link.href %}
+            <a href="{{ link.href }}" class="omega-side__item {{ link_active }}" {{ link_attributes }}>
+              {% if link.icon %}
+                <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+              {% endif %}
+              <span class="omega-shell__label">{{ link.label }}</span>
+              {% if link.badge %}
+                <span class="omega-chip omega-side__chip omega-shell__label {{ link.badge.class }}">{{ link.badge.text }}</span>
+              {% endif %}
+            </a>
+          {% endiftruthy %}
+          {% iffalsy link.href %}
+            <button type="button" class="omega-side__item" {{ link_attributes }}>
+              {% if link.icon %}
+                <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+              {% endif %}
+              <span class="omega-shell__label">{{ link.label }}</span>
+            </button>
+          {% endiffalsy %}
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+
+  <!-- Bottom section: optional vert slot + user row -->
+  <div class="mt-auto">
+    {% comment %} The rail vert slot: the surface opts in through its sidebar data
+      (the dashboard does, admin does not) and the brand's `advertising` config key
+      gates it — no config, no slot chrome (docs/web/ads-system.md). {% endcomment %}
+    {% if data.bottom.vert.enabled and site.advertising %}
+      <div class="omega-side__ad omega-shell__label">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="omega-chip">Sponsored</span>
+          <a href="/pricing" class="omega-footer__link" data-omega-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
+            {% omega_icon "xmark", "fa-xs" %}
+          </a>
+        </div>
+        {% section "verts/unit", type: "in-article", size: "rectangle" %}
+        <a href="/pricing" class="d-block text-center omega-footer__link small mt-2 text-decoration-none" data-omega-bind="@show !auth.resolved.active" hidden>
+          Remove with <span class="text-primary">Pro</span>
+        </a>
+      </div>
+    {% endif %}
+
+    <!-- User row -->
+    <div class="omega-side__user" data-omega-bind="@show auth.user" hidden>
+      <span class="avatar avatar-sm rounded-circle overflow-hidden d-inline-flex flex-shrink-0">
+        <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+      </span>
+      <span class="omega-shell__label flex-grow-1 overflow-hidden">
+        <span class="omega-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.displayName">User</span>
+        <span class="omega-side__user-email d-block text-truncate" data-omega-bind="@text auth.user.email">email@example.com</span>
+      </span>
+      <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">
+        {% omega_icon "gear", "fa-sm" %}
+      </a>
+    </div>
+  </div>
+</aside>

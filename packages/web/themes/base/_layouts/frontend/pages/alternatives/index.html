@@ -1,0 +1,172 @@
+---
+layout: frontend/core/base
+
+# Hero Section
+hero:
+  tagline: "Compare & choose"
+  headline: "{{ site.brand.name }} vs the"
+  headline_accent: "competition"
+  description: "Head-to-head comparisons, no spin. See exactly where we win."
+  primary_button:
+    text: "Get started free"
+    href: "/pricing"
+  secondary_button:
+    text: "See pricing"
+    href: "/pricing"
+
+# Alternatives Section
+alternatives:
+  superheadline:
+    icon: "scale-balanced"
+    text: "Comparisons"
+  headline: "Explore <em>alternatives</em>"
+  subheadline: "In-depth comparisons to help you make the right choice"
+  empty_message: "No alternatives available yet"
+  view_comparison: "View full comparison"
+
+# Value Props Section
+value_props:
+  superheadline:
+    icon: "trophy"
+    text: "Why us"
+  headline: "Why people choose <em>{{ site.brand.name }}</em>"
+  subheadline: "Here's what sets us apart from the rest"
+  items:
+    - title: "Lightning fast"
+      description: "Built on modern infrastructure for blazing performance. No more waiting around."
+      icon: "bolt"
+    - title: "AI-powered"
+      description: "Smart automation built into every workflow to save you hours every week."
+      icon: "wand-magic-sparkles"
+    - title: "24/7 support"
+      description: "Real humans ready to help whenever you need it. Average response time under 5 minutes."
+      icon: "headset"
+
+# Stats Section
+stats:
+  - number: "50,000+"
+    label: "Active users"
+    sublabel: "From 120+ countries"
+  - number: "4.9"
+    label: "Average rating"
+    sublabel: "Across review platforms"
+  - number: "99.99%"
+    label: "Uptime"
+    sublabel: "Enterprise-grade"
+  - number: "24/7"
+    label: "Support"
+    sublabel: "Real humans"
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "rocket"
+    text: "Get started"
+  headline: "Ready to make the switch?"
+  subheadline: "Join thousands of happy users who chose {{ site.brand.name }}. Start your free trial today. No credit card required."
+  primary_button:
+    text: "Start free trial"
+    href: "/pricing"
+  secondary_button:
+    text: "Talk to sales"
+    href: "/contact"
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    {% component "heading/masthead", eyebrow: resolved.hero.tagline, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
+    <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
+      {% iftruthy resolved.hero.primary_button.text %}
+        <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ resolved.hero.primary_button.text }}
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      {% endiftruthy %}
+      {% iftruthy resolved.hero.secondary_button.text %}
+        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
+          {{ resolved.hero.secondary_button.text }}
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      {% endiftruthy %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Comparisons — hairline rows ═══ -->
+<section>
+  <div class="container">
+    <div class="omega-duo">
+      <div class="omega-duo__aside omega-section-head" data-omega-reveal>
+        {% component "heading/section-head", superheadline: resolved.alternatives.superheadline.text, headline: resolved.alternatives.headline, sub: resolved.alternatives.subheadline %}
+      </div>
+
+      <div>
+        {% if site.alternatives %}
+          {% assign alternatives = site.alternatives | sort: 'alternative.competitor.name' %}
+        {% else %}
+          {% assign alternatives = nil %}
+        {% endif %}
+
+        {% if alternatives and alternatives.size > 0 %}
+          <div class="omega-rowlist" data-omega-reveal-stagger="50">
+            {% for item in alternatives %}
+              {% if item.draft and jekyll.environment == 'production' %}
+                {% continue %}
+              {% endif %}
+              <a href="{{ item.url }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
+                <span>{{ site.brand.name }} vs {{ item.alternative.competitor.name }}</span>
+                <span class="omega-rowlist__meta">
+                  {{ resolved.alternatives.view_comparison }}
+                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                </span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="card" data-omega-reveal>
+            <div class="card-body p-5 text-center text-muted">
+              <p class="fs-6 mb-0">{{ resolved.alternatives.empty_message }}</p>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Value props — hairline rows ═══ -->
+{% assign value_props_size = resolved.value_props.items | size %}
+{% if value_props_size > 0 %}
+  <section>
+    <div class="container">
+      <div class="omega-duo">
+        <div class="omega-duo__aside omega-section-head" data-omega-reveal>
+          {% component "heading/section-head", superheadline: resolved.value_props.superheadline.text, headline: resolved.value_props.headline %}
+        </div>
+
+        <div class="omega-rowlist" data-omega-reveal-stagger="60">
+          {% for prop in resolved.value_props.items %}
+            <div class="omega-rowlist__item" data-omega-reveal>
+              <span class="d-inline-flex align-items-center gap-3">
+                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon prop.icon, "fa-sm" %}</span>
+                <strong>{{ prop.title }}</strong>
+              </span>
+              <span class="omega-rowlist__meta">{{ prop.description }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- ═══ Stats band ═══ -->
+
+{% section "marketing/stats", items: resolved.stats %}
+<!-- ═══ CTA band ═══ -->
+{% iftruthy resolved.cta.headline %}
+  {% section "marketing/cta", data: resolved.cta %}
+{% endiftruthy %}
+
+{{ content | omega_content_format }}

@@ -29,7 +29,7 @@
  * (components inside section slots, sections inside component slots).
  *
  * Resolution walks the layer chain (consumer `_sections`/`_components` →
- * active theme → classy base — first match wins), mirroring themes/layouts.
+ * active theme → base — first match wins), mirroring themes/layouts.
  * Each entry is a folder owning `section.html` + optional `section.json5`
  * ({ description, args, defaults, demo }) — defaults merge under passed args,
  * top-level args validate against the schema (warn + did-you-mean, never

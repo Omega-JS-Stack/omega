@@ -21,7 +21,7 @@ Both tiers share the same anatomy, resolution, and asset rules.
 ## 2. Anatomy — a section is a folder that owns everything about itself
 
 ```
-themes/classy/_sections/marketing/hero/
+themes/base/_sections/marketing/hero/
   section.html    ← markup (Liquid). The args are the data contract.
   section.scss    ← its styles (optional)
   section.js      ← its behavior (optional — most sections have none)
@@ -48,7 +48,7 @@ For `{% section "marketing/hero" %}`, first match wins:
 
 1. **Consumer-local**: `<src>/_sections/marketing/hero/` — consumers author their own sections here (their git holds ONLY their own work)
 2. **Active theme**: `themes/<active>/_sections/...`
-3. **Base theme (classy)**: `themes/classy/_sections/...` — the floor, same as the theming two-lane model
+3. **Base layer**: `themes/base/_sections/...` — the floor, same as the theming two-lane model
 
 Theme sections live inside the installed package (never scaffolded into the consumer repo) — consumer git stays clean; framework updates flow.
 

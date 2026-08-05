@@ -44,7 +44,7 @@ newsletter:
 {% endcomment %}
 
 <!-- Reading progress — filled by the theme page JS (pages/blog/post.js) -->
-<div class="reading-progress" aria-hidden="true"><span></span></div>
+<div class="newsflash-progress" aria-hidden="true"><span></span></div>
 
 {% comment %} Vert placement (docs/web/ads-system.md): auto-placed units need the
   `advertising` config key, and a post opts out with `verts: false` in its
@@ -61,9 +61,9 @@ newsletter:
       <div class="col-xl-9 col-lg-10 col-md-12 col-12">
         <header class="text-center mb-4" data-lazy="@class animation-slide-up">
           {% if resolved.post.categories[0] %}
-            <span class="kicker mb-3">{{ resolved.post.categories[0] | omega_title_case }}</span>
+            <span class="newsflash-kicker mb-3">{{ resolved.post.categories[0] | omega_title_case }}</span>
           {% else %}
-            <span class="kicker mb-3">Dispatch</span>
+            <span class="newsflash-kicker mb-3">Dispatch</span>
           {% endif %}
           <h1 class="display-4 mt-2 mb-0">{{ resolved.post.title }}</h1>
         </header>
@@ -107,7 +107,7 @@ newsletter:
     <!-- Hero image — the framed splash -->
     <div class="row justify-content-center">
       <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-lazy="@class animation-slide-up">
-        <div class="art-frame article-hero shadow">
+        <div class="newsflash-frame newsflash-frame--article shadow">
           {%- omega_post resolved.post.id, "image-tag", class="w-100 blog-post-image" -%}
         </div>
       </div>
@@ -137,7 +137,7 @@ newsletter:
     <!-- Tags -->
     <div class="row justify-content-center mb-4">
       <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
-        <div class="tag-row d-flex flex-wrap gap-2 pt-4">
+        <div class="newsflash-tag-row d-flex flex-wrap gap-2 pt-4">
           {% assign tags = '' | split: ',' %}
             {% for tag in resolved.post.tags %}
               {% assign tag_fixed = tag | omega_title_case %}

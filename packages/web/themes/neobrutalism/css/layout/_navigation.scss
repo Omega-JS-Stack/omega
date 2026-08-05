@@ -1,123 +1,140 @@
-// Neobrutalism Theme — Navigation
-// The inherited nav markup (.navbar-wrapper > .navbar.navbar-floating) is a
-// floating glass pill in Classy. Here we make it a solid, ink-framed bar that
-// sits flush at the top — a hard horizontal block, true to the style.
+// Neobrutalism Theme: Navigation
+// The BASE nav include (header.omega-nav; the theme forks no nav markup)
+// worn as a solid, ink-framed bar sitting flush at the top: a hard
+// horizontal block, true to the style. Sticky (in-flow), so pages need no
+// clearance offset. Scroll state comes from the shared motion engine
+// (data-omega-scroll-watch on the header stamps data-omega-scrolled; the
+// omega- namespace keeps the rule through the PurgeCSS greedy safelist).
+// Classy's _nav.scss (fixed glassy pill) is deliberately NOT imported: this
+// file owns the whole block.
 
-.navbar-wrapper {
-  position: fixed;
+.omega-nav {
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1030;
-  pointer-events: none;
-
-  .navbar {
-    pointer-events: auto;
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding-left: clamp(1rem, 4vw, 3rem);
-    padding-right: clamp(1rem, 4vw, 3rem);
-  }
-}
-
-.navbar.navbar-floating {
-  border-radius: 0;
-  padding: 0.75rem clamp(1rem, 4vw, 3rem);
-  background: var(--nb-surface) !important;
-  border: 0;
+  background: var(--nb-surface);
   border-bottom: $nb-border-width-lg solid var(--nb-border-color);
   transition: $nb-transition;
 
-  // Slight shadow only once scrolled (data-omega-scrolled stamped by
-  // js/navbar-scroll.js; omega- namespace so the purge safelist keeps it)
+  // Hard offset shadow only once scrolled
   &[data-omega-scrolled='true'] {
     @include nb-shadow(sm);
+  }
+
+  .navbar {
+    padding: 0.75rem clamp(1rem, 4vw, 3rem);
   }
 
   .container,
   .container-fluid {
     padding: 0;
+    max-width: 100%;
+  }
+
+  // Nav links: square hover blocks. Hover/active fill is the PRIMARY blue
+  // (white text), not the yellow accent, so the top-bar interactions match
+  // the brand's blue buttons instead of the yellow CTA accent.
+  .omega-nav__link {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.4rem 0.85rem;
+    margin: 0 0.15rem;
+    border: $nb-border-width-sm solid transparent;
+    border-radius: 0;
+    color: var(--bs-body-color);
+    text-decoration: none;
+    background: transparent;
+    transition: $nb-transition;
+
+    // Interactive accent (blue), not the yellow signature accent. Single
+    // token so every hover/active state across the theme stays consistent.
+    &:hover,
+    &:focus-visible {
+      background: var(--nb-accent-interactive);
+      color: var(--nb-accent-interactive-ink);
+      border-color: var(--nb-border-color);
+    }
+
+    // Active = solid blue block with white text (matches hover, readable).
+    &.active {
+      background: var(--nb-accent-interactive);
+      color: var(--nb-accent-interactive-ink);
+      border-color: var(--nb-border-color);
+    }
+  }
+
+  // Mobile collapsed menu becomes a bordered drawer panel
+  @media (max-width: 991.98px) {
+    .navbar-collapse {
+      margin-top: 0.75rem;
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+      background: var(--nb-surface);
+      @include nb-border();
+      @include nb-shadow(md);
+    }
+
+    .omega-nav__link {
+      width: 100%;
+    }
+
+    // Actions sit under a hard rule, full width, real tap targets
+    .omega-nav__mobile-actions {
+      margin-top: 0.6rem;
+      padding-top: 0.75rem;
+      border-top: $nb-border-width-sm solid var(--nb-border-color);
+    }
   }
 }
 
-// Brand: chunky display type, no fade
-.navbar-brand {
+// Brand lockup, shared by the bar AND the footer include: chunky display
+// type, no fade.
+.omega-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: $nb-font-display;
   font-weight: 900;
   font-size: 1.4rem;
   letter-spacing: -0.03em;
-
-  .brand-logo { height: 32px; width: auto; margin-right: 0.5rem; }
-}
-
-// Nav links: square hover blocks. Hover/active fill is the PRIMARY blue (white
-// text) — not the yellow accent — so the top-bar interactions match the brand's
-// blue buttons instead of the yellow CTA accent.
-.navbar-nav .nav-link {
-  font-weight: 700;
-  font-size: 0.95rem;
-  padding: 0.4rem 0.85rem;
-  margin: 0 0.15rem;
-  border-radius: 0;
   color: var(--bs-body-color);
-  border: $nb-border-width-sm solid transparent;
-  transition: $nb-transition;
+  text-decoration: none;
 
-  // Interactive accent (blue), not the yellow signature accent. Single token so
-  // every hover/active state across the theme stays consistent.
-  &:hover {
-    background: var(--nb-accent-interactive);
-    color: var(--nb-accent-interactive-ink);
-    border-color: var(--nb-border-color);
+  &:hover,
+  &:focus-visible {
+    color: var(--bs-body-color);
   }
 
-  // Active = solid blue block with white text (matches hover, always readable).
-  // Use &.active.active + !important to beat Bootstrap's .text-body utility that
-  // the nav include adds to links (which otherwise forces color back to body).
-  &.active,
-  &.active.text-body {
-    background: var(--nb-accent-interactive) !important;
-    color: var(--nb-accent-interactive-ink) !important;
-    border-color: var(--nb-border-color);
+  img {
+    height: 32px;
+    width: auto;
   }
 }
 
-// Mobile toggle: a hard square button
+// Mobile toggle: a hard square button (the base include renders a bars icon
+// glyph, not Bootstrap's background-image span)
 .navbar-toggler {
   border-radius: 0;
   padding: 0.3rem 0.55rem;
+  color: var(--bs-body-color);
   background: var(--nb-surface);
   @include nb-border($nb-border-width-sm);
   transition: $nb-transition;
 
-  &:hover { background: var(--nb-accent-interactive); }
-  &:focus { box-shadow: var(--nb-shadow-sm); }
-
-  .navbar-toggler-icon {
-    width: 1.25em;
-    height: 1.25em;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2817,17,17,1%29' stroke-linecap='square' stroke-miterlimit='10' stroke-width='3' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  &:hover {
+    background: var(--nb-accent-interactive);
+    color: var(--nb-accent-interactive-ink);
   }
 
-  [data-bs-theme="dark"] & .navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28245,245,245,1%29' stroke-linecap='square' stroke-miterlimit='10' stroke-width='3' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-  }
-}
-
-// Mobile collapsed menu becomes a bordered drawer panel
-@media (max-width: 991.98px) {
-  .navbar-collapse {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    background: var(--nb-surface);
-    @include nb-border();
-    @include nb-shadow(md);
+  &:focus {
+    box-shadow: var(--nb-shadow-sm);
   }
 }
 
 // ============================================
-// Dropdown menus — hard bordered panels
+// Dropdown menus: hard bordered panels
 // ============================================
 .dropdown-menu {
   background: var(--nb-surface);

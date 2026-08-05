@@ -21,17 +21,24 @@ hero:
     icon: "book-open"
     href: "/pricing"
 
-# Trusted By Section
+# Trusted By Section (base marketing/trusted-by, restyled)
 trusted_by:
   headline: "Trusted by the best"
   logos:
-    - name: "amazon"
-    - name: "google"
-    - name: "hubspot"
-    - name: "paypal"
-    - name: "slack"
-    - name: "shopify"
-    - name: "stripe"
+    - name: "Amazon"
+      logo: "amazon"
+    - name: "Google"
+      logo: "google"
+    - name: "HubSpot"
+      logo: "hubspot"
+    - name: "PayPal"
+      logo: "paypal"
+    - name: "Slack"
+      logo: "slack"
+    - name: "Shopify"
+      logo: "shopify"
+    - name: "Stripe"
+      logo: "stripe"
 
 # Showcase Section
 showcase:
@@ -94,63 +101,60 @@ testimonials:
       company: "Creative Studio"
       initial: "E"
 
-# Stats Section
+# Stats Section (base marketing/stats, restyled as color blocks)
 stats:
   - number: "50,000+"
     label: "Active users"
     sublabel: "From 120+ countries"
-    color: "blue"
   - number: "200+"
     label: "Solutions"
     sublabel: "Industry-leading"
-    color: "pink"
   - number: "4.9"
     label: "Average rating"
-    color: "yellow"
   - number: "98%"
     label: "Success rate"
     sublabel: "Business growth"
-    color: "green"
 
-# CTA Section
+# CTA Section (base marketing/cta, restyled as the ink panel)
 cta:
   superheadline:
-    icon: "rocket"
     text: "Launch"
   headline: "Ready to transform your"
   headline_accent: "business?"
-  description: "Join thousands of successful companies who have already accelerated their growth with {{ site.brand.name }}"
+  subheadline: "Join thousands of successful companies who have already accelerated their growth with {{ site.brand.name }}"
   primary_button:
     text: "Start today"
-    icon: "rocket"
     href: "/dashboard"
   secondary_button:
     text: "Talk to an expert"
-    icon: "comments"
     href: "/contact"
 ---
 
 {% comment %}
-  NEOBRUTALISM HOMEPAGE
-  Reuses the same resolved.* data contract as the classy homepage, but with
-  a deliberately different STRUCTURE: an asymmetric split hero, an ink-framed logo
-  marquee, alternating offset showcase blocks, big numbered step blocks, oversized
-  color-block stats, and a full-bleed CTA. Color blocks rotate through the nb accent
-  palette. See docs/themes.md "Per-page HTML layout overrides".
+  NEOBRUTALISM HOMEPAGE (identity fork, #177)
+  Same resolved.* data contract as the base homepage, different STRUCTURE
+  where the neobrutalist design demands it: an asymmetric split hero,
+  alternating offset showcase blocks, and big numbered step cards. Those
+  bands are hand-built here and wear neo-* BEM classes. Everything with a
+  base-section counterpart of the same content shape delegates instead:
+  trusted-by (the omega-marquee logo wall, framed by this theme's scss),
+  stats (omega-stat cells painted as color blocks), testimonials, and the
+  cta band (omega-cta ink panel). Convention: docs/web/sections.md
+  "Markup convention: base, skin, fork".
 {% endcomment %}
 
 <!-- ============================================ -->
-<!-- HERO — asymmetric split: oversized headline | offset action stack -->
+<!-- HERO: asymmetric split: oversized headline | offset action stack -->
 <!-- ============================================ -->
-<section class="section-hero text-bg-warning">
+<section class="neo-hero text-bg-warning">
   <div class="container">
     <div class="row align-items-center g-5">
       <!-- Left: kicker + giant headline + description -->
       <div class="col-lg-7">
-        <p class="text-uppercase fw-semibold mb-4">{{ resolved.hero.tagline }}</p>
-        <h1 class="hero-title mb-4">
+        <p class="neo-kicker neo-kicker--ink text-uppercase mb-4">{{ resolved.hero.tagline }}</p>
+        <h1 class="neo-hero__title mb-4">
           {{ resolved.hero.headline }}
-          <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+          <span class="neo-accent">{{ resolved.hero.headline_accent }}</span>
         </h1>
         <p class="fs-3 fw-medium mb-0" style="max-width: 36ch;">
           {{ resolved.hero.description }}
@@ -159,7 +163,7 @@ cta:
 
       <!-- Right: stacked, full-width CTA buttons (d-grid = full-width children) -->
       <div class="col-lg-5">
-        <div class="d-grid gap-3 hero-actions">
+        <div class="d-grid gap-3 neo-hero__actions">
           <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-dark btn-lg">
             {% omega_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
           </a>
@@ -173,61 +177,40 @@ cta:
 </section>
 
 <!-- ============================================ -->
-<!-- TRUSTED BY — ink-framed marquee strip -->
+<!-- TRUSTED BY: base marquee wall, ink-framed by the theme scss -->
 <!-- ============================================ -->
-<section class="logo-strip">
-  <div class="container">
-    <div class="logo-strip-box">
-      <span class="logo-strip-label">{{ resolved.trusted_by.headline }}</span>
-      <div class="infinite-scroll-wrapper">
-        <div class="infinite-scroll-track">
-          {% for logo in resolved.trusted_by.logos %}
-            <div class="infinite-scroll-item infinite-scroll-item--logo filter-adaptive">
-              {% omega_logo logo.name, "combomarks", "original" %}
-            </div>
-          {% endfor %}
-          {% comment %} duplicate for seamless loop {% endcomment %}
-          {% for logo in resolved.trusted_by.logos %}
-            <div class="infinite-scroll-item infinite-scroll-item--logo filter-adaptive" aria-hidden="true">
-              {% omega_logo logo.name, "combomarks", "original" %}
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/trusted-by", data: resolved.trusted_by %}
 
 <!-- ============================================ -->
-<!-- SHOWCASE — alternating offset blocks that break the grid -->
+<!-- SHOWCASE: alternating offset blocks that break the grid -->
 <!-- ============================================ -->
-<section class="showcase">
+<section class="neo-showcase">
   <div class="container">
-    <header class="section-head mb-5">
+    <header class="neo-section-head mb-5">
       {% iftruthy resolved.showcase.superheadline.text %}
-        <span class="kicker mb-3">
+        <span class="neo-kicker mb-3">
           {% omega_icon resolved.showcase.superheadline.icon, "me-1" %}{{ resolved.showcase.superheadline.text }}
         </span>
       {% endiftruthy %}
-      <h2 class="section-title">
+      <h2 class="neo-section-head__title">
         {{ resolved.showcase.headline }}
-        <span class="text-accent">{{ resolved.showcase.headline_accent }}</span>
+        <span class="neo-accent">{{ resolved.showcase.headline_accent }}</span>
       </h2>
     </header>
 
     {% assign showcase_bgs = "text-bg-primary,text-bg-secondary,text-bg-success,text-bg-info,text-bg-warning" | split: "," %}
-    <div class="showcase-list">
+    <div class="neo-showcase__list">
       {% for item in resolved.showcase.items %}
         {% assign bg = showcase_bgs[forloop.index0] | default: "text-bg-primary" %}
         {% comment %} Liquid can't use a filter inside `if`, so compute the parity first {% endcomment %}
         {% assign row_parity = forloop.index0 | modulo: 2 %}
-        <article class="showcase-row {% if row_parity == 1 %}showcase-row--flip{% endif %}">
-          <div class="showcase-num {{ bg }}">
+        <article class="neo-showcase__row {% if row_parity == 1 %}neo-showcase__row--flip{% endif %}">
+          <div class="neo-showcase__num {{ bg }}">
             {{ forloop.index | prepend: '0' | slice: -2, 2 }}
           </div>
-          <div class="showcase-body">
-            <h3 class="showcase-title">{{ item.title }}</h3>
-            <p class="showcase-desc">{{ item.description }}</p>
+          <div class="neo-showcase__body">
+            <h3 class="neo-showcase__title">{{ item.title }}</h3>
+            <p class="neo-showcase__desc">{{ item.description }}</p>
           </div>
         </article>
       {% endfor %}
@@ -236,33 +219,33 @@ cta:
 </section>
 
 <!-- ============================================ -->
-<!-- FEATURES — big numbered step cards -->
+<!-- FEATURES: big numbered step cards -->
 <!-- ============================================ -->
-<section class="steps bg-body-tertiary">
+<section class="neo-steps bg-body-tertiary">
   <div class="container">
-    <header class="section-head mb-5">
+    <header class="neo-section-head mb-5">
       {% iftruthy resolved.features.superheadline.text %}
-        <span class="kicker mb-3">
+        <span class="neo-kicker mb-3">
           {% omega_icon resolved.features.superheadline.icon, "me-1" %}{{ resolved.features.superheadline.text }}
         </span>
       {% endiftruthy %}
-      <h2 class="section-title">
+      <h2 class="neo-section-head__title">
         {{ resolved.features.headline }}
-        <span class="text-accent">{{ resolved.features.headline_accent }}</span>
+        <span class="neo-accent">{{ resolved.features.headline_accent }}</span>
       </h2>
     </header>
 
     <div class="row g-4">
       {% for feature in resolved.features.items %}
         <div class="col-md-4">
-          <div class="card step-card h-100">
+          <div class="card neo-step-card h-100">
             <div class="card-body">
-              <div class="step-card-top">
-                <span class="step-card-num">{{ forloop.index }}</span>
-                <span class="step-card-icon">{% omega_icon feature.icon %}</span>
+              <div class="neo-step-card__top">
+                <span class="neo-step-card__num">{{ forloop.index }}</span>
+                <span class="neo-step-card__icon">{% omega_icon feature.icon %}</span>
               </div>
-              <h3 class="step-card-title">{{ feature.title }}</h3>
-              <p class="step-card-desc">{{ feature.description }}</p>
+              <h3 class="neo-step-card__title">{{ feature.title }}</h3>
+              <p class="neo-step-card__desc">{{ feature.description }}</p>
             </div>
           </div>
         </div>
@@ -280,61 +263,15 @@ cta:
 </section>
 
 <!-- ============================================ -->
-<!-- STATS — oversized color-block cells -->
+<!-- STATS: base stats band, painted as oversized color blocks -->
 <!-- ============================================ -->
-<section class="stats">
-  <div class="container">
-    {% assign stat_bgs = "blue:text-bg-primary,pink:text-bg-secondary,green:text-bg-success,yellow:text-bg-warning,info:text-bg-info" | split: "," %}
-    <div class="stats-grid">
-      {% for stat in resolved.stats %}
-        {% assign stat_bg = "text-bg-primary" %}
-        {% case stat.color %}
-          {% when "pink" %}{% assign stat_bg = "text-bg-secondary" %}
-          {% when "green" %}{% assign stat_bg = "text-bg-success" %}
-          {% when "yellow" %}{% assign stat_bg = "text-bg-warning" %}
-          {% when "info" %}{% assign stat_bg = "text-bg-info" %}
-          {% else %}{% assign stat_bg = "text-bg-primary" %}
-        {% endcase %}
-        <div class="stat-block {{ stat_bg }}">
-          <span class="stat-block-num">{{ stat.number }}</span>
-          <span class="stat-block-label">{{ stat.label }}</span>
-          {% iftruthy stat.sublabel %}<span class="stat-block-sub">{{ stat.sublabel }}</span>{% endiftruthy %}
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
+{% section "marketing/stats", items: resolved.stats %}
 
 {% section "marketing/testimonials", data: resolved.testimonials %}
 
 <!-- ============================================ -->
-<!-- CTA — full-bleed ink block -->
+<!-- CTA: base cta band, painted as the full-bleed ink block -->
 <!-- ============================================ -->
-<section class="cta">
-  <div class="container">
-    <div class="cta-panel">
-      {% iftruthy resolved.cta.superheadline.text %}
-        <span class="kicker kicker--invert mb-4">
-          {% omega_icon resolved.cta.superheadline.icon, "me-1" %}{{ resolved.cta.superheadline.text }}
-        </span>
-      {% endiftruthy %}
-      <h2 class="cta-title">
-        {{ resolved.cta.headline }}
-        <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
-      </h2>
-      <p class="cta-desc">{{ resolved.cta.description }}</p>
-      <div class="d-flex flex-wrap gap-3 justify-content-center">
-        <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-warning btn-lg">
-          {% omega_icon resolved.cta.primary_button.icon, "me-2" %}{{ resolved.cta.primary_button.text }}
-        </a>
-        {% iftruthy resolved.cta.secondary_button %}
-          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg">
-            {% omega_icon resolved.cta.secondary_button.icon, "me-2" %}{{ resolved.cta.secondary_button.text }}
-          </a>
-        {% endiftruthy %}
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/cta", data: resolved.cta %}
 
 {{ content | omega_content_format }}

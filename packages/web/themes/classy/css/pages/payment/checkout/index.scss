@@ -4,12 +4,12 @@
 // CARD composed from the shared receipt vocabulary (components/_receipt.scss)
 // so checkout and confirmation read as one story. Tokens only, both modes.
 
-.classy-checkout {
+.omega-checkout {
   max-width: 72rem;
 }
 
 // ── Header — the serif moment left, brand right ─────────────────────────────
-.classy-checkout__head {
+.omega-checkout__head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -21,12 +21,12 @@
   }
 }
 
-.classy-checkout__head-title {
+.omega-checkout__head-title {
   min-width: 0;
 }
 
 // ── Brand (small, right of the title — cover pages have no nav) ─────────────
-.classy-checkout__brand {
+.omega-checkout__brand {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -49,7 +49,7 @@
 }
 
 // ── Quiet links (change plan, switch account, help) ─────────────────────────
-.classy-checkout__quiet-link {
+.omega-checkout__quiet-link {
   color: var(--omega-ink-muted);
   text-decoration: none;
   white-space: nowrap;
@@ -61,7 +61,7 @@
 }
 
 // ── Panels — the hairline surfaces the left column is built from ────────────
-.classy-checkout__panel {
+.omega-checkout__panel {
   padding: 1.375rem;
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
@@ -86,11 +86,11 @@
   }
 }
 
-.classy-checkout__panel-head {
+.omega-checkout__panel-head {
   margin-bottom: 1rem;
 }
 
-.classy-checkout__panel-title {
+.omega-checkout__panel-title {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -100,7 +100,7 @@
   color: var(--omega-ink);
 }
 
-.classy-checkout__account {
+.omega-checkout__account {
   color: var(--omega-ink-muted);
   font-size: 0.9375rem;
 
@@ -110,7 +110,7 @@
 }
 
 // ── Mobile collapsed rows (Shopify-style: everything folds but the summary) ─
-.classy-checkout__rowtoggle {
+.omega-checkout__rowtoggle {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -120,18 +120,18 @@
   border: 0;
   text-align: left;
 
-  .classy-checkout__rowtoggle-chev {
+  .omega-checkout__rowtoggle-chev {
     color: var(--omega-ink-faint);
     flex-shrink: 0;
     transition: transform var(--omega-speed) var(--omega-ease);
   }
 
-  &[aria-expanded='true'] .classy-checkout__rowtoggle-chev {
+  &[aria-expanded='true'] .omega-checkout__rowtoggle-chev {
     transform: rotate(180deg);
   }
 }
 
-.classy-checkout__rowtoggle-value {
+.omega-checkout__rowtoggle-value {
   margin-left: auto;
   min-width: 0;
   overflow: hidden;
@@ -145,7 +145,7 @@
 
 @media (max-width: 991.98px) {
   // A folded panel IS its one-line row; expanded content pads under it
-  .classy-checkout__panel:has(> .classy-checkout__rowtoggle) {
+  .omega-checkout__panel:has(> .omega-checkout__rowtoggle) {
     > .collapse.show,
     > .collapsing {
       padding-top: 1rem;
@@ -159,43 +159,43 @@
     padding-bottom: 0.625rem !important;
   }
 
-  .classy-checkout .classy-display--section {
+  .omega-checkout .omega-display--section {
     font-size: 1.5rem;
   }
 
-  .classy-checkout__panel {
+  .omega-checkout__panel {
     padding: 1rem;
   }
 
-  .classy-checkout__panel-head {
+  .omega-checkout__panel-head {
     margin-bottom: 0.75rem;
   }
 
   // Price rows stay visible (never folded) — they just tighten up
-  .classy-checkout .classy-receipt__panel {
+  .omega-checkout .omega-receipt__panel {
     padding: 0.125rem 1rem;
   }
 
-  .classy-checkout .classy-receipt__row {
+  .omega-checkout .omega-receipt__row {
     padding-block: 0.5rem;
     font-size: 0.875rem;
   }
 
-  .classy-checkout .classy-receipt__total {
+  .omega-checkout .omega-receipt__total {
     font-size: 1.25rem;
   }
 
-  .classy-checkout__fineprint {
+  .omega-checkout__fineprint {
     font-size: 0.75rem;
   }
 
-  .classy-checkout__discount .form-control,
-  .classy-checkout__discount .btn {
+  .omega-checkout__discount .form-control,
+  .omega-checkout__discount .btn {
     padding-block: 0.3125rem;
     font-size: 0.875rem;
   }
 
-  .classy-checkout__trust {
+  .omega-checkout__trust {
     gap: 0.375rem 1.25rem;
   }
 }
@@ -208,38 +208,38 @@
     padding-bottom: 0.5rem !important;
   }
 
-  .classy-checkout__head {
+  .omega-checkout__head {
     margin-bottom: 0.625rem;
   }
 
-  .classy-checkout__panel {
+  .omega-checkout__panel {
     padding: 0.8125rem;
   }
 
-  .classy-checkout .row {
+  .omega-checkout .row {
     --bs-gutter-y: 0.75rem;
   }
 
-  .classy-checkout .classy-receipt__row {
+  .omega-checkout .omega-receipt__row {
     padding-block: 0.4375rem;
   }
 
-  .classy-checkout__fineprint {
+  .omega-checkout__fineprint {
     font-size: 0.6875rem;
     line-height: 1.4;
   }
 
-  .classy-checkout__paybuttons .payment-button {
+  .omega-checkout__paybuttons .payment-button {
     padding-block: 0.5rem;
   }
 
-  .classy-checkout__terms {
+  .omega-checkout__terms {
     font-size: 0.6875rem;
   }
 }
 
 // ── Billing cycle tiles ─────────────────────────────────────────────────────
-.classy-checkout__tile {
+.omega-checkout__tile {
   display: block;
   width: 100%;
   height: 100%;
@@ -255,17 +255,17 @@
   }
 }
 
-.btn-check:checked + .classy-checkout__tile {
+.btn-check:checked + .omega-checkout__tile {
   border-color: var(--omega-ink);
   box-shadow: 0 0 0 1px var(--omega-ink);
 }
 
-.btn-check:focus-visible + .classy-checkout__tile {
+.btn-check:focus-visible + .omega-checkout__tile {
   outline: 2px solid var(--omega-accent);
   outline-offset: 2px;
 }
 
-.classy-checkout__tile-head {
+.omega-checkout__tile-head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -273,7 +273,7 @@
   margin-bottom: 0.625rem;
 }
 
-.classy-checkout__tile-radio {
+.omega-checkout__tile-radio {
   width: 1.125rem;
   height: 1.125rem;
   border: 1.5px solid var(--omega-line-strong);
@@ -281,21 +281,21 @@
   flex-shrink: 0;
   transition: border-color var(--omega-speed) var(--omega-ease), background var(--omega-speed) var(--omega-ease);
 
-  .btn-check:checked + .classy-checkout__tile & {
+  .btn-check:checked + .omega-checkout__tile & {
     border-color: var(--omega-accent);
     background: var(--omega-accent);
     box-shadow: inset 0 0 0 3.5px var(--omega-surface);
   }
 }
 
-.classy-checkout__tile-name {
+.omega-checkout__tile-name {
   font-size: 0.875rem;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--omega-ink);
 }
 
-.classy-checkout__tile-price {
+.omega-checkout__tile-price {
   display: block;
   font-family: var(--omega-font-marketing);
   font-size: 1.5rem;
@@ -305,7 +305,7 @@
   color: var(--omega-ink);
 }
 
-.classy-checkout__tile-per {
+.omega-checkout__tile-per {
   font-family: var(--omega-font-display);
   font-size: 0.8125rem;
   font-weight: 400;
@@ -314,19 +314,19 @@
   margin-left: 2px;
 }
 
-.classy-checkout__cadence {
+.omega-checkout__cadence {
   color: var(--omega-ink-muted);
 }
 
 // ── Inline notes (guarantee / trial) — quiet, not alert boxes ───────────────
-.classy-checkout__note {
+.omega-checkout__note {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   font-size: 0.875rem;
   color: var(--omega-ink-muted);
 
-  &--ok .classy-icon-chip {
+  &--ok .omega-icon-chip {
     color: var(--omega-ok);
     border-color: color-mix(in srgb, var(--omega-ok) 35%, var(--omega-line));
     background: color-mix(in srgb, var(--omega-ok) 8%, var(--omega-surface));
@@ -385,7 +385,7 @@
   --bs-btn-disabled-border-color: #ffc439;
 }
 
-.classy-checkout__terms {
+.omega-checkout__terms {
   margin-top: 0.375rem;
   text-align: center;
   color: var(--omega-ink-faint);
@@ -401,7 +401,7 @@
 }
 
 // Mobile payment stack — card leads full-width, wallets pair up two-across
-.classy-checkout__paybuttons {
+.omega-checkout__paybuttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
@@ -411,24 +411,24 @@
   }
 
   [data-payment-method='card'],
-  .classy-checkout__terms {
+  .omega-checkout__terms {
     grid-column: 1 / -1;
   }
 }
 
 // ── Order summary — the receipt card ────────────────────────────────────────
-.classy-checkout__sticky {
+.omega-checkout__sticky {
   position: sticky;
   top: 2rem;
 }
 
 @media (max-width: 991.98px) {
-  .classy-checkout__sticky {
+  .omega-checkout__sticky {
     position: static;
   }
 }
 
-.classy-checkout__summary {
+.omega-checkout__summary {
   padding: 1rem;
   background: var(--omega-surface);
   border: 1px solid var(--omega-line-strong);
@@ -439,7 +439,7 @@
   }
 }
 
-.classy-checkout__summary-head {
+.omega-checkout__summary-head {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -448,13 +448,13 @@
   margin-bottom: 0.875rem;
 }
 
-.classy-checkout__mark {
+.omega-checkout__mark {
   width: 1.375rem;
   height: 1.375rem;
   object-fit: contain;
 }
 
-.classy-checkout__product {
+.omega-checkout__product {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -462,7 +462,7 @@
   margin-bottom: 0.875rem;
 }
 
-.classy-checkout__product-name {
+.omega-checkout__product-name {
   font-family: var(--omega-font-marketing);
   font-size: 1.125rem;
   font-weight: 550;
@@ -470,34 +470,34 @@
   color: var(--omega-ink);
 }
 
-.classy-checkout__discount-zone {
+.omega-checkout__discount-zone {
   margin-bottom: 0.875rem;
 }
 
 // Negative rows (discount / trial credit) — the good kind of red ink
-.classy-checkout__row-ok {
+.omega-checkout__row-ok {
   color: var(--omega-ok);
   font-variant-numeric: tabular-nums;
 }
 
-.classy-checkout__row-bad {
+.omega-checkout__row-bad {
   color: var(--omega-danger);
 }
 
-.classy-checkout__recurring {
+.omega-checkout__recurring {
   color: var(--omega-ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
 // Subscription terms — the fine print under the numbers
-.classy-checkout__fineprint {
+.omega-checkout__fineprint {
   margin-top: 0.875rem;
   color: var(--omega-ink-faint);
   line-height: 1.5;
 }
 
 // ── Trust foot — green marks (the assurance moment stays green, Ian) ───────
-.classy-checkout__trust {
+.omega-checkout__trust {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -512,7 +512,7 @@
 }
 
 // ── Discount input — rounded ends on the group ──────────────────────────────
-.classy-checkout__discount {
+.omega-checkout__discount {
   .form-control {
     border-radius: var(--omega-radius-m) 0 0 var(--omega-radius-m);
   }
@@ -523,7 +523,7 @@
 }
 
 // ── Dev toggle (dev builds only) ────────────────────────────────────────────
-.classy-checkout__dev-toggle {
+.omega-checkout__dev-toggle {
   width: 2.125rem;
   height: 2.125rem;
   padding: 0;

@@ -28,8 +28,9 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px) and
    `core/css/motion/_index.scss` (below). Both paint exclusively through
    tokens so a skin restyles them without touching structure.
-3. **Theme** — `themes/<id>/` (classy is the flagship and the universal
-   fallback layer). classy v2's `css/base/_root.scss` bridges Bootstrap's CSS
+3. **Theme** — `themes/<id>/`, a skin over `themes/base` (the structural
+   `omega-*` markup layer every theme chain terminates at; classy is the
+   flagship and the default skin). classy v2's `css/base/_root.scss` bridges Bootstrap's CSS
    variables onto the tokens, so every Bootstrap component follows the theme,
    the brand ramp, and consumer overrides with zero recompilation.
 
@@ -105,20 +106,22 @@ the tokens).
   theme `@forward` (Sass emits a module's CSS at its first load), or theme
   token overrides lose the cascade.
 
-Tier 2 stays: fork `themes/_template` for a full theme; classy remains the
-fall-through layer for anything the theme doesn't cover.
+Tier 2 stays: fork `themes/_template` for a full theme; `themes/base` remains
+the fall-through layer for anything the theme doesn't cover, and base's
+`_theme.scss` forwards classy's theme as the default skin css.
 
 ### CSS fall-through — the two lanes (cp190, closes the audit's asymmetry)
 
 Layouts/includes fall through per-file, but a theme's `_theme.scss` never
-did — a non-classy theme rendered the shared `classy-*` vocabulary
+did — a non-classy theme rendered the shared `omega-*` vocabulary
 unstyled on fall-through pages. Two blessed lanes now cover it, both
 proven:
 
 - **Partial/consumer themes** (no Bootstrap of their own): put
   `@forward 'omega:theme';` at the top of the theme's `_theme.scss` — the
   importer resolves through the layer roots and SELF-SKIPS the requesting
-  file, so the forward lands on classy's `_theme.scss` and emits its whole
+  file, so the forward lands on base's `_theme.scss` (a bridge forwarding
+  classy's theme as the default skin css) and emits classy's whole
   chain (Bootstrap included, configured through the forward); the theme's
   own rules land after and win the cascade. Pinned in
   `test/themes.test.js` ("inheritance hatch").
@@ -127,7 +130,7 @@ proven:
   directly as the vocabulary FLOOR — they are deliberately TOKEN-PURE
   (zero Sass config coupling), so they paint through the importing theme's
   token re-values. The set: `layout/shell` (+ `.page-header`),
-  `layout/footer` (the shared footer include speaks `classy-footer`
+  `layout/footer` (the shared footer include speaks `omega-footer`
   vocabulary on every page — the floor supplies structure, the theme
   re-inks it), `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
   `components/receipt`, `components/badges` (chips/dot-status). Import
@@ -137,7 +140,7 @@ proven:
 
 **The guard ([#98](https://github.com/Omega-JS-Stack/omega/issues/98))**: the web
 asset lane reads the COMPILED main bundle for three sentinels the two lanes both
-guarantee — `.classy-auth`, `.classy-statgrid`, `.classy-footer`, one per
+guarantee — `.omega-auth`, `.omega-statgrid`, `.omega-footer`, one per
 fall-through surface (the other floor partials ride along unsentineled) — and a
 non-classy theme missing ANY of them gets one loud build WARNING (never a failure)
 naming the theme, the missing piece (hatch vs floor — decided by whether the
@@ -152,24 +155,24 @@ Rule for classy authors: app/auth vocabulary partials MUST stay token-pure
 
 Every classy frontend default page composes from one shared set
 (`themes/classy/css/marketing/_content.scss` + the existing section/bento
-vocab): `classy-page-hero` (+ `classy-display--page`) opener, `classy-prose`
-long-form (blog posts, legal md, bios), `classy-timeline`, `classy-post-card`
+vocab): `omega-page-hero` (+ `omega-display--page`) opener, `omega-prose`
+long-form (blog posts, legal md, bios), `omega-timeline`, `omega-post-card`
 (the ONE blog card — `_includes/frontend/components/post-card.html`, shared
-by index/related/category/tag grids), `classy-person`, `classy-facts`
+by index/related/category/tag grids), `omega-person`, `omega-facts`
 (hairline-divided columns; `__value--num` serif numerals, `__sub` footnote),
-`classy-chip-cloud`, `classy-blog-search`, and token-driven `.pagination`.
+`omega-chip-cloud`, `omega-blog-search`, and token-driven `.pagination`.
 Consumer frontmatter keys are unchanged — pages re-rendered, data contracts
 kept.
 
 **Compositional set (cp147 — pages are COMPOSED, not centered)**:
-`classy-hero-split` (asymmetric opener: statement + side rail),
-`classy-duo` (label/head column + body column, sticky aside; column split
-overridable via `--classy-duo-cols`), `classy-statement` (editorial letter
-text — big serif with italic `<em>`), `classy-numbered` (principles list
-with serif italic indices), `classy-channel` (contact/support rows),
-`classy-band` (one wide hairline row — enterprise, platform strips),
-`classy-form-panel` (the hairline container every long form sits in), and
-the `.classy-quiet` fine-print voice.
+`omega-hero-split` (asymmetric opener: statement + side rail),
+`omega-duo` (label/head column + body column, sticky aside; column split
+overridable via `--omega-duo-cols`), `omega-statement` (editorial letter
+text — big serif with italic `<em>`), `omega-numbered` (principles list
+with serif italic indices), `omega-channel` (contact/support rows),
+`omega-band` (one wide hairline row — enterprise, platform strips),
+`omega-form-panel` (the hairline container every long form sits in), and
+the `.omega-quiet` fine-print voice.
 
 **Post media + author contracts** (post-card AND the post page honor them):
 `post.image: false` → designed no-media panel (serif italic category
@@ -184,7 +187,7 @@ link columns; ONE hairline base row where copyright, legal links, the
 language dropup pill, and the segmented appearance control all share the
 same 1.75rem scale. The appearance segments are plain `data-appearance-set`
 buttons — core appearance.js stamps `.active`/`aria-pressed`. The brand
-lockup class (`.classy-nav__brand`) is root-scoped and shared by nav +
+lockup class (`.omega-nav__brand`) is root-scoped and shared by nav +
 footer.
 
 **Per-page theme css override slot**: `themes/<theme>/css/pages/<page>/index.scss`
@@ -196,13 +199,13 @@ language there.
 
 ## App panels (App DNA — dashboard/admin content)
 
-`themes/classy/css/app/_panels.scss`: `classy-statgrid` (the DIRECTION
+`themes/classy/css/app/_panels.scss`: `omega-statgrid` (the DIRECTION
 merged stat card — ONE card, hairline column dividers, micro-label +
 tabular value + delta chip per cell; it sizes off ITS OWN width, never the
-viewport — `--classy-statgrid-cols` sets the column CEILING and cells reflow
+viewport — `--omega-statgrid-cols` sets the column CEILING and cells reflow
 below a 10rem floor, so a statgrid nested in a half-width card wraps instead
-of overflowing), `classy-panel-title` (the 14/650 card-title voice), and
-`classy-activity` (hairline-divided feed rows with neutral icon chips).
+of overflowing), `omega-panel-title` (the 14/650 card-title voice), and
+`omega-activity` (hairline-divided feed rows with neutral icon chips).
 The backend dashboard layout and the admin dashboard/users blueprints
 render on these; every JS-populated id (`stat-*`, tables, charts) is a
 contract and stays.
@@ -309,7 +312,7 @@ fades are alpha masks and monotone chart fills); ink primary buttons
 (`.btn-adaptive` — built from `$dark`/`$light` by the shared overrides layer);
 accent reserved for links, active states, focus, meters, chart series-1, and
 small signals. Marketing display voice is the serif `--omega-font-marketing`
-(`.classy-display`); app surfaces stay on the grotesk. The app chrome rides
+(`.omega-display`); app surfaces stay on the grotesk. The app chrome rides
 `.omega-shell` with the content area drawn as one big rounded surface card
 (matching margins/radii on topbar + main — the markup contract is untouched).
 

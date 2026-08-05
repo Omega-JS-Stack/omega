@@ -1,0 +1,52 @@
+---
+layout: frontend/core/cover
+---
+
+<section class="col-12">
+  <div class="omega-auth" data-omega-reveal>
+    <div class="omega-auth__card">
+      <!-- Logo -->
+      <div class="omega-auth__brand">
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+      </div>
+
+      <!-- Header -->
+      <h1 class="omega-auth__title">Reset your password</h1>
+      <p class="omega-auth__sub">Enter your email and we'll send you a reset link.</p>
+
+      <!-- Spinner -->
+      {% capture initializing_spinner %}<span class="spinner-border spinner-border-sm me-2 form-initializing-spinner"></span>{% endcapture %}
+
+      <!-- Reset Form -->
+      <form id="auth-form" autocomplete="on" novalidate data-form-state="initializing" onsubmit="return false">
+        <div class="mb-3 text-start">
+          <label for="email" class="form-label">
+            Email <span class="text-danger">*</span>
+          </label>
+          <input type="email" class="form-control" id="email" name="email" placeholder="you@example.com" autocomplete="email" autofocus required>
+        </div>
+
+        <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
+          {{ initializing_spinner }}
+          <span class="button-text">Send reset link</span>
+          <span class="omega-nudge ms-2">{% omega_icon "paper-plane", "fa-sm" %}</span>
+        </button>
+      </form>
+
+      <!-- Back to Sign in -->
+      <div class="omega-auth__foot">
+        Remember your password?
+        <a href="/signin">Sign in</a>
+      </div>
+
+      <!-- Help -->
+      <div class="mt-4 pt-3 hairline-top text-center">
+        <span class="small omega-quiet">
+          Need help? <a href="/contact" class="text-decoration-none">Contact support</a>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

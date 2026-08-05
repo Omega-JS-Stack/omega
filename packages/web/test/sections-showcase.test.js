@@ -37,13 +37,13 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
   assert.ok(!/Introducing \{\{/.test(hero), 'no unescaped liquid in the docs display');
 
   // Live demos: three hero variants render the real section
-  assert.equal((hero.match(/class="classy-hero(?:"| )/g) || []).length, 3, 'all three demo variants render live');
+  assert.equal((hero.match(/class="omega-hero(?:"| )/g) || []).length, 3, 'all three demo variants render live');
 
   // Shared bands demo their generic copy; two faq instances coexist by dom_id
   const faq = pages.get('/test/sections/section/marketing/faq');
   assert.ok(faq.includes('demoFaqDuoAccordion') && faq.includes('demoFaqCenterAccordion'), 'variant dom_ids namespace the accordions');
   const sectionHead = pages.get('/test/sections/component/heading/section-head');
-  assert.ok(sectionHead.includes('border rounded p-4 classy-section-head'), 'stage_class supplies the natural shell');
+  assert.ok(sectionHead.includes('border rounded p-4 omega-section-head'), 'stage_class supplies the natural shell');
 
   // The dev-only surface stays out of the meta files
   assert.ok(!(pages.get('/sitemap.xml') || '').includes('/test/sections'), 'sitemap clean');
@@ -57,14 +57,15 @@ test('cp219: the newsflash showcase — overrides and fallthroughs chip their ow
   // cp246, data/org-chart #72)
   assert.equal(showcaseUrls(pages).length, 26, 'index + 25 entry pages under newsflash');
 
+  // marketing/cta fork deleted (#177 phase 2): the entry chips the base
+  // layer and demos base markup, exactly what a composing page gets.
   const cta = pages.get('/test/sections/section/marketing/cta');
-  assert.ok(cta.includes('>newsflash<'), 'override entry chips its owning layer');
-  assert.ok(cta.includes('cta-panel') && !cta.includes('classy-cta'), 'the demo renders the OVERRIDE (what a composing page gets)');
-  assert.ok(cta.includes('data-icon="headset"'), 'icon keys render in the nf demo (the override\'s distinguishing feature)');
+  assert.ok(cta.includes('>base<'), 'fallthrough entry chips the base layer');
+  assert.ok(cta.includes('omega-cta') && !cta.includes('cta-panel'), 'the demo renders the base band (what a composing page gets)');
 
   const hero = pages.get('/test/sections/section/marketing/hero');
-  assert.ok(hero.includes('>classy<'), 'fallthrough entry chips the base layer — the doctrine made visible');
-  assert.ok(hero.includes('classy-hero'), 'fallthrough demo renders the classy base');
+  assert.ok(hero.includes('>base<'), 'fallthrough entry chips the base layer — the doctrine made visible');
+  assert.ok(hero.includes('omega-hero'), 'fallthrough demo renders the classy base');
 
   const newsletter = pages.get('/test/sections/section/marketing/newsletter-cta');
   assert.ok(newsletter.includes('inherits js'), 'declared §7 inherit lane surfaces as a docs chip');

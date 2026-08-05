@@ -1,6 +1,6 @@
 /**
  * The @omega.js/web asset pipeline over ordered LAYER ROOTS (site → active
- * theme → classy → core). Each layer root follows one convention:
+ * theme → base → core). Each layer root follows one convention:
  *
  *   <layer>/js/main.js        - the main-bundle module (core ships the default)
  *   <layer>/js/pages/**       - page modules (index.js per page dir, or flat)
@@ -18,7 +18,7 @@
  *   @omega.js/client             → the @omega.js/client entry (options.clientEntry)
  *   __main_assets__/js/...  → the core layer (framework runtime modules)
  *   __main_assets__/themes/…→ the packaged themes dir (e.g. bootstrap js)
- *   __theme__/...           → active theme root, classy fallback
+ *   __theme__/...           → active theme root, base fallback
  *   <framework dependency>  → resolved from @omega.js/web's own installation,
  *                             so consumer code imports chart.js & friends bare
  *
@@ -136,7 +136,7 @@ function resolvePageAsset(map, base) {
 /**
  * Build the js + css bundles for a site, returning the asset manifest.
  * @param {object} options
- * @param {string[]} options.layers - ordered layer roots (site → active theme → classy → core)
+ * @param {string[]} options.layers - ordered layer roots (site → active theme → base → core)
  * @param {string[]} options.themeRoots - the theme layer dirs within `layers`
  *   (resolveThemeLayers output — consumer-local theme dirs can't be derived)
  * @param {string} options.themesDir - the themes dir (for __main_assets__/themes)
@@ -220,7 +220,7 @@ async function buildAssets(options) {
           return { resolveDir: path.dirname(args.path), contents: lines.join('\n') };
         });
 
-        // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (classy fallback)
+        // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (base fallback)
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           const rest = args.path.slice('__main_assets__/'.length);
           const target = rest.startsWith('themes/')
@@ -328,12 +328,12 @@ async function buildAssets(options) {
     const mainCss = compileScss(mainScss, ownerRoot);
     manifest.css.main = emitCss(mainCss, 'main');
     // #98: the compiled bundle is the only honest place to ask whether the
-    // active theme reached the classy fall-through vocabulary at all.
+    // active theme reached the shared fall-through vocabulary at all.
     checkThemeVocabulary({ css: mainCss, themeRoots, warn: options.warn });
   }
 
   // Page css: base entries come from NON-theme layers (site, core); the theme
-  // namespace comes from theme layers (active wins over classy). Both load.
+  // namespace comes from theme layers (active wins over base). Both load.
   const baseCssDirs = options.layers.filter((layer) => !themeRoots.includes(layer)).map((l) => path.join(l, 'css')).filter((d) => fs.existsSync(d));
   const themeCssDirs = themeRoots.map((l) => path.join(l, 'css')).filter((d) => fs.existsSync(d));
   for (const [dirs, bucket, suffix] of [[baseCssDirs, 'pages', ''], [themeCssDirs, 'themePages', '.theme']]) {

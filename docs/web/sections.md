@@ -17,7 +17,7 @@ filenames differ (`_sections/<id>/section.*` vs `_components/<id>/component.*`).
 ## Anatomy
 
 ```
-themes/classy/_sections/marketing/hero/
+themes/base/_sections/marketing/hero/
   section.html    ← markup (Liquid). Renders against { args } ONLY.
   section.scss    ← styles (optional) — compiles into the main sheet
   section.js      ← behavior (optional) — bundles behind DOM-presence init
@@ -32,7 +32,7 @@ excluded from Eleventy content processing.
 ## Resolution
 
 First match wins, whole-folder: consumer `<src>/_sections/<id>/` → active
-theme → classy base. A consumer overriding a section owns ALL of it (markup +
+theme → base. A consumer overriding a section owns ALL of it (markup +
 assets travel together). Theme sections live inside the installed package —
 consumer git holds only the consumer's own work.
 
@@ -170,6 +170,46 @@ scope. Interpolation happens at the CALL site: any string value (default or
 passed) containing Liquid renders against the calling page's scope before the
 section sees it, so defaults like `"Introducing {{ site.brand.name }}"` work
 while markup stays portable to every framework surface.
+
+## Markup convention: base, skin, fork (ratified 2026-08-04, #177)
+
+Structure lives once, look lives per theme, identity is a bounded escape
+hatch. The rules:
+
+- **The base theme owns shared markup.** `themes/base` holds the structural
+  markup of every shared surface (layouts, sections, includes, components)
+  with neutral `omega-*` BEM classes
+  (`omega-<block>__<element>--<modifier>`). The theme layer chain ends at
+  base for every theme. Base markup is a contract: changing it touches every
+  theme, so it gets API-level care and tests.
+- **A theme is a skin by default.** A theme ships tokens plus scss over the
+  base's `omega-*` selectors (and fonts, `_theme.js`). It forks no shared
+  markup. Identical DOM across themes is what makes theme switching safe:
+  a consumer's custom css and overrides survive the switch.
+- **Forks are identity, and they are bounded.** A theme forks a surface's
+  folder only when its design needs different structure (newsflash's ticker,
+  story cards, newspaper homepage). Fork markup uses theme-prefixed BEM
+  (`newsflash-<block>__<element>--<modifier>`); the theme's README lists its
+  forks. Everything else falls through to base.
+- **Pages are compositions.** A page layout is a thin sequence of
+  `{% section %}` calls; a hand-built band belongs in a section folder.
+- **Behavior contracts ride the base.** Core JS selectors (`.amount`,
+  `.billing-info`, `.price-per-unit`, `.btn-adaptive`, `.button-text`) and
+  `data-*` idioms (`data-lazy`, `data-plan-*`, `data-billing`,
+  `data-omega-countup`, `data-service-uptime`) live in base markup; a fork
+  keeps them, whatever its styling does.
+- **The theme ladder.** Rung 1: tokens only, a complete restyled site
+  (`_template` is this rung). Rung 2: component scss over `omega-*`
+  selectors. Rung 3: identity forks. Each rung is a working theme.
+- **Unprefixed vocabulary.** Bootstrap and core utility classes stay as-is
+  (`card`, `row`, `btn-adaptive`, `animation-*`); `avatar`/`avatar-*`,
+  `hairline*`, and `cursor-help` are base utilities shared by all themes.
+
+Classy is a skin like the others; its former structural markup IS the base.
+
+Enforcement is mechanical: `packages/web/test/theme-convention.test.js`
+pins the class discipline and the README fork lists, so drift fails the
+suite.
 
 ## Schemas & validation
 
@@ -448,7 +488,7 @@ a reason: alternative.html's stats+CTA composite and pricing's social-proof
 stats (star rows) and FAQ+guarantee panel are divergent per-page composites,
 not instances of the shared contracts; status's subscribe band is its own
 compact idiom, not newsletter-cta; the team portrait card repeats only as an
-SCSS pattern (`classy-person` — the index variant carries a links row the
+SCSS pattern (`omega-person` — the index variant carries a links row the
 member page deliberately drops), like the rowlist/hairline idiom. The
 boundary doctrine the audit settled: **sections/components are for
 composable bands with data args (+ finished-HTML slots, cp224); context-bound

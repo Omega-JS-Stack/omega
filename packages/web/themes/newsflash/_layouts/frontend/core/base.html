@@ -18,12 +18,12 @@ theme:
      Absent when the site has no posts. Nav-chrome: pages that disable the
      masthead (cover chain — 404, auth) drop the ticker with it. -->
 {% if site.posts.size > 0 and resolved.theme.nav.enabled != false %}
-  <div class="ticker omega-marquee" data-omega-marquee="50">
-    <div class="ticker-track omega-marquee__track">
+  <div class="newsflash-ticker omega-marquee" data-omega-marquee="50">
+    <div class="newsflash-ticker__track omega-marquee__track">
       {% for post in site.posts limit: 5 %}
-        <span class="ticker-item omega-marquee__item">
+        <span class="newsflash-ticker__item omega-marquee__item">
           {% if forloop.first %}
-            <span class="live-dot"></span><b>LATEST</b>
+            <span class="newsflash-ticker__dot"></span><b>LATEST</b>
           {% else %}
             {% omega_icon "bolt" %}
           {% endif %}

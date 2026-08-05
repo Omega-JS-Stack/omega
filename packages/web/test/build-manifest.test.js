@@ -106,7 +106,7 @@ test('/build.js carries the SAME meta for the service worker (importScripts cann
 
 test('the status page reads every manifest field the builder emits', () => {
   const page = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'status', 'index.js'), 'utf8');
-  const layout = fs.readFileSync(path.join(PKG, 'themes', 'classy', '_layouts', 'frontend', 'pages', 'status.html'), 'utf8');
+  const layout = fs.readFileSync(path.join(PKG, 'themes', 'base', '_layouts', 'frontend', 'pages', 'status.html'), 'utf8');
 
   for (const [field, slot] of [
     ['timestamp', 'build-time'],

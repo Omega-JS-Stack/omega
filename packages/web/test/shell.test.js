@@ -136,5 +136,5 @@ test('the same page falls through to classy — v2 rides the shell contract too'
 
   assert.ok(app && app.includes('id="app-page-content"'), 'classy backend base still renders the page');
   assert.ok(app.includes('data-omega-shell'), 'classy v2 expresses the omega-shell contract');
-  assert.ok(app.includes('classy-side__brand'), 'classy skin chrome present in the shell');
+  assert.ok(app.includes('omega-side__brand'), 'classy skin chrome present in the shell');
 });

@@ -125,11 +125,11 @@ cta:
   newsroom's numbered three-step playbook, coverage-desk cards (linked to
   their category pages), a masthead numbers strip, "more to chew on" story
   tiles, and a dark big-read CTA band. (Reader quotes live on the about page.)
-  The rundown, desks, stats, and big-read CTA bands render through the
-  section library (newsflash-layer sections; marketing/stats and
-  marketing/cta OVERRIDE the classy base), and the rail signup card is the
-  newsletter-cta override's rail variant (managed form, §7-bound); only the
-  posts-driven bands are still rendered by this layout. The
+  The rundown and desks bands render through newsflash-layer sections;
+  marketing/stats and marketing/cta fall through to the BASE sections
+  (omega-* markup, restyled by this theme's scss), and the rail signup card
+  is the newsletter-cta fork's rail variant (managed form, §7-bound); only
+  the posts-driven bands are still rendered by this layout. The
   frontmatter defaults are NEWS-genre copy — a theme's defaults are part of
   its identity (see docs/themes.md "Frontmatter defaults are part of the
   theme's identity"). Universal sections (hero, stats, cta, newsletter) keep
@@ -141,18 +141,18 @@ cta:
 <!-- ============================================ -->
 <!-- HERO — front page lead: pitch left, cover story right -->
 <!-- ============================================ -->
-<section class="section-hero pb-4">
+<section class="newsflash-hero pb-4">
   <div class="container">
     <div class="row align-items-center g-4 g-lg-5">
       <!-- Left: kicker + serif headline + dek + actions -->
       <div class="col-lg-6" data-lazy="@class animation-slide-up">
         {% iftruthy resolved.hero.tagline %}
-          <span class="kicker">{{ resolved.hero.tagline }}</span>
+          <span class="newsflash-kicker">{{ resolved.hero.tagline }}</span>
         {% endiftruthy %}
-        <h1 class="hero-title my-3">
+        <h1 class="newsflash-hero__title my-3">
           {{ resolved.hero.headline }}
           {% iftruthy resolved.hero.headline_accent %}
-            <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+            <span class="newsflash-accent">{{ resolved.hero.headline_accent }}</span>
           {% endiftruthy %}
         </h1>
         {% iftruthy resolved.hero.description %}
@@ -176,14 +176,14 @@ cta:
       <div class="col-lg-6" data-lazy="@class animation-slide-up">
         {% if site.posts.size > 0 %}
           {% assign featured = site.posts.first %}
-          <a href="{{ site.url }}{{ featured.url }}" class="hero-art d-block position-relative text-decoration-none text-body">
-            <span class="badge bg-body-tertiary hero-art-chip">Featured</span>
-            <div class="art-frame shadow">
+          <a href="{{ site.url }}{{ featured.url }}" class="newsflash-hero__art d-block position-relative text-decoration-none text-body">
+            <span class="badge bg-body-tertiary newsflash-hero__chip">Featured</span>
+            <div class="newsflash-frame shadow">
               {%- omega_post featured.post.id, "image-tag", class="w-100" -%}
             </div>
             <div class="mt-3">
               {% if featured.post.categories[0] %}
-                <span class="kicker mb-1">{{ featured.post.categories[0] | omega_title_case }}</span>
+                <span class="newsflash-kicker mb-1">{{ featured.post.categories[0] | omega_title_case }}</span>
               {% endif %}
               <h2 class="h4 mb-1">{{ featured.post.title }}</h2>
               {% capture featured_rt %}{% omega_readtime featured.content %}{% endcapture %}
@@ -191,10 +191,10 @@ cta:
             </div>
           </a>
         {% else %}
-          <div class="hero-art position-relative">
-            <span class="badge bg-body-tertiary hero-art-chip">Featured</span>
-            <div class="art-frame shadow">
-              <div class="cover-art ratio ratio-4x3"></div>
+          <div class="newsflash-hero__art position-relative">
+            <span class="badge bg-body-tertiary newsflash-hero__chip">Featured</span>
+            <div class="newsflash-frame shadow">
+              <div class="newsflash-hero__cover ratio ratio-4x3"></div>
             </div>
           </div>
         {% endif %}
@@ -234,7 +234,7 @@ cta:
   it's chrome, not content).
 {% endcomment %}
 {% if site.posts.size > 4 %}
-<section class="section-feed">
+<section class="newsflash-feed">
   <div class="container">
     {% component "heading/rule-head", text: resolved.latest.superheadline.text, link_text: resolved.latest.view_all.text, link_href: resolved.latest.view_all.href %}
 
@@ -243,13 +243,13 @@ cta:
       <div class="col-lg-7">
         <div>
           {% for post in site.posts offset: 4 limit: 5 %}
-            <a href="{{ site.url }}{{ post.url }}" class="feed-item" data-lazy="@class animation-slide-up">
-              <div class="art-frame">
+            <a href="{{ site.url }}{{ post.url }}" class="newsflash-feed__item" data-lazy="@class animation-slide-up">
+              <div class="newsflash-frame">
                 {%- omega_post post.post.id, "image-tag", class="w-100" -%}
               </div>
               <div>
                 {% if post.post.categories[0] %}
-                  <span class="kicker mb-1">{{ post.post.categories[0] | omega_title_case }}</span>
+                  <span class="newsflash-kicker mb-1">{{ post.post.categories[0] | omega_title_case }}</span>
                 {% endif %}
                 <h3 class="h4 my-2">{{ post.post.title }}</h3>
                 {% iftruthy post.post.description %}
@@ -265,12 +265,12 @@ cta:
 
       <!-- The rail -->
       <aside class="col-lg-5 col-xl-4 ms-auto">
-        <div class="rail-stack d-flex flex-column gap-4">
+        <div class="newsflash-rail d-flex flex-column gap-4">
           {% comment %} Most read: posts 10-14 — the next slice after the feed (no duplicates) {% endcomment %}
           {% if site.posts.size > 9 %}
             <div class="card p-4" data-lazy="@class animation-slide-up">
-              <div class="rail-title">Most read</div>
-              <ol class="mostread list-unstyled mb-0">
+              <div class="newsflash-rail__title">Most read</div>
+              <ol class="newsflash-rail__mostread list-unstyled mb-0">
                 {% for post in site.posts offset: 9 limit: 5 %}
                   <li>
                     <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
@@ -301,7 +301,7 @@ cta:
 {% section "marketing/desks", data: resolved.desks %}
 
 <!-- ============================================ -->
-<!-- STATS — masthead numbers, stroked numerals -->
+<!-- STATS — masthead numbers (base marketing/stats, restyled) -->
 <!-- ============================================ -->
 {% section "marketing/stats", items: resolved.stats %}
 
@@ -326,8 +326,8 @@ cta:
 {% endif %}
 
 <!-- ============================================ -->
-<!-- CTA — the dark big-read band (shared marketing/cta, nf override) -->
+<!-- CTA — the dark big-read band (base marketing/cta, restyled) -->
 <!-- ============================================ -->
-{% section "marketing/cta", data: resolved.cta, section_class: "cta" %}
+{% section "marketing/cta", data: resolved.cta %}
 
 {{ content | omega_content_format }}

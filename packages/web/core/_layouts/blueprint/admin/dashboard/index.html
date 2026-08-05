@@ -27,46 +27,46 @@ prerender_icons:
 ---
 
 <!-- Merged stat card (App DNA) -->
-<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 4;">
-  <div class="classy-statgrid__cell">
-    <div class="classy-statgrid__label">
-      <span class="classy-micro">Total users</span>
+<div class="omega-statgrid mb-4" style="--omega-statgrid-cols: 4;">
+  <div class="omega-statgrid__cell">
+    <div class="omega-statgrid__label">
+      <span class="omega-micro">Total users</span>
       {% omega_icon "users", "fa-sm" %}
     </div>
-    <h3 class="classy-statgrid__value" id="stat-total-users">
+    <h3 class="omega-statgrid__value" id="stat-total-users">
       <span class="spinner-border spinner-border-sm fs-6"></span>
     </h3>
     <small class="text-muted" id="stat-new-users"></small>
   </div>
 
-  <div class="classy-statgrid__cell">
-    <div class="classy-statgrid__label">
-      <span class="classy-micro">MRR</span>
+  <div class="omega-statgrid__cell">
+    <div class="omega-statgrid__label">
+      <span class="omega-micro">MRR</span>
       {% omega_icon "credit-card", "fa-sm" %}
     </div>
-    <h3 class="classy-statgrid__value" id="stat-mrr">
+    <h3 class="omega-statgrid__value" id="stat-mrr">
       <span class="spinner-border spinner-border-sm fs-6"></span>
     </h3>
     <small class="text-muted" id="stat-mrr-count"></small>
   </div>
 
-  <div class="classy-statgrid__cell">
-    <div class="classy-statgrid__label">
-      <span class="classy-micro">Orders (30d)</span>
+  <div class="omega-statgrid__cell">
+    <div class="omega-statgrid__label">
+      <span class="omega-micro">Orders (30d)</span>
       {% omega_icon "receipt", "fa-sm" %}
     </div>
-    <h3 class="classy-statgrid__value" id="stat-orders">
+    <h3 class="omega-statgrid__value" id="stat-orders">
       <span class="spinner-border spinner-border-sm fs-6"></span>
     </h3>
     <small class="text-muted" id="stat-orders-sub"></small>
   </div>
 
-  <div class="classy-statgrid__cell">
-    <div class="classy-statgrid__label">
-      <span class="classy-micro">Push subscribers</span>
+  <div class="omega-statgrid__cell">
+    <div class="omega-statgrid__label">
+      <span class="omega-micro">Push subscribers</span>
       {% omega_icon "bell", "fa-sm" %}
     </div>
-    <h3 class="classy-statgrid__value" id="stat-notifications">
+    <h3 class="omega-statgrid__value" id="stat-notifications">
       <span class="spinner-border spinner-border-sm fs-6"></span>
     </h3>
     <small class="text-muted" id="stat-new-notifications"></small>
@@ -102,35 +102,35 @@ prerender_icons:
         <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "circle-exclamation", "fa-md me-2" %} Needs attention</h6>
       </div>
       <div class="card-body py-2">
-        <div class="classy-activity">
-          <div class="classy-activity__row align-items-center">
-            <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "cart-shopping", "fa-sm" %}</span>
-            <div class="classy-activity__body">
-              <div class="classy-activity__title">Abandoned carts</div>
-              <p class="classy-activity__desc">Pending checkouts that never converted</p>
+        <div class="omega-activity">
+          <div class="omega-activity__row align-items-center">
+            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "cart-shopping", "fa-sm" %}</span>
+            <div class="omega-activity__body">
+              <div class="omega-activity__title">Abandoned carts</div>
+              <p class="omega-activity__desc">Pending checkouts that never converted</p>
             </div>
-            <span class="classy-count" id="att-carts"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="classy-iconbtn" href="/admin/firebase?collection=payments-carts" aria-label="Review abandoned carts">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <span class="omega-count" id="att-carts"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="omega-iconbtn" href="/admin/firebase?collection=payments-carts" aria-label="Review abandoned carts">{% omega_icon "arrow-right", "fa-sm" %}</a>
           </div>
 
-          <div class="classy-activity__row align-items-center">
-            <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "hourglass-half", "fa-sm" %}</span>
-            <div class="classy-activity__body">
-              <div class="classy-activity__title">Expiring within 7 days</div>
-              <p class="classy-activity__desc">Subscriptions about to lapse</p>
+          <div class="omega-activity__row align-items-center">
+            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "hourglass-half", "fa-sm" %}</span>
+            <div class="omega-activity__body">
+              <div class="omega-activity__title">Expiring within 7 days</div>
+              <p class="omega-activity__desc">Subscriptions about to lapse</p>
             </div>
-            <span class="classy-count" id="att-expiring"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="classy-iconbtn" href="/admin/users" aria-label="Review expiring subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <span class="omega-count" id="att-expiring"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="omega-iconbtn" href="/admin/users" aria-label="Review expiring subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
           </div>
 
-          <div class="classy-activity__row align-items-center">
-            <span class="classy-icon-chip classy-icon-chip--neutral">{% omega_icon "triangle-exclamation", "fa-sm" %}</span>
-            <div class="classy-activity__body">
-              <div class="classy-activity__title">Suspended subscriptions</div>
-              <p class="classy-activity__desc">Payment failed: plan on hold</p>
+          <div class="omega-activity__row align-items-center">
+            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "triangle-exclamation", "fa-sm" %}</span>
+            <div class="omega-activity__body">
+              <div class="omega-activity__title">Suspended subscriptions</div>
+              <p class="omega-activity__desc">Payment failed: plan on hold</p>
             </div>
-            <span class="classy-count" id="att-suspended"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="classy-iconbtn" href="/admin/users" aria-label="Review suspended subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <span class="omega-count" id="att-suspended"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="omega-iconbtn" href="/admin/users" aria-label="Review suspended subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
           </div>
         </div>
       </div>
@@ -155,7 +155,7 @@ prerender_icons:
           No users found
         </div>
         <div class="table-responsive">
-          <table class="table classy-table d-none" id="recent-users-table">
+          <table class="table omega-table d-none" id="recent-users-table">
             <thead>
               <tr>
                 <th>Email</th>
@@ -184,7 +184,7 @@ prerender_icons:
           No orders found
         </div>
         <div class="table-responsive">
-          <table class="table classy-table d-none" id="recent-orders-table">
+          <table class="table omega-table d-none" id="recent-orders-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -220,7 +220,7 @@ prerender_icons:
         <div id="content-empty" class="text-center text-muted py-4 d-none">
           No posts yet. Write the first one
         </div>
-        <div class="classy-activity d-none" id="content-list"></div>
+        <div class="omega-activity d-none" id="content-list"></div>
       </div>
       <div class="card-footer small text-muted d-none" id="content-footer"></div>
     </div>

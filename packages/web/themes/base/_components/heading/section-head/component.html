@@ -1,0 +1,18 @@
+{% comment %} Section-head cluster: omega-micro eyebrow + the
+omega-display--section h2 (+ optional em accent) + plain sub line. The
+caller owns the omega-section-head wrapper div (its centering/duo/margin
+classes vary) and anything after the cluster — this is the inner head only.
+Sections compose it too (nested composition): pass the resolved STRING as
+superheadline. {% endcomment %}
+{% iftruthy args.superheadline %}
+  <span class="omega-micro">{{ args.superheadline }}</span>
+{% endiftruthy %}
+{% iftruthy args.headline %}
+  <h2 class="omega-display omega-display--section">
+    {{ args.headline }}{% if args.headline_accent != blank %}
+    <em>{{ args.headline_accent }}</em>{% endif %}
+  </h2>
+{% endiftruthy %}
+{% iftruthy args.sub %}
+  <p>{{ args.sub }}</p>
+{% endiftruthy %}

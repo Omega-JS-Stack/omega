@@ -1,90 +1,89 @@
 // Newsflash Theme — Shared Panels & Numerals
-// Cross-page editorial set pieces: the dark "big read" CTA band (home,
-// pricing, about) and the stroked serif numerals (stats strips, step
-// numbers). Universal semantic class names — no theme prefixes.
+// Editorial overlays for the BASE marketing set pieces the theme renders
+// unforked: the dark "big read" CTA band (omega-cta on omega-ink-panel), the
+// stats strip (omega-stat), and the desk-card icon chip (the one fork-owned
+// piece left here). Structure comes from the classy floor partials imported
+// in _theme.scss; these rules land later and re-ink it editorial.
 
 // ============================================
-// CTA panel — the dark big-read band
+// Ink panel: the dark slab (big-read CTA, newsletter band)
 // ============================================
-.cta-panel {
+// The floor's panel re-values its local tokens to classy grays; restamp them
+// from the newsflash panel palette so everything inside paints editorial.
+.omega-ink-panel {
+  --omega-surface: var(--nf-panel-bg);
+  --omega-surface-2: color-mix(in srgb, var(--nf-panel-color) 8%, var(--nf-panel-bg));
+  --omega-ink: var(--nf-panel-color);
+  --omega-ink-muted: color-mix(in srgb, var(--nf-panel-color) 72%, transparent);
+  --omega-ink-faint: color-mix(in srgb, var(--nf-panel-color) 55%, transparent);
+  --omega-line: color-mix(in srgb, var(--nf-panel-color) 18%, transparent);
+  --omega-line-strong: color-mix(in srgb, var(--nf-panel-color) 40%, transparent);
+
   background: var(--nf-panel-bg);
   color: var(--nf-panel-color);
   border-radius: calc(#{$nf-radius} + 8px);
-  padding: clamp(2.5rem, 6vw, 4rem);
+}
+
+// ============================================
+// CTA band: the big read
+// ============================================
+.omega-cta {
   position: relative;
   overflow: hidden;
 
-  .kicker {
+  // Spinning vermilion ring field: the band's decorative flourish, drawn as
+  // a pseudo (base markup carries no ornament element).
+  &::before {
+    content: "";
+    position: absolute;
+    right: -120px;
+    top: 50%;
+    width: 520px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle, var(--omega-accent) 0 2px, transparent 2px 34px);
+    opacity: 0.7;
+    transform: translateY(-50%);
+    animation: nf-cta-rings-spin 60s linear infinite;
+    pointer-events: none;
+  }
+
+  > * {
+    position: relative;
+  }
+
+  // Kicker and accents go volt on the slab (vermilion vanishes on ink)
+  .omega-micro {
     color: var(--nf-volt);
   }
 
-  .text-accent {
-    color: var(--nf-volt);
+  .omega-cta__headline {
+    font-style: italic;
+    font-weight: 550;
+    letter-spacing: -0.015em;
+
+    em {
+      color: var(--nf-volt);
+    }
   }
 }
 
-.cta-title {
-  font-style: italic;
-  font-weight: 550;
-  font-size: clamp(2rem, 3.6vw, 3.2rem);
-  letter-spacing: -0.015em;
-  line-height: 1.1;
-  margin: 0.75rem 0;
-  // The global heading ink beats the panel's inherited color — restate it,
-  // or the title vanishes ink-on-ink (the volt .text-accent was the only
-  // visible word).
-  color: var(--nf-panel-color);
-}
-
-.cta-desc {
-  color: var(--nf-panel-color);
-  opacity: 0.72;
-  max-width: 36em;
-  margin-bottom: 1.75rem;
-}
-
-// Spinning vermilion ring field — the band's decorative flourish
-.cta-rings {
-  position: absolute;
-  right: -120px;
-  top: 50%;
-  width: 520px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: repeating-radial-gradient(circle, var(--omega-accent) 0 2px, transparent 2px 34px);
-  opacity: 0.7;
-  transform: translateY(-50%);
-  animation: cta-rings-spin 60s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes cta-rings-spin {
+@keyframes nf-cta-rings-spin {
   to { transform: translateY(-50%) rotate(360deg); }
 }
 
 @media (max-width: 991.98px) {
-  .cta-rings { opacity: 0.3; }
+  .omega-cta::before { opacity: 0.3; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cta-rings { animation: none; }
+  .omega-cta::before { animation: none; }
 }
 
 // ============================================
-// Feature icon chip — round accent badge for desk cards (features, values,
-// contact methods)
+// Stats: masthead numbers, stroked serif numerals
 // ============================================
-.feature-icon {
-  width: 3rem;
-  height: 3rem;
-  flex: none;
-  border: var(--nf-border);
-}
-
-// ============================================
-// Stroked numerals — stats strips, oversized counters
-// ============================================
-.stat-num {
+.omega-stat .omega-stat__num {
   font-family: $nf-font-display;
   font-style: italic;
   font-weight: 800;
@@ -92,4 +91,14 @@
   line-height: 1.1;
   color: transparent;
   -webkit-text-stroke: 1.5px var(--omega-ink);
+}
+
+// ============================================
+// Desk-card icon chip: round accent badge (marketing/desks fork)
+// ============================================
+.newsflash-desks__icon {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border: var(--nf-border);
 }

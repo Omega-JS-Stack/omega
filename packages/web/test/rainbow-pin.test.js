@@ -33,7 +33,7 @@ test('the rainbow palette is ONE list: the classy ring and the dotfield carry th
   const scss = fs.readFileSync(UTILITIES, 'utf8');
   const motion = fs.readFileSync(MOTION, 'utf8');
 
-  const scssStops = readStops(scss, /--classy-gradient-stops:\s*([^;]+);/, '--classy-gradient-stops');
+  const scssStops = readStops(scss, /--omega-gradient-stops:\s*([^;]+);/, '--omega-gradient-stops');
   const jsStops = readStops(motion, /const RAINBOW_STOPS = \[([^\]]+)\]/, 'RAINBOW_STOPS');
 
   assert.deepStrictEqual(
@@ -44,6 +44,6 @@ test('the rainbow palette is ONE list: the classy ring and the dotfield carry th
   assert.deepStrictEqual(
     jsStops,
     scssStops,
-    'motion.js RAINBOW_STOPS drifted from --classy-gradient-stops — the ring and the dotfield are the same palette: change both or neither',
+    'motion.js RAINBOW_STOPS drifted from --omega-gradient-stops — the ring and the dotfield are the same palette: change both or neither',
   );
 });

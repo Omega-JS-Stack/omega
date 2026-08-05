@@ -2,7 +2,7 @@
 // hairline + the sticky meta rail that travels with the reader (xl+).
 
 // Reading progress: an accent hairline pinned to the very top
-.classy-read-progress {
+.omega-read-progress {
   position: fixed;
   inset-inline: 0;
   top: 0;
@@ -20,7 +20,7 @@
 }
 
 // Sticky byline rail — quiet, hairline-separated, travels with the reader
-.classy-article-rail {
+.omega-article-rail {
   position: sticky;
   top: 6rem;
   display: flex;
@@ -29,25 +29,25 @@
   padding-inline-end: 1.5rem;
 }
 
-.classy-article-rail__author {
+.omega-article-rail__author {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   color: var(--omega-ink);
   text-decoration: none;
 
-  .classy-post-card__avatar {
+  .omega-post-card__avatar {
     flex-shrink: 0;
   }
 }
 
-.classy-article-rail__name {
+.omega-article-rail__name {
   font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.3;
 }
 
-.classy-article-rail__meta {
+.omega-article-rail__meta {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;

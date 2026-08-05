@@ -14,7 +14,7 @@ client:
 {% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
-<p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
+<p class="omega-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
 This is the {{ breadcrumb }} for {{ brand }}, accessible from [{{ site.url }}]({{ site.url }}).
 

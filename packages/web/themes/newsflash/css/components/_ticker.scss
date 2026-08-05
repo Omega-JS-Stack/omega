@@ -3,9 +3,9 @@
 // latest headlines with a pulsing live dot. The SKIN lives here; the loop
 // mechanics (cloning, constant px/s, hover pause, reduced-motion off) ride
 // the shared motion engine — base.html stamps data-omega-marquee.
-// Genuinely novel UI (no Bootstrap equivalent) → universal semantic classes.
+// Fork markup (the core/base.html identity fork), so theme-prefixed BEM.
 
-.ticker {
+.newsflash-ticker {
   --omega-marquee-gap: 0; // items self-space via padding
 
   background: var(--nf-panel-bg);
@@ -25,11 +25,11 @@
   }
 }
 
-.ticker-track {
+.newsflash-ticker__track {
   padding: 0.55em 0;
 }
 
-.ticker-item {
+.newsflash-ticker__item {
   display: inline-flex;
   align-items: center;
   gap: 0.6em;
@@ -41,7 +41,7 @@
   }
 }
 
-.live-dot {
+.newsflash-ticker__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -58,9 +58,9 @@
 @media (prefers-reduced-motion: reduce) {
   // The engine stops the loop; the static row stays scrollable by hand
   // (and sheds the engine's edge mask so no headline fades out).
-  .live-dot { animation: none; }
+  .newsflash-ticker__dot { animation: none; }
 
-  .ticker {
+  .newsflash-ticker {
     overflow-x: auto;
     mask-image: none;
   }

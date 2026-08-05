@@ -3,26 +3,26 @@
 // activity rows. Everything paints through tokens.
 
 // ── Merged stat card — ONE card, hairline column dividers ───────────────────
-.classy-statgrid {
+.omega-statgrid {
   // The cell floor: below it a column drops out of the row.
-  --classy-statgrid-cell: 10rem;
+  --omega-statgrid-cell: 10rem;
 
   display: grid;
-  // Container-driven, never viewport-driven: `--classy-statgrid-cols` is the
+  // Container-driven, never viewport-driven: `--omega-statgrid-cols` is the
   // CEILING (100% / cols is the widest a cell asks for, so at most that many
   // fit), the cell floor is the collapse point, and auto-fit picks the count
   // from the grid's OWN width — so a statgrid nested in a half-width card
   // reflows instead of overflowing.
   grid-template-columns: repeat(
     auto-fit,
-    minmax(max(var(--classy-statgrid-cell), calc(100% / var(--classy-statgrid-cols, 4))), 1fr)
+    minmax(max(var(--omega-statgrid-cell), calc(100% / var(--omega-statgrid-cols, 4))), 1fr)
   );
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
   overflow: hidden;
 
-  .classy-statgrid__cell {
+  .omega-statgrid__cell {
     padding: 1.125rem 1.25rem 1.25rem;
     // Hairlines that never count columns: each cell paints its start/top rule
     // 1px OUTSIDE its box, and the card's overflow clip eats the ones on the
@@ -32,7 +32,7 @@
       0 -1px 0 var(--omega-line);
   }
 
-  .classy-statgrid__label {
+  .omega-statgrid__label {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -44,7 +44,7 @@
     }
   }
 
-  .classy-statgrid__value {
+  .omega-statgrid__value {
     font-size: 1.5rem;
     font-weight: 650;
     letter-spacing: -0.02em;
@@ -58,8 +58,8 @@
 // ── Data table — the App-DNA table voice (admin directories, activity) ──────
 // Composes WITH Bootstrap's .table: kills its body-bg paint so rows sit on
 // the card's surface, micro-caps header on surface-2, hairline rows, quiet
-// hover. Use as `table classy-table` (drop table-hover — hover lives here).
-.classy-table {
+// hover. Use as `table omega-table` (drop table-hover — hover lives here).
+.omega-table {
   --bs-table-bg: transparent;
   --bs-table-color: var(--omega-ink);
   --bs-table-border-color: var(--omega-line);
@@ -100,7 +100,7 @@
 }
 
 // ── Inline count — attention rows, list tallies ─────────────────────────────
-.classy-count {
+.omega-count {
   flex-shrink: 0;
   font-size: 1.125rem;
   font-weight: 650;
@@ -113,7 +113,7 @@
 }
 
 // ── Ghost icon button — quiet ⋮ / inline actions ────────────────────────────
-.classy-iconbtn {
+.omega-iconbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -135,7 +135,7 @@
 }
 
 // ── Panel head — the 14/650 card title voice ────────────────────────────────
-.classy-panel-title {
+.omega-panel-title {
   margin-bottom: 1rem;
   font-size: 0.875rem;
   font-weight: 650;
@@ -144,8 +144,8 @@
 }
 
 // ── Activity rows — hairline-divided, neutral icon chips ────────────────────
-.classy-activity {
-  .classy-activity__row {
+.omega-activity {
+  .omega-activity__row {
     display: flex;
     align-items: flex-start;
     gap: 0.875rem;
@@ -157,25 +157,25 @@
     }
   }
 
-  .classy-activity__body {
+  .omega-activity__body {
     flex: 1 1 auto;
     min-width: 0;
   }
 
-  .classy-activity__title {
+  .omega-activity__title {
     margin-bottom: 0.125rem;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--omega-ink);
   }
 
-  .classy-activity__desc {
+  .omega-activity__desc {
     margin: 0;
     font-size: 0.8125rem;
     color: var(--omega-ink-muted);
   }
 
-  .classy-activity__time {
+  .omega-activity__time {
     flex-shrink: 0;
     font-size: 0.75rem;
     color: var(--omega-ink-faint);

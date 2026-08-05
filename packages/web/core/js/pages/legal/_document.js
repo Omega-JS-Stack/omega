@@ -32,13 +32,13 @@ function buildToc() {
 
   const $headings = [...$doc.querySelectorAll('h2, h3')];
   if (!$headings.length) {
-    $toc.closest('.classy-legal__rail')?.setAttribute('hidden', '');
+    $toc.closest('.omega-legal__rail')?.setAttribute('hidden', '');
     return;
   }
 
   const seen = new Set();
   const $list = document.createElement('ol');
-  $list.className = 'classy-legal__toc-list';
+  $list.className = 'omega-legal__toc-list';
 
   $headings.forEach(($heading) => {
     if (!$heading.id) {
@@ -54,7 +54,7 @@ function buildToc() {
 
     const $item = document.createElement('li');
     if ($heading.tagName === 'H3') {
-      $item.className = 'classy-legal__toc-sub';
+      $item.className = 'omega-legal__toc-sub';
     }
     const $link = document.createElement('a');
     $link.href = `#${$heading.id}`;

@@ -4,7 +4,7 @@
  * docs, no pages) gets the full working site. Pins: page count, key URLs,
  * literal /404.html, taxonomy + collection generators, markdown legal
  * layouts, manifest-injected assets, zero unresolved Liquid, and the
- * classy-fallback contract for partial themes (neobrutalism, newsflash).
+ * base-fallback contract for partial themes (neobrutalism, newsflash).
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -58,7 +58,7 @@ test('every theme builds the full default page set for a bare consumer', () => {
   assert.strictEqual(builds.neobrutalism.htmlCount, builds.classy.htmlCount, 'neobrutalism = classy page count (no own sections)');
   assert.strictEqual(
     builds.newsflash.htmlCount - builds.classy.htmlCount,
-    libSize('newsflash', 'classy') - libSize('classy'),
+    libSize('newsflash', 'base') - libSize('base'),
     'newsflash delta = its own showcase entries, nothing else',
   );
 });
@@ -96,7 +96,7 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
   for (const theme of THEMES) {
     for (const file of ['terms.html', 'privacy.html', 'cookies.html']) {
       const html = page(theme, file);
-      const region = html.slice(html.indexOf('data-legal-doc'), html.indexOf('classy-legal__doc-foot'));
+      const region = html.slice(html.indexOf('data-legal-doc'), html.indexOf('omega-legal__doc-foot'));
       // #92: a commented-out clause is still SHIPPED bytes — a draft parked in
       // an HTML comment reaches every consumer's legal page verbatim, raw
       // markdown and all. Comments in a legal document carry no draft copy.
@@ -107,7 +107,7 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
       // Comments are not rendered text — the rendered-copy checks skip them.
       const doc = region.replace(/<!--[\s\S]*?-->/g, '');
 
-      assert.ok(html.includes('<article class="classy-legal__doc classy-prose" data-legal-doc>'), `${theme}/${file}: the document wrapper`);
+      assert.ok(html.includes('<article class="omega-legal__doc omega-prose" data-legal-doc>'), `${theme}/${file}: the document wrapper`);
       assert.ok(doc.includes('<h2>'), `${theme}/${file}: section headings — no headings means the JS hides the rail and the doc falls into its track`);
       assert.ok(!doc.includes('**'), `${theme}/${file}: markdown emphasis resolved, never literal`);
       assert.ok(!/<p>\s*<li>/.test(doc), `${theme}/${file}: no list mangled by markdown's indented-html handling`);

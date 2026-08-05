@@ -13,7 +13,7 @@ body {
 // Accent blocks: .text-bg-* (Bootstrap) get the hard neobrutalist edge when
 // used as full-bleed section/decorative blocks. Bootstrap already sets the
 // background + a readable contrast color; we just square the corners.
-// (Borders/shadows are added per-component where needed, e.g. .showcase-num.)
+// (Borders/shadows are added per-component where needed, e.g. .neo-showcase__num.)
 // ============================================
 .text-bg-primary,
 .text-bg-secondary,
@@ -22,4 +22,68 @@ body {
 .text-bg-warning,
 .text-bg-danger {
   border-radius: 0;
+}
+
+// ============================================
+// Base voice re-tunes: the omega-* type vocabulary the fall-through
+// surfaces speak (classy's typography partial is deliberately NOT imported;
+// these are the pieces base markup actually uses, in the neobrutalist voice)
+// ============================================
+// Marketing display: chunky grotesk (Archivo via --omega-font-marketing),
+// accents get the ink-marker swipe (the neo-accent treatment on base markup).
+.omega-display {
+  font-family: var(--omega-font-marketing);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+
+  em,
+  i {
+    font-style: normal;
+    background: #111111;
+    color: var(--nb-accent-yellow);
+    padding: 0 0.1em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+
+.omega-display--hero {
+  font-size: clamp(2.75rem, 6vw, 5rem);
+  line-height: 0.95;
+}
+
+.omega-display--page {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 0.95;
+}
+
+.omega-display--section {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+// Micro labels become the mono kicker voice. Authored in full: classy's
+// typography partial (the usual .omega-micro home) is not imported.
+.omega-micro {
+  font-family: $nb-font-mono;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-body-color);
+}
+
+// The faintest voice (footnotes, reassurance lines): same home story.
+.omega-quiet {
+  color: var(--bs-secondary-color);
+}
+
+// Display voice on arbitrary elements (status page numbers): same home story.
+.text-marketing {
+  font-family: var(--omega-font-marketing);
+}
+
+// In-page anchors clear the sticky ink bar.
+[id] {
+  scroll-margin-top: 5.5rem;
 }

@@ -392,8 +392,8 @@ function setupCurrentPlanIndicator() {
 
 function adjustNavbarOffset() {
   const $promoBanner = document.getElementById('pricing-promo-banner');
-  // The fixed nav the banner pushes down (classy v2's .classy-nav; .navbar-wrapper for legacy themes)
-  const $nav = document.querySelector('.classy-nav, .navbar-wrapper');
+  // The fixed nav the banner pushes down (classy v2's .omega-nav; .navbar-wrapper for legacy themes)
+  const $nav = document.querySelector('.omega-nav, .navbar-wrapper');
   const $firstSection = document.querySelector('main > section:first-of-type');
 
   if (!$promoBanner || !$nav) {

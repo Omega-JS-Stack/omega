@@ -1,6 +1,6 @@
 // Newsflash Theme — Blog post page-specific CSS
 // The editorial article treatment for
-// (_layouts/themes/newsflash/frontend/pages/blog/post.html): reading-progress
+// (_layouts/frontend/pages/blog/post.html): reading-progress
 // bar, drop cap, serif crossheads with the vermilion dash, framed in-content
 // images, and the centered pullquote. NOTE: [slug] wildcard filename (spec §7)
 // — the key blog/[slug] styles every /blog/<slug> post page, no frontmatter.
@@ -12,7 +12,7 @@
 // Reading progress — fixed vermilion rule across the very top
 // ============================================
 // Sits above the sticky masthead (z-index 1030); driven by pages/blog/post.js.
-.reading-progress {
+.newsflash-progress {
   position: fixed;
   top: 0;
   left: 0;
@@ -34,7 +34,7 @@
 // ============================================
 // Article hero — wide cinematic frame
 // ============================================
-.article-hero {
+.newsflash-frame--article {
   aspect-ratio: 21 / 10;
 
   img {
@@ -175,7 +175,7 @@
 }
 
 // Tag row sits on a hairline rule
-.tag-row {
+.newsflash-tag-row {
   border-top: var(--nf-border);
 }
 

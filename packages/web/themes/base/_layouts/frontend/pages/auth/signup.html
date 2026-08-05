@@ -1,0 +1,140 @@
+---
+layout: frontend/core/cover
+
+benefits:
+  - title: "Free forever"
+    description: "Start free, upgrade when you're ready"
+    icon: "gift"
+  - title: "No setup fees"
+    description: "Instant start, no hidden costs"
+    icon: "credit-card"
+  - title: "24/7 support"
+    description: "Real humans, whenever you need them"
+    icon: "headset"
+
+social_signup:
+  - id: "google.com"
+    name: "Google"
+    logo: "google"
+---
+
+<section class="col-12">
+  <div class="omega-auth omega-auth--split" data-omega-reveal>
+    <!-- Form column -->
+    <div class="omega-auth__card">
+      <!-- Logo -->
+      <div class="omega-auth__brand">
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+      </div>
+
+      <!-- Header -->
+      <h1 class="omega-auth__title">Create your account</h1>
+      <p class="omega-auth__sub">Get started with {{ site.brand.name }} in seconds</p>
+
+      <!-- Spinner -->
+      {% capture initializing_spinner %}<span class="spinner-border spinner-border-sm me-2 form-initializing-spinner"></span>{% endcapture %}
+
+      <!-- Sign up Form -->
+      <form id="auth-form" autocomplete="on" novalidate data-form-state="initializing" onsubmit="return false">
+        <!-- Hidden default submit button for Enter key -->
+        <button type="submit" class="d-none" data-provider="email" aria-hidden="true" tabindex="-1"></button>
+
+        <!-- Social Signup (Optional) -->
+        {% if resolved.social_signup and resolved.social_signup.size > 0 %}
+          <div>
+            {% for provider in resolved.social_signup %}
+              <button type="submit" class="btn btn-outline-adaptive omega-auth__social w-100 mb-2 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
+                {{ initializing_spinner }}
+                {% comment %} `logo:` renders the provider's own brandmark in
+                FULL COLOR (core/logos, inlined by omega_logo); `icon:` is the
+                monochrome currentColor glyph for providers without one {% endcomment %}
+                {% iftruthy provider.logo %}
+                  <span class="d-inline-flex me-2" aria-hidden="true">{% omega_logo provider.logo, "brandmarks" %}</span>
+                {% endiftruthy %}
+                {% iffalsy provider.logo %}
+                  {% omega_icon provider.icon, "me-2" %}
+                {% endiffalsy %}
+                <span class="button-text">Sign up with {{ provider.name }}</span>
+              </button>
+            {% endfor %}
+          </div>
+
+          <!-- Divider -->
+          <div class="omega-auth__divider">or</div>
+        {% endif %}
+
+        <div class="mb-3 text-start">
+          <label for="email" class="form-label">
+            Email <span class="text-danger">*</span>
+          </label>
+          <input type="email" class="form-control" id="email" name="email" placeholder="you@example.com" autocomplete="email" autofocus>
+        </div>
+
+        <div class="mb-3 text-start">
+          <label for="password" class="form-label">
+            Password <span class="text-danger">*</span>
+          </label>
+          <div class="input-group">
+            <input type="password" class="form-control" id="password" name="password" placeholder="Create a strong password" autocomplete="new-password">
+            <button class="btn omega-password-toggle px-3" type="button" aria-label="Toggle password visibility">
+              <span class="omega-password-show">{% omega_icon "eye", "fa-fw" %}</span>
+              <span class="omega-password-hide d-none">{% omega_icon "eye-slash", "fa-fw" %}</span>
+            </button>
+          </div>
+        </div>
+
+        {% comment %} TODO: in regions that allow pre-checked consent (e.g. US), default both to checked. {% endcomment %}
+        <div id="consent-group" class="omega-auth__consent mb-3 text-start p-2 rounded">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="consent-legal" name="consentLegal">
+            <label class="form-check-label small" for="consent-legal">
+              I agree to {{ site.brand.name }}'s
+              <a href="/terms" class="text-decoration-none" target="_blank">Terms of Service</a>
+              and
+              <a href="/privacy" class="text-decoration-none" target="_blank">Privacy Policy</a>.
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="consent-marketing" name="consentMarketing">
+            <label class="form-check-label small" for="consent-marketing">
+              Send me product updates and occasional news. Unsubscribe anytime.
+            </label>
+          </div>
+          <div id="consent-error" class="omega-auth__consent-error small mt-2 d-none"></div>
+        </div>
+
+        <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
+          {{ initializing_spinner }}
+          <span class="button-text">Create account</span>
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+        </button>
+      </form>
+
+      <!-- Sign in Link -->
+      <div class="omega-auth__foot">
+        Already have an account?
+        <a href="/signin">Sign in</a>
+      </div>
+    </div>
+
+    <!-- Ink pitch panel (lg+) -->
+    <div class="omega-auth__aside omega-ink-panel omega-dotgrid" data-omega-dotfield aria-hidden="true">
+      <div class="omega-auth__aside-title">
+        Everything you need to <em>ship</em>, from day one.
+      </div>
+      <div>
+        {% for benefit in resolved.benefits %}
+          <div class="omega-auth__aside-row">
+            {% omega_icon "check", "text-success fa-sm" %}
+            <span><strong>{{ benefit.title }}</strong>: {{ benefit.description }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="omega-auth__aside-foot">
+        Free plan included · no credit card required
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

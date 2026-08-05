@@ -141,7 +141,7 @@ pass: each run drops them all and re-emits only what it produced, so a skipped
 or failed pair is listed nowhere.
 
 The visitor-facing **language switcher** is the footer dropup in the shared
-classy footer include (`_includes/frontend/sections/footer.html`, the base layer
+base footer include (`_includes/frontend/sections/footer.html`, the base layer
 every theme inherits). It renders CLIENT-SIDE from the page's own
 `link[rel="alternate"][hreflang]` tags — the produced-only SSOT above — so the
 menu can never offer a copy that was not written: `core/js/core/language-switcher.js`

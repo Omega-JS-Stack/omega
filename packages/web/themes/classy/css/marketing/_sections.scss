@@ -3,8 +3,8 @@
 
 // ── Logo marquee band ────────────────────────────────────────────────────────
 
-.classy-logos {
-  .classy-micro {
+.omega-logos {
+  .omega-micro {
     display: block;
     text-align: center;
     margin-bottom: 1.5rem;
@@ -36,7 +36,7 @@
   // item's grayscale — dark mode luminance-flips them so ink-dark marks stay
   // legible on charcoal. Hover restores the brand color (the item drops its
   // filter; the invert must go with it).
-  .classy-logos__mark {
+  .omega-logos__mark {
     display: inline-flex;
     align-items: center;
 
@@ -51,7 +51,7 @@
   }
 
   // Logo lockups: inlined FA brand mark + name, muted like a proper logo wall
-  .classy-logos__lockup {
+  .omega-logos__lockup {
     display: inline-flex;
     align-items: center;
     gap: 0.5625rem;
@@ -69,7 +69,7 @@
 
   // Word-logos (the draft-2 treatment): typographic brand names, alternating
   // grotesk/serif voices so the row reads like a real logo wall.
-  .classy-logos__word {
+  .omega-logos__word {
     font-size: 1.15625rem;
     font-weight: 650;
     letter-spacing: -0.02em;
@@ -78,13 +78,13 @@
     white-space: nowrap;
   }
 
-  .omega-marquee__item:nth-child(even) .classy-logos__word {
+  .omega-marquee__item:nth-child(even) .omega-logos__word {
     font-family: var(--omega-font-serif);
     font-weight: 560;
     font-style: italic;
   }
 
-  .omega-marquee__item:nth-child(3n) .classy-logos__word {
+  .omega-marquee__item:nth-child(3n) .omega-logos__word {
     text-transform: uppercase;
     font-size: 0.96875rem;
     letter-spacing: 0.06em;
@@ -93,7 +93,7 @@
 
 // ── Stats band ───────────────────────────────────────────────────────────────
 
-.classy-stats {
+.omega-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem 1.5rem;
@@ -103,11 +103,11 @@
   }
 }
 
-.classy-stat {
+.omega-stat {
   padding-inline-start: 1.25rem;
   border-inline-start: 1px solid var(--omega-line-strong);
 
-  .classy-stat__num {
+  .omega-stat__num {
     font-family: var(--omega-font-marketing);
     font-size: clamp(2rem, 3.6vw, 2.75rem);
     font-weight: 560;
@@ -117,14 +117,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .classy-stat__label {
+  .omega-stat__label {
     margin-top: 0.375rem;
     font-size: 0.84375rem;
     font-weight: 550;
     color: var(--omega-ink-muted);
   }
 
-  .classy-stat__sub {
+  .omega-stat__sub {
     font-size: 0.71875rem;
     color: var(--omega-ink-faint);
   }
@@ -136,7 +136,7 @@
 // feature rows line up across every card, thin muted checks, CTA pinned to
 // the bottom so buttons align. Enterprise rides the same card with a serif
 // "Custom" amount.
-.classy-price-card {
+.omega-price-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -147,23 +147,23 @@
   border-radius: var(--omega-radius-l);
 
   // Recommended plan wears the iridescent gradient ring (2px, padding-box /
-  // border-box two-layer paint — see .classy-btn-ring for the button twin)
-  &.classy-price-card--popular {
+  // border-box two-layer paint — see .omega-btn-ring for the button twin)
+  &.omega-price-card--popular {
     border: 2px solid transparent;
     background:
       linear-gradient(var(--omega-surface), var(--omega-surface)) padding-box,
-      var(--classy-gradient) border-box;
+      var(--omega-gradient) border-box;
     box-shadow: var(--omega-shadow-2);
   }
 
-  .classy-price-card__popular {
+  .omega-price-card__popular {
     position: absolute;
     top: 0;
     left: 50%;
     transform: translate(-50%, -50%);
   }
 
-  .classy-price-card__name {
+  .omega-price-card__name {
     font-size: 1.1875rem;
     font-weight: 650;
     letter-spacing: -0.01em;
@@ -172,7 +172,7 @@
   }
 
   // Fixed two-line slot — keeps every card's price on the same baseline
-  .classy-price-card__tagline {
+  .omega-price-card__tagline {
     min-height: 2.6em;
     margin-bottom: 1.25rem;
     font-size: 0.875rem;
@@ -180,7 +180,7 @@
     color: var(--omega-ink-muted);
   }
 
-  .classy-price-card__price {
+  .omega-price-card__price {
     display: flex;
     align-items: baseline;
     gap: 0.25rem;
@@ -189,7 +189,7 @@
 
     // ONE amount voice — serif marketing display for numbers AND words
     // (Ian 2026-07-16: "$29" rendered sans beside serif "Free"/"Custom")
-    .classy-price-card__amount {
+    .omega-price-card__amount {
       font-family: var(--omega-font-marketing);
       font-size: 2.625rem;
       font-weight: 500;
@@ -198,27 +198,27 @@
       line-height: 1;
     }
 
-    .classy-price-card__currency {
+    .omega-price-card__currency {
       font-size: 1.125rem;
       font-weight: 600;
       color: var(--omega-ink-muted);
     }
 
-    .classy-price-card__per {
+    .omega-price-card__per {
       font-size: 0.8125rem;
       color: var(--omega-ink-faint);
     }
   }
 
   // Fixed one-line slot (swaps with the billing toggle — a JS contract)
-  .classy-price-card__billing {
+  .omega-price-card__billing {
     min-height: 1.25rem;
     margin: 0.375rem 0 1.25rem;
     font-size: 0.75rem;
     color: var(--omega-ink-faint);
   }
 
-  .classy-price-card__features {
+  .omega-price-card__features {
     margin: 0;
     padding: 0;
     list-style: none;
@@ -235,7 +235,7 @@
       // The check is a one-line-tall box so the glyph centers on the FIRST
       // line of its feature text (the old baseline + magic margin drifted as
       // soon as a feature wrapped). Ink comes from Bootstrap's `.text-success`.
-      .classy-price-card__check {
+      .omega-price-card__check {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -256,7 +256,7 @@
     }
   }
 
-  .classy-price-card__tier-note {
+  .omega-price-card__tier-note {
     margin: 0.875rem 0 0.25rem;
     font-size: 0.75rem;
     font-style: italic;
@@ -264,7 +264,7 @@
   }
 
   // CTA pinned to the card floor — buttons align across the row
-  .classy-price-card__cta {
+  .omega-price-card__cta {
     margin-top: auto;
     padding-top: 1.5rem;
   }
@@ -276,7 +276,7 @@
 // recessed surface-2 (the footer's appearance control re-skins its thumb the
 // same way). The platform rail below is the other reading of the same control:
 // a recessed track with a raised selected segment.
-.classy-billing-toggle {
+.omega-billing-toggle {
   display: inline-flex;
   padding: 0.25rem;
   background: var(--omega-surface);
@@ -301,7 +301,7 @@
   }
 
   // The accent SAVE chip rides inside the Annually segment
-  .classy-billing-toggle__save {
+  .omega-billing-toggle__save {
     padding: 0.125rem 0.4375rem;
     font-size: 0.625rem;
     vertical-align: 0.0625em;
@@ -333,7 +333,7 @@
 // The recessed track sits straight on the page ground, so it reads only
 // because surface-2 is a real well now (#152); the selected segment is the
 // raised white surface on top of it.
-.classy-platform-rail {
+.omega-platform-rail {
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -377,12 +377,12 @@
 
 // ── Serif quote ──────────────────────────────────────────────────────────────
 
-.classy-quote {
+.omega-quote {
   max-width: 46rem;
   margin-inline: auto;
   text-align: center;
 
-  .classy-quote__text {
+  .omega-quote__text {
     font-family: var(--omega-font-marketing);
     font-size: clamp(1.375rem, 2.6vw, 1.75rem);
     font-weight: 460;
@@ -396,7 +396,7 @@
     }
   }
 
-  .classy-quote__attr {
+  .omega-quote__attr {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -404,7 +404,7 @@
     margin-top: 1.5rem;
   }
 
-  .classy-quote__avatar {
+  .omega-quote__avatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -427,13 +427,13 @@
     }
   }
 
-  .classy-quote__name {
+  .omega-quote__name {
     font-size: 0.84375rem;
     font-weight: 600;
     color: var(--omega-ink);
   }
 
-  .classy-quote__role {
+  .omega-quote__role {
     font-size: 0.78125rem;
     color: var(--omega-ink-faint);
   }
@@ -441,11 +441,11 @@
 
 // ── CTA band (ink panel) ─────────────────────────────────────────────────────
 
-.classy-cta {
+.omega-cta {
   padding: 3.5rem 1.5rem;
   text-align: center;
 
-  .classy-cta__headline {
+  .omega-cta__headline {
     font-family: var(--omega-font-marketing);
     font-size: clamp(1.875rem, 4vw, 2.875rem);
     font-weight: 560;
@@ -456,14 +456,14 @@
     margin-inline: auto;
   }
 
-  .classy-cta__sub {
+  .omega-cta__sub {
     max-width: 36rem;
     margin: 1rem auto 0;
     font-size: 0.96875rem;
     color: var(--omega-ink-muted);
   }
 
-  .classy-cta__ctas {
+  .omega-cta__ctas {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -509,7 +509,7 @@
 // ── FAQ accordion ────────────────────────────────────────────────────────────
 
 // FAQ — bronn pattern: no boxes, hairline-divided rows
-.classy-faq {
+.omega-faq {
   .accordion-item {
     margin-bottom: 0;
     background: transparent;
@@ -557,16 +557,16 @@
 // ── Feature comparison table ─────────────────────────────────────────────────
 
 // The money-back guarantee line wears the ok-green shield (Ian 2026-07-16)
-.classy-guarantee-icon {
+.omega-guarantee-icon {
   color: var(--omega-ok);
 }
 
-.classy-compare {
+.omega-compare {
   // Included/absent marks: filled-circle check, muted filled-circle X — state
   // told by mark + color, readable in both themes. The check's ink is
   // Bootstrap's `.text-success`, which the root bridge points at --omega-ok,
   // so every affirmation tick and every status green are the same green.
-  .classy-compare__no {
+  .omega-compare__no {
     color: var(--omega-ink-faint);
     opacity: 0.7;
   }
@@ -608,7 +608,7 @@
 
 // ── Promo banner (pricing) ───────────────────────────────────────────────────
 
-.classy-promo {
+.omega-promo {
   background: var(--omega-surface);
   border-bottom: 1px solid var(--omega-line);
   font-size: 0.84375rem;
@@ -616,7 +616,7 @@
 
   // Slides in when the JS un-hides it — the nav/section transitions glide down
   &:not([hidden]) {
-    animation: classy-promo-in var(--omega-speed-slow) var(--omega-ease);
+    animation: omega-promo-in var(--omega-speed-slow) var(--omega-ease);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -625,15 +625,15 @@
     }
   }
 
-  .classy-promo__countdown,
-  .classy-promo__code {
+  .omega-promo__countdown,
+  .omega-promo__code {
     font-family: var(--omega-font-mono);
     font-weight: 600;
     color: var(--omega-ink);
   }
 }
 
-@keyframes classy-promo-in {
+@keyframes omega-promo-in {
   from {
     transform: translateY(-100%);
   }

@@ -24,7 +24,7 @@ const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 
 
 /** The shipped bundle for a theme chain. */
 function compileBundle(theme) {
-  const layers = [path.join(PKG, 'themes', theme), path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
+  const layers = [path.join(PKG, 'themes', theme), path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')];
   return sass.compile(path.join(PKG, 'core', 'css', 'main.scss'), {
     importers: [layeredFileImporter(layers), sectionsImporter([])],
     loadPaths: layers,
@@ -46,24 +46,24 @@ test('#44: the check seam is gone, the ink is Bootstrap success bridged to --ome
 
   // The two greens Ian caught side by side on /pricing: the plan check (now
   // .text-success) and the money-back shield must resolve to the SAME hue.
-  const guarantee = css.match(/\.classy-guarantee-icon\s*\{[^}]*\}/)[0];
+  const guarantee = css.match(/\.omega-guarantee-icon\s*\{[^}]*\}/)[0];
   assert.match(guarantee, /color: var\(--omega-ok\)/, 'the guarantee shield reads the same success hue as a tick');
 });
 
 test('#11: no check site paints its own tick a local color', () => {
   const css = compileBundle('classy');
 
-  assert.ok(!/\.classy-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green');
-  assert.match(css, /\.classy-auth__aside-row svg\s*\{(?:(?!color)[^}])*\}/, 'the signup benefit check dropped its local grey');
+  assert.ok(!/\.omega-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green');
+  assert.match(css, /\.omega-auth__aside-row svg\s*\{(?:(?!color)[^}])*\}/, 'the signup benefit check dropped its local grey');
   assert.ok(
-    !/\.classy-price-card__check\s*\{[^}]*color:/.test(css),
+    !/\.omega-price-card__check\s*\{[^}]*color:/.test(css),
     'the plan-feature check dropped its local accent',
   );
 });
 
 test('#10: the plan-feature check is a one-line box, not a magic margin', () => {
   const css = compileBundle('classy');
-  const rule = css.match(/\.classy-price-card__features li \.classy-price-card__check\s*\{[^}]*\}/)[0];
+  const rule = css.match(/\.omega-price-card__features li \.omega-price-card__check\s*\{[^}]*\}/)[0];
 
   assert.match(rule, /display: inline-flex/, 'the check is its own box');
   assert.match(rule, /align-items: center/, 'the glyph centers inside it');
@@ -100,8 +100,8 @@ test('#44: the check surfaces stamp text-success on plan features, comparison, s
 
   const pricing = pages.get('/pricing');
   assert.ok(pricing, '/pricing built');
-  assert.match(pricing, /classy-price-card__check text-success/, 'plan-feature checks carry the success class');
-  assert.match(pricing, /classy-compare__yes text-success/, 'comparison yes-marks carry the success class');
+  assert.match(pricing, /omega-price-card__check text-success/, 'plan-feature checks carry the success class');
+  assert.match(pricing, /omega-compare__yes text-success/, 'comparison yes-marks carry the success class');
   assert.ok(!pricing.includes('omega-check'), 'no page still stamps the retired seam class');
 
   const signup = pages.get('/signup');
@@ -111,13 +111,13 @@ test('#44: the check surfaces stamp text-success on plan features, comparison, s
 
 test('#44: every affirmation-check site wears text-success and nothing else', () => {
   const affirmationSites = [
-    ['themes/classy/_layouts/frontend/pages/pricing.html', 'check'],
-    ['themes/classy/_layouts/frontend/pages/auth/signup.html', 'check'],
-    ['themes/classy/_sections/marketing/hero/section.html', 'check'],
-    ['themes/classy/_sections/marketing/product-demo/section.html', 'check'],
-    ['themes/classy/_layouts/frontend/pages/alternatives/alternative.html', 'circle-check'],
-    ['themes/newsflash/_layouts/frontend/pages/pricing.html', 'circle-check'],
-    ['themes/neobrutalism/_layouts/frontend/pages/pricing.html', 'circle-check'],
+    ['themes/base/_layouts/frontend/pages/pricing.html', 'check'],
+    ['themes/base/_layouts/frontend/pages/auth/signup.html', 'check'],
+    ['themes/base/_sections/marketing/hero/section.html', 'check'],
+    ['themes/base/_sections/marketing/product-demo/section.html', 'check'],
+    ['themes/base/_layouts/frontend/pages/alternatives/alternative.html', 'circle-check'],
+    // Neither partial theme forks a pricing layout (#177 phases 2 + 3);
+    // their /pricing renders the base page, already pinned above.
   ];
 
   for (const [rel, icon] of affirmationSites) {

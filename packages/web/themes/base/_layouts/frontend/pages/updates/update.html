@@ -1,0 +1,118 @@
+---
+layout: frontend/core/cover
+
+# Update Section
+update:
+  version: null
+  title: null
+  date: null
+  summary: null
+  highlights: []
+  type: "release"  # release, hotfix, security, maintenance
+
+# Navigation
+navigation:
+  back_text: "All updates"
+  back_url: "/updates"
+---
+
+<!-- Hero Section -->
+<section class="update-hero omega-dotgrid py-5" data-omega-dotfield>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10" data-omega-reveal>
+        <!-- Mono breadcrumb -->
+        <div class="omega-post-card__eyebrow mb-4">
+          <a href="{{ resolved.navigation.back_url }}">{{ resolved.navigation.back_text }}</a>
+          <span>/</span>
+          <span>v{{ resolved.update.version }}</span>
+        </div>
+
+        <!-- Update Header -->
+        <div class="card update-header-card">
+          <div class="card-body p-4">
+            <div class="d-flex align-items-start gap-3 flex-wrap">
+              <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg flex-shrink-0">
+                {% if resolved.update.type == "security" %}
+                  {% omega_icon "shield-halved", "fa-lg" %}
+                {% elsif resolved.update.type == "hotfix" %}
+                  {% omega_icon "bug", "fa-lg" %}
+                {% elsif resolved.update.type == "maintenance" %}
+                  {% omega_icon "wrench", "fa-lg" %}
+                {% else %}
+                  {% omega_icon "rocket", "fa-lg" %}
+                {% endif %}
+              </span>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                  <h1 class="omega-display omega-display--section mb-0">Version {{ resolved.update.version }}</h1>
+                  {% if resolved.update.type == "security" %}
+                    <span class="omega-status omega-status--danger"><span class="omega-dot omega-dot--danger"></span>Security</span>
+                  {% elsif resolved.update.type == "hotfix" %}
+                    <span class="omega-status omega-status--warn"><span class="omega-dot omega-dot--warn"></span>Hotfix</span>
+                  {% elsif resolved.update.type == "maintenance" %}
+                    <span class="omega-status"><span class="omega-dot"></span>Maintenance</span>
+                  {% else %}
+                    <span class="omega-chip omega-chip--accent">Release</span>
+                  {% endif %}
+                </div>
+                {% iftruthy resolved.update.title %}
+                  <p class="fs-5 text-muted mb-2">{{ resolved.update.title }}</p>
+                {% endiftruthy %}
+                <div class="text-muted small">
+                  {% omega_icon "calendar", "me-1" %}
+                  {{ resolved.update.date | date: "%B %d, %Y" }}
+                </div>
+              </div>
+            </div>
+
+            {% iftruthy resolved.update.highlights %}
+              <div class="mt-4 pt-3 hairline-top">
+                <div class="d-flex flex-wrap gap-2">
+                  {% for highlight in resolved.update.highlights %}
+                    <span class="omega-chip">
+                      {{ highlight.text }}
+                    </span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endiftruthy %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Update Content Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="update-content omega-prose" data-omega-reveal>
+          {{ content | omega_content_format }}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Navigation Section -->
+<section class="py-5 pt-0">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3" data-omega-reveal>
+          <a href="{{ resolved.navigation.back_url }}" class="text-decoration-none">
+            {% omega_icon "arrow-left", "me-1" %}
+            {{ resolved.navigation.back_text }}
+          </a>
+          <a href="/status" class="text-decoration-none">
+            View system status
+            {% omega_icon "arrow-right", "ms-1" %}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

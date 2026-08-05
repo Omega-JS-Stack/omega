@@ -8,7 +8,7 @@
  * chains the build resolves through (`resolveThemeLayers` + `collectProviders`
  * in ./layers.js) — never a second table of layer order:
  *
- * - sections/components — consumer → active theme → classy (engine.js hands
+ * - sections/components — consumer → active theme → base (engine.js hands
  *   registerSectionTags exactly these bases; core owns no entries). Resolution
  *   is per ENTRY, not per file: the layer owning `section.html` wins the whole
  *   folder unless the winner declares `inherit` (docs/web/sections.md), so a

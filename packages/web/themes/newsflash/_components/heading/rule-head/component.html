@@ -3,14 +3,14 @@
   link (arrow-right built in: it is the idiom, not a knob). The h2 renders
   only when text is set; the link only when link_text is set. The doc
   comment trims its trailing newline (-%}) so the rendered markup starts
-  tight — call sites adjacent to whitespace-trimmed tags (team/member's
-  captures) keep their glued joins.
+  tight and call sites adjacent to whitespace-trimmed tags keep their
+  glued joins.
 {% endcomment -%}
-<div class="section-head" data-lazy="@class animation-slide-up">
+<div class="newsflash-rule-head" data-lazy="@class animation-slide-up">
   {% iftruthy args.text %}
     <h2>{{ args.text }}</h2>
   {% endiftruthy %}
-  <span class="rule"></span>
+  <span class="newsflash-rule-head__rule"></span>
   {% iftruthy args.link_text %}
     <a href="{{ args.link_href }}">{{ args.link_text }} {% omega_icon "arrow-right", "ms-1" %}</a>
   {% endiftruthy %}

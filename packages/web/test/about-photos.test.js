@@ -20,11 +20,11 @@ test('about/hero: image: leads with the photo; without it the statement split is
   assert.ok(hero, 'the entry is in the library');
 
   // Three demo variants: statement only, facts rail, photo lead
-  assert.equal((hero.match(/class="classy-photo-lead"/g) || []).length, 1, 'only the image variant paints a photo lead');
-  assert.equal((hero.match(/class="classy-hero-split"/g) || []).length, 2, 'the imageless variants keep the statement split');
+  assert.equal((hero.match(/class="omega-photo-lead"/g) || []).length, 1, 'only the image variant paints a photo lead');
+  assert.equal((hero.match(/class="omega-hero-split"/g) || []).length, 2, 'the imageless variants keep the statement split');
   assert.ok(hero.includes('alt="Placeholder artwork in warm amber tones"'), 'the photo carries its describing alt (role="img" mandates a non-empty label)');
-  assert.ok(/classy-photo-lead__img[^>]*data-lazy="@src /.test(hero), 'the lead rides the standard lazy lane');
-  assert.ok(hero.includes('classy-photo-lead__facts'), 'the facts rail follows the picture');
+  assert.ok(/omega-photo-lead__img[^>]*data-lazy="@src /.test(hero), 'the lead rides the standard lazy lane');
+  assert.ok(hero.includes('omega-photo-lead__facts'), 'the facts rail follows the picture');
 });
 
 test('about/letter: image: hangs a photo in the aside; without it the aside is unchanged', async () => {
@@ -34,7 +34,7 @@ test('about/letter: image: hangs a photo in the aside; without it the aside is u
   assert.ok(letter, 'the entry is in the library');
 
   // Two demo variants: the default letter and the one with the aside photo
-  assert.equal((letter.match(/class="classy-aside-photo"/g) || []).length, 1, 'only the image variant frames a photo');
+  assert.equal((letter.match(/class="omega-aside-photo"/g) || []).length, 1, 'only the image variant frames a photo');
   assert.ok(letter.includes('alt="Placeholder artwork in soft green tones"'), 'the aside photo describes itself');
-  assert.equal((letter.match(/class="classy-duo__aside"/g) || []).length, 2, 'both variants keep the aside itself');
+  assert.equal((letter.match(/class="omega-duo__aside"/g) || []).length, 2, 'both variants keep the aside itself');
 });

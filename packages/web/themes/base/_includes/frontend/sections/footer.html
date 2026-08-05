@@ -1,0 +1,142 @@
+{% comment %}
+  Classy v2 footer — draft-2 pattern: brand block + link columns on one grid,
+  then ONE hairline base row where every control (legal links, language,
+  appearance) shares the same quiet 1.75rem scale. Section data:
+  json-in-_includes (a consumer src/_includes/frontend/sections/footer.json
+  overrides the packaged one) — same binding pattern as admin/sections/sidebar.
+{% endcomment %}
+{% assign data = site.data._includes.frontend.sections.footer %}
+<footer class="omega-footer mt-auto" role="contentinfo" aria-label="Site footer">
+  <div class="container">
+    <div class="omega-footer__grid">
+      <!-- Brand block: lockup, one-liner, socials -->
+      <div class="omega-footer__brand">
+        {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+        {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
+        {% capture logo_description %}{{ data.logo.description | default: site.brand.description | omega_liquify }}{% endcapture %}
+        {% assign logo_description = logo_description | strip %}
+        {% comment %} A data value that LIQUIFIES to empty (e.g. '{{ site.meta.description }}' with no meta.description set) still needs the brand fallback — `default:` only sees the raw string {% endcomment %}
+        {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = site.brand.description %}{% endif %}
+        {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
+
+        <a class="omega-nav__brand" href="{{ logo_href }}">
+          {% if logo_src and logo_src != '' and logo_src != 'null' %}
+            <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.5rem; width: auto;"/>
+          {% endif %}
+          {% if logo_text and logo_text != '' and logo_text != 'null' %}
+            <span>{{ logo_text }}</span>
+          {% endif %}
+        </a>
+        {% if logo_description and logo_description != '' and logo_description != 'null' %}
+          <p class="omega-footer__desc">{{ logo_description }}</p>
+        {% endif %}
+
+        {% if data.socials.enabled %}
+          <div class="omega-footer__social" aria-label="Social links">
+            {% if data.socials.list and data.socials.list.size > 0 %}
+              {% assign social_list = data.socials.list %}
+            {% else %}
+              {% assign social_list = 'twitter,facebook,instagram,linkedin,github' | split: ',' %}
+            {% endif %}
+            {% for social in social_list %}
+              {% iftruthy social %}
+                <a href="{% omega_social social %}" class="omega-footer__social-link" aria-label="{{ social | capitalize }}">
+                  {% omega_icon social, "fa-sm" %}
+                </a>
+              {% endiftruthy %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Link columns -->
+      {% if data.links and data.links.size > 0 %}
+        <div class="omega-footer__cols">
+          {% for link_group in data.links %}
+            {% capture group_label %}{{ link_group.label | default: 'Links' }}{% endcapture %}
+            <nav class="omega-footer__col" aria-label="{{ group_label }}">
+              <div class="omega-footer__head">{{ group_label }}</div>
+              <ul class="list-unstyled mb-0">
+                {% for link in link_group.links %}
+                  {% capture link_classes %}omega-footer__link{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
+                  {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                  {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
+                  {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+                  <li>
+                    <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
+                      {{ link_icon }}
+                      {{ link.label }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </nav>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Base row: copyright left, matched-scale utilities right -->
+    <div class="omega-footer__base">
+      {% if data.copyright.enabled %}
+        <span class="omega-footer__copyright">
+          {% if data.copyright.text %}
+            {{ data.copyright.text | omega_liquify }}
+          {% else %}
+            {% comment %} A sub-brand credits its parent (brand.company), linked
+            when company.url names one — no parent configured (or a company that
+            IS the brand) keeps the plain line {% endcomment %}
+            {% assign parent_company = site.brand.company %}
+            {% if parent_company and parent_company != '' and parent_company != 'null' and parent_company != site.brand.name %}
+              {% if site.company.url %}
+                {% capture parent_mark %}<a href="{{ site.company.url }}">{{ parent_company }}</a>{% endcapture %}
+              {% else %}
+                {% capture parent_mark %}{{ parent_company }}{% endcapture %}
+              {% endif %}
+              © {{ site.omega.date.year }} {{ site.brand.name }} by {{ parent_mark }}. All rights reserved.
+            {% else %}
+              © {{ site.omega.date.year }} {{ site.brand.name }}. All rights reserved.
+            {% endif %}
+          {% endif %}
+        </span>
+      {% endif %}
+
+      {% comment %} Framework attribution — a constant, never brand config {% endcomment %}
+      <span class="omega-footer__powered">
+        {% omega_icon "bolt", "fa-sm" %}
+        <span>Powered by <a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a></span>
+      </span>
+
+      <div class="omega-footer__tools">
+        {% if data.legal.enabled %}
+          <nav class="omega-footer__legal" aria-label="Legal">
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/cookies">Cookies</a>
+          </nav>
+        {% endif %}
+
+        <!-- Language (dropup) — the rows render CLIENT-SIDE from the page's own
+             hreflang alternates (core/js/core/language-switcher.js). Those tags
+             are stitched post-translation and name only the languages actually
+             PRODUCED for this page, so the menu can never offer a copy that was
+             never written. Fewer than two languages → this block stays hidden. -->
+        <div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>
+          <button class="omega-footer__pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            {% omega_icon "language", "fa-sm" %}
+            <span>Language</span>
+          </button>
+          <ul class="dropdown-menu" data-omega-language-list></ul>
+        </div>
+
+        <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->
+        <div class="omega-footer__seg" role="group" aria-label="Appearance" data-omega-segmented>
+          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% omega_icon "sun", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% omega_icon "moon", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% omega_icon "circle-half-stroke", "fa-sm" %}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

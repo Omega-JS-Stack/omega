@@ -27,7 +27,7 @@ const BRACKET_RE = /\[\s*(site\.[a-zA-Z0-9_.]+)\s*\]/g;
 
 // Per-page refs: `page.*` (the real sweet-saucy recipe meta) and `resolved.*`
 // (layout defaults templating on the merged cascade — cover's align knob,
-// the classy alternative competitor values). These render UNCACHED against
+// the base alternative competitor values). These render UNCACHED against
 // the caller's per-page scope; the raw-string cache would serve the first
 // page's rendering to every page.
 const PER_PAGE_RE = /\b(?:page|resolved)\./;

@@ -124,7 +124,7 @@ function setAttentionCount(id, settled) {
 
   const count = settled.value.data().count;
   $el.textContent = count.toLocaleString();
-  $el.classList.toggle('classy-count--warn', count > 0);
+  $el.classList.toggle('omega-count--warn', count > 0);
 }
 
 // ============================================
@@ -330,12 +330,12 @@ async function loadContent() {
       const editorHref = `/admin/posts/editor?post=${encodeURIComponent(url)}`;
 
       return `
-        <div class="classy-activity__row align-items-center">
-          <div class="classy-activity__body">
-            <div class="classy-activity__title text-truncate"><a href="${escape(editorHref)}" class="text-decoration-none">${escape(item.title || 'Untitled')}</a></div>
-            <p class="classy-activity__desc font-monospace text-truncate">${escape(pathname)}</p>
+        <div class="omega-activity__row align-items-center">
+          <div class="omega-activity__body">
+            <div class="omega-activity__title text-truncate"><a href="${escape(editorHref)}" class="text-decoration-none">${escape(item.title || 'Untitled')}</a></div>
+            <p class="omega-activity__desc font-monospace text-truncate">${escape(pathname)}</p>
           </div>
-          <span class="classy-activity__time">${escape(published)}</span>
+          <span class="omega-activity__time">${escape(published)}</span>
         </div>
       `;
     }).join('');
@@ -388,7 +388,7 @@ async function loadRecentUsers() {
     const $row = document.createElement('tr');
     $row.innerHTML = `
       <td class="text-truncate" style="max-width: 200px;">${omega.utilities().escapeHTML(email)}</td>
-      <td><span class="classy-chip${isPaid ? ' classy-chip--accent' : ''}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
+      <td><span class="omega-chip${isPaid ? ' omega-chip--accent' : ''}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
       <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
@@ -436,7 +436,7 @@ async function loadRecentOrders() {
     const $row = document.createElement('tr');
     $row.innerHTML = `
       <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities().escapeHTML(orderId)}">${omega.utilities().escapeHTML(orderId)}</td>
-      <td><span class="classy-chip classy-chip--accent">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
+      <td><span class="omega-chip omega-chip--accent">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
       <td class="small">${omega.utilities().escapeHTML(capitalize(processor))}</td>
       <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;

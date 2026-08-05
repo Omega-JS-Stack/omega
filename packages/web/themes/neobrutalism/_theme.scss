@@ -14,17 +14,32 @@
 // CSS custom properties (light/dark bridge)
 @import 'css/base/root';
 
-// ── The classy app/auth FLOOR (cp190, #98) ──────────────────────────────────
-// A full sibling theme (own Bootstrap) reaches the shared fall-through
-// vocabulary by importing classy's token-pure partials directly — they paint
-// through THIS theme's token re-values. EARLY on purpose: the floor sits under
-// the theme's own voice. Contract: docs/shared/theming.md § "CSS fall-through".
+// ── The classy FLOOR (cp190, widened for #177 phase 3) ──────────────────────
+// Fall-through surfaces render BASE markup (omega-* classes), and the
+// structural css for that vocabulary lives in classy's partials, which are
+// deliberately TOKEN-PURE, so a full sibling theme imports them directly
+// and they paint through THIS theme's token re-values (ink/paper/accents).
+// Phase 3 widened the floor beyond app/auth to the marketing vocabulary
+// (omega-cta, omega-stats, omega-price-card, omega-band, omega-compare, and
+// the rest) because neobrutalism now renders the base pricing page and the
+// base marketing sections unforked.
+// Imported EARLY on purpose: the floor sits UNDER the theme's own voice, so
+// later neobrutalist rules win every collision.
+// NOT imported: classy's typography (its element rules would beat the
+// Archivo headings this theme sets), layout/general (fixed-nav clearance
+// rhythm; the flush ink bar needs none), and layout/nav (fixed glassy bar;
+// _navigation.scss re-skins .omega-nav below).
+// Contract: docs/shared/theming.md § "CSS fall-through".
 @import '../classy/css/layout/shell';
 @import '../classy/css/layout/footer';
 @import '../classy/css/app/panels';
 @import '../classy/css/pages/auth';
 @import '../classy/css/components/receipt';
 @import '../classy/css/components/badges';
+@import '../classy/css/base/utilities';
+@import '../classy/css/marketing/hero';
+@import '../classy/css/marketing/content';
+@import '../classy/css/marketing/sections';
 
 // Base styles
 @import 'css/base/typography';
@@ -38,7 +53,7 @@
 @import 'css/components/buttons';
 @import 'css/components/cards';
 @import 'css/components/forms';
-@import 'css/components/infinite-scroll';
+@import 'css/components/marketing';
 
 // Universal Bootstrap overrides (shared across all omega themes).
 // Must come AFTER Bootstrap is loaded via config to use @extend.

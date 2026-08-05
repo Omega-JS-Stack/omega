@@ -6,12 +6,12 @@
   form shared by the index story grids, blog index, category/tag pages, and
   related posts; the lead-story splash is its own layout-owned form.
 {% endcomment %}
-<a href="{{ args.url }}" class="story-card">
-  <div class="art-frame mb-3">
+<a href="{{ args.url }}" class="newsflash-story-card">
+  <div class="newsflash-frame mb-3">
     {%- omega_post args.id, "image-tag", class="w-100" -%}
   </div>
   {% iftruthy args.kicker %}
-    <span class="kicker mb-1">{{ args.kicker }}</span>
+    <span class="newsflash-kicker mb-1">{{ args.kicker }}</span>
   {% endiftruthy %}
   <h3 class="h5 my-2">{{ args.title }}</h3>
   {% component "news/byline", author: args.author, date: args.date, readtime: args.readtime %}

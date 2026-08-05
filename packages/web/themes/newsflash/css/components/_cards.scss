@@ -30,8 +30,8 @@ a.card {
 }
 
 // Framed images inside hovered cards/links zoom slowly (cinematic pan feel)
-.card:hover .art-frame img,
-a:hover > .art-frame img {
+.card:hover .newsflash-frame img,
+a:hover > .newsflash-frame img {
   transform: scale(1.04);
 }
 

@@ -130,16 +130,16 @@ test('dashboard rail: the sidebar vert slot rides the app shell, config-gated', 
   const on = await buildWith({ ...miniData, advertising: ADVERTISING }, {}, 'verts-rail-on');
   const app = on.get('/app');
 
-  assert.ok(app.includes('classy-side__ad'), 'the rail slot renders on the user app surface');
+  assert.ok(app.includes('omega-side__ad'), 'the rail slot renders on the user app surface');
   assert.ok(app.includes('data-omega-vert="in-article"'), 'the slot carries a unit');
   assert.ok(app.includes('data-omega-vert-size="rectangle"'), 'sized for the rail');
   assert.ok(app.includes('Remove with'), 'the upsell rides along for non-paying users');
 
   // Staff never see verts: the admin sidebar data carries no bottom slot
-  assert.ok(!on.get('/admin').includes('classy-side__ad'), 'admin rail carries no vert slot');
+  assert.ok(!on.get('/admin').includes('omega-side__ad'), 'admin rail carries no vert slot');
 
   const off = await buildWith(miniData, {}, 'verts-rail-off');
-  assert.ok(!off.get('/app').includes('classy-side__ad'), 'no advertising config, no slot chrome');
+  assert.ok(!off.get('/app').includes('omega-side__ad'), 'no advertising config, no slot chrome');
   assert.ok(!off.get('/app').includes('data-omega-vert='), 'and no unit');
 });
 

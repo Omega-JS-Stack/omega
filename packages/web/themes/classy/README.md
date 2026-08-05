@@ -1,5 +1,7 @@
 # Classy Theme Customization Guide
 
+Classy is a skin over the base layer: structural markup (layouts, sections, includes, components) lives in `themes/base` with the `omega-*` vocabulary, and this theme styles those selectors (css, fonts, `_theme.js`, `_config.scss`).
+
 ## How to Customize in Your Consuming Project
 
 The Classy theme is designed to be fully customizable. All theme variables use `!default` which means you can override them BEFORE the theme is imported.

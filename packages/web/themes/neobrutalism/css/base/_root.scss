@@ -14,10 +14,6 @@
   --nb-surface: #{$nb-surface};
   --nb-surface-alt: #{$nb-surface-alt};
 
-  // Height of the fixed navbar — the first section adds this to its top padding
-  // so content clears the overlapping nav (see _general.scss "Section rhythm").
-  --nb-navbar-height: 4.5rem;
-
   // Border + shadow color follow the ink
   --nb-border-color: var(--nb-ink);
   --nb-shadow-color: var(--nb-ink);
@@ -64,6 +60,89 @@
   --bs-warning-rgb: var(--omega-warn-rgb);
   --bs-danger: var(--omega-danger);
   --bs-danger-rgb: var(--omega-danger-rgb);
+}
+
+// ============================================
+// The --omega-* token re-value (#177 phase 3)
+// ============================================
+// The classy floor partials and core chrome paint through the shared
+// --omega-* contract (core/css/tokens/_index.scss). Restamp the same NAMES
+// with the neobrutalist sheet so fall-through surfaces (pricing, marketing
+// sections, app panels) read ink/paper/hard-shadow instead of the core
+// placeholders. Plumbing mirrors the core sheet exactly (three stamps: OS
+// preference via media query, appearance.js's data-bs-theme attribute beats
+// it both ways). Genuinely neobrutalist extras keep the --nb-* namespace.
+@mixin nb-omega-light-tokens {
+  --omega-ground: #{$nb-paper};
+  --omega-surface: #{$nb-surface};
+  --omega-surface-2: #{$nb-surface-alt};
+  --omega-ink: #{$nb-ink};
+  --omega-ink-muted: #{mix($nb-ink, $nb-paper, 72%)};
+  --omega-ink-faint: #{mix($nb-ink, $nb-paper, 48%)};
+  --omega-line: #{$nb-ink}; // hard ink rules ARE the identity, no soft dividers
+  --omega-line-strong: #{$nb-ink};
+  --omega-accent: #{$primary}; // placeholder; brand.color wins at build
+  --omega-accent-hover: #{mix(black, $primary, 12%)};
+  --omega-accent-active: #{mix(black, $primary, 18%)};
+  --omega-accent-subtle: #{rgba($primary, 0.12)};
+  --omega-accent-ink: #ffffff;
+  --omega-accent-ring: #{rgba($primary, 0.35)};
+  --omega-shadow-1: #{$nb-shadow-offset-sm} #{$nb-shadow-offset-sm} 0 #{$nb-ink};
+  --omega-shadow-2: #{$nb-shadow-offset} #{$nb-shadow-offset} 0 #{$nb-ink};
+}
+
+@mixin nb-omega-dark-tokens {
+  --omega-ground: #{$nb-paper-dark};
+  --omega-surface: #{$nb-surface-dark};
+  --omega-surface-2: #{$nb-surface-alt-dark};
+  --omega-ink: #{$nb-ink-dark};
+  --omega-ink-muted: #{mix($nb-ink-dark, $nb-paper-dark, 72%)};
+  --omega-ink-faint: #{mix($nb-ink-dark, $nb-paper-dark, 48%)};
+  --omega-line: #{$nb-ink-dark};
+  --omega-line-strong: #{$nb-ink-dark};
+  --omega-accent: #{$primary}; // the flat saturated blue holds in both modes
+  --omega-accent-hover: #{mix(white, $primary, 12%)};
+  --omega-accent-active: #{mix(white, $primary, 18%)};
+  --omega-accent-subtle: #{rgba($primary, 0.16)};
+  --omega-accent-ink: #ffffff;
+  --omega-accent-ring: #{rgba($primary, 0.35)};
+  --omega-shadow-1: #{$nb-shadow-offset-sm} #{$nb-shadow-offset-sm} 0 #{$nb-ink-dark};
+  --omega-shadow-2: #{$nb-shadow-offset} #{$nb-shadow-offset} 0 #{$nb-ink-dark};
+}
+
+:root {
+  @include nb-omega-light-tokens;
+
+  // Shape: zero radius everywhere the contract offers one (the signature).
+  // The pill slot keeps its value so rounded-circle avatars and the shared
+  // segmented thumb stay intact.
+  --omega-radius-xs: 0;
+  --omega-radius-s: 0;
+  --omega-radius-m: 0;
+  --omega-radius-l: 0;
+  --omega-radius-xl: 0;
+
+  // Type: chunky grotesk display, clean grotesk body, mono accents
+  --omega-font-ui: #{$font-family-sans-serif};
+  --omega-font-mono: #{$nb-font-mono};
+  --omega-font-marketing: #{$nb-font-display};
+  --omega-font-display: #{$nb-font-display};
+}
+
+// OS preference carries when no explicit choice is stamped…
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include nb-omega-dark-tokens;
+  }
+}
+
+// …and the appearance.js stamp beats the OS in BOTH directions.
+:root[data-bs-theme='dark'] {
+  @include nb-omega-dark-tokens;
+}
+
+:root[data-bs-theme='light'] {
+  @include nb-omega-light-tokens;
 }
 
 // ============================================

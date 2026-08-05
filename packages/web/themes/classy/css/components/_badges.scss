@@ -9,7 +9,7 @@
 // ============================================
 // Chip — the hairline micro-pill (counts, SPONSORED, NEW, env tags)
 // ============================================
-.classy-chip {
+.omega-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -25,13 +25,13 @@
   white-space: nowrap;
 }
 
-.classy-chip--accent {
+.omega-chip--accent {
   color: var(--omega-accent);
   background: var(--omega-accent-subtle);
   border-color: transparent;
 }
 
-.classy-chip--ink {
+.omega-chip--ink {
   color: var(--omega-ground);
   background: var(--omega-ink);
   border-color: var(--omega-ink);
@@ -40,7 +40,7 @@
 // ============================================
 // Status pill — dot + label
 // ============================================
-.classy-status {
+.omega-status {
   display: inline-flex;
   align-items: center;
   gap: 0.4375rem;
@@ -53,20 +53,20 @@
   border-radius: var(--omega-radius-pill, 50rem);
   white-space: nowrap;
 
-  .classy-dot {
+  .omega-dot {
     width: 6px;
     height: 6px;
   }
 }
 
-.classy-status--ok {
+.omega-status--ok {
   color: var(--omega-ok);
 }
 
-.classy-status--warn {
+.omega-status--warn {
   color: var(--omega-warn);
 }
 
-.classy-status--danger {
+.omega-status--danger {
   color: var(--omega-danger);
 }

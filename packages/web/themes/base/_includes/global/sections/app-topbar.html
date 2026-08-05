@@ -1,0 +1,225 @@
+{% comment %}
+  Classy v2 app topbar — shared markup for backend + admin surfaces (the cap
+  of the big content card). The CALLER assigns `data` before including this.
+
+  Data shape:
+    search:  { enabled, action, name, placeholder }        (optional; form GET)
+    status:  { label, tone: ok|warn|danger }                (optional env pill)
+    actions: [{ type: 'account' } | { type: 'notifications', icon, badge, dropdown }
+              | { label, href, icon, class, size, dropdown }]
+
+    action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else
+    renders no size class. NEVER test it for truthiness: Liquid answers `.size`
+    on a hash with its KEY COUNT, so every action would "have" a size (#43).
+
+  Breadcrumbs come from the page's resolved.theme.header.breadcrumbs.items
+  (the same frontmatter API as ever — they render here now instead of the
+  in-card page header).
+{% endcomment %}
+
+<header class="omega-shell__topbar">
+  <div class="omega-shell__topbar-start">
+    <!-- Drawer toggle (mobile) -->
+    <button class="btn-icon d-xl-none" type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar" aria-label="Toggle navigation">
+      {% omega_icon "bars", "fa-md" %}
+    </button>
+
+    <!-- Rail collapse toggle (desktop) -->
+    <button class="btn-icon d-none d-xl-inline-flex" type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar" aria-label="Toggle sidebar">
+      {% omega_icon "table-columns", "fa-sm" %}
+    </button>
+
+    <!-- Breadcrumb trail -->
+    <div class="omega-topbar__crumbs d-none d-md-flex">
+      {% if resolved.theme.header.breadcrumbs.items %}
+        {% for crumb in resolved.theme.header.breadcrumbs.items %}
+          {% if forloop.last %}
+            <span>{{ crumb.label }}</span>
+          {% else %}
+            {% iftruthy crumb.href %}
+              <a href="{{ crumb.href }}">{{ crumb.label }}</a>
+            {% endiftruthy %}
+            {% iffalsy crumb.href %}
+              <span>{{ crumb.label }}</span>
+            {% endiffalsy %}
+            <span class="omega-topbar__crumb-sep">/</span>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <span>{{ resolved.theme.header.title.content | default: resolved.meta.title | omega_liquify }}</span>
+      {% endif %}
+
+      {% iftruthy data.status.label %}
+        <span class="omega-status omega-status--{{ data.status.tone | default: 'ok' }} ms-2">
+          <span class="omega-dot omega-dot--{{ data.status.tone | default: 'ok' }}"></span>
+          {{ data.status.label }}
+        </span>
+      {% endiftruthy %}
+    </div>
+  </div>
+
+  <!-- Search (center) -->
+  {% if data.search %}
+    <div class="omega-topbar__center">
+      <form class="omega-search" action="{{ data.search.action | default: '/search' }}" method="get" role="search">
+        {% omega_icon "magnifying-glass", "fa-sm" %}
+        <input
+          type="search"
+          name="{{ data.search.name | default: 'q' }}"
+          placeholder="{{ data.search.placeholder | default: 'Search…' }}"
+          aria-label="Search"
+        />
+        <kbd>⌘K</kbd>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="omega-shell__topbar-end">
+    <!-- Custom Actions -->
+    {% for action in data.actions %}
+      {% if action.type == 'notifications' %}
+        <!-- Notifications Dropdown -->
+        {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+        <div class="dropdown">
+          {% capture notif_icon %}{{ action.icon | default: "bell" }}{% endcapture %}
+          <button class="btn-icon position-relative" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false" aria-label="{{ action.label | default: 'Notifications' }}">
+            {% omega_icon notif_icon, "fa-sm" %}
+            {% if action.badge %}
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill {{ action.badge.class | default: 'bg-danger' }}">
+                {{ action.badge.text }}
+                <span class="visually-hidden">unread notifications</span>
+              </span>
+            {% endif %}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" style="min-width: 320px; max-height: 400px; overflow-y: auto;">
+            <li class="px-3 py-2 hairline-bottom">
+              <div class="d-flex align-items-center justify-content-between">
+                <h6 class="mb-0">{{ action.label | default: 'Notifications' }}</h6>
+                {% if action.mark_all_read %}
+                  <a href="{{ action.mark_all_read }}" class="small text-decoration-none">Mark all read</a>
+                {% endif %}
+              </div>
+            </li>
+            {% if action.dropdown %}
+              {% for notification in action.dropdown %}
+                {% capture notif_attributes %}{% if notification.attributes %}{% for attr in notification.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                {% capture notif_class %}dropdown-item px-3 py-2 {% if notification.class %}{{ notification.class }}{% endif %}{% endcapture %}
+
+                {% if notification.divider %}
+                  <li><hr class="dropdown-divider" {{ notif_attributes }}/></li>
+                {% else %}
+                  <li>
+                    {% capture notif_content %}
+                      <div class="d-flex">
+                        {% if notification.icon %}
+                          <span class="omega-icon-chip omega-icon-chip--neutral me-3 flex-shrink-0">
+                            {% omega_icon notification.icon, "fa-sm" %}
+                          </span>
+                        {% endif %}
+                        <div class="flex-fill">
+                          <div class="fw-semibold small">{{ notification.title }}</div>
+                          {% if notification.message %}
+                            <div class="small text-muted">{{ notification.message }}</div>
+                          {% endif %}
+                          {% if notification.time %}
+                            <div class="small text-muted mt-1">{{ notification.time }}</div>
+                          {% endif %}
+                        </div>
+                        {% if notification.unread %}
+                          <span class="omega-dot ms-2 mt-1"></span>
+                        {% endif %}
+                      </div>
+                    {% endcapture %}
+                    {% iftruthy notification.href %}
+                      <a class="{{ notif_class }}" href="{{ notification.href }}" {{ notif_attributes }}>
+                        {{ notif_content }}
+                      </a>
+                    {% endiftruthy %}
+                    {% iffalsy notification.href %}
+                      <div class="{{ notif_class }}" {{ notif_attributes }}>
+                        {{ notif_content }}
+                      </div>
+                    {% endiffalsy %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <li class="px-3 py-4 text-center text-muted small">
+                No notifications
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      {% elsif action.type == 'account' %}
+        <!-- Account Dropdown -->
+        {% include global/sections/account.html size="sm" attributes=action.attributes %}
+      {% elsif action.dropdown %}
+        <!-- Generic Dropdown -->
+        {% comment %}Liquid's `.size` on a hash is its KEY COUNT — test the value, never truthiness (#43). The btn-sm default only applies when the author set no size.{% endcomment %}
+        {% assign action_size = '' %}{% if action.size == 'sm' or action.size == 'lg' %}{% assign action_size = action.size %}{% endif %}
+        {% capture action_class %}btn {% if action_size != '' %}btn-{{ action_size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive{% if action_size == '' %} btn-sm{% endif %}{% endif %}{% endcapture %}
+        {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+        <div class="dropdown">
+          <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
+            {% if action.icon %}
+              {% omega_icon action.icon, "fa-sm me-2" %}
+            {% endif %}
+            <span>{{ action.label }}</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% for child in action.dropdown %}
+              {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+              {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
+              {% capture child_content %}
+                {% if child.icon %}
+                  {% omega_icon child.icon, "fa-sm me-2" %}
+                {% endif %}
+                <span>{{ child.label }}</span>
+              {% endcapture %}
+
+              {% if child.divider %}
+                <li><hr class="dropdown-divider" {{ child_attributes }}/></li>
+              {% else %}
+                <li>
+                  {% iftruthy child.href %}
+                    <a class="{{ child_class }}" href="{{ child.href }}" {{ child_attributes }}>
+                      {{ child_content }}
+                    </a>
+                  {% endiftruthy %}
+                  {% iffalsy child.href %}
+                    <button class="{{ child_class }}" type="button" {{ child_attributes }}>
+                      {{ child_content }}
+                    </button>
+                  {% endiffalsy %}
+                </li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </div>
+      {% else %}
+        <!-- Regular Button -->
+        {% comment %}Liquid's `.size` on a hash is its KEY COUNT — test the value, never truthiness (#43). The btn-sm default only applies when the author set no size.{% endcomment %}
+        {% assign action_size = '' %}{% if action.size == 'sm' or action.size == 'lg' %}{% assign action_size = action.size %}{% endif %}
+        {% capture action_class %}btn {% if action_size != '' %}btn-{{ action_size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive{% if action_size == '' %} btn-sm{% endif %}{% endif %}{% endcapture %}
+        {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+        {% capture action_content %}
+          {% if action.icon %}
+            {% omega_icon action.icon, "fa-sm me-2" %}
+          {% endif %}
+          <span>{{ action.label }}</span>
+        {% endcapture %}
+        {% iftruthy action.href %}
+          <a class="{{ action_class }}" href="{{ action.href }}" {{ action_attributes }}>
+            {{ action_content }}
+          </a>
+        {% endiftruthy %}
+        {% iffalsy action.href %}
+          <button class="{{ action_class }}" type="button" {{ action_attributes }}>
+            {{ action_content }}
+          </button>
+        {% endiffalsy %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</header>

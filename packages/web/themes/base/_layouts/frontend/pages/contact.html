@@ -1,0 +1,210 @@
+---
+layout: frontend/core/base
+
+# Hero Section
+hero:
+  headline: "Talk to a <em>human</em>"
+  headline_accent: ""
+  subheadline: "Questions, ideas, or something broken: a real person from {{ site.brand.name }} reads every message."
+
+# Contact Methods Section (the channels rail)
+contact_methods:
+  - title: "Email support"
+    description: "Get help within 24 hours"
+    icon: "envelope"
+    value: "Email us"
+    link: "#form"
+  - title: "Live chat"
+    description: "Chat with our team now 24/7"
+    icon: "comments"
+    value: "Chat now"
+    link: "#chat"
+
+# Contact Form Section
+contact_form:
+  superheadline:
+    icon: "envelope"
+    text: "Email"
+  headline: "Send us a <em>message</em>"
+  subheadline: "Fill out the form below and we'll get back to you within 24 hours."
+
+# Response facts — the rail footer
+stats:
+  items:
+    - number: "<15m"
+      label: "Response time"
+      sublabel: "Median first reply"
+    - number: "24/7"
+      label: "Live chat support"
+      sublabel: "Every day of the year"
+    - number: "4.9"
+      label: "Support rating"
+      sublabel: "Across review platforms"
+    - number: "50+"
+      label: "Languages"
+      sublabel: "Around the world"
+
+# FAQs Section
+faqs:
+  superheadline:
+    icon: "circle-question"
+    text: "FAQs"
+  headline: "Frequently asked <em>questions</em>"
+  subheadline: "Everything you need to know about our support experience."
+  items:
+  - question: "How quickly do you respond to support requests?"
+    answer: "We aim to respond to all support requests within 24 hours during business days. For urgent issues, our live chat is available 24/7."
+  - question: "Do you offer phone support?"
+    answer: "Yes! Phone support is available for premium customers. Contact us to schedule a call with our support team."
+  - question: "Can you help with technical integration?"
+    answer: "Absolutely! Our technical support team can help with API integration, troubleshooting, and custom implementations."
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-0" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    {% component "heading/masthead", eyebrow: "Contact", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+  </div>
+</section>
+
+<!-- ═══ Channels rail + form ═══ -->
+<section id="form">
+  <div class="container">
+    <div class="omega-duo" style="--omega-duo-cols: 5fr 7fr;">
+      <!-- Rail: ways to reach us -->
+      <div class="omega-duo__aside" data-omega-reveal-stagger="80">
+        <span class="omega-micro d-block mb-2" data-omega-reveal>Ways to reach us</span>
+
+        <div class="mb-5">
+          {% for method in resolved.contact_methods %}
+            <a href="{{ method.link }}" class="omega-channel" data-omega-reveal>
+              <span class="omega-icon-chip">{% omega_icon method.icon, "fa-sm" %}</span>
+              <span class="omega-channel__body">
+                <span class="omega-channel__title d-block">{{ method.title }}</span>
+                <span class="omega-channel__desc d-block">{{ method.description }}</span>
+              </span>
+              <span class="omega-channel__arrow">{% omega_icon "arrow-right", "fa-sm" %}</span>
+            </a>
+          {% endfor %}
+        </div>
+
+        <!-- Response facts (count up on reveal) -->
+        {% if resolved.stats.items %}
+          <div class="omega-facts mt-5" style="--omega-facts-cols: 2;" data-omega-reveal>
+            {% for stat in resolved.stats.items %}
+              <div class="omega-facts__item">
+                <span class="omega-micro omega-facts__label">{{ stat.label }}</span>
+                <span class="omega-facts__value omega-facts__value--num" data-omega-countup>{{ stat.number }}</span>
+                {% iftruthy stat.sublabel %}
+                  <span class="omega-facts__sub">{{ stat.sublabel }}</span>
+                {% endiftruthy %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- The form -->
+      <div class="omega-form-panel" data-omega-reveal>
+        <div class="mb-4">
+          {% iftruthy resolved.contact_form.superheadline.text %}
+            <span class="omega-micro d-block mb-2">{{ resolved.contact_form.superheadline.text }}</span>
+          {% endiftruthy %}
+          <h2 class="omega-display omega-display--section mb-2">{{ resolved.contact_form.headline }}</h2>
+          {% iftruthy resolved.contact_form.subheadline %}
+            <p class="text-muted mb-0">{{ resolved.contact_form.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <form id="contact-form" autocomplete="on" data-form-state="initializing" onsubmit="return false">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label for="first_name" class="form-label fw-semibold">First name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="first_name" name="first_name"
+                placeholder="Enter your first name"
+                autocomplete="given-name"
+                minlength="2"
+                maxlength="50"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6">
+              <label for="last_name" class="form-label fw-semibold">Last name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="last_name" name="last_name"
+                placeholder="Enter your last name"
+                autocomplete="family-name"
+                minlength="2"
+                maxlength="50"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+          </div>
+
+          <!-- Honeypot field (bot detection) -->
+          <div class="form-group mb-3" style="display: none;" aria-hidden="true">
+            <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- Hidden auth field (auto-populated via bindings) -->
+          <input type="hidden" aria-hidden="true" name="uid" data-omega-bind="@value auth.user.uid">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label for="email" class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
+              <input type="email" class="form-control" id="email" name="email"
+                placeholder="Enter your email address"
+                autocomplete="email"
+                data-omega-bind="@value auth.user.email"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6">
+              <label for="company" class="form-label fw-semibold">Company</label>
+              <input type="text" class="form-control" id="company" name="company"
+                placeholder="Optional"
+                autocomplete="organization"
+                maxlength="100">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+            <select class="form-select" id="subject" name="subject" required>
+              <option value="">Choose a topic...</option>
+              <option value="general">General inquiry</option>
+              <option value="support">Technical support</option>
+              <option value="billing">Billing question</option>
+              <option value="partnership">Partnership</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <div class="mb-4">
+            <label for="message" class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="message" name="message" rows="5"
+              placeholder="Tell us how we can help you..."
+              minlength="10"
+              maxlength="5000"
+              required></textarea>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <button type="submit" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
+              Send message
+              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FAQ — asymmetric ═══ -->
+{% if resolved.faqs.items %}
+  {% section "marketing/faq", data: resolved.faqs %}
+{% endif %}
+
+{{ content | omega_content_format }}

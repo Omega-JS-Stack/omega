@@ -109,8 +109,14 @@ see the harness README for the honest before/after numbers.
 
 ## Packaged content (the real UJM port, B2)
 
-- `themes/classy/` — the full flagship theme, classy v2 (frontend + backend +
-  admin layouts, includes, css, js, vendored webfonts): warm-paper/charcoal
+- `themes/base/` — the structural markup layer every theme chain terminates
+  at: frontend + backend + admin layouts, includes, sections, and components
+  in the neutral `omega-*` BEM vocabulary. Themes are skins over these
+  selectors and fork markup only for identity surfaces (the ladder: tokens →
+  component scss → bounded forks); convention in
+  [docs/web/sections.md](../../docs/web/sections.md).
+- `themes/classy/` — the flagship skin, classy v2 (css, js, vendored
+  webfonts over base's markup): warm-paper/charcoal
   token-driven skin, zero gradients, ink primaries, serif marketing display
   (Newsreader) over an Inter UI, `.omega-shell` app chrome — see
   [docs/shared/theming.md](../../docs/shared/theming.md). Every default frontend page ships
@@ -126,8 +132,9 @@ see the harness README for the honest before/after numbers.
   (after core page css), which makes it the override slot for core page rules
   (status/feedback use this to repaint JS-toggled `bg-*` state classes in the
   hairline language);
-  `themes/neobrutalism/` and `themes/newsflash/` — partial themes that fall
-  back to classy per file; `themes/bootstrap/` — the vendored Bootstrap 5
+  `themes/neobrutalism/` and `themes/newsflash/` — skins with bounded
+  identity forks that fall back to base per file (fork lists in each
+  theme's README); `themes/bootstrap/` — the vendored Bootstrap 5
   scss/js the themes build on (sibling imports); `themes/_template/` — the
   theme-starter skeleton.
 - `core/` — the theme-agnostic layer: `_layouts/blueprint/**` (45 page-type
@@ -212,7 +219,7 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 ## Architecture
 
 - **Layered layouts** — layer chain `consumer _layouts → active theme →
-  classy → core`; the winning `_layouts/**` file per relative path is
+  base → core`; the winning `_layouts/**` file per relative path is
   registered as an Eleventy v3 **virtual template** (build) or composed as a
   **symlink farm** (dev). Consumer-local layouts (sweet-saucy's recipe) are
   first-class; consumer `_layouts` is ignored as content (cwd-relative glob —
@@ -220,7 +227,7 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 - **Blueprint dispatch, plain names** — `layout: blueprint/pricing` →
   (core) blueprint carries the page-type defaults → `layout:
   frontend/pages/pricing` resolves through the theme layers (active wins,
-  classy fills). The legacy bracket idiom (`themes/[ site.theme.id ]/…`) and
+  base fills). The legacy bracket idiom (`themes/[ site.theme.id ]/…`) and
   hardcoded `themes/<id>/…` prefixes are ALIASED for every layout in the map
   — migrated content uses plain names, the B4 codemod rewrites the rest.
 - **Includes layering** — LiquidJS `root:` array over consumer `_includes`
@@ -245,7 +252,7 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 - **Assets** — every layer root follows one convention (`js/main.js`,
   `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
   `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
-  themes dir, `__theme__/*` to the active theme (classy fallback),
+  themes dir, `__theme__/*` to the active theme (base fallback),
   `@omega.js/client` (subpaths included) to @omega.js/client. Every package
   the framework declares as a dependency resolves from the FRAMEWORK's
   installation for whoever imports it, so a consumer page module writes
@@ -352,7 +359,8 @@ of UJM's `@use 'ultimate-jekyll-manager' with (…)` customization.
 (own `_theme.scss`, `_layouts/`, `css/`, `js/`) and set `theme.id: "<id>"` —
 consumer-local themes beat packaged ones ([resolveThemeLayers](src/layers.js)),
 `omega dev` watches them, and anything the theme doesn't cover falls through
-to the classy base (until the C3 reskin folds the base layer into core).
+to `themes/base` (base's `_theme.scss` forwards classy's theme as the
+default skin css).
 Legacy `themes/<id>/…` layout spellings alias for consumer ids too.
 
 ## App shell (C3)

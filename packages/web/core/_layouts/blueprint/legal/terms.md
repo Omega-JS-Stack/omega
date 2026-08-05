@@ -14,7 +14,7 @@ client:
 {% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
-<p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
+<p class="omega-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
 Welcome to [{{ site.url }}]({{ site.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"){% if site.brand.company and site.brand.company != site.brand.name %}, a brand that is a part of our parent company, **{{ site.brand.company }}**.{% else %}.{% endif %} By visiting our website ("the website","our website", "the site", or "our site"), using the {{ brand }} application ("the software", "our software", "the application", "our application", "the app", or "our app"), and/or accessing the information, resources, services, and tools we provide, you acknowledge, understand, and agree to accept and adhere to the following {{ breadcrumb }} as stated in this policy. Our Policy applies to all visitors, users, and others who access the Service ("Users").
 

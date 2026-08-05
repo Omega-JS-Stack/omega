@@ -1,0 +1,43 @@
+---
+layout: frontend/core/cover
+---
+
+<section class="col-12">
+  <div class="omega-auth" data-omega-reveal>
+    <div class="omega-auth__card text-center">
+      <!-- Logo -->
+      <div class="omega-auth__brand">
+        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+      </div>
+
+      <!-- Header -->
+      <h1 class="omega-auth__title">Signing you in</h1>
+      <p class="omega-auth__sub">Hold tight. Completing your secure sign-in.</p>
+
+      <!-- Spinner -->
+      <div id="token-spinner" class="text-center mb-3">
+        <div class="spinner-border spinner-border-sm" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Status message -->
+      <div id="token-status" class="text-center">
+        <p class="small omega-quiet mb-0">Generating secure token...</p>
+      </div>
+
+      <!-- Error message (hidden by default) -->
+      <div id="token-error" class="alert alert-danger d-none mt-3 text-start" role="alert">
+        <strong>Error:</strong> <span id="token-error-message"></span>
+      </div>
+
+      <!-- Actions (hidden until the flow resolves with an error) -->
+      <div id="token-actions" class="text-center d-none mt-3">
+        <button type="button" id="token-retry" class="btn btn-adaptive w-100">{% omega_icon "rotate-right", "fa-sm me-2" %}Try again</button>
+        <a href="/" class="btn btn-link btn-sm text-muted d-block mt-2">{% omega_icon "house", "fa-xs me-1" %}Go home</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

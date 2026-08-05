@@ -1,0 +1,44 @@
+{% comment %}
+  Classy v2 testimonial quote — one large serif quote with italic emphasis
+  (draft-2 marketing DNA). Multiple items cycle via the shared word-rotator
+  mechanic; a single item renders static. A SHARED band: index, pricing, and
+  alternatives all pass their own copy (items: quote / author / role /
+  company / initial / avatar) — so json5 defaults stay NEUTRAL and page copy
+  rides the data bridge, never the section.
+{% endcomment %}
+{% assign _t = args %}
+{% if _t.items and _t.items.size > 0 %}
+<section>
+  <div class="container">
+    <div class="omega-quote" data-omega-reveal>
+      {% iftruthy _t.superheadline %}
+        {% if _t.superheadline.text %}
+          <span class="omega-micro d-block mb-4">{{ _t.superheadline.text }}</span>
+        {% else %}
+          <span class="omega-micro d-block mb-4">{{ _t.superheadline }}</span>
+        {% endif %}
+      {% endiftruthy %}
+
+      <div data-omega-rotate="5200" class="w-100">
+        {% for item in _t.items %}
+          <div class="w-100" style="white-space: normal;">
+            <p class="omega-quote__text">&ldquo;{{ item.quote }}&rdquo;</p>
+            <div class="omega-quote__attr">
+              {% iftruthy item.avatar %}
+                <span class="omega-quote__avatar"><img src="{{ args.placeholder }}" data-lazy="@src {{ item.avatar }}" alt="{{ item.author }}"/></span>
+              {% endiftruthy %}
+              {% iffalsy item.avatar %}
+                <span class="omega-quote__avatar">{{ item.initial | default: item.author | slice: 0 }}</span>
+              {% endiffalsy %}
+              <span class="omega-quote__name">{{ item.author }}</span>
+              <span class="omega-quote__role">
+                {{ item.role }}{% if item.company %}{% if item.role %}, {% endif %}{{ item.company }}{% endif %}
+              </span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}

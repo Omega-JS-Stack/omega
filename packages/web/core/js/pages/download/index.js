@@ -63,8 +63,8 @@ function setupPlatformDetection() {
     return;
   }
 
-  const platformName = $card.querySelector('.classy-dl-card__name, strong')?.textContent.trim() || detectedPlatform;
-  const $chipIcon = $card.querySelector('.classy-dl-card__mark, .classy-icon-chip, .fa');
+  const platformName = $card.querySelector('.omega-dl-card__name, strong')?.textContent.trim() || detectedPlatform;
+  const $chipIcon = $card.querySelector('.omega-dl-card__mark, .omega-icon-chip, .fa');
 
   $hero.href = $link.getAttribute('href');
   $hero.querySelector('[data-hero-label]').textContent = `Download for ${platformName}`;

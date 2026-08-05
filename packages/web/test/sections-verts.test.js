@@ -1,5 +1,5 @@
 /**
- * The verts/unit section (docs/web/ads-system.md phase 2) — the classy-base
+ * The verts/unit section (docs/web/ads-system.md phase 2) — the base-layer
  * fallback-ladder vert band. Pins: context-free markup (host element + data
  * attrs from args, the standard @hide auth binding), neutral mechanical
  * defaults, §7 asset-lane registration (section.js in the main bundle,
@@ -16,11 +16,11 @@ const { Liquid } = require('liquidjs');
 const { registerSectionTags, collectSectionAssets, buildSectionLibrary } = require('../src/sections.js');
 
 const PKG = path.resolve(__dirname, '..');
-const CLASSY = path.join(PKG, 'themes', 'classy');
+const BASE = path.join(PKG, 'themes', 'base');
 const NEWSFLASH = path.join(PKG, 'themes', 'newsflash');
 
-/** Fresh engine over the real classy layer with a captured warn sink. */
-function makeEngine(baseDirs = [CLASSY]) {
+/** Fresh engine over the real base layer with a captured warn sink. */
+function makeEngine(baseDirs = [BASE]) {
   const warnings = [];
   const engine = new Liquid();
   registerSectionTags(engine, { baseDirs, warn: (message) => warnings.push(message) });
@@ -60,8 +60,8 @@ test('verts/unit: neutral mechanical defaults — display/rectangle, no pins, no
 
 // ─── §7 asset lanes + library resolution ────────────────────────────────────
 
-test('verts/unit: registers both §7 asset lanes from the classy base', () => {
-  const assets = collectSectionAssets([CLASSY]);
+test('verts/unit: registers both §7 asset lanes from the base layer', () => {
+  const assets = collectSectionAssets([BASE]);
   const entry = assets.find((item) => item.kind === 'section' && item.id === 'verts/unit');
 
   assert.ok(entry, 'entry collected');
@@ -69,17 +69,17 @@ test('verts/unit: registers both §7 asset lanes from the classy base', () => {
   assert.ok(entry.scss && entry.scss.endsWith('_sections/verts/unit/section.scss'), 'section.scss rides omega:sections');
 });
 
-test('verts/unit: resolves through the library under BOTH themes — newsflash falls through to classy', () => {
-  for (const roots of [[CLASSY], [NEWSFLASH, CLASSY]]) {
+test('verts/unit: resolves through the library under BOTH themes — newsflash falls through to base', () => {
+  for (const roots of [[BASE], [NEWSFLASH, BASE]]) {
     const library = buildSectionLibrary({ baseDirs: roots });
     const entry = library.entries.find((item) => item.kind === 'section' && item.id === 'verts/unit');
     assert.ok(entry, `verts/unit resolves over ${roots.length} layer(s)`);
-    assert.strictEqual(entry.source, 'classy', 'chips the classy base layer');
+    assert.strictEqual(entry.source, 'base', 'chips the base layer');
   }
 });
 
 test('verts/unit: section.js delegates WHOLLY to the shared client verts module (one implementation)', () => {
-  const js = fs.readFileSync(path.join(CLASSY, '_sections', 'verts', 'unit', 'section.js'), 'utf8');
+  const js = fs.readFileSync(path.join(BASE, '_sections', 'verts', 'unit', 'section.js'), 'utf8');
   assert.ok(js.includes("from '@omega.js/client'"), 'imports the shared singleton');
   assert.ok(js.includes('omega.verts().mount'), 'delegates lazy-arm + ladder to the client verts module');
   assert.ok(!js.includes('IntersectionObserver'), 'no private lazy fork — the module owns the observer');
@@ -87,7 +87,7 @@ test('verts/unit: section.js delegates WHOLLY to the shared client verts module 
 });
 
 test('verts/unit: the host paints NO chrome — the card inside the frame owns bg, border, radius', () => {
-  const scss = fs.readFileSync(path.join(CLASSY, '_sections', 'verts', 'unit', 'section.scss'), 'utf8');
+  const scss = fs.readFileSync(path.join(BASE, '_sections', 'verts', 'unit', 'section.scss'), 'utf8');
   const chrome = /(background|border|border-radius|box-shadow|overflow)\s*:/;
 
   // Only the iframe reset (display/width/border: 0) may declare anything
@@ -110,7 +110,7 @@ test('verts/unit: the host paints NO chrome — the card inside the frame owns b
       }
     }
   };
-  [path.join(CLASSY, 'css'), path.join(NEWSFLASH, 'css')].forEach(scan);
+  [path.join(PKG, 'themes', 'classy', 'css'), path.join(NEWSFLASH, 'css')].forEach(scan);
 
   assert.deepEqual(offenders, [], 'no theme sheet dresses the vert host');
 });

@@ -1,19 +1,19 @@
 // classy account — the user home speaks the same dialect as the rest of the
-// backend: the section rail reuses the shell sidebar recipe (classy-side__*),
+// backend: the section rail reuses the shell sidebar recipe (omega-side__*),
 // sections open with the admin page-header anatomy, and hairlines replace
 // elevation. The core page css keeps the functional floor.
 
 // The rail sits on the main SURFACE (the sidebar sits on the darker ground),
 // so the sidebar's surface-colored active fill is invisible here — active and
 // hover step one level down the stack instead.
-#account-nav .classy-side__item {
+#account-nav .omega-side__item {
   &:hover:not(.active),
   &:focus-visible:not(.active) {
     background: color-mix(in srgb, var(--omega-surface-2) 55%, transparent);
   }
 }
 
-#account-nav .classy-side__item.active {
+#account-nav .omega-side__item.active {
   background: var(--omega-surface-2);
 }
 

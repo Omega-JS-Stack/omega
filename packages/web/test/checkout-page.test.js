@@ -100,17 +100,17 @@ test('#18: the page wears the classy language — panels, receipt card, serif he
   const pages = await build();
   const checkout = pages.get('/payment/checkout');
 
-  assert.ok(checkout.includes('classy-display classy-display--section'), 'the serif display headline leads');
-  const panels = checkout.match(/classy-checkout__panel(?![-_])/g) || [];
+  assert.ok(checkout.includes('omega-display omega-display--section'), 'the serif display headline leads');
+  const panels = checkout.match(/omega-checkout__panel(?![-_])/g) || [];
   assert.equal(panels.length, 4, 'plan, account, desktop payment, mobile payment all sit on panels');
-  assert.ok(checkout.includes('classy-checkout__summary'), 'the order summary is a surface card');
-  assert.ok(checkout.includes('classy-receipt__panel'), 'the money rows keep the shared receipt vocabulary');
-  assert.ok(checkout.includes('classy-checkout__product-name'), 'the summary names the product');
+  assert.ok(checkout.includes('omega-checkout__summary'), 'the order summary is a surface card');
+  assert.ok(checkout.includes('omega-receipt__panel'), 'the money rows keep the shared receipt vocabulary');
+  assert.ok(checkout.includes('omega-checkout__product-name'), 'the summary names the product');
   assert.ok(checkout.includes('data-omega-reveal-stagger'), 'the zones reveal in on load');
-  assert.ok(checkout.includes('classy-quiet'), 'metadata speaks in the quiet voice');
+  assert.ok(checkout.includes('omega-quiet'), 'metadata speaks in the quiet voice');
 
   // The pre-redesign chrome is gone
-  assert.ok(!checkout.includes('classy-checkout__section'), 'the bare hairline sections are gone');
+  assert.ok(!checkout.includes('omega-checkout__section'), 'the bare hairline sections are gone');
   for (const legacy of ['text-success', 'text-danger', 'card-body p-4']) {
     assert.ok(!checkout.includes(legacy), `Bootstrap-era chrome gone: ${legacy}`);
   }
@@ -120,16 +120,16 @@ test('#18: the mobile one-screen contract survives — folds, but never the numb
   const pages = await build();
   const checkout = pages.get('/payment/checkout');
 
-  const toggles = checkout.match(/classy-checkout__rowtoggle d-lg-none collapsed/g) || [];
+  const toggles = checkout.match(/omega-checkout__rowtoggle d-lg-none collapsed/g) || [];
   assert.equal(toggles.length, 2, 'plan and account fold to one-line rows on phones');
   assert.ok(checkout.includes('id="collapse-billing"') && checkout.includes('id="collapse-account"'), 'both collapses keep their targets');
-  assert.ok(!/classy-receipt__panel[^>]*collapse/.test(checkout), 'the price rows are never inside a collapse');
-  assert.ok(checkout.includes('classy-checkout__paybuttons'), 'the mobile wallet grid still renders');
+  assert.ok(!/omega-receipt__panel[^>]*collapse/.test(checkout), 'the price rows are never inside a collapse');
+  assert.ok(checkout.includes('omega-checkout__paybuttons'), 'the mobile wallet grid still renders');
 
   const scss = fs.readFileSync(
     path.join(PKG, 'themes', 'classy', 'css', 'pages', 'payment', 'checkout', 'index.scss'), 'utf8',
   );
-  assert.ok(!scss.includes('.classy-checkout__section'), 'the dead section rules went with the markup');
+  assert.ok(!scss.includes('.omega-checkout__section'), 'the dead section rules went with the markup');
   assert.ok(scss.includes('max-height: 700px'), 'the short-phone rhythm is still tuned');
   assert.ok(!/#[0-9a-f]{3,6}/i.test(scss.replace(/#fff\b|#3c4043|#f6f5f3|#ffc439|#eabc53|#e8ad2e|#333\b/g, '')), 'colors are tokens (only the sanctioned wallet-brand hexes remain)');
 });

@@ -57,20 +57,20 @@ function collectLayered(layerDirs, filter) {
  * themes win: `<consumerDir>/themes/<id>` beats the packaged `<themesDir>/<id>`,
  * so a brand ships a FULL theme without forking the framework (C3 tier 2 —
  * tier 1 is a consumer main.scss over the stock theme via `omega:main`).
- * The classy base stays in every chain until the C3 reskin folds the base
- * layer into core.
+ * Every chain ends at `themes/base`, the structural markup layer with the
+ * neutral `omega-*` vocabulary (#177); themes are skins over it.
  * @param {object} options
  * @param {string} [options.activeTheme] - theme id (default 'classy')
  * @param {string} [options.consumerDir] - consumer root to probe for local themes
  * @param {string} options.themesDir - packaged themes root
- * @returns {string[]} ordered theme layer dirs (active first, classy base last)
+ * @returns {string[]} ordered theme layer dirs (active first, base last)
  */
 function resolveThemeLayers({ activeTheme, consumerDir, themesDir }) {
   const resolveId = (id) => {
     const local = consumerDir ? path.join(consumerDir, 'themes', id) : null;
     return local && fs.existsSync(local) ? local : path.join(themesDir, id);
   };
-  return [...new Set([activeTheme || 'classy', 'classy'])].map(resolveId);
+  return [...new Set([activeTheme || 'classy', 'base'])].map(resolveId);
 }
 
 module.exports = { collectLayered, collectProviders, resolveThemeLayers };

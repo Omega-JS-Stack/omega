@@ -13,15 +13,12 @@ window.bootstrap = bootstrap;
 }
 /* @dev-only:end */
 
-// Theme behaviors
-import setupNavbarScroll from './js/navbar-scroll.js';
+// Theme behaviors (navbar scroll state rides the shared motion engine's
+// data-omega-scroll-watch on the base nav include; no theme JS)
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 
 // Initialize when DOM is ready
 domReady().then(() => {
-  // Neobrutalism behaviors
-  setupNavbarScroll();
-
   // Generic Bootstrap initializations
   initializeTooltips();
 });

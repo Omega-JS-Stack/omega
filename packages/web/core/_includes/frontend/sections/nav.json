@@ -43,7 +43,7 @@
     {
       label: 'Sign up',
       href: '/signup',
-      class: 'btn-adaptive classy-btn-ring',
+      class: 'btn-adaptive omega-btn-ring',
       icon: 'user-plus',
       attributes: [
         ['data-omega-bind', '@show !auth.user']

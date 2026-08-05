@@ -52,7 +52,7 @@ test('dev build without consumer posts injects the sample posts', async () => {
   const page2 = [...pages.keys()].find((u) => u === '/blog/page/2' || u === '/blog/page/2/');
   assert.ok(page2, 'sample volume exercises pagination (page 2 exists)');
   assert.ok(pages.get(page2).includes('Welcome to the blog'), 'oldest samples paginate to page 2');
-  assert.ok(pages.get(page2).includes('classy-post-card__media--pattern'), 'image-less samples use the designed no-media panel');
+  assert.ok(pages.get(page2).includes('omega-post-card__media--pattern'), 'image-less samples use the designed no-media panel');
 
   // Sample updates ride the same lane (/updates release feed)
   const update = pages.get('/updates/v1.3.0');

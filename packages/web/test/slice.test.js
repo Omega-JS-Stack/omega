@@ -91,7 +91,7 @@ test('consumer about.md SUPPRESSES the framework default about page', () => {
   const html = pages.get('/about');
   // The default about page dispatches blueprint/about → classy about layout
   // (hero "About us"); the consumer page uses blueprint/index — if the
-  // default leaked, both would target /about and the classy-about hero
+  // default leaked, both would target /about and the omega-about hero
   // would render.
   assert.ok(!html.includes('headline_accent">us<'), 'default about must not leak');
 });
@@ -221,10 +221,10 @@ test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admi
   // cp183: the account interior speaks the admin dialect — the rail reuses
   // the shell sidebar recipe, sections open with the page-header anatomy,
   // cards wear admin caps, and the marketing serif voice is gone.
-  assert.ok(account.includes('classy-side__item'), 'rail speaks the shell sidebar dialect');
+  assert.ok(account.includes('omega-side__item'), 'rail speaks the shell sidebar dialect');
   assert.ok(account.includes('page-title'), 'sections open with the admin page-header anatomy');
   assert.ok(account.includes('card-header'), 'cards wear admin caps');
-  assert.ok(!account.includes('classy-display--section'), 'marketing display voice does not leak into the app');
+  assert.ok(!account.includes('omega-display--section'), 'marketing display voice does not leak into the app');
   // cp185: one skeleton on every section — the rail/content row fills the
   // panel and the rail column draws its full-height lane divider (the rail
   // box must not track whichever column happens to be tallest).
@@ -259,11 +259,14 @@ test('template-kit tags render inside Eleventy (omega_icon, urlmatches nav)', ()
   assert.ok(pages.get('/').includes('navbar'), 'nav include renders from the packaged nav.json data');
 });
 
-test('neobrutalism theme: layered overrides win, classy fills the gaps', async () => {
+test('neobrutalism theme: layered overrides win, base fills the gaps', async () => {
   const neo = await buildMini({ activeTheme: 'neobrutalism' });
   assert.ok(neo.get('/').includes('data-theme-id="neobrutalism"'), 'site.theme.id reflects active theme');
-  assert.ok(neo.get('/pricing').includes('pricing-title'), 'neobrutalism pricing layout override wins (neo-only markup)');
-  assert.ok(neo.get('/signin').includes('id="auth-form"'), 'classy signin fills the gap');
+  // #177 phase 3: the pricing fork is gone. The base page serves (no
+  // catalog in the mini fixture → the honest empty state).
+  assert.ok(neo.get('/pricing').includes('id="pricing-empty"'), 'neobrutalism pricing falls through to the base page');
+  assert.ok(!neo.get('/pricing').includes('pricing-title'), 'no trace of the deleted fork vocabulary');
+  assert.ok(neo.get('/signin').includes('id="auth-form"'), 'base signin fills the gap');
 });
 
 test('farm mode (symlinks, dev): identical output to virtual mode', async () => {

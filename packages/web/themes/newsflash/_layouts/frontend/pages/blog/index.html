@@ -39,11 +39,11 @@ newsletter_cta:
   <div class="container">
     <div class="row align-items-end g-4" data-lazy="@class animation-slide-up">
       <div class="col-lg-8">
-        <span class="kicker mb-2">The latest</span>
+        <span class="newsflash-kicker mb-2">The latest</span>
         <h1 class="display-4 mb-2">
           {{ resolved.hero.headline }}
           {% iftruthy resolved.hero.headline_accent %}
-            <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+            <span class="newsflash-accent">{{ resolved.hero.headline_accent }}</span>
           {% endiftruthy %}
         </h1>
         {% iftruthy resolved.hero.subheadline %}
@@ -79,16 +79,16 @@ newsletter_cta:
       <!-- Lead story splash -->
       {% assign lead = paginator.posts.first %}
       {% component "heading/rule-head", text: "Lead story" %}
-      <a href="{{ site.url }}{{ lead.url }}" class="story-card story-card--lead mb-5" data-lazy="@class animation-slide-up">
+      <a href="{{ site.url }}{{ lead.url }}" class="newsflash-story-card newsflash-story-card--lead mb-5" data-lazy="@class animation-slide-up">
         <div class="row g-4 g-lg-5 align-items-center">
           <div class="col-lg-7">
-            <div class="art-frame shadow">
+            <div class="newsflash-frame shadow">
               {%- omega_post lead.post.id, "image-tag", class="w-100" -%}
             </div>
           </div>
           <div class="col-lg-5">
             {% if lead.post.categories[0] %}
-              <span class="kicker mb-2">{{ lead.post.categories[0] | omega_title_case }}</span>
+              <span class="newsflash-kicker mb-2">{{ lead.post.categories[0] | omega_title_case }}</span>
             {% endif %}
             <h3 class="h1 my-2">{{ lead.post.title }}</h3>
             {% capture lead_rt %}{% omega_readtime lead.content %}{% endcapture %}
@@ -113,7 +113,7 @@ newsletter_cta:
     {% else %}
       <!-- No posts yet -->
       <div class="text-center py-5" data-lazy="@class animation-slide-up">
-        <span class="kicker mb-2">No dispatches yet</span>
+        <span class="newsflash-kicker mb-2">No dispatches yet</span>
         <h2 class="h3 mb-2">The presses are warming up</h2>
         <p class="text-body-secondary mb-0">Check back soon for our first stories.</p>
       </div>

@@ -4,7 +4,7 @@
  * fall-through".
  *
  * Framework pages a theme doesn't cover (auth, account, legal) render the
- * shared `classy-*` vocabulary. A theme reaches it either through the
+ * shared `omega-*` vocabulary. A theme reaches it either through the
  * inheritance hatch (`@forward 'omega:theme';` — partial themes) or by
  * importing classy's token-pure floor partials (full sibling themes with
  * their own Bootstrap). A theme that does neither still builds — and those
@@ -25,9 +25,9 @@ const logger = new Logger('theme-vocabulary');
 // vocabulary defines the same selectors itself and passes — the check asks
 // only "is the shared vocabulary painted at all".
 const SENTINELS = [
-  { selector: '.classy-auth', partial: 'pages/auth', surface: 'auth pages (sign-in, sign-up, reset)' },
-  { selector: '.classy-statgrid', partial: 'app/panels', surface: 'account/app panels' },
-  { selector: '.classy-footer', partial: 'layout/footer', surface: 'the shared site footer' },
+  { selector: '.omega-auth', partial: 'pages/auth', surface: 'auth pages (sign-in, sign-up, reset)' },
+  { selector: '.omega-statgrid', partial: 'app/panels', surface: 'account/app panels' },
+  { selector: '.omega-footer', partial: 'layout/footer', surface: 'the shared site footer' },
 ];
 
 // A theme that DEFINES Bootstrap's body-bg custom property ships its own
@@ -42,7 +42,7 @@ const OWN_BOOTSTRAP = '--bs-body-bg:';
  * @param {object} options
  * @param {string} options.css - the compiled MAIN css bundle
  * @param {string[]} options.themeRoots - resolveThemeLayers output (active theme first,
- *   classy last); a single root means classy is active and the check is moot
+ *   base last); a single root means base itself is active and the check is moot
  * @param {function} [options.warn] - warning sink (default the devkit logger)
  * @returns {{ theme: string, lane: 'hatch'|'floor', missing: string[] }|null} null when silent
  */
@@ -62,7 +62,7 @@ function checkThemeVocabulary(options) {
   const warn = options.warn || logger.warn.bind(logger);
   warn(
     `theme "${theme}" skips the CSS fall-through contract — framework pages (auth, account, legal) `
-    + `will render UNSTYLED classy-* markup.\n`
+    + `will render UNSTYLED omega-* markup.\n`
     + `  missing from the compiled bundle: `
     + `${missing.map((sentinel) => `${sentinel.selector} (${sentinel.partial} → ${sentinel.surface})`).join(', ')}\n`
     + `  the missing piece: the ${lane === 'hatch' ? 'inheritance hatch (this theme ships no Bootstrap of its own)' : 'vocabulary floor (this theme ships its own Bootstrap)'}\n`

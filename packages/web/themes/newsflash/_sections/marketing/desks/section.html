@@ -16,8 +16,8 @@
         {% comment %} Each desk card links to its category page (href overrides the slugified title) {% endcomment %}
         {% capture desk_href %}{% if desk.href %}{{ desk.href }}{% else %}/blog/categories/{{ desk.title | slugify }}{% endif %}{% endcapture %}
         <div class="col-md-4" data-lazy="@class animation-slide-up">
-          <a href="{{ desk_href }}" class="card story-card h-100 p-4 text-decoration-none">
-            <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
+          <a href="{{ desk_href }}" class="card newsflash-story-card h-100 p-4 text-decoration-none">
+            <span class="newsflash-desks__icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
               {% omega_icon desk.icon %}
             </span>
             <h3 class="h4 mb-2">{{ desk.title }}</h3>

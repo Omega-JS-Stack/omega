@@ -13,15 +13,8 @@ section {
   padding-bottom: clamp(3rem, 7vw, 6rem);
 }
 
-// The navbar is fixed and overlaps the page, so the FIRST section on every page
-// must add the navbar's height to its top padding — otherwise its content sits
-// under the nav (cramped at the top, unbalanced vs. the section's bottom).
-// Targets the first section regardless of page; the !important beats a `pt-0`
-// utility that a layout may put on the first section.
-main > section:first-child,
-#main-content > section:first-child {
-  padding-top: calc(var(--nb-navbar-height) + clamp(2rem, 5vw, 4rem)) !important;
-}
+// The ink bar is sticky (in-flow), so no first-section navbar offset is
+// needed; content starts right under the bar.
 
 // ============================================
 // Hero — flat color block, not a gradient
@@ -62,15 +55,6 @@ section.bg-gradient-rainbow {
     padding: 0.4rem 0.8rem;
     opacity: 1 !important;
   }
-}
-
-// Accent text (headline_accent spans) — marker highlight instead of color swap
-.text-accent {
-  background: #111111;
-  color: var(--nb-accent-yellow);
-  padding: 0 0.12em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
 }
 
 // ============================================
@@ -129,9 +113,38 @@ section.bg-gradient-rainbow {
 .border-gradient-rainbow { border-image: none !important; }
 
 // ============================================
-// Footer
+// Shared section header (base markup: micro eyebrow + display headline + sub)
 // ============================================
-footer {
+// Authored here because classy's layout/general (its usual home) is not
+// imported: its fixed-nav clearance rhythm has no place under the sticky
+// ink bar.
+.omega-section-head {
+  max-width: 46rem;
+
+  .omega-micro {
+    display: block;
+    margin-bottom: 0.875rem;
+  }
+
+  p {
+    margin-top: 1rem;
+    color: var(--bs-secondary-color);
+  }
+}
+
+.omega-section-head--center {
+  margin-inline: auto;
+  text-align: center;
+}
+
+// ============================================
+// Footer: the surface slab closed by a thick ink rule
+// ============================================
+// Structure comes from the classy footer floor (grid, columns, base row;
+// see _theme.scss); this overlay hardens it: solid surface, lg ink rule on
+// top, block-fill link hovers.
+footer,
+.omega-footer {
   background: var(--nb-surface);
   border-top: $nb-border-width-lg solid var(--nb-border-color);
 

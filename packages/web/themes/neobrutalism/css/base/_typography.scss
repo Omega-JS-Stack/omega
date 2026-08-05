@@ -32,25 +32,9 @@ code, kbd, samp, pre {
   font-family: $nb-font-mono;
 }
 
-// Eyebrow / kicker label — universal "section kicker" above headlines.
-.kicker {
-  display: inline-block;
-  font-family: $nb-font-mono;
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.35rem 0.65rem;
-  background: var(--nb-accent-yellow);
-  color: #111111;
-  @include nb-border($nb-border-width-sm);
-
-  // On a dark/ink panel (e.g. the CTA), keep the accent block readable.
-  &--invert { background: var(--nb-accent-yellow); color: #111111; }
-}
-
-// Highlighted inline text — marker-style background swipe.
-.highlight {
+// Marker-style background swipe on emphasized inline text (mark is the
+// element markdown/content emits; the fork vocabulary uses .neo-accent).
+mark {
   background: var(--nb-accent-yellow);
   color: #111111;
   padding: 0 0.15em;

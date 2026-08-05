@@ -1,0 +1,38 @@
+<section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %} data-omega-section="marketing/newsletter-cta">
+  <div class="container">
+    <div class="omega-cta omega-ink-panel" data-omega-reveal="scale">
+      {% iftruthy args.superheadline.text %}
+        <span class="omega-micro d-block mb-3">{{ args.superheadline.text }}</span>
+      {% endiftruthy %}
+      <h2 class="omega-cta__headline">{{ args.headline }}</h2>
+      {% iftruthy args.subheadline %}
+        <p class="omega-cta__sub">{{ args.subheadline }}</p>
+      {% endiftruthy %}
+
+      <!-- Newsletter Form -->
+      <form id="newsletter-form" class="newsletter-form mt-4" novalidate data-form-state="initializing" onsubmit="return false">
+        <div class="row g-3 justify-content-center">
+          <div class="col-md-5">
+            <input
+              type="email"
+              class="form-control form-control-lg"
+              placeholder="{{ args.form.placeholder }}"
+              name="email"
+              required
+              autocomplete="email"
+            >
+            <div class="invalid-feedback text-start">
+              Please enter a valid email address.
+            </div>
+          </div>
+          <div class="col-md-auto">
+            <button type="submit" class="btn btn-adaptive btn-lg px-4">
+              {% omega_icon "paper-plane", "fa-sm me-2" %}
+              <span class="button-text">{{ args.button.text }}</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

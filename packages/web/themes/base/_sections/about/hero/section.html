@@ -1,0 +1,39 @@
+{% capture facts_rail %}
+  {% for stat in args.facts %}
+    <div class="omega-facts__item">
+      <span class="omega-micro omega-facts__label">{{ stat.label }}</span>
+      <span class="omega-facts__value omega-facts__value--num" data-omega-countup>{{ stat.number }}</span>
+    </div>
+  {% endfor %}
+{% endcapture %}
+<section class="omega-dotgrid{% if args.image != blank %} omega-photo-lead-band{% endif %}" data-omega-dotfield>
+  <div class="container">
+    {% if args.image != blank %}
+      <!-- Photo lead: the picture opens the page, the words ride it -->
+      <figure class="omega-photo-lead" data-omega-reveal>
+        <img class="omega-photo-lead__img" src="{{ args.placeholder }}" data-lazy="@src {{ args.image }}" alt="{{ args.image_alt }}"/>
+        <figcaption class="omega-photo-lead__words" data-omega-reveal-stagger="90">
+          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description, sub_class: "omega-photo-lead__sub" %}
+        </figcaption>
+      </figure>
+
+      {% if args.facts %}
+        <div class="omega-facts omega-photo-lead__facts" style="--omega-facts-cols: 4;" data-omega-reveal>
+          {{ facts_rail }}
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="omega-hero-split">
+        <div data-omega-reveal-stagger="90">
+          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description %}
+        </div>
+
+        {% if args.facts %}
+          <div class="omega-facts" style="--omega-facts-cols: 2;" data-omega-reveal="left">
+            {{ facts_rail }}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</section>

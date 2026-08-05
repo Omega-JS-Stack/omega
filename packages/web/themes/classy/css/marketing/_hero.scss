@@ -2,10 +2,10 @@
 // command, and the floating product frame. Motion is the life: rotator,
 // reveals, float; color stays reserved.
 
-.classy-hero {
+.omega-hero {
   text-align: center;
 
-  .classy-hero__badge {
+  .omega-hero__badge {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -19,7 +19,7 @@
     border-radius: 50rem;
     text-decoration: none;
 
-    .classy-dot {
+    .omega-dot {
       width: 6px;
       height: 6px;
     }
@@ -33,7 +33,7 @@
   }
 
   // The rotating second line — italic serif; motion carries it, not color.
-  .classy-hero__rotator {
+  .omega-hero__rotator {
     font-style: italic;
 
     > * {
@@ -41,7 +41,7 @@
     }
   }
 
-  .classy-hero__sub {
+  .omega-hero__sub {
     max-width: 42rem;
     margin: 1.375rem auto 0;
     font-size: 1.09375rem;
@@ -49,7 +49,7 @@
     color: var(--omega-ink-muted);
   }
 
-  .classy-hero__ctas {
+  .omega-hero__ctas {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -57,7 +57,7 @@
     margin-top: 2rem;
   }
 
-  .classy-hero__meta {
+  .omega-hero__meta {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -70,13 +70,13 @@
 
 // ── Floating product frame ───────────────────────────────────────────────────
 
-.classy-hero__frame {
+.omega-hero__frame {
   max-width: 61.25rem;
   margin: 3.5rem auto 0;
   perspective: 1200px;
 }
 
-.classy-hero__frame-inner {
+.omega-hero__frame-inner {
   overflow: hidden;
   text-align: start;
   background: var(--omega-surface);
@@ -85,14 +85,14 @@
   box-shadow: var(--omega-shadow-2);
   transition: transform var(--omega-speed-slow) var(--omega-ease);
 
-  .classy-hero__frame:hover & {
+  .omega-hero__frame:hover & {
     transform: rotateX(1.1deg) translateY(-3px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .classy-hero__frame-inner,
-  .classy-hero__frame:hover .classy-hero__frame-inner {
+  .omega-hero__frame-inner,
+  .omega-hero__frame:hover .omega-hero__frame-inner {
     transform: none;
     transition: none;
   }
@@ -100,11 +100,11 @@
 
 // ── The mini product mock inside the frame (pure CSS + one inline SVG) ──────
 
-.classy-mock {
+.omega-mock {
   font-size: 0.71875rem;
   color: var(--omega-ink-muted);
 
-  .classy-mock__topbar {
+  .omega-mock__topbar {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -112,7 +112,7 @@
     border-bottom: 1px solid var(--omega-line);
   }
 
-  .classy-mock__dots {
+  .omega-mock__dots {
     display: flex;
     gap: 5px;
 
@@ -124,14 +124,14 @@
     }
   }
 
-  .classy-mock__body {
+  .omega-mock__body {
     display: grid;
     grid-template-columns: 11.5rem minmax(0, 1fr);
     min-height: 20rem;
     background: var(--omega-ground);
   }
 
-  .classy-mock__side {
+  .omega-mock__side {
     display: none;
     padding: 0.75rem 0.625rem;
     border-inline-end: 1px solid var(--omega-line);
@@ -141,7 +141,7 @@
     }
   }
 
-  .classy-mock__side-item {
+  .omega-mock__side-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -156,7 +156,7 @@
       border-color: var(--omega-line);
     }
 
-    .classy-mock__side-ico {
+    .omega-mock__side-ico {
       width: 0.875rem;
       height: 0.875rem;
       border-radius: 4px;
@@ -164,12 +164,12 @@
       flex-shrink: 0;
     }
 
-    &.active .classy-mock__side-ico {
+    &.active .omega-mock__side-ico {
       background: var(--omega-accent);
     }
   }
 
-  .classy-mock__main {
+  .omega-mock__main {
     padding: 0.875rem;
 
     @media (max-width: 767.98px) {
@@ -177,40 +177,40 @@
     }
   }
 
-  .classy-mock__tiles {
+  .omega-mock__tiles {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.625rem;
     margin-bottom: 0.625rem;
   }
 
-  .classy-mock__tile {
+  .omega-mock__tile {
     padding: 0.625rem 0.75rem;
     background: var(--omega-surface);
     border: 1px solid var(--omega-line);
     border-radius: var(--omega-radius-m);
 
-    .classy-mock__tile-label {
+    .omega-mock__tile-label {
       font-size: 0.625rem;
       letter-spacing: 0.07em;
       text-transform: uppercase;
       color: var(--omega-ink-faint);
     }
 
-    .classy-mock__tile-value {
+    .omega-mock__tile-value {
       font-size: 1.03125rem;
       font-weight: 650;
       font-variant-numeric: tabular-nums;
       color: var(--omega-ink);
     }
 
-    .classy-mock__tile-delta {
+    .omega-mock__tile-delta {
       font-size: 0.65625rem;
       color: var(--omega-ok);
     }
   }
 
-  .classy-mock__chart {
+  .omega-mock__chart {
     padding: 0.75rem;
     background: var(--omega-surface);
     border: 1px solid var(--omega-line);
@@ -226,7 +226,7 @@
 }
 
 @media (max-width: 767.98px) {
-  .classy-mock__body {
+  .omega-mock__body {
     grid-template-columns: minmax(0, 1fr);
   }
 }

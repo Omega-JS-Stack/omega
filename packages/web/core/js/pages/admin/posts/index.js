@@ -152,7 +152,7 @@ function renderRow(post) {
 
   // Categories cell (first 3 + overflow count)
   const badges = tags.slice(0, 3)
-    .map((tag) => `<span class="classy-chip">${escape(String(tag))}</span>`)
+    .map((tag) => `<span class="omega-chip">${escape(String(tag))}</span>`)
     .join(' ');
   const overflow = tags.length > 3 ? ` <span class="text-muted small">+${tags.length - 3}</span>` : '';
 
@@ -168,7 +168,7 @@ function renderRow(post) {
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="classy-icon-chip classy-icon-chip--neutral">${getPrerenderedIcon('newspaper', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('newspaper', 'fa-sm')}</span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 320px;">${escape(title)}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 320px; font-size: 0.7rem;">${escape(pathname)}</div>
@@ -180,7 +180,7 @@ function renderRow(post) {
     <td class="text-muted small">${escape(publishedText)}${publishedAgo}</td>
     <td>
       <div class="dropdown">
-        <button class="classy-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Post actions">
+        <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Post actions">
           ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">

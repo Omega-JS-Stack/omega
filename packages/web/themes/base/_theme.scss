@@ -1,0 +1,4 @@
+// Base ships structure, not look. This file exists so the inheritance hatch
+// keeps resolving: a partial theme's `@forward 'omega:theme';` self-skips its
+// own file, lands here, and inherits the default skin (classy).
+@forward '../classy/theme';

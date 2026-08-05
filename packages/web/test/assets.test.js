@@ -43,7 +43,7 @@ function build(themeIds) {
 
 test('layered page modules: site layer wins, core fills the rest, all content-hashed', async () => {
   fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
 
   // Site layer's flat index.js + the real UJM core modules under dir-index
   // keys + wildcard filenames (blog/[slug] serves every post URL — spec §7)
@@ -89,7 +89,7 @@ test('resolvePageAsset: exact beats /index spelling beats wildcard; segments mat
 });
 
 test('the asset_path families resolve by URL alone against the real manifest', async () => {
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
 
   // The dead frontmatter's old exact keys are gone…
   for (const dead of ['blog/post', 'updates/update', 'alternatives/alternative/index', 'legal/document/index']) {
@@ -112,7 +112,7 @@ test('the asset_path families resolve by URL alone against the real manifest', a
 });
 
 test('§7 asset lanes: section.scss joins the main sheet, section.js boots behind DOM presence', async () => {
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
 
   // css lane: the fixture's section.scss compiled in via omega:sections
   const mainCss = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
@@ -135,7 +135,7 @@ test('§7 asset lanes: section.scss joins the main sheet, section.js boots behin
 });
 
 test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {
-  await build(['classy']);
+  await build(['classy', 'base']);
   // The redirect layout references /assets/js/modules/<name>.bundle.js
   // directly (omega_cachebreak query, no content hash) — the lane must emit it.
   const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
@@ -171,7 +171,7 @@ function walkJs(dir) {
 }
 
 test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runtime', async () => {
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
   assert.ok(manifest.js.main, 'main bundle in manifest');
 
   const graph = readGraph(manifest.js.main);
@@ -196,9 +196,9 @@ test('tooltips: one shared initializer on the core layer, wired by every theme (
   }
 
   // Every theme that wires tooltips still gets them into its bundle graph
-  // (real chain: a sibling theme always sits over the classy base).
+  // (real chain: a sibling theme always sits over the base layer).
   for (const theme of ['classy', 'newsflash', 'neobrutalism']) {
-    const manifest = await build(theme === 'classy' ? ['classy'] : [theme, 'classy']);
+    const manifest = await build([theme, 'base']);
     const graph = readGraph(manifest.js.main);
     assert.ok(graph.includes('data-bs-toggle="tooltip"'), `${theme}: the shared initializer rides the bundle`);
     assert.ok(graph.includes('tooltips'), `${theme}: the initializer body (not just the selector) bundled`);
@@ -211,7 +211,7 @@ test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chun
   // hashed as sources drift) read as duplicates, exactly like the sibling
   // tests that clear OUT before building.
   fs.rmSync(OUT, { recursive: true, force: true });
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
 
   // Page entries are thin boot stubs importing shared chunks
   const signinEntry = fs.readFileSync(path.join(OUT, manifest.js.pages['signin/index'].slice(1)), 'utf8');
@@ -231,8 +231,8 @@ test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chun
 });
 
 test('layered sass: main css compiles per theme through omega:theme', async () => {
-  const classy = await build(['classy']);
-  const newsflash = await build(['newsflash', 'classy']);
+  const classy = await build(['classy', 'base']);
+  const newsflash = await build(['newsflash', 'base']);
 
   const classyCss = fs.readFileSync(path.join(OUT, classy.css.main.slice(1)), 'utf8');
   const newsflashCss = fs.readFileSync(path.join(OUT, newsflash.css.main.slice(1)), 'utf8');
@@ -243,11 +243,11 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
 
   // cp190 floor: sibling themes carry classy's token-pure app/auth
   // vocabulary so fall-through pages render styled (Lane B)
-  assert.ok(newsflashCss.includes('.classy-auth'), 'newsflash bundle carries the classy auth floor');
-  assert.ok(newsflashCss.includes('.classy-statgrid'), 'newsflash bundle carries the classy app floor');
-  // cp192: the shared footer include speaks classy-footer vocabulary on every
+  assert.ok(newsflashCss.includes('.omega-auth'), 'newsflash bundle carries the classy auth floor');
+  assert.ok(newsflashCss.includes('.omega-statgrid'), 'newsflash bundle carries the classy app floor');
+  // cp192: the shared footer include speaks omega-footer vocabulary on every
   // page — the floor supplies its structure, the theme re-inks it
-  assert.ok(newsflashCss.includes('.classy-footer'), 'newsflash bundle carries the classy footer floor');
+  assert.ok(newsflashCss.includes('.omega-footer'), 'newsflash bundle carries the classy footer floor');
   // …and speaks the shared token contract after the cp187 rebase
   assert.ok(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)');
 
@@ -279,7 +279,7 @@ test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () =>
 });
 
 test('PurgeCSS strips selectors unused by the rendered HTML', async () => {
-  const manifest = await build(['classy']);
+  const manifest = await build(['classy', 'base']);
   fs.writeFileSync(
     path.join(OUT, 'index.html'),
     '<body class="omega-body"><div class="container"><a class="btn btn-primary">x</a></div></body>'
@@ -320,12 +320,12 @@ test('only-half rebuilds (dev watcher narrowing): css writes no js, js writes no
 
 test('fonts: the layer union is pruned to css-referenced faces — sibling themes ship no base-layer fat (cp243)', async () => {
   fs.rmSync(OUT, { recursive: true, force: true });
-  await build(['newsflash', 'classy']);
+  await build(['newsflash', 'base']);
   const fonts = path.join(OUT, 'assets', 'fonts');
   assert.ok(fs.existsSync(path.join(fonts, 'fraunces-normal-latin.woff2')), 'newsflash ships its own faces');
-  assert.ok(!fs.existsSync(path.join(fonts, 'newsreader-normal-latin.woff2')), 'classy-only faces pruned from the newsflash chain');
+  assert.ok(!fs.existsSync(path.join(fonts, 'newsreader-normal-latin.woff2')), 'classy faces pruned from the newsflash chain');
 
   fs.rmSync(OUT, { recursive: true, force: true });
-  await build(['classy']);
+  await build(['classy', 'base']);
   assert.ok(fs.existsSync(path.join(OUT, 'assets', 'fonts', 'newsreader-normal-latin.woff2')), 'the classy chain keeps its own faces');
 });

@@ -1,0 +1,19 @@
+{% if args.items and args.items.size > 0 %}
+  <section>
+    <div class="container">
+      <div class="omega-stats" data-omega-reveal-stagger="80">
+        {% for stat in args.items %}
+          <div class="omega-stat" data-omega-reveal>
+            <div class="omega-stat__num" data-omega-countup>{{ stat.number }}</div>
+            <div class="omega-stat__label">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="omega-stat__sub">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>{% if args.after != blank %}
+
+      {{ args.after }}{% endif %}
+    </div>
+  </section>
+{% endif %}

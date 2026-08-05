@@ -46,20 +46,20 @@ main {
   // starts below the nav and its dots read detached from it (Ian 2026-07-31).
   // On the band, the dots run up behind the transparent nav, giving a post
   // the same opener every other page has.
-  > article:first-of-type:has(> .classy-dotgrid:first-child) {
+  > article:first-of-type:has(> .omega-dotgrid:first-child) {
     padding-top: 0;
 
-    > .classy-dotgrid:first-child {
+    > .omega-dotgrid:first-child {
       @include nav-clearance;
     }
   }
 }
 
 // Shared section header (micro label + display headline + sub)
-.classy-section-head {
+.omega-section-head {
   max-width: 44rem;
 
-  .classy-micro {
+  .omega-micro {
     display: block;
     margin-bottom: 0.875rem;
   }
@@ -71,7 +71,7 @@ main {
   }
 }
 
-.classy-section-head--center {
+.omega-section-head--center {
   margin-inline: auto;
   text-align: center;
 }

@@ -1,0 +1,273 @@
+{% comment %} Section data: json-in-_includes (a consumer src/_includes/frontend/sections/nav.json overrides the packaged one) — same binding pattern as admin/sections/sidebar {% endcomment %}
+{% assign data = site.data._includes.frontend.sections.nav %}
+
+<!-- Classy v2 marketing nav: transparent over the hero, glassy after scroll.
+     The shared motion engine stamps data-omega-scrolled (no theme JS). -->
+<header class="omega-nav" data-omega-scroll-watch="24">
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <!-- Logo -->
+      {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+      {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+      {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
+      {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
+
+      <a class="navbar-brand omega-nav__brand py-0" href="{{ logo_href }}">
+        {% iftruthy logo_src %}
+          {% if data.logo.type == 'wordmark' %}
+            <img src="{{ logo_src | omega_cachebreak }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.75rem; width: auto;"/>
+          {% else %}
+            <img src="{{ logo_src | omega_cachebreak }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}"/>
+          {% endif %}
+        {% endiftruthy %}
+        {% if data.logo.type != 'wordmark' %}
+          {% iftruthy logo_text %}
+            <span>{{ logo_text }}</span>
+          {% endiftruthy %}
+        {% endif %}
+      </a>
+
+      <!-- Mobile controls wrapper -->
+      <div class="d-lg-none d-flex align-items-center ms-auto">
+        <!-- Mobile toggle -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle navigation">
+          {% omega_icon "bars", "fa-md" %}
+        </button>
+
+        <!-- Mobile account dropdown (directly to the right of toggler) -->
+        {% for action in data.actions %}
+          {% if action.type == 'account' %}
+            <div class="ms-2">
+              {% include global/sections/account.html size="sm" attributes=action.attributes %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <!-- Navigation -->
+      <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+        <!-- Centered Navigation Links -->
+        <ul class="navbar-nav mx-auto">
+          {% for link in data.links %}
+            {% if link.dropdown %}
+              {% capture link_active %}{% urlmatches link.href, "active" %}{% endcapture %}
+              {% capture link_class %}omega-nav__link dropdown-toggle {{ link_active }} {% if link.class %}{{ link.class }}{% endif %}{% endcapture %}
+              {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              <li class="nav-item dropdown">
+                <button class="{{ link_class }}" type="button" data-bs-toggle="dropdown" {{ link_attributes }}>
+                  <span class="d-inline-flex align-items-center">
+                    {% if link.icon %}
+                      {% omega_icon link.icon, "fa-sm me-2" %}
+                    {% endif %}
+                    <span>{{ link.label }}</span>
+                  </span>
+                </button>
+                <ul class="dropdown-menu">
+                  {% for child in link.dropdown %}
+                    {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                    {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
+                    {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                    {% capture child_content %}
+                      <span class="d-inline-flex align-items-center">
+                        {% if child.icon %}
+                          {% omega_icon child.icon, "fa-sm me-2" %}
+                        {% endif %}
+                        <span>{{ child.label }}</span>
+                      </span>
+                    {% endcapture %}
+
+                    {% if child.divider %}
+                      <li><hr class="dropdown-divider" {{ child_attributes }}/></li>
+                    {% else %}
+                      <li>
+                        {% iftruthy child.href %}
+                          <a class="{{ child_class }}" href="{{ child.href }}" {{ child_attributes }}>
+                            {{ child_content }}
+                          </a>
+                        {% endiftruthy %}
+                        {% iffalsy child.href %}
+                          <button class="{{ child_class }}" type="button" {{ child_attributes }}>
+                            {{ child_content }}
+                          </button>
+                        {% endiffalsy %}
+                      </li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </li>
+            {% else %}
+              {% capture link_active %}{% urlmatches link.href, "active" %}{% endcapture %}
+              {% capture link_class %}omega-nav__link {{ link_active }} {% if link.class %}{{ link.class }}{% endif %}{% endcapture %}
+              {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              {% capture link_content %}
+                <span class="d-inline-flex align-items-center">
+                  {% if link.icon %}
+                    {% omega_icon link.icon, "fa-sm me-2" %}
+                  {% endif %}
+                  <span>{{ link.label }}</span>
+                </span>
+              {% endcapture %}
+              <li class="nav-item">
+                {% iftruthy link.href %}
+                  <a class="{{ link_class }}" href="{{ link.href }}" {{ link_attributes }}>
+                    {{ link_content }}
+                  </a>
+                {% endiftruthy %}
+                {% iffalsy link.href %}
+                  <button class="{{ link_class }}" type="button" {{ link_attributes }}>
+                    {{ link_content }}
+                  </button>
+                {% endiffalsy %}
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+
+        <!-- Right-aligned Actions (desktop only) -->
+        <div class="d-none d-lg-inline-flex align-items-center gap-2">
+          {% for action in data.actions %}
+            {% if action.type == 'account' %}
+              <!-- Account dropdown with profile picture (desktop) -->
+              {% include global/sections/account.html size="md" attributes=action.attributes %}
+            {% elsif action.dropdown %}
+              <!-- Regular button dropdown -->
+              {% capture action_class %}btn dropdown-toggle {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
+              {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              <div class="dropdown">
+                <button class="{{ action_class }}" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
+                  <span class="d-inline-flex align-items-center">
+                    {% if action.icon %}
+                      {% omega_icon action.icon, "fa-sm me-2" %}
+                    {% endif %}
+                    <span>{{ action.label }}</span>
+                  </span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  {% for child in action.dropdown %}
+                    {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                    {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
+                    {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                    {% capture child_content %}
+                      <span class="d-inline-flex align-items-center">
+                        {% if child.icon %}
+                          {% omega_icon child.icon, "fa-sm me-2" %}
+                        {% endif %}
+                        <span>{{ child.label }}</span>
+                      </span>
+                    {% endcapture %}
+
+                    {% if child.divider %}
+                      <li><hr class="dropdown-divider" {{ child_attributes }}/></li>
+                    {% else %}
+                      <li>
+                        {% iftruthy child.href %}
+                          <a class="{{ child_class }}" href="{{ child.href }}" {{ child_attributes }}>
+                            {{ child_content }}
+                          </a>
+                        {% endiftruthy %}
+                        {% iffalsy child.href %}
+                          <button class="{{ child_class }}" type="button" {{ child_attributes }}>
+                            {{ child_content }}
+                          </button>
+                        {% endiffalsy %}
+                      </li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </div>
+            {% else %}
+              {% capture action_class %}btn {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
+              {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              {% capture action_content %}
+                <span class="d-inline-flex align-items-center">
+                  {% if action.icon %}
+                    {% omega_icon action.icon, "fa-sm me-2" %}
+                  {% endif %}
+                  <span>{{ action.label }}</span>
+                </span>
+              {% endcapture %}
+              {% iftruthy action.href %}
+                <a class="{{ action_class }}" href="{{ action.href }}" role="button" {{ action_attributes }}>
+                  {{ action_content }}
+                </a>
+              {% endiftruthy %}
+              {% iffalsy action.href %}
+                <button class="{{ action_class }}" type="button" {{ action_attributes }}>
+                  {{ action_content }}
+                </button>
+              {% endiffalsy %}
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <!-- Non-account actions for mobile (inside collapsible) -->
+        <div class="d-lg-none omega-nav__mobile-actions">
+          {% for action in data.actions %}
+            {% if action.type != 'account' %}
+              {% capture action_class %}btn w-100 mt-2 {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
+              {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+              {% capture action_content %}
+                <span class="d-inline-flex align-items-center">
+                  {% if action.icon %}
+                    {% omega_icon action.icon, "fa-sm me-2" %}
+                  {% endif %}
+                  <span>{{ action.label }}</span>
+                </span>
+              {% endcapture %}
+              {% if action.dropdown %}
+                <div class="dropdown">
+                  <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
+                    {{ action_content }}
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end w-100">
+                    {% for child in action.dropdown %}
+                      {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                      {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
+                      {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                      {% capture child_content %}
+                        <span class="d-inline-flex align-items-center">
+                          {% if child.icon %}
+                            {% omega_icon child.icon, "fa-sm me-2" %}
+                          {% endif %}
+                          <span>{{ child.label }}</span>
+                        </span>
+                      {% endcapture %}
+
+                      {% if child.divider %}
+                        <li><hr class="dropdown-divider" {{ child_attributes }}/></li>
+                      {% else %}
+                        <li>
+                          {% iftruthy child.href %}
+                            <a class="{{ child_class }}" href="{{ child.href }}" {{ child_attributes }}>
+                              {{ child_content }}
+                            </a>
+                          {% endiftruthy %}
+                          {% iffalsy child.href %}
+                            <button class="{{ child_class }}" type="button" {{ child_attributes }}>
+                              {{ child_content }}
+                            </button>
+                          {% endiffalsy %}
+                        </li>
+                      {% endif %}
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% else %}
+                {% iftruthy action.href %}
+                  <a class="{{ action_class }}" href="{{ action.href }}" role="button" {{ action_attributes }}>
+                    {{ action_content }}
+                  </a>
+                {% endiftruthy %}
+                {% iffalsy action.href %}
+                  <button class="{{ action_class }}" type="button" {{ action_attributes }}>
+                    {{ action_content }}
+                  </button>
+                {% endiffalsy %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>

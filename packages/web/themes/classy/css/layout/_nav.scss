@@ -2,7 +2,7 @@
 // The shared motion engine stamps data-omega-scrolled via
 // [data-omega-scroll-watch]; no theme JS involved.
 
-.classy-nav {
+.omega-nav {
   position: fixed;
   inset-inline: 0;
   top: 0;
@@ -28,7 +28,7 @@
   // (brand lockup styles live at root scope below — the footer reuses them)
 
   // ── Links ──────────────────────────────────────────────────────────────────
-  .classy-nav__link {
+  .omega-nav__link {
     display: inline-flex;
     align-items: center;
     padding: 0.4375rem 0.75rem;
@@ -55,7 +55,7 @@
   }
 
   // Dropdown-toggle links: soften Bootstrap's caret so it reads as a hint
-  .classy-nav__link.dropdown-toggle::after {
+  .omega-nav__link.dropdown-toggle::after {
     margin-left: 0.375rem;
     opacity: 0.45;
     transform: translateY(1px);
@@ -106,13 +106,13 @@
       box-shadow: var(--omega-shadow-2);
     }
 
-    .classy-nav__link {
+    .omega-nav__link {
       width: 100%;
       padding-block: 0.625rem;
     }
 
     // Actions sit under a hairline, full width, real tap targets
-    .classy-nav__mobile-actions {
+    .omega-nav__mobile-actions {
       margin-top: 0.625rem;
       padding-top: 0.75rem;
       border-top: 1px solid var(--omega-line);
@@ -126,7 +126,7 @@
 }
 
 // ── Brand lockup — shared by the marketing nav AND the footer ───────────────
-.classy-nav__brand {
+.omega-nav__brand {
   display: inline-flex;
   align-items: center;
   gap: 0.625rem;

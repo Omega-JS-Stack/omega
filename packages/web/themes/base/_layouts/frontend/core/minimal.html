@@ -1,0 +1,36 @@
+---
+layout: frontend/core/base
+
+theme:
+  nav:
+    enabled: true
+  # main:
+  #   class: ""
+  footer:
+    enabled: true
+---
+
+<!-- ═══ Masthead (document pages: legal, plain-markdown content) ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="omega-display omega-display--page" data-omega-reveal>
+      {{ resolved.meta.breadcrumb }}
+    </h1>
+    {% iftruthy resolved.meta.description %}
+      <p class="omega-hero-split__sub" data-omega-reveal>
+        {{ resolved.meta.description }}
+      </p>
+    {% endiftruthy %}
+  </div>
+</section>
+
+<!-- ═══ Document body ═══ -->
+<section>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 omega-prose">
+        {{ content | omega_content_format }}
+      </div>
+    </div>
+  </div>
+</section>

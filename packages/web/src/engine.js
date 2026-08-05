@@ -128,7 +128,7 @@ function configureOmega(eleventyConfig, options) {
   // the token sheet's neutral placeholder stands.
   site.brandTokens = composeBrandTokens(site.brand?.color);
 
-  // ---- Theme layer chain: active theme → classy base → core
+  // ---- Theme layer chain: active theme → base → core
   // (consumer-local themes/<id> beats the packaged theme — C3 tier 2)
   const themeLayers = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
   const layers = [...themeLayers, coreDir];
@@ -235,7 +235,7 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.amendLibrary('liquid', (engine) => {
     // The section/component library tags resolve through the same precedence
     // as every other layer: consumer-local _sections/_components → active
-    // theme → classy base (docs/web/omega-sections-spec.md).
+    // theme → base (docs/web/omega-sections-spec.md).
     registerSectionTags(engine, { baseDirs: [options.consumerDir, ...themeLayers] });
     registerLiquid(engine, {
       site,
@@ -258,7 +258,7 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Layered layouts (zero copying): virtual templates or symlink farm.
   // Layer order: consumer-local _layouts (sweet-saucy ships src/_layouts/
-  // recipe.html) → active theme → classy → core (blueprint/root/modules —
+  // recipe.html) → active theme → base → core (blueprint/root/modules —
   // the theme-agnostic framework layouts live in the core layer).
   // The farm must live OUTSIDE the input dir — inside it, Eleventy processes
   // the symlinked layouts as content templates (and `../`-relative inputs
@@ -508,11 +508,11 @@ function configureOmega(eleventyConfig, options) {
       }
 
       // Layout-frontmatter Liquid: the preprocessor only sees PAGE frontmatter,
-      // so cascade data contributed by layouts (real classy contact carries
-      // `{{ site.brand.name }}`, real sweet-saucy recipe carries
+      // so cascade data contributed by layouts (the real base contact layout
+      // carries `{{ site.brand.name }}`, real sweet-saucy recipe carries
       // `{{ page.recipe.title }}` in meta values) still holds raw refs here.
       // `resolved` is in context too — layout defaults template on the merged
-      // data (classy alternative: tagline "The #1 {{ resolved.alternative.
+      // data (base alternative: tagline "The #1 {{ resolved.alternative.
       // competitor.name }} alternative"); `page.resolved` covers the legacy
       // spelling in not-yet-migrated consumer frontmatter.
       // Copy-on-write: shared cascade sub-objects are never mutated, and

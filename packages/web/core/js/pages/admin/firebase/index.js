@@ -402,7 +402,7 @@ function renderCellValue(value) {
   }
 
   if (typeof value === 'boolean') {
-    return `<span class="classy-chip ${value ? 'classy-chip--accent' : ''}">${value}</span>`;
+    return `<span class="omega-chip ${value ? 'omega-chip--accent' : ''}">${value}</span>`;
   }
 
   if (typeof value === 'number') {

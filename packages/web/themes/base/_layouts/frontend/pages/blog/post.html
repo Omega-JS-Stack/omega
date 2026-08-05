@@ -1,0 +1,255 @@
+---
+layout: frontend/core/base
+
+theme:
+  post:
+    image:
+      class: "img-fluid rounded-3 w-100 my-5"
+
+client:
+  socialSharing:
+    enabled: true
+
+author_section:
+  author_position: "Marketing Manager"
+
+related_posts:
+  superheadline: "Keep reading"
+  headline: "Related <em>posts</em>"
+  limit: 3
+
+newsletter:
+  superheadline:
+    icon: "envelope"
+    text: "Newsletter"
+  headline: "Stay in the loop"
+  subheadline: "Join our newsletter and get resources, curated content, and inspiration delivered straight to your inbox."
+  button:
+    text: "Submit"
+  form:
+    placeholder: "jonsnow@gmail.com"
+---
+
+<!-- Reading progress — accent hairline pinned under the nav (post JS drives width) -->
+<div class="omega-read-progress" aria-hidden="true"><span data-read-progress></span></div>
+
+{% comment %} Vert placement (docs/web/ads-system.md): auto-placed units need the
+  `advertising` config key, and a post opts out with `verts: false` in its
+  frontmatter. The opt-out also travels to the mid-article JS insertion lane
+  (pages/blog/[slug].js) through data-omega-verts on the article. {% endcomment %}
+{% assign _verts_on = false %}
+{% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
+
+<!-- ═══ Article — left-aligned editorial header (bronn pattern) ═══ -->
+<article{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
+  {% comment %} Dotfield band: the animated dots sit behind the post masthead
+    ONLY — the read surface below stays plain, so nothing moves behind body
+    text. Same contract as every other page's hero (omega-dotgrid +
+    data-omega-dotfield). {% endcomment %}
+  <div class="omega-dotgrid" data-omega-dotfield>
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-xl-9 col-lg-10 col-12">
+          <header data-omega-reveal-stagger="80">
+            <!-- Mono breadcrumb -->
+            <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+              <a href="/blog">Blog</a>
+              {% if resolved.post.categories[0] %}
+                <span>/</span>
+                <a href="/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | omega_title_case }}</a>
+              {% endif %}
+            </div>
+
+            <h1 class="omega-display omega-display--page" data-omega-reveal>{{ resolved.post.title }}</h1>
+
+            {% iftruthy resolved.post.description %}
+              <p class="omega-hero-split__sub" data-omega-reveal>{{ resolved.post.description }}</p>
+            {% endiftruthy %}
+
+            <!-- Hairline + mono byline row -->
+            {%- capture _author_name -%}{%- omega_member resolved.post.author, "name" -%}{%- endcapture -%}
+            <div class="d-flex align-items-center gap-3 flex-wrap mt-4 pt-4 hairline-top" data-omega-reveal>
+              {% if _author_name != '' %}
+                <a href="{%- omega_member resolved.post.author, "url" -%}" class="omega-post-card__avatar">
+                  {%- omega_member resolved.post.author, "image-tag", class="" -%}
+                </a>
+              {% else %}
+                <span class="omega-post-card__avatar omega-post-card__avatar--fallback" aria-hidden="true">
+                  {% omega_icon "pen-nib", "fa-xs" %}
+                </span>
+              {% endif %}
+              <div class="omega-post-card__eyebrow">
+                {% if _author_name != '' %}
+                  <a href="{%- omega_member resolved.post.author, "url" -%}">{{ _author_name }}</a>
+                {% else %}
+                  <span>{{ site.brand.name }}</span>
+                {% endif %}
+                <span>·</span>
+                <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
+                <span>·</span>
+                <span>{% omega_readtime content %} min read</span>
+              </div>
+            </div>
+          </header>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    {% comment %} Hero media honors the post.image contract: false → no hero
+    (the title IS the hero); a string → that image; absent → legacy id-path {% endcomment %}
+    {% unless resolved.post.image == false %}
+      <div class="row justify-content-center">
+        <div class="col-xl-9 col-lg-10 col-12 mt-5" data-omega-reveal>
+          {%- if resolved.post.image -%}
+            <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.post.image }}" alt="{{ resolved.post.title }}" class="img-fluid w-100 blog-post-image hairline rounded-4">
+          {%- else -%}
+            {%- omega_post resolved.post.id, "image-tag", class="img-fluid w-100 blog-post-image hairline rounded-4" -%}
+          {%- endif -%}
+        </div>
+      </div>
+    {% endunless %}
+
+    <div class="row justify-content-center mt-5">
+      <!-- Sticky meta rail (xl+): the byline travels with the reader -->
+      <div class="col-xl-2 d-none d-xl-block">
+        <aside class="omega-article-rail" aria-label="Article meta">
+          {% if _author_name != '' %}
+            <a href="{%- omega_member resolved.post.author, "url" -%}" class="omega-article-rail__author">
+              <span class="omega-post-card__avatar">{%- omega_member resolved.post.author, "image-tag", class="" -%}</span>
+              <span class="omega-article-rail__name">{{ _author_name }}</span>
+            </a>
+          {% endif %}
+          <div class="omega-article-rail__meta omega-quiet small">
+            <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
+            <span>{% omega_readtime content %} min read</span>
+          </div>
+          <div data-social-share
+                data-platforms=""
+                data-title=""
+                data-description=""
+                data-url=""
+                data-size="sm"
+                data-labels="false">
+          </div>
+        </aside>
+      </div>
+
+      <div class="blog-post-content omega-prose col-xl-7 col-lg-8 col-md-12 col-12">
+        {{ content | omega_content_format }}
+      </div>
+
+      <div class="col-xl-2 d-none d-xl-block"><!-- optical balance --></div>
+    </div>
+
+    <!-- Vert -->
+    {% if _verts_on %}
+      <div class="row justify-content-center mb-3">
+        <div class="col-xl-7 col-lg-8 col-md-12 col-12">
+          {% section "verts/unit", type: "in-article" %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</article>
+
+<!-- ═══ Tags, author & comments ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <!-- Tags -->
+    {% assign tags = '' | split: ',' %}
+    {% for tag in resolved.post.tags %}
+      {% assign tag_fixed = tag | omega_title_case %}
+      {% unless tags contains tag_fixed %}
+        {% assign tags = tags | push: tag_fixed %}
+      {% endunless %}
+    {% endfor %}
+    {% if tags.size > 0 %}
+      <div class="row justify-content-center mb-5">
+        <div class="col-xl-7 col-lg-8 col-md-12 col-12">
+          <div class="omega-chip-cloud justify-content-start">
+            {% for tag in tags %}
+              <a href="/blog/tags/{{ tag | slugify }}" class="omega-chip">{{ tag }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Author & share (author block only when the member resolves) -->
+    <div class="row justify-content-center mb-5">
+      <div class="col-xl-7 col-lg-8 col-md-12 col-12">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 py-4 hairline-top hairline-bottom">
+          {% if _author_name != '' %}
+            <div class="d-flex align-items-center">
+              <a href="{% omega_member resolved.post.author, "url" %}" class="omega-person__avatar d-block me-3" style="width: 3rem; height: 3rem; margin-bottom: 0;">
+                {% omega_member resolved.post.author, "image-tag", class="w-100 h-100 object-fit-cover" %}
+              </a>
+              <div>
+                <a href="{% omega_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
+                  <div class="fw-semibold">{{ _author_name }}</div>
+                </a>
+                {%- capture _author_position -%}{%- omega_member resolved.post.author, "position" -%}{%- endcapture -%}
+                {% if _author_position != '' %}
+                  <div class="text-muted small">{{ _author_position }}</div>
+                {% elsif resolved.author_section.author_position %}
+                  <div class="text-muted small">{{ resolved.author_section.author_position }}</div>
+                {% endif %}
+              </div>
+            </div>
+          {% else %}
+            <div class="d-flex align-items-center">
+              <span class="omega-post-card__avatar omega-post-card__avatar--fallback me-2" aria-hidden="true">
+                {% omega_icon "pen-nib", "fa-xs" %}
+              </span>
+              <div class="fw-semibold">{{ site.brand.name }}</div>
+            </div>
+          {% endif %}
+          <div data-social-share
+                data-platforms=""
+                data-title=""
+                data-description=""
+                data-url=""
+                data-size="sm"
+                data-labels="false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="row justify-content-center">
+      <div class="col-xl-7 col-lg-8 col-md-12 col-12">
+        {%- include modules/engagement/giscus.html -%}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Related posts ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="omega-section-head mb-5" data-omega-reveal>
+      {% component "heading/section-head", superheadline: resolved.related_posts.superheadline, headline: resolved.related_posts.headline %}
+    </div>
+
+    <div class="row g-4 gy-5" data-omega-reveal-stagger="60">
+      {% assign count = 0 %}
+      {% assign limit = resolved.related_posts.limit | default: 3 %}
+      {% for post in site.posts %}
+        {% if count < limit %}
+          {% if post.id != resolved.post.id %}
+            {% assign count = count | plus: 1 %}
+            <div class="col-xl-4 col-lg-6 col-md-12" data-omega-reveal>
+              {% include frontend/components/post-card.html post=post %}
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Newsletter band (shared; full-width now matches the blog index — flag for skin review if the old narrowed look mattered) ═══ -->
+{% section "marketing/newsletter-cta", data: resolved.newsletter, section_class: "pt-0" %}

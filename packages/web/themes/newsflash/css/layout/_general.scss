@@ -111,20 +111,45 @@ hr {
 }
 
 // ============================================
+// Shared section header (base markup: micro eyebrow + display headline + sub)
+// ============================================
+// Authored here because classy's layout/general (its usual home) is not
+// imported: its fixed-nav clearance rhythm has no place under the sticky
+// masthead.
+.omega-section-head {
+  max-width: 44rem;
+
+  .omega-micro {
+    display: block;
+    margin-bottom: 0.875rem;
+  }
+
+  p {
+    margin-top: 1rem;
+    color: var(--omega-ink-muted);
+  }
+}
+
+.omega-section-head--center {
+  margin-inline: auto;
+  text-align: center;
+}
+
+// ============================================
 // Footer — the ink slab that closes every page
 // ============================================
 // Structure comes from the classy footer floor (grid, columns, base row —
 // see _theme.scss); this overlay re-inks it: panel slab instead of surface,
 // pale text, volt column heads. Same selectors as the floor at equal
 // specificity — the overlay wins by landing later in the bundle.
-.classy-footer {
+.omega-footer {
   background: var(--nf-panel-bg);
   border-top: 0; // the slab's own edge against the paper IS the rule
   color: var(--nf-panel-color);
 
   // Masthead echo — wordmark-only oversized serif. The minted brandmark is
   // ink-on-transparent and would vanish on the slab, so it sits out.
-  .classy-nav__brand {
+  .omega-nav__brand {
     color: var(--nf-panel-color);
     text-decoration: none; // nameplates aren't underlined
 
@@ -136,12 +161,12 @@ hr {
     }
   }
 
-  .classy-footer__desc {
+  .omega-footer__desc {
     color: var(--nf-panel-color);
     opacity: 0.6;
   }
 
-  .classy-footer__social-link {
+  .omega-footer__social-link {
     color: var(--nf-panel-color);
     opacity: 0.78;
 
@@ -154,13 +179,13 @@ hr {
   }
 
   // Volt uppercase column heads (the editorial footer's section labels)
-  .classy-footer__head {
+  .omega-footer__head {
     font-weight: 800;
     letter-spacing: 0.14em;
     color: var(--nf-volt);
   }
 
-  .classy-footer__link {
+  .omega-footer__link {
     color: var(--nf-panel-color);
     opacity: 0.78;
 
@@ -172,16 +197,16 @@ hr {
   }
 
   // Base row — pale hairline + pale controls on the slab
-  .classy-footer__base {
+  .omega-footer__base {
     border-top-color: color-mix(in srgb, var(--nf-panel-color) 18%, transparent);
   }
 
-  .classy-footer__copyright {
+  .omega-footer__copyright {
     color: var(--nf-panel-color);
     opacity: 0.6;
   }
 
-  .classy-footer__powered {
+  .omega-footer__powered {
     color: var(--nf-panel-color);
     opacity: 0.6;
 
@@ -195,7 +220,7 @@ hr {
     }
   }
 
-  .classy-footer__legal a {
+  .omega-footer__legal a {
     color: var(--nf-panel-color);
     opacity: 0.78;
 
@@ -206,7 +231,7 @@ hr {
     }
   }
 
-  .classy-footer__pill {
+  .omega-footer__pill {
     color: var(--nf-panel-color);
     border-color: color-mix(in srgb, var(--nf-panel-color) 35%, transparent);
 
@@ -217,7 +242,7 @@ hr {
     }
   }
 
-  .classy-footer__seg {
+  .omega-footer__seg {
     border-color: color-mix(in srgb, var(--nf-panel-color) 35%, transparent);
 
     button {

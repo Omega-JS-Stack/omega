@@ -1,0 +1,125 @@
+---
+layout: frontend/core/base
+---
+
+<!-- ═══ Member — portrait split ═══ -->
+<section class="omega-dotgrid" data-omega-dotfield>
+  <div class="container">
+    {%- capture member_name -%}{%- omega_member resolved.member.id, "name" -%}{%- endcapture -%}
+    {%- assign first_name = member_name | split: ' ' | first -%}
+
+    <!-- Mono breadcrumb -->
+    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="/team">Team</a>
+      <span>/</span>
+      <span>{{ member_name }}</span>
+    </div>
+
+    <div class="omega-duo" style="--omega-duo-cols: 4fr 8fr;">
+      <!-- Portrait panel + facts -->
+      <div class="omega-duo__aside" data-omega-reveal>
+        <div class="omega-person mb-4">
+          <span class="omega-person__portrait">
+            {%- omega_member resolved.member.id, "image-tag", class="" -%}
+          </span>
+        </div>
+
+        {% if resolved.member.location or resolved.member.joined %}
+          <div class="omega-rowlist">
+            {% iftruthy resolved.member.location %}
+              <div class="omega-rowlist__item">
+                <span>{{ resolved.member.location }}</span>
+                <span class="omega-rowlist__meta">Location</span>
+              </div>
+            {% endiftruthy %}
+            {% iftruthy resolved.member.joined %}
+              <div class="omega-rowlist__item">
+                <span>{{ resolved.member.joined | date: "%B %Y" }}</span>
+                <span class="omega-rowlist__meta">Joined</span>
+              </div>
+            {% endiftruthy %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Identity + bio -->
+      <div data-omega-reveal-stagger="80">
+        <h1 class="omega-display omega-display--page" data-omega-reveal>{{ member_name }}</h1>
+
+        <div class="d-flex align-items-center gap-3 flex-wrap mt-2 mb-4" data-omega-reveal>
+          <span class="omega-micro">{{ resolved.member.position }}</span>
+          {% iftruthy resolved.member.links %}
+            <span class="d-inline-flex gap-2">
+              {% for link in resolved.member.links %}
+                {% assign link_icon = link.id %}
+                {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                <a href="{{ link.url }}" class="omega-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
+                  {% omega_icon link_icon, "fa-sm" %}
+                </a>
+              {% endfor %}
+            </span>
+          {% endiftruthy %}
+        </div>
+
+        {% iftruthy resolved.member.description %}
+          <p class="omega-statement mb-4" data-omega-reveal>{{ resolved.member.description }}</p>
+        {% endiftruthy %}
+
+        {% if resolved.member.skills or resolved.member.hobbies %}
+          <div class="omega-chip-cloud justify-content-start mb-4" data-omega-reveal>
+            {% for skill in resolved.member.skills %}
+              <span class="omega-chip">{{ skill }}</span>
+            {% endfor %}
+            {% for hobby in resolved.member.hobbies %}
+              <span class="omega-chip omega-chip--accent">{{ hobby }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="omega-prose" data-omega-reveal>
+          {{ content | omega_content_format }}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ The rest of the team ═══ -->
+{% assign _others_count = 0 %}
+{% for other in site.team %}
+  {% unless other.url == page.url %}{% assign _others_count = _others_count | plus: 1 %}{% endunless %}
+{% endfor %}
+{% if _others_count > 0 %}
+  <section class="pt-0">
+    <div class="container">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4" data-omega-reveal>
+        <h2 class="omega-panel-head justify-content-start h5 mb-0">More of the team</h2>
+        <a href="/team" class="text-decoration-none small">
+          Everyone
+          {% omega_icon "arrow-right", "fa-xs ms-1" %}
+        </a>
+      </div>
+
+      <div class="row g-4" data-omega-reveal-stagger="70">
+        {% assign _shown = 0 %}
+        {% for other in site.team %}
+          {% if other.url == page.url or _shown >= 4 %}{% continue %}{% endif %}
+          {% assign _shown = _shown | plus: 1 %}
+          <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
+            <div class="omega-person">
+              <a href="{{ other.url }}" class="omega-person__portrait">
+                {%- omega_member other.id, "image-tag", class="" -%}
+              </a>
+              <div class="omega-person__body">
+                <h3 class="omega-person__name">
+                  <a href="{{ other.url }}">{%- omega_member other.id, "name" -%}</a>
+                </h3>
+                <span class="omega-micro omega-person__role">{{ other.member.position }}</span>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

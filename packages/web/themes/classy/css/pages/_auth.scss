@@ -2,7 +2,7 @@
 // layout. App-family type on a quiet surface card. `--split` pairs the card
 // with an ink aside (the signup pitch panel).
 
-.classy-auth {
+.omega-auth {
   width: 100%;
   margin-inline: auto;
 
@@ -17,7 +17,7 @@
   }
 
   // Split variant: form card + ink pitch panel (signup)
-  &.classy-auth--split {
+  &.omega-auth--split {
     display: grid;
     gap: 0;
     background: var(--omega-surface);
@@ -31,7 +31,7 @@
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     }
 
-    .classy-auth__card {
+    .omega-auth__card {
       border: 0;
       border-radius: 0;
       box-shadow: none;
@@ -43,9 +43,9 @@
     }
   }
 
-  // The ink pitch panel (hidden under lg) — rides .classy-ink-panel's local
+  // The ink pitch panel (hidden under lg) — rides .omega-ink-panel's local
   // token re-scope in markup; radius flattens inside the split shell
-  .classy-auth__aside {
+  .omega-auth__aside {
     display: none;
     position: relative;
 
@@ -58,7 +58,7 @@
     }
   }
 
-  .classy-auth__aside-title {
+  .omega-auth__aside-title {
     font-family: var(--omega-font-marketing);
     font-size: 1.75rem;
     font-weight: 550;
@@ -71,7 +71,7 @@
     }
   }
 
-  .classy-auth__aside-row {
+  .omega-auth__aside-row {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
@@ -92,13 +92,13 @@
     }
   }
 
-  .classy-auth__aside-foot {
+  .omega-auth__aside-foot {
     margin-top: 1.75rem;
     font-size: 0.75rem;
     color: var(--omega-ink-faint);
   }
 
-  .classy-auth__card {
+  .omega-auth__card {
     padding: 2rem 1.75rem;
     background: var(--omega-surface);
     border: 1px solid var(--omega-line);
@@ -106,7 +106,7 @@
     box-shadow: var(--omega-shadow-1);
   }
 
-  .classy-auth__brand {
+  .omega-auth__brand {
     display: flex;
     justify-content: center;
     margin-bottom: 1.25rem;
@@ -119,7 +119,7 @@
     }
   }
 
-  .classy-auth__title {
+  .omega-auth__title {
     font-size: 1.375rem;
     font-weight: 650;
     letter-spacing: -0.02em;
@@ -127,7 +127,7 @@
     margin-bottom: 0.25rem;
   }
 
-  .classy-auth__sub {
+  .omega-auth__sub {
     font-size: 0.875rem;
     color: var(--omega-ink-muted);
     text-align: center;
@@ -138,7 +138,7 @@
   // brandmark in its own colors when the frontmatter names `logo:` (omega_logo),
   // the monochrome omega_icon glyph otherwise. Either way an inline SVG: the ITW
   // CDN logo <img> stays retired.
-  .classy-auth__social {
+  .omega-auth__social {
     svg {
       width: 1.125rem;
       height: 1.125rem;
@@ -148,7 +148,7 @@
   // Signup consent group: transparent border reserves the layout space; the
   // validation JS (libs/auth/forms.js) toggles .is-invalid — same border
   // color the email/password fields show when invalid
-  .classy-auth__consent {
+  .omega-auth__consent {
     border: 1px solid transparent;
 
     &.is-invalid {
@@ -156,12 +156,12 @@
     }
   }
 
-  .classy-auth__consent-error {
+  .omega-auth__consent-error {
     color: var(--bs-form-invalid-color, var(--bs-danger, #dc3545));
   }
 
   // OR divider
-  .classy-auth__divider {
+  .omega-auth__divider {
     display: flex;
     align-items: center;
     gap: 0.875rem;
@@ -183,12 +183,12 @@
   // "Forgot password?" beside the password label — the accent link color the
   // rest of the card uses (Bootstrap's .form-text would paint it muted gray),
   // at helper-text size
-  .classy-auth__forgot {
+  .omega-auth__forgot {
     font-size: 0.875em;
     font-weight: 600;
   }
 
-  .classy-auth__foot {
+  .omega-auth__foot {
     margin-top: 1.5rem;
     text-align: center;
     font-size: 0.875rem;
@@ -214,20 +214,20 @@
 }
 
 // Feature bullets on the cover page's side column (signup)
-.classy-auth-features {
-  .classy-auth-features__item {
+.omega-auth-features {
+  .omega-auth-features__item {
     display: flex;
     gap: 0.875rem;
     margin-bottom: 1.25rem;
   }
 
-  .classy-auth-features__title {
+  .omega-auth-features__title {
     font-size: 0.9375rem;
     font-weight: 650;
     color: var(--omega-ink);
   }
 
-  .classy-auth-features__desc {
+  .omega-auth-features__desc {
     font-size: 0.84375rem;
     color: var(--omega-ink-muted);
     margin-bottom: 0;

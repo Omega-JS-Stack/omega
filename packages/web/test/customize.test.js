@@ -130,7 +130,7 @@ test('cp220: the {% composition %} guard — append without the flag (legacy), r
   const replaced = (await buildConsumer(consumer, 'customize-replace')).get('/');
   assert.ok(replaced.includes('My replacement home'), 'the page body renders');
   assert.ok(replaced.includes('<h2'), 'markdown content formats (parity branch)');
-  assert.ok(!replaced.includes('classy-hero'), 'the default composition is REPLACED by default');
+  assert.ok(!replaced.includes('omega-hero'), 'the default composition is REPLACED by default');
 
   // append: true — the legacy escape hatch: body renders BELOW the composition
   fs.writeFileSync(
@@ -138,9 +138,9 @@ test('cp220: the {% composition %} guard — append without the flag (legacy), r
     '---\nlayout: blueprint/index\npermalink: /\nappend: true\n---\n\n## My appended prose\n',
   );
   const appended = (await buildConsumer(consumer, 'customize-append')).get('/');
-  assert.ok(appended.includes('classy-hero'), 'the default composition still renders');
+  assert.ok(appended.includes('omega-hero'), 'the default composition still renders');
   assert.ok(appended.includes('My appended prose'), 'body content appends below it');
-  assert.ok(appended.indexOf('classy-hero') < appended.indexOf('My appended prose'), 'composition first, content after');
+  assert.ok(appended.indexOf('omega-hero') < appended.indexOf('My appended prose'), 'composition first, content after');
 });
 
 test('cp220: materialize-then-build identity, then divergence — args land, bands drop, words keep flowing', async () => {
@@ -176,7 +176,7 @@ test('cp220: materialize-then-build identity, then divergence — args land, ban
   for (const [url, content] of before) {
     assert.strictEqual(normalize(url, after.get(url)), normalize(url, content), `${url} unchanged by materializing`);
   }
-  assert.ok(after.get('/').includes('classy-hero'), 'the composition renders from the page body now');
+  assert.ok(after.get('/').includes('omega-hero'), 'the composition renders from the page body now');
   assert.ok(after.get('/').includes('Sarah Johnson'), 'theme words flow through resolved.* — never inlined');
 
   // Diverge the new-world way (frontmatter is meta-only): an arg override on
@@ -191,7 +191,7 @@ test('cp220: materialize-then-build identity, then divergence — args land, ban
   const custom = await buildConsumer(SCRATCH, 'customize-c');
   const customHome = custom.get('/');
   assert.ok(customHome.includes('MiniCo custom close'), 'the call-site arg override lands');
-  assert.ok(!customHome.includes('classy-stats'), 'the deleted one-liner drops exactly that band');
+  assert.ok(!customHome.includes('omega-stats'), 'the deleted one-liner drops exactly that band');
   assert.ok(customHome.includes('Sarah Johnson'), 'untouched bands keep their theme words');
   for (const [url, content] of after) {
     if (url === '/') continue;

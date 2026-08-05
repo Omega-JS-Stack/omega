@@ -25,29 +25,29 @@ h6, .h6 {
 // ============================================
 // Marketing display — the serif voice
 // ============================================
-.classy-display {
+.omega-display {
   font-family: var(--omega-font-marketing);
   font-weight: 560;
   letter-spacing: -0.022em;
   line-height: 1.04;
 }
 
-.classy-display--hero {
+.omega-display--hero {
   font-size: clamp(2.75rem, 6.2vw, 4.625rem);
 }
 
-.classy-display--section {
+.omega-display--section {
   font-size: clamp(1.875rem, 3.4vw, 2.625rem);
   line-height: 1.08;
 }
 
-.classy-display--page {
+.omega-display--page {
   font-size: clamp(2.25rem, 4.6vw, 3.375rem);
   line-height: 1.06;
 }
 
-.classy-display em,
-.classy-display i {
+.omega-display em,
+.omega-display i {
   font-style: italic;
 }
 
@@ -59,7 +59,7 @@ h6, .h6 {
 // ============================================
 // Micro labels — the uppercase 11px voice
 // ============================================
-.classy-micro {
+.omega-micro {
   font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0.09em;
@@ -82,7 +82,7 @@ h6, .h6 {
 }
 
 // The faintest voice — footnotes, reassurance lines, fine print
-.classy-quiet {
+.omega-quiet {
   color: var(--omega-ink-faint);
 }
 

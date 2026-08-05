@@ -299,7 +299,7 @@ test('wave 5: the faq union — duo + center variants, converged ids, dom_id kno
   assert.ok(download.includes('Is MiniCo free to download?'), 'faq items rode the data bridge, brand-liquified');
   const alt = pages.get('/alternatives/acme-growth');
   assert.ok(alt, 'alternative page built');
-  assert.ok(alt.includes('classy-section-head--center'), 'variant: "center" renders the stacked shell');
+  assert.ok(alt.includes('omega-section-head--center'), 'variant: "center" renders the stacked shell');
   assert.ok(alt.includes('How long does a MiniCo migration take?'), 'call-site liquification replaced the explicit omega_liquify');
   assert.ok(alt.includes('<em>switching</em>'), 'accent em renders in the center head');
   // The multi-instance knob rides the body-call lane on the demo page.
@@ -315,15 +315,15 @@ test('wave 6: heading/masthead — the first REAL component serves the interior-
   assert.ok(pricing, 'pricing built');
   assert.ok(pricing.includes('<em>for the right price</em>'), 'pricing copy moved from inline | default: to frontmatter intact');
   assert.ok(pricing.includes('>Pricing</span>'), 'literal eyebrow arg renders the micro label');
-  assert.ok(pricing.includes('classy-hero__sub mx-auto'), 'sub_class knob carries the centered variant');
+  assert.ok(pricing.includes('omega-hero__sub mx-auto'), 'sub_class knob carries the centered variant');
   const about = pages.get('/about-blueprint');
   assert.ok(about, 'about blueprint page built');
   assert.ok(about.includes('>About MiniCo</span>'), 'eyebrow | default: fallback fires when superheadline is unset');
   const blog = pages.get('/blog');
-  assert.ok(blog.includes('classy-display--page mb-0'), 'h1_class knob appends to the display classes');
-  assert.ok(blog.includes('classy-hero-split__sub mt-3 mb-0'), 'blog sub_class variant rides through');
+  assert.ok(blog.includes('omega-display--page mb-0'), 'h1_class knob appends to the display classes');
+  assert.ok(blog.includes('omega-hero-split__sub mt-3 mb-0'), 'blog sub_class variant rides through');
   const terms = pages.get('/terms');
-  assert.ok(terms.includes('>Legal</span>') && terms.includes('classy-legal__sub classy-quiet'), 'legal head converges with its own knobs');
+  assert.ok(terms.includes('>Legal</span>') && terms.includes('omega-legal__sub omega-quiet'), 'legal head converges with its own knobs');
   const alt = pages.get('/alternatives/acme-growth');
   assert.ok(alt.includes('<em>Acme Growth</em>'), 'component args liquify at call site (the dropped omega_liquify)');
 });
@@ -363,7 +363,7 @@ test('body-call lane: a consumer page composes the section with YAML args', asyn
   assert.ok(demo, 'sections-demo built');
   assert.ok(demo.includes('Composed from'), 'body-call headline rendered');
   assert.ok(demo.includes('a body call'), 'body-call rotating item rendered');
-  assert.ok(!demo.includes('classy-mock'), 'frame.enabled: false suppressed the product frame');
+  assert.ok(!demo.includes('omega-mock'), 'frame.enabled: false suppressed the product frame');
   assert.ok(!demo.includes('btn-cmd'), 'unset command renders no command button (pass B)');
 });
 
@@ -396,10 +396,10 @@ test('cp219: expression name must resolve to an id string', async () => {
 
 const THEMES = path.join(__dirname, '..', 'themes');
 
-test('cp219: buildSectionLibrary — resolved entries over the real classy chain', () => {
-  const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'classy')] });
-  assert.equal(entries.length, 19, `classy chain: 16 sections + 3 components (verts/unit added cp246, data/org-chart #72), got ${entries.length}`);
-  assert.ok(entries.every((entry) => entry.source === 'classy'), 'every entry owned by the classy layer');
+test('cp219: buildSectionLibrary — resolved entries over the real base chain', () => {
+  const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'base')] });
+  assert.equal(entries.length, 19, `base chain: 16 sections + 3 components (verts/unit added cp246, data/org-chart #72), got ${entries.length}`);
+  assert.ok(entries.every((entry) => entry.source === 'base'), 'every entry owned by the base layer');
 
   const hero = entries.find((entry) => entry.id === 'marketing/hero' && entry.kind === 'section');
   assert.ok(hero.argsTable.some((row) => row.name === 'rotating' && row.type === 'array'), 'args rows normalized');
@@ -414,14 +414,15 @@ test('cp219: buildSectionLibrary — resolved entries over the real classy chain
 });
 
 test('cp219: buildSectionLibrary — the newsflash chain resolves overrides and fallthroughs honestly', () => {
-  const { entries } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'newsflash'), path.join(THEMES, 'classy')] });
+  const { entries } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'newsflash'), path.join(THEMES, 'base')] });
   assert.equal(entries.length, 25, `nf chain: 19 shared ids + 6 nf-only, got ${entries.length}`);
 
   const cta = entries.find((entry) => entry.id === 'marketing/cta');
-  assert.equal(cta.source, 'newsflash', 'the override wins the entry');
+  assert.equal(cta.source, 'base', 'the deleted fork falls through: the base owns the entry (#177 phase 2)');
   const hero = entries.find((entry) => entry.id === 'marketing/hero');
-  assert.equal(hero.source, 'classy', 'fallthrough ids show the base layer (the doctrine, visible)');
+  assert.equal(hero.source, 'base', 'fallthrough ids show the base layer (the doctrine, visible)');
   const newsletter = entries.find((entry) => entry.id === 'marketing/newsletter-cta');
+  assert.equal(newsletter.source, 'newsflash', 'the kept fork wins its entry');
   assert.deepEqual(newsletter.inherit, ['js'], 'declared inherit lanes surface for the docs chip');
   const byline = entries.find((entry) => entry.id === 'news/byline');
   assert.equal(byline.demo.length, 0, 'lookup-driven components stay demo-less by design');

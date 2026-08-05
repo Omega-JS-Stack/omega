@@ -107,7 +107,7 @@ function updateReferralsList(referrals) {
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <div class="d-flex align-items-center">
-                  <span class="classy-chip me-2">#${sortedReferrals.length - index}</span>
+                  <span class="omega-chip me-2">#${sortedReferrals.length - index}</span>
                   <div>
                     <strong class="font-monospace small">${omega.utilities().escapeHTML(referral.uid || 'Unknown User')}</strong>
                     <div class="text-muted small">${omega.utilities().escapeHTML(dateStr)}${timeStr ? ` at ${omega.utilities().escapeHTML(timeStr)}` : ''}</div>

@@ -6,7 +6,7 @@
 
 // Classy's vendored faces take over the font tokens (scheme-agnostic — one
 // :root stamp). The system stacks stay as fallbacks, and everything below
-// (Bootstrap bridge, type presets, .classy-display) reads THESE tokens, so a
+// (Bootstrap bridge, type presets, .omega-display) reads THESE tokens, so a
 // consumer re-points fonts by redefining two custom properties.
 :root {
   --omega-font-ui: 'Inter', -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif;

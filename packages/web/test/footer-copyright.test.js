@@ -9,7 +9,7 @@ const { test } = require('node:test');
 const { buildWith, miniData } = require('./lib/build.js');
 
 function copyrightLine(html) {
-  const match = html.match(/class="?classy-footer__copyright"?[^>]*>([\s\S]*?)<\/span>/);
+  const match = html.match(/class="?omega-footer__copyright"?[^>]*>([\s\S]*?)<\/span>/);
   assert.ok(match, 'the footer renders a copyright span');
   return match[1].replace(/\s+/g, ' ').trim();
 }
@@ -55,7 +55,7 @@ test('brand.company + company.url → the parent name links the parent site', as
 test('the base row carries the framework powered-by line', async () => {
   const pages = await buildWith(miniData, {}, 'footer-powered');
   const html = pages.get('/');
-  const match = html.match(/class="classy-footer__powered"[^>]*>([\s\S]*?)<\/span>\s*<\/span>/);
+  const match = html.match(/class="omega-footer__powered"[^>]*>([\s\S]*?)<\/span>\s*<\/span>/);
 
   assert.ok(match, 'the footer renders a powered-by span');
   const line = match[1].replace(/\s+/g, ' ').trim();

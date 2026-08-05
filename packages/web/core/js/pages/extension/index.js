@@ -59,7 +59,7 @@ function setupBrowserDetection() {
   $hero.target = '_blank';
   $hero.rel = 'noopener';
   $hero.querySelector('[data-hero-label]').textContent = $link.textContent.trim();
-  const $mark = $card.querySelector('.classy-dl-card__mark svg');
+  const $mark = $card.querySelector('.omega-dl-card__mark svg');
   if ($mark) {
     $hero.querySelector('[data-hero-icon]').innerHTML = $mark.outerHTML;
   }

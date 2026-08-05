@@ -3,10 +3,10 @@
   with optional accent span, then an optional lead paragraph. Callers keep
   their own <header> shell (margins vary per band).
 {% endcomment %}
-<h2 class="h1 mb-2">
+<h2 class="newsflash-lede h1 mb-2">
   {{ args.headline }}
   {% iftruthy args.headline_accent %}
-    <span class="text-accent">{{ args.headline_accent }}</span>
+    <span class="newsflash-accent">{{ args.headline_accent }}</span>
   {% endiftruthy %}
 </h2>
 {% iftruthy args.subheadline %}

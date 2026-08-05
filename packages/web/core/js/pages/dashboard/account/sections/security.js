@@ -153,7 +153,7 @@ function update2FAStatus(twoFactorData) {
 
   if (twoFactorData?.enabled) {
     if ($2faStatus) {
-      $2faStatus.innerHTML = '<span class="classy-status classy-status--ok"><span class="classy-dot classy-dot--ok"></span>Enabled</span>';
+      $2faStatus.innerHTML = '<span class="omega-status omega-status--ok"><span class="omega-dot omega-dot--ok"></span>Enabled</span>';
     }
     if ($2faBtn) {
       $2faBtn.textContent = 'Manage 2FA';
@@ -161,7 +161,7 @@ function update2FAStatus(twoFactorData) {
     }
   } else {
     if ($2faStatus) {
-      $2faStatus.innerHTML = '<span class="classy-status"><span class="classy-dot classy-dot--muted"></span>Disabled</span>';
+      $2faStatus.innerHTML = '<span class="omega-status"><span class="omega-dot omega-dot--muted"></span>Disabled</span>';
     }
     if ($2faBtn) {
       $2faBtn.textContent = 'Enable 2FA';
@@ -304,7 +304,7 @@ async function updateActiveSessions(account) {
         </div>
         <div class="text-end">
           <small class="text-muted">${omega.utilities().escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
-          ${session.isCurrent ? '<span class="classy-chip classy-chip--accent ms-2">Current</span>' : ''}
+          ${session.isCurrent ? '<span class="omega-chip omega-chip--accent ms-2">Current</span>' : ''}
         </div>
       </div>
     </div>

@@ -56,7 +56,7 @@ function parseFrontmatter(raw) {
 
 /**
  * The ordered `_layouts` dirs for a consumer + active theme — mirrors the
- * engine's layout layer order (consumer → active theme → classy → core).
+ * engine's layout layer order (consumer → active theme → base → core).
  * @param {object} options
  * @param {string} options.consumerDir
  * @param {object} [options.siteData] - resolved config (theme.id names the active theme)

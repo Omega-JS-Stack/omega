@@ -35,16 +35,16 @@ test('#14: platform identity is the MARK — the small neutral chip is gone', as
   const download = pages.get('/download');
   assert.ok(download, 'download page built');
 
-  const marks = download.match(/classy-dl-card__mark/g) || [];
+  const marks = download.match(/omega-dl-card__mark/g) || [];
   assert.equal(marks.length, 3, 'every desktop card leads with the platform mark');
-  assert.ok(!download.includes('classy-dl-card__chip'), 'the old chip variant is gone');
+  assert.ok(!download.includes('omega-dl-card__chip'), 'the old chip variant is gone');
 });
 
 test('#14: two artifacts ride side by side — one does not', async () => {
   const pages = await buildWith(withDownloads);
   const download = pages.get('/download');
 
-  const splits = download.match(/classy-dl-card__actions classy-dl-card__actions--split/g) || [];
+  const splits = download.match(/omega-dl-card__actions omega-dl-card__actions--split/g) || [];
   assert.equal(splits.length, 1, 'only Linux (.deb + snap) splits its action row');
   assert.ok(download.includes('app.deb') && download.includes('app.snap'), 'both Linux artifacts render');
   assert.ok(!download.includes('btn-adaptive w-100'), 'action width is the flex row\'s job now');
@@ -88,16 +88,16 @@ test('QA: /download keeps its hero masthead and drops the second lead-in', async
   const h1s = download.match(/<h1[^>]*>/g) || [];
   assert.equal(h1s.length, 1, 'exactly one h1 (SEO checklist)');
   assert.ok(!h1s[0].includes('visually-hidden'), 'the h1 is visible, not screen-reader only');
-  assert.ok(download.includes('<span class="classy-micro d-block mb-3" data-omega-reveal>Download</span>'),
+  assert.ok(download.includes('<span class="omega-micro d-block mb-3" data-omega-reveal>Download</span>'),
     'the masthead eyebrow renders');
   assert.ok(download.includes('Take MiniCo with you'), 'the hero headline renders');
-  assert.ok(download.includes('classy-hero__sub'), 'the hero sub line renders');
+  assert.ok(download.includes('omega-hero__sub'), 'the hero sub line renders');
 
   const platforms = sectionOf(download, 'platforms');
-  assert.ok(!platforms.includes('classy-section-head'), 'no section head above the platform cards');
+  assert.ok(!platforms.includes('omega-section-head'), 'no section head above the platform cards');
   assert.ok(!download.includes('Every platform,'), 'the second lead-in copy is gone');
   assert.ok(!download.includes('Pick your machine'), 'the older second lead-in stays gone');
-  assert.ok(download.includes('classy-dl-card__mark'), 'the platform cards still render');
+  assert.ok(download.includes('omega-dl-card__mark'), 'the platform cards still render');
 });
 
 test('QA: /extension echoes it — hero masthead kept, second lead-in gone', async () => {
@@ -107,25 +107,25 @@ test('QA: /extension echoes it — hero masthead kept, second lead-in gone', asy
   const h1s = extension.match(/<h1[^>]*>/g) || [];
   assert.equal(h1s.length, 1, 'exactly one h1 (SEO checklist)');
   assert.ok(!h1s[0].includes('visually-hidden'), 'the h1 is visible, not screen-reader only');
-  assert.ok(extension.includes('<span class="classy-micro d-block mb-3" data-omega-reveal>Extension</span>'),
+  assert.ok(extension.includes('<span class="omega-micro d-block mb-3" data-omega-reveal>Extension</span>'),
     'the masthead eyebrow renders');
   assert.ok(extension.includes('One tab away, in <em>every</em> browser'), 'the hero headline renders');
-  assert.ok(extension.includes('classy-hero__sub'), 'the hero sub line renders');
+  assert.ok(extension.includes('omega-hero__sub'), 'the hero sub line renders');
 
   const browsers = sectionOf(extension, 'browsers');
-  assert.ok(!browsers.includes('classy-section-head'), 'no section head above the browser cards');
+  assert.ok(!browsers.includes('omega-section-head'), 'no section head above the browser cards');
   assert.ok(!extension.includes('Your browser is'), 'the second lead-in copy is gone');
-  assert.ok(extension.includes('classy-dl-card__mark'), 'the browser cards still render');
+  assert.ok(extension.includes('omega-dl-card__mark'), 'the browser cards still render');
 });
 
 test('#14: the onboarding modal wears the current design language', async () => {
   const pages = await buildWith(withDownloads);
   const download = pages.get('/download');
 
-  assert.ok(download.includes('modal-content classy-dl-modal'), 'the modal is a classy surface');
-  assert.ok(download.includes('classy-dl-modal__pane'), 'the command panes are designed surfaces');
-  assert.ok(download.includes('classy-dl-modal__cmd'), 'the command inputs are token-painted');
-  assert.ok(download.includes('classy-dl-modal__help'), 'the help note replaced alert-info');
+  assert.ok(download.includes('modal-content omega-dl-modal'), 'the modal is a classy surface');
+  assert.ok(download.includes('omega-dl-modal__pane'), 'the command panes are designed surfaces');
+  assert.ok(download.includes('omega-dl-modal__cmd'), 'the command inputs are token-painted');
+  assert.ok(download.includes('omega-dl-modal__help'), 'the help note replaced alert-info');
 
   for (const legacy of ['alert alert-success', 'alert alert-info', 'bg-body-tertiary', 'bg-white border border-primary', 'bg-dark text-light']) {
     assert.ok(!download.includes(legacy), `Bootstrap-era chrome gone: ${legacy}`);
@@ -136,7 +136,7 @@ test('QA: the modal is instructions only — no started card, no dismiss button'
   const pages = await buildWith(withDownloads);
   const download = pages.get('/download');
 
-  assert.ok(!download.includes('classy-dl-modal__started'), 'the download-started card is gone');
+  assert.ok(!download.includes('omega-dl-modal__started'), 'the download-started card is gone');
   assert.ok(!download.includes('Your download should begin automatically'), 'its copy went with it');
   assert.ok(!download.includes('modal-footer'), 'the footer holding "Got it!" is gone');
   assert.ok(!download.includes('Got it!'), 'the redundant dismiss button is gone');
@@ -145,8 +145,8 @@ test('QA: the modal is instructions only — no started card, no dismiss button'
   const scss = fs.readFileSync(
     path.join(PKG, 'themes', 'classy', 'css', 'marketing', '_downloads.scss'), 'utf8',
   );
-  assert.ok(!scss.includes('.classy-dl-modal__started'), 'the dead rule went with the markup');
-  const help = scss.match(/\.classy-dl-modal__help \{[^}]*\}/)[0];
+  assert.ok(!scss.includes('.omega-dl-modal__started'), 'the dead rule went with the markup');
+  const help = scss.match(/\.omega-dl-modal__help \{[^}]*\}/)[0];
   assert.ok(!help.includes('display: flex'), 'the help note sets as prose, not as gapped flex items');
 });
 
