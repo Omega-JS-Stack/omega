@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.22.1] (2026-08-04)
 ### Fixed
-- [#183](../../issues/183) — Icon presentation is ONE sheet for every target: web's icon sheet is vendored to desktop and extension at prepare, it implements the `fa-bounce`/`fa-beat` core markup already uses, and `icon-core` parses all 12 shipped size classes as modifiers instead of icon names.
-- [#185](../../issues/185) — Every continuous loop in the web package's core css parks under `prefers-reduced-motion`, not just the `.animation-*` utilities: the lazy-load and binding shimmers, the exit-popup wave, the studio record pulse, and the download/extension pointers, with the test roster derived from every looping sheet.
-- [#182](../../issues/182) — `assets.test.js` builds its fixtures into a per-process out dir and clears it when the file finishes, so two concurrent web-suite runs no longer wipe each other's assets mid-flight.
+- [#183](../../issues/183) [`a6907a0f`](../../commit/a6907a0f) Thanks [@ianwieds]! — Icon presentation is ONE sheet for every target: web's icon sheet is vendored to desktop and extension at prepare, it implements the `fa-bounce`/`fa-beat` core markup already uses, and `icon-core` parses all 12 shipped size classes as modifiers instead of icon names.
+- [#185](../../issues/185) [`a6907a0f`](../../commit/a6907a0f) Thanks [@ianwieds]! — Every continuous loop in the web package's core css parks under `prefers-reduced-motion`, not just the `.animation-*` utilities: the lazy-load and binding shimmers, the exit-popup wave, the studio record pulse, and the download/extension pointers, with the test roster derived from every looping sheet.
+- [#182](../../issues/182) [`a6907a0f`](../../commit/a6907a0f) Thanks [@ianwieds]! — `assets.test.js` builds its fixtures into a per-process out dir and clears it when the file finishes, so two concurrent web-suite runs no longer wipe each other's assets mid-flight.
 
 ## [0.22.0] (2026-08-04)
 ### Added
