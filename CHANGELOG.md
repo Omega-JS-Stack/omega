@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.22.3] (2026-08-05)
 ### Added
-- [#188](../../issues/188) — A web-package guard test compiles every core sheet, theme, and vendored Bootstrap, and fails on any bare `var()` consuming a custom property nothing defines, the mechanism behind invisible surfaces.
+- [#188](../../issues/188) [`f52ea7c0`](../../commit/f52ea7c0) Thanks [@ianwieds]! — A web-package guard test compiles every core sheet, theme, and vendored Bootstrap, and fails on any bare `var()` consuming a custom property nothing defines, the mechanism behind invisible surfaces.
 
 ### Fixed
-- [#27](../../issues/27) — Newsflash dropdown menus, the mobile nav drawer, the 404 URL chip, and the pricing billing toggle rendered transparent: the theme's `--bs-card-bg` paper alias is now defined at `:root` so every consumer resolves it.
-- [#187](../../issues/187) — The updates page's code and pre blocks paint their tinted panels again: two uses of a misnamed `--bs-body-tertiary-bg` are renamed to Bootstrap's real `--bs-tertiary-bg`.
+- [#27](../../issues/27) [`f52ea7c0`](../../commit/f52ea7c0) Thanks [@ianwieds]! — Newsflash dropdown menus, the mobile nav drawer, the 404 URL chip, and the pricing billing toggle rendered transparent: the theme's `--bs-card-bg` paper alias is now defined at `:root` so every consumer resolves it.
+- [#187](../../issues/187) [`f52ea7c0`](../../commit/f52ea7c0) Thanks [@ianwieds]! — The updates page's code and pre blocks paint their tinted panels again: two uses of a misnamed `--bs-body-tertiary-bg` are renamed to Bootstrap's real `--bs-tertiary-bg`.
 
 ## [0.22.2] (2026-08-05)
 ### Fixed
