@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.22.2] (2026-08-05)
 ### Fixed
-- [#186](../../issues/186) — The reduced-motion park guard now covers the theme trees too: `animations.test.js` derives its roster from every looping theme sheet as well as core css, compiling each through its theme, so an unparked theme loop fails the suite.
-- [#36](../../issues/36) — Devkit's isolated e2e-harness pass runs the file directly instead of through `node --test`, removing the runner-IPC deserialize fault that failed the file while every subtest passed; the retry and evidence log stay as a net for unknown flakes.
+- [#186](../../issues/186) [`85ceef38`](../../commit/85ceef38) Thanks [@ianwieds]! — The reduced-motion park guard now covers the theme trees too: `animations.test.js` derives its roster from every looping theme sheet as well as core css, compiling each through its theme, so an unparked theme loop fails the suite.
+- [#36](../../issues/36) [`85ceef38`](../../commit/85ceef38) Thanks [@ianwieds]! — Devkit's isolated e2e-harness pass runs the file directly instead of through `node --test`, removing the runner-IPC deserialize fault that failed the file while every subtest passed; the retry and evidence log stay as a net for unknown flakes.
 
 ## [0.22.1] (2026-08-04)
 ### Fixed
