@@ -233,6 +233,14 @@ $nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mi
   @include nf-light-rgb;
 }
 
+// The theme uses --bs-card-bg as its universal "framed paper" background
+// (dropdowns, the mobile nav drawer, accordions, pricing chrome). Root-level
+// so it resolves on EVERY consumer; an undefined var() in a background
+// shorthand computes to transparent, which is how invisible panels happen.
+:root {
+  --bs-card-bg: var(--omega-surface);
+}
+
 // Component surfaces ride the tokens too. (Volt ::selection lives in
 // css/base/_utilities.scss with the rest of the editorial garnish.)
 .card,
