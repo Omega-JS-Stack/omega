@@ -7,7 +7,7 @@
  * (`infinite` in the shorthand), not off a hand-kept list: a new infinite
  * utility with no park fails here. #185 widens the same pin from the
  * animation sheet to EVERY core sheet that declares a loop, roster derived
- * from the tree.
+ * from the tree; #186 widens the roster again, over the theme trees.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -19,6 +19,12 @@ const { PKG } = require('./lib/build.js');
 
 const CSS_DIR = path.join(PKG, 'core', 'css');
 const ANIMATION_SHEET = path.join(CSS_DIR, 'core', '_animations.scss');
+const THEMES_DIR = path.join(PKG, 'themes');
+
+// themes/bootstrap/scss is vendored upstream Bootstrap, not ours to edit, and
+// its spinners answer reduced motion by slowing down rather than stopping. The
+// roster covers everything this package authors, bootstrap overrides included.
+const VENDOR_THEME = path.join(THEMES_DIR, 'bootstrap', 'scss') + path.sep;
 
 const compileSheet = (file) => {
   const warnings = [];
@@ -30,13 +36,29 @@ const compileSheet = (file) => {
 
 const compileAnimationSheet = () => compileSheet(ANIMATION_SHEET);
 
-// Every core sheet whose source declares an infinite animation. Derived from
-// the tree, so a new looping sheet is guarded the day it lands.
-const loopingSheets = () => fs.readdirSync(CSS_DIR, { recursive: true, withFileTypes: true })
+// Every sheet under a tree whose source declares an infinite animation.
+// Derived from the tree, so a new looping sheet is guarded the day it lands.
+const loopingSheets = (root) => fs.readdirSync(root, { recursive: true, withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.endsWith('.scss'))
   .map((entry) => path.join(entry.parentPath, entry.name))
+  .filter((file) => !file.startsWith(VENDOR_THEME))
   .filter((file) => /animation[^;{}]*:[^;{}]*\binfinite\b/.test(fs.readFileSync(file, 'utf8')))
   .sort();
+
+// The animation names a sheet's own loops carry. A theme partial compiles as
+// part of a whole theme, so the check needs a way to stay on that sheet's
+// rules instead of every rule the theme's import chain drags in.
+const loopNames = (file) => [...fs.readFileSync(file, 'utf8')
+  .matchAll(/animation:\s*([a-zA-Z][\w-]*)[^;{}]*\binfinite\b/g)].map((match) => match[1]);
+
+// A theme partial is a fragment, not a compilation unit: its variables and
+// mixins arrive through the theme entry's import chain, so the entry is what
+// compiles. Component and section sheets are the exception, because the
+// sections lane compiles each one on its own.
+const compileUnitFor = (sheet) => {
+  const [theme, area] = path.relative(THEMES_DIR, sheet).split(path.sep);
+  return area === '_components' || area === '_sections' ? sheet : path.join(THEMES_DIR, theme, '_theme.scss');
+};
 
 // Compiled sass is flat, so every innermost `selector { decls }` reads off one
 // pass; selector lists split, whitespace collapsed to the compiled spelling.
@@ -45,9 +67,11 @@ const cssRules = (css) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match)
   decls: match[2],
 }));
 
-// Selectors carrying an infinite animation shorthand.
-const loopingSelectors = (css) => cssRules(css)
+// Selectors carrying an infinite animation shorthand, narrowed to a set of
+// animation names when the compiled css holds more than the sheet under test.
+const loopingSelectors = (css, names = null) => cssRules(css)
   .filter((rule) => /animation:[^;]*\binfinite\b/.test(rule.decls))
+  .filter((rule) => !names || names.some((name) => new RegExp(`animation:\\s*${name}\\b`).test(rule.decls)))
   .flatMap((rule) => rule.selectors);
 
 // Every `selector { … }` rule that sits inside a reduced-motion media block.
@@ -114,7 +138,7 @@ test('#184: one-shot utilities are NOT parked, because a 1s fade is not a motion
 });
 
 test('#185: every core sheet that loops parks that loop, not just the animation sheet', () => {
-  const sheets = loopingSheets();
+  const sheets = loopingSheets(CSS_DIR);
   assert.ok(sheets.includes(ANIMATION_SHEET), 'the derivation finds the animation sheet at minimum');
 
   for (const sheet of sheets) {
@@ -123,6 +147,31 @@ test('#185: every core sheet that loops parks that loop, not just the animation 
 
     const loops = loopingSelectors(css);
     assert.ok(loops.length > 0, `${name}: source declares a loop, so the compiled sheet must show one`);
+
+    const parks = parkedRules(css);
+    for (const loop of loops) {
+      assert.ok(parks.has(loop), `${name}: \`${loop}\` loops forever with no reduced-motion park`);
+      assert.match(parks.get(loop), /animation: none/, `${name}: \`${loop}\`'s park stops the loop outright`);
+    }
+  }
+});
+
+test('#186: theme sheets loop under the same deal as core css', () => {
+  const sheets = loopingSheets(THEMES_DIR);
+  for (const theme of ['base', 'classy', 'newsflash']) {
+    assert.ok(sheets.some((sheet) => sheet.startsWith(path.join(THEMES_DIR, theme) + path.sep)),
+      `the derivation still reaches themes/${theme}`);
+  }
+
+  const compiled = new Map();
+  for (const sheet of sheets) {
+    const name = path.relative(PKG, sheet);
+    const unit = compileUnitFor(sheet);
+    if (!compiled.has(unit)) compiled.set(unit, compileSheet(unit).css);
+    const css = compiled.get(unit);
+
+    const loops = loopingSelectors(css, loopNames(sheet));
+    assert.ok(loops.length > 0, `${name}: source declares a loop, so the compiled theme must show one`);
 
     const parks = parkedRules(css);
     for (const loop of loops) {

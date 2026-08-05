@@ -298,13 +298,17 @@ Resilience rules (load-bearing):
   stamp (head.html) — **no JS means a fully visible page**.
 - `prefers-reduced-motion` renders final states: reveals resolve instantly,
   count-ups show their target, rotators hold the first word, marquees park.
-  EVERY continuous loop in `core/css` parks with them: the `.animation-*`
-  utilities (spin, pulse, pulse-right, bounce, wiggle, flex, shimmer), the
-  lazy-load and binding shimmers, the exit-popup wave, the studio record
-  pulse, and the download/extension walkthrough pointers. The one-shot fades,
-  slides, and popups already end on their final state. `test/animations.test.js`
-  derives its roster from the sheets that declare `infinite`, so a new
-  unparked loop fails the suite.
+  EVERY continuous loop in `core/css` and in the theme sheets this package
+  authors parks with them (vendored Bootstrap keeps upstream's own behavior):
+  the `.animation-*` utilities (spin, pulse, pulse-right, bounce, wiggle, flex,
+  shimmer), the motion library's float, marquee, and caret blink, the lazy-load
+  and binding shimmers, the exit-popup wave, the studio record pulse, the
+  download/extension walkthrough pointers, and the theme loops (the typing
+  dots, the org-chart flow lines, the ticker pulse, the CTA rings, the
+  infinite-scroll track). The one-shot fades, slides, and popups already end on
+  their final state. `test/animations.test.js` derives its roster from every
+  core and theme sheet that declares `infinite`, so a new unparked loop fails
+  the suite.
 - The PurgeCSS safelist keeps every `omega-`-namespaced selector plus
   Bootstrap's own JS-toggled transition classes (`collapse`/`collapsing`/
   `show`/`showing`/`fade` — `src/assets.js`) because that state is
