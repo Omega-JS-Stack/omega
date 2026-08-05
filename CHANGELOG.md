@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.21.0] (2026-08-04)
 ### Changed
-- [#177](../../issues/177) — Themes are rebuilt on a base/skin/fork model: `themes/base` owns all shared structural markup as `omega-*` BEM, every theme is a scss skin over it, and only bounded identity forks carry theme-prefixed markup, with a census guard in the web suite failing the drift.
+- [#177](../../issues/177) [`840841e1`](../../commit/840841e1) Thanks [@ianwieds]! — Themes are rebuilt on a base/skin/fork model: `themes/base` owns all shared structural markup as `omega-*` BEM, every theme is a scss skin over it, and only bounded identity forks carry theme-prefixed markup, with a census guard in the web suite failing the drift.
 
 ## [0.20.4] (2026-08-04)
 ### Fixed
