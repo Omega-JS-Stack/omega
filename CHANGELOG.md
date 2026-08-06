@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.24.1] (2026-08-06)
 ### Fixed
-- [#196](../../issues/196) — The flows-lane flake is closed at its root: a signout page no longer bounces to the homepage when the redirect policy races the sign-out, and the client delivers auth states strictly in order (a slow account fetch can never resurface a stale signed-in state).
+- [#196](../../issues/196) [`400818e3`](../../commit/400818e3) Thanks [@ianwieds]! — The flows-lane flake is closed at its root: a signout page no longer bounces to the homepage when the redirect policy races the sign-out, and the client delivers auth states strictly in order (a slow account fetch can never resurface a stale signed-in state).
 
 ## [0.24.0] (2026-08-06)
 ### Added
