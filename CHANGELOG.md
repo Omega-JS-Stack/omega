@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.23.1] (2026-08-05)
 ### Fixed
-- [#195](../../issues/195) — Local dist freshness is judged file by file: a missing or older dist file is stale on its own, deleted-source leftovers count, and vendor writes can no longer mask an uncopied edit. Heals lock per package, re-exec on every heal, and a CLI booting with no monorepo watcher warns loudly.
-- [#194](../../issues/194) — The `omega` dispatcher no longer dead-ends in a standalone app scaffolded before its framework dependency lands: a brand-shaped directory without `@omega.js/manager` falls back to the host framework's CLI with a stderr note instead of exiting.
+- [#195](../../issues/195) [`51422487`](../../commit/51422487) Thanks [@ianwieds]! — Local dist freshness is judged file by file: a missing or older dist file is stale on its own, deleted-source leftovers count, and vendor writes can no longer mask an uncopied edit. Heals lock per package, re-exec on every heal, and a CLI booting with no monorepo watcher warns loudly.
+- [#194](../../issues/194) [`51422487`](../../commit/51422487) Thanks [@ianwieds]! — The `omega` dispatcher no longer dead-ends in a standalone app scaffolded before its framework dependency lands: a brand-shaped directory without `@omega.js/manager` falls back to the host framework's CLI with a stderr note instead of exiting.
 
 ## [0.23.0] (2026-08-05)
 ### Added
