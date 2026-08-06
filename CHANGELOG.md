@@ -5,19 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.25.0] (2026-08-06)
 ### Added
-- [#144](../../issues/144) — A published install wires itself whole: `@omega.js/mcp-router` becomes the seventh publishable and a manager dependency, the vendored Claude plugin launches it through an in-plugin resolver in any layout, and the repo map ships as the manager's `docs/AGENTS.md` so a brand's docs chain resolves on disk and from npm.
+- [#144](../../issues/144) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — A published install wires itself whole: `@omega.js/mcp-router` becomes the seventh publishable and a manager dependency, the vendored Claude plugin launches it through an in-plugin resolver in any layout, and the repo map ships as the manager's `docs/AGENTS.md` so a brand's docs chain resolves on disk and from npm.
 
 ### Changed
-- [#202](../../issues/202) — `omega setup` no longer writes live marketing-campaign seeds as a side effect: the check reads every run and reports drift as a warning, and creating or enforcing seeds now requires the explicit `--seed-campaigns` flag. demo-* and no-connection behavior is unchanged.
+- [#202](../../issues/202) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — `omega setup` no longer writes live marketing-campaign seeds as a side effect: the check reads every run and reports drift as a warning, and creating or enforcing seeds now requires the explicit `--seed-campaigns` flag. demo-* and no-connection behavior is unchanged.
 
 ### Fixed
-- [#198](../../issues/198) — The boot freshness heal now walks the host's `@omega.js/*` runtime dependency chain (deps first, host last), so a brand website boot heals a stale linked `@omega.js/client` instead of serving yesterday's bundle.
-- [#199](../../issues/199) — Desktop and extension boots now judge their vendored web assets for freshness: a `vendorAssets` source newer than its vendored copy, or a copy that was never vendored, marks the dist stale and triggers the rebuild.
-- [#139](../../issues/139) — Editing a theme layer's font files now reaches the dev server: theme `fonts/` directories joined the config-reset watch lane, so `site.fontPreloads` regenerates instead of serving a stale preload list.
+- [#198](../../issues/198) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — The boot freshness heal now walks the host's `@omega.js/*` runtime dependency chain (deps first, host last), so a brand website boot heals a stale linked `@omega.js/client` instead of serving yesterday's bundle.
+- [#199](../../issues/199) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — Desktop and extension boots now judge their vendored web assets for freshness: a `vendorAssets` source newer than its vendored copy, or a copy that was never vendored, marks the dist stale and triggers the rebuild.
+- [#139](../../issues/139) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — Editing a theme layer's font files now reaches the dev server: theme `fonts/` directories joined the config-reset watch lane, so `site.fontPreloads` regenerates instead of serving a stale preload list.
 
 ### Removed
-- [#203](../../issues/203) — Dead code swept: the devkit dispatcher's unused `frameworkOf` helper and the extension's never-loaded `gulp/tasks/BU/` folder are gone.
+- [#203](../../issues/203) [`a7dfad42`](../../commit/a7dfad42) Thanks [@ianwieds]! — Dead code swept: the devkit dispatcher's unused `frameworkOf` helper and the extension's never-loaded `gulp/tasks/BU/` folder are gone.
 
 ## [0.24.1] (2026-08-06)
 ### Fixed
