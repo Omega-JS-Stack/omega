@@ -5,12 +5,21 @@
 // the backend-written doc).
 import { resolveAccount, resolveSubscription } from '@omega.js/account';
 import { registerTrigger } from './triggers.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('auth');
 
 class Auth {
   constructor(manager) {
     this.manager = manager;
     this._authStateCallbacks = [];
     this._hasProcessedStateChange = false;
+
+    // Bumped by every auth state change so emissions stay strictly ordered: a
+    // signed-in emission awaits its account fetch while a signed-out one fires
+    // instantly, so a slow fetch would otherwise deliver a STALE signed-in
+    // state after a newer signed-out one (#196).
+    this._stateGeneration = 0;
   }
 
   // Check if user is authenticated
@@ -86,14 +95,24 @@ class Auth {
       return () => {};
     }
 
-    // Build auth state and call the provided callback
+    // Build auth state and call the provided callback.
+    // Returns true when it delivered, false when a newer state superseded it.
     const run = async (user) => {
+      const generation = this._stateGeneration;
       const state = { user: this.getUser() };
 
       // Fetch account data if the user is logged in and Firestore is available
       // (failures are captured inside _getAccountData and degrade to null)
       if (user && this.manager.firebaseFirestore) {
         state.account = await this._getAccountData(user.uid);
+      }
+
+      // A newer auth state change owns the truth now — delivering this one
+      // would hand consumers a stale user out of order. Drop it entirely; the
+      // newer run updates the bindings, the storage and the callback.
+      if (generation !== this._stateGeneration) {
+        logger.warn('Dropping a superseded auth state emission — a newer state change owns the truth');
+        return false;
       }
 
       // Ensure account is always a resolved object
@@ -114,12 +133,28 @@ class Auth {
       }
 
       callback(state);
+
+      return true;
     };
 
-    // Once listeners: wait for auth to settle, fire once, done
+    // Once listeners: wait for auth to settle, fire once, done.
+    // A superseded run must be RE-DELIVERED here: a once listener holds no
+    // subscription, so nothing would ever re-issue it and every awaiting caller
+    // (checkout boot, the extension auth helpers) would hang forever. Each retry
+    // re-reads the current user, so the loop settles as soon as auth stops
+    // changing. The persistent path below needs no loop — it IS subscribed, so
+    // the superseding state change re-issues through _authStateCallbacks.
     if (options.once) {
-      this.manager._authReady.then(() => {
-        run(this.manager.firebaseAuth?.currentUser || null);
+      this.manager._authReady.then(async () => {
+        let delivered = false;
+
+        while (!delivered) {
+          delivered = await run(this.manager.firebaseAuth?.currentUser || null);
+
+          if (!delivered) {
+            logger.warn('Re-running a superseded once listener with the newest auth state');
+          }
+        }
       });
 
       return () => {};
@@ -152,6 +187,9 @@ class Auth {
 
   // Called by Manager when Firebase auth state changes
   _handleAuthStateChange(user) {
+    // Supersede any in-flight emission before starting this one
+    this._stateGeneration++;
+
     // Reset state processing flag for new auth state
     this._hasProcessedStateChange = false;
 

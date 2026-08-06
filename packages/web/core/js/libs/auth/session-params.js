@@ -22,12 +22,31 @@ export async function handleAuthSignout() {
   try {
     logger.log('Signing out user due to authSignout=true parameter');
 
+    // The core/auth.js listener also guards signout-in-progress by reading
+    // ?authSignout from the URL, but that guard misses whenever a queued STALE
+    // signed-in state-change is processed AFTER the param strip below (#196).
+    // This flag survives the strip; the listener clears it on the signed-out
+    // state-change it was waiting for. Same pattern as __OMEGA_CUSTOM_TOKEN_SIGNIN.
+    //
+    // ONLY when somebody is actually signed in: signing out with no user
+    // produces no uid change, so Firebase fires no state change, so nothing
+    // would ever clear the flag — and the next signed-in state change on this
+    // page load (checkout's switch-account link, the legacy reset redirects)
+    // would be swallowed, stranding the user on /signin.
+    if (omega.auth().isAuthenticated()) {
+      window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
+    }
+
     await omega.auth().signOut();
 
     // Remove the authSignout parameter from URL to prevent sign-out loop
     url.searchParams.delete('authSignout');
     window.history.replaceState({}, document.title, url.toString());
   } catch (error) {
+    // Failed sign-out: no signed-out state-change is coming, so clear the flag
+    // ourselves rather than wedge the listener on every later state change.
+    window.__OMEGA_SIGNOUT_IN_PROGRESS = false;
+
     logger.error('Error signing out:', error);
   }
 }

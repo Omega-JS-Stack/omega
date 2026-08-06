@@ -12,3 +12,6 @@ dist/
 
 # OS
 .DS_Store
+
+# Run logs (truncated on every launch — never committed)
+logs/

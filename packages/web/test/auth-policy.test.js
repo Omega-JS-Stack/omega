@@ -23,21 +23,29 @@ const esbuild = require('esbuild');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const AUTH_ENTRY = path.join(CORE_DIR, 'js', 'core', 'auth.js');
+// The ?authSignout handler runs beside the policy listener on a real page boot,
+// and #196's wedge only shows when both drive the same window.
+const SESSION_PARAMS_ENTRY = path.join(CORE_DIR, 'js', 'libs', 'auth', 'session-params.js');
 
 // Bundle once: the client resolves to a stub module that hands back whatever
 // globalThis.__omegaClient holds at REQUIRE time, so each test loads the bundle
 // fresh (cache-busted below) against its own stub.
-const BUNDLE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-auth-policy-')), 'auth.cjs');
+const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-auth-policy-'));
+const BUNDLE = path.join(BUNDLE_DIR, 'auth.cjs');
+const SESSION_PARAMS_BUNDLE = path.join(BUNDLE_DIR, 'session-params.cjs');
 
 let building = null;
 
-function bundleOnce() {
-  building ||= esbuild.build({
-    entryPoints: [AUTH_ENTRY],
-    outfile: BUNDLE,
+function bundleModule(entryPoint, outfile) {
+  return esbuild.build({
+    entryPoints: [entryPoint],
+    outfile,
     bundle: true,
     format: 'cjs',
     platform: 'browser',
+    // The custom-token path imports it lazily and no test walks there; bundling
+    // the whole firebase auth SDK into the harness buys nothing.
+    external: ['@firebase/auth'],
     plugins: [{
       name: 'harness-aliases',
       setup(build) {
@@ -53,6 +61,13 @@ function bundleOnce() {
       },
     }],
   });
+}
+
+function bundleOnce() {
+  building ||= Promise.all([
+    bundleModule(AUTH_ENTRY, BUNDLE),
+    bundleModule(SESSION_PARAMS_ENTRY, SESSION_PARAMS_BUNDLE),
+  ]);
 
   return building;
 }
@@ -69,9 +84,13 @@ function makeClient({ policy, roles = null, redirects = {} }) {
       auth: { config: { policy, roles, redirects } },
       analytics: { meta: 'META-PIXEL' },
     },
+    // `signedInUser` is the harness's stand-in for firebase's currentUser: the
+    // signout handler asks whether anybody is signed in before flagging.
+    signedInUser: null,
     auth: () => ({
       listen: (options, handler) => listeners.push(handler),
       signOut: async () => signOuts.push(true),
+      isAuthenticated: () => !!client.signedInUser,
     }),
     isValidRedirectUrl: () => true,
     notifications: () => ({ subscribe: async () => {} }),
@@ -95,7 +114,10 @@ function makeBrowser({ href, pagePath = '/dashboard/account' }) {
       get hostname() { return new URL(href).hostname; },
       get pathname() { return new URL(href).pathname; },
     },
-    history: { replaceState: () => {} },
+    // The real thing rewrites the address bar without navigating — the signout
+    // handler strips ?authSignout through it, and the guards downstream read the
+    // stripped URL.
+    history: { replaceState: (state, title, url) => { href = String(url); } },
   };
 
   globalThis.document = {
@@ -123,11 +145,14 @@ async function boot({ href, policy, roles, redirects, pagePath }) {
   // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and
   // macOS's tmpdir is a symlink (/var → /private/var).
   delete require.cache[require.resolve(BUNDLE)];
+  delete require.cache[require.resolve(SESSION_PARAMS_BUNDLE)];
   require(BUNDLE).default();
 
   return {
     navigations,
     client,
+    // The ?authSignout / ?authCustomToken handlers, bound to this same window.
+    sessionParams: require(SESSION_PARAMS_BUNDLE),
     // The listener the module registered (undefined when policy short-circuited).
     fire: (state) => client.listeners[0](state),
   };
@@ -211,6 +236,91 @@ test('auth policy: the suppression is one-shot — the next signed-out state sti
   assert.deepStrictEqual(navigations, [
     'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26authReturnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
   ]);
+});
+
+test('auth policy: a stale signed-in state after the authSignout param is stripped keeps the page (#196)', async () => {
+  const { navigations, fire } = await boot({
+    href: 'https://brand.test/signin',
+    policy: 'unauthenticated',
+    redirects: REDIRECTS,
+    pagePath: '/signin',
+  });
+
+  // What handleAuthSignout leaves behind mid-signout: the flag set, and the URL
+  // already stripped of ?authSignout — so only the flag can catch the stale event.
+  window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
+
+  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+
+  assert.deepStrictEqual(navigations, [], 'the stale signed-in event must not bounce off /signin');
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'the flag holds until the signed-out event lands');
+
+  // The signed-out event the flag was waiting for: clears it, page stays put.
+  await fire({ user: null, account: null });
+
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
+  assert.deepStrictEqual(navigations, []);
+});
+
+test('auth policy: the signed-out state clears the signout flag and falls through to the normal path', async () => {
+  const { navigations, fire } = await boot({
+    href: 'https://brand.test/dashboard/account',
+    policy: 'authenticated',
+    redirects: REDIRECTS,
+  });
+
+  window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
+
+  await fire({ user: null, account: null });
+
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
+  assert.deepStrictEqual(navigations, [
+    'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
+  ], 'no authReturnUrl to stay for — the authenticated page still kicks the user out');
+});
+
+test('auth policy: a signed-OUT visit to ?authSignout=true never wedges the next sign-in (#196)', async () => {
+  const { navigations, fire, client, sessionParams } = await boot({
+    href: 'https://brand.test/signin?authSignout=true',
+    policy: 'unauthenticated',
+    redirects: REDIRECTS,
+    pagePath: '/signin',
+  });
+
+  // Nobody is signed in — checkout's switch-account link and the legacy reset
+  // redirects both land here. signOut() changes no uid, so firebase fires NO
+  // state change, so nothing would ever clear a flag set now.
+  client.signedInUser = null;
+
+  await sessionParams.handleAuthSignout();
+
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, undefined, 'no state change is coming — the flag must not be set');
+  assert.deepStrictEqual(client.signOuts, [true], 'the signOut still runs unconditionally');
+  assert.strictEqual(window.location.href, 'https://brand.test/signin', 'and the param is still stripped');
+
+  // The user signs in on this same page load: the policy must still bounce them.
+  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+
+  assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account'], 'a swallowed sign-in strands the user on /signin');
+});
+
+test('auth policy: a signed-IN visit to ?authSignout=true still flags the signout for the listener', async () => {
+  const { fire, client, sessionParams } = await boot({
+    href: 'https://brand.test/dashboard/account?authSignout=true',
+    policy: 'authenticated',
+    redirects: REDIRECTS,
+  });
+
+  client.signedInUser = { uid: 'u1' };
+
+  await sessionParams.handleAuthSignout();
+
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'a real signout is in flight — the flag guards the stale event');
+
+  // The signed-out state change the flag was waiting for clears it.
+  await fire({ user: null, account: null });
+
+  assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
 });
 
 test('auth policy: policy disabled registers no listener and never navigates', async () => {

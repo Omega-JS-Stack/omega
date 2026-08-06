@@ -78,6 +78,24 @@ export default function () {
         return; // Let pages.js handle the signout
       }
 
+      // The URL check above is not enough: handleAuthSignout (libs/auth/session-params.js)
+      // strips ?authSignout as soon as signOut() resolves, and under load a STALE
+      // signed-in state-change can be processed AFTER that strip — the guard misses,
+      // the policy: 'unauthenticated' branch below sees a user and redirects off the
+      // page (#196). The flag survives the strip, so it decides instead.
+      if (window.__OMEGA_SIGNOUT_IN_PROGRESS) {
+        if (user) {
+          // Stale signed-in event, signout still propagating — same deal as above.
+          logger.warn('Skipping state-change processing — signout in progress');
+          justSignedOut = true;
+          return;
+        }
+
+        // The signed-out event we were waiting for: clear the flag and fall through
+        // to the normal unauthenticated handling (justSignedOut + authReturnUrl).
+        window.__OMEGA_SIGNOUT_IN_PROGRESS = false;
+      }
+
       // Handle authentication state changes and page policies
       if (user) {
         // User is authenticated
