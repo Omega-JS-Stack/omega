@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.26.1] (2026-08-06)
 ### Added
-- [#205](../../issues/205) — The Google account convention is recorded in the manager README's cloud row: sign every consent as the company account (the consenting identity owns every created project); personal accounts stay IAM members, with `access-heal.js` repairing wrong-identity projects.
+- [#205](../../issues/205) [`f95eff6f`](../../commit/f95eff6f) Thanks [@ianwieds]! — The Google account convention is recorded in the manager README's cloud row: sign every consent as the company account (the consenting identity owns every created project); personal accounts stay IAM members, with `access-heal.js` repairing wrong-identity projects.
 
 ### Fixed
-- [#206](../../issues/206) — A config reset no longer restarts the dev server: `devServerOptions()` hands Eleventy one stable object per session, so resets read as unchanged and the edit-burst restart race (`ERR_SERVER_ALREADY_LISTEN`, dev server terminating mid-session) is gone.
-- [#204](../../issues/204) — Stale `docs/themes.md` pointers in the web themes and the layers test page now name the real homes (`docs/shared/theming.md`, `docs/web/sections.md`), and the layers page comment drops the never-built `OMEGA_TEST_LAYERS` flag for the real manual steps.
+- [#206](../../issues/206) [`f95eff6f`](../../commit/f95eff6f) Thanks [@ianwieds]! — A config reset no longer restarts the dev server: `devServerOptions()` hands Eleventy one stable object per session, so resets read as unchanged and the edit-burst restart race (`ERR_SERVER_ALREADY_LISTEN`, dev server terminating mid-session) is gone.
+- [#204](../../issues/204) [`f95eff6f`](../../commit/f95eff6f) Thanks [@ianwieds]! — Stale `docs/themes.md` pointers in the web themes and the layers test page now name the real homes (`docs/shared/theming.md`, `docs/web/sections.md`), and the layers page comment drops the never-built `OMEGA_TEST_LAYERS` flag for the real manual steps.
 
 ## [0.26.0] (2026-08-06)
 ### Added
