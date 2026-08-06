@@ -6,7 +6,9 @@
  * prepare → the devkit vendor lane) and the tarball listing is asserted: the
  * package's own guide at `docs/index.md`, the shared contracts under
  * `docs/shared/`, and — for @omega.js/manager, the package every brand
- * installs — the Claude plugin plus the package-root marketplace that a brand's
+ * installs — the repo-root map at `docs/AGENTS.md`
+ * ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)) plus the Claude
+ * plugin and the package-root marketplace that a brand's
  * `.claude/settings.json` points at
  * ([#62](https://github.com/Omega-JS-Stack/omega/issues/62)).
  *
@@ -20,7 +22,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const { DOCUMENTED_PACKAGES, PLUGIN_DIR, MARKETPLACE_FILE } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
+const { DOCUMENTED_PACKAGES, PLUGIN_DIR, MARKETPLACE_FILE, MAP_FILE } = require(path.join(ROOT, 'packages', 'devkit', 'tools', 'vendor-docs.js'));
 
 // One pack per package is the expensive part — pack once, share the listing.
 const listings = new Map();
@@ -78,19 +80,21 @@ test('vendor-docs: @omega.js/manager also ships the Claude plugin and its market
     'the plugin hooks must ship'
   );
 
-  // The MCP server addresses a path OUTSIDE the plugin (the monorepo's
-  // packages/mcp-router), which no consumer install has — the vendored copy
-  // ships without it rather than failing to start it every session (#144).
-  assert.ok(
-    !files.includes('claude-plugin/.mcp.json'),
-    'the vendored plugin must not carry the monorepo-only MCP server declaration'
-  );
+  // The MCP server ships too: since #144 the declaration addresses a launcher
+  // INSIDE the plugin, which node-resolves @omega.js/mcp-router — a real
+  // dependency of this package — from the install around it.
+  assert.ok(files.includes('claude-plugin/.mcp.json'), 'the vendored plugin must carry the MCP server declaration');
+  assert.ok(files.includes('claude-plugin/mcp-router-launch.js'), 'the launcher it names must ship with it');
+
+  // The map — a published brand has no monorepo for the agent-docs chain's
+  // scope symlink to point at, so it points here (#144).
+  assert.ok(files.includes('docs/AGENTS.md'), 'the repo-root map must ship inside the manager');
 });
 
 /**
  * The exact destinations the lane writes into a package: one per entry of the
  * monorepo guide tree (flattened into `docs/`), the shared contracts, and —
- * for the manager — the vendored plugin and its marketplace. Scoping to THESE
+ * for the manager — the map, the vendored plugin and its marketplace. Scoping to THESE
  * (not the whole `docs/` dir) keeps the assertion about the lane's own output:
  * a hand-authored committed doc with unrelated edits beside them is not this
  * test's business, but a lane write to a non-gitignored path still trips it.
@@ -102,7 +106,7 @@ function laneOutputs(short) {
   const paths = fs.readdirSync(path.join(ROOT, 'docs', short)).map((entry) => `packages/${short}/docs/${entry}`);
   paths.push(`packages/${short}/docs/shared`);
   if (short === 'manager') {
-    paths.push(`packages/${short}/${PLUGIN_DIR}`, `packages/${short}/${MARKETPLACE_FILE}`);
+    paths.push(`packages/${short}/${MAP_FILE}`, `packages/${short}/${PLUGIN_DIR}`, `packages/${short}/${MARKETPLACE_FILE}`);
   }
   return paths;
 }

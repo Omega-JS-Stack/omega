@@ -5,10 +5,10 @@
  * `node_modules/@omega.js/AGENTS.md`, plus a one-line CLAUDE.md pointer
  * (`@AGENTS.md`). The scope file is a symlink this service maintains: it
  * resolves the framework monorepo through the installed manager package and
- * links straight at the live top-level map (published installs get the map
- * vendored into the package — the docs-vendoring issue retargets this).
- * Idempotent: create when missing, heal a missing/stale first-line import in
- * place, never touch consumer content below the import.
+ * links straight at the live top-level map; a published install has no
+ * monorepo, so it links at the map the prepare lane vendored into the package
+ * (`docs/AGENTS.md`). Idempotent: create when missing, heal a missing/stale
+ * first-line import in place, never touch consumer content below the import.
  */
 const { join, dirname } = require('node:path');
 const fs = require('node:fs');
@@ -68,11 +68,13 @@ function resolveImportLine(brandRoot) {
 }
 
 /**
- * Ensure `node_modules/@omega.js/AGENTS.md` links at the top-level omega
- * AGENTS.md. The monorepo is found by resolving the installed manager
- * package's real path (the local-era file: symlink) and stepping up to its
- * repo root; when that resolution yields no map (published install, no
- * vendored map yet), the link is left alone and the step reports skipped.
+ * Ensure `node_modules/@omega.js/AGENTS.md` links at the omega map. The
+ * installed manager package's real path (the local-era file: symlink) names
+ * both candidates, in this order: the monorepo's LIVE map two dirs up, then
+ * the copy the prepare lane vendors into the package (`docs/AGENTS.md`, #144).
+ * The live map wins wherever it exists, so a locally linked brand never lands
+ * on the generated copy sitting in that same monorepo's packages/manager.
+ * Neither present (pre-install) → the link is left alone and the step skips.
  *
  * @param {string} brandRoot - Absolute brand monorepo root
  * @returns {'present'|'created'|'healed'|'skipped'} - What happened
@@ -86,11 +88,14 @@ function ensureGuideLink(brandRoot) {
   let mapFile;
   try {
     const managerReal = fs.realpathSync(join(scope.scopeDir, 'manager'));
-    mapFile = join(dirname(dirname(managerReal)), 'AGENTS.md');
+    mapFile = [
+      join(dirname(dirname(managerReal)), 'AGENTS.md'),
+      join(managerReal, 'docs', 'AGENTS.md'),
+    ].find((candidate) => jetpack.exists(candidate) === 'file');
   } catch {
     return 'skipped';
   }
-  if (jetpack.exists(mapFile) !== 'file') {
+  if (!mapFile) {
     return 'skipped';
   }
 

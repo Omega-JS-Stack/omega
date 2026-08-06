@@ -212,21 +212,24 @@ jobs:
       # imports of the PRIVATE @omega.js packages (devkit/config/account/template-kit
       # — the vendor after-hook rewrites dist references to relative paths; see
       # packages/devkit/tools/vendor.js). Published @omega.js runtime deps
-      # (@omega.js/client, and @omega.js/backend inside manager) legitimately stay
-      # as package requires — the scratch install maps them to their local tarballs
-      # via overrides until they exist on npm. ALL SIX publishables are covered;
-      # scripts/release-check.js is this gate's laptop mirror.
+      # (@omega.js/client, and @omega.js/backend + @omega.js/mcp-router inside
+      # manager) legitimately stay as package requires — the scratch install maps
+      # them to their local tarballs via overrides until they exist on npm. ALL
+      # SEVEN publishables are covered; scripts/release-check.js is this gate's
+      # laptop mirror.
       - name: Pack and scratch-install each package
         run: |
           set -euo pipefail
           client_tarball=$(npm pack --workspace=packages/client --pack-destination /tmp | tail -1)
           backend_tarball=$(npm pack --workspace=packages/backend --pack-destination /tmp | tail -1)
-          for pkg in backend client extension desktop web manager; do
+          router_tarball=$(npm pack --workspace=packages/mcp-router --pack-destination /tmp | tail -1)
+          for pkg in backend client extension desktop web mcp-router manager; do
             echo "=== $pkg ==="
             case "$pkg" in
-              client)  tarball="$client_tarball" ;;
-              backend) tarball="$backend_tarball" ;;
-              *)       tarball=$(npm pack --workspace=packages/$pkg --pack-destination /tmp | tail -1) ;;
+              client)     tarball="$client_tarball" ;;
+              backend)    tarball="$backend_tarball" ;;
+              mcp-router) tarball="$router_tarball" ;;
+              *)          tarball=$(npm pack --workspace=packages/$pkg --pack-destination /tmp | tail -1) ;;
             esac
             scratch=$(mktemp -d)
             name=$(node -p "require('./packages/$pkg/package.json').name")
@@ -238,6 +241,7 @@ jobs:
                 const overrides = {};
                 if ('$pkg' !== 'client') overrides['@omega.js/client'] = 'file:/tmp/$client_tarball';
                 if ('$pkg' !== 'backend') overrides['@omega.js/backend'] = 'file:/tmp/$backend_tarball';
+                if ('$pkg' !== 'mcp-router') overrides['@omega.js/mcp-router'] = 'file:/tmp/$router_tarball';
                 p.overrides = overrides;
                 fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
               " \

@@ -16,7 +16,7 @@ module.exports = async ({ brandRoot, brand }) => {
     present: 'node_modules/@omega.js/AGENTS.md links the framework map',
     created: 'Linked node_modules/@omega.js/AGENTS.md at the framework map',
     healed: 'Relinked node_modules/@omega.js/AGENTS.md at the framework map',
-    skipped: 'No resolvable framework map yet (pre-install or published without vendored docs) — link skipped',
+    skipped: 'No resolvable framework map yet (pre-install) — link skipped',
   }[guide];
   console.log(`      ${chalk.green('✓')} ${guideLabel}`);
 

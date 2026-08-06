@@ -12,17 +12,18 @@
  *      vendoring; npm packs private:true packages fine, it only refuses to
  *      publish them, which is the latch working as designed)
  *   2. install the tarball into a scratch project — `overrides` pin the
- *      published @omega.js runtime deps (client, backend) to their local
- *      tarballs so nothing resolves against the (empty) registry
+ *      published @omega.js runtime deps (client, backend, mcp-router) to their
+ *      local tarballs so nothing resolves against the (empty) registry
  *   3. `require.resolve('<name>')` from the scratch project
  *   4. scan the installed tree for raw PRIVATE @omega.js references
  *      (devkit/config/account/template-kit) — vendoring must have rewritten
  *      or eliminated every one; published runtime deps (@omega.js/client,
- *      @omega.js/backend) are legitimate package requires and are skipped
+ *      @omega.js/backend, @omega.js/mcp-router) are legitimate package
+ *      requires and are skipped
  *
  * Flags:
- *   --only=web,manager   check a subset (client/backend still pack — their
- *                        tarballs feed the overrides)
+ *   --only=web,manager   check a subset (client/backend/mcp-router still pack —
+ *                        their tarballs feed the overrides)
  *   --keep               keep the scratch dir for inspection
  */
 
@@ -34,10 +35,10 @@ const path = require('node:path');
 
 // Constants
 const ROOT = path.join(__dirname, '..');
-const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'web'];
+const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web'];
 const PRIVATE_PACKAGES = ['devkit', 'config', 'account', 'template-kit'];
 // Always packed even under --only: overrides point at these tarballs
-const OVERRIDE_PACKAGES = ['client', 'backend'];
+const OVERRIDE_PACKAGES = ['client', 'backend', 'mcp-router'];
 
 // The ways shipped code can reference an @omega.js package (mirrors
 // devkit/tools/vendor.js REFERENCE_PATTERNS + ci.yml's pack-smoke grep).

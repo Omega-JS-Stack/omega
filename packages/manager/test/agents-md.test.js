@@ -122,6 +122,47 @@ test('agents-md: ensureGuideLink links the scope AGENTS.md at the top-level map,
   assert.equal(ensureGuideLink(brand), 'present');
 });
 
+// A published consumer: a REAL manager package directory (no symlink, no
+// monorepo above it) carrying the map the prepare lane vendored into it.
+function publishedFixture() {
+  const brand = tmpdir();
+  const manager = path.join(brand, 'node_modules', '@omega.js', 'manager');
+  fs.mkdirSync(path.join(manager, 'docs'), { recursive: true });
+  return { brand, manager };
+}
+
+test('agents-md: ensureGuideLink links a published install at the vendored map (#144)', () => {
+  const { brand, manager } = publishedFixture();
+  const vendored = path.join(manager, 'docs', 'AGENTS.md');
+  fs.writeFileSync(vendored, '# the vendored map\n');
+
+  assert.equal(ensureGuideLink(brand), 'created');
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  assert.equal(fs.realpathSync(link), fs.realpathSync(vendored), 'no monorepo above it — the package copy is the target');
+  assert.equal(fs.readFileSync(link, 'utf8'), '# the vendored map\n');
+
+  assert.equal(ensureGuideLink(brand), 'present');
+});
+
+test('agents-md: a published install with no vendored map still skips', () => {
+  const { brand } = publishedFixture();
+
+  assert.equal(ensureGuideLink(brand), 'skipped');
+  assert.ok(!fs.existsSync(path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md')), 'nothing is linked');
+});
+
+test('agents-md: a locally linked brand takes the LIVE map, never the generated copy in that monorepo', () => {
+  const { monorepo, brand } = linkFixture();
+  // The monorepo's own packages/manager grows the vendored map on every
+  // prepare — the live map two dirs up must still win.
+  fs.mkdirSync(path.join(monorepo, 'packages', 'manager', 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(monorepo, 'packages', 'manager', 'docs', 'AGENTS.md'), '# the generated copy\n');
+
+  assert.equal(ensureGuideLink(brand), 'created');
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  assert.equal(fs.readFileSync(link, 'utf8'), '# the map\n');
+});
+
 test('agents-md: ensureGuideLink replaces a stale regular file and skips when nothing resolves', () => {
   const { brand } = linkFixture();
   const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');

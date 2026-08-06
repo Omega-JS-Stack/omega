@@ -8,6 +8,12 @@ class MarketingCampaignsSeededTest extends BaseTest {
     return 'marketing campaigns seeded in Firestore';
   }
 
+  getWarning() {
+    return [
+      'live campaign seeding is opt-in — run `npx omega setup --seed-campaigns` to seed/enforce',
+    ];
+  }
+
   async run() {
     // demo-* projects are emulator-only — live Firestore doesn't exist and the
     // generated fake service account authenticates nowhere (the first .get()
@@ -31,7 +37,7 @@ class MarketingCampaignsSeededTest extends BaseTest {
 
       // Doc doesn't exist → fail
       if (!doc.exists) {
-        return false;
+        return this._driftVerdict();
       }
 
       // Check enforced fields + missing defaults
@@ -41,13 +47,13 @@ class MarketingCampaignsSeededTest extends BaseTest {
         const actual = _.get(data, path);
 
         if (!_.isEqual(actual, expected)) {
-          return false;
+          return this._driftVerdict();
         }
       }
 
       // Check for missing fields that should exist from seed
       if (hasMissingFields(data, seed.doc)) {
-        return false;
+        return this._driftVerdict();
       }
     }
 
@@ -57,6 +63,12 @@ class MarketingCampaignsSeededTest extends BaseTest {
   async fix() {
     if (this.isDemoProject) {
       return; // run() never fails demo projects; never touch live Firestore here
+    }
+
+    // Belt for a future direct caller: run() already warns instead of failing
+    // when the flag is absent, so the runner can never reach this fix.
+    if (!this._seedingRequested()) {
+      return;
     }
 
     const admin = this._getAdmin();
@@ -110,6 +122,23 @@ class MarketingCampaignsSeededTest extends BaseTest {
         console.log(chalk.dim(`  ✓ ${seed.id} — all enforced fields correct`));
       }
     }
+  }
+
+  /**
+   * The verdict for a missing/drifted seed. Reads run on every live project,
+   * but writing 5 docs into a REAL project's Firestore is opt-in: without the
+   * flag a drift warns (non-blocking, and the runner never fixes a 'warn'),
+   * with the flag it fails so fix() seeds/enforces.
+   */
+  _driftVerdict() {
+    return this._seedingRequested() ? false : 'warn';
+  }
+
+  /** True when the run opted into live seeding with `--seed-campaigns`. */
+  _seedingRequested() {
+    const argv = this.self.argv || {};
+
+    return !!(argv.seedCampaigns || argv['seed-campaigns']);
   }
 
   _getAdmin() {

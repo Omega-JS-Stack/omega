@@ -12,7 +12,8 @@
  * - startVendorPropagation() — re-prepare dist-building frameworks when a
  *   vendored shared package (devkit, config, account) changes
  * - ensureFreshLocalDist() / freshnessBoot() — rebuild a locally-linked
- *   framework's stale dist at CLI boot (and re-exec once after a rebuild)
+ *   framework's stale dist (and its @omega.js/* runtime deps') at CLI boot
+ *   (and re-exec once after a rebuild)
  *
  * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
  * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
@@ -744,6 +745,23 @@ function newestMtimeUnder(dir) {
 }
 
 /**
+ * Newest mtime (ms) of a path that may be a FILE or a directory — a declared
+ * `omega.vendorAssets` entry names either shape. Missing path → 0.
+ * @param {string} target - File or directory to measure.
+ * @returns {number} Newest mtimeMs, or 0 when nothing exists.
+ */
+function newestMtimeOf(target) {
+  let stat;
+  try {
+    stat = fs.statSync(target);
+  } catch (e) {
+    return 0;
+  }
+
+  return stat.isDirectory() ? newestMtimeUnder(target) : stat.mtimeMs;
+}
+
+/**
  * Every file under dir, keyed by its dir-relative POSIX path — skipping
  * node_modules/.temp/dist and never following symlinks (a framework dist can
  * carry a circular self-link fixture). Missing dir → empty map.
@@ -813,8 +831,9 @@ function allowedDistExtras(pkg) {
  * src file must exist at its mapped dist path with an mtime at least as new, no
  * dist file may lack a src counterpart (a deleted source) unless prepare
  * generates it, and — inside the monorepo — each embedded dist/vendor/<name>
- * copy must be newer than that private package's src (vendored copies only
- * refresh on a full prepare).
+ * copy must be newer than that private package's src, and each declared
+ * `omega.vendorAssets` destination newer than the sibling package's source it
+ * was copied from (both kinds of copy only refresh on a full prepare).
  * @param {object} options
  * @param {string} options.srcDir - The package's src directory.
  * @param {string} options.distDir - The package's dist directory.
@@ -859,6 +878,36 @@ function distStaleReason(options) {
       if (fs.existsSync(vendorDir)
         && newestMtimeUnder(path.join(monorepoRoot, 'packages', name, 'src')) > newestMtimeUnder(vendorDir)) {
         return `dist/vendor/${name} is older than packages/${name}/src`;
+      }
+    }
+
+    // The declared assets the orphan scan above exempts: that exemption stopped
+    // the false "deleted source" hits, but it left the destinations with NO
+    // freshness question at all, so an edit to web's core/ or themes/ never made
+    // desktop/extension stale and a watcher-down boot served the old copy
+    // (#199). The source is a monorepo sibling package (the vendor hook copies
+    // it verbatim, no build step), so the inMonorepo guard skips the loop on a
+    // published install — where there is no sibling to compare against.
+    for (const entry of (pkg && pkg.omega && pkg.omega.vendorAssets) || []) {
+      if (!entry || !entry.package || !entry.from || !entry.to) {
+        continue; // Malformed — the vendor hook is the one that fails on it
+      }
+      if (!entry.package.startsWith('@omega.js/')) {
+        continue; // Foreign scope — the short-name → packages/<name> mapping below only holds for ours
+      }
+      const sourceMtime = newestMtimeOf(path.join(monorepoRoot, 'packages', entry.package.split('/').pop(), entry.from));
+      if (sourceMtime === 0) {
+        // A wrong `from` (rename/typo) lands here too and stays silent — the
+        // vendor hook's warning owns that mistake; returning stale instead
+        // would loop a full prepare on every boot with nothing to fix it
+        continue;
+      }
+      const destination = path.join(distDir, entry.to);
+      if (!fs.existsSync(destination)) {
+        return `dist/${entry.to} was never vendored from ${entry.package}'s ${entry.from}`;
+      }
+      if (sourceMtime > newestMtimeOf(destination)) {
+        return `dist/${entry.to} is older than ${entry.package}'s ${entry.from}`;
       }
     }
   }
@@ -1062,6 +1111,30 @@ function resolvePackageRealDir(packageName, fromDir) {
   }
 }
 
+/**
+ * Whether a resolved directory is a SOURCE CHECKOUT rather than a registry
+ * install: a real path still inside node_modules is installed, and an
+ * unresolvable package is nothing at all.
+ * @param {string|null} realDir - Resolved package directory.
+ * @returns {boolean}
+ */
+function isLocalCheckout(realDir) {
+  return Boolean(realDir) && !realDir.split(path.sep).includes('node_modules');
+}
+
+/**
+ * Read a package's manifest.
+ * @param {string} realDir - The package directory.
+ * @returns {object|null} The manifest, or null when it is unreadable.
+ */
+function readPackageManifest(realDir) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(realDir, 'package.json'), 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+
 // One watch-down warning per process, however many packages get checked.
 let warnedWatchDown = false;
 
@@ -1110,18 +1183,13 @@ function ensureFreshLocalDist(options) {
   }
 
   const realDir = resolvePackageRealDir(packageName, fromDir);
-  if (!realDir || realDir.split(path.sep).includes('node_modules')) {
+  if (!isLocalCheckout(realDir)) {
     // Unresolvable (bootstrap dir, nothing installed) or a real registry
     // install — either way there is no local source checkout to freshen
     return { status: 'registry', packageName, dir: realDir || undefined };
   }
 
-  let pkg;
-  try {
-    pkg = JSON.parse(fs.readFileSync(path.join(realDir, 'package.json'), 'utf8'));
-  } catch (e) {
-    pkg = null;
-  }
+  const pkg = readPackageManifest(realDir);
   const srcDir = path.join(realDir, 'src');
   if (!fs.existsSync(srcDir) || !(pkg && pkg.scripts && pkg.scripts.prepare)) {
     return { status: 'not-buildable', packageName, dir: realDir };
@@ -1182,19 +1250,70 @@ function ensureFreshLocalDist(options) {
   });
 }
 
+/**
+ * The ordered list of packages ONE boot checks: the CLI host plus every
+ * `@omega.js/*` RUNTIME dependency reachable from it through local checkouts.
+ *
+ * The host alone is not enough: web's bundle carries `@omega.js/client`'s dist
+ * verbatim, so a boot that heals web and stops there still serves the browser a
+ * stale client (#198). devDependencies are never walked — nothing a consumer
+ * RUNS comes from them. A dep that resolves into node_modules (registry
+ * install) or nowhere stays on the list — ensureFreshLocalDist classifies it —
+ * but its own deps do not, because there is no local source under it to go
+ * stale. Each dep resolves from ITS depender's real dir, so the walk follows
+ * the actual node_modules chain rather than guessing a layout.
+ *
+ * Order is post-order — DEPS FIRST, host LAST — so a host prepare that consumes
+ * a dep's artifacts (vendored copies, bundled dists) sees the freshened ones.
+ * @param {object} options
+ * @param {string} options.packageName - The CLI host package.
+ * @param {string} [options.fromDir] - Resolution origin (default process.cwd()).
+ * @returns {Array<{packageName: string, fromDir: string}>} ensureFreshLocalDist arguments, in check order.
+ */
+function freshnessCheckList(options) {
+  const { packageName, fromDir = process.cwd() } = options;
+  const list = [];
+  const visited = new Set();
+
+  const walk = (name, origin) => {
+    if (visited.has(name)) {
+      return; // A cycle or a diamond — one check per package either way
+    }
+    visited.add(name);
+
+    const realDir = resolvePackageRealDir(name, origin);
+    if (isLocalCheckout(realDir)) {
+      const dependencies = (readPackageManifest(realDir) || {}).dependencies || {};
+      for (const dep of Object.keys(dependencies)) {
+        if (dep.startsWith(SCOPE)) {
+          walk(dep, realDir);
+        }
+      }
+    }
+
+    list.push({ packageName: name, fromDir: origin });
+  };
+
+  walk(packageName, fromDir);
+  return list;
+}
+
 // One freshness scan per process per module instance — a dispatcher hop that
 // re-enters the SAME framework's run() must not scan (or rebuild) twice.
 let freshnessBootRan = false;
 
 /**
  * CLI-boot wiring for ensureFreshLocalDist: every framework run() calls this
- * first. On a rebuild, the running process booted from the STALE dist — so the
- * same invocation re-execs ONCE (OMEGA_FRESH_REEXEC guards the loop) and this
- * process exits with the child's status. That is EVERY heal, whoever built it
- * (`by: self|watch|peer`): a dist the watch or a peer CLI rebuilt leaves this
- * process just as stale as one it rebuilt itself. Every other outcome returns
- * and the boot continues.
- * @param {object} options - Same as ensureFreshLocalDist.
+ * first, naming the HOST package — and the boot checks the host's whole
+ * `@omega.js/*` runtime dependency closure (freshnessCheckList), deps first,
+ * because the host's dist is not the only code this invocation serves (#198).
+ * On a rebuild ANYWHERE in that list, the running process booted from the STALE
+ * dist — so the same invocation re-execs ONCE (OMEGA_FRESH_REEXEC guards the
+ * loop) and this process exits with the child's status. That is EVERY heal,
+ * whoever built it (`by: self|watch|peer`): a dist the watch or a peer CLI
+ * rebuilt leaves this process just as stale as one it rebuilt itself. Every
+ * other outcome returns the HOST's result and the boot continues.
+ * @param {object} options - Same as ensureFreshLocalDist (packageName = the host).
  * @returns {{status: string, by?: string, packageName: string, dir?: string}}
  */
 function freshnessBoot(options) {
@@ -1203,8 +1322,19 @@ function freshnessBoot(options) {
   }
   freshnessBootRan = true;
 
-  const result = ensureFreshLocalDist(options);
-  if (result.status !== 'rebuilt') {
+  // The whole list runs even after a heal: a dep rebuild can leave its
+  // dependents stale in turn, and the re-exec below covers them all at once
+  let result = null;
+  let healed = false;
+  for (const entry of freshnessCheckList(options)) {
+    const entryResult = ensureFreshLocalDist(entry);
+    healed = healed || entryResult.status === 'rebuilt';
+    if (entry.packageName === options.packageName) {
+      result = entryResult; // The host is last — its result is the boot's
+    }
+  }
+
+  if (!healed) {
     return result;
   }
 
@@ -1235,5 +1365,6 @@ module.exports = {
   releaseWatchLock,
   FRESHNESS_VENDORABLES,
   ensureFreshLocalDist,
+  freshnessCheckList,
   freshnessBoot,
 };

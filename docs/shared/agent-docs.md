@@ -10,7 +10,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
                   below:   `# <brand> — brand notes` + the brand's own notes — NEVER touched by the framework
 ```
 
-`node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. Published installs get the framework DOCS vendored into each package already (below); the top-level map itself is not vendored yet, so the link still resolves only through a local-era install — vendoring the map and retargeting the link is [#144](https://github.com/Omega-JS-Stack/omega/issues/144).
+`node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. A published install has no monorepo above the package, so the link lands on the map prepare vendored INTO it (`@omega.js/manager/docs/AGENTS.md`, below). The two candidates are tried in that order, live map first, so a locally linked brand never lands on the generated copy sitting in that same monorepo's `packages/manager` ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)).
 
 (The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short. Heals no longer scrub legacy copies (#148): a leftover marker or retired import line is consumer content, removed by hand per [breaking-changes.md](breaking-changes.md).)
 
@@ -30,7 +30,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 | No `CLAUDE.md` | Created as the one-line `@AGENTS.md` pointer |
 | `CLAUDE.md` carries content | WARNED (never clobbered) with the move-it-to-AGENTS.md message |
 
-Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip, path resolution, create/heal/idempotence, content preservation).
+Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip against both the local-era and published-install shapes, path resolution, create/heal/idempotence, content preservation).
 
 ## Published packages carry their own docs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64))
 
@@ -40,9 +40,14 @@ A consumer install has no monorepo to point at, so the prepare lane ships the kn
 |---|---|---|
 | `docs/<package>/` | `<package>/docs/` (flat) | The guide lands at `docs/index.md`, beside the package's committed deep docs; nested dirs (`classy-v2/`) survive |
 | `docs/shared/` | `<package>/docs/shared/` | The cross-framework contracts, verbatim |
-| `agent-plugins/claude/` | `manager/claude-plugin/` + `manager/.claude-plugin/marketplace.json` | Manager ONLY — the plugin every brand enables (see below). The copy ships WITHOUT `.mcp.json`: that server lives outside the plugin, in the monorepo's `packages/mcp-router`, which is not in the publish set — how the router reaches consumers is [#144](https://github.com/Omega-JS-Stack/omega/issues/144) |
+| `AGENTS.md` (the repo-root map) | `manager/docs/AGENTS.md` | Manager ONLY — the target the brand chain's scope symlink lands on when there is no monorepo. Links retargeted (see below) |
+| `agent-plugins/claude/` | `manager/claude-plugin/` + `manager/.claude-plugin/marketplace.json` | Manager ONLY — the plugin every brand enables (see below). `.mcp.json` ships WITH it: since [#144](https://github.com/Omega-JS-Stack/omega/issues/144) it launches `mcp-router-launch.js` inside the plugin, which node-resolves `@omega.js/mcp-router` from the install around it (a real dependency of the manager) instead of addressing the monorepo tree |
 
-The guide's monorepo-relative links are rewritten to the shipped layout on the way in (`../../packages/<self>/` → `../`, `../shared/` → `shared/`), so `docs/index.md` still reaches the package's deep docs, its README, and the shared contracts. Cross-framework links (`../backend/index.md`) are left verbatim — another framework's guide isn't in this tarball. Everything written is GENERATED: gitignored per package, cleared before each rewrite, and pinned by `scripts/vendor-docs.test.js`, which packs all six for real and reads the tarball listings.
+The guide's monorepo-relative links are rewritten to the shipped layout on the way in (`../../packages/<self>/` → `../`, `../shared/` → `shared/`), so `docs/index.md` still reaches the package's deep docs, its README, and the shared contracts. Cross-framework links (`../backend/index.md`) are left verbatim — another framework's guide isn't in this tarball.
+
+The map's links are repo-root-relative, so it gets its own pass (`rewriteMapLinks`): `docs/shared/<x>.md` → `shared/<x>.md`, `docs/manager/<x>.md` → `<x>.md` (the manager's guide tree lands flat in the same dir), `docs/<other>/<x>.md` → `../../<other>/docs/<x>.md` (a sibling package under the same `@omega.js` scope), and a `packages/…` or `apps/…` link keeps its words while losing the link — no published target exists. A sibling that never publishes (`devkit`) or isn't installed leaves a dead relative link, the same trade the guide trees already make.
+
+Everything written is GENERATED: gitignored per package, cleared before each rewrite, and pinned by `packages/devkit/test/vendor-docs.test.js` (fixture monorepo) plus `scripts/vendor-docs.test.js`, which packs all six documented packages for real and reads the tarball listings.
 
 Version-matched by construction: the docs in `node_modules/@omega.js/web/docs/` are the docs of the version installed there.
 

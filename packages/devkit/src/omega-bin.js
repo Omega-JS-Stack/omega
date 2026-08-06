@@ -50,10 +50,6 @@ function frameworksOf(pkg) {
   return FRAMEWORKS.filter((name) => declared[name]);
 }
 
-function frameworkOf(pkg) {
-  return frameworksOf(pkg)[0] || null;
-}
-
 /**
  * Is `dir` a brand-monorepo root? Carries a config/omega.json5 that is not
  * itself an APP of a brand above it (directly under an apps/ dir whose parent

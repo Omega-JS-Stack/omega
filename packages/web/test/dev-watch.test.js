@@ -98,6 +98,19 @@ function app() {
   write('_sections/toy-section/section.html', '<section data-section="{{ args.label }}">toy</section>');
   write('_sections/toy-section/section.json5', '{ defaults: { label: "BEFORE" } }');
 
+  // The active theme layer's first-paint faces: engine.js readdir's the first
+  // theme layer WITH a fonts/ dir once per config registration
+  // (site.fontPreloads), so a face added mid-session only lands through a
+  // reset. The page emits the same loop core/_includes/core/head.html does —
+  // the real chrome this fixture's toy layouts replace.
+  write(`themes/${ACTIVE_THEME}/fonts/aaa-400-normal-latin.woff2`, 'face');
+  write('pages/fonts-page.html', [
+    '---',
+    'permalink: /fonts-page.html',
+    '---',
+    '{% for font in site.fontPreloads %}<link rel="preload" href="{{ font }}"/>{% endfor %}',
+  ].join('\n'));
+
   write('pages/index.html', page('toy.html', '/', '<p data-nav="{{ site.data._includes.nav.label }}">home</p>'));
   write('pages/section-page.html', page('toy.html', '/section-page.html', '{% section "toy-section" %}'));
   write('pages/theme-page.html', page('theme-toy.html', '/theme-page.html', '<p>theme</p>'));
@@ -295,6 +308,19 @@ test('a watched _sections edit is served by the very next rebuild', async (t) =>
 
   fixture.write('_sections/toy-section/section.json5', '{ defaults: { label: "AFTER" } }');
   await watch.pageBecomes(/data-section="AFTER-AFTER"/, 'the section defaults are re-read too', 'section-page.html');
+});
+
+test('a watched theme-layer fonts edit is served by the very next rebuild', async (t) => {
+  const fixture = app();
+  const watch = await startWatch(t, fixture);
+
+  assert.match(watch.page('fonts-page.html'), /"\/assets\/fonts\/aaa-400-normal-latin\.woff2"/, 'the first build preloads the authored face');
+
+  fixture.write(`themes/${ACTIVE_THEME}/fonts/mmm-400-normal-latin.woff2`, 'face');
+  await watch.pageBecomes(/"\/assets\/fonts\/mmm-400-normal-latin\.woff2"/, 'the rebuild re-reads the fonts dir, not the config-time capture', 'fonts-page.html');
+
+  fixture.write(`themes/${ACTIVE_THEME}/fonts/zzz-400-normal-latin.woff2`, 'face');
+  await watch.pageBecomes(/"\/assets\/fonts\/zzz-400-normal-latin\.woff2"/, 'every later face lands too', 'fonts-page.html');
 });
 
 test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {

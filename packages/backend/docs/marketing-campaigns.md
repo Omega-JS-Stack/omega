@@ -336,7 +336,7 @@ Requires `GH_TOKEN` env var (org-scoped, write access to `newsletter-assets`). W
 
 ## Seed Campaigns
 
-Created by `npx omega setup` (idempotent, enforced fields checked every run):
+Checked by `npx omega setup` every run (missing or drifted seeds are reported as a warning, never written). Creating them and enforcing their fields is opt-in: `npx omega setup --seed-campaigns` (idempotent). Emulator runs seed on boot, so demo-* projects need neither.
 
 | ID | Type | Description |
 |----|------|-------------|

@@ -15,13 +15,16 @@
 //   3. Rewrites the guide's monorepo-relative links to the shipped layout:
 //      `../../packages/<self>/` → `../` (so `docs/architecture.md` and
 //      `README.md` both land) and `../shared/` → `shared/`
-//   4. For @omega.js/manager ONLY: copies the Claude plugin to
-//      `claude-plugin/` and writes a package-root `.claude-plugin/marketplace.json`
-//      listing it by the package-relative `./claude-plugin` source, so a
-//      consumer brand can enable the plugin straight from its node_modules
-//      ([#62](https://github.com/Omega-JS-Stack/omega/issues/62)). The copy
-//      ships without the plugin's `.mcp.json` — that server lives outside the
-//      plugin, in the monorepo ([#144](https://github.com/Omega-JS-Stack/omega/issues/144))
+//   4. For @omega.js/manager ONLY: copies the repo-root map (`AGENTS.md`) to
+//      `docs/AGENTS.md` with its links retargeted at the shipped layout, so a
+//      published install has a map for the brand chain to link at, copies the
+//      Claude plugin to `claude-plugin/` — `.mcp.json` INCLUDED, since it now
+//      addresses a launcher inside the plugin that node-resolves the installed
+//      `@omega.js/mcp-router` ([#144](https://github.com/Omega-JS-Stack/omega/issues/144))
+//      — and writes a package-root `.claude-plugin/marketplace.json` listing it
+//      by the package-relative `./claude-plugin` source, so a consumer brand
+//      can enable the plugin straight from its node_modules
+//      ([#62](https://github.com/Omega-JS-Stack/omega/issues/62))
 //
 // Everything it writes is GENERATED (gitignored per package) and idempotent:
 // each destination is cleared before it is rewritten, so a deleted source doc
@@ -34,9 +37,10 @@ const Logger = require('../src/logger');
 
 const logger = new Logger('devkit-vendor-docs');
 
-// The packages that ship docs — the six publishables. The private packages
-// (devkit, config, account, template-kit) are vendored INTO these and never
-// ship a tree of their own.
+// The packages that ship docs — the six DOCUMENTED publishables (mcp-router
+// publishes but carries no guide tree). The private packages (devkit, config,
+// account, template-kit) are vendored INTO these and never ship a tree of
+// their own.
 const DOCUMENTED_PACKAGES = ['backend', 'client', 'desktop', 'extension', 'manager', 'web'];
 
 // The Claude plugin: source in the monorepo, destination inside the manager
@@ -45,8 +49,10 @@ const PLUGIN_PACKAGE = 'manager';
 const PLUGIN_SOURCE = 'agent-plugins/claude';
 const PLUGIN_DIR = 'claude-plugin';
 const MARKETPLACE_FILE = path.join('.claude-plugin', 'marketplace.json');
-// Monorepo-only: the MCP server it declares lives outside the plugin (#144).
-const MCP_FILE = '.mcp.json';
+// The repo-root map — the ONE agent entry — and where it ships inside the
+// manager package for the brand chain's scope symlink to point at (#144).
+const MAP_SOURCE = 'AGENTS.md';
+const MAP_FILE = path.join('docs', 'AGENTS.md');
 
 /**
  * Rewrite a guide file's monorepo-relative links to the shipped layout.
@@ -63,8 +69,47 @@ function rewriteGuideLinks(contents, short) {
 }
 
 /**
- * Copy the monorepo docs (and, for the manager, the Claude plugin) into a
- * publishable package.
+ * Rewrite the repo-root map's links for the copy that ships at
+ * `@omega.js/manager/docs/AGENTS.md`. Every target is repo-root-relative
+ * there, and each kind has exactly one shipped home:
+ *
+ * | In the monorepo | Shipped as | Why |
+ * |---|---|---|
+ * | `docs/shared/<x>.md` | `shared/<x>.md` | the manager's own vendored shared contracts sit beside it |
+ * | `docs/manager/<x>.md` | `<x>.md` | the manager's guide tree lands FLAT in the same dir |
+ * | `docs/<other>/<x>.md` | `../../<other>/docs/<x>.md` | a sibling package under the same @omega.js scope |
+ * | `packages/…`, `apps/…` | the link text alone | no published target exists — the words survive, the link doesn't |
+ *
+ * A sibling that isn't installed, never publishes (`devkit`), or publishes
+ * without a guide tree (`mcp-router` is not in DOCUMENTED_PACKAGES) leaves a
+ * dead relative link — the same trade the guide trees already make for their
+ * cross-framework links, and better than a `docs/` path that resolves nowhere.
+ *
+ * @param {string} contents - The map markdown as written in the monorepo
+ * @returns {string} - The map as it ships inside the manager package
+ */
+function rewriteMapLinks(contents) {
+  return contents.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (link, text, target) => {
+    if (target.startsWith('docs/shared/')) {
+      return `[${text}](${target.slice('docs/'.length)})`;
+    }
+    if (target.startsWith(`docs/${PLUGIN_PACKAGE}/`)) {
+      return `[${text}](${target.slice(`docs/${PLUGIN_PACKAGE}/`.length)})`;
+    }
+    const sibling = target.match(/^docs\/([^/]+)\/(.+)$/);
+    if (sibling) {
+      return `[${text}](../../${sibling[1]}/docs/${sibling[2]})`;
+    }
+    if (/^(packages|apps)\//.test(target)) {
+      return text;
+    }
+    return link;
+  });
+}
+
+/**
+ * Copy the monorepo docs (and, for the manager, the map and the Claude plugin)
+ * into a publishable package.
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - The package root (defaults to process.cwd())
@@ -118,22 +163,21 @@ function vendorDocs(options) {
   jetpack.copy(sharedDir, path.join(docsDir, 'shared'));
   written.push('docs/shared/');
 
-  // The Claude plugin rides along in the manager package: it is the one
-  // package every brand installs, and its hooks and skills address themselves
-  // through CLAUDE_PLUGIN_ROOT. The one file that reached OUTSIDE the plugin
-  // is dropped below, so the shipped copy is self-contained.
+  // The map and the Claude plugin ride along in the manager package: it is the
+  // one package every brand installs.
   let plugin = false;
   if (short === PLUGIN_PACKAGE) {
+    // The map — a published brand has no monorepo to link at, so the workspace
+    // service's scope symlink lands on THIS copy instead (#144).
+    jetpack.write(path.join(cwd, MAP_FILE), rewriteMapLinks(jetpack.read(path.join(monorepoRoot, MAP_SOURCE))));
+    written.push('docs/AGENTS.md');
+
+    // The plugin, whole — its hooks and skills address themselves through
+    // CLAUDE_PLUGIN_ROOT, and since #144 so does `.mcp.json`: it launches the
+    // in-plugin launcher, which node-resolves @omega.js/mcp-router from the
+    // install around it. Nothing in the shipped copy reaches outside itself.
     jetpack.remove(path.join(cwd, PLUGIN_DIR));
     jetpack.copy(path.join(monorepoRoot, PLUGIN_SOURCE), path.join(cwd, PLUGIN_DIR));
-
-    // …minus the MCP declaration: it points at the monorepo's own
-    // packages/mcp-router, which is not in the publish set, so in a consumer
-    // install the path doesn't exist and the server fails to start every
-    // session. Shipping the plugin WITHOUT it is the deliberate call until
-    // [#144](https://github.com/Omega-JS-Stack/omega/issues/144) resolves how
-    // the router reaches consumers. The live monorepo plugin keeps its copy.
-    jetpack.remove(path.join(cwd, PLUGIN_DIR, MCP_FILE));
 
     // The root marketplace stays the SSOT for name/owner/description — only the
     // source moves, from the monorepo path to the in-package one.
@@ -154,4 +198,4 @@ module.exports = vendorDocs;
 module.exports.DOCUMENTED_PACKAGES = DOCUMENTED_PACKAGES;
 module.exports.PLUGIN_DIR = PLUGIN_DIR;
 module.exports.MARKETPLACE_FILE = MARKETPLACE_FILE;
-module.exports.MCP_FILE = MCP_FILE;
+module.exports.MAP_FILE = MAP_FILE;

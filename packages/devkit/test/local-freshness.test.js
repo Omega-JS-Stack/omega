@@ -112,6 +112,31 @@ function makeConsumer(dir, pkgDir) {
   fs.symlinkSync(pkgDir, path.join(dir, 'node_modules', '@scratch', 'pkg'), 'dir');
 }
 
+/** A buildable scratch package under a chosen name, optionally with @omega.js deps. */
+function makeOmegaPkg(dir, name, dependencies, devDependencies) {
+  const manifest = { name };
+  if (dependencies) {
+    manifest.dependencies = dependencies;
+  }
+  if (devDependencies) {
+    manifest.devDependencies = devDependencies;
+  }
+  makePkg(dir, { manifest });
+}
+
+/** Symlink pkgDir into dir's node_modules under its package name (a local link). */
+function linkPkg(dir, name, pkgDir) {
+  const target = path.join(dir, 'node_modules', name);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.symlinkSync(pkgDir, target, 'dir');
+}
+
+/** A consumer dir with nothing linked yet (linkPkg adds the links). */
+function makeConsumerRoot(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: 'consumer', version: '0.0.0' })}\n`);
+}
+
 /** Fake monorepo root recognized by isMonorepoRoot, with a devkit src to age. */
 function makeFakeMonorepo(root) {
   fs.mkdirSync(path.join(root, 'packages', 'devkit', 'src'), { recursive: true });
@@ -325,6 +350,140 @@ test('a dist/docs or dist/package.json leftover is stale — nothing generates t
   assert.equal(result.status, 'rebuilt');
   assert.equal(fs.existsSync(path.join(pkgDir, 'dist', 'package.json')), false);
   assert.equal(fs.existsSync(path.join(pkgDir, 'dist', 'docs')), false);
+});
+
+// ---- declared vendorAssets: the exemption is not a free pass (#199)
+
+// @omega.js-scoped like the real declarations — the staleness loop skips
+// foreign scopes outright (their short name can't map to packages/<name>)
+const ASSET_SOURCE = '@omega.js/web';
+
+/** The fake monorepo's asset-source package — where a vendorAssets `from` resolves. */
+function sourcePkgDir(root) {
+  return path.join(root, 'packages', 'web');
+}
+
+/** Write an asset (with its dirs) in the source package a vendorAssets entry names. */
+function writeSourceAsset(root, relative) {
+  const abs = path.join(sourcePkgDir(root), relative);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, 'source\n');
+  fs.writeFileSync(path.join(sourcePkgDir(root), 'package.json'), `${JSON.stringify({ name: ASSET_SOURCE, version: '0.0.0' })}\n`);
+}
+
+/** Write the vendored dist copy (with its dirs) the vendor hook would have made. */
+function writeVendoredCopy(pkgDir, relative) {
+  const abs = path.join(pkgDir, 'dist', relative);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, 'vendored\n');
+}
+
+test('a vendorAssets source newer than its vendored dist copy is stale', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, {
+    manifest: { omega: { vendorAssets: [{ package: ASSET_SOURCE, from: 'themes', to: 'assets/themes' }] } },
+  });
+  makeConsumer(consumer, pkgDir);
+  writeVendoredCopy(pkgDir, 'assets/themes/classy/theme.scss');
+  writeSourceAsset(root, 'themes/classy/theme.scss');
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 2000); // own dist fresh, copy and all
+  setTreeTimes(sourcePkgDir(root), 3000); // the theme edited after the copy
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'rebuilt');
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+});
+
+test('a vendorAssets source older than its vendored dist copy is fresh', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, {
+    manifest: { omega: { vendorAssets: [{ package: ASSET_SOURCE, from: 'themes', to: 'assets/themes' }] } },
+  });
+  makeConsumer(consumer, pkgDir);
+  writeVendoredCopy(pkgDir, 'assets/themes/classy/theme.scss');
+  writeSourceAsset(root, 'themes/classy/theme.scss');
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 3000); // vendored after the source
+  setTreeTimes(sourcePkgDir(root), 2000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'fresh');
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
+});
+
+test('a single-FILE vendorAssets entry compares that file, not a tree', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, {
+    manifest: {
+      omega: {
+        vendorAssets: [{ package: ASSET_SOURCE, from: 'core/js/core/app-shell.js', to: 'assets/js/app-shell.js' }],
+      },
+    },
+  });
+  makeConsumer(consumer, pkgDir);
+  writeVendoredCopy(pkgDir, 'assets/js/app-shell.js');
+  writeSourceAsset(root, 'core/js/core/app-shell.js');
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 2000);
+  setTreeTimes(sourcePkgDir(root), 3000); // the one file edited after the copy
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'rebuilt');
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+});
+
+test('a vendorAssets destination that was never vendored is stale', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, {
+    manifest: { omega: { vendorAssets: [{ package: ASSET_SOURCE, from: 'themes', to: 'assets/themes' }] } },
+  });
+  makeConsumer(consumer, pkgDir);
+  writeSourceAsset(root, 'themes/classy/theme.scss');
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 5000); // newer than the source, and still missing the copy
+  setTreeTimes(sourcePkgDir(root), 2000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'rebuilt');
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+});
+
+test('a foreign-scope vendorAssets entry is skipped, not mismapped', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, {
+    // Short name 'web' collides with the monorepo dir a real entry maps to —
+    // the scope guard must skip it before the packages/web comparison runs
+    manifest: { omega: { vendorAssets: [{ package: '@types/web', from: 'themes', to: 'assets/themes' }] } },
+  });
+  makeConsumer(consumer, pkgDir);
+  writeSourceAsset(root, 'themes/classy/theme.scss');
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 2000); // missing the copy AND older than the source
+  setTreeTimes(sourcePkgDir(root), 3000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'fresh');
 });
 
 // ---- the live watch: bounded grace, then heal anyway
@@ -547,4 +706,135 @@ test('integration: a wired CLI on a stale link rebuilds and re-execs exactly onc
   assert.equal(fs.existsSync(builtSentinel(pkgDir)), true); // rebuilt
   assert.equal((result.stdout.match(/rebuilding/g) || []).length, 1); // one loud rebuild line
   assert.deepEqual(result.stdout.match(/CLI_RAN reexec=\d/g), ['CLI_RAN reexec=1']); // the command ran ONCE, in the re-exec
+});
+
+// ---- the boot walk: the host AND its @omega.js/* runtime deps (#198)
+
+const HOST_NAME = '@omega.js/scratch-host';
+const DEP_NAME = '@omega.js/scratch-dep';
+const GRANDDEP_NAME = '@omega.js/scratch-granddep';
+const DEVDEP_NAME = '@omega.js/scratch-devdep';
+
+/** Write and run the wired CLI (freshnessBoot, then the "command") in consumer. */
+function runWiredCli(consumer, packageName) {
+  const cliPath = path.join(consumer, 'cli.js');
+  fs.writeFileSync(cliPath, [
+    `const local = require(${JSON.stringify(require.resolve('../src/local'))});`,
+    `const result = local.freshnessBoot({ packageName: ${JSON.stringify(packageName)}, fromDir: __dirname });`,
+    "console.log('STATUS ' + result.status);",
+    "console.log('CLI_RAN reexec=' + (process.env.OMEGA_FRESH_REEXEC || '0'));",
+    '',
+  ].join('\n'));
+
+  const env = Object.assign({}, process.env);
+  delete env.OMEGA_SKIP_FRESHNESS;
+  delete env.OMEGA_FRESH_REEXEC;
+  return spawnSync(process.execPath, [cliPath], { cwd: consumer, env, encoding: 'utf8' });
+}
+
+test('a stale @omega.js/* runtime dep of the host heals too (#198)', (t) => {
+  const scratch = makeScratch(t);
+  const hostDir = path.join(scratch, 'host');
+  const depDir = path.join(scratch, 'dep');
+  const consumer = path.join(scratch, 'consumer');
+  // The web→client shape: the CLI host is fresh, the dep whose dist the host's
+  // bundle carries verbatim is not — healing only the host serves stale code.
+  makeOmegaPkg(hostDir, HOST_NAME, { [DEP_NAME]: '*' });
+  makeOmegaPkg(depDir, DEP_NAME);
+  linkPkg(hostDir, DEP_NAME, depDir);
+  makeConsumerRoot(consumer);
+  linkPkg(consumer, HOST_NAME, hostDir);
+  setTreeTimes(path.join(hostDir, 'src'), 1000);
+  setTreeTimes(path.join(hostDir, 'dist'), 2000); // host fresh
+  setTreeTimes(path.join(depDir, 'dist'), 1000);
+  setTreeTimes(path.join(depDir, 'src'), 2000); // dep stale
+
+  const result = runWiredCli(consumer, HOST_NAME);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.existsSync(builtSentinel(depDir)), true, result.stdout); // the DEP got healed
+  assert.equal(buildCount(hostDir), 0); // the host was fresh — nothing to build
+  assert.deepEqual(result.stdout.match(/CLI_RAN reexec=\d/g), ['CLI_RAN reexec=1']); // a dep heal re-execs like any other
+});
+
+test('a fresh dep leaves the boot alone and returns the host result', (t) => {
+  const scratch = makeScratch(t);
+  const hostDir = path.join(scratch, 'host');
+  const depDir = path.join(scratch, 'dep');
+  const consumer = path.join(scratch, 'consumer');
+  makeOmegaPkg(hostDir, HOST_NAME, { [DEP_NAME]: '*' });
+  makeOmegaPkg(depDir, DEP_NAME);
+  linkPkg(hostDir, DEP_NAME, depDir);
+  makeConsumerRoot(consumer);
+  linkPkg(consumer, HOST_NAME, hostDir);
+  for (const dir of [hostDir, depDir]) {
+    setTreeTimes(path.join(dir, 'src'), 1000);
+    setTreeTimes(path.join(dir, 'dist'), 2000);
+  }
+
+  const result = runWiredCli(consumer, HOST_NAME);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes('STATUS fresh'), true, result.stdout); // the HOST's result
+  assert.deepEqual(result.stdout.match(/CLI_RAN reexec=\d/g), ['CLI_RAN reexec=0']); // no re-exec
+  assert.equal(buildCount(hostDir) + buildCount(depDir), 0);
+});
+
+test('the check list is deps-first, host-last, and a dependency cycle terminates', (t) => {
+  const scratch = makeScratch(t);
+  const hostDir = path.join(scratch, 'host');
+  const depDir = path.join(scratch, 'dep');
+  const consumer = path.join(scratch, 'consumer');
+  makeOmegaPkg(hostDir, HOST_NAME, { [DEP_NAME]: '*' });
+  makeOmegaPkg(depDir, DEP_NAME, { [HOST_NAME]: '*' }); // back-edge: A → B → A
+  linkPkg(hostDir, DEP_NAME, depDir);
+  linkPkg(depDir, HOST_NAME, hostDir);
+  makeConsumerRoot(consumer);
+  linkPkg(consumer, HOST_NAME, hostDir);
+
+  const list = local.freshnessCheckList({ packageName: HOST_NAME, fromDir: consumer });
+  assert.deepEqual(list.map((entry) => entry.packageName), [DEP_NAME, HOST_NAME]);
+  assert.equal(list[0].fromDir, hostDir); // each dep resolves from ITS depender
+});
+
+test('a dep that resolves to a registry install is checked but not walked', (t) => {
+  const scratch = makeScratch(t);
+  const hostDir = path.join(scratch, 'host');
+  const granddepDir = path.join(scratch, 'granddep');
+  const consumer = path.join(scratch, 'consumer');
+  makeOmegaPkg(hostDir, HOST_NAME, { [DEP_NAME]: '*' });
+  const installed = path.join(hostDir, 'node_modules', DEP_NAME); // a REAL dir under node_modules
+  makeOmegaPkg(installed, DEP_NAME, { [GRANDDEP_NAME]: '*' });
+  makeOmegaPkg(granddepDir, GRANDDEP_NAME);
+  linkPkg(installed, GRANDDEP_NAME, granddepDir);
+  makeConsumerRoot(consumer);
+  linkPkg(consumer, HOST_NAME, hostDir);
+
+  const list = local.freshnessCheckList({ packageName: HOST_NAME, fromDir: consumer });
+  assert.deepEqual(list.map((entry) => entry.packageName), [DEP_NAME, HOST_NAME]); // no granddep
+  assert.equal(local.ensureFreshLocalDist(list[0]).status, 'registry');
+});
+
+test('the walk is transitive through dependencies and never through devDependencies', (t) => {
+  const scratch = makeScratch(t);
+  const hostDir = path.join(scratch, 'host');
+  const depDir = path.join(scratch, 'dep');
+  const granddepDir = path.join(scratch, 'granddep');
+  const devdepDir = path.join(scratch, 'devdep');
+  const consumer = path.join(scratch, 'consumer');
+  // host → dep → granddep, and a devDependency that is just as linkable: the
+  // depth stops at nothing a consumer RUNS, and starts at nothing it doesn't.
+  makeOmegaPkg(hostDir, HOST_NAME, { [DEP_NAME]: '*' });
+  makeOmegaPkg(depDir, DEP_NAME, { [GRANDDEP_NAME]: '*' }, { [DEVDEP_NAME]: '*' });
+  makeOmegaPkg(granddepDir, GRANDDEP_NAME);
+  makeOmegaPkg(devdepDir, DEVDEP_NAME);
+  linkPkg(hostDir, DEP_NAME, depDir);
+  linkPkg(depDir, GRANDDEP_NAME, granddepDir);
+  linkPkg(depDir, DEVDEP_NAME, devdepDir); // resolvable, and still not walked
+  makeConsumerRoot(consumer);
+  linkPkg(consumer, HOST_NAME, hostDir);
+
+  const list = local.freshnessCheckList({ packageName: HOST_NAME, fromDir: consumer });
+  assert.deepEqual(list.map((entry) => entry.packageName), [GRANDDEP_NAME, DEP_NAME, HOST_NAME]);
+  assert.equal(list[0].fromDir, depDir); // the granddep resolved from ITS depender
 });

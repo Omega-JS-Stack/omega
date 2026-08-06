@@ -38,7 +38,7 @@ Ian 2026-07-18: "still use local … until we are fully locked on all decisions 
 
 - Every `@omega.js/*` dep in the real brand is a committed relative `file:` spec into THIS monorepo.
 - Versions re-reset to 0.1.0 (cp238, supersedes cp228 — Ian: 0.x until live publishes are proven; 1.0.0 is a later deliberate graduation), so the first publish flips them to `^0.1.0` seamlessly.
-- All six publishables carry a mechanical `private: true` latch until the proving checkpoint unlatches them ([docs/shared/publishing.md](publishing.md) is the runbook).
+- All seven publishables carry a mechanical `private: true` latch until the proving checkpoint unlatches them ([docs/shared/publishing.md](publishing.md) is the runbook).
 
 ## The line that never moves
 

@@ -24,6 +24,13 @@
   "engines": {
     "node": ">=22"
   },
+  "keywords": [
+    "omega",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude"
+  ],
   "author": "ITW Creative Works",
   "license": "MIT"
 }

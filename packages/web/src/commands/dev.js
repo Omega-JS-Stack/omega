@@ -334,7 +334,8 @@ function devServerOptions(outDir, authPort) {
  * `src/themes/<id>` or the packaged one) → core. Same chain, same resolution
  * — `resolveThemeLayers` — so a target can never drift from what
  * `configureOmega` actually captured. Only the machinery subtrees of a layer
- * (`_layouts`/`_includes`/`_sections`/`_components`): a whole theme dir would
+ * (`_layouts`/`_includes`/`_sections`/`_components`, plus a theme's `fonts/`,
+ * whose face list is a config-time readdir): a whole theme dir would
  * drag scss (the sass lane's own watcher) and pages (the incremental rebuild
  * path) into full config resets. The packaged `defaults` tree is the one whole
  * root (#136) — nothing in it rides the incremental path.
@@ -410,6 +411,18 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
       const target = path.join(layer, dir);
       if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
     }
+  }
+
+  // The theme layers' `fonts/` dirs (#139), the same theme-only chain the
+  // capture reads: configureOmega readdir's the first layer WITH the dir into
+  // site.fontPreloads, so a face added or removed mid-session serves stale
+  // preload tags until restart. No consumer `src/fonts` — the capture never
+  // looks there. Theme dirs are also asset watchDirs, so a font edit rides
+  // BOTH lanes (asset rebuild + config reset) — same accepted cost as the
+  // _sections block above (#138).
+  for (const layer of themeLayers) {
+    const target = path.join(layer, 'fonts');
+    if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
   }
 
   for (const target of targets) {
