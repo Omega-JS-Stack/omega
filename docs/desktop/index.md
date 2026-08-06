@@ -140,7 +140,7 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ### Dev logs
 
-Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`OMEGA_BUILD_MODE=true`) — chosen by build mode, path via `OMEGA_LOG_FILE`; disable with `OMEGA_LOG_FILE=false`. `npx omega test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback. See [docs/logging.md](../../packages/desktop/docs/logging.md).
+Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`OMEGA_BUILD_MODE=true`) — chosen by build mode, path via `OMEGA_LOG_FILE`; disable with `OMEGA_LOG_FILE=false`. `npx omega test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. The packaged app's own `logs/runtime.log` (main + preload + renderer) sits beside them, and Windows signing appends `logs/signing.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback — never restart the app to see output it already wrote. The runtime logger: [docs/logging.md](../../packages/desktop/docs/logging.md); the cross-framework tee contract and the full path table: [docs/shared/logging.md](../shared/logging.md).
 
 ### CDP debugging (Claude ↔ Electron)
 

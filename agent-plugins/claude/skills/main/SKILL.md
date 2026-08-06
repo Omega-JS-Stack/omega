@@ -45,6 +45,10 @@ Brand work happens in one of four places — resolve which before touching files
 
 Nothing in this monorepo is ever the production brand. Topology, history, and the local-era `file:` dependency contract: `docs/shared/brands.md`. Linking a brand against the local frameworks: `docs/shared/local-dev.md`.
 
+## Inspecting a running system — grep the logs FIRST
+
+Every OMEGA surface tees its whole run to a file, truncated on each launch: an app's `logs/dev.log` / `logs/build.log` / `logs/test.log`, a brand root's `logs/manage.log`, the backend's `dist/emulator.log`, this monorepo's `.temp/logs/<lane>.log` and `.temp/logs/watch-all.log`, and each e2e lane's `.temp/<lane>/steps.log` (`grep '^FAIL' .temp/*/steps.log` names the failing step). Server state, build errors, test failures and emulator traffic are ALREADY on disk — never restart a dev server, emulator or watcher, and never re-run a suite, just to see output. The mechanism, the retention rule and the full path table: `docs/shared/logging.md`.
+
 ## Project state
 
 Live work is GitHub issues (project-state spec v4): the queue is a query (`gh issue list`), status labels carry state, and a spec is the `## Spec` section of its issue — never a file. Shipped work is `CHANGELOG.md`; durable rulings from the retired board era are `docs/shared/rulings.md`.

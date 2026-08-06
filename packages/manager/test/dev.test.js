@@ -150,3 +150,31 @@ test('a manage cycle with errors stops dev boot loudly — no app leg spawns', a
   await assert.rejects(() => bootDev(root, { only: 'web' }), /manage/i);
   assert.deepStrictEqual(boot, [`manage:${root}`], 'nothing booted on top of a broken brand');
 });
+
+// ─── Verb log (#197) ─────────────────────────────────────────────────────────
+
+test('boot tees the brand-level fan-out to <brandRoot>/logs/manage.log, ANSI stripped', async () => {
+  boot.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  // The tee declines under a runner by design; this asserts what it does when
+  // it does not decline, so the signal is lifted for the duration.
+  const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
+  delete process.env.CI;
+  delete process.env.GITHUB_ACTIONS;
+
+  try {
+    await bootDev(root, { only: 'web' });
+  } finally {
+    // dev() never returns, so nothing else would restore the writers.
+    require('@omega.js/devkit/attach-log-file').detach();
+    for (const [key, value] of Object.entries(priorCi)) {
+      if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; }
+    }
+  }
+
+  const contents = fs.readFileSync(path.join(root, 'logs', 'manage.log'), 'utf8');
+  assert.match(contents, /omega dev — booting web/, "the boot banner is in the brand's log");
+  assert.ok(!contents.includes('\x1B['), 'the file is ANSI-free');
+});

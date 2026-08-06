@@ -19,6 +19,7 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 ## Non-negotiables
 
 - **Read the guide before editing.** Which context owns a concern — background is the auth source of truth, everything else reflects it over `chrome.runtime` messaging — is the first thing to get right.
+- **🚫 Never start the user's `npm start`** — it is their long-running watcher. **Grep the logs FIRST**: the app's `logs/dev.log`, `logs/build.log` and `logs/test.log` carry the whole run, truncated per launch and ANSI-stripped, so a build error or a failing suite is a `grep`, never a restart (`docs/shared/logging.md`).
 - **Gate behavior on the intentional environment check** (`isProduction()`, or `isDevelopment() || isTesting()`) — never `!isDevelopment()`.
 - **Secrets never enter `config/omega.json5`** — `.env` only; the config validator hard-fails secret-shaped keys.
 - **Deploys are deliberate** — only `omega deploy` (and an explicit `OMEGA_IS_PUBLISH` run) reaches a store; a commit never does (`docs/shared/deploys.md`).

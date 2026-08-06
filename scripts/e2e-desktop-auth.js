@@ -73,6 +73,7 @@ const LOG_DIR = path.join(ROOT, '.temp', 'desktop-auth-e2e');
 const BRAND_ID = 'desktop-auth-e2e';
 
 const { readPortsFile } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -80,13 +81,18 @@ const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const failures = [];
+const stepsLog = createStepsLog(LOG_DIR);
 
+// Every verdict lands in .temp/desktop-auth-e2e/steps.log as it happens, so a
+// crashed run still names the step that broke.
 async function step(name, fn) {
   try {
     const detail = await fn();
+    stepsLog.pass(name, detail);
     console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
   } catch (error) {
     failures.push({ name, error });
+    stepsLog.fail(name, error);
     console.log(`  ✗ ${name}\n      ${error.message}`);
     throw error;
   }
@@ -472,6 +478,10 @@ async function main() {
 }
 
 main().catch((error) => {
+  // A death outside step() — the live-stack preflight guard, a throw on the way
+  // up — has no verdict yet; record one so steps.log still answers "why did
+  // nothing run?". A step failure propagating out is already on file.
+  stepsLog.abort(error);
   console.error(`\n✗ desktop auth e2e errored: ${error.message}`);
   console.error(`   logs: ${path.relative(ROOT, LOG_DIR)}/ — staged app: ${path.relative(ROOT, APP_DIR)}\n`);
   process.exit(1);

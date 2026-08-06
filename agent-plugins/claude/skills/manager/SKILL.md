@@ -20,5 +20,6 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 - **No package carries agent docs.** The repo-root `AGENTS.md` map is the one agent entry; the brand guide is `docs/manager/brand.md`. Never create a `packages/<pkg>/AGENTS.md` or `CLAUDE.md`.
 - **Upstream-first, permission first**: a defect the next consumer would hit gets fixed in the framework, not patched in the brand — but a consumer session surfaces the proposed framework change and waits for Ian's go (or files an upstream issue) before editing the monorepo. The rule and its "within reason" line live in `docs/shared/local-dev.md`.
 - **Every service is idempotent.** Check before acting; a second run must change nothing.
+- **Grep the logs FIRST.** The manage cycle and the `omega dev` fan-out both tee to `<brandRoot>/logs/manage.log`, and every app keeps its own `logs/` beside it — truncated per launch, gitignored. What a service walk did, and what a dev leg printed, is on disk: read it instead of re-running a manage or restarting the stack (`docs/shared/logging.md`).
 - **Secrets never enter `config/omega.json5`** — `.env` and `.omega/secrets/` only; `.omega/` is gitignored and never committed.
 - **Deploys are deliberate** — only `omega deploy` publishes, backend first; a commit never does (`docs/shared/deploys.md`).

@@ -61,6 +61,7 @@ const LOG_DIR = path.join(ROOT, '.temp', 'extension-auth-e2e');
 const EXTENSION_DIR = path.join(LOG_DIR, 'extension');
 
 const { readPortsFile } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const BUILD_TIMEOUT = 300000;
@@ -76,13 +77,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripAnsi = (text) => text.replace(/\x1B\[[0-9;]*m/g, '');
 
 const failures = [];
+const stepsLog = createStepsLog(LOG_DIR);
 
+// Every verdict lands in .temp/extension-auth-e2e/steps.log as it happens, so a
+// crashed run still names the step that broke.
 async function step(name, fn) {
   try {
     const detail = await fn();
+    stepsLog.pass(name, detail);
     console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
   } catch (error) {
     failures.push({ name, error });
+    stepsLog.fail(name, error);
     console.log(`  ✗ ${name}\n      ${error.message}`);
     throw error;
   }
@@ -448,6 +454,10 @@ async function main() {
 }
 
 main().catch((error) => {
+  // A death outside step() — the live-stack preflight guard, a throw on the way
+  // up — has no verdict yet; record one so steps.log still answers "why did
+  // nothing run?". A step failure propagating out is already on file.
+  stepsLog.abort(error);
   console.error(`\n✗ extension auth e2e errored: ${error.message}`);
   console.error(`   logs: ${path.relative(ROOT, LOG_DIR)}/\n`);
   process.exit(1);

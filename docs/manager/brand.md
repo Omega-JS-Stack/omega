@@ -21,6 +21,7 @@ A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one app 
 - `.env` — secrets, ALWAYS (the config loader hard-fails secret-shaped keys in omega.json5). Gitignored.
 - `.omega/` — durable state, secrets store, run output. Gitignored; never commit it.
 - `apps/<target>/` — one workspace per enabled target (see table above).
+- `logs/` — the brand-level run log, `logs/manage.log` (the manage cycle AND `npm run dev`'s fan-out). Gitignored, truncated on every launch.
 - `AGENTS.md` / `CLAUDE.md` — the doc chain: `CLAUDE.md` is a one-line `@AGENTS.md` pointer; `AGENTS.md`'s first line imports the framework guide; everything below the import is the brand's own.
 
 ## Verbs (the whole interface)
@@ -49,6 +50,24 @@ npx omega i live     # restore published registry versions
 
 Tests follow the layered doctrine in each framework's own `docs/test-framework.md` (unit for functions, integration for in-package systems, e2e only across framework boundaries; never mock what you can test real). Bare `npx omega test` runs are PROJECT-only — the framework corpus needs an explicit `framework:` or `full:` target.
 
+## Logs — grep them, never restart
+
+Every verb tees its whole run to a file: truncated on each launch, ANSI-stripped, gitignored. Server state, build errors, test failures and emulator traffic are ALREADY on disk — read them instead of restarting a process or re-running a suite.
+
+| Where | Files |
+|---|---|
+| brand root | `logs/manage.log` — the manage cycle, and `npm run dev`'s fan-out across every leg |
+| any app | `apps/<target>/logs/dev.log`, `logs/build.log`, `logs/test.log` |
+| backend, extra | `apps/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, `dist/test.log` — beside firebase-tools' `*-debug.log` |
+| desktop, extra | `apps/desktop/logs/runtime.log` — the running app itself (packaged builds: the OS log dir) |
+
+```bash
+tail -50 apps/website/logs/dev.log            # is the dev server up, what did it last build
+grep -i error apps/backend/dist/emulator.log  # what the emulator actually served
+```
+
+The mechanism, the retention rule, and the complete path table: [../shared/logging.md](../shared/logging.md).
+
 ## Working locally against the framework (upstream-first)
 
 When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` dep is linked LIVE from the local framework monorepo — a framework change reflects here instantly. That linkage exists for a reason: real applications expose framework holes. **When you hit a defect or gap that EVERY consumer would face — a broken core style, a missing option, a wrong default — it belongs in the FRAMEWORK (the linked monorepo), not in this brand.** The test: would the next consumer project need the same patch? Then it belongs upstream. **But ask first, always: SURFACE the proposed framework change (what is broken, what you would change, why every consumer needs it) and WAIT for Ian's go before editing the monorepo — or file it as an upstream issue.** Never edit the framework silently as a side effect of brand work. Within reason: brand-specific looks, content, and one-off behavior stay in the brand; framework edits follow the framework's own rules (its docs, its tests). When the link is NOT active (published versions installed), file the gap upstream instead of patching around it locally.
@@ -59,5 +78,5 @@ When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` 
 - **Never edit `node_modules/`** — framework bugs get fixed in the framework.
 - **Secrets never enter omega.json5** — `.env` / `.omega/secrets/` only.
 - **Deploys are deliberate**: only `omega deploy` publishes. Commits and pushes never auto-publish.
-- **Don't start long-running dev processes the user may already be running** (`npm run dev`, emulators) — assume theirs is up; read the app's `dist/*.log` files for output instead.
+- **Don't start long-running dev processes the user may already be running** (`npm run dev`, emulators) — assume theirs is up and GREP THE LOGS; every surface already wrote its output to disk.
 - **Framework-owned file sections** (marked `Default Values` / `OMEGA Rules` blocks) are rewritten by `omega setup` — put customizations in the marked custom sections only.

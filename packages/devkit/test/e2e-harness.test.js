@@ -81,6 +81,73 @@ test('step records failures and rethrows; passes do not accumulate', async () =>
   assert.equal(harness.failures[0].name, 'failing step');
 });
 
+// ---- steps.log: the harness's verdicts on disk (#197)
+
+// exit() ends the process on failure — the ONE thing a unit test must stub (a
+// real exit would take the runner with it). The stub throws so the call site
+// behaves like the real one: it never returns.
+const EXITED = new Error('process.exit');
+function callExit(harness) {
+  const realExit = process.exit;
+  let code = null;
+  process.exit = (value) => { code = value; throw EXITED; };
+  try {
+    harness.exit();
+  } catch (error) {
+    if (error !== EXITED) { throw error; }
+  } finally {
+    process.exit = realExit;
+  }
+  return code;
+}
+
+test('every harness step writes its verdict to steps.log as it lands', async () => {
+  const root = makeTempBrand([]);
+  const harness = new E2eHarness(root);
+  const stepsLog = path.join(root, 'e2e', '.logs', 'steps.log');
+
+  await harness.step('page boots @omega.js/client against the emulators', async () => 'auth :9099');
+  await assert.rejects(
+    () => harness.step('signup creates the auth user', async () => {
+      throw new Error('user doc not created within 90s\n      (last state: null)');
+    }),
+    /user doc not created/,
+  );
+
+  const contents = fs.readFileSync(stepsLog, 'utf8');
+  assert.match(contents, /^PASS {2}page boots @omega\.js\/client against the emulators \(auth :9099\)$/m);
+  // One line per step: the multi-line failure detail collapses
+  assert.match(contents, /^FAIL {2}signup creates the auth user — user doc not created within 90s \(last state: null\)$/m);
+});
+
+test('a failure recorded outside step() lands as a preflight verdict on exit', () => {
+  const root = makeTempBrand([]);
+  const harness = new E2eHarness(root);
+  const stepsLog = path.join(root, 'e2e', '.logs', 'steps.log');
+
+  // What a runner does when puppeteer.launch()/preparePage() dies before any
+  // step ran — without this the file would hold a header and nothing else.
+  harness.failures.push({ name: 'harness setup', error: new Error('puppeteer.launch failed') });
+
+  assert.equal(callExit(harness), 1);
+  assert.match(fs.readFileSync(stepsLog, 'utf8'), /^FAIL {2}preflight — puppeteer\.launch failed$/m);
+});
+
+test('exit() adds no preflight line when a step already recorded the failure', async () => {
+  const root = makeTempBrand([]);
+  const harness = new E2eHarness(root);
+  const stepsLog = path.join(root, 'e2e', '.logs', 'steps.log');
+
+  await assert.rejects(() => harness.step('sign out', async () => { throw new Error('currentUser still set'); }));
+
+  callExit(harness);
+
+  const contents = fs.readFileSync(stepsLog, 'utf8');
+  const verdicts = contents.split('\n').filter((line) => /^(PASS|FAIL) /.test(line));
+  assert.equal(verdicts.length, 1);
+  assert.equal(/preflight/.test(contents), false);
+});
+
 // ---- static site server
 
 test('site server serves files, 404s missing paths, and blocks traversal', async () => {

@@ -9,12 +9,19 @@
  * Sets process.exitCode = 1 when any service errored so CI and scripts can
  * gate on it.
  */
+const path = require('node:path');
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { runManage } = require('../manage.js');
 const { runCompany } = require('../company.js');
 const { resolveManageRoot, filterChildArgs } = require('../lib/company.js');
 
 module.exports = async (options) => {
   const resolved = resolveManageRoot(process.cwd());
+
+  // Tee the whole fan-out to <brandRoot>/logs/manage.log (#197) — one greppable
+  // record of the service walk. Outside a brand the verb errors out anyway, so
+  // cwd is the honest fallback.
+  attachLogFile(path.join(resolved?.root || process.cwd(), 'logs', 'manage.log'));
 
   let report;
   if (resolved?.isCompany) {

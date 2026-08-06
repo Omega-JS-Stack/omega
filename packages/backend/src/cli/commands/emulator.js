@@ -11,6 +11,7 @@ const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv } = require('@o
 const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { seed } = require('../../test/seed.js');
+const { createChildLog } = require('../utils/attach-log-file');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
@@ -19,6 +20,11 @@ const EMULATOR_FLAGS = '--only functions,firestore,auth,database,hosting,pubsub'
 
 class EmulatorCommand extends BaseCommand {
   async execute() {
+    // The emulator IS the backend's dev leg under brand-root `omega dev`, so it
+    // shares the dev-log lane with `omega serve` (they never run together — same
+    // ports). The firebase CHILD keeps its own dist/emulator.log (#197).
+    this.attachVerbLog('dev');
+
     this.log(chalk.cyan('\n  Starting Firebase emulator (keep-alive mode)...\n'));
     this.log(chalk.gray('  Emulator will stay running until you press Ctrl+C\n'));
 
@@ -298,44 +304,19 @@ class EmulatorCommand extends BaseCommand {
     // Wipe stale firebase-tools debug logs + any leftover @omega.js/backend logs from older versions.
     this.sweepStaleLogs();
 
-    // Set up log file + reset-sentinel watcher.
-    // Mutable `currentStream` so the test command can request a fresh log by touching
-    // emulator.log.reset — the watcher detects it, closes the current stream, and
-    // reopens with flags: 'w' (truncating cleanly from our process' perspective).
+    // The emulator child's own log, beside firebase-tools' *-debug.log files.
+    // The reset sentinel lets `omega test` ask this long-lived log for a fresh
+    // slate mid-run; the poll + roll live in the shared child-log sink.
     const logPath = this.getLogsPath('emulator.log');
-    const resetSentinelPath = this.getTempPath('emulator.log.reset');
-    const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
-
-    let currentStream = fs.createWriteStream(logPath, { flags: 'w' });
-
-    function writeToLog(data) {
-      if (currentStream && !currentStream.destroyed) {
-        currentStream.write(stripAnsi(data.toString()));
-      }
-    }
-
-    // Clean up any stale sentinel from a prior crashed run
-    try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* not present, ok */ }
-
-    const resetWatcher = setInterval(() => {
-      if (!fs.existsSync(resetSentinelPath)) {
-        return;
-      }
-
-      try {
-        const oldStream = currentStream;
-        currentStream = fs.createWriteStream(logPath, { flags: 'w' });
-        oldStream.end();
-        fs.unlinkSync(resetSentinelPath);
-      } catch (e) {
-        // Best-effort. If reset fails the test still runs, the log just won't be fresh.
-      }
-    }, 500);
+    const childLog = createChildLog({
+      logPath,
+      resetPath: this.getTempPath('emulator.log.reset'),
+    });
 
     // Write pre-emulator info to log file
     if (process.env.TEST_EXTENDED_MODE) {
-      EXTENDED_MODE_WARNING.forEach((line) => writeToLog(`${line}\n`));
-      writeToLog('\n');
+      EXTENDED_MODE_WARNING.forEach((line) => childLog.write(`${line}\n`));
+      childLog.write('\n');
     }
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}`));
@@ -387,7 +368,7 @@ class EmulatorCommand extends BaseCommand {
 
     child.stdout.on('data', (data) => {
       process.stdout.write(data);
-      writeToLog(data);
+      childLog.write(data);
       if (!ready && READY_MARKER.test(data.toString())) {
         ready = true;
         readyResolve();
@@ -396,7 +377,7 @@ class EmulatorCommand extends BaseCommand {
 
     child.stderr.on('data', (data) => {
       process.stderr.write(data);
-      writeToLog(data);
+      childLog.write(data);
       // firebase-tools prints the ready line to stderr sometimes — watch both.
       if (!ready && READY_MARKER.test(data.toString())) {
         ready = true;
@@ -411,11 +392,7 @@ class EmulatorCommand extends BaseCommand {
     });
 
     child.on('close', (code, signal) => {
-      clearInterval(resetWatcher);
-      if (currentStream && !currentStream.destroyed) {
-        currentStream.end();
-      }
-      try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* ok */ }
+      childLog.close();
       // The TLS proxy lives in THIS process — release the public port with
       // the stack (and drop any keep-alive sockets holding it open)
       if (httpsProxy) {

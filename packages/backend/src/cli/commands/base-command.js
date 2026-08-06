@@ -4,6 +4,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const ui = require('../utils/ui');
+const attachLogFile = require('../utils/attach-log-file');
 
 class BaseCommand {
   constructor(main) {
@@ -54,6 +55,23 @@ class BaseCommand {
     const projectDir = this.main.firebaseProjectPath;
     const logsDir = path.join(projectDir, 'dist');
     return filename ? path.join(logsDir, filename) : logsDir;
+  }
+
+  /**
+   * Tee THIS process' stdout/stderr to `<appRoot>/logs/<verb>.log` — the
+   * cross-framework verb-log lane (#197): every framework's dev/build/test
+   * writes its own run there, so an agent greps one predictable path.
+   *
+   * Distinct from `getLogsPath()`, which is `dist/` — where the firebase CHILD
+   * processes' output lands, beside firebase-tools' own *-debug.log files.
+   *
+   * @param {string} verb - Log base name (`dev`, `build`, `test`).
+   * @returns {string} The absolute log path.
+   */
+  attachVerbLog(verb) {
+    const logPath = path.join(this.main.firebaseProjectPath, 'logs', `${verb}.log`);
+    attachLogFile(logPath);
+    return logPath;
   }
 
   /**

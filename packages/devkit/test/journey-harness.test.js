@@ -9,7 +9,19 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { scrubCredentialEnv, latestRunFile, discoverBrandApps } = require('../src/test/journey-harness.js');
+const { JourneyRun, scrubCredentialEnv, latestRunFile, discoverBrandApps } = require('../src/test/journey-harness.js');
+
+/** A run bound to a throwaway log dir — no brand, no children, just the recorder. */
+function runInTempLogDir() {
+  const logDir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'journey-steps-'));
+  const run = new JourneyRun({
+    monorepoRoot: os.tmpdir(),
+    spec: { id: 'journey-brand' },
+    logDir,
+    log: () => {},
+  });
+  return { run, logDir, read: () => fs.readFileSync(path.join(logDir, 'steps.log'), 'utf8') };
+}
 
 test('scrubCredentialEnv drops credential-shaped vars, keeps operating env', () => {
   const scrubbed = scrubCredentialEnv({
@@ -72,4 +84,48 @@ test('discoverBrandApps returns package.json-bearing apps in journey order', () 
   );
 
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+// --- steps.log: the journey's verdicts on disk (#197) ---
+
+test('every journey step writes its verdict to steps.log as it lands', async () => {
+  const { run, read, logDir } = runInTempLogDir();
+
+  await run.step('onboard scaffolds journey-brand', async () => '/tmp/journey-brand');
+  await assert.rejects(
+    run.step('`omega dev` boots web + backend emulator', async () => {
+      throw new Error('dev not ready after 7 min\n  waiting on: backend');
+    }),
+    /dev not ready/,
+  );
+
+  const contents = read();
+  assert.match(contents, /^PASS {2}onboard scaffolds journey-brand \(\/tmp\/journey-brand\)$/m);
+  // One line per step: the multi-line failure detail collapses
+  assert.match(contents, /^FAIL {2}`omega dev` boots web \+ backend emulator — dev not ready after 7 min waiting on: backend$/m);
+
+  fs.rmSync(logDir, { recursive: true, force: true });
+});
+
+test('a journey abort outside the steps is recorded as a preflight failure', () => {
+  const { run, read, logDir } = runInTempLogDir();
+
+  run.stepsLog.abort('preconditions unmet: java is not installed');
+
+  assert.match(read(), /^FAIL {2}preflight — preconditions unmet: java is not installed$/m);
+
+  fs.rmSync(logDir, { recursive: true, force: true });
+});
+
+test('a journey abort after a failed step adds nothing — that verdict is on file', async () => {
+  const { run, read, logDir } = runInTempLogDir();
+
+  await assert.rejects(run.step('headless manage', async () => { throw new Error('update service error'); }));
+  run.stepsLog.abort(new Error('update service error'));
+
+  const verdicts = read().split('\n').filter((line) => /^(PASS|FAIL) /.test(line));
+  assert.equal(verdicts.length, 1);
+  assert.equal(/preflight/.test(read()), false);
+
+  fs.rmSync(logDir, { recursive: true, force: true });
 });

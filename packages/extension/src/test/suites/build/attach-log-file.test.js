@@ -1,15 +1,23 @@
-// Build-layer tests for src/utils/attach-log-file.js — tee process.stdout/stderr to a file
-// with ANSI stripping. Each test attaches, writes, detaches, then inspects the file.
+// Build-layer tests for src/utils/attach-log-file.js — the vendored shim over
+// @omega.js/devkit/attach-log-file. Each test attaches, writes, detaches, then
+// inspects the file. The tee's own contract (both sinks, truncation, crash
+// tails, CI skip) is pinned in devkit; this suite pins that the shim the
+// framework's verbs require IS that tee, through the framework's own paths.
 //
 // CRITICAL: these tests run INSIDE a live `npx omega test` process whose own output is being
 // teed to logs/test.log by the singleton. So they must NOT touch the singleton — exercising
 // attach()/detach() on it would detach the live tee mid-run and truncate logs/test.log. Each
 // test uses its OWN `createTee()` instance, which stacks under the live singleton tee and
 // restores it cleanly on detach.
+//
+// Every attach passes an explicit `env` so the tee's CI skip is never what a
+// green run depends on — the suite behaves the same on a laptop and a runner.
 
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+
+const NO_CI = { env: {} };
 
 module.exports = {
   type: 'suite',
@@ -35,21 +43,19 @@ module.exports = {
       },
     },
     {
-      name: 'attach + stdout.write + detach: file contains the writes',
-      run: async (ctx) => {
+      name: 'attach + stdout.write + detach: file contains the writes, ANSI stripped',
+      run: (ctx) => {
         const attach = require(path.join(__dirname, '..', '..', '..', 'utils', 'attach-log-file.js'));
         // Isolated instance — stacks under the live test.log tee, never clobbers it.
         const tee = attach.createTee();
         const tmpPath = path.join(os.tmpdir(), `extension-log-${Date.now()}.log`);
         try {
-          const stream = tee.attach(tmpPath);
+          // attach() returns the DETACH function; the writes themselves are
+          // synchronous fd writes, so there is nothing to flush before reading.
+          const detach = tee.attach(tmpPath, NO_CI);
           process.stdout.write('hello world\n');
           process.stdout.write('\x1B[31mcolored\x1B[0m line\n');
-          // Wait for stream to flush before detaching + reading.
-          await new Promise((resolve) => stream.write('', resolve));
-          tee.detach();
-          // detach() ends the stream; wait for the close event.
-          await new Promise((resolve) => stream.on('close', resolve));
+          detach();
 
           const contents = fs.readFileSync(tmpPath, 'utf8');
           ctx.expect(contents).toContain('hello world');
@@ -62,15 +68,15 @@ module.exports = {
       },
     },
     {
-      name: 'idempotent: attaching twice with same path returns same stream',
+      name: 'idempotent: attaching twice with the same path returns the same detach',
       run: (ctx) => {
         const attach = require(path.join(__dirname, '..', '..', '..', 'utils', 'attach-log-file.js'));
         const tee = attach.createTee();
         const tmpPath = path.join(os.tmpdir(), `extension-log-idem-${Date.now()}.log`);
         try {
-          const s1 = tee.attach(tmpPath);
-          const s2 = tee.attach(tmpPath);
-          ctx.expect(s1).toBe(s2);
+          const d1 = tee.attach(tmpPath, NO_CI);
+          const d2 = tee.attach(tmpPath, NO_CI);
+          ctx.expect(d1).toBe(d2);
         } finally {
           tee.detach();
           try { fs.unlinkSync(tmpPath); } catch (e) {}
@@ -78,12 +84,14 @@ module.exports = {
       },
     },
     {
-      name: 'attach with falsy path returns null and does nothing',
+      name: 'attach with falsy path returns a no-op detach and patches nothing',
       run: (ctx) => {
         const attach = require(path.join(__dirname, '..', '..', '..', 'utils', 'attach-log-file.js'));
         const tee = attach.createTee();
-        ctx.expect(tee.attach(null)).toBe(null);
-        ctx.expect(tee.attach('')).toBe(null);
+        const priorWrite = process.stdout.write;
+        ctx.expect(typeof tee.attach(null, NO_CI)).toBe('function');
+        ctx.expect(typeof tee.attach('', NO_CI)).toBe('function');
+        ctx.expect(process.stdout.write).toBe(priorWrite);
       },
     },
   ],

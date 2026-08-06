@@ -51,6 +51,7 @@ const LOG_DIR = path.join(ROOT, '.temp', 'flows-e2e');
 const SHOT_DIR = path.join(LOG_DIR, 'screenshots');
 
 const { CLASSIC_PORTS, readPortsFile, resolvePorts, composeTargetConfig } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 300000;
 const DEV_READY_TIMEOUT = 300000;
@@ -95,11 +96,14 @@ const AUTH_FLOW_HOSTS = new Set([
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const failures = [];
+const stepsLog = createStepsLog(LOG_DIR);
 let activePage = null;
 
 /**
  * Run a named step. A failure screenshots whatever page is active and keeps
- * going — one broken area must not hide the state of the other three.
+ * going — one broken area must not hide the state of the other three. Every
+ * verdict also lands in .temp/flows-e2e/steps.log as it happens, so a crashed
+ * run still names the step that broke.
  * @param {string} name - step label
  * @param {Function} fn - the step body
  * @returns {Promise<boolean>} true when the step passed
@@ -107,10 +111,12 @@ let activePage = null;
 async function step(name, fn) {
   try {
     const detail = await fn();
+    stepsLog.pass(name, detail);
     console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
     return true;
   } catch (error) {
     failures.push({ name, error });
+    stepsLog.fail(name, error);
     console.log(`  ✗ ${name}\n      ${error.message}`);
     await screenshot(name);
     return false;
@@ -898,6 +904,7 @@ async function main() {
     activePage = null;
   } catch (error) {
     failures.push({ name: 'harness', error });
+    stepsLog.fail('harness', error);
     console.log(`  ✗ harness\n      ${error.message}`);
     await screenshot('harness');
   } finally {
@@ -923,6 +930,9 @@ async function main() {
 }
 
 main().catch((error) => {
+  // A death outside step() — a preflight guard, a throw on the way up — has no
+  // verdict yet; record one so steps.log still answers "why did nothing run?".
+  stepsLog.abort(error);
   console.error(`\n✗ user-flows e2e errored: ${error.message}\n`);
   process.exit(1);
 });

@@ -16,6 +16,7 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 const { resolvePorts, readPortsFile } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log.js');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -61,6 +62,12 @@ class E2eHarness {
     this.sitePort = options.sitePort || 4600;
     this.targets = discoverTargets(brandRoot);
     this.logDir = options.logDir || path.join(brandRoot, 'e2e', '.logs');
+
+    // Per-step verdicts on disk beside the environment logs (#197), same format
+    // the journey harness and the root e2e runners write: the emulator/page logs
+    // say what the stack printed, this says which step broke. `grep '^FAIL'` it
+    // after a run that died, or one read back hours later.
+    this.stepsLog = createStepsLog(this.logDir);
 
     this.emulator = null;
     this.emulatorPorts = {};
@@ -126,14 +133,18 @@ class E2eHarness {
 
   /**
    * Run a named step with pass/fail logging. Throws on failure (caller
-   * should wrap in try/catch if it wants to continue past failures).
+   * should wrap in try/catch if it wants to continue past failures). The
+   * verdict lands in steps.log as it happens, so a SIGKILLed run still names
+   * the step it died on.
    */
   async step(name, fn) {
     try {
       const detail = await fn();
+      this.stepsLog.pass(name, detail);
       console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
     } catch (error) {
       this.failures.push({ name, error });
+      this.stepsLog.fail(name, error);
       console.log(`  ✗ ${name}\n      ${error.message}`);
       throw error;
     }
@@ -166,7 +177,7 @@ class E2eHarness {
     // Write page console log unconditionally — an EMPTY page.log is itself
     // diagnostic signal ("the page produced no console output at all").
     fs.mkdirSync(this.logDir, { recursive: true });
-    fs.writeFileSync(path.join(this.logDir, 'page.log'), this.pageConsole.join('\n') + '\n');
+    fs.writeFileSync(path.join(this.logDir, 'page.log'), `${this.pageConsole.join('\n')}\n`);
 
     if (this.siteServer) {
       this.siteServer.close();
@@ -184,6 +195,10 @@ class E2eHarness {
    */
   exit() {
     if (this.failures.length) {
+      // A failure a runner pushed itself (puppeteer.launch, preparePage — the
+      // deaths OUTSIDE step()) has no verdict yet; abort() records it as
+      // `preflight` and no-ops when a step already failed.
+      this.stepsLog.abort(this.failures[this.failures.length - 1].error);
       console.log(`\n  ${this.failures.length} step(s) failed — logs: ${path.relative(this.brandRoot, this.logDir)}/\n`);
       process.exit(1);
     }

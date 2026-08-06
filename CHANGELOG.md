@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#197](../../issues/197) — Every surface now logs to a greppable file: framework verbs write `logs/dev|build|test.log` per app, backend children keep rolling logs, the brand fan-out writes `logs/manage.log`, root lanes and the watcher tee to `.temp/logs/`, and e2e runners record per-step verdicts. Terminal keeps colors; files are stripped and cleared each launch.
 
 ## [0.23.1] (2026-08-05)
 ### Fixed

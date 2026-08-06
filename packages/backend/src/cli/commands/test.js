@@ -17,6 +17,11 @@ class TestCommand extends BaseCommand {
     const self = this.main;
     const argv = self.argv;
 
+    // Tee THIS process to <appRoot>/logs/test.log (#197) — the setup lines, the
+    // port summary and the emulator boot that the runner-child's dist/test.log
+    // never sees.
+    this.attachVerbLog('test');
+
     // `--extended` CLI shorthand for the shared, unprefixed TEST_EXTENDED_MODE
     // env var (cross-framework parity with BXM/UJM/EM). Either the flag OR the
     // env var opts into REAL external services (default skipped). Set this

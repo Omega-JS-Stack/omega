@@ -10,6 +10,11 @@
  * Single-instance: takes the devkit watch lock (.omega/dev-watch.lock) so a
  * second `npm start` — or an `omega dev --local` session spawning the watch —
  * exits cleanly instead of double-watching.
+ *
+ * The whole watcher — its own lines and every child watch's output, which
+ * already flows through console.log/error here — tees to
+ * `.temp/logs/watch-all.log` (#197), so "is the watcher alive, did it respawn,
+ * what did it rebuild" is a grep instead of a restart.
  */
 
 // Libraries
@@ -18,6 +23,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { acquireWatchLock, releaseWatchLock, startVendorPropagation } = require('@omega.js/devkit/local');
 const { VENDORABLE_PACKAGES } = require('@omega.js/devkit/vendor');
+const { teeLog } = require('./tee-log');
 
 // Constants
 const ROOT = path.resolve(__dirname, '..');
@@ -46,6 +52,10 @@ function main() {
     console.log(`Monorepo watch already running (pid ${lock.pid}) — nothing to do`);
     return;
   }
+
+  // AFTER the lock: attaching truncates the file, and a second `npm start`
+  // must never wipe the log of the watcher that is actually running.
+  teeLog('watch-all');
 
   const watchable = discoverWatchable();
   if (watchable.length === 0) {

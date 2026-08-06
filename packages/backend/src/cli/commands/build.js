@@ -12,6 +12,8 @@ class BuildCommand extends BaseCommand {
   async execute() {
     const self = this.main;
 
+    this.attachVerbLog('build');
+
     const { staged } = stageFunctions({ projectDir: self.firebaseProjectPath });
 
     this.log(chalk.bold('\n  Staged dist/ from the authored tree:'));

@@ -11,6 +11,7 @@
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findBrandRoot } = require('@omega.js/config');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -24,6 +25,14 @@ const logger = new Logger('omega:build');
 module.exports = async function (options) {
   options = options || {};
   const paths = consumerPaths();
+
+  // Tee the whole run to <appRoot>/logs/build.log (#197). `omega test` runs this
+  // build INSIDE its own logs/test.log tee and passes logFile: false — a second
+  // attach would detach that tee and the rest of the run would go uncaptured.
+  if (options.logFile !== false) {
+    attachLogFile(path.join(paths.root, 'logs', 'build.log'));
+  }
+
   const siteData = loadSiteData(paths.root);
   const brandRoot = findBrandRoot(paths.root);
 

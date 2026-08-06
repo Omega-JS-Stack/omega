@@ -63,13 +63,13 @@ module.exports = async function (options) {
 
   if (reporter === 'json') {
     // Final machine-readable summary.
-    process.stdout.write(JSON.stringify({
+    process.stdout.write(`${JSON.stringify({
       event:   'summary',
       passed:  result.passed,
       failed:  result.failed,
       skipped: result.skipped,
       total:   result.passed + result.failed + result.skipped,
-    }) + '\n');
+    })}\n`);
   }
 
   if (result.failed > 0) {
@@ -78,7 +78,8 @@ module.exports = async function (options) {
     throw new Error(`${result.failed} test(s) failed`);
   }
 
-  // Flush test.log fully and restore stdout/stderr. Stream writes are async, so
-  // detach() resolves once the buffered tail (the Results block) is on disk.
+  // Close test.log and restore stdout/stderr. Nothing to flush: every write
+  // already went to the fd synchronously (#197), so detach() just closes the
+  // handle — the Results block is on disk before this line runs.
   await attachLogFile.detach();
 };

@@ -1,10 +1,20 @@
 # Logging
 
-@omega.js/backend CLI commands automatically save all output to log files while still streaming to the console. **@omega.js/backend's logs live in `<projectDir>/dist/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit inside the staged tree (which the stage step PRESERVES across re-stages) and can be grepped alongside the runtime it drove.
+@omega.js/backend CLI commands automatically save all output to log files while still streaming to the console — in two files per verb, one of which CONTAINS the other.
+
+The **verb's whole run** lands in `<projectDir>/logs/<verb>.log`, the lane every OMEGA framework shares (contract: `docs/shared/logging.md` in the Omega repo). It is a SUPERSET: the verb mirrors every chunk its firebase child pipes over to its own stdout, so this file holds the full child stream plus the verb's own lines:
+
+| File | Source | Lifetime |
+|---|---|---|
+| `logs/dev.log` | `npx omega serve` / `npx omega emulator` — port allocation, the TLS proxy, the stage watcher, **and** the firebase child's whole stream | Truncated each run |
+| `logs/build.log` | `npx omega build` | Truncated each run |
+| `logs/test.log` | `npx omega test` — setup lines, the port summary, the emulator boot, **and** the runner/emulator child's stream | Truncated each run |
+
+The **firebase children's** output ALSO lands on its own in `<projectDir>/dist/`, not `logs/` — a deliberate exception so it sits inside the staged tree (which the stage step PRESERVES across re-stages) and can be grepped alongside the runtime it drove, beside firebase-tools' own `*-debug.log` files.
 
 ## Log files
 
-All in `<projectDir>/dist/`:
+The child-only files, all in `<projectDir>/dist/` — the same lines the verb log carries, with none of the verb's own around them (and the only ones that roll mid-run):
 
 | File | Source | Lifetime |
 |---|---|---|
@@ -25,21 +35,24 @@ const attachLogFile = require('../utils/attach-log-file');
 
 attachLogFile(this.getLogsPath('deploy.log'));
 // ... run command — all stdout/stderr is now teed to the log file ...
-await attachLogFile.detach();
+attachLogFile.detach();
 ```
 
 - **Singleton**: default export is a process-wide singleton (one file at a time)
-- **Factory**: `attachLogFile.createTee()` returns an independent tee for stacking
+- **Factory**: `attachLogFile.createTee()` returns an independent tee for stacking, with LIFO detach
 - **Idempotent**: attaching the same path twice returns the existing handle
-- **Flush-safe**: `detach()` returns a Promise — await before `process.exit()`
+- **Crash-safe**: writes go to an open fd synchronously, so the lines describing a crash survive it
+- **Synchronous detach**: `detach()` restores the writers and closes the fd — it returns nothing and there is no buffered tail to flush
+- **Truncate on attach**: a new launch clears the previous run's file
+- **CI no-op**: under `CI` / `GITHUB_ACTIONS` the tee declines — the runner captures its own output
 
-Used by `deploy.js`. The `serve`/`emulator`/`test` commands use inline stream management (they need reset-sentinel polling and reload detection that the basic tee doesn't cover).
+Every verb attaches it through `BaseCommand#attachVerbLog(verb)` for the `logs/` lane; `deploy.js` attaches a `dist/` path directly. The `serve`/`emulator`/`test` commands additionally pipe their firebase CHILD into `createChildLog()` — the same sink plus the mid-run `roll()` that reset-sentinel polling and reload detection need.
 
 ## What gets captured
 
 When `npx omega test` starts its own emulator, logs go to `emulator.log` (it delegates to the emulator command). When running against an already-running emulator, logs go to `test.log`.
 
-All files are gitignored via `*.log`. Reset sentinels (`*.log.reset`), the watch trigger file, and `test-mode.json` live separately in `<projectDir>/.temp/` — they're transient internal signals with no debugging value.
+All files are gitignored (`logs/` as a directory, `dist/` output via `*.log`). Reset sentinels (`*.log.reset`), the watch trigger file, and `test-mode.json` live separately in `<projectDir>/.temp/` — they're transient internal signals with no debugging value.
 
 ## See also
 

@@ -19,6 +19,10 @@ Control a browser over CDP. **Your session owns a private Chrome** — it auto-l
 - **NEVER quit, kill, or restart Chrome by app name** (`killall "Google Chrome"`, `pkill "Google Chrome"`, osascript). The user's PERSONAL Chrome is running too — you would kill their browser. You never need to kill anything: your browser dies with your session.
 - **Never launch Chrome manually.** The MCP owns the browser lifecycle.
 
+## Diagnosing a server? Grep the logs first
+
+A browser answers "what does this page render", not "why did the build fail" or "what did the backend serve". Every OMEGA surface already tee'd its run to disk — an app's `logs/dev.log` and `logs/build.log`, the backend's `dist/emulator.log`, a lane's `.temp/logs/<lane>.log`. Read those FIRST, and never restart a dev server, emulator or watcher to see output it already wrote. Paths and contract: `docs/shared/logging.md`.
+
 ## Ephemeral profile
 
 The browser uses a throwaway profile — cookies/logins do NOT persist between sessions. If a task needs auth, log in during the task.

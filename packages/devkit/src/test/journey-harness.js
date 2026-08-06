@@ -33,6 +33,7 @@ const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 const { spawn, spawnSync } = require('node:child_process');
+const { createStepsLog } = require('./steps-log.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real app builds dominate; a warm rerun finishes far inside them.
@@ -157,6 +158,12 @@ class JourneyRun {
     this.logDir = options.logDir;
     this.log = options.log || console.log;
 
+    // Per-step verdicts on disk, in the SAME format the root e2e runners use
+    // (#197): the stage logs beside it say what a leg printed, this says which
+    // leg broke. `grep '^FAIL' <logDir>/steps.log` after a run that died, or
+    // one read back hours later.
+    this.stepsLog = createStepsLog(options.logDir);
+
     this.tempRoot = null;
     this.brandRoot = null;
     this.devStack = null; // live `omega dev` handle
@@ -164,15 +171,21 @@ class JourneyRun {
     this.logIndex = 0;
   }
 
-  /** E2eHarness-style step: ✓/✗ line, collected result, throw on failure. */
+  /**
+   * E2eHarness-style step: ✓/✗ line, collected result, throw on failure — and
+   * the verdict written to steps.log as it lands, so a SIGKILLed run still
+   * names the leg it died on.
+   */
   async step(name, fn) {
     const startedAt = Date.now();
     try {
       const detail = await fn();
       this.steps.push({ name, ok: true });
+      this.stepsLog.pass(name, detail);
       this.log(`  ✓ ${name}${detail ? ` (${detail})` : ''} [${Math.round((Date.now() - startedAt) / 1000)}s]`);
     } catch (error) {
       this.steps.push({ name, ok: false, error: error.message });
+      this.stepsLog.fail(name, error);
       this.log(`  ✗ ${name}\n      ${error.message}`);
       throw error;
     }
@@ -342,6 +355,7 @@ async function runJourney(options) {
       return { status: 'skipped', reason, steps: run.steps, brandRoot: null };
     }
     run.log(`  ✗ ${reason} (strict)`);
+    run.stepsLog.abort(reason);
     return { status: 'failed', reason, steps: run.steps, brandRoot: null };
   }
 
@@ -528,6 +542,8 @@ async function runJourney(options) {
     });
   } catch (error) {
     failed = true;
+    // step() recorded its own verdict; a throw from BETWEEN the steps has none.
+    run.stepsLog.abort(error);
   } finally {
     if (run.devStack) {
       await run.devStack.stop().catch(() => {});
@@ -546,4 +562,6 @@ async function runJourney(options) {
   return { status: failed ? 'failed' : 'passed', steps: run.steps, brandRoot: failed || run.keep ? run.brandRoot : null };
 }
 
-module.exports = { runJourney, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandApps };
+// JourneyRun is exported for its unit pins — the step recorder is testable
+// without a two-hour brand birth; nothing else constructs one.
+module.exports = { runJourney, JourneyRun, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandApps };

@@ -42,6 +42,8 @@ Layer names inside a suite are platform-native on purpose: desktop's `main`/`ren
 
 **The auth lanes divide by SURFACE.** `npm run test:auth` ([scripts/e2e-auth-token.js](../../scripts/e2e-auth-token.js)) is the fast WIRE-CONTRACT lane: the desktop client-bridge required in-process from node against the emulator, proving the custom-token round trip in seconds. Tiers 2c and 2d are the REAL-SURFACE proofs of the same chain — the extension's background SW inside actual Chrome, and the desktop app inside actual Electron with a real OS-delivered deep link. A change to the token wire runs the fast lane; a change to how either app RECEIVES it runs its real-surface lane.
 
+**Every lane leaves a log.** A lane tees its full output — its own lines plus every child command's — to `.temp/logs/<lane>.log` (`test:packages` → `.temp/logs/test-packages.log`), and each e2e runner writes per-step verdicts to `.temp/<lane>/steps.log` beside its environment logs, so `grep '^FAIL' .temp/*/steps.log` names the failing step even after a lane was killed. Truncated per run; read them instead of re-running a lane to see what it said ([logging.md](logging.md)).
+
 **Skip knobs** (all documented in their script headers too): `OMEGA_SKIP_E2E=1` (sandbox e2e, verts, auth-token, extension auth, desktop auth, user flows), `OMEGA_SKIP_JOURNEY=1` (journey), `OMEGA_JOURNEY_STRICT=1` (unmet journey preconditions fail instead of skip), `OMEGA_JOURNEY_KEEP=1` (keep the temp brand after a green run).
 
 **Publish rehearsal — `npm run release:check`** (scripts/release-check.js): packs every publishable (real prepare + vendoring), scratch-installs each tarball with local-tarball overrides for the published @omega.js runtime deps, `require.resolve`s it, and scans the installed tree for raw private @omega.js references. The laptop mirror of CI's pack-smoke; the mechanical gate for the publish-proving checkpoint. `--only=web,manager` iterates a subset; `--keep` preserves the scratch dir.
@@ -57,7 +59,7 @@ The scripted form of the cp194 hand rehearsal — proof that a consumer OUTSIDE 
 - **Preconditions skip, never lie**: no network or no java → the lane prints SKIPPED and exits 0 (`OMEGA_JOURNEY_STRICT=1` turns that into a failure). `OMEGA_SKIP_JOURNEY=1` skips outright.
 - **Runtime legs run creds-scrubbed**: `omega dev` and manage children get credential-shaped env vars stripped — the journey must never reach a real cloud. Install legs (onboard/link/setup) keep the machine env.
 - **The manage scorecard** comes from the brand's `.omega/runs/*.json`: `update` must succeed and no service may error except the allowed set (default `{testing}` — the live-URL probe of a never-deployed `.invalid` brand fails by design).
-- **Artifacts**: stage logs in `.temp/journey/`; on failure the temp brand is KEPT and its path printed (`OMEGA_JOURNEY_KEEP=1` keeps it on success too).
+- **Artifacts**: numbered stage logs in `.temp/journey/`, per-step verdicts in `.temp/journey/steps.log` (`grep '^FAIL'` names the leg that broke, including a `preflight` abort that never reached a step); on failure the temp brand is KEPT and its path printed (`OMEGA_JOURNEY_KEEP=1` keeps it on success too).
 - Heavy by design (registry installs, all-four app builds) — that's the point; it caught brand-root manager resolution (#8), the ambient-Node engines stamp (#9), and the stale-manifest clobber + linked-prepare destruction (#10) on its first runs.
 
 # Test scoping (`omega test`) — the C5 grammar

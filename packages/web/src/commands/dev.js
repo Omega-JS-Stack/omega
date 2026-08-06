@@ -33,6 +33,7 @@ const {
   findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { emitLanguageFlags } = require('../language-flags.js');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
@@ -50,6 +51,10 @@ const WATCH_DEBOUNCE_MS = 250;
 
 module.exports = async function (options) {
   options = options || {};
+
+  // Tee the whole run to <appRoot>/logs/dev.log — first statement of the verb
+  // so a crash on the way up is already in the file (#197).
+  attachLogFile(path.join(consumerPaths().root, 'logs', 'dev.log'));
 
   if (options.local) {
     await linkBrandToMonorepo();

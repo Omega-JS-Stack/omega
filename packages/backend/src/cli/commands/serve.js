@@ -1,14 +1,21 @@
 const BaseCommand = require('./base-command');
 const path = require('path');
-const fs = require('fs');
 const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const WatchCommand = require('./watch');
+const { createChildLog } = require('../utils/attach-log-file');
 
 class ServeCommand extends BaseCommand {
   async execute() {
     const self = this.main;
     const projectDir = self.firebaseProjectPath;
+
+    // The backend's dev loop → <appRoot>/logs/dev.log (#197). A SUPERSET of the
+    // firebase CHILD's dist/dev.log wired further down: our own output (port
+    // allocation, proxy, watcher) PLUS every child chunk, because we mirror the
+    // child to our stdout and this tee catches it there. dist/dev.log is the
+    // child-only view — and the one that rolls on each reload.
+    this.attachVerbLog('dev');
     const { isPortFree, resolvePorts, writePortsFile, clearPortsFile } = require('@omega.js/config');
     const { loadEmulatorPorts } = require('./setup-tests/emulator-config.js');
 
@@ -74,47 +81,16 @@ class ServeCommand extends BaseCommand {
       ? { https: port, hosting: internalPort }
       : { hosting: port });
 
-    // Set up log file in the project directory.
+    // The firebase child's own log, beside firebase-tools' *-debug.log files.
+    // The reset sentinel lets a sibling process ask this long-lived log for a
+    // fresh slate mid-run; the poll + roll live in the shared child-log sink.
     const logPath = this.getLogsPath('dev.log');
-    const resetSentinelPath = this.getTempPath('dev.log.reset');
     const RELOAD_MARKER = /Using node@\d+ from host\./;
-    const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
-
-    let currentStream = fs.createWriteStream(logPath, { flags: 'w' });
+    const childLog = createChildLog({
+      logPath,
+      resetPath: this.getTempPath('dev.log.reset'),
+    });
     let reloadCount = 0;
-
-    function rollLog() {
-      try {
-        const oldStream = currentStream;
-        currentStream = fs.createWriteStream(logPath, { flags: 'w' });
-        oldStream.end();
-      } catch (e) {
-        // Best-effort.
-      }
-    }
-
-    function writeToLog(data) {
-      if (currentStream && !currentStream.destroyed) {
-        currentStream.write(stripAnsi(data.toString()));
-      }
-    }
-
-    // Clean up any stale sentinel from a prior crashed serve run
-    try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* not present, ok */ }
-
-    // Poll every 500ms for the reset sentinel
-    const resetWatcher = setInterval(() => {
-      if (!fs.existsSync(resetSentinelPath)) {
-        return;
-      }
-
-      try {
-        rollLog();
-        fs.unlinkSync(resetSentinelPath);
-      } catch (e) {
-        // Best-effort.
-      }
-    }, 500);
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
@@ -160,24 +136,20 @@ class ServeCommand extends BaseCommand {
           if (RELOAD_MARKER.test(text)) {
             reloadCount++;
             if (reloadCount > 1) {
-              rollLog();
+              childLog.roll();
             }
           }
-          writeToLog(data);
+          childLog.write(data);
         });
 
         child.stderr.on('data', (data) => {
           process.stderr.write(data);
-          writeToLog(data);
+          childLog.write(data);
         });
 
         child.on('close', () => {
-          clearInterval(resetWatcher);
+          childLog.close();
           stageWatch.close();
-          if (currentStream && !currentStream.destroyed) {
-            currentStream.end();
-          }
-          try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* ok */ }
           // Retract the published port map (clean shutdown)
           clearPortsFile(projectDir);
         });

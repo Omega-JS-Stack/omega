@@ -23,8 +23,10 @@
  */
 
 // Libraries
+const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 
 // Local
 const { runManage } = require('../manage.js');
@@ -74,6 +76,10 @@ module.exports = async (options = {}) => {
     console.error(chalk.red('✖ omega dev: no brand root found (looked for config/omega.json5 walking up from here)'));
     process.exit(1);
   }
+
+  // Tee the brand-level fan-out — the manage cycle AND every leg's prefixed
+  // output — to <brandRoot>/logs/manage.log (#197).
+  attachLogFile(path.join(brandRoot, 'logs', 'manage.log'));
 
   const apps = discoverApps(brandRoot).filter((app) => app.target && DEV_LEGS[app.target]);
   const { selected, unknown, missing } = selectDevTargets({

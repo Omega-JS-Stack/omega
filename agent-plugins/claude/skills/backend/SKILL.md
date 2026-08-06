@@ -18,7 +18,8 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 ## Non-negotiables
 
 - **Read the guide before editing.** The route/schema contract, the usage helper, and the Firestore conventions each have footguns documented and nowhere else.
-- **🚫 Never start the user's long-running processes** (`omega emulator`, `omega serve`) — assume they are running and read the `dist/*.log` files for output. `omega test` is fine; it starts its own emulator.
+- **🚫 Never start the user's long-running processes** (`omega emulator`, `omega serve`) — assume they are running. `omega test` is fine; it starts its own emulator.
+- **Grep the logs FIRST.** Two lanes, both truncated per launch: the CLI's own run in the app's `logs/dev.log` / `logs/build.log` / `logs/test.log`, and the firebase children in `dist/emulator.log` / `dist/dev.log` / `dist/test.log`, beside firebase-tools' `*-debug.log`. Emulator traffic and the last failure are already on disk — read them instead of restarting anything (`docs/shared/logging.md`).
 - **Never mock — test against the real emulator.** Every feature ships tests at every surface it exposes.
 - **Secrets never enter `config/omega.json5`** — `.env` only; the config validator hard-fails secret-shaped keys.
 - **Deploys are deliberate** — only `omega deploy` publishes; a commit never does (`docs/shared/deploys.md`).

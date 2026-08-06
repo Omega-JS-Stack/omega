@@ -204,7 +204,8 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.ok(uncommented.every((line) => line.startsWith('OMEGA_')), 'only omega-owned keys are provisioned');
 
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-  for (const entry of ['node_modules/', '.omega/', '.env', 'dist/']) {
+  // logs/ joins the list with #197 — every verb writes one there now.
+  for (const entry of ['node_modules/', '.omega/', '.env', 'dist/', 'logs/']) {
     assert.ok(gitignore.includes(entry), `gitignore missing ${entry}`);
   }
 });

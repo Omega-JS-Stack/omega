@@ -819,13 +819,21 @@ npx omega test user/ admin/       # Multiple project paths
 
 ### Log Files
 
-@omega.js/backend CLI commands automatically save output to log files in the project's `functions/` directory (alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place):
-- **`functions/dev.log`** — Output from `npx omega serve` (@omega.js/backend's local dev server)
-- **`functions/emulator.log`** — Full emulator + Cloud Functions output (`npx omega emulator`)
-- **`functions/test.log`** — Test runner output (`npx omega test`, when running against an existing emulator)
-- **`functions/production.log`** — Production Cloud Function logs (`npx omega logs:read` or `npx omega logs:tail`)
+@omega.js/backend CLI commands automatically save their output — two lanes, two homes.
 
-Logs are overwritten on each run and gitignored via `*.log`. Use them to debug failing tests or review function output. Transient internal artifacts (reset sentinels, watch trigger, `test-mode.json`) live separately in `<projectDir>/.temp/`.
+The **verb** tees its own run to `<projectDir>/logs/`, the lane every OMEGA framework shares:
+- **`logs/dev.log`** — `npx omega serve` / `npx omega emulator` (port allocation, the proxy, the watcher)
+- **`logs/build.log`** — `npx omega build`
+- **`logs/test.log`** — `npx omega test` (setup lines, port summary, emulator boot)
+
+The firebase **children** write to `<projectDir>/dist/`, alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place:
+- **`dist/dev.log`** — the `firebase serve` child
+- **`dist/emulator.log`** — full emulator + Cloud Functions output
+- **`dist/test.log`** — the test runner child
+- **`dist/deploy.log`** — `npx omega deploy`
+- **`dist/production.log`** — Production Cloud Function logs (`npx omega logs:read` or `npx omega logs:tail`)
+
+Every log is truncated on each run (`logs/` is gitignored; `dist/` output is gitignored via `*.log`), and the stale-log sweep at each verb start clears ours while deliberately leaving firebase-tools' debug logs alone. Read them to debug failing tests or review function output instead of restarting a long-running process. Transient internal artifacts (reset sentinels, watch trigger, `test-mode.json`) live separately in `<projectDir>/.temp/`. The cross-framework contract and the full path table: `docs/shared/logging.md` in the Omega repo.
 
 ### Test Locations
 

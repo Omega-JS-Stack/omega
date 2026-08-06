@@ -53,6 +53,7 @@ const CLIENT_SRC = path.join(ROOT, 'packages', 'client', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'verts-e2e');
 
 const { readPortsFile, composeTargetConfig } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -112,13 +113,18 @@ const VERTS = [
 ];
 
 const failures = [];
+const stepsLog = createStepsLog(LOG_DIR);
 
+// Every verdict lands in .temp/verts-e2e/steps.log as it happens, so a crashed
+// run still names the step that broke.
 async function step(name, fn) {
   try {
     const detail = await fn();
+    stepsLog.pass(name, detail);
     console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
   } catch (error) {
     failures.push({ name, error });
+    stepsLog.fail(name, error);
     console.log(`  ✗ ${name}\n      ${error.message}`);
     throw error;
   }
@@ -393,7 +399,14 @@ async function main() {
       return `${serveUrl.split('?')[0]} → 200`;
     });
   } catch (error) {
-    // step() already reported it; fall through to teardown
+    // step() already reported and recorded its own failure. Anything else — the
+    // live-stack preflight guard above, a harness throw between steps — has no
+    // verdict at all, and swallowing it here used to end in a false PASSED.
+    if (failures.length === 0) {
+      failures.push({ name: 'preflight', error });
+      console.log(`  ✗ preflight\n      ${error.message}`);
+    }
+    stepsLog.abort(error);
   } finally {
     if (emulator) {
       await stopEmulator(emulator.child);
@@ -411,6 +424,9 @@ async function main() {
 }
 
 main().catch((error) => {
+  // A death outside step() and outside main's own catch — record it, so
+  // steps.log still answers "why did nothing run?".
+  stepsLog.abort(error);
   console.error('Harness error:', error);
   process.exit(1);
 });

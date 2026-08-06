@@ -48,6 +48,7 @@ const DESKTOP_SRC = path.join(ROOT, 'packages', 'desktop', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'auth-token-e2e');
 
 const { readPortsFile } = require('@omega.js/config');
+const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -55,13 +56,18 @@ const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const failures = [];
+const stepsLog = createStepsLog(LOG_DIR);
 
+// Every verdict lands in .temp/auth-token-e2e/steps.log as it happens, so a
+// crashed run still names the step that broke.
 async function step(name, fn) {
   try {
     const detail = await fn();
+    stepsLog.pass(name, detail);
     console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
   } catch (error) {
     failures.push({ name, error });
+    stepsLog.fail(name, error);
     console.log(`  ✗ ${name}\n      ${error.message}`);
     throw error;
   }
@@ -240,6 +246,10 @@ async function main() {
 }
 
 main().catch((error) => {
+  // A death outside step() — the live-stack preflight guard, a throw on the way
+  // up — has no verdict yet; record one so steps.log still answers "why did
+  // nothing run?". A step failure propagating out is already on file.
+  stepsLog.abort(error);
   console.error(`\n✗ auth-token e2e errored: ${error.message}\n`);
   process.exit(1);
 });

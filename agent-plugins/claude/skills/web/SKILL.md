@@ -21,6 +21,7 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 
 - **Read the guide before editing.** Layers, the frontmatter allow-list, and the section contract each have rules that are not guessable from the file tree.
 - **🚫 Never run a consumer's `omega dev`** — it is the user's long-running process. Assume it is up; ask the user to start it if it is not.
+- **Grep the logs FIRST.** Every verb tees its whole run to the app's `logs/` — `dev.log`, `build.log`, `test.log`, truncated per launch and ANSI-stripped. `tail`/`grep` them; restarting the dev server or re-running a build to see output it already wrote is never the move (`docs/shared/logging.md`).
 - **Consumer page frontmatter is meta-only** and content keys are stripped with a build warning. Content belongs in sections.
 - **Secrets never enter `config/omega.json5`** — `.env` only; the config validator hard-fails secret-shaped keys.
 - **Nothing generated is committed** — `dist/` and `.omega/` are artifacts. The translation cache is the one deliberate exception.
