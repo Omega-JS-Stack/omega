@@ -114,16 +114,29 @@ function findTarget(startDir) {
   }
 }
 
-/** Resolve a dispatch target's ./cli from where it is declared, with a clear failure. */
-function resolveCli(name, fromDir, hint) {
+/**
+ * Resolve a dispatch target's ./cli from where it is declared.
+ * @returns {{ cliPath: string } | { error: Error }} — callers decide whether an
+ *   unresolvable target is fatal (cross-framework) or falls back (brand).
+ */
+function tryResolveCli(name, fromDir) {
   const req = createRequire(path.join(fromDir, 'package.json'));
   try {
-    return req.resolve(`${name}/cli`);
+    return { cliPath: req.resolve(`${name}/cli`) };
   } catch (e) {
-    console.error(`omega: found ${name} context (${fromDir}) but could not resolve '${name}/cli': ${e.message}`);
+    return { error: e };
+  }
+}
+
+/** Resolve a dispatch target's ./cli from where it is declared, with a clear failure. */
+function resolveCli(name, fromDir, hint) {
+  const { cliPath, error } = tryResolveCli(name, fromDir);
+  if (error) {
+    console.error(`omega: found ${name} context (${fromDir}) but could not resolve '${name}/cli': ${error.message}`);
     console.error(hint);
     process.exit(1);
   }
+  return cliPath;
 }
 
 async function run({ hostName, hostRun }) {
@@ -141,8 +154,18 @@ async function run({ hostName, hostRun }) {
   // A brand root — the manager owns brand-level commands (`omega test` fans
   // out over apps/*). Resolve it from the brand root and hand over.
   if (target.kind === 'brand') {
-    const cliPath = resolveCli(MANAGER, target.dir,
-      `Is ${MANAGER} installed? Add it to the brand root's devDependencies, or \`mgr i local\` for a monorepo link.`);
+    const { cliPath } = tryResolveCli(MANAGER, target.dir);
+
+    // Brand-SHAPED is not always a brand: `omega setup` scaffolds
+    // config/omega.json5 into a standalone app before its framework dep lands
+    // in package.json, so the walk classifies a fresh app as a brand root. With
+    // no manager installed there is no brand-level CLI to hand over to — fall
+    // back to the host framework rather than dead-ending (#194). A real brand
+    // root still dispatches to the manager the moment it exists.
+    if (!cliPath) {
+      console.error(`omega: brand-shaped directory at ${target.dir} but ${MANAGER} is not installed — running ${hostName} instead (install ${MANAGER} at the brand root, or \`mgr i local\` for a monorepo link, if this really is a brand)`);
+      return hostRun();
+    }
     return require(cliPath).run();
   }
 

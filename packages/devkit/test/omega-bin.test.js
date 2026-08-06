@@ -191,6 +191,64 @@ test('run(): cross-framework dispatch resolves the target\'s ./cli and calls run
   assert.equal(fs.readFileSync(marker, 'utf8'), 'dispatched');
 });
 
+test('run(): a brand-SHAPED dir with no manager installed falls back to the HOST CLI with a note (#194)', async () => {
+  // `omega setup` scaffolds config/omega.json5 into a STANDALONE app before the
+  // framework dep lands in its package.json — brand-shaped, but no manager to
+  // dispatch to. The dispatcher must not dead-end there.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-nomgr-'));
+  const appDir = path.join(scratch, 'fresh-app');
+  fs.mkdirSync(path.join(appDir, 'config'), { recursive: true });
+  fs.mkdirSync(path.join(appDir, '.git'), { recursive: true }); // bound the walk inside the scratch
+  fs.writeFileSync(
+    path.join(appDir, 'package.json'),
+    JSON.stringify({ name: 'fresh-app', dependencies: {} })
+  );
+  fs.writeFileSync(path.join(appDir, 'config', 'omega.json5'), '{ brand: { id: "fresh-app" } }\n');
+
+  const cwd0 = process.cwd();
+  const error0 = console.error;
+  const notes = [];
+  let ran = 0;
+  console.error = (...args) => { notes.push(args.join(' ')); };
+  process.chdir(appDir);
+  try {
+    await run({ hostName: '@omega.js/web', hostRun: () => { ran += 1; } });
+  } finally {
+    process.chdir(cwd0);
+    console.error = error0;
+  }
+
+  assert.equal(ran, 1);
+  const note = notes.join('\n');
+  assert.match(note, /@omega\.js\/manager is not installed/);
+  assert.match(note, /running @omega\.js\/web/);
+  assert.ok(note.includes(appDir), `note names the brand-shaped dir: ${note}`);
+});
+
+test('run(): an unresolvable CROSS-FRAMEWORK app still hard-fails (never falls back to the wrong CLI)', () => {
+  // The brand fallback (#194) must not soften this branch: the app names a
+  // DIFFERENT framework, so running the host's CLI would run the wrong tool.
+  // Real execution in a child process — this path calls process.exit(1).
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-xfail-'));
+  const appDir = path.join(scratch, 'site');
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(appDir, 'package.json'),
+    JSON.stringify({ name: 'site', dependencies: { '@omega.js/web': '*' } })
+  );
+  const runner = path.join(scratch, 'runner.js');
+  fs.writeFileSync(
+    runner,
+    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
+      + `.run({ hostName: '@omega.js/desktop', hostRun: () => console.log('HOST-RAN') });`
+  );
+
+  const out = require('child_process').spawnSync(process.execPath, [runner], { cwd: appDir, encoding: 'utf8' });
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false);
+  assert.match(out.stderr, /could not resolve '@omega\.js\/web\/cli'/);
+});
+
 test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-brand-'));
   const brandRoot = path.join(scratch, 'my-brand');

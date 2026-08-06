@@ -542,7 +542,15 @@ function startMonorepoWatch(options) {
 function startVendorPropagation(options) {
   const { packagesDir, packages, dependents, log = () => {}, debounceMs = 400 } = options;
 
-  const runPrepare = options.runPrepare || ((dependent) => new Promise((resolve) => {
+  // This prepare takes the dependent's heal lock for the child's whole life:
+  // it writes the same dist a booting CLI's heal rebuilds, so the two must
+  // never run at once. The wait is async — the watcher keeps serving its other
+  // watches while a peer's prepare finishes.
+  const runPrepare = options.runPrepare || ((dependent) => acquireHealLock(dependent.dir).then((release) => new Promise((resolve) => {
+    const done = () => {
+      release();
+      resolve();
+    };
     const child = spawn('npm', ['run', 'prepare'], { cwd: dependent.dir, stdio: ['ignore', 'pipe', 'pipe'] });
 
     // Quiet on success — surface output only when the prepare fails
@@ -552,7 +560,7 @@ function startVendorPropagation(options) {
 
     child.on('error', (error) => {
       log(`prepare failed to spawn in ${dependent.name}: ${error.message}`);
-      resolve();
+      done();
     });
     child.on('exit', (code) => {
       if (code !== 0) {
@@ -560,9 +568,9 @@ function startVendorPropagation(options) {
       } else {
         log(`re-prepared ${dependent.name}`);
       }
-      resolve();
+      done();
     });
-  }));
+  })));
 
   let timer = null;
   let running = false;
@@ -656,6 +664,40 @@ const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit'];
 // Directory names the freshness scan never descends into.
 const FRESHNESS_SKIP_DIRS = new Set(['node_modules', '.temp', 'dist']);
 
+// Dist paths prepare legitimately generates with no src counterpart, so their
+// presence is never "a src file was deleted": the vendor hook's module copies
+// (dist/vendor/**). Nothing else — vendor-docs writes to the package ROOT
+// docs/ and prepare-package rewrites the ROOT package.json, so a dist/docs or
+// dist/package.json IS a leftover. A host's declared `omega.vendorAssets`
+// destinations join the set per package (see allowedDistExtras) — that is how
+// desktop/extension end up with a dist/assets tree the web package owns.
+const DIST_EXTRAS = ['vendor'];
+
+// The per-package heal mutex (mkdir-as-mutex, owner pid inside) — .omega/ is
+// gitignored monorepo-wide, so the lock never dirties a package.
+const HEAL_LOCK = path.join('.omega', 'heal.lock');
+// A prepare legitimately holds the lock for minutes, so the loser waits long
+// and only ever proceeds unlocked as a last resort — a heal must never fail
+// over its own bookkeeping.
+const HEAL_LOCK_WAIT_MS = 120000;
+const HEAL_LOCK_POLL_MS = 50;
+// Grace for the window between mkdir and the owner file landing: a lock with no
+// readable owner is only abandoned once it is older than this.
+const HEAL_LOCK_ORPHAN_MS = 5000;
+
+// Bounded grace for an in-flight watcher copy before the boot heals anyway.
+const WATCH_GRACE_MS = 2000;
+const WATCH_POLL_MS = 100;
+
+/**
+ * Synchronous wait — this whole path is sync by design (it runs before a CLI's
+ * first await, and freshnessBoot may re-exec the process).
+ * @param {number} ms - Milliseconds to block.
+ */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 /**
  * Newest mtime (ms) of any file or directory under dir, recursive — skipping
  * node_modules/.temp/dist and never following symlinks. Directory mtimes are
@@ -702,6 +744,289 @@ function newestMtimeUnder(dir) {
 }
 
 /**
+ * Every file under dir, keyed by its dir-relative POSIX path — skipping
+ * node_modules/.temp/dist and never following symlinks (a framework dist can
+ * carry a circular self-link fixture). Missing dir → empty map.
+ * @param {string} dir - Directory to scan.
+ * @returns {Map<string, number>} relative path → mtimeMs.
+ */
+function filesUnder(dir) {
+  const files = new Map();
+  const queue = [''];
+
+  while (queue.length > 0) {
+    const relative = queue.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(path.join(dir, relative), { withFileTypes: true });
+    } catch (e) {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+      const child = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (!FRESHNESS_SKIP_DIRS.has(entry.name)) {
+          queue.push(child);
+        }
+        continue;
+      }
+      if (entry.isFile()) {
+        try {
+          files.set(child, fs.statSync(path.join(dir, child)).mtimeMs);
+        } catch (e) {
+          // Raced deletion — skip
+        }
+      }
+    }
+  }
+
+  return files;
+}
+
+/**
+ * The dist paths a prepare of THIS package generates without a src counterpart:
+ * the standing set (`dist/vendor/**`) plus every `omega.vendorAssets`
+ * destination the host declares (each is a dist-relative file or directory the
+ * vendor hook copies from another package).
+ * @param {object|null} pkg - The package's manifest.
+ * @returns {string[]} Dist-relative POSIX paths (files or directory roots).
+ */
+function allowedDistExtras(pkg) {
+  const declared = ((pkg && pkg.omega && pkg.omega.vendorAssets) || [])
+    .map((entry) => entry && entry.to)
+    .filter(Boolean)
+    .map((to) => to.split(path.sep).join('/').replace(/^\.\//, '').replace(/\/+$/, ''));
+
+  return DIST_EXTRAS.concat(declared);
+}
+
+/**
+ * Per-file staleness evidence for a locally-linked package's dist.
+ *
+ * A whole-tree newest-mtime compare is not enough: prepare's after-hook writes
+ * into dist too (vendored modules, declared assets), so ANY dist write
+ * after a src edit made the tree read "fresh" while individual dist files were
+ * stale or missing outright (the 2026-08-05 incident). Evidence instead: every
+ * src file must exist at its mapped dist path with an mtime at least as new, no
+ * dist file may lack a src counterpart (a deleted source) unless prepare
+ * generates it, and — inside the monorepo — each embedded dist/vendor/<name>
+ * copy must be newer than that private package's src (vendored copies only
+ * refresh on a full prepare).
+ * @param {object} options
+ * @param {string} options.srcDir - The package's src directory.
+ * @param {string} options.distDir - The package's dist directory.
+ * @param {object|null} options.pkg - The package's manifest.
+ * @param {string} options.monorepoRoot - Monorepo root (only read when inMonorepo).
+ * @param {boolean} options.inMonorepo - Whether the package lives in the monorepo.
+ * @returns {string|null} The first piece of evidence, or null when fresh.
+ */
+function distStaleReason(options) {
+  const { srcDir, distDir, pkg, monorepoRoot, inMonorepo } = options;
+
+  if (!fs.existsSync(distDir)) {
+    return 'dist/ is missing';
+  }
+
+  const srcFiles = filesUnder(srcDir);
+  const distFiles = filesUnder(distDir);
+
+  for (const [relative, mtime] of srcFiles) {
+    const distMtime = distFiles.get(relative);
+    if (distMtime === undefined) {
+      return `dist/${relative} is missing`;
+    }
+    if (mtime > distMtime) {
+      return `dist/${relative} is older than src/${relative}`;
+    }
+  }
+
+  const extras = allowedDistExtras(pkg);
+  for (const relative of distFiles.keys()) {
+    if (srcFiles.has(relative)) {
+      continue;
+    }
+    if (!extras.some((extra) => relative === extra || relative.startsWith(`${extra}/`))) {
+      return `dist/${relative} has no src counterpart (deleted source)`;
+    }
+  }
+
+  if (inMonorepo) {
+    for (const name of FRESHNESS_VENDORABLES) {
+      const vendorDir = path.join(distDir, 'vendor', name);
+      if (fs.existsSync(vendorDir)
+        && newestMtimeUnder(path.join(monorepoRoot, 'packages', name, 'src')) > newestMtimeUnder(vendorDir)) {
+        return `dist/vendor/${name} is older than packages/${name}/src`;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Whether a held heal lock can be stolen: its owner process is gone, or the
+ * lock has no readable owner and is older than the mkdir→write grace (the
+ * holder died mid-acquire).
+ * @param {string} lockDir - The lock directory.
+ * @returns {boolean}
+ */
+function healLockAbandoned(lockDir) {
+  let pid;
+  try {
+    pid = JSON.parse(fs.readFileSync(path.join(lockDir, 'owner.json'), 'utf8')).pid;
+  } catch (e) {
+    try {
+      return Date.now() - fs.statSync(lockDir).mtimeMs > HEAL_LOCK_ORPHAN_MS;
+    } catch (statError) {
+      return false; // Lock vanished — the caller's next mkdir wins it
+    }
+  }
+
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (e) {
+    // Only "no such process" means gone: EPERM is a LIVE process this user may
+    // not signal, and stealing its lock would double the build it is running
+    return e.code === 'ESRCH';
+  }
+}
+
+/**
+ * Make the lock's parent (`<package>/.omega`) — the one piece of bookkeeping
+ * that must exist before any mkdir-as-mutex attempt.
+ * @param {string} lockDir - The lock directory.
+ * @returns {boolean} False when the dir is unmakeable (read-only fs, full
+ *   disk) — the caller then proceeds unlocked rather than failing the heal.
+ */
+function ensureHealLockParent(lockDir) {
+  try {
+    fs.mkdirSync(path.dirname(lockDir), { recursive: true });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * ONE attempt at the mkdir-as-mutex, stealing an abandoned lock and retrying
+ * once. Never throws: a heal must not fail over its own bookkeeping.
+ * @param {string} lockDir - The lock directory.
+ * @returns {boolean} Whether this process now holds the lock.
+ */
+function tryHealLock(lockDir) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fs.mkdirSync(lockDir);
+    } catch (e) {
+      if (attempt === 0 && healLockAbandoned(lockDir)) {
+        fs.rmSync(lockDir, { recursive: true, force: true });
+        continue;
+      }
+      return false;
+    }
+    try {
+      fs.writeFileSync(path.join(lockDir, 'owner.json'), JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    } catch (e) {
+      // The owner file is liveness evidence, not the mutex itself — a lock
+      // nobody can read is only abandoned after the orphan grace, which is
+      // exactly the right answer for a holder that could not write it
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Release a held heal lock. Idempotent — a spawn that emits both 'error' and
+ * 'exit' must never delete a lock a LATER process has since won.
+ * @param {string} lockDir - The lock directory.
+ * @returns {function} The release function.
+ */
+function healLockReleaser(lockDir) {
+  let released = false;
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    fs.rmSync(lockDir, { recursive: true, force: true });
+  };
+}
+
+/**
+ * Run fn under the package's cross-process heal lock, so two CLIs booting on
+ * the same stale link produce ONE build. The loser waits for the winner (a
+ * prepare can run for minutes), an abandoned lock is stolen, and a wait that
+ * outlives the deadline proceeds unlocked rather than failing the boot.
+ * @param {string} realDir - The package directory.
+ * @param {function} fn - Critical section.
+ * @returns {*} fn's result.
+ */
+function withHealLock(realDir, fn) {
+  const lockDir = path.join(realDir, HEAL_LOCK);
+  const deadline = Date.now() + HEAL_LOCK_WAIT_MS;
+  let release = null;
+
+  if (ensureHealLockParent(lockDir)) {
+    while (true) {
+      if (tryHealLock(lockDir)) {
+        release = healLockReleaser(lockDir);
+        break;
+      }
+      if (Date.now() >= deadline) {
+        break;
+      }
+      sleepSync(HEAL_LOCK_POLL_MS);
+    }
+  }
+
+  try {
+    return fn();
+  } finally {
+    if (release) {
+      release();
+    }
+  }
+}
+
+/**
+ * The same heal lock, awaited WITHOUT blocking: the watch process takes it
+ * around its own `npm run prepare` spawn, and must keep serving its other
+ * watchers while a peer's prepare finishes (never sleepSync here).
+ * @param {string} realDir - The package directory.
+ * @returns {Promise<function>} Resolves to a release function — always safe to
+ *   call, including when the wait timed out and the caller proceeds unlocked.
+ */
+function acquireHealLock(realDir) {
+  const lockDir = path.join(realDir, HEAL_LOCK);
+  const unlocked = () => {};
+  if (!ensureHealLockParent(lockDir)) {
+    return Promise.resolve(unlocked);
+  }
+
+  const deadline = Date.now() + HEAL_LOCK_WAIT_MS;
+  return new Promise((resolve) => {
+    const attempt = () => {
+      if (tryHealLock(lockDir)) {
+        resolve(healLockReleaser(lockDir));
+        return;
+      }
+      if (Date.now() >= deadline) {
+        resolve(unlocked);
+        return;
+      }
+      setTimeout(attempt, HEAL_LOCK_POLL_MS);
+    };
+    attempt();
+  });
+}
+
+/**
  * Resolve a package's REAL on-disk directory as seen from fromDir, mirroring
  * Node resolution. require.resolve of '<name>/package.json' first (works when
  * there is no exports map — @omega.js/backend), then a manual node_modules
@@ -737,6 +1062,22 @@ function resolvePackageRealDir(packageName, fromDir) {
   }
 }
 
+// One watch-down warning per process, however many packages get checked.
+let warnedWatchDown = false;
+
+/**
+ * Warn once that the monorepo's src→dist watch is not running: every framework
+ * CLI boots through the freshness path, so all five surfaces get this for free.
+ * @param {string} monorepoRoot - Monorepo root path.
+ */
+function warnWatchDown(monorepoRoot) {
+  if (warnedWatchDown) {
+    return;
+  }
+  warnedWatchDown = true;
+  console.warn(`omega: the monorepo src→dist watch is not running — edits reach linked apps only at CLI boot; run \`npm start\` in ${monorepoRoot} for live rebuilds`);
+}
+
 /**
  * Ensure a locally-linked framework's dist is at least as new as its src —
  * rebuilding it (`npm run prepare`) when a src edit landed without a prepare,
@@ -744,15 +1085,18 @@ function resolvePackageRealDir(packageName, fromDir) {
  * rebuild (Ian's ask, 2026-07-20).
  *
  * Only acts on SOURCE CHECKOUTS: a registry install (real path still inside
- * node_modules) is untouched. Staleness compares the newest mtime under src/
- * against dist/ (missing dist = stale), and — for packages sitting in the
- * monorepo — also each embedded dist/vendor/<name> copy against that
- * vendorable package's src (vendored copies only refresh on a full prepare).
- * When the monorepo watch holds a live lock, the rebuild is left to it.
+ * node_modules) is untouched. Staleness is PER-FILE evidence (distStaleReason),
+ * never a whole-tree mtime compare. A live monorepo watch buys a bounded grace
+ * for its in-flight copy — then the boot heals anyway, because a watcher that
+ * silently died is exactly what let a stale dist serve for a day (#195). Heals
+ * take the package's cross-process lock, so N booting CLIs produce one build.
  * @param {object} options
  * @param {string} options.packageName - The package to check (e.g. '@omega.js/web').
  * @param {string} [options.fromDir] - Resolution origin (default process.cwd()).
- * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'watch-owned'|'rebuilt'|'rebuild-failed', packageName: string, dir?: string}}
+ * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'rebuilt'|'rebuild-failed', by?: 'self'|'watch'|'peer', packageName: string, dir?: string}}
+ *   Every HEALED outcome is 'rebuilt' — `by` only says who built it — because
+ *   whoever built it, this process booted from the pre-heal dist and must
+ *   re-exec.
  */
 function ensureFreshLocalDist(options) {
   const { packageName, fromDir = process.cwd() } = options;
@@ -784,44 +1128,58 @@ function ensureFreshLocalDist(options) {
   }
 
   const distDir = path.join(realDir, 'dist');
-  let stale = !fs.existsSync(distDir) || newestMtimeUnder(srcDir) > newestMtimeUnder(distDir);
-
-  // Vendored shared-package copies: a devkit/config/account/template-kit edit
-  // only lands in dist/vendor/<name> via a full prepare — an up-to-date own-src
-  // dist can still be stale on vendored code (the cp184 class of bug)
   const monorepoRoot = path.dirname(path.dirname(realDir));
   const inMonorepo = isMonorepoRoot(monorepoRoot);
-  if (!stale && inMonorepo) {
-    for (const name of FRESHNESS_VENDORABLES) {
-      const vendorDir = path.join(distDir, 'vendor', name);
-      if (fs.existsSync(vendorDir)
-        && newestMtimeUnder(path.join(monorepoRoot, 'packages', name, 'src')) > newestMtimeUnder(vendorDir)) {
-        stale = true;
-        break;
+  const watchPid = inMonorepo ? readLiveWatchPid(monorepoRoot) : null;
+
+  // Liveness: a monorepo-linked CLI booting with no watch running still heals
+  // itself below, but src→dist propagation is only as live as this boot — say
+  // so once, loudly, instead of letting a dead watcher go unnoticed for a day
+  if (inMonorepo && !watchPid) {
+    warnWatchDown(monorepoRoot);
+  }
+
+  const staleness = () => distStaleReason({ srcDir, distDir, pkg, monorepoRoot, inMonorepo });
+  let reason = staleness();
+  if (!reason) {
+    return { status: 'fresh', packageName, dir: realDir };
+  }
+
+  // A live watch owns the copy — give its in-flight write a bounded moment to
+  // land, then heal anyway (blind trust of the lock is what masked #195)
+  if (watchPid) {
+    const deadline = Date.now() + WATCH_GRACE_MS;
+    while (Date.now() < deadline) {
+      sleepSync(WATCH_POLL_MS);
+      reason = staleness();
+      if (!reason) {
+        console.log(`\x1b[2momega: local ${packageName} dist was stale — the monorepo watch rebuilt it\x1b[0m`);
+        return { status: 'rebuilt', by: 'watch', packageName, dir: realDir };
       }
     }
   }
 
-  if (!stale) {
-    return { status: 'fresh', packageName, dir: realDir };
-  }
+  return withHealLock(realDir, () => {
+    // The lock loser arrives after the winner's prepare: re-check instead of
+    // building again — running twice equals running once. Still a HEAL, so it
+    // re-execs like any other: this process's modules came from the stale dist
+    reason = staleness();
+    if (!reason) {
+      return { status: 'rebuilt', by: 'peer', packageName, dir: realDir };
+    }
 
-  if (inMonorepo && readLiveWatchPid(monorepoRoot)) {
-    console.log(`\x1b[2momega: local ${packageName} dist is stale — the monorepo watch will rebuild it\x1b[0m`);
-    return { status: 'watch-owned', packageName, dir: realDir };
-  }
-
-  console.log(`omega: local ${packageName} dist is stale — rebuilding…`);
-  const result = spawnSync('npm', ['run', 'prepare'], {
-    cwd: realDir,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
+    console.log(`omega: local ${packageName} dist is stale (${reason}) — rebuilding…`);
+    const result = spawnSync('npm', ['run', 'prepare'], {
+      cwd: realDir,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+    if (result.status !== 0) {
+      console.warn(`omega: rebuild failed (npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status} in ${realDir}) — continuing on the stale dist`);
+      return { status: 'rebuild-failed', packageName, dir: realDir };
+    }
+    return { status: 'rebuilt', by: 'self', packageName, dir: realDir };
   });
-  if (result.status !== 0) {
-    console.warn(`omega: rebuild failed (npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status} in ${realDir}) — continuing on the stale dist`);
-    return { status: 'rebuild-failed', packageName, dir: realDir };
-  }
-  return { status: 'rebuilt', packageName, dir: realDir };
 }
 
 // One freshness scan per process per module instance — a dispatcher hop that
@@ -832,10 +1190,12 @@ let freshnessBootRan = false;
  * CLI-boot wiring for ensureFreshLocalDist: every framework run() calls this
  * first. On a rebuild, the running process booted from the STALE dist — so the
  * same invocation re-execs ONCE (OMEGA_FRESH_REEXEC guards the loop) and this
- * process exits with the child's status. Every other outcome returns and the
- * boot continues.
+ * process exits with the child's status. That is EVERY heal, whoever built it
+ * (`by: self|watch|peer`): a dist the watch or a peer CLI rebuilt leaves this
+ * process just as stale as one it rebuilt itself. Every other outcome returns
+ * and the boot continues.
  * @param {object} options - Same as ensureFreshLocalDist.
- * @returns {{status: string, packageName: string, dir?: string}}
+ * @returns {{status: string, by?: string, packageName: string, dir?: string}}
  */
 function freshnessBoot(options) {
   if (freshnessBootRan) {
@@ -859,6 +1219,7 @@ function freshnessBoot(options) {
 module.exports = {
   DEFAULT_MONOREPO,
   WATCH_LOCK,
+  HEAL_LOCK,
   isMonorepoRoot,
   resolveMonorepoRoot,
   packageDir,
