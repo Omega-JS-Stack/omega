@@ -11,6 +11,7 @@
     "./local-https": "./src/local-https.js",
     "./safe-install": "./src/safe-install.js",
     "./npm-registry": "./src/npm-registry.js",
+    "./reads": "./src/reads.js",
     "./attach-log-file": "./src/attach-log-file.js",
     "./cli-router": "./src/cli-router.js",
     "./prompt": "./src/prompt.js",

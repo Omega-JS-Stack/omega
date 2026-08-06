@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#200](../../issues/200) — Dev watch targets register themselves: config-time reads go through `@omega.js/devkit/reads` (reading IS registration, a guard test fails direct reads), scan-shaped answers refresh live on their own rescan lane, and duplicate permalinks get a loud dev diagnostic and a failed production build.
+
+### Fixed
+- [#139](../../issues/139) — The last stale config-time captures are gone: a brand's first real post retires the sample corpus mid-session without a restart, and permalink collisions surface immediately instead of silently last-one-wins.
 
 ## [0.25.0] (2026-08-06)
 ### Added

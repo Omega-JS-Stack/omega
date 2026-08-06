@@ -40,6 +40,7 @@ const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
 const { configureOmega } = require('../engine.js');
+const reads = require('@omega.js/devkit/reads');
 const { reconcileSampleContent } = require('../sample-content.js');
 const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -48,6 +49,9 @@ const { PATHS, resolveClientEntry } = require('../paths.js');
 const logger = new Logger('omega:dev');
 
 const WATCH_DEBOUNCE_MS = 250;
+// The rescan lane settles faster than the asset lane: a scan is a readdir, and
+// the sooner it lands the sooner a permalink collision is on screen.
+const RESCAN_DEBOUNCE_MS = 50;
 
 module.exports = async function (options) {
   options = options || {};
@@ -233,12 +237,23 @@ module.exports = async function (options) {
 
   // ---- Eleventy watch + serve
   const Eleventy = require('@11ty/eleventy').default;
+  let rescanWatchers = [];
   const elev = new Eleventy(paths.src, paths.out, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
       eleventyConfig.setServerOptions(devServerOptions(paths.out, devPorts.auth));
-      registerTemplateWatchTargets(eleventyConfig, { consumerDir: paths.src, activeTheme });
+      // Arms the watch registration for the config build below — the engine's
+      // captured reads are what fill it in (#200). The reset union goes to
+      // Eleventy, the rescan union to the light content watcher; a config
+      // reset re-runs this callback, so the previous rescan watchers close
+      // before the new union arms.
+      registerTemplateWatchTargets(eleventyConfig, {
+        onRescans: (rescans) => {
+          rescanWatchers.forEach((watcher) => watcher.close());
+          rescanWatchers = watchRescanTargets(rescans);
+        },
+      });
       return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
         siteData,
@@ -329,20 +344,29 @@ function devServerOptions(outDir, authPort) {
  * rebuild logs "Wrote N files" and re-renders the stale capture until the
  * server is restarted.
  *
- * EVERY layer of the same chain the engine reads is a target (#134), not just
- * the consumer's: consumer `src/` → the theme layers (a consumer-local
- * `src/themes/<id>` or the packaged one) → core. Same chain, same resolution
- * — `resolveThemeLayers` — so a target can never drift from what
- * `configureOmega` actually captured. Only the machinery subtrees of a layer
- * (`_layouts`/`_includes`/`_sections`/`_components`, plus a theme's `fonts/`,
- * whose face list is a config-time readdir): a whole theme dir would
- * drag scss (the sass lane's own watcher) and pages (the incremental rebuild
- * path) into full config resets. The packaged `defaults` tree is the one whole
- * root (#136) — nothing in it rides the incremental path.
+ * The targets are DERIVED, never listed (#200): `configureOmega` reads every
+ * config-time input through the captured-read helper (@omega.js/devkit/reads), which
+ * records the directory of each read — the union IS the set of dirs the
+ * capture depends on, so a capture added to the engine later registers itself.
+ * A hand list could only ever be the set someone remembered (#139).
  *
- * Packaged targets register REAL paths. A linked brand reaches the framework
- * through a `node_modules/@omega.js/web` symlink, and Eleventy's watcher
- * ignores everything under `node_modules` — the resolved path sidesteps it.
+ * Ordering: Eleventy runs this before `configureOmega` in the same config
+ * callback, so it ARMS the registration instead of doing it — the recorded
+ * union only exists once the engine's capture scope closes, which happens on
+ * the way out of `configureOmega`, still inside this callback and long before
+ * Eleventy reads its watch targets.
+ *
+ * What lands in the union: each layer's machinery dirs (`_layouts`,
+ * `_includes`, `_sections`, `_components`, a theme's `fonts/`), the packaged
+ * `defaults` tree (#136), and the layer roots the theme chain PROBES — a
+ * consumer-local `src/themes/<id>` included, so an scss edit inside a brand's
+ * own theme rides BOTH lanes: the asset watcher's rebuild AND a config reset
+ * (the same accepted cost the `_sections` dirs already pay, #138).
+ *
+ * Packaged targets register REAL paths (the helper realpaths anything outside
+ * the consumer dir). A linked brand reaches the framework through a
+ * `node_modules/@omega.js/web` symlink, and Eleventy's watcher ignores
+ * everything under `node_modules` — the resolved path sidesteps it.
  *
  * BOTH path forms are registered for cwd-contained targets. The absolute form
  * alone carries the reset today (the dev loop hands Eleventy absolute dirs, so
@@ -357,81 +381,73 @@ function devServerOptions(outDir, authPort) {
  * Eleventy re-root its watcher to the common ancestor, after which NO event
  * path matches ANY registered target and every reset dies — including the
  * consumer ones (#134 verification).
+ *
+ * ONLY the reset union lands here. The same scope also records the RESCAN
+ * union (#200 Lane B) — the content scans, whose dirs must never carry a reset
+ * — and `options.onRescans` hands it to the lane that owns it
+ * (watchRescanTargets below).
  * @param {object} eleventyConfig
- * @param {object} options
- * @param {string} options.consumerDir - the Eleventy input dir (<root>/src)
- * @param {string} [options.activeTheme] - theme id (default 'classy')
- * @param {string} [options.themesDir] - packaged themes root (default: packaged themes)
- * @param {string} [options.coreDir] - the framework core layer (default: packaged core)
- * @param {string} [options.defaultsDir] - framework defaults root (default: packaged defaults)
+ * @param {object} [options]
+ * @param {function} [options.onRescans] - (rescanTargets) => void, the rescan lane
  */
 function registerTemplateWatchTargets(eleventyConfig, options) {
-  const themesDir = options.themesDir || PATHS.themes;
-  const coreDir = options.coreDir || PATHS.core;
-  const defaultsDir = options.defaultsDir || PATHS.defaults;
-  const themeLayers = resolveThemeLayers({
-    activeTheme: options.activeTheme,
-    consumerDir: options.consumerDir,
-    themesDir,
+  reads.onNextScope((targets, rescans) => {
+    for (const { dir } of targets) {
+      const relative = path.relative(process.cwd(), dir);
+      const forms = relative.startsWith('..') ? [dir] : new Set([dir, relative]);
+      for (const form of forms) {
+        eleventyConfig.addWatchTarget(form, { resetConfig: true });
+      }
+    }
+    if (options && options.onRescans) options.onRescans(rescans);
   });
-  const targets = new Set();
+}
 
-  // The defaults tree WHOLE (#136): every dir under it — pages, showcase, the
-  // sample-content corpora — is read at config time and registered as virtual
-  // templates, so an edit to a packaged default page serves stale until
-  // restart. Nothing under defaults/ rides the incremental path (it is not the
-  // Eleventy input dir and carries no assets), so the root is the honest
-  // target — it cannot drift as the engine grows another defaults reader.
-  if (fs.existsSync(defaultsDir)) targets.add(fs.realpathSync(defaultsDir));
+/**
+ * The RESCAN lane (#200 Lane B): a light watcher per recorded rescan dir that
+ * re-runs just the capture whose input changed. No config reset ever — that is
+ * the entire reason these dirs are a separate union: they hold the brand's
+ * CONTENT (pages/, the collection dirs), and a reset there would drag every
+ * page edit off Eleventy's incremental lane.
+ *
+ * What a re-run buys: the live decision object is current the moment a file
+ * lands (the permalink-collision diagnostic re-emits right there, before any
+ * rebuild finishes). It is NOT what makes a render fresh — the engine
+ * re-scans on `eleventy.before`, so whichever watcher sees the file first, the
+ * render that follows reads current answers.
+ *
+ * Debounced like the asset lane: an editor's save is several events, and a
+ * scan per event is pure waste. A dir that does not exist yet is skipped —
+ * fs.watch cannot arm a missing path, and a collection dir appearing under
+ * Eleventy's input dir triggers a rebuild (and its re-scan) by itself.
+ *
+ * Closing DROPS the queued re-run: every config reset closes this union and
+ * opens the new one, and a debounce still in flight belongs to captures the
+ * previous build owned.
+ * @param {Array<{ dir: string, rerun: function }>} targets - the recorded rescan union
+ * @returns {Array<{ close: function }>} the live watchers (the caller closes them)
+ */
+function watchRescanTargets(targets) {
+  return targets.filter((target) => fs.existsSync(target.dir)).map((target) => {
+    let timer = null;
+    const watcher = fs.watch(target.dir, { recursive: true }, () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          target.rerun();
+        } catch (error) {
+          logger.error('Rescan failed:', error);
+        }
+      }, RESCAN_DEBOUNCE_MS);
+    });
 
-  for (const dir of ['_layouts', '_includes']) {
-    // The consumer's own dirs register unconditionally — a brand may author
-    // src/_includes mid-session, and the reset must already be armed.
-    targets.add(path.join(options.consumerDir, dir));
-
-    // Framework layers exist per theme, not per convention — most carry only
-    // one of the two dirs, and a missing one is not a watchable path.
-    for (const layer of [...themeLayers, coreDir]) {
-      const target = path.join(layer, dir);
-      if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
-    }
-  }
-
-  // Section/component entries are the same capture shape over a shorter chain
-  // (consumer → theme layers, no core): sections.js caches each entry's
-  // resolved template and its json5 defaults PER config registration, so an
-  // edit to a section renders the cached parse until a reset. The dirs are
-  // Eleventy-ignored, so template/json5 edits have no other lane — but the
-  // dirs are also asset watchDirs, so a section.scss/js edit rides BOTH lanes:
-  // its css hot-swap AND a config reset (accepted cost, #138).
-  for (const dir of ['_sections', '_components']) {
-    targets.add(path.join(options.consumerDir, dir));
-
-    for (const layer of themeLayers) {
-      const target = path.join(layer, dir);
-      if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
-    }
-  }
-
-  // The theme layers' `fonts/` dirs (#139), the same theme-only chain the
-  // capture reads: configureOmega readdir's the first layer WITH the dir into
-  // site.fontPreloads, so a face added or removed mid-session serves stale
-  // preload tags until restart. No consumer `src/fonts` — the capture never
-  // looks there. Theme dirs are also asset watchDirs, so a font edit rides
-  // BOTH lanes (asset rebuild + config reset) — same accepted cost as the
-  // _sections block above (#138).
-  for (const layer of themeLayers) {
-    const target = path.join(layer, 'fonts');
-    if (fs.existsSync(target)) targets.add(fs.realpathSync(target));
-  }
-
-  for (const target of targets) {
-    const relative = path.relative(process.cwd(), target);
-    const forms = relative.startsWith('..') ? [target] : new Set([target, relative]);
-    for (const form of forms) {
-      eleventyConfig.addWatchTarget(form, { resetConfig: true });
-    }
-  }
+    return {
+      close: () => {
+        clearTimeout(timer);
+        watcher.close();
+      },
+    };
+  });
 }
 
 /**
@@ -687,6 +703,7 @@ module.exports.readSiblingPorts = readSiblingPorts;
 module.exports.devServerOptions = devServerOptions;
 module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
+module.exports.watchRescanTargets = watchRescanTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 
 async function linkBrandToMonorepo() {

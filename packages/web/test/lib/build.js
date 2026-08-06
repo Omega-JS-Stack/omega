@@ -47,7 +47,11 @@ async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build'
     },
   });
   const results = await elev.toJSON();
-  return new Map(results.map((r) => [r.url, r.content]));
+  // Only the pages that SHIP. A framework page the consumer took over, or a
+  // sample the brand's own content replaced, is registered and gated at render
+  // time (#200 Lane B) — it writes no file, which Eleventy reports as `url:
+  // false`, and a build's product is the files it wrote.
+  return new Map(results.filter((r) => typeof r.url === 'string').map((r) => [r.url, r.content]));
 }
 
 /**

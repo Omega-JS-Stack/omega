@@ -25,4 +25,5 @@ Ian's durable rulings, migrated verbatim from PROGRESS.md's Rulings lane when th
 - Ian 2026-07-30: uniformity — commands/surfaces of the same TYPE act the SAME; no split defaults within one family (the CLI read/write emulator split was the offense: every backend CLI subcommand now defaults to the emulator, `--production` the only path to live)
 - Ian 2026-07-30: NO legacy accommodations in the new system — no code path accepting a superseded form; breaking changes get DOCUMENTED (register: #148) and migrated once, manually (playbook: #149); the config-convert input lane is the one sanctioned legacy-reading exception
 - Ian 2026-07-30: company membership is the `.omega/company.json` stamp POINTER — brands never physically nest inside a company folder; anything resolving the company must follow the stamp, never the directory tree
+- Ian 2026-08-06: harmonize at BUILD time, never in a later pass — when a mechanism lands in one framework, its shared home (devkit) and the mirroring evaluation happen in the same work item; "wait for the harmonization pass" is not an accepted answer (first application: the #200 captured-read helper lifted to devkit pre-ship)
 

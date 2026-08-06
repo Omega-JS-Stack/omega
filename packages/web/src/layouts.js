@@ -11,6 +11,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const reads = require('@omega.js/devkit/reads');
 
 /**
  * Register the winning layout files as Eleventy virtual templates so that
@@ -20,7 +21,7 @@ const path = require('node:path');
  */
 function registerVirtualLayouts(eleventyConfig, layoutMap) {
   for (const [rel, abs] of layoutMap) {
-    eleventyConfig.addTemplate(`_includes/${rel}`, fs.readFileSync(abs, 'utf8'));
+    eleventyConfig.addTemplate(`_includes/${rel}`, reads.read(abs));
   }
 }
 

@@ -5,9 +5,13 @@
  * base theme → core); for any relative path the FIRST layer that contains it
  * wins. Both bake-off candidates build their theme layering, page-module
  * unions, and default-page scans on this.
+ *
+ * Every read goes through the captured-read helper (@omega.js/devkit/reads): inside a
+ * config build that is what registers each probed layer dir as a dev watch
+ * target, including the ones that do not exist yet (#200).
  */
-const fs = require('node:fs');
 const path = require('node:path');
+const reads = require('@omega.js/devkit/reads');
 
 /**
  * Collect EVERY layer that provides each relative path, in layer order. The
@@ -21,9 +25,9 @@ function collectProviders(layerDirs, filter) {
   const providers = new Map();
 
   for (const dir of layerDirs) {
-    if (!fs.existsSync(dir)) continue;
+    if (!reads.dirExists(dir)) continue;
 
-    for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    for (const entry of reads.readdir(dir, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile()) continue;
 
       const rel = path.relative(dir, path.join(entry.parentPath, entry.name));
@@ -68,7 +72,7 @@ function collectLayered(layerDirs, filter) {
 function resolveThemeLayers({ activeTheme, consumerDir, themesDir }) {
   const resolveId = (id) => {
     const local = consumerDir ? path.join(consumerDir, 'themes', id) : null;
-    return local && fs.existsSync(local) ? local : path.join(themesDir, id);
+    return local && reads.dirExists(local) ? local : path.join(themesDir, id);
   };
   return [...new Set([activeTheme || 'classy', 'base'])].map(resolveId);
 }

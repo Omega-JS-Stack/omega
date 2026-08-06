@@ -16,16 +16,18 @@ const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
 const Logger = require('@omega.js/devkit/logger');
+const reads = require('@omega.js/devkit/reads');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { applyMarkdownImages } = require('./markdown-images.js');
-const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
+const { permalinkOf } = require('./consumer-scan.js');
+const { createDecisions } = require('./decisions.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
 const { applyCollectionLimits } = require('./limit-collections.js');
 const { resolvePageAsset } = require('./assets.js');
-const { SAMPLE_SETS, resolveAnchor, generateSampleSet, hasOwnContent } = require('./sample-content.js');
+const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -88,9 +90,43 @@ const { deepMerge } = require('./merge.js');
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function configureOmega(eleventyConfig, options) {
+  // The capture scope (#200): every config-time read below goes through
+  // @omega.js/devkit/reads, and each one records the dir it touched. `omega dev` arms a
+  // handler before this runs and registers the recorded union as its
+  // config-reset watch targets when the scope closes on the way out — so a
+  // capture added here can never drift out of the watch set. Other callers
+  // (`omega build`, tests) open a scope nobody consumes: recording is cheap.
+  reads.openScope({ consumerDir: options.consumerDir });
+  try {
+    return buildConfig(eleventyConfig, options);
+  } finally {
+    // Config-time reading is over: hand the recorded union to whoever armed a
+    // handler (the dev loop's watch registration — src/commands/dev.js). In a
+    // FINALLY because a config build that throws (a bad section.json5, a
+    // broken omega.json5) must still register what it read: those very dirs
+    // are where the fix lands, and an unregistered union means the fix needs a
+    // restart to be seen.
+    reads.closeScope();
+  }
+}
+
+/**
+ * The config build itself — everything between opening and closing the capture
+ * scope (configureOmega above owns that lifecycle).
+ * @param {object} eleventyConfig
+ * @param {object} options - configureOmega's options
+ * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
+ */
+function buildConfig(eleventyConfig, options) {
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
+  // The packaged defaults tree is a config-time input WHOLE (#136): default
+  // pages, the showcase and the sample corpora are all read out of it below,
+  // and probing the root records the tree as ONE dependency — nothing under it
+  // rides the incremental path, so a defaults reader added later is watched
+  // whether or not it reads through a dir this build touched.
+  reads.dirExists(defaultsDir);
   const site = toSiteGlobal(options.siteData);
   const activeTheme = options.activeTheme || (site.theme && site.theme.id) || 'classy';
   const layoutMode = options.layoutMode || 'virtual';
@@ -141,11 +177,14 @@ function configureOmega(eleventyConfig, options) {
   // consumer-local theme that vendors no faces rides the base theme's.
   // Sorted: readdir order is filesystem-dependent and the emitted HTML
   // must be deterministic.
+  // EVERY layer is probed, not just up to the winner: the probe is what arms
+  // the dev watch (#200), so a fonts dir that appears in any layer mid-session
+  // resets the config instead of serving the captured face list.
   const themeFontsDir = themeLayers
     .map((layer) => path.join(layer, 'fonts'))
-    .find((dir) => fs.existsSync(dir));
+    .filter((dir) => reads.dirExists(dir))[0];
   site.fontPreloads = themeFontsDir
-    ? fs.readdirSync(themeFontsDir)
+    ? reads.readdir(themeFontsDir)
         .filter((f) => f.endsWith('-normal-latin.woff2'))
         .sort()
         .map((f) => `/assets/fonts/${f}`)
@@ -159,7 +198,7 @@ function configureOmega(eleventyConfig, options) {
   // EXISTING dirs only — LiquidJS probes every root per include lookup, and
   // a nonexistent root costs ~1s over the corpus (measured: 3.60→4.65s).
   const includeRoots = [path.join(options.consumerDir, '_includes'), ...layers.map((layer) => path.join(layer, '_includes'))]
-    .filter((dir) => fs.existsSync(dir));
+    .filter((dir) => reads.dirExists(dir));
   eleventyConfig.setLiquidOptions({
     jekyllInclude: true,
     root: includeRoots,
@@ -179,7 +218,7 @@ function configureOmega(eleventyConfig, options) {
   // layers win.
   const dataIncludes = {};
   for (const root of [...includeRoots].reverse()) {
-    for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+    for (const entry of reads.readdir(root, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
       const rel = path.relative(root, path.join(entry.parentPath, entry.name));
       const segments = rel.replace(/\.json$/, '').split(path.sep);
@@ -188,7 +227,7 @@ function configureOmega(eleventyConfig, options) {
       try {
         // JSON5 — the packaged section files (nav/footer/sidebar) use
         // unquoted keys, comments, and trailing commas
-        node[segments[segments.length - 1]] = JSON5.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
+        node[segments[segments.length - 1]] = JSON5.parse(reads.read(path.join(root, rel)));
       } catch { /* malformed data file — leave the slot empty */ }
     }
   }
@@ -398,36 +437,7 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Jekyll conventions + page.resolved equivalent
   eleventyConfig.addGlobalData('eleventyComputed', {
-    permalink: (data) => {
-      const inputPath = data.page.inputPath;
-      let permalink = data.permalink;
-      // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
-      // :title", with Eleventy's fileSlug stripping the dated-filename part) —
-      // but an EXPLICIT permalink in the doc's frontmatter wins, like Jekyll.
-      // '' counts as absent: Eleventy's computed dependency pass probes with
-      // an empty-string proxy, and that probe value persists into the data.
-      if (permalink === undefined || permalink === '') {
-        if (inputPath.includes('/_posts/')) permalink = `/blog/${data.page.fileSlug}`;
-        else if (inputPath.includes('/_alternatives/')) permalink = `/alternatives/${data.page.fileSlug}`;
-        else if (inputPath.includes('/_team/')) permalink = `/team/${data.page.fileSlug}`;
-        else if (inputPath.includes('/_updates/')) permalink = `/updates/${data.page.fileSlug}`;
-      }
-      // Jekyll flat URLs (legacy UJM parity): `/about` writes `about.html`,
-      // NOT `about/index.html` — site URLs carry no trailing slash. page.url
-      // stays extensionless ('/about') via the .html-stripping urlTransform
-      // below, exactly like Jekyll's page.url for extensionless permalinks.
-      // A whitelist of real output extensions, NOT path.extname — dotted slugs
-      // (`/updates/v1.0.0`) must still get their .html. Liquid-carrying
-      // permalinks (pagination/taxonomy) can't be shape-tested as raw strings —
-      // they spell their full shape explicitly (blog.md ends in `.html`) and
-      // pass through untouched.
-      const KNOWN_EXT = /\.(html|xml|txt|json|js|css|webmanifest|svg|ics|pdf)$/i;
-      if (typeof permalink === 'string' && !/[{}]/.test(permalink)
-          && !KNOWN_EXT.test(permalink) && !permalink.endsWith('/')) {
-        return `${permalink}.html`;
-      }
-      return permalink;
-    },
+    permalink: jekyllPermalink,
     // Jekyll paginator compat: layouts iterate `paginator.posts` with Jekyll
     // post shapes (post.url, post.post.title), so items are flattened
     // ({ url, date, ...data }) — references, not copies.
@@ -532,19 +542,50 @@ function configureOmega(eleventyConfig, options) {
     environment: options.environment,
   });
 
-  // ---- Default pages: virtual templates unless the consumer owns the URL
-  const consumerUrls = scanConsumerPermalinks(options.consumerDir);
-  const defaultPages = collectLayered([path.join(defaultsDir, 'pages')]);
-  const suppressed = [];
-  for (const [rel, abs] of defaultPages) {
-    const raw = fs.readFileSync(abs, 'utf8');
-    const url = permalinkOf(raw);
-    if (url && consumerUrls.has(url)) {
-      suppressed.push(url);
-      continue;
-    }
-    eleventyConfig.addTemplate(`omega-defaults/${rel}`, raw);
+  // ---- The live decisions (#200 Lane B): which URLs the consumer's own pages
+  // claim, and which collections the brand has real content in. Both are
+  // CONTENT facts, so both are rescan captures — a config-time value would
+  // only refresh through a config reset, and a config reset on every page edit
+  // is exactly what the incremental contract forbids. Everything below asks
+  // this object at render time.
+  const decisions = createDecisions({
+    consumerDir: options.consumerDir,
+    collectionDirs: SAMPLE_SETS.map((set) => set.collectionDir),
+    environment: options.environment,
+  });
+  // Re-scan before every REBUILD, so a render can never read a decision older
+  // than its own build — whichever watcher saw the file event first. The dev
+  // loop's rescan watcher is the prompt lane (it updates and reports the
+  // moment a file lands, before any rebuild finishes); this is the ordering
+  // guarantee. A production build has exactly one build and one scan.
+  if (options.environment !== 'production') {
+    eleventyConfig.on('eleventy.before', () => decisions.refresh());
   }
+
+  // ---- Default pages: virtual templates the consumer can take over by
+  // claiming the same permalink. The showcase (development only) rides the
+  // same lane: auto-generated pages over the resolved library — /test/sections
+  // + one page per entry (spec §9). Production builds omit the showcase
+  // entirely: a page rendering EVERY section would keep every section's CSS
+  // alive through the PurgeCSS content scan and quietly defeat §7
+  // self-trimming.
+  const frameworkPages = [
+    ...[...collectLayered([path.join(defaultsDir, 'pages')])]
+      .map(([rel, abs]) => ({ virtual: `omega-defaults/${rel}`, label: `defaults/pages/${rel}`, abs })),
+    ...(options.environment === 'production' ? [] : [...collectLayered([path.join(defaultsDir, 'showcase')])]
+      .map(([rel, abs]) => ({ virtual: `omega-defaults/showcase/${rel}`, label: `defaults/showcase/${rel}`, abs }))),
+  ].map((page) => {
+    const raw = reads.read(page.abs);
+    return { ...page, raw, url: permalinkOf(raw) };
+  });
+
+  for (const page of frameworkPages) {
+    // Registered UNCONDITIONALLY, gated at render time: suppression is a live
+    // answer now, and a template skipped at config time could only come back
+    // through a config reset.
+    eleventyConfig.addTemplate(page.virtual, page.raw, renderGate(() => !decisions.suppresses(page.url)));
+  }
+  decisions.framework(frameworkPages.filter((page) => page.url));
 
   // ---- Sample content (development only): a content-less brand still gets
   // living pages locally. Injected as virtual templates under the matching
@@ -552,29 +593,18 @@ function configureOmega(eleventyConfig, options) {
   // (tags, permalinks, taxonomy). Dates ROLL — the corpus rhythm re-anchors
   // to the build day (or the OMEGA_SAMPLE_ANCHOR / sampleAnchor pin), spec
   // §8. The FIRST consumer file in a collection — or a production build —
-  // removes that collection's samples entirely.
+  // removes that collection's samples entirely, and in dev that happens on the
+  // very next render: the gate is the live own-content answer.
   if (options.environment !== 'production') {
     const sampleAnchorMs = resolveAnchor(options.sampleAnchor);
     for (const set of SAMPLE_SETS) {
-      if (hasOwnContent(options.consumerDir, set.collectionDir)) continue;
       for (const { name, content } of generateSampleSet(defaultsDir, set, sampleAnchorMs)) {
-        eleventyConfig.addTemplate(`omega-defaults/${set.collectionDir}/${name}`, content);
+        eleventyConfig.addTemplate(
+          `omega-defaults/${set.collectionDir}/${name}`,
+          content,
+          renderGate(() => !decisions.hasOwn(set.collectionDir)),
+        );
       }
-    }
-
-    // ---- The section showcase (development only, same gate): auto-generated
-    // pages over the resolved library — /test/sections + one page per entry
-    // (spec §9). Production builds omit them entirely: a page rendering EVERY
-    // section would keep every section's CSS alive through the PurgeCSS
-    // content scan and quietly defeat §7 self-trimming.
-    for (const [rel, abs] of collectLayered([path.join(defaultsDir, 'showcase')])) {
-      const raw = fs.readFileSync(abs, 'utf8');
-      const url = permalinkOf(raw);
-      if (url && consumerUrls.has(url)) {
-        suppressed.push(url);
-        continue;
-      }
-      eleventyConfig.addTemplate(`omega-defaults/showcase/${rel}`, raw);
     }
   }
 
@@ -630,7 +660,82 @@ function configureOmega(eleventyConfig, options) {
     });
   }
 
-  return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };
+  return { site, layers, layoutMap, frontmatter, suppressed: decisions.suppressedUrls(), decisions, collectionsHolder };
+}
+
+/**
+ * The permalink every template computes — the ONE Jekyll-convention rule, so a
+ * gated virtual template (renderGate below) resolves its URL exactly like an
+ * ungated one.
+ * @param {object} data - the template's data cascade
+ * @returns {string|object|undefined} the permalink Eleventy writes to
+ */
+function jekyllPermalink(data) {
+  const inputPath = data.page.inputPath;
+  let permalink = data.permalink;
+  // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
+  // :title", with Eleventy's fileSlug stripping the dated-filename part) —
+  // but an EXPLICIT permalink in the doc's frontmatter wins, like Jekyll.
+  // '' counts as absent: Eleventy's computed dependency pass probes with
+  // an empty-string proxy, and that probe value persists into the data.
+  if (permalink === undefined || permalink === '') {
+    if (inputPath.includes('/_posts/')) permalink = `/blog/${data.page.fileSlug}`;
+    else if (inputPath.includes('/_alternatives/')) permalink = `/alternatives/${data.page.fileSlug}`;
+    else if (inputPath.includes('/_team/')) permalink = `/team/${data.page.fileSlug}`;
+    else if (inputPath.includes('/_updates/')) permalink = `/updates/${data.page.fileSlug}`;
+  }
+  // Jekyll flat URLs (legacy UJM parity): `/about` writes `about.html`,
+  // NOT `about/index.html` — site URLs carry no trailing slash. page.url
+  // stays extensionless ('/about') via configureOmega's .html-stripping
+  // urlTransform, exactly like Jekyll's page.url for extensionless permalinks.
+  // A whitelist of real output extensions, NOT path.extname — dotted slugs
+  // (`/updates/v1.0.0`) must still get their .html. Liquid-carrying
+  // permalinks (pagination/taxonomy) can't be shape-tested as raw strings —
+  // they spell their full shape explicitly (blog.md ends in `.html`) and
+  // pass through untouched.
+  const KNOWN_EXT = /\.(html|xml|txt|json|js|css|webmanifest|svg|ics|pdf)$/i;
+  if (typeof permalink === 'string' && !/[{}]/.test(permalink)
+      && !KNOWN_EXT.test(permalink) && !permalink.endsWith('/')) {
+    return `${permalink}.html`;
+  }
+  return permalink;
+}
+
+/**
+ * The render-time gate of a virtual template (#200 Lane B). The template is
+ * registered unconditionally and decides per BUILD whether it SHIPS:
+ * `permalink: false` writes no file and `eleventyExcludeFromCollections` keeps
+ * it out of every collection, so nothing downstream can see it. Eleventy
+ * computes both per build, so a decision that flips between watch rebuilds
+ * lands on the very next render with no config reset.
+ *
+ * What a shut gate does NOT do is skip the render: Eleventy still renders a
+ * `permalink: false` template and throws away the output. The cost is real —
+ * a template error inside a suppressed default page is still a fatal build
+ * error — and it is the price of the lane: a template skipped at config time
+ * could only come back through a config reset.
+ *
+ * The gate is also invisible to PAGINATED templates: Eleventy reads
+ * `eleventyExcludeFromCollections` off the raw frontmatter when it expands
+ * pagination, before any computed value exists. Every paginated default
+ * therefore spells the key in its own frontmatter (pinned by
+ * test/collections-gate.test.js).
+ * @param {function} isActive - () => boolean, asked at data time
+ * @returns {object} addTemplate data
+ */
+function renderGate(isActive) {
+  return {
+    eleventyComputed: {
+      // Open gate: the same permalink the global computed would have produced
+      // (a per-template `eleventyComputed.permalink` replaces that key).
+      permalink: (data) => (isActive() ? jekyllPermalink(data) : false),
+      // Open gate: the page's OWN frontmatter answer stands VERBATIM — `true`,
+      // the list-of-collections form, or undefined for the pages that never
+      // set it. Narrowing it to a boolean here would quietly rewrite a
+      // template's own answer into one this gate never asked about.
+      eleventyExcludeFromCollections: (data) => (isActive() ? data.eleventyExcludeFromCollections : true),
+    },
+  };
 }
 
 module.exports = { configureOmega };

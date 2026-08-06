@@ -62,6 +62,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 const yaml = require('js-yaml');
+const reads = require('@omega.js/devkit/reads');
 const { deepMerge } = require('./merge.js');
 const Logger = require('@omega.js/devkit/logger');
 
@@ -423,14 +424,18 @@ function buildSectionLibrary(options) {
     };
   };
 
+  // The walk reads through the captured-read helper (#200): this runs at
+  // CONFIG time (the library is a global data value), so every dir it probes
+  // becomes a dev config-reset target — including the entry folders a brand
+  // has not authored yet.
   const walk = (source, dir, kind, prefix) => {
     const basename = KINDS[kind].basename;
-    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+    for (const item of reads.readdir(dir, { withFileTypes: true })) {
       if (!item.isDirectory()) continue;
       const id = prefix ? `${prefix}/${item.name}` : item.name;
       if (!NAME_SHAPE.test(id)) continue;
       const entryDir = path.join(dir, item.name);
-      if (!fs.existsSync(path.join(entryDir, `${basename}.html`))) {
+      if (!reads.fileExists(path.join(entryDir, `${basename}.html`))) {
         walk(source, entryDir, kind, id);
         continue;
       }
@@ -438,9 +443,9 @@ function buildSectionLibrary(options) {
       if (entries.has(key)) continue; // a higher layer already won
       let meta = {};
       const metaPath = path.join(entryDir, `${basename}.json5`);
-      if (fs.existsSync(metaPath)) {
+      if (reads.fileExists(metaPath)) {
         try {
-          meta = JSON5.parse(fs.readFileSync(metaPath, 'utf8'));
+          meta = JSON5.parse(reads.read(metaPath));
         } catch (error) {
           warn(`showcase: unreadable ${metaPath} (${error.message}) — listing with empty meta`);
         }
@@ -453,7 +458,7 @@ function buildSectionLibrary(options) {
     const source = root === options.consumerDir ? 'consumer' : path.basename(root);
     for (const kind of Object.keys(KINDS)) {
       const dir = path.join(root, KINDS[kind].dirname);
-      if (fs.existsSync(dir)) walk(source, dir, kind, '');
+      if (reads.dirExists(dir)) walk(source, dir, kind, '');
     }
   }
 

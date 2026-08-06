@@ -53,7 +53,10 @@ async function buildConsumer(consumerDir, name, siteData = miniData) {
     },
   });
   const results = await elev.toJSON();
-  return new Map(results.map((r) => [r.url, r.content]));
+  // Only the pages that SHIP: a framework page the consumer took over is
+  // registered and gated at render time (#200 Lane B), which Eleventy reports
+  // as `url: false` — it writes no file.
+  return new Map(results.filter((r) => typeof r.url === 'string').map((r) => [r.url, r.content]));
 }
 
 /**

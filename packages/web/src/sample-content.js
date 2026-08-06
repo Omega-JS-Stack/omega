@@ -10,6 +10,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const reads = require('@omega.js/devkit/reads');
 
 // The day the sample corpus dates were authored against (spec §8 ruling,
 // Ian 2026-07-18). Anchor === epoch reproduces the authored dates exactly —
@@ -110,27 +111,38 @@ function rollFile(name, content, anchorMs, collectionDir) {
  */
 function generateSampleSet(defaultsDir, set, anchorMs) {
   const dir = path.join(defaultsDir, set.samplesDir);
-  return fs.readdirSync(dir)
+  // Through the captured-read helper (#200): configureOmega generates the sets
+  // at config time, so the corpus dir becomes a dev config-reset target. The
+  // boot-phase caller (reconcileSampleContent) runs outside a capture scope,
+  // where the same reads record nothing.
+  return reads.readdir(dir)
     .filter((name) => name.endsWith('.md'))
     .sort()
-    .map((name) => rollFile(name, fs.readFileSync(path.join(dir, name), 'utf8'), anchorMs, set.collectionDir));
+    .map((name) => rollFile(name, reads.read(path.join(dir, name)), anchorMs, set.collectionDir));
 }
 
 /**
  * Does the consumer have any file of their own in a collection dir?
  * Recursive — Jekyll-style year subfolders (_posts/2024/…) count. Dotfiles
  * don't.
+ *
+ * Reads through the captured-read helper as a RESCAN capture (#200 Lane B):
+ * the collection dirs are where the brand's real content lands, so they must
+ * never become config-reset targets — the answer is re-scanned and the sample
+ * injection gate consults it at render time. Config-time callers wrap this in
+ * `reads.rescan(...)` (src/decisions.js); the boot-phase caller
+ * (reconcileSampleContent) runs outside a capture scope and records nothing.
  * @param {string} consumerDir
  * @param {string} collectionDir - collection folder name ('_posts', '_team')
  * @returns {boolean}
  */
 function hasOwnContent(consumerDir, collectionDir) {
   const root = path.join(consumerDir, collectionDir);
-  if (!fs.existsSync(root)) return false;
+  if (!reads.dirExists(root)) return false;
   const stack = [root];
   while (stack.length) {
     const dir = stack.pop();
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of reads.readdir(dir, { withFileTypes: true })) {
       if (entry.name.startsWith('.')) continue;
       if (entry.isDirectory()) stack.push(path.join(dir, entry.name));
       else if (entry.isFile()) return true;

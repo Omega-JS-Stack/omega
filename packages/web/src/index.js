@@ -10,7 +10,7 @@ const { buildSite } = require('./build.js');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { collectLayered } = require('./layers.js');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
-const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
+const { permalinkOf } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { PATHS, resolveClientEntry } = require('./paths.js');
 const { consumerPaths, loadSiteData } = require('./consumer.js');
@@ -25,7 +25,6 @@ module.exports = {
   collectLayered,
   createFrontmatterResolver,
   permalinkOf,
-  scanConsumerPermalinks,
   registerVirtualLayouts,
   composeSymlinkFarm,
   PATHS,
