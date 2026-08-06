@@ -3,7 +3,7 @@
 // testimonial scroll). Mostly layout/animation (theme-agnostic); cosmetic
 // bits are tuned to the editorial look (framed cards, paper fade edges).
 // NOTE: this is structural behavior the inherited Classy layouts depend on —
-// see docs/themes.md "Structural vs visual components".
+// see docs/web/sections.md (the base theme owns shared structural markup).
 
 .infinite-scroll-wrapper {
   position: relative;

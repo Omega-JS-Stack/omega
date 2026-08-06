@@ -309,6 +309,10 @@ function resolveAssetThemeLayers(paths, activeTheme) {
   return resolveThemeLayers({ activeTheme, consumerDir: paths.src, themesDir: PATHS.themes });
 }
 
+// The session's server-options objects, keyed by (outDir, authPort) — why they
+// must be the IDENTICAL object on every config reset is in devServerOptions.
+const SERVER_OPTIONS = new Map();
+
 /**
  * Dev-server options: the image-variant fallback middleware (dev never runs
  * the responsive matrix — missing -NNNpx/.webp URLs rewrite to the verbatim
@@ -321,18 +325,38 @@ function resolveAssetThemeLayers(paths, activeTheme) {
  * The auth-emulator proxy goes FIRST: it owns whole URL prefixes and answers
  * them itself, so it must run before the clean-URL rewriter gets a chance to
  * treat one as a page path.
+ *
+ * ONE object per (outDir, authPort), for the life of the process (#206). The
+ * config callback runs again on every config RESET, and Eleventy decides
+ * whether to restart the dev server by `assert.deepStrictEqual`-ing the
+ * config's serverOptions against the copy it saved at boot
+ * (EleventyServe.hasOptionsChanged) — where differing FUNCTION references can
+ * only ever read as "changed". Handing back a rebuilt object therefore
+ * restarted the server (close + relisten) on every single reset, and an edit
+ * burst raced a queued build's restart against a socket the previous one had
+ * not released yet: ERR_SERVER_ALREADY_LISTEN, process dead. Nothing here
+ * varies during a session — the middleware closes over outDir and the auth
+ * port, both fixed at boot — so the cache is the whole fix: Eleventy's
+ * DeepCopy of the object shares the middleware array and its function
+ * references, and the identical object compares equal across every reset.
  * @param {string} outDir
  * @param {number} [authPort] - the auth emulator port to proxy (classic 9099)
  * @returns {object} setServerOptions() payload
  */
 function devServerOptions(outDir, authPort) {
-  return {
-    middleware: [devAuthEmulator(authPort || CLASSIC_PORTS.auth), devCleanUrls(outDir), devImageFallback(outDir)],
-    watch: [
-      path.join(outDir, 'assets', 'css'),
-      path.join(outDir, 'assets', 'js'),
-    ],
-  };
+  const key = `${outDir} ${authPort}`;
+
+  if (!SERVER_OPTIONS.has(key)) {
+    SERVER_OPTIONS.set(key, {
+      middleware: [devAuthEmulator(authPort || CLASSIC_PORTS.auth), devCleanUrls(outDir), devImageFallback(outDir)],
+      watch: [
+        path.join(outDir, 'assets', 'css'),
+        path.join(outDir, 'assets', 'js'),
+      ],
+    });
+  }
+
+  return SERVER_OPTIONS.get(key);
 }
 
 /**

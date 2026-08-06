@@ -11,7 +11,7 @@ The Classy theme is designed to be fully customizable. All theme variables use `
 > theme, and the framework's SASS `loadPaths` resolve the theme to whichever
 > `src/assets/themes/<theme.id>/_theme.scss` wins — your project's copy first,
 > then the packaged copy. You never import the theme file by path directly.
-> See [`docs/themes.md`](../../../../docs/themes.md) for the full mechanism.
+> See [`docs/shared/theming.md`](../../../../docs/shared/theming.md) for the full mechanism.
 
 ### Example: Customizing Colors in Your Project
 
@@ -36,7 +36,7 @@ In your consuming project's `src/assets/css/main.scss`:
 To customize beyond variables — change actual component styles or markup —
 **shadow the theme**: create `src/assets/themes/classy/` in your project. The
 framework's loadPaths resolve your copy before the packaged one. (To build a wholly new
-look, author a new theme instead — see `docs/themes.md`.)
+look, author a new theme instead — see `docs/shared/theming.md`.)
 
 ## Available Customizable Variables
 

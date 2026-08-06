@@ -101,7 +101,7 @@ test('mcp: the plugin declares exactly one MCP server — the router', () => {
   assert.deepEqual(mcp.mcpServers['mcp-router'], {
     type: 'stdio',
     command: 'node',
-    args: ['${CLAUDE_PLUGIN_ROOT}/../../packages/mcp-router/bin/mcp-router.js'],
+    args: ['${CLAUDE_PLUGIN_ROOT}/mcp-router-launch.js'],
   });
 });
 
