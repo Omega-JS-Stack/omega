@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.27.0] (2026-08-06)
 ### Added
-- [#207](../../issues/207) — `targets.web.collections` declares a brand's own collections: documents under `_<name>/` get contract URLs, and the engine generates the listing, pagination, and per-category pages from one themeable layout pair; a consumer page at any generated URL takes it over.
-- [#208](../../issues/208) — Generated sample content now says what it is: every sample document carries a `generated: true` marker, and a TEST pill in the warn status color renders on the post page and every blog listing row. Development only, as before — production ships neither the samples nor the badge.
-- [#209](../../issues/209) — The flows e2e lane gained four billing journeys on dedicated seeded personas: upgrade to paid, cancel with access kept until term end, a declined renewal suspending a payer, and a trial claimed then converted.
+- [#207](../../issues/207) [`e7e720f2`](../../commit/e7e720f2) Thanks [@ianwieds]! — `targets.web.collections` declares a brand's own collections: documents under `_<name>/` get contract URLs, and the engine generates the listing, pagination, and per-category pages from one themeable layout pair; a consumer page at any generated URL takes it over.
+- [#208](../../issues/208) [`e7e720f2`](../../commit/e7e720f2) Thanks [@ianwieds]! — Generated sample content now says what it is: every sample document carries a `generated: true` marker, and a TEST pill in the warn status color renders on the post page and every blog listing row. Development only, as before — production ships neither the samples nor the badge.
+- [#209](../../issues/209) [`e7e720f2`](../../commit/e7e720f2) Thanks [@ianwieds]! — The flows e2e lane gained four billing journeys on dedicated seeded personas: upgrade to paid, cancel with access kept until term end, a declined renewal suspending a payer, and a trial claimed then converted.
 
 ## [0.26.1] (2026-08-06)
 ### Added
