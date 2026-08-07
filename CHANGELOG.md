@@ -5,16 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.28.0] (2026-08-07)
 ### Added
-- [#215](../../issues/215) — The dev palette lists the four billing-journey personas for one-click sign-in, and a signed-in test account gains a "Reset to seed" button: a development-only backend route rebuilds that account (auth user, user doc, order fixtures) from its canonical seed shape.
+- [#215](../../issues/215) [`50498beb`](../../commit/50498beb) Thanks [@ianwieds]! — The dev palette lists the four billing-journey personas for one-click sign-in, and a signed-in test account gains a "Reset to seed" button: a development-only backend route rebuilds that account (auth user, user doc, order fixtures) from its canonical seed shape.
 
 ### Fixed
-- [#212](../../issues/212) — The payment routes stopped trusting the caller and the processor: cancel's `skipGuards` and the portal's `returnUrl` are privilege- and origin-checked, a suspended subscription force-cancels only on "already gone", webhook and dispute-alert deliveries claim atomically, Chargeblast alerts verify their signature, Stripe renewals reach the pipeline, and PayPal prorations derive their period.
-- [#212](../../issues/212) — The webhook pipeline recognizes Chargebee refunds and renewals, dispatches a reprocessed refund once, flags a processor API failure's fallback as stale, fails the checkout intent behind a failed webhook, reconstructs one-time test resources, reports dispute-email outcomes truthfully, and logs its silent parse failures.
-- [#210](../../issues/210) — Cancelling a test-processor subscription no longer depends on checkout metadata: the cancel processor derives the product from the order document or the seeded subscription, so emulator accounts without a live checkout cancel cleanly.
+- [#212](../../issues/212) [`50498beb`](../../commit/50498beb) Thanks [@ianwieds]! — The payment routes stopped trusting the caller and the processor: cancel's `skipGuards` and the portal's `returnUrl` are privilege- and origin-checked, a suspended subscription force-cancels only on "already gone", webhook and dispute-alert deliveries claim atomically, Chargeblast alerts verify their signature, Stripe renewals reach the pipeline, and PayPal prorations derive their period.
+- [#212](../../issues/212) [`50498beb`](../../commit/50498beb) Thanks [@ianwieds]! — The webhook pipeline recognizes Chargebee refunds and renewals, dispatches a reprocessed refund once, flags a processor API failure's fallback as stale, fails the checkout intent behind a failed webhook, reconstructs one-time test resources, reports dispute-email outcomes truthfully, and logs its silent parse failures.
+- [#210](../../issues/210) [`50498beb`](../../commit/50498beb) Thanks [@ianwieds]! — Cancelling a test-processor subscription no longer depends on checkout metadata: the cancel processor derives the product from the order document or the seeded subscription, so emulator accounts without a live checkout cancel cleanly.
 
 ### Security
-- [#213](../../issues/213) — The payments webhook verifies each processor's native signature, not just the shared key: Stripe events are checked against the raw request bytes whenever `STRIPE_WEBHOOK_SECRET` is set, and unsigned or tampered payloads get a 401. Unset, the route stays key-only and warns. PayPal, Chargebee, and `test` remain key-only.
+- [#213](../../issues/213) [`50498beb`](../../commit/50498beb) Thanks [@ianwieds]! — The payments webhook verifies each processor's native signature, not just the shared key: Stripe events are checked against the raw request bytes whenever `STRIPE_WEBHOOK_SECRET` is set, and unsigned or tampered payloads get a 401. Unset, the route stays key-only and warns. PayPal, Chargebee, and `test` remain key-only.
 
 ## [0.27.0] (2026-08-06)
 ### Added
