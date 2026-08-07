@@ -26,6 +26,14 @@
  *      OMEGA_WEBSITE_PORT, because the backend builds its checkout
  *      confirmation URLs from it and boots before the site does.
  *
+ * On top of those single flows it runs the BILLING JOURNEYS (#209): the paid
+ * lifecycle a brand's money actually moves through — upgrade, cancel, a
+ * declined renewal, a trial converting — each on its OWN dedicated seeded
+ * persona, so no journey can inherit another's subscription state. It also
+ * talks to the emulator's Firestore directly (firebase-admin, host-side
+ * only): reading the processor ids a journey's webhook needs, and writing the
+ * purchase records persona seeding cannot.
+ *
  * The browser is headless and refuses every host but the local stack and the
  * provider flow's irreducible externals (AUTH_FLOW_HOSTS), so ad and analytics
  * scripts never load and the vert ladder runs the same everywhere. Every
@@ -37,6 +45,7 @@ const path = require('path');
 const fs = require('fs');
 const net = require('net');
 const { spawn } = require('child_process');
+const { createRequire } = require('module');
 const assert = require('assert');
 
 if (process.env.OMEGA_SKIP_E2E === '1') {
@@ -50,8 +59,16 @@ const PLAYGROUND_WEBSITE = path.join(ROOT, 'apps', 'omega-playground', 'apps', '
 const LOG_DIR = path.join(ROOT, '.temp', 'flows-e2e');
 const SHOT_DIR = path.join(LOG_DIR, 'screenshots');
 
-const { CLASSIC_PORTS, readPortsFile, resolvePorts, composeTargetConfig } = require('@omega.js/config');
+const { CLASSIC_PORTS, readPortsFile, resolvePorts, composeTargetConfig, loadEnv } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
+
+// The billing journeys hand-build the processor webhooks no UI can produce (a
+// declined renewal, a trial converting), and the webhook route authenticates
+// them with the SAME shared key the backend's own test processor uses — it
+// lives in the brand's .env cascade, never in this file. Loaded inside main()
+// AFTER the children's environment is snapshotted: loadEnv mutates this
+// process's env, and the children resolve their own cascade already.
+let WEBHOOK_KEY = null;
 
 const EMULATOR_READY_TIMEOUT = 300000;
 const DEV_READY_TIMEOUT = 300000;
@@ -66,14 +83,35 @@ const CLASSIC_HOLD_PORTS = [...new Set([...Object.values(CLASSIC_PORTS), 4443, 5
 // Seeded personas (@omega.js/backend's test-accounts.js — every persona shares
 // the deterministic password, and the domain comes from the brand's contact
 // email). One persona per area, so no area's writes can perturb another's.
-const { TEST_ACCOUNT_PASSWORD: PASSWORD } = require('@omega.js/backend/src/test/test-accounts.js');
+const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS } = require('@omega.js/backend/src/test/test-accounts.js');
 const PERSONA_IDS = {
   password: '_test.basic',
   checkout: '_test.premium-expired',
   account: '_test.premium-active',
   googleOne: '_test.google.one',
   googleTwo: '_test.google.two',
+  // One DEDICATED persona per billing journey (#209) — never shared with
+  // another journey, so no journey inherits another's subscription state.
+  journeyUpgrade: '_test.journey-flows-upgrade',
+  journeyCancel: '_test.journey-flows-cancel',
+  journeyFailure: '_test.journey-flows-failure',
+  journeyTrial: '_test.journey-flows-trial',
 };
+
+/**
+ * A journey persona's own seed definition. The lane reads uids and seeded
+ * payment ids straight off test-accounts.js — the seeder's SSOT — so a
+ * renamed persona breaks loudly here instead of silently missing its account.
+ * @param {string} key - the test-accounts.js account key
+ * @returns {object} the account definition ({ id, uid, email, properties })
+ */
+function personaSeed(key) {
+  const account = TEST_ACCOUNTS[key];
+  if (!account) {
+    throw new Error(`no seeded persona named ${key} — test-accounts.js and this lane have drifted`);
+  }
+  return account;
+}
 
 // The only hosts a page may reach. Everything else — ad scripts, analytics,
 // avatar services, CDNs — is refused, which is what keeps the vert ladder and
@@ -430,9 +468,16 @@ async function waitForLanding(page, timeout = 60000) {
 /**
  * The account page's rendered account state — the live half of the
  * signed-in policy contract (bindings fed from the emulator's user doc).
+ * The two alert flags are the journeys' only way to tell a cancelling or
+ * trialing subscription apart: web core's billing.js renders BOTH of those as
+ * the plain "Active" status label, so plan + status alone cannot see them. A
+ * `@show` binding toggles the `hidden` attribute, so visibility is read off
+ * the attribute — the billing SECTION itself is display-hidden until it is
+ * navigated to, which no journey needs to do.
+ *
  * @param {object} page - puppeteer page
  * @param {string} siteUrl - the dev site origin
- * @returns {Promise<object>} { url, email, plan, status }
+ * @returns {Promise<object>} { url, email, plan, status, cancelling, trialing }
  */
 async function readAccountPage(page, siteUrl) {
   await page.goto(`${siteUrl}/dashboard/account`, { waitUntil: 'networkidle2' });
@@ -444,18 +489,116 @@ async function readAccountPage(page, siteUrl) {
     { timeout: 60000 },
   ).catch(() => {});
 
-  return page.evaluate(() => ({
-    url: window.location.href,
-    email: document.querySelector('[data-omega-bind="@text auth.user.email"]')?.textContent.trim() || null,
-    plan: document.querySelector('[data-omega-bind="@text billing.plan.name"]')?.textContent.trim() || null,
-    status: document.querySelector('[data-omega-bind="@text billing.status.label"]')?.textContent.trim() || null,
-  }));
+  return page.evaluate(() => {
+    const shown = (binding) => {
+      const element = document.querySelector(`[data-omega-bind="@show ${binding}"]`);
+      return !!element && !element.hasAttribute('hidden');
+    };
+
+    return {
+      url: window.location.href,
+      email: document.querySelector('[data-omega-bind="@text auth.user.email"]')?.textContent.trim() || null,
+      plan: document.querySelector('[data-omega-bind="@text billing.plan.name"]')?.textContent.trim() || null,
+      status: document.querySelector('[data-omega-bind="@text billing.status.label"]')?.textContent.trim() || null,
+      cancelling: shown('billing.alerts.cancelling'),
+      trialing: shown('billing.alerts.trialing'),
+    };
+  });
+}
+
+/**
+ * Re-read the account page until its rendered billing state agrees with
+ * `predicate`. Every billing journey ends on an ASYNCHRONOUS pipeline
+ * (processor webhook → Firestore trigger → the page's auth listener), so a
+ * journey's verdict is the first render that agrees — not the first render.
+ * @param {object} page - puppeteer page
+ * @param {string} siteUrl - the dev site origin
+ * @param {Function} predicate - receives the readAccountPage result
+ * @param {string} wanted - what the predicate is waiting for (error text)
+ * @returns {Promise<object>} the agreeing account state
+ */
+async function waitForAccountState(page, siteUrl, predicate, wanted) {
+  const deadline = Date.now() + 120000;
+  let account = null;
+
+  while (Date.now() < deadline) {
+    account = await readAccountPage(page, siteUrl);
+    if (predicate(account)) {
+      return account;
+    }
+    await sleep(3000);
+  }
+
+  throw new Error(`the account page never showed ${wanted} (last: ${JSON.stringify(account)})`);
+}
+
+/**
+ * Sign a persona in through the REAL /signin form. Every billing journey
+ * opens this way — a journey that reached its account through the SDK would
+ * not be the path a customer takes to it.
+ * @param {object} page - puppeteer page
+ * @param {string} siteUrl - the dev site origin
+ * @param {string} email - the seeded persona's email
+ */
+async function signInWithPassword(page, siteUrl, email) {
+  await page.goto(`${siteUrl}/signin`, { waitUntil: 'networkidle2' });
+  await waitForAuthForm(page);
+  await page.type('#email', email);
+  await page.type('#password', PASSWORD);
+  await clickElement(page, 'button[data-provider="email"]:not(.d-none)');
+  await waitForLanding(page);
+}
+
+/**
+ * Buy a plan on the TEST card processor and wait for the confirmation
+ * surface. `params` carries the journey's own checkout knobs on top of the
+ * monthly test-card defaults (the trial journey forces its own eligibility).
+ * @param {object} page - puppeteer page
+ * @param {string} siteUrl - the dev site origin
+ * @param {object} params - extra checkout query params (must include product)
+ * @returns {Promise<string>} the orderId the confirmation URL carries
+ */
+async function payWithTestCard(page, siteUrl, params) {
+  const query = new URLSearchParams({ frequency: 'monthly', _dev_cardProcessor: 'test', ...params });
+  await page.goto(`${siteUrl}/payment/checkout?${query}`, { waitUntil: 'networkidle2' });
+  await page.waitForSelector('#checkout-form[data-form-state="ready"]', { timeout: 60000 });
+  await clickElement(page, '#checkout-form button[data-payment-method="card"]:not([hidden])');
+  await page.waitForFunction(
+    () => window.location.pathname.startsWith('/payment/confirmation'),
+    { timeout: 90000 },
+  );
+
+  const orderId = new URL(page.url()).searchParams.get('orderId');
+  if (!orderId) {
+    throw new Error(`the confirmation URL carried no orderId (${page.url()})`);
+  }
+  return orderId;
+}
+
+/**
+ * POST a hand-built processor webhook at the backend exactly as a processor
+ * would. Two of the four journeys' end states — a declined renewal, a trial
+ * converting — have NO user-facing surface that can produce them; a webhook
+ * is the only way they ever arrive, in production or here.
+ * @param {string} apiUrl - the emulator's hosting origin (rewrites /omega/**)
+ * @param {object} event - the Stripe-shaped event body
+ */
+async function postTestWebhook(apiUrl, event) {
+  const response = await fetch(`${apiUrl}/omega/payments/webhook?processor=test&key=${WEBHOOK_KEY}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+
+  if (!response.ok) {
+    throw new Error(`the ${event.type} webhook was refused (${response.status}: ${(await response.text()).slice(0, 200)})`);
+  }
 }
 
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('\nUser-flows e2e (real Chromium: auth, checkout, verts, account)\n');
+  console.log('\nUser-flows e2e (real Chromium: auth, checkout, verts, account, billing journeys)\n');
 
   let puppeteer = null;
   try {
@@ -478,6 +621,12 @@ async function main() {
   }
   const persona = (id) => `${PERSONA_IDS[id]}@${personaDomain}`;
   const brandId = backendConfig.brand?.id;
+  // The billing journeys' paid tier — the same product the checkout area buys
+  const paidProduct = (backendConfig.payment?.products || []).find((product) => product.id === 'premium');
+  // The id a processor puts on the plan. Brands with no real Stripe product
+  // carry the `_test_<id>` sentinel the resolver maps back (see the backend's
+  // test intent processor) — either way the pipeline resolves the same plan.
+  const planProductId = paidProduct?.stripe?.productId || `_test_${paidProduct?.id}`;
 
   let hold = null;
   let emulator = null;
@@ -495,6 +644,8 @@ async function main() {
 
     let sitePort = null;
     let siteUrl = null;
+    let apiUrl = null;
+    let firestorePort = null;
 
     await step('the classic ports are held so the stack boots beside a live dev', async () => {
       hold = await holdClassicPorts();
@@ -509,6 +660,14 @@ async function main() {
 
     const childEnv = { ...process.env, OMEGA_WEBSITE_PORT: String(sitePort) };
 
+    // Only NOW: the children carry the environment they always did, and this
+    // process gains the brand's secrets the billing journeys need.
+    loadEnv(PLAYGROUND_BACKEND);
+    WEBHOOK_KEY = process.env.OMEGA_WEBHOOK_KEY;
+    if (!WEBHOOK_KEY) {
+      throw new Error('OMEGA_WEBHOOK_KEY is missing from the playground backend\'s .env cascade — the billing journeys cannot post their webhooks');
+    }
+
     await step('the Paperloom emulator boots + personas seed', async () => {
       emulator = startChild({
         bin: path.join(ROOT, 'node_modules', '.bin', 'mgr'),
@@ -521,10 +680,14 @@ async function main() {
       });
       await emulator.ready;
       const ports = readPortsFile(PLAYGROUND_BACKEND);
-      if (!ports?.auth || !ports?.hosting) {
+      if (!ports?.auth || !ports?.hosting || !ports?.firestore) {
         throw new Error(`resolved port map incomplete: ${JSON.stringify(ports)}`);
       }
       assert.notEqual(ports.auth, CLASSIC_PORTS.auth, 'the emulator must not take the classic auth port');
+      // Hosting rewrites /omega/** at the api function — the origin the
+      // billing journeys post their processor webhooks to.
+      apiUrl = `http://127.0.0.1:${ports.hosting}`;
+      firestorePort = ports.firestore;
       return `auth :${ports.auth}, hosting :${ports.hosting}, functions :${ports.functions}`;
     });
 
@@ -894,13 +1057,294 @@ async function main() {
       assert.equal(account.email, persona('account'), `the account page should show the persona (got ${account.email})`);
       // The seeded persona holds an active paid subscription — the plan name
       // comes from the BRAND's product catalog, resolved through the user doc
-      const paidProduct = (backendConfig.payment?.products || []).find((product) => product.id === 'premium');
       assert.equal(account.plan, paidProduct?.name, `the plan should resolve from the emulator's user doc (got ${account.plan})`);
       assert.match(account.status || '', /active/i, `the subscription status should render (got ${account.status})`);
       return `${account.email} · ${account.plan} · ${account.status}`;
     });
 
     await accountPage.close();
+
+    // ---- Area 5: billing journeys -----------------------------------------
+    //
+    // One paid-lifecycle JOURNEY per DEDICATED persona (#209): upgrade,
+    // cancel, a declined renewal, a trial converting. Each runs on its own
+    // seeded `journey-flows-*` account, so no journey can inherit another's
+    // subscription state, and each verdict is read off the RENDERED account
+    // page — the surface a customer judges their plan by.
+    //
+    // Two of the four end states have no UI that reaches them: a renewal is
+    // declined, and a trial ends, on the PROCESSOR's clock. Those legs post a
+    // hand-built test webhook at the backend exactly as a processor would —
+    // the same shape @omega.js/backend's own payment journeys send.
+
+    console.log('\n  Billing journeys');
+
+    let db = null;
+
+    await step('the seeded personas\' purchase records stand beside their subscriptions', async () => {
+      assert.ok(paidProduct, 'the brand catalog must carry the `premium` plan the journeys buy');
+
+      // firebase-admin from the backend app's own resolution, pointed at the
+      // emulator. Setting the host here only affects THIS process — both
+      // children were spawned with their environment already snapshotted.
+      process.env.FIRESTORE_EMULATOR_HOST = `127.0.0.1:${firestorePort}`;
+      const backendRequire = createRequire(path.join(PLAYGROUND_BACKEND, 'package.json'));
+      const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
+      const projectId = firebaserc.projects.default;
+
+      const admin = backendRequire('firebase-admin');
+      if (admin.apps.length === 0) {
+        admin.initializeApp({ projectId });
+      }
+      db = admin.firestore();
+
+      // Persona seeding writes user docs and NOTHING else, so a seeded
+      // subscription arrives without the payments-orders record every real
+      // purchase leaves behind — and two backend surfaces read exactly that
+      // record. The rest of the record is the pipeline's to write.
+      const seedOrder = (key, status) => {
+        const seed = personaSeed(key);
+        const payment = seed.properties.subscription.payment;
+
+        return db.doc(`payments-orders/${payment.orderId}`).set({
+          id: payment.orderId,
+          type: 'subscription',
+          owner: seed.uid,
+          productId: paidProduct.id,
+          processor: payment.processor,
+          resourceId: payment.resourceId,
+          unified: { product: { id: paidProduct.id, name: paidProduct.name }, status },
+        }, { merge: true });
+      };
+
+      // Surface 1 — the test cancel processor reads the plan's processor
+      // product id off the LIVE order. Without it the cancellation webhook
+      // would name no plan and the pipeline would resolve the persona down to
+      // Basic mid-cancel, which is not what cancelling does.
+      await seedOrder('journey-flows-cancel', 'active');
+      // Surface 2 — trial eligibility (and the intent route's own downgrade
+      // guard) call ANY prior subscription order disqualifying, per owner.
+      // These LAPSED records' only job is to exist: they are what keep the two
+      // journeys that BUY the plan off the 14-day trial, so each one proves
+      // what its name claims — a direct purchase, and a payer's renewal being
+      // declined — instead of quietly re-running the trial journey.
+      await seedOrder('journey-flows-upgrade', 'cancelled');
+      await seedOrder('journey-flows-failure', 'cancelled');
+
+      return `3 orders → ${paidProduct.id} (project ${projectId})`;
+    });
+
+    await step('JOURNEY upgrade: a free persona pays and lands on the paid plan', async () => {
+      const upgradePage = await newPage(browser, 'journey-upgrade', consoleLog);
+      activePage = upgradePage;
+
+      await signInWithPassword(upgradePage, siteUrl, persona('journeyUpgrade'));
+
+      const before = await readAccountPage(upgradePage, siteUrl);
+      assert.equal(before.email, persona('journeyUpgrade'), `the journey should run on its own persona (got ${before.email})`);
+      assert.match(before.status || '', /free/i, `the persona should start unpaid (got ${before.status})`);
+
+      // No `_dev_trialEligible` knob: this persona's LAPSED purchase record
+      // makes the server refuse it a trial on its own, so what this journey
+      // drives is the direct paid path — the one the trial journey is not.
+      await payWithTestCard(upgradePage, siteUrl, { product: paidProduct.id });
+
+      const account = await waitForAccountState(
+        upgradePage,
+        siteUrl,
+        (state) => state.plan === paidProduct.name && /active/i.test(state.status || ''),
+        `${paidProduct.name} · Active`,
+      );
+      assert.equal(account.cancelling, false, 'a fresh purchase is not cancelling');
+      assert.equal(account.trialing, false, 'a paid purchase is not a trial');
+
+      await upgradePage.close();
+      activePage = null;
+      return `${before.status} → ${account.plan} · ${account.status}`;
+    });
+
+    await step('JOURNEY cancel: a paid persona cancels and keeps access until the term ends', async () => {
+      const cancelPage = await newPage(browser, 'journey-cancel', consoleLog);
+      activePage = cancelPage;
+
+      await signInWithPassword(cancelPage, siteUrl, persona('journeyCancel'));
+
+      const before = await readAccountPage(cancelPage, siteUrl);
+      assert.equal(before.plan, paidProduct.name, `the persona should start on the paid plan (got ${before.plan})`);
+      assert.equal(before.cancelling, false, 'nothing should be scheduled to cancel before the journey runs');
+
+      // The REAL cancel surface: the account page's accordion form, its
+      // required confirmation, and the POST /omega/payments/cancel behind it.
+      await cancelPage.waitForSelector('#cancel-subscription-form[data-form-state="ready"]', { timeout: 60000 });
+      await clickElement(cancelPage, '#cancel-confirm-checkbox');
+      await clickElement(cancelPage, '#cancel-subscription-btn');
+      // `submitted` is the form's ACCEPTED state (the form disallows resubmit);
+      // a refused cancel drops back to `ready` with the error on it. The
+      // success copy itself is a toast that dismisses, so the state is what
+      // can be waited on.
+      await cancelPage.waitForSelector('#cancel-subscription-form[data-form-state="submitted"]', { timeout: 60000 });
+
+      // Cancelling is not losing the plan: web core renders a cancelling
+      // subscription as plain "Active" and says so in the alert, so the ALERT
+      // is the only thing that can tell the two apart.
+      const account = await waitForAccountState(
+        cancelPage,
+        siteUrl,
+        (state) => state.cancelling,
+        'the cancellation-scheduled alert',
+      );
+      assert.equal(account.plan, paidProduct.name, `access continues on the paid plan until the term ends (got ${account.plan})`);
+      assert.match(account.status || '', /active/i, `a cancelling subscription still reads active (got ${account.status})`);
+
+      await cancelPage.close();
+      activePage = null;
+      return `${account.plan} · ${account.status} · cancellation scheduled`;
+    });
+
+    await step('JOURNEY payment failure: a declined renewal suspends the persona', async () => {
+      const failurePage = await newPage(browser, 'journey-failure', consoleLog);
+      activePage = failurePage;
+
+      await signInWithPassword(failurePage, siteUrl, persona('journeyFailure'));
+      // Like the upgrade persona, this one's LAPSED purchase record makes the
+      // server refuse it a trial — a renewal can only be declined for someone
+      // who is actually paying.
+      const orderId = await payWithTestCard(failurePage, siteUrl, { product: paidProduct.id });
+
+      const paid = await waitForAccountState(
+        failurePage,
+        siteUrl,
+        (state) => state.plan === paidProduct.name && /active/i.test(state.status || ''),
+        `${paidProduct.name} · Active`,
+      );
+      assert.equal(paid.trialing, false, 'the renewal being declined must belong to a payer, not a trial');
+
+      // A month later the renewal charge is declined. Nothing a user can
+      // drive produces that — the processor's invoice event is the only door.
+      // Reading the subscription id only AFTER the page showed the purchase
+      // matters: the seed carries a lapsed subscription id of its own, and
+      // the purchase overwrites it in the same write that flipped the plan.
+      const seed = personaSeed('journey-flows-failure');
+      const userDoc = await db.doc(`users/${seed.uid}`).get();
+      const resourceId = userDoc.data()?.subscription?.payment?.resourceId;
+      assert.ok(resourceId, 'the purchase should have left a processor subscription id on the user doc');
+
+      await postTestWebhook(apiUrl, {
+        id: `_test-evt-flows-failure-${Date.now()}`,
+        type: 'invoice.payment_failed',
+        data: {
+          object: {
+            id: `in_test_flows_failure_${Date.now()}`,
+            object: 'invoice',
+            billing_reason: 'subscription_cycle',
+            amount_due: 999,
+            amount_paid: 0,
+            status: 'open',
+            parent: {
+              type: 'subscription_details',
+              subscription_details: {
+                subscription: resourceId,
+                metadata: { uid: seed.uid, orderId: orderId },
+              },
+            },
+          },
+        },
+      });
+
+      const account = await waitForAccountState(
+        failurePage,
+        siteUrl,
+        (state) => /suspended/i.test(state.status || ''),
+        'Suspended',
+      );
+      assert.equal(account.plan, paidProduct.name, `a suspended subscription keeps its plan on the page (got ${account.plan})`);
+
+      await failurePage.close();
+      activePage = null;
+      return `${paid.status} → ${account.status}`;
+    });
+
+    // The trial is TWO journeys' worth of state on one persona — claiming it,
+    // then the processor converting it — so it keeps one page across both.
+    const trialPage = await newPage(browser, 'journey-trial', consoleLog);
+    let trialOrderId = null;
+    let trialResourceId = null;
+
+    await step('JOURNEY trial: a trial checkout lands the persona trialing', async () => {
+      activePage = trialPage;
+
+      await signInWithPassword(trialPage, siteUrl, persona('journeyTrial'));
+      // `_dev_trialEligible=true` is checkout's own dev override — the server
+      // still refuses a trial to anyone with subscription history, so this
+      // persona's first purchase is the only reason it lands one.
+      trialOrderId = await payWithTestCard(trialPage, siteUrl, { product: paidProduct.id, _dev_trialEligible: 'true' });
+
+      const account = await waitForAccountState(
+        trialPage,
+        siteUrl,
+        (state) => state.trialing,
+        'the free-trial alert',
+      );
+      assert.equal(account.plan, paidProduct.name, `a trial runs on the paid plan (got ${account.plan})`);
+      assert.match(account.status || '', /active/i, `a trialing subscription reads active (got ${account.status})`);
+      assert.equal(account.cancelling, false, 'a fresh trial is not cancelling');
+
+      const seed = personaSeed('journey-flows-trial');
+      const subscription = (await db.doc(`users/${seed.uid}`).get()).data()?.subscription;
+      assert.equal(subscription?.trial?.claimed, true, 'the trial should be claimed on the user doc');
+      trialResourceId = subscription?.payment?.resourceId;
+
+      return `${account.plan} · ${account.status} · trialing`;
+    });
+
+    await step('JOURNEY trial: the trial converts and the persona keeps the plan as a payer', async () => {
+      activePage = trialPage;
+      assert.ok(trialResourceId, 'the trial leg must have left a processor subscription id to convert');
+
+      const seed = personaSeed('journey-flows-trial');
+      const nowUNIX = Math.floor(Date.now() / 1000);
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      // The trial ending is the processor's clock: it converts by updating
+      // the subscription with its trial window now CLOSED. Same status, same
+      // product — what changes is that the customer is paying.
+      await postTestWebhook(apiUrl, {
+        id: `_test-evt-flows-trial-converted-${Date.now()}`,
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: trialResourceId,
+            object: 'subscription',
+            status: 'active',
+            metadata: { uid: seed.uid, orderId: trialOrderId },
+            cancel_at_period_end: false,
+            cancel_at: null,
+            canceled_at: null,
+            current_period_end: Math.floor(periodEnd.getTime() / 1000),
+            current_period_start: nowUNIX,
+            start_date: nowUNIX - (86400 * 14),
+            trial_start: nowUNIX - (86400 * 14),
+            trial_end: nowUNIX,
+            plan: { product: planProductId, interval: 'month' },
+          },
+        },
+      });
+
+      const account = await waitForAccountState(
+        trialPage,
+        siteUrl,
+        (state) => state.plan === paidProduct.name && !state.trialing,
+        `${paidProduct.name} with the trial alert gone`,
+      );
+      assert.match(account.status || '', /active/i, `the converted subscription reads active (got ${account.status})`);
+      assert.equal(account.cancelling, false, 'converting is not cancelling');
+
+      await trialPage.close();
+      activePage = null;
+      return `trialing → ${account.plan} · ${account.status}`;
+    });
+
     activePage = null;
   } catch (error) {
     failures.push({ name: 'harness', error });

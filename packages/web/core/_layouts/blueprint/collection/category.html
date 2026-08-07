@@ -1,0 +1,13 @@
+---
+layout: frontend/pages/collection/category
+
+# One page per category of a brand's own collection (#207). The term rides the
+# page's `category` pagination alias, so the meta reads it through `resolved`
+# — one page per term, one title per term.
+meta:
+  title: "{{ resolved.category.name }} - {{ resolved.collection.title }} - {{ site.brand.name }}"
+  description: "{{ resolved.collection.description }}"
+  breadcrumb: "{{ resolved.category.name }}"
+---
+
+{{ content | omega_content_format }}

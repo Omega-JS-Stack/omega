@@ -593,6 +593,106 @@ const JOURNEY_ACCOUNTS = {
       personal: { name: { first: 'Lifecycle', last: 'Sync' } },
     },
   },
+  // Flows-lane billing journeys (#209): the root `npm run test:flows` lane
+  // drives a REAL browser through upgrade, cancel, a declined renewal, and a
+  // trial. Ian's rule is one DEDICATED persona per journey — shared with no
+  // other journey and no other lane — so no journey can inherit another's
+  // subscription state. They are their own personas rather than the
+  // same-named `journey-payments-*` ones for exactly that reason (and because
+  // the cancel journey needs a paid start, which the payments cancel journey
+  // must NOT have — it buys its own subscription first).
+  //
+  // Unlike every other journey account these are seeded as ESTABLISHED users
+  // (signup-processed, legal consent granted, like the static personas): the
+  // frontend consent guard signs a processed-but-unconsented doc out on its
+  // NEXT page load, and a browser journey spans several loads.
+  //
+  // Trial-INELIGIBLE by design: this journey proves the DIRECT paid path, so
+  // it must never be handed the 14-day trial the trial journey exists to
+  // cover. Eligibility is NOT read off this doc — /payments/trial-eligibility
+  // and the intent route's own downgrade guard both run the SAME query
+  // (payments-orders where owner == uid and type == 'subscription'), so the
+  // flows lane stands `orderId` up as a lapsed purchase record beside this
+  // seed. The doc carries the matching story: it subscribed two years ago,
+  // the term ran out a year ago, and it is back on basic — the shape the
+  // cancel route itself writes when it resets a dead subscription.
+  'journey-flows-upgrade': {
+    id: 'journey-flows-upgrade',
+    uid: '_test-journey-flows-upgrade',
+    email: '_test.journey-flows-upgrade@{domain}',
+    properties: {
+      roles: {},
+      subscription: {
+        product: { id: 'basic' },
+        status: 'cancelled',
+        expires: getPastExpires(),
+        cancellation: { pending: false },
+        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_upgrade', orderId: '_test-order-journey-flows-upgrade', startDate: getPastExpires(2) },
+      },
+      personal: { name: { first: 'Jules', last: 'Upgrade' } },
+      flags: { signupProcessed: true },
+      consent: seededConsent(),
+    },
+  },
+  // The one journey that starts PAID: a cancellation needs something to
+  // cancel, and the cancel route requires an active paid subscription with
+  // processor details that is older than 24 hours (its age guard), so the
+  // start state is seeded rather than bought. `orderId` names the purchase
+  // record the flows lane stands up beside this doc — the test cancel
+  // processor reads the plan's processor product id off that order.
+  'journey-flows-cancel': {
+    id: 'journey-flows-cancel',
+    uid: '_test-journey-flows-cancel',
+    email: '_test.journey-flows-cancel@{domain}',
+    properties: {
+      roles: {},
+      subscription: {
+        product: { id: 'premium' },
+        status: 'active',
+        expires: getFutureExpires(),
+        cancellation: { pending: false },
+        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_cancel', orderId: '_test-order-journey-flows-cancel', startDate: getPastExpires() },
+      },
+      personal: { name: { first: 'Kit', last: 'Cancel' } },
+      flags: { signupProcessed: true },
+      consent: seededConsent(),
+    },
+  },
+  // Trial-INELIGIBLE for the same reason, and by the same means: a declined
+  // RENEWAL is a PAYER's event, so this journey's checkout has to land a paid
+  // subscription rather than the 14-day trial a pristine account is offered.
+  // Same lapsed-history shape as the upgrade persona, with its own order
+  // record — the eligibility query is per-owner.
+  'journey-flows-failure': {
+    id: 'journey-flows-failure',
+    uid: '_test-journey-flows-failure',
+    email: '_test.journey-flows-failure@{domain}',
+    properties: {
+      roles: {},
+      subscription: {
+        product: { id: 'basic' },
+        status: 'cancelled',
+        expires: getPastExpires(),
+        cancellation: { pending: false },
+        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_failure', orderId: '_test-order-journey-flows-failure', startDate: getPastExpires(2) },
+      },
+      personal: { name: { first: 'Robin', last: 'Failure' } },
+      flags: { signupProcessed: true },
+      consent: seededConsent(),
+    },
+  },
+  'journey-flows-trial': {
+    id: 'journey-flows-trial',
+    uid: '_test-journey-flows-trial',
+    email: '_test.journey-flows-trial@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Quinn', last: 'Trial' } },
+      flags: { signupProcessed: true },
+      consent: seededConsent(),
+    },
+  },
 };
 
 /**

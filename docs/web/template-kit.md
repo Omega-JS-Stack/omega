@@ -99,8 +99,10 @@ registerLiquid(new Liquid({ jekyllInclude: true }), {
 config (machinery keys `targets`/`enabled` stripped; `url` derived from
 `brand.url` unless explicit; `baseurl` defaulted) — the site.* audit showed
 the resolved omega.json5 shape IS the template shape. Engine-owned keys
-(`site.posts`, `site.pages`, `site.data`, `site.time`, `site.collections`)
-are the SSG's responsibility.
+(`site.posts`, `site.pages`, `site.data`, `site.time`) are the SSG's
+responsibility. `site.collections` is not among them ([#207](https://github.com/Omega-JS-Stack/omega/issues/207)):
+it carries the `targets.web.collections` DECLARATION through the identity
+mapping, and the engine reads it to generate each declared collection's pages.
 
 ## What is deliberately NOT here
 

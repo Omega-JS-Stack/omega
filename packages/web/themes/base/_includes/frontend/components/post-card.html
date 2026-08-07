@@ -34,6 +34,12 @@
       <a href="{{ _p.url }}">{{ _p.post.title }}</a>
     </h3>
 
+    {% comment %} Generated-content tell (#208): sample content renders on the
+      real posts lane, so every listing row of a `generated` document says so.
+      Keyed off the frontmatter flag ALONE — no environment check, because
+      samples never inject into a production build. {% endcomment %}
+    {% if _p.generated %}<span class="omega-generated-badge">TEST</span>{% endif %}
+
     {%- capture _excerpt -%}{{ _p.post.description }}{%- endcapture -%}
     {%- assign _excerpt = _excerpt | strip -%}
     {%- if _excerpt == '' -%}

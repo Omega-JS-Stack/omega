@@ -1,0 +1,80 @@
+---
+layout: frontend/core/base
+
+# ═══ The listing page of a brand's own collection (#207). Every value comes
+# from targets.web.collections.<name> through the generated page's
+# `collection` block, so ONE layout serves docs, guides, recipes, portfolios.
+
+collection_empty: "Nothing here yet. The first entry will land right on this page."
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    {% component "heading/masthead", headline: resolved.collection.title, sub: resolved.collection.description %}
+
+    {% comment %} Category rail — the collection's own taxonomy, one link per term {% endcomment %}
+    {% assign terms = collections[resolved.collection.taxonomy] %}
+    {% if terms and terms.size > 0 %}
+      <nav class="omega-tabs mt-5" aria-label="{{ resolved.collection.title }} categories" data-omega-reveal>
+        <a href="{{ resolved.collection.base }}" class="active">All</a>
+        {% for term in terms %}
+          <a href="{{ resolved.collection.base }}/categories/{{ term.slug }}">{{ term.name }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═══ The documents on this page ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8">
+        {% if paginator.posts.size > 0 %}
+          <div class="omega-rowlist" data-omega-reveal-stagger="50">
+            {% for item in paginator.posts %}
+              {% comment %} A document keeps its own fields under the namespace of the
+              configured category field (doc.category → doc.title); a bare `title`
+              is the flat spelling. {% endcomment %}
+              {% assign entry = item[resolved.collection.namespace] %}
+              <a href="{{ item.url }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
+                <span>{{ entry.title | default: item.title | default: item.url }}</span>
+                <span class="omega-rowlist__meta">
+                  {{ entry.description | default: item.description }}
+                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                </span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="omega-status-empty" data-omega-reveal>
+            <span class="omega-dot"></span>
+            <span>{{ resolved.collection_empty }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Pagination — the paths come from the paginator, which is the one home of the URL shape -->
+    {% if paginator.total_pages > 1 %}
+      <nav aria-label="{{ resolved.collection.title }} pagination" class="d-flex justify-content-center align-items-center gap-3 mt-5" data-omega-reveal>
+        {% if paginator.previous_page_path %}
+          <a class="btn btn-outline-adaptive btn-sm omega-hover-nudge" href="{{ paginator.previous_page_path }}">
+            {% omega_icon "chevron-left", "fa-xs me-2" %}
+            Previous
+          </a>
+        {% endif %}
+        <span class="omega-quiet small">Page {{ paginator.page }} of {{ paginator.total_pages }}</span>
+        {% if paginator.next_page_path %}
+          <a class="btn btn-outline-adaptive btn-sm omega-hover-nudge" href="{{ paginator.next_page_path }}">
+            Next
+            {% omega_icon "chevron-right", "fa-xs ms-2" %}
+          </a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  </div>
+</section>
+
+{{ content | omega_content_format }}

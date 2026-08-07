@@ -35,6 +35,20 @@ const COLLECTIONS = {
 // collection is ever named `randomize`.
 const RANDOMIZE_KEY = 'randomize';
 
+/**
+ * The samplable collections: the engine's own, plus the brand's declared ones
+ * (#207), whose documents live in `_<name>/` and list URL-ascending.
+ * @param {Array<object>} [collections] - the brand's collections (readCollections' output)
+ * @returns {object} collection name → { dir, newestFirst }
+ */
+function samplable(collections) {
+  const map = { ...COLLECTIONS };
+  for (const collection of collections || []) {
+    map[collection.name] = { dir: collection.dir, newestFirst: false };
+  }
+  return map;
+}
+
 // The template extensions the engine's collection lanes render.
 const DOCUMENT_EXT = /\.(md|html|liquid)$/;
 
@@ -43,10 +57,11 @@ const DOCUMENT_EXT = /\.(md|html|liquid)$/;
  * an ERROR, not a warning: an unlimited collection is indistinguishable from
  * a working config until someone counts the pages.
  * @param {object} [config] - the raw dev.limitCollections value
+ * @param {Array<object>} [collections] - the brand's own collections (readCollections' output)
  * @returns {{ entries: Array<{ name: string, limit: number }>, randomize: boolean }|null} null when unset
  * @throws {Error} on an unknown collection name, a non-positive limit, or a non-boolean randomize
  */
-function readLimits(config) {
+function readLimits(config, collections) {
   if (config === undefined || config === null) return null;
 
   if (typeof config !== 'object' || Array.isArray(config)) {
@@ -57,6 +72,7 @@ function readLimits(config) {
   }
 
   const entries = [];
+  const known = samplable(collections);
 
   for (const [name, value] of Object.entries(config)) {
     if (name === RANDOMIZE_KEY) {
@@ -66,10 +82,10 @@ function readLimits(config) {
       continue;
     }
 
-    if (!COLLECTIONS[name]) {
+    if (!known[name]) {
       throw new Error(
         `targets.web.dev.limitCollections.${name} is not an OMEGA collection `
-        + `— the collections are ${Object.keys(COLLECTIONS).join(', ')}`,
+        + `— the collections are ${Object.keys(known).join(', ')}`,
       );
     }
 
@@ -113,11 +129,13 @@ function sampleDocuments(documents, limit, randomize) {
 /**
  * A collection's documents on disk, in the order the collection lists them.
  * @param {string} consumerDir - the consumer site (Eleventy input dir)
- * @param {string} name - collection name (a COLLECTIONS key)
+ * @param {string} name - collection name (a samplable() key)
+ * @param {Array<object>} [collections] - the brand's own collections (readCollections' output)
  * @returns {string[]} absolute file paths
  */
-function collectionDocuments(consumerDir, name) {
-  const root = path.join(consumerDir, COLLECTIONS[name].dir);
+function collectionDocuments(consumerDir, name, collections) {
+  const known = samplable(collections);
+  const root = path.join(consumerDir, known[name].dir);
   if (!fs.existsSync(root)) return [];
 
   const documents = fs.readdirSync(root, { recursive: true, withFileTypes: true })
@@ -125,7 +143,7 @@ function collectionDocuments(consumerDir, name) {
     .map((entry) => path.join(entry.parentPath, entry.name))
     .sort();
 
-  return COLLECTIONS[name].newestFirst ? documents.reverse() : documents;
+  return known[name].newestFirst ? documents.reverse() : documents;
 }
 
 /**
@@ -135,18 +153,19 @@ function collectionDocuments(consumerDir, name) {
  * @param {object} options
  * @param {string} options.consumerDir - the consumer site (Eleventy input dir)
  * @param {object} [options.limits] - the raw dev.limitCollections config
+ * @param {Array<object>} [options.collections] - the brand's own collections (readCollections' output)
  * @param {string} [options.environment] - 'production' never samples
  * @returns {{ dropped: Set<string>, limited: Array<{ name: string, kept: number, total: number }> }|null} null when nothing is limited
  */
 function applyCollectionLimits(eleventyConfig, options) {
-  const config = readLimits(options.limits);
+  const config = readLimits(options.limits, options.collections);
   if (!config || !config.entries.length || options.environment === 'production') return null;
 
   const dropped = new Set();
   const limited = [];
 
   for (const { name, limit } of config.entries) {
-    const documents = collectionDocuments(options.consumerDir, name);
+    const documents = collectionDocuments(options.consumerDir, name, options.collections);
     if (documents.length <= limit) continue;
 
     const kept = new Set(sampleDocuments(documents, limit, config.randomize));

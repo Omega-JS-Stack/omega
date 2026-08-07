@@ -14,5 +14,11 @@
     <span class="newsflash-kicker mb-1">{{ args.kicker }}</span>
   {% endiftruthy %}
   <h3 class="h5 my-2">{{ args.title }}</h3>
+  {% comment %} Generated-content tell (#208): callers pass the document's
+    `generated` flag straight through, so every story row of a sample post
+    says what it is. {% endcomment %}
+  {% iftruthy args.generated %}
+    <span class="omega-generated-badge mb-2">TEST</span>
+  {% endiftruthy %}
   {% component "news/byline", author: args.author, date: args.date, readtime: args.readtime %}
 </a>

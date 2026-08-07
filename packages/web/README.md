@@ -90,7 +90,8 @@ see the harness README for the honest before/after numbers.
 | Module | Owns |
 |--------|------|
 | [engine.js](src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
-| [collections.js](src/collections.js) | posts / alternatives / team / updates collections + blog taxonomy aggregation (deterministic date-desc, slug tie-break order) |
+| [collections.js](src/collections.js) | posts / alternatives / team / updates collections + taxonomy aggregation (deterministic date-desc, slug tie-break order), and the same registration for the brand's own collections |
+| [dynamic-pages.js](src/dynamic-pages.js) | Dynamic pages, the jekyll-uj-powertools dynamic-pages successor: `targets.web.collections` declares a brand's own collection (`docs: { field: 'doc.category', size, title, description, permalink }`), its documents live in `_docs/` and publish at `/docs/<slug>`, and the engine generates the paginated listing (`/docs`, `/docs/2…`) plus one page per category of `field` (`/docs/categories/<slug>`) as virtual templates on the default-page lane — a consumer page at any of those permalinks takes that URL over |
 | [markdown-images.js](src/markdown-images.js) | Markdown `![alt](src)` renders through template-kit's `buildImageHtml` (the `omega_image` builder — one image-markup SSOT): responsive `<picture>` + lazy placeholder for local raster images, the plain lazy `<img>` lane for external or non-raster sources. `@post/<file>` resolves to `/assets/images/blog/post-<post.id>/<file>`; used off a post it FAILS the build naming the file. Note: feeds embed the rendered (lazy) markup, so feed readers see the placeholder — legacy parity |
 | [limit-collections.js](src/limit-collections.js) | Dev-mode collection sampling (`targets.web.dev.limitCollections`, the jekyll-uj-powertools limit-collections successor): first-N in collection order, or a random sample with `randomize: true`; the sampled-out documents are skipped before render, so they cost no pages, collection entries or taxonomy terms. Development builds only, loud on every build; the config is validated in production too, where nothing is ever sampled |
 | [layouts.js](src/layouts.js) | Layered layout delivery, zero copying: virtual templates (build) / symlink farm (dev, watchable) |
@@ -184,7 +185,14 @@ see the harness README for the honest before/after numbers.
   removed per collection once the consumer owns it) so the filler can be
   read and copied — never committed, never mixed with real content. The
   first consumer file in a collection — or any production build — removes
-  that collection's samples entirely. The two oldest posts carry
+  that collection's samples entirely. Every generated document is MARKED:
+  the generator writes `generated: true` into the frontmatter (never the
+  corpus files, so a newly authored sample cannot forget it), and the base
+  theme renders a `--omega-warn` TEST pill wherever such a document shows —
+  the post page, the blog listing's featured lead, and every post card
+  (`core/css/core/_generated-badge.scss`, `#208`). The templates key off the
+  flag ALONE, with no environment check, because samples never inject into a
+  production build. The two oldest posts carry
   `post.image: false` + no author, exercising the designed no-media panel
   (serif category monogram) and the brand-byline author fallback; both
   contracts apply to real posts too (`post.image: false` → no-media panel,

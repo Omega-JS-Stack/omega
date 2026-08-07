@@ -214,7 +214,7 @@ cta:
         {% for post in site.posts offset: 1 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
             {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
           </div>
         {% endfor %}
       </div>
@@ -317,7 +317,7 @@ cta:
         {% for post in site.posts offset: 14 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
             {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt %}
+            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
           </div>
         {% endfor %}
       </div>

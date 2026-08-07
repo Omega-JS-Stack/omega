@@ -10,7 +10,11 @@
  * config's own shape, so this is an identity mapping plus: machinery keys
  * stripped (`targets`, `enabled`), `url` derived (explicit url, else
  * brand.url), `baseurl` defaulted. ENGINE-owned keys (site.posts, site.pages,
- * site.data, site.time, site.collections) are the SSG's job, not config's.
+ * site.data, site.time) are the SSG's job, not config's. `site.collections`
+ * is NOT one of them (#207): it is the config-carried collections
+ * DECLARATION (`targets.web.collections`), which rides the identity mapping
+ * like any other section and which the engine reads to generate each
+ * declared collection's pages.
  *
  * The resolved config for target 'web' already overlays targets.web onto the
  * top level, so web-specific sections land here automatically.

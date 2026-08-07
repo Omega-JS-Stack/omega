@@ -60,9 +60,10 @@ test('anchor === epoch reproduces the authored corpus (names, dates, bodies)', (
     for (const file of generated) {
       const corpus = fs.readFileSync(path.join(PATHS.defaults, set.samplesDir, file.name), 'utf8');
       assert.ok(file.content.includes('# Generated sample content'), `${file.name}: generated header present`);
-      // Removing the injected header restores the corpus byte-for-byte —
-      // at epoch the date transforms are all identity.
-      const withoutHeader = file.content.replace(/^# Generated sample content[^\n]*\n# Do not edit[^\n]*\n/m, '');
+      // Removing the injected block — the two header comments and the #208
+      // `generated: true` marker — restores the corpus byte-for-byte; at epoch
+      // the date transforms are all identity.
+      const withoutHeader = file.content.replace(/^# Generated sample content[^\n]*\n# Do not edit[^\n]*\ngenerated: true\n/m, '');
       assert.strictEqual(withoutHeader, corpus, `${file.name}: content identical at epoch (header aside)`);
     }
   }
@@ -97,7 +98,7 @@ test('a shifted anchor rolls every date uniformly — order, slugs, bodies untou
   const teamSet = SAMPLE_SETS.find((s) => s.samplesDir === 'sample-team');
   for (const file of generateSampleSet(PATHS.defaults, teamSet, resolveAnchor(PLUS_30))) {
     const corpus = fs.readFileSync(path.join(PATHS.defaults, 'sample-team', file.name), 'utf8');
-    const withoutHeader = file.content.replace(/^# Generated sample content[^\n]*\n# Do not edit[^\n]*\n/m, '');
+    const withoutHeader = file.content.replace(/^# Generated sample content[^\n]*\n# Do not edit[^\n]*\ngenerated: true\n/m, '');
     assert.strictEqual(withoutHeader, corpus, `${file.name}: dateless team files pass through verbatim`);
   }
 });

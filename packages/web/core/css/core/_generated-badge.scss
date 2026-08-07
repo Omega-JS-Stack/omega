@@ -1,0 +1,36 @@
+// The generated-content TEST badge (#208)
+// ============================================
+// Sample content is injected in DEVELOPMENT only, and only while the brand
+// owns no content in that collection — but on screen it renders on the real
+// posts lane and looks exactly like real writing. This pill is the tell: any
+// document carrying `generated: true` in its frontmatter wears it.
+//
+// Framework machinery, not theme voice, so the STYLE lives in core
+// (theme-agnostic) rather than a theme's sheet: every theme's badge looks the
+// same and no skin has to restyle it. The MARKUP is still per-theme — base and
+// newsflash each render their own conditional — so what stops a forked blog
+// template from dropping the warning is the packaged-theme sweep in
+// test/sample-generated-badge.test.js, not this file.
+// Colors come off the --omega-warn status token family, so it reads correctly
+// in light and dark and against any brand ramp.
+//
+// It costs a production build nothing: samples never inject there, so no
+// markup carries the class and PurgeCSS's content scan trims the rule.
+
+.omega-generated-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.15em 0.55em;
+  border: 1px solid rgba(var(--omega-warn-rgb), 0.45);
+  border-radius: 999px;
+  background: rgba(var(--omega-warn-rgb), 0.14);
+  color: var(--omega-warn);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: middle;
+}

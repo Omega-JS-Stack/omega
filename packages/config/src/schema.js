@@ -617,7 +617,13 @@ const TARGET_SCHEMAS = {
       path:        'dev.limitCollections',
       type:        'object',
       required:    false,
-      description: "Dev-only collection sampling (#190): collection name → max documents ({ posts: 50 }), plus `randomize: true` for a random sample instead of the first N. Collection names are @omega.js/web's (posts, alternatives, team, updates) and the engine hard-fails an unknown one. Development builds only — production never samples.",
+      description: "Dev-only collection sampling (#190): collection name → max documents ({ posts: 50 }), plus `randomize: true` for a random sample instead of the first N. Collection names are @omega.js/web's (posts, alternatives, team, updates) plus the brand's own `collections`, and the engine hard-fails an unknown one. Development builds only — production never samples.",
+    },
+    {
+      path:        'collections',
+      type:        'object',
+      required:    false,
+      description: "The brand's own content collections (#207): collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
     },
   ],
 

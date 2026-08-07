@@ -24,8 +24,9 @@ const { permalinkOf } = require('./consumer-scan.js');
 const { createDecisions } = require('./decisions.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
-const { registerCollections } = require('./collections.js');
+const { registerCollections, BUILT_IN_COLLECTIONS } = require('./collections.js');
 const { applyCollectionLimits } = require('./limit-collections.js');
+const { readCollections, collectionPages } = require('./dynamic-pages.js');
 const { resolvePageAsset } = require('./assets.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
@@ -50,7 +51,11 @@ const RESOLVED_OMIT = new Set([
 // via site.* directly — mirrors inject-properties.rb's config exclusions,
 // which also dropped `collections`; seeding the site collection arrays
 // would make every page's resolved walk all 1,030 post docs).
-const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team', 'updates', 'alternatives']);
+// `collections` is excluded on the same grounds it was in the legacy engine,
+// for its CURRENT meaning (#207): it is the config-carried collections
+// declaration the engine reads to generate pages — machinery, not page data,
+// so nothing should be reading the raw map off `resolved`.
+const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team', 'updates', 'alternatives', 'collections']);
 
 // Consumer PAGE frontmatter is meta-only (Ian's rule, 2026-07-19: content
 // lives in {% section %} calls — and nothing may even TRY to consume it from
@@ -133,6 +138,14 @@ function buildConfig(eleventyConfig, options) {
 
   // Reflect the active theme into the site global templates render against
   site.theme = { ...(site.theme || {}), id: activeTheme };
+
+  // ---- The brand's own collections (#207): validated HERE, before anything
+  // reads them, so a bad entry fails the config build instead of quietly
+  // generating nothing. Built-ins plus these are the whole collection roster —
+  // directory tagging, permalinks, dev sampling and the generated pages below
+  // all read this one list.
+  const dynamicCollections = readCollections(site.collections);
+  const allCollections = [...BUILT_IN_COLLECTIONS, ...dynamicCollections];
 
   // ---- Runtime composition: omega.json5 keeps ONE home per shared section
   // (cloud, payment at the top level); the chrome + @omega.js/client contract
@@ -368,10 +381,10 @@ function buildConfig(eleventyConfig, options) {
   };
   eleventyConfig.addPreprocessor('omega-frontmatter', 'md,html,liquid', (data) => {
     const inputPath = data.page.inputPath;
-    if (inputPath.includes('/_posts/')) data.tags = ['posts'];
-    else if (inputPath.includes('/_alternatives/')) data.tags = ['alternatives'];
-    else if (inputPath.includes('/_team/')) data.tags = ['team'];
-    else if (inputPath.includes('/_updates/')) data.tags = ['updates'];
+    // Directory → collection tag, the Jekyll convention: a document under
+    // `_<collection>/` belongs to that collection, the brand's own included.
+    const collection = allCollections.find((entry) => inputPath.includes(`/${entry.dir}/`));
+    if (collection) data.tags = [collection.name];
 
     // The meta-only guard: real files under pages/ may carry ONLY meta keys
     // in frontmatter. readOwnFrontmatter already filters the plumbing set
@@ -437,7 +450,7 @@ function buildConfig(eleventyConfig, options) {
 
   // ---- Jekyll conventions + page.resolved equivalent
   eleventyConfig.addGlobalData('eleventyComputed', {
-    permalink: jekyllPermalink,
+    permalink: (data) => jekyllPermalink(data, allCollections),
     // Jekyll paginator compat: layouts iterate `paginator.posts` with Jekyll
     // post shapes (post.url, post.post.title), so items are flattened
     // ({ url, date, ...data }) — references, not copies.
@@ -528,8 +541,9 @@ function buildConfig(eleventyConfig, options) {
     return undefined;
   });
 
-  // ---- Collections: posts, alternatives, team, blog taxonomy
-  registerCollections(eleventyConfig, collectionsHolder);
+  // ---- Collections: posts, alternatives, team, blog taxonomy, and the
+  // brand's own collections plus their taxonomies (#207)
+  registerCollections(eleventyConfig, collectionsHolder, dynamicCollections);
 
   // ---- Dev-mode collection limiting (#190): a brand with thousands of posts
   // samples them locally so the dev build stays fast — the sampled-out
@@ -539,6 +553,7 @@ function buildConfig(eleventyConfig, options) {
   applyCollectionLimits(eleventyConfig, {
     consumerDir: options.consumerDir,
     limits: site.dev && site.dev.limitCollections,
+    collections: dynamicCollections,
     environment: options.environment,
   });
 
@@ -583,9 +598,32 @@ function buildConfig(eleventyConfig, options) {
     // Registered UNCONDITIONALLY, gated at render time: suppression is a live
     // answer now, and a template skipped at config time could only come back
     // through a config reset.
-    eleventyConfig.addTemplate(page.virtual, page.raw, renderGate(() => !decisions.suppresses(page.url)));
+    eleventyConfig.addTemplate(page.virtual, page.raw, renderGate(() => !decisions.suppresses(page.url), allCollections));
   }
-  decisions.framework(frameworkPages.filter((page) => page.url));
+
+  // ---- Dynamic pages (#207): the listing and category pages of every
+  // collection the brand declared, generated as virtual templates on the SAME
+  // lane as the default pages above. Their permalink is only known per RENDER
+  // (the listing's page number, the category's slug), so the gate asks the
+  // live decisions about that page's own URL — a consumer page at any one of
+  // them takes just that URL over.
+  const dynamicPages = dynamicCollections.flatMap(collectionPages);
+  for (const page of dynamicPages) {
+    eleventyConfig.addTemplate(page.virtual, page.raw, {
+      eleventyComputed: {
+        permalink: (data) => {
+          const url = page.urlOf(data);
+          return url && !decisions.suppresses(url) ? `${url}.html` : false;
+        },
+      },
+    });
+  }
+
+  // The collision picture: the default pages plus every generated page whose
+  // URL is a config-time fact (a listing's own page 1). A category page's URL
+  // is a CONTENT fact — it exists because a document names that term — so it
+  // can only be answered by the render-time gate above.
+  decisions.framework([...frameworkPages, ...dynamicPages].filter((page) => page.url));
 
   // ---- Sample content (development only): a content-less brand still gets
   // living pages locally. Injected as virtual templates under the matching
@@ -602,7 +640,7 @@ function buildConfig(eleventyConfig, options) {
         eleventyConfig.addTemplate(
           `omega-defaults/${set.collectionDir}/${name}`,
           content,
-          renderGate(() => !decisions.hasOwn(set.collectionDir)),
+          renderGate(() => !decisions.hasOwn(set.collectionDir), allCollections),
         );
       }
     }
@@ -668,9 +706,10 @@ function buildConfig(eleventyConfig, options) {
  * gated virtual template (renderGate below) resolves its URL exactly like an
  * ungated one.
  * @param {object} data - the template's data cascade
+ * @param {object[]} collections - the declared collections (#207): `{ dir: '_<name>', base }` — a document under `dir` publishes at `<base>/<slug>`
  * @returns {string|object|undefined} the permalink Eleventy writes to
  */
-function jekyllPermalink(data) {
+function jekyllPermalink(data, collections) {
   const inputPath = data.page.inputPath;
   let permalink = data.permalink;
   // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
@@ -679,10 +718,8 @@ function jekyllPermalink(data) {
   // '' counts as absent: Eleventy's computed dependency pass probes with
   // an empty-string proxy, and that probe value persists into the data.
   if (permalink === undefined || permalink === '') {
-    if (inputPath.includes('/_posts/')) permalink = `/blog/${data.page.fileSlug}`;
-    else if (inputPath.includes('/_alternatives/')) permalink = `/alternatives/${data.page.fileSlug}`;
-    else if (inputPath.includes('/_team/')) permalink = `/team/${data.page.fileSlug}`;
-    else if (inputPath.includes('/_updates/')) permalink = `/updates/${data.page.fileSlug}`;
+    const collection = collections.find((entry) => inputPath.includes(`/${entry.dir}/`));
+    if (collection) permalink = `${collection.base}/${data.page.fileSlug}`;
   }
   // Jekyll flat URLs (legacy UJM parity): `/about` writes `about.html`,
   // NOT `about/index.html` — site URLs carry no trailing slash. page.url
@@ -721,14 +758,15 @@ function jekyllPermalink(data) {
  * therefore spells the key in its own frontmatter (pinned by
  * test/collections-gate.test.js).
  * @param {function} isActive - () => boolean, asked at data time
+ * @param {Array<object>} collections - the collection roster jekyllPermalink reads
  * @returns {object} addTemplate data
  */
-function renderGate(isActive) {
+function renderGate(isActive, collections) {
   return {
     eleventyComputed: {
       // Open gate: the same permalink the global computed would have produced
       // (a per-template `eleventyComputed.permalink` replaces that key).
-      permalink: (data) => (isActive() ? jekyllPermalink(data) : false),
+      permalink: (data) => (isActive() ? jekyllPermalink(data, collections) : false),
       // Open gate: the page's OWN frontmatter answer stands VERBATIM — `true`,
       // the list-of-collections form, or undefined for the pages that never
       // set it. Narrowing it to a boolean here would quietly rewrite a

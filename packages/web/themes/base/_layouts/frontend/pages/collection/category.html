@@ -1,0 +1,64 @@
+---
+layout: frontend/core/base
+
+# ═══ One category of a brand's own collection (#207). The term rides the
+# page's `category` pagination alias and carries its own documents.
+
+category_empty: "Nothing in this category yet."
+---
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="{{ resolved.collection.base }}">{{ resolved.collection.title }}</a>
+      <span>/</span>
+      <span>{{ category.name }}</span>
+    </div>
+
+    {% component "heading/masthead", headline: category.name, sub: resolved.collection.description %}
+  </div>
+</section>
+
+<!-- ═══ The documents in this category ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8">
+        {% if category.posts.size > 0 %}
+          <div class="omega-rowlist" data-omega-reveal-stagger="50">
+            {% comment %} Taxonomy terms carry the raw collection documents, so a
+            document's own fields live under `data` (the listing's paginator
+            flattens them; this one does not). {% endcomment %}
+            {% for item in category.posts %}
+              {% assign entry = item.data[resolved.collection.namespace] %}
+              <a href="{{ item.url }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
+                <span>{{ entry.title | default: item.data.title | default: item.url }}</span>
+                <span class="omega-rowlist__meta">
+                  {{ entry.description | default: item.data.description }}
+                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                </span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="omega-status-empty" data-omega-reveal>
+            <span class="omega-dot"></span>
+            <span>{{ resolved.category_empty }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row justify-content-center mt-5">
+      <div class="col-12 text-center">
+        <a href="{{ resolved.collection.base }}" class="btn btn-outline-adaptive">
+          {% omega_icon "arrow-left", "fa-sm me-2" %}
+          All {{ resolved.collection.title }}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

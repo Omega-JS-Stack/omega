@@ -9,6 +9,7 @@
     author: 'string',
     date: 'string',
     readtime: 'string',
+    generated: { description: 'the document\'s `generated` frontmatter flag — truthy renders the #208 TEST badge (sample content only)' },
   },
 
   defaults: {},

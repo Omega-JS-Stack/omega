@@ -10,6 +10,10 @@
  *     off raw frontmatter when it expands pagination, long before any computed
  *     value exists, so the gate is invisible there;
  *   - the gate narrowing a template's OWN answer on the way through.
+ *
+ * The sweep covers every template the engine registers: the packaged defaults
+ * on disk, and the pages synthesized for a brand's own collections (#207),
+ * which are paginated by definition.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -61,19 +65,23 @@ function stubConfig() {
 
 // The real packaged defaults over a consumer that claims `/` — so the index
 // default's gate is SHUT and every other default's gate is open.
-function gates(t) {
+function templates(t, siteData) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-gate-'));
   t.after(() => fs.rmSync(out, { recursive: true, force: true }));
 
   const config = stubConfig();
   configureOmega(config, {
     consumerDir: BARE,
-    siteData: SITE_DATA,
+    siteData: siteData || SITE_DATA,
     environment: 'development',
     farmDir: path.join(out, 'farm'),
     assetManifest: { js: { pages: {} }, css: { pages: {}, themePages: {} } },
   });
-  return new Map(config.templates.map((entry) => [entry.virtual, entry.data]));
+  return config.templates;
+}
+
+function gates(t) {
+  return new Map(templates(t).map((entry) => [entry.virtual, entry.data]));
 }
 
 const excludeGate = (data) => data.eleventyComputed.eleventyExcludeFromCollections;
@@ -94,6 +102,31 @@ test('every paginated default spells eleventyExcludeFromCollections in its own f
     + 'so the render gate\'s computed value never reaches a paginated template — every one of them must '
     + 'carry the literal `eleventyExcludeFromCollections: true`, or its generated pages land in the '
     + 'collections a suppressed page must stay out of');
+});
+
+test('every synthesized collection page spells it too', (t) => {
+  // The dynamic pages (#207) are built as source strings, so the same
+  // invariant is a property of the GENERATOR: a listing or category page that
+  // lost the key would paginate its way into the sitemap and the page index.
+  const synthesized = templates(t, {
+    ...SITE_DATA,
+    collections: { docs: { field: 'doc.category' }, recipes: { field: 'recipe.cuisine', size: 3 } },
+  }).filter((entry) => entry.virtual.startsWith('omega-dynamic/'));
+
+  assert.deepEqual(synthesized.map((entry) => entry.virtual), [
+    'omega-dynamic/docs/index.html',
+    'omega-dynamic/docs/categories.html',
+    'omega-dynamic/recipes/index.html',
+    'omega-dynamic/recipes/categories.html',
+  ], 'every declared collection generates its listing and its category pages');
+
+  for (const entry of synthesized) {
+    const frontmatter = frontmatterOf(entry.raw);
+    assert.ok(/^pagination:/m.test(frontmatter), `${entry.virtual} paginates`);
+    assert.ok(/^eleventyExcludeFromCollections:\s*true\s*$/m.test(frontmatter),
+      `${entry.virtual} must carry the literal \`eleventyExcludeFromCollections: true\` — Eleventy reads it off `
+      + 'RAW frontmatter when it expands pagination, so a computed value never reaches a paginated template');
+  }
 });
 
 test('an open gate passes the template\'s own eleventyExcludeFromCollections through verbatim', (t) => {

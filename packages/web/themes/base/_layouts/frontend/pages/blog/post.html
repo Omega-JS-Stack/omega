@@ -60,6 +60,14 @@ newsletter:
               {% endif %}
             </div>
 
+            {% comment %} Generated-content tell (#208): a sample post reads
+              exactly like real writing, so the page it renders on says what it
+              is. Keyed off the frontmatter flag ALONE — no environment check,
+              because samples never inject into a production build. {% endcomment %}
+            {% if resolved.generated %}
+              <div class="mb-3" data-omega-reveal><span class="omega-generated-badge">TEST</span></div>
+            {% endif %}
+
             <h1 class="omega-display omega-display--page" data-omega-reveal>{{ resolved.post.title }}</h1>
 
             {% iftruthy resolved.post.description %}

@@ -77,8 +77,12 @@ function shiftDay(value, anchorMs) {
 /**
  * Roll one corpus file: date-prefixed filenames shift (posts — Eleventy reads
  * page.date from the prefix), `date: YYYY-MM-DD` lines inside the frontmatter
- * block shift (updates), and a generated-content header comment lands inside
- * the frontmatter (inert in YAML, never rendered).
+ * block shift (updates), a generated-content header comment lands inside
+ * the frontmatter (inert in YAML, never rendered), and the `generated: true`
+ * marker lands with it — the RENDER-visible half (#208), which templates key
+ * the TEST badge off so filler can never be mistaken for the brand's own
+ * writing on screen. It rides the generator, never the corpus files, so every
+ * sample document carries it and no fixture can forget to.
  * @param {string} name - corpus filename
  * @param {string} content - corpus file content
  * @param {number} anchorMs
@@ -93,7 +97,8 @@ function rollFile(name, content, anchorMs, collectionDir) {
   const fmEnd = content.startsWith('---\n') ? content.indexOf('\n---', 4) : -1;
   if (fmEnd !== -1) {
     const header = '# Generated sample content (@omega.js/web) — dates roll with each dev build.\n'
-      + `# Do not edit: real files in ${collectionDir}/ replace this whole set.\n`;
+      + `# Do not edit: real files in ${collectionDir}/ replace this whole set.\n`
+      + 'generated: true\n';
     const frontmatter = content
       .slice(4, fmEnd)
       .replace(/^(\s*date: )(\d{4}-\d{2}-\d{2})$/gm, (_, prefix, day) => `${prefix}${shiftDay(day, anchorMs)}`);
