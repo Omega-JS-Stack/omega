@@ -448,6 +448,17 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'premium', name: 'Premium' }, status: 'suspended', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_suspended', startDate: getPastExpires() } },
     },
   },
+  // A paid subscriber whose order doc never existed (#210): payment.orderId stays null,
+  // so the cancel processor has to resolve the plan's product from the subscription itself.
+  'cancel-no-order': {
+    id: 'cancel-no-order',
+    uid: '_test-cancel-no-order',
+    email: '_test.cancel-no-order@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_no_order', startDate: getPastExpires() } },
+    },
+  },
   // Dedicated accounts for portal validation tests
   'portal-no-processor': {
     id: 'portal-no-processor',
@@ -1188,6 +1199,56 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
 }
 
 /**
+ * Seed a persona's canonical purchase record — the `payments-orders/{orderId}` doc
+ * that account seeding itself never writes. Persona seeding writes user docs and
+ * NOTHING else, so a seeded subscription arrives without the order record every real
+ * purchase leaves behind, and two backend surfaces read exactly that record: the test
+ * cancel processor (it reads the plan's processor product id off the LIVE order) and
+ * the per-owner trial-eligibility query (any prior subscription order disqualifies).
+ *
+ * Only the personas whose seed carries `subscription.payment.orderId` have a purchase
+ * record; everything else is a no-op (a pristine account has bought nothing).
+ *
+ * The record's status MIRRORS the seeded subscription's — an order's `unified.status`
+ * IS the state of the subscription it bought, so it is not a second fact to keep in
+ * step: an active paid persona carries a live order, a lapsed one a cancelled one.
+ *
+ * @param {object} admin - Firebase admin instance (pointed at the emulator)
+ * @param {string} key - Account key in TEST_ACCOUNTS (e.g. 'journey-flows-cancel')
+ * @param {object} [config] - @omega.js/backend config (resolves the paid product)
+ * @returns {Promise<object|null>} `{ orderId, status }`, or null when the persona carries no order
+ */
+async function seedOrderFixture(admin, key, config) {
+  const account = TEST_ACCOUNTS[key];
+
+  if (!account) {
+    throw new Error(`No seeded persona named ${key} — there is no order fixture to seed`);
+  }
+
+  const subscription = account.properties?.subscription || {};
+  const payment = subscription.payment || {};
+
+  if (!payment.orderId) {
+    return null;
+  }
+
+  const paidProduct = getFirstPaidProduct(config);
+  const status = subscription.status;
+
+  await admin.firestore().doc(`payments-orders/${payment.orderId}`).set({
+    id: payment.orderId,
+    type: 'subscription',
+    owner: account.uid,
+    productId: paidProduct.id,
+    processor: payment.processor,
+    resourceId: payment.resourceId,
+    unified: { product: { id: paidProduct.id, name: paidProduct.name }, status },
+  }, { merge: true });
+
+  return { orderId: payment.orderId, status };
+}
+
+/**
  * Test data constants - SSOT for test values
  */
 const TEST_DATA = {
@@ -1207,5 +1268,7 @@ module.exports = {
   getAccountDefinitions,
   fetchPrivateKeys,
   deleteTestUsers,
+  createAccount,
   createTestAccounts,
+  seedOrderFixture,
 };

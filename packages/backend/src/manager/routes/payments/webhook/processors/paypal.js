@@ -3,6 +3,13 @@
  * Extracts, validates, and categorizes webhook event data from PayPal
  *
  * PayPal webhook events: https://developer.paypal.com/api/rest/webhooks/event-names/
+ *
+ * No verifySignature() yet, so these events are gated by `?key=` alone. PayPal's
+ * scheme (POST /v1/notifications/verify-webhook-signature with the PAYPAL-*
+ * transmission headers) needs the WEBHOOK ID of the endpoint the event arrived
+ * on — @omega.js/manager's payment service creates that endpoint and knows the
+ * id, but nothing plumbs it to the backend (no config field, no env var). TODO:
+ * carry the id into the backend's environment, then verify here.
  */
 
 // Events we process, mapped to their category

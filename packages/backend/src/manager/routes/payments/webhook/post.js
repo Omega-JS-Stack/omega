@@ -3,6 +3,10 @@ const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
+// Processors already warned about running key-only, so the notice lands once per
+// instance instead of once per event
+const keyOnlyWarned = new Set();
+
 /**
  * POST /payments/webhook?processor=stripe&key=XXX
  * Receives payment processor webhooks, validates them, and saves to Firestore
@@ -11,6 +15,8 @@ const safeCompare = require('../../../helpers/safe-compare.js');
  * This handler is processor-agnostic. Each processor module defines:
  *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, raw, uid }
  *   - isSupported(eventType) — returns true for events we should process
+ *   - verifySignature(req) — optional; verifies the processor's native signature
+ *     over the raw bytes, returning { status: 'verified' | 'invalid' | 'unconfigured' }
  */
 module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
@@ -54,6 +60,24 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
   }
 
+  // Verify the processor's native signature — the key param above is a defense
+  // layer, not the boundary. A processor that ships a signing scheme verifies
+  // strictly once its secret is configured; without it the route stays on the
+  // key-only path and says so. Nothing is parsed or stored before this passes.
+  if (processorModule.verifySignature) {
+    const verification = processorModule.verifySignature(ctx.ref.req);
+
+    if (verification.status === 'invalid') {
+      ctx.error(`Rejected ${processor} webhook: signature verification failed (${verification.reason})`);
+      return ctx.respond('Invalid signature', { code: 401 });
+    }
+
+    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(processor)) {
+      keyOnlyWarned.add(processor);
+      ctx.warn(`${processor} webhooks are running key-only: ${verification.reason}. Set it to verify every event's signature.`);
+    }
+  }
+
   // Parse the webhook using the processor
   let parsed;
   try {
@@ -78,46 +102,66 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond({ received: true, ignored: true });
   }
 
-  // Check for duplicate (skip if already processing/completed)
-  const existingDoc = await admin.firestore().doc(`payments-webhooks/${eventId}`).get();
-  if (existingDoc.exists) {
-    const existingStatus = existingDoc.data()?.status;
-    if (existingStatus !== 'failed') {
-      ctx.log(`Duplicate webhook ${eventId}, existing status=${existingStatus}, skipping`);
-      return ctx.respond({ received: true, duplicate: true });
-    }
-    ctx.log(`Retrying previously failed webhook ${eventId}`);
-  }
-
   // Build timestamps
   const now = powertools.timestamp(new Date(), { output: 'string' });
   const nowUNIX = powertools.timestamp(now, { output: 'unix' });
 
-  // Save to Firestore with status=pending (trigger handles the rest)
-  await admin.firestore().doc(`payments-webhooks/${eventId}`).set({
-    id: eventId,
-    processor: processor,
-    status: 'pending',
-    raw: raw,
-    owner: uid,
-    event: {
-      type: eventType,
-      category: category,
-      resourceType: resourceType,
-      resourceId: resourceId,
-    },
-    error: null,
-    metadata: {
-      created: {
-        timestamp: now,
-        timestampUNIX: nowUNIX,
+  // Claim the event, then save — in ONE transaction. Processors retry, and a
+  // retry can arrive while the first delivery is still in flight: a read
+  // followed by a separate write leaves a window where both deliveries see no
+  // doc and both write, so the pipeline runs the same event twice. The
+  // transaction's read locks the document, so exactly one delivery claims it
+  // and the other is told it is a duplicate ([#212]).
+  const docRef = admin.firestore().doc(`payments-webhooks/${eventId}`);
+  const claimed = await admin.firestore().runTransaction(async (transaction) => {
+    const existingDoc = await transaction.get(docRef);
+
+    if (existingDoc.exists) {
+      const existingStatus = existingDoc.data()?.status;
+
+      // A failed webhook is the one state that may be reclaimed — that IS the retry path
+      if (existingStatus !== 'failed') {
+        return { claimed: false, status: existingStatus };
+      }
+    }
+
+    // Save with status=pending (trigger handles the rest)
+    transaction.set(docRef, {
+      id: eventId,
+      processor: processor,
+      status: 'pending',
+      raw: raw,
+      owner: uid,
+      event: {
+        type: eventType,
+        category: category,
+        resourceType: resourceType,
+        resourceId: resourceId,
       },
-      completed: {
-        timestamp: null,
-        timestampUNIX: null,
+      error: null,
+      metadata: {
+        created: {
+          timestamp: now,
+          timestampUNIX: nowUNIX,
+        },
+        completed: {
+          timestamp: null,
+          timestampUNIX: null,
+        },
       },
-    },
+    });
+
+    return { claimed: true, retried: existingDoc.exists };
   });
+
+  if (!claimed.claimed) {
+    ctx.log(`Duplicate webhook ${eventId}, existing status=${claimed.status}, skipping`);
+    return ctx.respond({ received: true, duplicate: true });
+  }
+
+  if (claimed.retried) {
+    ctx.log(`Retrying previously failed webhook ${eventId}`);
+  }
 
   ctx.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, processor=${processor}, uid=${uid}`);
 

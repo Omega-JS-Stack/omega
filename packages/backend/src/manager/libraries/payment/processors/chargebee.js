@@ -1,4 +1,5 @@
 const powertools = require('node-powertools');
+const staleFallback = require('../stale-fallback.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -123,9 +124,16 @@ const Chargebee = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it
+      // If the API call fails but we have raw webhook data, use it — flagged and
+      // logged, because the payload is older than the answer we could not get
       if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return rawFallback;
+        return staleFallback(rawFallback, {
+          ctx: context?.ctx,
+          processor: 'chargebee',
+          resourceType,
+          resourceId,
+          error: e,
+        });
       }
 
       throw e;
@@ -167,7 +175,9 @@ const Chargebee = {
             return { uid: parsed.uid, orderId: parsed.orderId || null };
           }
         } catch (e) {
-          // Invalid JSON in pass_thru_content — skip
+          // Invalid JSON in pass_thru_content — skip this page, but never silently:
+          // a malformed pass_thru is why a checkout's UID went unresolved
+          ctx.error(`resolveUidFromHostedPage(): Invalid JSON in pass_thru_content on hosted page ${hp.id || 'unknown'} (skipping): ${e.message}`);
         }
       }
 
@@ -423,7 +433,9 @@ function parseMetaData(resource) {
         productId: parsed.productId || null,
       };
     } catch (e) {
-      // Invalid JSON — fall through to legacy
+      // Invalid JSON — fall through to legacy, but say so: a malformed meta_data
+      // is why a resource's uid/orderId came back empty
+      console.error(`[@omega.js/backend:payment:chargebee] parseMetaData(): Invalid JSON in meta_data on ${resource.id || 'unknown'} (falling back to cf_* fields): ${e.message}`);
     }
   }
 
@@ -617,7 +629,7 @@ function resolveProduct(raw, config) {
   // Items model takes priority — check all products first
   if (itemPriceId) {
     for (const product of config.payment.products) {
-      if (product.chargebee?.itemId && itemPriceId.startsWith(product.chargebee.itemId + '-')) {
+      if (product.chargebee?.itemId && itemPriceId.startsWith(`${product.chargebee.itemId}-`)) {
         return { id: product.id, name: product.name || product.id };
       }
     }

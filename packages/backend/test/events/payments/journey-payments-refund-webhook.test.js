@@ -8,8 +8,12 @@
  * 3. Extract refundDetails via the processor library's getRefundDetails()
  * 4. Record the transition name on the webhook doc for auditing
  *
+ * 5. Fire exactly once when the same refund event is reprocessed
+ *
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
+const powertools = require('node-powertools');
+
 module.exports = {
   description: 'Payment journey: paid → refund webhook → payment-refunded transition',
   type: 'suite',
@@ -174,6 +178,46 @@ module.exports = {
 
         // The order was last updated by the refund webhook event
         assert.equal(orderDoc.metadata?.updatedBy?.event?.name, 'charge.refunded', 'Last event should be charge.refunded');
+      },
+    },
+
+    {
+      name: 'reprocessed-refund-fires-once',
+      async run({ firestore, assert, state, waitFor }) {
+        // Reprocess the SAME refund event: put the completed doc back to pending,
+        // exactly as the route's retry path does. Refund detection reads the event
+        // type alone, so without an idempotency guard the second pass re-dispatches
+        // payment-refunded and the customer is emailed twice about one refund.
+        //
+        // The received timestamp is deliberately set AHEAD of the order's last write
+        // so the pre-existing staleness guard cannot be what skips this pass — the
+        // only thing left to suppress the transition is the idempotency guard.
+        const received = powertools.timestamp(new Date(Date.now() + 60000), { output: 'string' });
+
+        await firestore.set(`payments-webhooks/${state.refundEventId}`, {
+          status: 'pending',
+          transition: 'reprocessing',
+          metadata: {
+            created: {
+              timestamp: received,
+              timestampUNIX: powertools.timestamp(received, { output: 'unix' }),
+            },
+          },
+        }, { merge: true });
+
+        await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${state.refundEventId}`);
+          return doc?.status === 'completed';
+        }, 15000, 500);
+
+        const webhookDoc = await firestore.get(`payments-webhooks/${state.refundEventId}`);
+
+        assert.equal(webhookDoc.transition, null, 'A reprocessed refund must dispatch nothing — one refund, one email');
+        assert.equal(webhookDoc.orderId, state.orderId, 'The reprocess should still resolve the same order');
+
+        // The pass ran in full (it was not skipped as stale) — the order carries its write
+        const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
+        assert.equal(orderDoc.metadata?.updatedBy?.event?.id, state.refundEventId, 'The order should record the reprocessed event');
       },
     },
   ],

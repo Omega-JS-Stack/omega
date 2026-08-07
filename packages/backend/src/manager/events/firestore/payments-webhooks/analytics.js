@@ -131,6 +131,8 @@ function isPaymentEvent(eventType) {
     // Stripe
     'invoice.payment_succeeded',
     'invoice.paid',
+    // Chargebee — the renewal event its webhook parser reports for a recurring charge
+    'subscription_renewed',
   ].includes(eventType);
 }
 
@@ -312,4 +314,9 @@ function fireTikTok({ resolved, currency, uid, processor, ctx, config }) {
   }
 }
 
-module.exports = { trackPayment };
+module.exports = {
+  trackPayment,
+  // Exported for testing
+  resolvePaymentEvent,
+  isPaymentEvent,
+};

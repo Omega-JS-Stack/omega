@@ -23,23 +23,29 @@ module.exports = {
     const now = Math.floor(timestamp / 1000);
     const periodEnd = now + (30 * 86400);
 
-    // Look up the Stripe product ID from the existing order so resolveProduct() can match.
-    // Falls back to the "_test_<id>" sentinel when no real Stripe product is configured.
+    // Look up the Stripe product ID for the plan so resolveProduct() can match.
+    // The order doc is the first source; when there is no order (a seeded paid persona, or
+    // any state where the order is missing) the subscription's own product is the fallback —
+    // without it the plan carries product=null and the pipeline downgrades the user to Basic
+    // mid-cancel instead of scheduling the cancellation.
     const orderId = subscription?.payment?.orderId;
-    let stripeProductId = null;
+    let productId = null;
 
     if (orderId) {
       const orderDoc = await admin.firestore().doc(`payments-orders/${orderId}`).get();
       if (orderDoc.exists) {
-        const orderData = orderDoc.data();
-        const productId = orderData.unified?.product?.id;
-        const products = ctx.Manager.config.payment?.products || [];
-        const product = products.find(p => p.id === productId);
-        if (product) {
-          stripeProductId = product.stripe?.productId || `_test_${product.id}`;
-        }
+        productId = orderDoc.data().unified?.product?.id || null;
       }
     }
+
+    productId = productId || subscription?.product?.id || null;
+
+    // Falls back to the "_test_<id>" sentinel when no real Stripe product is configured.
+    const products = ctx.Manager.config.payment?.products || [];
+    const product = products.find(p => p.id === productId);
+    const stripeProductId = product
+      ? (product.stripe?.productId || `_test_${product.id}`)
+      : null;
 
     // Detect if user is on a trial
     const isTrialing = subscription?.trial?.claimed

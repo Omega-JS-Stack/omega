@@ -7,6 +7,11 @@
  */
 const path = require('path');
 
+// Webhook event types that mean "money went back to the customer", per processor:
+// PayPal PAYMENT.SALE.REFUNDED, Stripe charge.refunded, Chargebee payment_refunded
+// (each string is the processor's own, as its webhook parser reports it).
+const REFUND_EVENTS = ['PAYMENT.SALE.REFUNDED', 'charge.refunded', 'payment_refunded'];
+
 /**
  * Detect what transition occurred based on category and before/after state
  *
@@ -14,11 +19,12 @@ const path = require('path');
  * @param {object|null} before - Previous state (null for new users / one-time)
  * @param {object} after - New unified state about to be written
  * @param {string} eventType - Original webhook event type (used for one-time detection)
+ * @param {object} [options] - { previouslyCompleted } — this webhook doc already completed once
  * @returns {string|null} Transition name or null if no meaningful change
  */
-function detectTransition(category, before, after, eventType) {
+function detectTransition(category, before, after, eventType, options) {
   if (category === 'subscription') {
-    return detectSubscriptionTransition(before, after, eventType);
+    return detectSubscriptionTransition(before, after, eventType, options);
   }
 
   if (category === 'one-time') {
@@ -35,17 +41,26 @@ function detectTransition(category, before, after, eventType) {
  *
  * @param {object|null} before - Previous users/{uid}.subscription (null/undefined for new users)
  * @param {object} after - New unified subscription
+ * @param {string} eventType - Original webhook event type
+ * @param {object} [options] - { previouslyCompleted } — this webhook doc already completed once
  * @returns {string|null} Transition name
  */
-function detectSubscriptionTransition(before, after, eventType) {
+function detectSubscriptionTransition(before, after, eventType, options) {
   if (!after) {
     return null;
   }
 
   // Refund events take priority — detected by webhook event type rather than state diff
   // because the subscription state may not change meaningfully during a refund
-  const refundEvents = ['PAYMENT.SALE.REFUNDED', 'charge.refunded'];
-  if (refundEvents.includes(eventType)) {
+  if (REFUND_EVENTS.includes(eventType)) {
+    // Idempotency: refund detection is event-type-only, so a webhook doc that is
+    // processed a second time (a redelivery, or a doc put back to pending) would
+    // re-dispatch payment-refunded and email the customer about the same refund
+    // twice. A doc that already completed once has already sent it.
+    if (options?.previouslyCompleted) {
+      return null;
+    }
+
     return 'payment-refunded';
   }
 
@@ -156,6 +171,7 @@ module.exports = {
   detectOneTimeTransition,
   dispatch,
   // Exported for testing
+  REFUND_EVENTS,
   isBasicOrNull,
   isPaid,
 };

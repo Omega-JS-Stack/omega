@@ -10,7 +10,7 @@
  * Stripe then sends a customer.subscription.deleted webhook which the existing
  * pipeline processes to update Firestore.
  */
-const FULL_REFUND_DAYS = 7;
+const { FULL_REFUND_DAYS } = require('../../../../libraries/payment/refund-policy.js');
 
 module.exports = {
   /**

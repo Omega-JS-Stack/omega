@@ -7,8 +7,10 @@
 // Libraries
 import omega from '@omega.js/client';
 
-// The N6 personas the backend emulator seeds on boot (packages/backend
-// src/test/test-accounts.js) — localpart → label. All share TEST_PASSWORD.
+// The personas worth switching between by hand — a CURATED subset of what the
+// backend emulator seeds on boot (packages/backend src/test/test-accounts.js),
+// not a mirror of it: the lifecycle states, then the four billing-journey
+// personas the flows lane drives. Localpart → label; all share TEST_PASSWORD.
 const PERSONAS = [
   { localpart: '_test.admin', label: 'Admin' },
   { localpart: '_test.basic', label: 'Basic' },
@@ -17,6 +19,10 @@ const PERSONAS = [
   { localpart: '_test.premium-suspended', label: 'Suspended' },
   { localpart: '_test.premium-cancelling', label: 'Cancelling' },
   { localpart: '_test.refunded', label: 'Refunded' },
+  { localpart: '_test.journey-flows-upgrade', label: 'Journey: Upgrade' },
+  { localpart: '_test.journey-flows-cancel', label: 'Journey: Cancel' },
+  { localpart: '_test.journey-flows-failure', label: 'Journey: Failure' },
+  { localpart: '_test.journey-flows-trial', label: 'Journey: Trial' },
 ];
 
 // Deterministic seeded password (emulator-only accounts — public by design)
@@ -134,6 +140,16 @@ function personaDomain() {
 }
 
 /**
+ * Is this the email of a seeded persona? Only those may be reset — the reset
+ * route deletes and recreates the account, so it refuses anything else anyway.
+ * @param {string} email
+ * @returns {boolean}
+ */
+function isPersona(email) {
+  return (email || '').startsWith('_test.');
+}
+
+/**
  * Build one panel section: label + node.
  */
 function section(doc, label, node) {
@@ -215,6 +231,36 @@ export default function devPalette() {
     personaGrid.appendChild(button);
   });
 
+  // Reset to seed — ONE control on the account you are signed in as (#215).
+  // A journey mutates its persona; this puts it back to the shape the backend
+  // seeded, user doc and purchase record alike, without an emulator reboot.
+  // Only personas can be reset, so it stays hidden for anybody else.
+  const reset = doc.createElement('button');
+  reset.type = 'button';
+  reset.className = 'omega-devbar__btn';
+  reset.textContent = 'Reset to seed';
+  reset.hidden = true;
+  reset.style.marginTop = '0.375rem';
+  reset.style.width = '100%';
+  reset.addEventListener('click', async () => {
+    const email = omega.auth().getUser()?.email;
+    if (!email) {
+      return;
+    }
+
+    reset.dataset.busy = 'true';
+    try {
+      await omega.request('/omega/test/reset-account', { method: 'POST' });
+      // The reset recreates the auth user, which kills this session — sign the
+      // same persona straight back in before reloading onto its seeded state.
+      await omega.auth().signInWithEmailAndPassword(email, TEST_PASSWORD);
+      window.location.reload();
+    } catch (error) {
+      reset.dataset.busy = 'false';
+      who.textContent = `✕ ${error.message} — is the backend emulator running? (npm run emulator)`;
+    }
+  });
+
   // Sign out rides the SHARED trigger (#16) — the class IS the wiring, so the
   // palette can never drift from what a real sign-out button does.
   const signOut = doc.createElement('button');
@@ -252,6 +298,7 @@ export default function devPalette() {
     head,
     section(doc, 'Signed in as', who),
     section(doc, 'Switch account', personaGrid),
+    reset,
     signOut,
     section(doc, 'Go to', links),
     note,
@@ -275,5 +322,6 @@ export default function devPalette() {
   omega.auth().listen({}, () => {
     const user = omega.auth().getUser();
     who.textContent = user?.email || 'Signed out';
+    reset.hidden = !isPersona(user?.email);
   });
 }

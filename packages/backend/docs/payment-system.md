@@ -204,6 +204,8 @@ module.exports = {
 module.exports = {
   isSupported(eventType) { return boolean; },
   parseWebhook(req) { return { eventId, eventType, category, resourceType, resourceId, raw, uid }; },
+  // Optional — the processor's native signature, checked over the raw bytes
+  verifySignature(req) { return { status: 'verified' | 'invalid' | 'unconfigured', reason }; },
 };
 ```
 
@@ -322,8 +324,35 @@ Key rules:
 | `payments-orders/{orderId}` | Order ID | Unified order data (single source of truth for orders) |
 | `users/{uid}.subscription` | User UID | Current subscription state (subscriptions only) |
 
+## Webhook Verification
+
+Two layers gate `POST /payments/webhook`:
+
+1. **The shared key** — `?key=<OMEGA_WEBHOOK_KEY>`, compared in constant time. Every processor rides it, and a mismatch is a 401 before anything else runs.
+2. **The processor's native signature** — a webhook processor may export `verifySignature(req)`, which the route runs before the payload is parsed or stored.
+
+| Processor | Native verification | Secret |
+|---|---|---|
+| `stripe` | The `stripe-signature` header checked against the raw bytes (`constructEvent`, which also enforces Stripe's timestamp tolerance, so a captured event cannot be replayed) | `STRIPE_WEBHOOK_SECRET` |
+| `paypal` | None yet — PayPal's scheme needs the endpoint's webhook ID, and nothing carries it into the backend | — |
+| `chargebee` | None — Chargebee does not sign payloads; credentials on the webhook URL are its mechanism, which the shared key already is | — |
+| `test` | None by design — its events are fabricated locally, and the route answers 403 in production | — |
+
+The dispute-alert route runs the same layer: its Chargeblast processor verifies the Svix headers (`svix-id`/`svix-timestamp`/`svix-signature`, HMAC over the raw bytes, 5-minute replay tolerance) when its secret is set.
+
+| Processor | Native verification | Secret |
+|---|---|---|
+| `chargeblast` (dispute-alert) | Svix signature over the raw bytes | `CHARGEBLAST_WEBHOOK_SECRET` |
+
+The fail mode is per processor, per configuration:
+
+- **Secret configured** → strict. A missing signature, a payload the signature does not cover, or a request that arrived without its raw bytes (only delivered bytes can be verified — re-serializing the parsed body would check a guess) is a 401, logged with the reason.
+- **Secret not configured** → the key-only path, with one warn per processor per instance naming the variable to set.
+
+Verification never needs the processor's API key: `STRIPE_WEBHOOK_SECRET` is the endpoint's signing secret from the Stripe Dashboard, or the one `stripe listen --print-secret` prints for a locally forwarded run ([stripe-webhook-forwarding.md](stripe-webhook-forwarding.md)).
+
 ## Test Processor
 
 The `test` processor generates Stripe-shaped data and auto-fires webhooks to the local server. Only available in non-production environments. Use `processor: 'test'` in intent requests during testing. The test webhook processor delegates to Stripe's parser since it generates Stripe-shaped payloads.
 
-Both doors enforce that: the intent side throws inside `intent/processors/test.js`, and `POST /payments/webhook?processor=test` answers 403 in production (the webhook processors receive only the raw request, so the route's dispatch layer carries the guard). Real processors are unaffected — a provider dashboard points at `POST /omega/payments/webhook?processor=<processor>&key=<OMEGA_WEBHOOK_KEY>`, and that shared key compare is the whole verification story for the webhook door.
+Both doors enforce that: the intent side throws inside `intent/processors/test.js`, and `POST /payments/webhook?processor=test` answers 403 in production (the webhook processors receive only the raw request, so the route's dispatch layer carries the guard). Real processors are unaffected — a provider dashboard points at `POST /omega/payments/webhook?processor=<processor>&key=<OMEGA_WEBHOOK_KEY>`, where the shared key is the outer layer and the processor's own signature is the boundary ([Webhook Verification](#webhook-verification)).

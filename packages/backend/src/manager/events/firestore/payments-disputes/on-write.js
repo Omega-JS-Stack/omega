@@ -73,8 +73,8 @@ module.exports = async ({ ctx, change, context }) => {
 
       // Still send email to alert brand about unmatched dispute
       if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
-        sendDisputeEmail({ alert, match: null, result: null, alertId, ctx });
-        await disputeRef.set({ actions: { email: 'success' } }, { merge: true });
+        const emailStatus = await sendDisputeEmail({ alert, match: null, result: null, alertId, ctx });
+        await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
       } else {
         ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
         await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
@@ -114,10 +114,10 @@ module.exports = async ({ ctx, change, context }) => {
       },
     }, { merge: true });
 
-    // Send email alert (fire-and-forget)
+    // Send email alert — awaited, because the dispute doc records its outcome
     if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
-      sendDisputeEmail({ alert, match, result, alertId, ctx });
-      await disputeRef.set({ actions: { email: 'success' } }, { merge: true });
+      const emailStatus = await sendDisputeEmail({ alert, match, result, alertId, ctx });
+      await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
     } else {
       ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
       await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
@@ -135,7 +135,10 @@ module.exports = async ({ ctx, change, context }) => {
 };
 
 /**
- * Send dispute alert email to brand contact (fire-and-forget)
+ * Send dispute alert email to brand contact
+ *
+ * Returns the outcome the dispute doc records — the caller must never claim a send
+ * that did not happen, so this resolves rather than throws.
  *
  * @param {object} options
  * @param {object} options.alert - Normalized alert data
@@ -143,6 +146,7 @@ module.exports = async ({ ctx, change, context }) => {
  * @param {object} [options.result] - Processing result (refund/cancel statuses)
  * @param {string} options.alertId - Dispute alert ID
  * @param {object} options.ctx - Assistant instance
+ * @returns {Promise<'success'|'failed'|'skipped'>}
  */
 function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   const Manager = ctx.Manager;
@@ -151,7 +155,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
 
   if (!brandEmail) {
     ctx.error(`sendDisputeEmail(): No brand.contact.email configured, skipping`);
-    return;
+    return Promise.resolve('skipped');
   }
 
   const matched = match ? 'Matched' : 'Unmatched';
@@ -225,7 +229,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
     messageLines.push('</ul>');
   }
 
-  email.send({
+  return email.send({
     sender: 'internal',
     to: brandEmail,
     subject: subject,
@@ -246,8 +250,13 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   })
     .then((r) => {
       ctx.log(`sendDisputeEmail(): Success alertId=${alertId}`);
+      return 'success';
     })
     .catch((e) => {
       ctx.error(`sendDisputeEmail(): Failed alertId=${alertId}: ${e.message}`);
+      return 'failed';
     });
 }
+
+// Exported for testing
+module.exports.sendDisputeEmail = sendDisputeEmail;

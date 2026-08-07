@@ -55,6 +55,20 @@ const Test = {
 
           return reconstructed;
         }
+
+        // The same reconstruction on the one-time side: a session/invoice webhook
+        // that carries no metadata (no uid, no orderId) is answered from the order
+        // the first webhook already wrote
+        if (data.type === 'one-time' && data.unified) {
+          const reconstructed = buildStripeOneTimeFromOrder(data, resourceId);
+
+          // Keep the webhook's fresh state, take the metadata only the order has
+          if (rawFallback && Object.keys(rawFallback).length > 0) {
+            return { ...rawFallback, metadata: { ...rawFallback.metadata, ...reconstructed.metadata } };
+          }
+
+          return reconstructed;
+        }
       }
     }
 
@@ -160,6 +174,28 @@ function buildStripeSubscriptionFromUnified(unified, resourceId, eventType, conf
     canceled_at: null,
     trial_start: unified.trial?.claimed ? (unified.payment?.startDate?.timestampUNIX || 0) : null,
     trial_end: unified.trial?.claimed ? (unified.trial?.expires?.timestampUNIX || 0) : null,
+  };
+}
+
+/**
+ * Reconstruct a Stripe-shaped one-time resource from the order stored in Firestore
+ *
+ * The one-time twin of buildStripeSubscriptionFromUnified(): what a real API call
+ * would return for a session/invoice — most importantly the metadata (uid, orderId,
+ * productId) that a bare webhook payload may not carry.
+ */
+function buildStripeOneTimeFromOrder(order, resourceId) {
+  const unified = order.unified || {};
+
+  return {
+    id: resourceId,
+    object: 'checkout.session',
+    status: unified.status === 'completed' ? 'complete' : unified.status || 'complete',
+    metadata: {
+      orderId: unified.payment?.orderId || order.id || null,
+      uid: order.owner || null,
+      productId: unified.product?.id || order.productId || null,
+    },
   };
 }
 

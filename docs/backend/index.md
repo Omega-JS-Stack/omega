@@ -174,7 +174,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 
 - [docs/verts.md](../../packages/backend/docs/verts.md) — house verts module (adblock-safe ad system): `verts` collection, public `GET /omega/verts/serve` (self-contained HTML unit, 204 no-fill) + fail-closed `GET /omega/verts/redirect`, admin CRUD, in-memory inventory cache (~5 min TTL), contextual targeting × weight selection
 - [docs/admin-post-route.md](../../packages/backend/docs/admin-post-route.md) — `POST/PUT /admin/post` blog creation via GitHub (image extraction + resize at ingest + `@post/` rewriting). Also the publish target for the Ghostii article engine (`libraries/content/ghostii.js`).
-- [docs/payment-system.md](../../packages/backend/docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, processor interface, product config, test processor
+- [docs/payment-system.md](../../packages/backend/docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, processor interface, webhook verification (the shared key plus each processor's native signature), product config, test processor
 - [docs/marketing-campaigns.md](../../packages/backend/docs/marketing-campaigns.md) — campaign CRUD routes, recurring campaigns, generator pipeline (newsletter), newsletter-driven blog article (`content.article.enabled`), template-owned schemas, asset hosting, seed campaigns
 - [docs/consent.md](../../packages/backend/docs/consent.md) — marketing consent capture: canonical `consent.{legal,marketing}` user-doc shape, signup-form capture, account-page toggle, HMAC unsub link (cross-provider unsub + re-add on resubscribe), admin contact-DELETE revoke mirror, SendGrid+Beehiiv webhook receivers, parent forwarder (`/marketing/webhook/forward`), library-level consent gate in `email.add()`/`email.sync()` (revoked-only skip), migration script template
 - [docs/mcp.md](../../packages/backend/docs/mcp.md) — Model Context Protocol server: 28 tools with role-based scoping (24 admin / 2 user / 2 public), tool annotations (title, read/write hints), OAuth 2.1 with PKCE + dynamic client registration + consumer website sign-in, consumer MCP tools (`src/mcp.js`), HTTPS local dev (mkcert), Claude Desktop/Chat/Code configuration
@@ -186,7 +186,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/usage-rate-limiting.md](../../packages/backend/docs/usage-rate-limiting.md) — usage tracking, monthly/daily caps, `setUser()` + mirrors for proxy usage, reset schedule
 - [docs/ai-library.md](../../packages/backend/docs/ai-library.md) — `Manager.AI()` unified entry for OpenAI + Anthropic (text via `.request()`, images via `.image()` → `gpt-image-2`)
 - [docs/marketing-fields.md](../../packages/backend/docs/marketing-fields.md) — adding custom fields to SendGrid + Beehiiv via the @omega.js/backend/OMEGA SSOT pair
-- [docs/stripe-webhook-forwarding.md](../../packages/backend/docs/stripe-webhook-forwarding.md) — auto-started Stripe CLI forwarding for local dev
+- [docs/stripe-webhook-forwarding.md](../../packages/backend/docs/stripe-webhook-forwarding.md) — auto-started Stripe CLI forwarding for local dev, and the CLI's own signing secret a locally verified run needs
 
 ### Testing & CLI
 

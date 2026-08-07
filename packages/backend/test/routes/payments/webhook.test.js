@@ -1,8 +1,35 @@
 /**
  * Test: POST /payments/webhook
  * Tests the webhook endpoint validates requests and saves to Firestore
+ *
+ * The Stripe round trips ride the real HTTP surface, so they are also the proof
+ * that the delivered bytes reach the route as `req.rawBody` — the only thing a
+ * signature can be verified against. They sign whenever `STRIPE_WEBHOOK_SECRET`
+ * is configured (the sandbox brand's .env carries one); a consumer without it
+ * runs the route's key-only mode instead, and the strict cases skip. The gate's
+ * own matrix lives in webhook-signature.test.js.
  */
+const Stripe = require('stripe');
 const { TEST_ACCOUNTS } = require('../../../src/test/test-accounts.js');
+
+// The bytes the http client puts on the wire are JSON.stringify(payload) — the
+// same bytes Firebase hands the route, and the ones this signature covers.
+function stripeSignature(payload, secret) {
+  return Stripe.webhooks.generateTestHeaderString({
+    payload: JSON.stringify(payload),
+    secret: secret,
+  });
+}
+
+// Request options carrying a Stripe signature header, or none when the route is
+// in key-only mode.
+function signedOptions(payload, secret) {
+  if (!secret) {
+    return undefined;
+  }
+
+  return { headers: { 'stripe-signature': stripeSignature(payload, secret) } };
+}
 
 module.exports = {
   description: 'Payment webhook endpoint',
@@ -49,8 +76,7 @@ module.exports = {
       auth: 'none',
       async run({ http, assert, firestore }) {
         const eventId = '_test-evt-valid-webhook';
-
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const payload = {
           id: eventId,
           type: 'customer.subscription.updated',
           data: {
@@ -60,7 +86,13 @@ module.exports = {
               status: 'active',
             },
           },
-        });
+        };
+
+        const response = await http.as('none').post(
+          `backend-manager/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          payload,
+          signedOptions(payload, process.env.STRIPE_WEBHOOK_SECRET),
+        );
 
         assert.isSuccess(response, 'Should accept valid webhook');
         assert.equal(response.data.received, true, 'Should confirm receipt');
@@ -73,6 +105,55 @@ module.exports = {
           doc.status === 'pending' || doc.status === 'processing' || doc.status === 'completed' || doc.status === 'failed',
           'Status should be pending, processing, completed, or failed',
         );
+      },
+    },
+
+    {
+      name: 'rejects-unsigned-stripe-webhook',
+      auth: 'none',
+      async run({ http, assert, skip }) {
+        if (!process.env.STRIPE_WEBHOOK_SECRET) {
+          return skip('STRIPE_WEBHOOK_SECRET is not configured — the route runs key-only here');
+        }
+
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+          id: '_test-evt-unsigned-webhook',
+          type: 'customer.subscription.updated',
+          data: { object: { id: 'sub_test_unsigned', metadata: { uid: TEST_ACCOUNTS.basic.uid }, status: 'active' } },
+        });
+
+        assert.isError(response, 401, 'Should reject an unsigned webhook while the secret is configured');
+      },
+    },
+
+    {
+      name: 'rejects-stripe-webhook-signed-for-other-bytes',
+      auth: 'none',
+      async run({ http, assert, firestore, skip }) {
+        const secret = process.env.STRIPE_WEBHOOK_SECRET;
+
+        if (!secret) {
+          return skip('STRIPE_WEBHOOK_SECRET is not configured — the route runs key-only here');
+        }
+
+        const eventId = '_test-evt-forged-webhook';
+        const signature = stripeSignature({ id: eventId, type: 'customer.subscription.updated', data: { object: { id: 'sub_test_signed' } } }, secret);
+
+        // Same signature, different body — the forgery the shared key cannot catch.
+        const response = await http.as('none').post(
+          `backend-manager/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          {
+            id: eventId,
+            type: 'customer.subscription.updated',
+            data: { object: { id: 'sub_test_forged', metadata: { uid: TEST_ACCOUNTS.basic.uid }, status: 'active' } },
+          },
+          { headers: { 'stripe-signature': signature } },
+        );
+
+        assert.isError(response, 401, 'Should reject a payload the signature does not cover');
+
+        const doc = await firestore.get(`payments-webhooks/${eventId}`);
+        assert.equal(doc, null, 'A rejected webhook must never reach Firestore');
       },
     },
 

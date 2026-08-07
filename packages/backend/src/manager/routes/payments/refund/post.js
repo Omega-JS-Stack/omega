@@ -78,8 +78,10 @@ module.exports = async ({ ctx, user, settings }) => {
   try {
     refund = await processorModule.processRefund({ resourceId, uid, subscription, ctx });
   } catch (e) {
-    ctx.log(`Failed to process refund via ${processor}: ${e.message}`);
-    return ctx.respond(`Failed to process refund: ${e.message}`, { code: 500 });
+    // The processor's own words stay in the logs — a client gets one neutral
+    // sentence, never an SDK message naming our internals ([#212]).
+    ctx.error(`Failed to process refund via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    return ctx.respond('We could not process your refund right now. Please try again shortly.', { code: 500 });
   }
 
   // Store refund reason/feedback on the order doc

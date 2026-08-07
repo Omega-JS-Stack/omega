@@ -5,8 +5,18 @@
  * PayPal refunds are issued against individual sale/capture transactions,
  * not against the subscription itself. We find the most recent completed
  * transaction and refund it.
+ *
+ * Proration is the same day-based compute Stripe and Chargebee run — PayPal
+ * just makes us assemble the period ourselves: it exposes no period_start /
+ * period_end on a transaction, so the period the refunded payment bought runs
+ * from that payment forward one billing interval. The interval comes from the
+ * subscription's own plan; when neither the plan nor `next_billing_time` can
+ * supply it the refund REFUSES rather than guessing at somebody's money
+ * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  */
-const FULL_REFUND_DAYS = 7;
+const { FULL_REFUND_DAYS } = require('../../../../libraries/payment/refund-policy.js');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 module.exports = {
   /**
@@ -58,23 +68,20 @@ module.exports = {
       refundAmount = transactionAmount;
       isFullRefund = true;
     } else {
-      // Prorated refund — estimate based on billing cycle
-      // PayPal doesn't expose period start/end per transaction like Stripe
-      // Approximate: 30 days for monthly, 365 for yearly
+      // Prorated: remaining days / total days * amount — the same compute the
+      // Stripe and Chargebee processors run, over a period PayPal makes us derive.
       const sub = await PayPalLib.request(`/v1/billing/subscriptions/${resourceId}`);
-      const nextBilling = sub.billing_info?.next_billing_time
-        ? new Date(sub.billing_info.next_billing_time)
-        : null;
+      const periodEnd = await this.resolvePeriodEnd({ sub, resourceId, periodStart: transactionDate, PayPalLib, ctx });
 
-      if (nextBilling) {
-        const totalDays = (nextBilling - transactionDate) / (1000 * 60 * 60 * 24);
-        const daysRemaining = Math.max(0, (nextBilling - now) / (1000 * 60 * 60 * 24));
-        refundAmount = Math.round((daysRemaining / totalDays) * transactionAmount * 100) / 100;
-      } else {
-        // Fallback: half refund
-        refundAmount = Math.round(transactionAmount * 50) / 100;
+      const totalDays = (periodEnd - transactionDate) / DAY_MS;
+
+      if (totalDays <= 0) {
+        throw new Error(`PayPal billing period for subscription ${resourceId} ends at or before the payment it covers — refusing to prorate`);
       }
 
+      const daysRemaining = Math.max(0, (periodEnd - now) / DAY_MS);
+
+      refundAmount = Math.round((daysRemaining / totalDays) * transactionAmount * 100) / 100;
       isFullRefund = false;
     }
 
@@ -113,5 +120,66 @@ module.exports = {
       currency: currency.toLowerCase(),
       full: isFullRefund,
     };
+  },
+
+  /**
+   * Resolve the end of the billing period a PayPal payment bought.
+   *
+   * PayPal's own answer comes first: `billing_info.next_billing_time` IS the
+   * period end while a subscription is live. A cancelled or suspended
+   * subscription drops that field, so the period is rebuilt from the payment
+   * being refunded plus the plan's REGULAR billing interval — the same
+   * derivation the PayPal library's period-end resolution runs. When neither is
+   * available the refund refuses: an invented period is an invented amount of
+   * somebody's money.
+   *
+   * @param {object} options
+   * @param {object} options.sub - The PayPal subscription resource
+   * @param {string} options.resourceId - PayPal subscription ID (for messages)
+   * @param {Date} options.periodStart - Start of the period being refunded (the payment's own date)
+   * @param {object} options.PayPalLib - The PayPal library (plan lookup)
+   * @param {object} options.ctx - Assistant instance for logging
+   * @returns {Promise<Date>} The period end
+   * @throws {Error} When the billing period cannot be derived
+   */
+  async resolvePeriodEnd({ sub, resourceId, periodStart, PayPalLib, ctx }) {
+    const nextBilling = sub.billing_info?.next_billing_time;
+
+    if (nextBilling) {
+      return new Date(nextBilling);
+    }
+
+    if (!sub.plan_id) {
+      throw new Error(`PayPal subscription ${resourceId} has no next_billing_time and no plan_id — the billing period cannot be derived`);
+    }
+
+    const plan = await PayPalLib.request(`/v1/billing/plans/${sub.plan_id}`);
+    const cycle = (plan.billing_cycles || []).find(c => c.tenure_type === 'REGULAR');
+    const unit = cycle?.frequency?.interval_unit;
+    const count = cycle?.frequency?.interval_count || 1;
+
+    if (!unit) {
+      throw new Error(`PayPal plan ${sub.plan_id} exposes no REGULAR billing interval — the billing period cannot be derived`);
+    }
+
+    // UTC arithmetic on purpose: the local-time setters shift the period by an
+    // hour across a DST boundary, and a billing period is not a wall clock.
+    const periodEnd = new Date(periodStart);
+
+    if (unit === 'YEAR') {
+      periodEnd.setUTCFullYear(periodEnd.getUTCFullYear() + count);
+    } else if (unit === 'MONTH') {
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + count);
+    } else if (unit === 'WEEK') {
+      periodEnd.setUTCDate(periodEnd.getUTCDate() + (count * 7));
+    } else if (unit === 'DAY') {
+      periodEnd.setUTCDate(periodEnd.getUTCDate() + count);
+    } else {
+      throw new Error(`PayPal plan ${sub.plan_id} uses an unknown billing interval "${unit}" — the billing period cannot be derived`);
+    }
+
+    ctx.log(`PayPal period end derived from plan ${sub.plan_id}: ${count} ${unit} after ${periodStart.toISOString()} → ${periodEnd.toISOString()}`);
+
+    return periodEnd;
   },
 };

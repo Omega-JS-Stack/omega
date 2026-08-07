@@ -9,7 +9,7 @@
  * Chargebee refunds are issued on invoices via POST /invoices/{id}/refund.
  * After refunding, the subscription is cancelled immediately.
  */
-const FULL_REFUND_DAYS = 7;
+const { FULL_REFUND_DAYS } = require('../../../../libraries/payment/refund-policy.js');
 
 module.exports = {
   /**

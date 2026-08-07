@@ -132,8 +132,10 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       ctx,
     });
   } catch (e) {
-    ctx.log(`Failed to create ${processor} intent: ${e.message}`);
-    return ctx.respond(`Failed to create intent: ${e.message}`, { code: 500 });
+    // The processor's own words stay in the logs — a client gets one neutral
+    // sentence, never an SDK message naming our internals ([#212]).
+    ctx.error(`Failed to create ${processor} intent: uid=${uid}, product=${productId}, error=${e.message}`);
+    return ctx.respond('We could not start your checkout right now. Please try again shortly.', { code: 500 });
   }
 
   ctx.log(`${processor} intent created: id=${result.id}, url=${result.url}`);

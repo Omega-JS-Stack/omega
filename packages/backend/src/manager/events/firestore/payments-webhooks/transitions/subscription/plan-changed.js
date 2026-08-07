@@ -5,7 +5,15 @@
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
 module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
-  const direction = (after.product?.id || '') > (before.product?.id || '') ? 'upgrade' : 'downgrade';
+  // Direction comes from what the plan costs, and only when the two prices are
+  // comparable — different billing cadences are not, and product IDs never were.
+  const beforePrice = Number(before.payment?.price) || 0;
+  const afterPrice = Number(after.payment?.price) || 0;
+  const comparable = before.payment?.frequency === after.payment?.frequency && beforePrice !== afterPrice;
+  const direction = comparable
+    ? (afterPrice > beforePrice ? 'upgrade' : 'downgrade')
+    : 'change';
+
   ctx.log(`Transition [subscription/plan-changed]: uid=${uid}, ${before.product?.id} → ${after.product?.id} (${direction})`);
 
   sendOrderEmail({

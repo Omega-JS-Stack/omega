@@ -30,11 +30,18 @@ module.exports = async ({ ctx, change, context }) => {
   const eventId = context.params.eventId;
   const webhookRef = admin.firestore().doc(`payments-webhooks/${eventId}`);
 
+  // A doc that already completed once and is pending again is a REPROCESS (a
+  // redelivery, or a doc put back to pending) — the transitions that fire on the
+  // event type alone must not dispatch their email a second time.
+  const previouslyCompleted = change.before.data()?.status === 'completed';
+
   // Set status to processing
   await webhookRef.set({ status: 'processing' }, { merge: true });
 
   // Hoisted so orderId is available in catch block for audit trail
   let orderId = null;
+  let passThruOrderId = null;
+  let library = null;
 
   try {
     const processor = dataAfter.processor;
@@ -53,7 +60,6 @@ module.exports = async ({ ctx, change, context }) => {
     }
 
     // Load the shared library for this processor
-    let library;
     try {
       library = loadProcessor(path.join(__dirname, '../../../libraries/payment/processors'), processor);
     } catch (e) {
@@ -63,9 +69,11 @@ module.exports = async ({ ctx, change, context }) => {
     // Fetch the latest resource from the processor API
     // This ensures we always work with the most current state, not stale webhook data
     const rawFallback = raw.data?.object || {};
-    const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, eventType, config: Manager.config });
+    const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, ctx, eventType, config: Manager.config });
 
-    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resource.status || 'unknown'}`);
+    // A flagged resource is the webhook's own payload, not the API's answer — say which
+    const source = resource._stale ? 'stale-fallback (webhook payload, processor API unreachable)' : 'processor API';
+    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resource.status || 'unknown'}, source=${source}`);
 
     // Resolve UID from the fetched resource if not available from webhook parse
     // This handles events like PAYMENT.SALE where the Sale object doesn't carry custom_id
@@ -84,7 +92,6 @@ module.exports = async ({ ctx, change, context }) => {
     // Chargebee hosted page checkouts don't forward subscription[meta_data] to the subscription,
     // but pass_thru_content is stored on the hosted page and contains our UID + orderId
     let resolvedFromPassThru = false;
-    let passThruOrderId = null;
     if (!uid && library.resolveUidFromHostedPage) {
       const passThruResult = await library.resolveUidFromHostedPage(resourceId, ctx);
       if (passThruResult) {
@@ -124,7 +131,7 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const transitionName = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, ctx, raw });
+    const transitionName = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
 
     // Mark webhook as completed (include transition name for auditing/testing)
     await webhookRef.set({
@@ -153,6 +160,20 @@ module.exports = async ({ ctx, change, context }) => {
       error: e.message || String(e),
     }, { merge: true });
 
+    // A throw before the orderId was resolved (a fetchResource failure, an
+    // unresolvable UID) would otherwise leave the intent pending forever — resolve
+    // it from what IS available: the webhook doc, or the raw payload the processor
+    // library can read an orderId out of.
+    if (!orderId) {
+      orderId = resolveOrderIdAfterFailure({ dataAfter, library, ctx }) || passThruOrderId;
+
+      if (orderId) {
+        ctx.log(`Resolved orderId ${orderId} for failed webhook ${eventId} from the webhook payload`);
+      } else {
+        ctx.warn(`Webhook ${eventId} failed with no resolvable orderId — its payments-intents doc (if any) stays pending and needs manual reconciliation`);
+      }
+    }
+
     // Mark intent as failed if we resolved the orderId before the error
     if (orderId) {
       await admin.firestore().doc(`payments-intents/${orderId}`).set({
@@ -170,6 +191,37 @@ module.exports = async ({ ctx, change, context }) => {
 };
 
 /**
+ * Resolve the orderId for a webhook that threw before the happy path resolved one
+ *
+ * @param {object} options
+ * @param {object} options.dataAfter - The webhook doc's data
+ * @param {object|null} options.library - Processor library (null when loading it was what failed)
+ * @param {object} options.ctx - Assistant instance
+ * @returns {string|null}
+ */
+function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
+  // An earlier pass may already have stamped it on the doc
+  if (dataAfter.orderId) {
+    return dataAfter.orderId;
+  }
+
+  const rawObject = dataAfter.raw?.data?.object;
+
+  if (!library?.getOrderId || !rawObject) {
+    return null;
+  }
+
+  // The same extraction the happy path uses, over the webhook payload instead of
+  // the fetched resource
+  try {
+    return library.getOrderId(rawObject) || null;
+  } catch (e) {
+    ctx.error(`resolveOrderIdAfterFailure(): ${dataAfter.processor} getOrderId() threw on the webhook payload: ${e.message}`, e);
+    return null;
+  }
+}
+
+/**
  * Process a payment event (subscription or one-time)
  * 1. Staleness check
  * 2. Read user doc (for transition detection)
@@ -179,7 +231,7 @@ module.exports = async ({ ctx, change, context }) => {
  * 6. Track analytics (non-blocking)
  * 7. Write to Firestore (user doc for subscriptions + payments-orders)
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, ctx, raw }) {
+async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
   const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
@@ -194,6 +246,10 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
         return null;
       }
     }
+  } else {
+    // The guard keys on the order — without one, an out-of-order delivery cannot be
+    // detected at all. Processing continues, but the unguarded window is visible.
+    ctx.warn(`Webhook ${eventId} has no orderId (processor=${processor}, ${resourceType} ${resourceId}) — the staleness guard cannot run, so an out-of-order delivery for this resource would be applied as-is`);
   }
 
   // Read current user doc (needed for transition detection + handler context)
@@ -271,7 +327,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
 
   // Detect and dispatch transition (non-blocking)
   const shouldRunHandlers = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
-  const transitionName = transitions.detectTransition(category, before, unified, eventType);
+  const transitionName = transitions.detectTransition(category, before, unified, eventType, { previouslyCompleted });
+
+  if (!transitionName && previouslyCompleted && transitions.REFUND_EVENTS.includes(eventType)) {
+    ctx.log(`Transition suppressed (idempotency): webhook ${eventId} already completed once, so its refund email was already sent`);
+  }
 
   if (transitionName) {
     ctx.log(`Transition detected: ${category}/${transitionName} (before.status=${before?.status || 'null'}, after.status=${unified.status})`);

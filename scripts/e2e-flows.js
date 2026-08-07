@@ -83,7 +83,7 @@ const CLASSIC_HOLD_PORTS = [...new Set([...Object.values(CLASSIC_PORTS), 4443, 5
 // Seeded personas (@omega.js/backend's test-accounts.js — every persona shares
 // the deterministic password, and the domain comes from the brand's contact
 // email). One persona per area, so no area's writes can perturb another's.
-const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS } = require('@omega.js/backend/src/test/test-accounts.js');
+const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS, seedOrderFixture } = require('@omega.js/backend/src/test/test-accounts.js');
 const PERSONA_IDS = {
   password: '_test.basic',
   checkout: '_test.premium-expired',
@@ -1098,38 +1098,24 @@ async function main() {
       }
       db = admin.firestore();
 
-      // Persona seeding writes user docs and NOTHING else, so a seeded
-      // subscription arrives without the payments-orders record every real
-      // purchase leaves behind — and two backend surfaces read exactly that
-      // record. The rest of the record is the pipeline's to write.
-      const seedOrder = (key, status) => {
-        const seed = personaSeed(key);
-        const payment = seed.properties.subscription.payment;
-
-        return db.doc(`payments-orders/${payment.orderId}`).set({
-          id: payment.orderId,
-          type: 'subscription',
-          owner: seed.uid,
-          productId: paidProduct.id,
-          processor: payment.processor,
-          resourceId: payment.resourceId,
-          unified: { product: { id: paidProduct.id, name: paidProduct.name }, status },
-        }, { merge: true });
-      };
-
+      // The fixtures are @omega.js/backend's own (`seedOrderFixture`, beside the
+      // persona shapes), so the lane and the dev reset route stand up the SAME
+      // record from ONE definition — each persona's status mirrors its seeded
+      // subscription's.
+      //
       // Surface 1 — the test cancel processor reads the plan's processor
       // product id off the LIVE order. Without it the cancellation webhook
       // would name no plan and the pipeline would resolve the persona down to
       // Basic mid-cancel, which is not what cancelling does.
-      await seedOrder('journey-flows-cancel', 'active');
+      await seedOrderFixture(admin, 'journey-flows-cancel', backendConfig);
       // Surface 2 — trial eligibility (and the intent route's own downgrade
       // guard) call ANY prior subscription order disqualifying, per owner.
       // These LAPSED records' only job is to exist: they are what keep the two
       // journeys that BUY the plan off the 14-day trial, so each one proves
       // what its name claims — a direct purchase, and a payer's renewal being
       // declined — instead of quietly re-running the trial journey.
-      await seedOrder('journey-flows-upgrade', 'cancelled');
-      await seedOrder('journey-flows-failure', 'cancelled');
+      await seedOrderFixture(admin, 'journey-flows-upgrade', backendConfig);
+      await seedOrderFixture(admin, 'journey-flows-failure', backendConfig);
 
       return `3 orders → ${paidProduct.id} (project ${projectId})`;
     });

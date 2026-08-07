@@ -1,4 +1,5 @@
 const powertools = require('node-powertools');
+const staleFallback = require('../stale-fallback.js');
 
 // Lazy singleton Stripe SDK instance
 let stripeInstance = null;
@@ -63,9 +64,16 @@ const Stripe = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it
+      // If the API call fails but we have raw webhook data, use it — flagged and
+      // logged, because the payload is older than the answer we could not get
       if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return rawFallback;
+        return staleFallback(rawFallback, {
+          ctx: context?.ctx,
+          processor: 'stripe',
+          resourceType,
+          resourceId,
+          error: e,
+        });
       }
 
       throw e;

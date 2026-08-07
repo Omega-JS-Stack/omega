@@ -118,6 +118,43 @@ module.exports = {
     },
 
     {
+      name: 'webhook-without-metadata-resolves-from-the-order',
+      async run({ http, firestore, assert, state, config, waitFor }) {
+        // A redelivery that carries no metadata (no uid, no orderId) — the shape a
+        // processor sends when the checkout's metadata never made it onto the event.
+        // The test processor answers it the way a real API would: from the order the
+        // first webhook already wrote, matched on its resourceId.
+        state.bareEventId = `_test-evt-one-time-bare-${Date.now()}`;
+
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+          id: state.bareEventId,
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              id: state.intentId,
+              object: 'checkout.session',
+              mode: 'payment',
+              status: 'complete',
+            },
+          },
+        });
+
+        assert.isSuccess(response, 'Webhook should be accepted');
+
+        await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${state.bareEventId}`);
+          return doc?.status === 'completed' || doc?.status === 'failed';
+        }, 15000, 500);
+
+        const webhookDoc = await firestore.get(`payments-webhooks/${state.bareEventId}`);
+
+        assert.equal(webhookDoc.status, 'completed', `Webhook should complete (error: ${webhookDoc.error || 'none'})`);
+        assert.equal(webhookDoc.owner, state.uid, 'UID should be reconstructed from the order');
+        assert.equal(webhookDoc.orderId, state.orderId, 'Order ID should be reconstructed from the order');
+      },
+    },
+
+    {
       name: 'intent-doc-completed',
       async run({ firestore, assert, state }) {
         const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);

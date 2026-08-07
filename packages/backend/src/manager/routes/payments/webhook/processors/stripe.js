@@ -1,13 +1,34 @@
 /**
  * Stripe webhook processor
- * Extracts, validates, and categorizes webhook event data from Stripe
+ * Verifies, extracts, and categorizes webhook event data from Stripe
  *
  * Each event is mapped to a category (subscription or one-time) and includes
  * the resource type + ID needed to fetch the latest state from Stripe's API.
  */
 
+// The Stripe SDK, loaded on first verification. Signature checking is a keyed
+// hash over the payload — it needs the endpoint secret, never the API key.
+let stripeSdk;
+
+// Invoice events, successful and failed. A renewal produces NO subscription
+// transition (active → active, same product), so the invoice event is the only
+// thing that tells the pipeline money moved — without it Stripe recurring
+// revenue never reaches analytics ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+//
+// `invoice.paid` is deliberately NOT here. Stripe fires it alongside
+// `invoice.payment_succeeded` for the same paid invoice, and the analytics
+// resolver treats every renewal-shaped webhook as its own payment — ingesting
+// both would report a renewal's revenue TWICE. `invoice.payment_succeeded` is
+// the narrower of the two (a payment attempt actually succeeded), so it is the
+// one that carries renewals. A brand must send `invoice.payment_succeeded`:
+// `invoice.paid` is rejected at the route (`isSupported`) and never stored.
+const INVOICE_EVENTS = new Set([
+  'invoice.payment_failed',
+  'invoice.payment_succeeded',
+]);
+
 // Events we process, mapped to their default category
-// Some events (invoice.payment_failed, checkout.session.completed) require
+// Some events (the invoice events, checkout.session.completed) require
 // inspecting the payload to determine the actual category
 const SUPPORTED_EVENTS = new Set([
   // Subscription lifecycle
@@ -15,8 +36,8 @@ const SUPPORTED_EVENTS = new Set([
   'customer.subscription.updated',
   'customer.subscription.deleted',
 
-  // Payment failures (could be subscription or one-time)
-  'invoice.payment_failed',
+  // Invoice outcomes — renewals and failures (could be subscription or one-time)
+  ...INVOICE_EVENTS,
 
   // Checkout completion (could be subscription or one-time)
   'checkout.session.completed',
@@ -31,6 +52,49 @@ module.exports = {
    */
   isSupported(eventType) {
     return SUPPORTED_EVENTS.has(eventType);
+  },
+
+  /**
+   * Verify Stripe's `stripe-signature` header against the delivered bytes
+   *
+   * The shared `?key=` param is a defense layer; this is the boundary. It runs
+   * strictly whenever STRIPE_WEBHOOK_SECRET is set — the endpoint's signing
+   * secret from the Stripe Dashboard, or `stripe listen --print-secret` for a
+   * forwarded local run. Unset, the route stays on the key-only path.
+   *
+   * @param {object} req - The raw HTTP request
+   * @returns {object} { status, reason }
+   *   - status: 'verified' | 'invalid' | 'unconfigured'
+   */
+  verifySignature(req) {
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!secret) {
+      return { status: 'unconfigured', reason: 'STRIPE_WEBHOOK_SECRET is not set' };
+    }
+
+    const signature = req.headers?.['stripe-signature'];
+
+    if (!signature) {
+      return { status: 'invalid', reason: 'no stripe-signature header' };
+    }
+
+    // Only the delivered bytes can be verified — re-serializing req.body would
+    // check a guess. GCF/Firebase requests carry rawBody.
+    if (!req.rawBody) {
+      return { status: 'invalid', reason: 'raw request body unavailable' };
+    }
+
+    stripeSdk = stripeSdk || require('stripe');
+
+    try {
+      // Also enforces Stripe's timestamp tolerance, so a captured event cannot be replayed
+      stripeSdk.webhooks.constructEvent(req.rawBody, signature, secret);
+
+      return { status: 'verified' };
+    } catch (e) {
+      return { status: 'invalid', reason: e.message };
+    }
   },
 
   /**
@@ -67,15 +131,17 @@ module.exports = {
       resourceId = dataObject.id;
       uid = dataObject.metadata?.uid || null;
 
-    } else if (eventType === 'invoice.payment_failed') {
-      // Payment failure — inspect billing_reason to determine category
+    } else if (INVOICE_EVENTS.has(eventType)) {
+      // Invoice outcome (renewal or failure) — inspect billing_reason to determine
+      // category. A subscription invoice resolves to the SUBSCRIPTION it belongs
+      // to, so the pipeline re-fetches live subscription state either way.
       const billingReason = dataObject.billing_reason || '';
       const subscriptionId = dataObject.parent?.subscription_details?.subscription
         || dataObject.subscription
         || null;
 
       if (billingReason.startsWith('subscription') && subscriptionId) {
-        // Subscription-related invoice failure
+        // Subscription-related invoice
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = subscriptionId;
@@ -84,7 +150,7 @@ module.exports = {
           || dataObject.metadata?.uid
           || null;
       } else {
-        // One-time invoice failure
+        // One-time (manual) invoice
         category = 'one-time';
         resourceType = 'invoice';
         resourceId = dataObject.id;

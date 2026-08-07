@@ -9,6 +9,11 @@
  *   event_type: "subscription_created",
  *   content: { subscription: {...}, customer: {...}, invoice: {...} }
  * }
+ *
+ * No verifySignature(): Chargebee does not sign webhook payloads. Its own
+ * authentication mechanism for an endpoint is the credentials carried on the
+ * webhook URL — which is what `?key=<OMEGA_WEBHOOK_KEY>` already is, so these
+ * events are key-only by design, not by omission.
  */
 
 const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');

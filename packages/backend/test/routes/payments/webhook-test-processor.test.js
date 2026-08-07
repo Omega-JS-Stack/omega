@@ -43,6 +43,23 @@ function withProductionEnvironment(fn) {
   }
 }
 
+// Run the thunk with Stripe's signature gate off. This suite is about the production
+// guard, so its real-processor case rides the key-only path deliberately — the gate
+// itself is proven in webhook-signature.test.js.
+function withoutStripeSignatureGate(fn) {
+  const original = process.env.STRIPE_WEBHOOK_SECRET;
+
+  delete process.env.STRIPE_WEBHOOK_SECRET;
+
+  try {
+    return fn();
+  } finally {
+    if (original !== undefined) {
+      process.env.STRIPE_WEBHOOK_SECRET = original;
+    }
+  }
+}
+
 // A minimal express-shaped response recorder — the one external sink respond() writes to.
 function recordingResponse() {
   const sent = { code: null, body: null, headers: {} };
@@ -109,12 +126,12 @@ module.exports = {
     {
       name: 'real-processors-are-untouched-in-production',
       async run({ assert, Manager }) {
-        const sent = await withProductionEnvironment(() => callWebhook({
+        const sent = await withoutStripeSignatureGate(() => withProductionEnvironment(() => callWebhook({
           Manager,
           query: { processor: 'stripe', key: VALID_KEY() },
           // An unsupported event type — the handler ignores it before any Firestore write.
           body: { id: '_test-evt-prod-stripe', type: 'ping.unsupported', data: { object: {} } },
-        }));
+        })));
 
         assert.equal(sent.code, 200, `Stripe should still be accepted in production, got ${sent.code}`);
         assert.equal(sent.body.ignored, true, 'Unsupported event should be ignored');

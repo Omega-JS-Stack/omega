@@ -1,4 +1,5 @@
 const powertools = require('node-powertools');
+const staleFallback = require('../stale-fallback.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -180,9 +181,20 @@ const PayPal = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it
+      // If the API call fails but we have raw webhook data, use it — flagged and
+      // logged, because the payload is older than the answer we could not get.
+      // An order fetch IS the capture, so its failure also means the money never moved.
       if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return rawFallback;
+        return staleFallback(rawFallback, {
+          ctx: context?.ctx,
+          processor: 'paypal',
+          resourceType,
+          resourceId,
+          error: e,
+          consequence: resourceType === 'order'
+            ? 'the order was NOT captured, so the funds have NOT moved; the payload below describes an UNCAPTURED order'
+            : null,
+        });
       }
 
       throw e;

@@ -1,6 +1,7 @@
 const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
+const isAlreadyGone = require('./_processor-errors.js');
 
 /**
  * POST /payments/cancel
@@ -33,9 +34,20 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond('No active paid subscription found', { code: 400 });
   }
 
-  // Guard: subscription younger than 24 hours (callers may bypass via skipGuards)
+  // `skipGuards` arrives in the request body, so it is a REQUEST, not a decision:
+  // it is honored for an admin, or anywhere outside a real deployment (the test
+  // suites and the dev palette cancel seeded subscriptions minutes old). Every
+  // other caller is ignored — loudly — and the guards below run as normal.
+  const mayBypassGuards = user.roles?.admin === true || ctx.isDevelopment() || ctx.isTesting();
+  const skipGuards = settings.skipGuards === true && mayBypassGuards;
+
+  if (settings.skipGuards === true && !mayBypassGuards) {
+    ctx.warn(`Ignoring skipGuards on cancel: uid=${uid} is not permitted to bypass the cancellation guards`);
+  }
+
+  // Guard: subscription younger than 24 hours (privileged callers may bypass via skipGuards)
   const startDateUNIX = subscription.payment?.startDate?.timestampUNIX;
-  if (!settings.skipGuards && startDateUNIX) {
+  if (!skipGuards && startDateUNIX) {
     const ageMs = Date.now() - (startDateUNIX * 1000);
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
     if (ageMs < twentyFourHoursMs) {
@@ -70,10 +82,13 @@ module.exports = async ({ ctx, user, settings }) => {
   try {
     await processorModule.cancelAtPeriodEnd({ resourceId, uid, subscription, ctx });
   } catch (e) {
-    // If the subscription is suspended and the processor rejects (subscription already dead/gone),
-    // directly reset the user's subscription to cancelled so they can re-subscribe
-    if (subscription.status === 'suspended') {
-      ctx.log(`Processor cancel failed for suspended subscription (${e.message}), resetting directly`);
+    // A suspended subscription the processor says NO LONGER EXISTS is a dead
+    // record on our side alone: reset it directly so the user can re-subscribe.
+    // The classification is the whole guard — every transient or unrecognized
+    // failure falls through to the caller with NOTHING written, so a network
+    // blip can never fabricate a cancellation ([#212]).
+    if (subscription.status === 'suspended' && isAlreadyGone(e)) {
+      ctx.log(`Processor reports the suspended subscription is already gone (${e.message}), resetting directly`);
       const admin = ctx.Manager.libraries.admin;
       const now = powertools.timestamp(new Date(), { output: 'string' });
       const nowUNIX = powertools.timestamp(now, { output: 'unix' });
@@ -90,8 +105,10 @@ module.exports = async ({ ctx, user, settings }) => {
       return ctx.respond({ success: true });
     }
 
-    ctx.log(`Failed to cancel subscription via ${processor}: ${e.message}`);
-    return ctx.respond(`Failed to cancel subscription: ${e.message}`, { code: 500 });
+    // The processor's own words stay in the logs — a client gets one neutral
+    // sentence, never an SDK message naming our internals ([#212]).
+    ctx.error(`Failed to cancel subscription via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    return ctx.respond('We could not cancel your subscription right now. Please try again shortly.', { code: 500 });
   }
 
   // Store cancellation reason/feedback on the order doc

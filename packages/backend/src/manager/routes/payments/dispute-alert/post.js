@@ -3,6 +3,10 @@ const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
+// Providers already warned about running key-only, so the notice lands once per
+// instance instead of once per alert
+const keyOnlyWarned = new Set();
+
 /**
  * POST /payments/dispute-alert?provider=chargeblast&key=XXX
  * Receives dispute alert webhooks (e.g., from Chargeblast), validates them,
@@ -11,6 +15,11 @@ const safeCompare = require('../../../helpers/safe-compare.js');
  * Query params:
  *   - provider: alert provider name (default: 'chargeblast')
  *   - key: must match OMEGA_WEBHOOK_KEY
+ *
+ * This handler is provider-agnostic. Each provider module defines:
+ *   - normalize(body) — extracts the standard dispute alert shape
+ *   - verifySignature(req) — optional; verifies the provider's native signature
+ *     over the raw bytes, returning { status: 'verified' | 'invalid' | 'unconfigured' }
  */
 module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
@@ -34,6 +43,25 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond(`Unknown alert provider: ${provider}`, { code: 400 });
   }
 
+  // Verify the provider's native signature — the key param above is a defense
+  // layer, not the boundary. A dispute alert drives refunds and force-cancels,
+  // so a provider that ships a signing scheme verifies strictly once its secret
+  // is configured; without it the route stays on the key-only path and says so.
+  // Nothing is normalized or stored before this passes ([#212]).
+  if (processorModule.verifySignature) {
+    const verification = processorModule.verifySignature(ctx.ref.req);
+
+    if (verification.status === 'invalid') {
+      ctx.error(`Rejected ${provider} dispute alert: signature verification failed (${verification.reason})`);
+      return ctx.respond('Invalid signature', { code: 401 });
+    }
+
+    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(provider)) {
+      keyOnlyWarned.add(provider);
+      ctx.warn(`${provider} dispute alerts are running key-only: ${verification.reason}. Set it to verify every alert's signature.`);
+    }
+  }
+
   // Normalize the payload using the processor
   let alert;
   try {
@@ -46,47 +74,65 @@ module.exports = async ({ ctx, Manager, libraries }) => {
 
   ctx.log(`Parsed dispute alert: id=${alertId}, provider=${provider}, processor=${alert.processor}, amount=${alert.amount}, card=****${alert.card.last4}`);
 
-  // Check for duplicate (skip if already processing/completed)
-  const existingDoc = await admin.firestore().doc(`payments-disputes/${alertId}`).get();
-  if (existingDoc.exists) {
-    const existingStatus = existingDoc.data()?.status;
-    if (existingStatus !== 'failed') {
-      ctx.log(`Duplicate dispute alert ${alertId}, existing status=${existingStatus}, skipping`);
-      return ctx.respond({ received: true, duplicate: true });
-    }
-    ctx.log(`Retrying previously failed dispute alert ${alertId}`);
-  }
-
   // Build timestamps
   const now = powertools.timestamp(new Date(), { output: 'string' });
   const nowUNIX = powertools.timestamp(now, { output: 'unix' });
 
-  // Save to Firestore with status=pending (trigger handles the rest)
-  await admin.firestore().doc(`payments-disputes/${alertId}`).set({
-    id: alertId,
-    provider: provider,
-    status: 'pending',
-    alert: alert,
-    match: null,
-    actions: {
-      refund: 'pending',
-      cancel: 'pending',
-      email: 'pending',
-    },
-    errors: [],
-    error: null,
-    metadata: {
-      created: {
-        timestamp: now,
-        timestampUNIX: nowUNIX,
+  // Claim the alert, then save — in ONE transaction, for the same reason the
+  // webhook route does: a read followed by a separate write leaves a window
+  // where two same-instant deliveries both see no doc and both write, and a
+  // dispute processed twice means two refunds ([#212]).
+  const docRef = admin.firestore().doc(`payments-disputes/${alertId}`);
+  const claimed = await admin.firestore().runTransaction(async (transaction) => {
+    const existingDoc = await transaction.get(docRef);
+
+    if (existingDoc.exists) {
+      const existingStatus = existingDoc.data()?.status;
+
+      // A failed alert is the one state that may be reclaimed — that IS the retry path
+      if (existingStatus !== 'failed') {
+        return { claimed: false, status: existingStatus };
+      }
+    }
+
+    // Save with status=pending (trigger handles the rest)
+    transaction.set(docRef, {
+      id: alertId,
+      provider: provider,
+      status: 'pending',
+      alert: alert,
+      match: null,
+      actions: {
+        refund: 'pending',
+        cancel: 'pending',
+        email: 'pending',
       },
-      completed: {
-        timestamp: null,
-        timestampUNIX: null,
+      errors: [],
+      error: null,
+      metadata: {
+        created: {
+          timestamp: now,
+          timestampUNIX: nowUNIX,
+        },
+        completed: {
+          timestamp: null,
+          timestampUNIX: null,
+        },
       },
-    },
-    raw: body,
+      raw: body,
+    });
+
+    return { claimed: true, retried: existingDoc.exists };
   });
+
+  if (!claimed.claimed) {
+    ctx.log(`Duplicate dispute alert ${alertId}, existing status=${claimed.status}, skipping`);
+    return ctx.respond({ received: true, duplicate: true });
+  }
+
+  if (claimed.retried) {
+    ctx.log(`Retrying previously failed dispute alert ${alertId}`);
+  }
 
   ctx.log(`Saved payments-disputes/${alertId}: provider=${provider}, processor=${alert.processor}`);
 
