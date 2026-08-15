@@ -68,7 +68,7 @@ so a tarball can never build missing its vendored internals. Contract:
    `npx omega i live` — tree-wide `file:` → `^0.1.0` + one registry install
    (`restoreRegistrySpecs`; `omega i local` is the way back for local-era work).
    Commit the brand's manifest+lock change.
-5. **Brand proof**: brand `npm start` (manage cycle) + a website build — the brand
+5. **Brand proof**: brand `npm run manage` (manage cycle) + a website build — the brand
    now runs on registry packages; CI-dispatch web deploys become buildable (the
    deploy guard stops refusing once no `file:` specs remain).
 6. Record: CHANGELOG entry + close the tracking issue; re-latch nothing — published is the

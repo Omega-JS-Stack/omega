@@ -3,9 +3,14 @@
 // opens the panel: switch between seeded emulator personas (they all share
 // the fixed test password), see who you are, sign out, and jump to the dev
 // surfaces. Styles are injected here so the palette costs production nothing.
+//
+// Pages add their own controls through the registry (#234): whatever a page
+// registered by the time you OPEN the panel is rendered after the built-ins,
+// merged into a built-in section when it reuses its id.
 
 // Libraries
 import omega from '@omega.js/client';
+import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
 
 // The personas worth switching between by hand — a CURATED subset of what the
 // backend emulator seeds on boot (packages/backend src/test/test-accounts.js),
@@ -122,8 +127,41 @@ const STYLES = `
   cursor: pointer;
 }
 .omega-devbar__btn:hover { background: var(--omega-surface-2, #ececeb); }
-.omega-devbar__btn[data-busy="true"] { opacity: 0.55; pointer-events: none; }
+.omega-devbar__btn[data-busy="true"],
+.omega-devbar__select[data-busy="true"] { opacity: 0.55; pointer-events: none; }
 .omega-devbar__note { font-size: 0.6875rem; color: var(--omega-ink-faint, #a1a19e); }
+.omega-devbar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4375rem 0.5rem;
+  font-size: 0.78125rem;
+  background: var(--omega-surface, #fff);
+  border: 1px solid var(--omega-line-strong, #d8d8d5);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.omega-devbar__section { display: flex; flex-direction: column; gap: 0.375rem; }
+.omega-devbar__extras { display: contents; }
+.omega-devbar__fields { display: flex; flex-direction: column; gap: 0.375rem; }
+.omega-devbar__field { display: flex; flex-direction: column; gap: 0.1875rem; }
+.omega-devbar__field-label {
+  font-size: 0.6875rem;
+  color: var(--omega-ink-muted, #6d6d6c);
+}
+.omega-devbar__select {
+  padding: 0.3125rem 0.5rem;
+  font-size: 0.78125rem;
+  color: var(--omega-ink, #1a1a19);
+  background: var(--omega-surface, #fff);
+  border: 1px solid var(--omega-line-strong, #d8d8d5);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.omega-devbar__select:focus-visible {
+  outline: 2px solid var(--omega-accent, currentColor);
+  outline-offset: 2px;
+}
 `;
 
 /**
@@ -150,14 +188,16 @@ function isPersona(email) {
 }
 
 /**
- * Build one panel section: label + node.
+ * Build one panel section: label + node. The wrap spaces its children with a
+ * gap rather than the heading carrying a bottom margin, because a section can
+ * hold more than one node once a page merges its own controls in (#234).
  */
 function section(doc, label, node) {
   const wrap = doc.createElement('div');
+  wrap.className = 'omega-devbar__section';
   const heading = doc.createElement('div');
   heading.className = 'omega-devbar__label';
   heading.textContent = label;
-  heading.style.marginBottom = '0.375rem';
   wrap.append(heading, node);
   return wrap;
 }
@@ -208,27 +248,42 @@ export default function devPalette() {
   who.className = 'omega-devbar__who';
   who.textContent = 'Checking auth…';
 
-  // Persona switcher
+  // Persona switcher — one dropdown rather than a grid of buttons, so the list
+  // can grow without the panel turning into a wall of them. The placeholder is
+  // what you see when you are signed in as anybody but a persona.
   const domain = personaDomain();
-  const personaGrid = doc.createElement('div');
-  personaGrid.className = 'omega-devbar__grid';
+  const personaSelect = doc.createElement('select');
+  personaSelect.className = 'omega-devbar__select';
+  personaSelect.setAttribute('aria-label', 'Switch account');
+  const placeholder = doc.createElement('option');
+  placeholder.value = '';
+  placeholder.disabled = true;
+  // Explicitly selected: the browser's initial-selection skips disabled
+  // options, which would show the first PERSONA before auth has settled.
+  placeholder.selected = true;
+  placeholder.textContent = 'Switch account…';
+  personaSelect.appendChild(placeholder);
   PERSONAS.forEach((persona) => {
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.className = 'omega-devbar__btn';
-    button.textContent = persona.label;
-    button.title = `${persona.localpart}@${domain}`;
-    button.addEventListener('click', async () => {
-      button.dataset.busy = 'true';
-      try {
-        await omega.auth().signInWithEmailAndPassword(`${persona.localpart}@${domain}`, TEST_PASSWORD);
-        window.location.reload();
-      } catch (error) {
-        button.dataset.busy = 'false';
-        who.textContent = `✕ ${error.message} — is the backend emulator running? (npm run emulator)`;
-      }
-    });
-    personaGrid.appendChild(button);
+    const option = doc.createElement('option');
+    option.value = persona.localpart;
+    option.textContent = persona.label;
+    option.title = `${persona.localpart}@${domain}`;
+    personaSelect.appendChild(option);
+  });
+  personaSelect.addEventListener('change', async () => {
+    const localpart = personaSelect.value;
+    if (!localpart) {
+      return;
+    }
+
+    personaSelect.dataset.busy = 'true';
+    try {
+      await omega.auth().signInWithEmailAndPassword(`${localpart}@${domain}`, TEST_PASSWORD);
+      window.location.reload();
+    } catch (error) {
+      personaSelect.dataset.busy = 'false';
+      who.textContent = `✕ ${error.message} — is the backend emulator running? (npm run emulator)`;
+    }
   });
 
   // Reset to seed — ONE control on the account you are signed in as (#215).
@@ -294,19 +349,60 @@ export default function devPalette() {
   note.className = 'omega-devbar__note';
   note.textContent = `Personas are seeded by the backend emulator (npm run emulator) against ${domain}; they all use the shared test password.`;
 
+  // The sections the palette owns, by id — a page that registers under one of
+  // these ids merges into it rather than repeating its heading (#234).
+  const builtIns = new Map();
+  const builtIn = (id, label, node) => {
+    const wrap = section(doc, label, node);
+    builtIns.set(id, wrap);
+    return wrap;
+  };
+
+  // Where a registered section that matches no built-in lands: after the
+  // palette's own sections, before the quick links.
+  const extras = doc.createElement('div');
+  extras.className = 'omega-devbar__extras';
+
   panel.append(
     head,
-    section(doc, 'Signed in as', who),
-    section(doc, 'Switch account', personaGrid),
+    builtIn('auth', 'Signed in as', who),
+    builtIn('personas', 'Switch account', personaSelect),
     reset,
     signOut,
-    section(doc, 'Go to', links),
+    extras,
+    builtIn('links', 'Go to', links),
     note,
   );
+
+  // Page-scoped sections (#234) are built on OPEN, not at boot: a page module
+  // loads on its own schedule, and the palette must pick up whatever has
+  // registered by the time you actually look. Once each — reopening the panel
+  // must not stack duplicates.
+  const rendered = new Set();
+  const renderDevSections = () => {
+    getDevSections().forEach((entry) => {
+      if (rendered.has(entry.id)) {
+        return;
+      }
+      rendered.add(entry.id);
+
+      const node = entry.buildNode(doc);
+      const host = builtIns.get(entry.id);
+      if (host) {
+        host.append(node);
+      } else {
+        extras.append(section(doc, entry.title, node));
+      }
+    });
+  };
 
   const setOpen = (open) => {
     panel.dataset.open = String(open);
     tab.style.display = open ? 'none' : '';
+
+    if (open) {
+      renderDevSections();
+    }
   };
   tab.addEventListener('click', () => setOpen(true));
   close.addEventListener('click', () => setOpen(false));
@@ -323,5 +419,11 @@ export default function devPalette() {
     const user = omega.auth().getUser();
     who.textContent = user?.email || 'Signed out';
     reset.hidden = !isPersona(user?.email);
+
+    // The dropdown reads as state, not just a menu: it shows the persona you
+    // are actually signed in as, and falls back to the placeholder for anybody
+    // else (a real account, signed out, a persona nobody curated into the list)
+    const localpart = (user?.email || '').split('@')[0];
+    personaSelect.value = PERSONAS.some((persona) => persona.localpart === localpart) ? localpart : '';
   });
 }

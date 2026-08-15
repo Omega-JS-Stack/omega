@@ -26,6 +26,9 @@ const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
 // SSOT, cp137) — the stub is just a canonical render with generated Omega
 // keys, so a scaffolded .env and a reordered one have the same shape.
 const { renderCanonicalEnv } = require('./env-order.js');
+// The heal's value is the SSOT for the manage script — a scaffolded brand
+// must never be born needing the migration the heal just learned (#229)
+const { MANAGE_SCRIPT } = require('./package-scripts.js');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the app manifest's `dependencies`
@@ -177,9 +180,12 @@ function renderRootPackageJson(answers) {
     workspaces: ['apps/*'],
     // npm scripts put node_modules/.bin on PATH, so plain `omega` (the
     // context-aware dispatcher) resolves — never the retired omega-manager name
+    // `npm start` boots the dev stack (`dev` stays as its alias); the bare
+    // manage cycle is `npm run manage`
     scripts: {
-      start: 'omega',
+      start: 'omega dev',
       dev: 'omega dev',
+      manage: MANAGE_SCRIPT,
       deploy: 'omega deploy',
     },
     // Brand-level verbs (`omega dev`, manage, the `start` script above) resolve
@@ -263,7 +269,7 @@ ${appList}
 2. Per app: \`cd apps/<dir> && npx omega setup\` — the framework scaffolds its
    consumer interior.
 3. Fill in \`.env\` as the brand adopts external services.
-4. \`npx omega\` — reconcile everything; rerun any time.
+4. \`npm run manage\` — reconcile everything; rerun any time.
 `;
 }
 

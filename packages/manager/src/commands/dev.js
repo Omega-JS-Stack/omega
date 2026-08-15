@@ -12,9 +12,10 @@
  *   omega dev --only web,backend    explicit set
  *   omega dev --except backend      default minus
  *   omega dev --all                 every target with a dev leg
+ *   omega dev --full                boot on the WHOLE manage walk, not the lane
  *
- * Boot order: a full manage cycle first (the brand's services reconcile —
- * derived assets, .env dispersal, certs), then the legs. See
+ * Boot order: a manage cycle first — the boot lane (workspace, assets,
+ * disperse: the local redistribution the legs consume), then the legs. See
  * docs/shared/local-dev.md for what refreshes when.
  *
  * Port coordination is already solved (N7): the backend leg publishes its
@@ -70,6 +71,51 @@ function selectDevTargets({ available, only, except, all }) {
   return { selected, unknown, missing };
 }
 
+/**
+ * Consecutive-duplicate collapser for ONE leg output stream (#230).
+ *
+ * The Firebase emulator re-prints its own infra lines once per function
+ * instance — "i  functions: Loaded environment variables from .env." dozens of
+ * times in a row — which buries the lines a human is actually watching for.
+ * Repeats of the line just emitted are swallowed and counted; the count
+ * surfaces as ONE note when a different line arrives (or the stream ends, so a
+ * leg that goes quiet mid-run never eats the tail). The rule is structural —
+ * any consecutive duplicate on any leg — never a list of known noisy strings.
+ *
+ * Blank lines are exempt: a note standing in for a run of them reads louder
+ * than the blanks it replaced.
+ *
+ * Stateful because a stream is; pure otherwise — lines in, lines out.
+ * @returns {{ push: (line: string) => string[], flush: () => string[] }}
+ */
+function createLineDeduper() {
+  let previous = null;
+  let repeats = 0;
+
+  const note = () => {
+    const pending = repeats > 0 ? [`  (repeated ${repeats}×)`] : [];
+    repeats = 0;
+    return pending;
+  };
+
+  return {
+    push(line) {
+      if (line === previous && line.trim() !== '') {
+        repeats += 1;
+        return [];
+      }
+      const out = note();
+      previous = line;
+      out.push(line);
+      return out;
+    },
+    flush() {
+      previous = null;
+      return note();
+    },
+  };
+}
+
 module.exports = async (options = {}) => {
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
@@ -77,9 +123,11 @@ module.exports = async (options = {}) => {
     process.exit(1);
   }
 
-  // Tee the brand-level fan-out — the manage cycle AND every leg's prefixed
-  // output — to <brandRoot>/logs/manage.log (#197).
-  attachLogFile(path.join(brandRoot, 'logs', 'manage.log'));
+  // Tee the brand-level fan-out — the boot manage cycle AND every leg's
+  // prefixed output — to <brandRoot>/logs/dev.log (#197), its OWN file: a boot
+  // used to truncate logs/manage.log and take the last service walk's record
+  // with it, and the two are read for different questions (#231).
+  attachLogFile(path.join(brandRoot, 'logs', 'dev.log'));
 
   const apps = discoverApps(brandRoot).filter((app) => app.target && DEV_LEGS[app.target]);
   const { selected, unknown, missing } = selectDevTargets({
@@ -109,25 +157,56 @@ module.exports = async (options = {}) => {
   // Boot opens with a full manage cycle (#44): the app watchers see only
   // their own app, so brand-level sources — assets/logo/brandmark.svg, .env,
   // certs — reach the apps ONLY through the service walk. Without this, a
-  // brand edit sits invisible until someone remembers to run `npx omega`.
+  // brand edit sits invisible until someone remembers to run `npm run manage`.
   // A broken brand fails the boot instead of serving stale output.
-  const report = await runManage(brandRoot, {});
+  // …and it never blocks on a human (#228): the boot walk runs headless, so
+  // console confirms, consent flows and secret pastes step aside into the run
+  // summary's ⚑ pending list instead of stalling the stack. `npm run manage`
+  // keeps the full interactive walk. The switch is restored before any leg
+  // spawns — the web dev server and the emulator ARE interactive surfaces.
+  //
+  // …and it walks only the BOOT LANE (#228): workspace + assets + disperse,
+  // the local redistribution the legs actually consume. The cloud services
+  // and the rebuild lane cost a minute-plus and nothing downstream of them
+  // reaches a dev leg, so they belong to `npm run manage` — or `--full` here.
+  const priorNonInteractive = process.env.OMEGA_NON_INTERACTIVE;
+  process.env.OMEGA_NON_INTERACTIVE = '1';
+  let report;
+  try {
+    report = await runManage(brandRoot, options.full ? {} : { lane: 'boot' });
+  } finally {
+    if (priorNonInteractive === undefined) {
+      delete process.env.OMEGA_NON_INTERACTIVE;
+    } else {
+      process.env.OMEGA_NON_INTERACTIVE = priorNonInteractive;
+    }
+  }
   if (report.hasErrors) {
     throw new Error('omega dev: the manage cycle reported errors — fix them (see the run summary above), then boot again');
+  }
+
+  if (!options.full) {
+    console.log(chalk.dim('   ⚑ boot ran the local lane only — `npm run manage` runs the full setup (or `omega dev --full`)'));
   }
 
   const pad = Math.max(...selected.map((target) => target.length));
   const children = [];
   let shuttingDown = false;
 
+  // One deduper per stream, so the legs never collapse against each other.
+  // Terminal and file see the SAME collapsed stream: the tee patches this
+  // process' writers (#197), so there is one stream to dedup, not two.
   const forward = (stream, log, name) => {
     let buffer = '';
+    const deduper = createLineDeduper();
+    const emit = (lines) => lines.forEach((line) => log(`${chalk.dim(`[${name.padEnd(pad)}]`)} ${line}`));
     stream.on('data', (chunk) => {
       buffer += chunk.toString();
       const lines = buffer.split('\n');
       buffer = lines.pop();
-      lines.forEach((line) => log(`${chalk.dim(`[${name.padEnd(pad)}]`)} ${line}`));
+      lines.forEach((line) => emit(deduper.push(line)));
     });
+    stream.on('end', () => emit(deduper.flush()));
   };
 
   for (const target of selected) {
@@ -175,5 +254,6 @@ module.exports = async (options = {}) => {
 };
 
 module.exports.selectDevTargets = selectDevTargets;
+module.exports.createLineDeduper = createLineDeduper;
 module.exports.DEV_LEGS = DEV_LEGS;
 module.exports.DEFAULT_TARGETS = DEFAULT_TARGETS;

@@ -208,9 +208,11 @@ test('company: a marker pointing at a non-company is stale; no marker is standal
 });
 
 test('company: filterChildArgs strips company flags in both forms, forwards the rest verbatim', () => {
+  // The leading verb goes too (#229): the spawn names `manage` itself, so
+  // forwarding it would run `omega manage manage` in every brand
   assert.deepEqual(
     filterChildArgs(['manage', '--brand', 'x', '--service=workspace', '--parallel', '--concurrency', '4', '--dry-run']),
-    ['manage', '--service=workspace', '--dry-run'],
+    ['--service=workspace', '--dry-run'],
   );
   assert.deepEqual(
     filterChildArgs(['--brand=x,y', '--concurrency=2', '--service', 'update']),

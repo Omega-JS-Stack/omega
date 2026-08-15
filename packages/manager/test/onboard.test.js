@@ -167,8 +167,11 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // (cp195 journey catch)
   assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': '*' });
   // Scripts say `omega` — the ONE user-facing verb (the retired omega-manager
-  // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251)
-  assert.deepEqual(pkg.scripts, { start: 'omega', dev: 'omega dev', deploy: 'omega deploy' });
+  // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251).
+  // `npm start` boots the dev stack; the manage cycle is the NAMED verb (#229)
+  assert.deepEqual(pkg.scripts, {
+    start: 'omega dev', dev: 'omega dev', manage: 'omega manage', deploy: 'omega deploy',
+  });
 
   // README speaks `npx omega` too — no user-facing surface names the old bin
   const readmeText = fs.readFileSync(path.join(root, 'README.md'), 'utf8');

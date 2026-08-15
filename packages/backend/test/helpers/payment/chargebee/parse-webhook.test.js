@@ -311,7 +311,31 @@ module.exports = {
     },
 
     {
-      name: 'payment-refunded-no-subscription-skipped',
+      name: 'payment-refunded-no-subscription-is-one-time',
+      async run({ assert }) {
+        // A refund with an invoice and no subscription is the refund of a one-time
+        // purchase — the same invoice the one-time payment_failed branch names.
+        // Dropping it meant that refund never entered the pipeline at all
+        // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+        const result = parseWebhook({
+          id: 'ev_refund_onetime',
+          event_type: 'payment_refunded',
+          content: {
+            invoice: { id: 'inv_onetime_refund' },
+            transaction: { id: 'txn_refund' },
+            customer: { id: 'cust_onetime', meta_data: '{"uid":"user-onetime-refund"}' },
+          },
+        });
+
+        assert.equal(result.category, 'one-time', 'No subscription → one-time refund');
+        assert.equal(result.resourceType, 'invoice', 'Should fetch the invoice');
+        assert.equal(result.resourceId, 'inv_onetime_refund', 'Resource ID should be the invoice ID');
+        assert.equal(result.uid, 'user-onetime-refund', 'UID from customer');
+      },
+    },
+
+    {
+      name: 'payment-refunded-with-neither-subscription-nor-invoice-skipped',
       async run({ assert }) {
         const result = parseWebhook({
           id: 'ev_refund_no_sub',
@@ -321,7 +345,7 @@ module.exports = {
           },
         });
 
-        assert.equal(result.category, null, 'No subscription → null (skipped)');
+        assert.equal(result.category, null, 'Nothing to resolve the purchase from → null (skipped)');
       },
     },
 

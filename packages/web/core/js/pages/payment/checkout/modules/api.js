@@ -19,9 +19,12 @@ export async function fetchTrialEligibility() {
 }
 
 // Validate a discount code via backend
+// `response: 'json'` is load-bearing: wonderful-fetch defaults to 'raw', and a
+// raw Response has no `.valid`/`.percent`, so every code read as invalid.
 export async function validateDiscountCode(code) {
   const response = await fetch(`${omega.getApiUrl()}/omega/payments/discount`, {
     query: { code },
+    response: 'json',
   });
 
   return response;
@@ -68,6 +71,18 @@ export async function createPaymentIntent({ state, processor, formData }) {
   if (Object.keys(supplemental).length > 0) {
     payload.supplemental = supplemental;
   }
+
+  /* @dev-only:start */
+  {
+    // The dev palette's "Decline next checkout" arm, a URL param like every
+    // other checkout dev control — presence is the arm, and it lasts until the
+    // palette applies it away. The read lives INSIDE the block, so production
+    // never looks and the literal never reaches a real bundle.
+    if (omega.isDevelopment() && new URLSearchParams(window.location.search).has('_dev_decline')) {
+      payload.simulate = 'decline';
+    }
+  }
+  /* @dev-only:end */
 
   console.log('Sending payment intent:', { processor, productId: state.product.id, payload });
 

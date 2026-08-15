@@ -13,4 +13,8 @@ module.exports = () => f.object({
   attribution: f.passthrough({ default: {} }),
   discount: f.string({ default: null }),
   supplemental: f.passthrough({ default: {} }),
+  // Checkout simulation — honored ONLY by the test processor (itself
+  // non-production), ignored everywhere else. Request-only: it is never
+  // persisted onto the intent or the order.
+  simulate: f.string({ default: null, enum: ['decline'] }),
 });

@@ -21,7 +21,7 @@ A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one app 
 - `.env` — secrets, ALWAYS (the config loader hard-fails secret-shaped keys in omega.json5). Gitignored.
 - `.omega/` — durable state, secrets store, run output. Gitignored; never commit it.
 - `apps/<target>/` — one workspace per enabled target (see table above).
-- `logs/` — the brand-level run log, `logs/manage.log` (the manage cycle AND `npm run dev`'s fan-out). Gitignored, truncated on every launch.
+- `logs/` — the brand-level run logs: `logs/manage.log` (the manage cycle) and `logs/dev.log` (`npm start`'s dev fan-out). Gitignored, truncated on every launch.
 - `AGENTS.md` / `CLAUDE.md` — the doc chain: `CLAUDE.md` is a one-line `@AGENTS.md` pointer; `AGENTS.md`'s first line imports the framework guide; everything below the import is the brand's own.
 
 ## Verbs (the whole interface)
@@ -29,11 +29,13 @@ A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one app 
 Run from the **brand root**:
 
 ```bash
-npm start                        # manage: reconcile EVERY service to omega.json5 (idempotent)
-npm start -- --service=<name>    # reconcile one service (workspace, github, cloud, cloudflare, …)
-npm run dev                      # local dev stack (website + backend by default)
-npm run deploy                   # DELIBERATE publish fan-out: each app's own deploy, backend first
+npm start                           # local dev stack (website + backend by default; `npm run dev` is the same)
+npm run manage                      # manage: reconcile EVERY service to omega.json5 (idempotent)
+npm run manage -- --service=<name>  # reconcile one service (workspace, github, cloud, cloudflare, …)
+npm run deploy                      # DELIBERATE publish fan-out: each app's own deploy, backend first
 ```
+
+The scripts are the named verbs (`omega manage`, `omega dev`, `omega deploy`) — a bare `omega` prints help and runs nothing. `npm start`'s boot reconciles the LOCAL lane only (workspace, assets, disperse); `npm run manage` is the full setup.
 
 Run from an **app root** (`apps/<target>/`):
 
@@ -56,7 +58,7 @@ Every verb tees its whole run to a file: truncated on each launch, ANSI-stripped
 
 | Where | Files |
 |---|---|
-| brand root | `logs/manage.log` — the manage cycle, and `npm run dev`'s fan-out across every leg |
+| brand root | `logs/manage.log` — the manage cycle · `logs/dev.log` — `npm start`'s dev fan-out across every leg (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
 | any app | `apps/<target>/logs/dev.log`, `logs/build.log`, `logs/test.log` |
 | backend, extra | `apps/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, `dist/test.log` — beside firebase-tools' `*-debug.log` |
 | desktop, extra | `apps/desktop/logs/runtime.log` — the running app itself (packaged builds: the OS log dir) |

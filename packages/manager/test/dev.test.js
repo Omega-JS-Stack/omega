@@ -19,12 +19,25 @@ const childProcess = require('node:child_process');
 const boot = [];
 let manageReport = { hasErrors: false, results: {}, brand: {} };
 
+// What OMEGA_NON_INTERACTIVE reads as at each boundary (#228): '1' during the
+// boot manage cycle, back to its prior value by the time a leg spawns.
+const nonInteractiveAt = { manage: [], spawn: [], spawnEnv: [] };
+
+// What each boot cycle asks runManage for — the lane lives here (#228)
+const manageOptions = [];
+
+// Every child the boot spawned, so a leg's output can be driven by hand (#230)
+const spawned = [];
+
 childProcess.spawn = (command, args, options) => {
   boot.push(`spawn:${path.basename(options.cwd)}`);
+  nonInteractiveAt.spawn.push(process.env.OMEGA_NON_INTERACTIVE);
+  nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.kill = () => {};
+  spawned.push(child);
   return child;
 };
 
@@ -35,15 +48,17 @@ require.cache[managePath] = {
   path: path.dirname(managePath),
   loaded: true,
   exports: {
-    runManage: async (startDir) => {
+    runManage: async (startDir, options) => {
       boot.push(`manage:${startDir}`);
+      nonInteractiveAt.manage.push(process.env.OMEGA_NON_INTERACTIVE);
+      manageOptions.push(options);
       return manageReport;
     },
   },
 };
 
 const devCommand = require('../src/commands/dev.js');
-const { selectDevTargets, DEFAULT_TARGETS } = devCommand;
+const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
 const ALL_APPS = ['web', 'backend', 'desktop', 'extension'];
 
@@ -151,9 +166,187 @@ test('a manage cycle with errors stops dev boot loudly — no app leg spawns', a
   assert.deepStrictEqual(boot, [`manage:${root}`], 'nothing booted on top of a broken brand');
 });
 
-// ─── Verb log (#197) ─────────────────────────────────────────────────────────
+// ─── Quiet boot (#228) ───────────────────────────────────────────────────────
 
-test('boot tees the brand-level fan-out to <brandRoot>/logs/manage.log, ANSI stripped', async () => {
+/** Clear the boot recorder and the env/options observations before a boot. */
+function resetRecorders() {
+  boot.length = 0;
+  manageOptions.length = 0;
+  Object.values(nonInteractiveAt).forEach((seen) => { seen.length = 0; });
+}
+
+/** Run fn with console.log captured; returns the joined lines. */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines.join('\n');
+}
+
+test('the boot manage cycle runs non-interactive — human gates skip instead of blocking the boot', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  await bootDev(root, { only: 'web' });
+
+  assert.deepStrictEqual(nonInteractiveAt.manage, ['1'],
+    'the boot walk runs under OMEGA_NON_INTERACTIVE — no console confirm, consent flow, or secret paste can stall it');
+});
+
+test('the non-interactive switch is restored before any leg spawns — the dev servers stay interactive', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  await bootDev(root, { only: 'web' });
+
+  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'], 'the boot still runs manage, then the leg');
+  assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
+  assert.deepStrictEqual(nonInteractiveAt.spawnEnv, [undefined], "the leg's inherited env carries no switch");
+  assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, undefined, 'and nothing leaks past the boot');
+});
+
+test('a clean report with pending human gates still boots the legs — pending is not an error', async () => {
+  resetRecorders();
+  manageReport = {
+    hasErrors: false,
+    brand: {},
+    results: {
+      cloud: {
+        status: 'warned',
+        output: { billing: { needsInteractive: 'pick a billing account' } },
+      },
+    },
+  };
+  const root = stageBrand();
+
+  const outcome = await bootDev(root, { only: 'web' });
+
+  assert.strictEqual(outcome, 'running');
+  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'],
+    "the summary's ⚑ pending list is the report — the stack boots regardless");
+});
+
+test('a pre-existing OMEGA_NON_INTERACTIVE survives the boot — the restore is not a blind delete', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+  process.env.OMEGA_NON_INTERACTIVE = '1';
+
+  try {
+    await bootDev(root, { only: 'web' });
+
+    assert.deepStrictEqual(nonInteractiveAt.manage, ['1']);
+    assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, '1', "the caller's own switch is put back, not dropped");
+    assert.deepStrictEqual(nonInteractiveAt.spawnEnv, ['1'], 'so the legs inherit what the caller asked for');
+  } finally {
+    delete process.env.OMEGA_NON_INTERACTIVE;
+  }
+});
+
+// ─── Boot lane (#228) ────────────────────────────────────────────────────────
+
+test('the boot walks the LOCAL lane only, and says where the full setup lives', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
+
+  assert.deepStrictEqual(manageOptions, [{ lane: 'boot' }],
+    'the dev legs consume the local slice — the slow services must not hold the boot');
+  assert.match(log, /npm run manage/, 'and the boot names the one command that runs the rest');
+  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'], 'still manage, then the legs');
+});
+
+test('omega dev --full boots on the whole manage walk instead of the lane', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const log = await captureLogAsync(() => bootDev(root, { only: 'web', full: true }));
+
+  assert.deepStrictEqual(manageOptions, [{}], 'no lane — the full walk');
+  assert.deepStrictEqual(nonInteractiveAt.manage, ['1'], 'and it is still quiet');
+  assert.ok(!/local lane/.test(log), 'nothing to point at — this run WAS the full setup');
+});
+
+test('omega dev --full is declared boolean (yargs would otherwise eat the next positional)', () => {
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  assert.ok(BOOLEAN_FLAGS.includes('full'), '--full takes no value — it must be declared boolean');
+});
+
+// ─── Leg output dedup (#230) ─────────────────────────────────────────────────
+
+/** Feed a whole stream through one deduper, flush included; lines in → out. */
+function dedupe(lines) {
+  const deduper = createLineDeduper();
+  return lines.flatMap((line) => deduper.push(line)).concat(deduper.flush());
+}
+
+const LOADED = 'i  functions: Loaded environment variables from .env.';
+
+test('consecutive duplicates collapse to the first line plus one count note', () => {
+  assert.deepStrictEqual(
+    dedupe([LOADED, LOADED, LOADED, LOADED, '✔  functions: emulator started']),
+    [LOADED, '  (repeated 3×)', '✔  functions: emulator started'],
+    'the emulator re-prints its infra lines once per function instance — a human reads them once',
+  );
+});
+
+test('the rule is consecutive duplicates, not a list of known noisy lines', () => {
+  assert.deepStrictEqual(
+    dedupe(['[watch] rebuilding…', '[watch] rebuilding…', 'done']),
+    ['[watch] rebuilding…', '  (repeated 1×)', 'done'],
+  );
+});
+
+test('a line that comes back later is not a duplicate — only runs collapse', () => {
+  assert.deepStrictEqual(dedupe(['A', 'B', 'A']), ['A', 'B', 'A']);
+});
+
+test('the pending count surfaces at end of stream — a leg that goes quiet never eats it', () => {
+  assert.deepStrictEqual(dedupe(['A', 'A', 'A']), ['A', '  (repeated 2×)']);
+});
+
+test('blank lines pass through — a note in place of them reads louder than they do', () => {
+  assert.deepStrictEqual(dedupe(['', '', 'A']), ['', '', 'A']);
+});
+
+test('each stream carries its own run — legs never dedup against each other', () => {
+  const backend = createLineDeduper();
+  const web = createLineDeduper();
+
+  assert.deepStrictEqual(backend.push(LOADED), [LOADED]);
+  assert.deepStrictEqual(web.push(LOADED), [LOADED], "the sibling leg still prints its own first line");
+});
+
+test('the booted leg prints the collapsed stream — the chatter lands once, then the count', async () => {
+  resetRecorders();
+  spawned.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const log = await captureLogAsync(async () => {
+    await bootDev(root, { only: 'web' });
+    spawned[0].stdout.emit('data', Buffer.from(`${LOADED}\n${LOADED}\n${LOADED}\n✔  ready\n`));
+  });
+
+  assert.strictEqual((log.match(/Loaded environment variables/g) || []).length, 1,
+    'the repeated infra line reaches the terminal exactly once');
+  assert.match(log, /\(repeated 2×\)/, 'and the repeats are counted, not silently dropped');
+  assert.match(log, /\[web\] ✔  ready/, 'the leg prefix still rides every line');
+});
+
+// ─── Verb log (#197, #231) ───────────────────────────────────────────────────
+
+test('boot tees the brand-level fan-out to <brandRoot>/logs/dev.log, ANSI stripped', async () => {
   boot.length = 0;
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
@@ -174,7 +367,9 @@ test('boot tees the brand-level fan-out to <brandRoot>/logs/manage.log, ANSI str
     }
   }
 
-  const contents = fs.readFileSync(path.join(root, 'logs', 'manage.log'), 'utf8');
-  assert.match(contents, /omega dev — booting web/, "the boot banner is in the brand's log");
+  const contents = fs.readFileSync(path.join(root, 'logs', 'dev.log'), 'utf8');
+  assert.match(contents, /omega dev — booting web/, "the boot banner is in the brand's dev log");
   assert.ok(!contents.includes('\x1B['), 'the file is ANSI-free');
+  assert.ok(!fs.existsSync(path.join(root, 'logs', 'manage.log')),
+    'manage.log stays the service walk\'s record — a boot never truncates it (#231)');
 });

@@ -512,7 +512,9 @@ async function runJourney(options) {
     await run.step('headless manage: update builds every app; no service errors beyond the allowed set', async () => {
       // Exit code is judged via the run file — a designed testing-service
       // error (live probe of a never-deployed brand) may flip the exit.
-      await run.runToExit('manage', run.dispatcherBin(run.brandRoot), [], {
+      // 'manage' is the named verb (#229) — bare `omega` prints help now, so a
+      // bare spawn here would leave the boot-lane run file as the newest one.
+      await run.runToExit('manage', run.dispatcherBin(run.brandRoot), ['manage'], {
         cwd: run.brandRoot,
         env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }, { scrub: true }),
         timeout: TIMEOUTS.manage,

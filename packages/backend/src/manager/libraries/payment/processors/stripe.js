@@ -40,7 +40,7 @@ const Stripe = {
    * Fetch the latest resource from Stripe's API
    * Falls back to the raw webhook payload if the API call fails
    *
-   * @param {string} resourceType - 'subscription' | 'invoice' | 'session'
+   * @param {string} resourceType - 'subscription' | 'invoice' | 'session' | 'charge'
    * @param {string} resourceId - Stripe resource ID
    * @param {object} rawFallback - Fallback data from webhook payload
    * @param {object} context - Additional context (e.g., { admin })
@@ -62,6 +62,22 @@ const Stripe = {
         return await stripe.checkout.sessions.retrieve(resourceId);
       }
 
+      if (resourceType === 'charge') {
+        // The refund of a one-time purchase carries the charge and nothing else.
+        // A charge inherits its metadata from the PaymentIntent that created it,
+        // so expand the intent: when the charge itself carries none, the intent
+        // is the only place uid/orderId/productId live
+        // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+        const charge = await stripe.charges.retrieve(resourceId, { expand: ['payment_intent'] });
+        const intentMetadata = charge.payment_intent?.metadata;
+
+        if (intentMetadata) {
+          return { ...charge, metadata: { ...intentMetadata, ...charge.metadata } };
+        }
+
+        return charge;
+      }
+
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
       // If the API call fails but we have raw webhook data, use it — flagged and
@@ -78,6 +94,17 @@ const Stripe = {
 
       throw e;
     }
+  },
+
+  /**
+   * Extract the resource a Stripe webhook envelope carries
+   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   *
+   * @param {object} raw - Raw Stripe webhook payload
+   * @returns {object|null}
+   */
+  extractResource(raw) {
+    return raw?.data?.object || null;
   },
 
   /**

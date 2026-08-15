@@ -310,6 +310,16 @@ const JOURNEY_ACCOUNTS = {
       personal: { name: { first: 'Riley', last: 'Failure' } },
     },
   },
+  'journey-payments-decline': {
+    id: 'journey-payments-decline',
+    uid: '_test-journey-payments-decline',
+    email: '_test.journey-payments-decline@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Dana', last: 'Decline' } },
+    },
+  },
   'journey-payments-plan-change': {
     id: 'journey-payments-plan-change',
     uid: '_test-journey-payments-plan-change',
@@ -515,6 +525,18 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: getPastExpires() } },
     },
   },
+  // A paid subscriber, pending cancellation, whose order doc never existed (#216):
+  // payment.orderId stays null, so the refund processor has to resolve the plan's
+  // product from the subscription itself.
+  'refund-no-order': {
+    id: 'refund-no-order',
+    uid: '_test-refund-no-order',
+    email: '_test.refund-no-order@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: true }, payment: { processor: 'test', resourceId: 'sub_test_refund_no_order', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+    },
+  },
   'route-refund-success': {
     id: 'route-refund-success',
     uid: '_test-route-refund-success',
@@ -529,6 +551,16 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-payments-refund-webhook',
     uid: '_test-journey-payments-refund-webhook',
     email: '_test.journey-payments-refund-webhook@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  // Journey: one-time purchase refunded end-to-end (buy with the test processor, refund it)
+  'journey-payments-one-time-refund': {
+    id: 'journey-payments-one-time-refund',
+    uid: '_test-journey-payments-one-time-refund',
+    email: '_test.journey-payments-one-time-refund@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },

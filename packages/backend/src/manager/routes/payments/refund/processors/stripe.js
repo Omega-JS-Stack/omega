@@ -1,6 +1,9 @@
 /**
  * Stripe refund processor
- * Issues a refund for the latest invoice and cancels the subscription immediately.
+ *
+ * Subscriptions: issues a refund for the latest invoice and cancels the
+ * subscription immediately. One-time purchases: refunds the payment behind the
+ * order's checkout session, in full.
  *
  * Refund amount:
  * - Full refund if the last payment was ≤7 days ago
@@ -104,6 +107,54 @@ module.exports = {
       amount: refundAmount / 100, // convert cents to dollars for response
       currency: refund.currency,
       full: isFullRefund,
+    };
+  },
+
+  /**
+   * Process a refund for a Stripe ONE-TIME purchase
+   *
+   * The order's resource is the checkout session the purchase completed with, and
+   * the payment behind it is what gets refunded. Always FULL: a one-time purchase
+   * buys no billing period, so there is nothing to prorate over
+   * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+   *
+   * @param {object} options
+   * @param {string} options.resourceId - Stripe checkout session ID (e.g., 'cs_xxx')
+   * @param {string} options.uid - User's UID (for logging)
+   * @param {object} options.order - The payments-orders doc being refunded
+   * @param {object} options.ctx - Assistant instance for logging
+   * @returns {{ amount: number, currency: string, full: boolean }}
+   */
+  async processOneTimeRefund({ resourceId, uid, order, ctx }) {
+    const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
+    const stripe = StripeLib.init();
+
+    const session = await stripe.checkout.sessions.retrieve(resourceId);
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+    if (!paymentIntentId) {
+      throw new Error(`No payment found for checkout session ${resourceId}`);
+    }
+
+    // No `amount` — the whole charge comes back. The idempotency key scoped to the
+    // session prevents a double-refund from a double-clicked button: Stripe caches
+    // the response for 24 hours and returns the original refund.
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      reason: 'requested_by_customer',
+    }, {
+      idempotencyKey: `omega-refund-one-time-${resourceId}`,
+    });
+
+    ctx.log(`Stripe one-time refund created: refundId=${refund.id}, amount=${refund.amount}, orderId=${order?.id}, uid=${uid}`);
+
+    return {
+      amount: refund.amount / 100, // convert cents to dollars for response
+      currency: refund.currency,
+      full: true,
     };
   },
 };

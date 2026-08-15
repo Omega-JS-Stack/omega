@@ -101,9 +101,10 @@ module.exports = async ({ brandRoot, apps, options }) => {
       console.log(`      ${chalk.yellow('⊘')} ${app.name}: would run npm run build ${chalk.dim('[DRY RUN]')}`);
       steps.push({ phase: 'build', success: true, skipped: true, dryRun: true });
     } else {
-      // Non-interactive certification runs (pipeline, CI) must be
-      // deterministic: web builds use the committed translation cache only —
-      // never a live LLM pass mid-run (the same law deploys follow).
+      // Non-interactive runs (pipeline, CI, and `omega dev`'s boot manage
+      // cycle — #228) must be deterministic: web builds use the committed
+      // translation cache only — never a live LLM pass mid-run (the same law
+      // deploys follow). New strings translate on the next interactive run.
       const buildArgs = ['run', 'build'];
       if (app.target === 'web' && process.env.OMEGA_NON_INTERACTIVE === '1') {
         buildArgs.push('--', '--cached-only');

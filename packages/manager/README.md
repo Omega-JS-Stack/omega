@@ -1,13 +1,13 @@
 # @omega.js/manager
 
-The OMEGA orchestration engine — omega-manager's brains, ported into the monorepo for the brand-monorepo world. `npx omega` at a brand root (the context-aware dispatcher hands brand roots here; the package's own direct bin is `omega-manager`, per the `omega-<framework>` convention) walks every service in dependency order and reconciles each one to the brand's `config/omega.json5`, **idempotently**: run it twice, get the same result.
+The OMEGA orchestration engine — omega-manager's brains, ported into the monorepo for the brand-monorepo world. `npx omega manage` at a brand root (the context-aware dispatcher hands brand roots here; the package's own direct bin is `omega-manager`, per the `omega-<framework>` convention) walks every service in dependency order and reconciles each one to the brand's `config/omega.json5`, **idempotently**: run it twice, get the same result. A bare `npx omega` prints help and touches nothing ([#229](https://github.com/Omega-JS-Stack/omega/issues/229)).
 
 ```bash
-npx omega                      # manage: all services against the brand containing cwd
-npx omega --service=update     # one service
-npx omega --dry-run            # preview update's install/build work without running it
-npx omega --continue-on-error  # don't stop at the first failing service
-npx omega --strict             # preflight failures (missing env/scopes) fail hard instead of skipping
+npx omega manage               # the whole walk: all services against the brand containing cwd
+npx omega manage --service=update     # one service
+npx omega manage --dry-run            # preview update's install/build work without running it
+npx omega manage --continue-on-error  # don't stop at the first failing service
+npx omega manage --strict             # preflight failures (missing env/scopes) fail hard instead of skipping
 npx omega onboard              # create (or converge) a brand — wizard in a TTY, derivation otherwise
                                #   (incl. the managed-accounts step: keep the inherited list —
                                #    company config or the support@{domain} default — or write your own)
@@ -15,14 +15,13 @@ npx omega deploy               # DELIBERATE publish fan-out: each app's own depl
                                #   (--only/--except filter apps; every other flag forwards; docs/shared/deploys.md)
 npx omega update               # dependency-freshness fan-out: each app's own update verb (apps
                                #   independent — one failure never blocks the rest; docs/shared/updates.md)
-npx omega help                 # command listing (also -h/--help; router built-in — --help no
-                               #   longer falls through to the manage cycle)
+npx omega help                 # command listing (also bare `npx omega`, -h, --help)
 
 # From a COMPANY workspace (config/omega.json5 has a `brands` key), the same
-# command runs every managed brand:
-npx omega                      # all brands, all services
-npx omega --brand=acme,zen     # only these brands
-npx omega --parallel           # concurrent brands (--concurrency=N, default: CPU count)
+# verb runs every managed brand:
+npx omega manage               # all brands, all services
+npx omega manage --brand=acme,zen     # only these brands
+npx omega manage --parallel           # concurrent brands (--concurrency=N, default: CPU count)
 ```
 
 Works from the brand root, from inside any `apps/{app}`, or from inside a backend's `functions/` dir — the brand root resolves by the same walk-up rule `@omega.js/config` uses. Run from a company root instead and the same manage fans out per brand (see [Company mode](#company-mode)).

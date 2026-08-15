@@ -104,10 +104,18 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = billingAgreementId;
-        uid = parseUidFromCustomId(resource.custom_id);
       } else {
-        category = null;
+        // No billing agreement behind it — this is the refund of a one-time
+        // purchase, and the sale it reversed is the resource the event carries.
+        // Dropping it (category = null) meant that refund never entered the
+        // pipeline at all — the Stripe twin of this gap
+        // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+        category = 'one-time';
+        resourceType = 'sale';
+        resourceId = resource.sale_id || resource.id;
       }
+
+      uid = parseUidFromCustomId(resource.custom_id);
     }
 
     return {

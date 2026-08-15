@@ -361,15 +361,43 @@ module.exports = {
     },
 
     {
-      name: 'sale-refunded-no-billing-agreement-skipped',
+      name: 'sale-refunded-no-billing-agreement-is-one-time',
       async run({ assert }) {
+        // A refunded sale with no billing agreement behind it is the refund of a
+        // one-time purchase. Dropping it (category null) meant that refund never
+        // entered the pipeline at all — the Stripe twin of this gap is what
+        // [#212](https://github.com/Omega-JS-Stack/omega/issues/212) fixed first.
         const result = parseWebhook({
           id: 'WH-refund-onetime',
           event_type: 'PAYMENT.SALE.REFUNDED',
-          resource: { id: 'REFUND-OT' },
+          resource: {
+            id: 'REFUND-OT',
+            sale_id: 'SALE-OT',
+            custom_id: 'uid:user-onetime-refund,orderId:ord-onetime,productId:credits-100',
+          },
         });
 
-        assert.equal(result.category, null, 'No billing agreement → null (skipped)');
+        assert.equal(result.category, 'one-time', 'No billing agreement → one-time refund');
+        assert.equal(result.resourceType, 'sale', 'The sale the refund reversed is the resource');
+        assert.equal(result.resourceId, 'SALE-OT', 'Resource ID should be the sale ID');
+        assert.equal(result.uid, 'user-onetime-refund', 'UID from custom_id');
+      },
+    },
+
+    {
+      name: 'sale-refunded-falls-back-to-the-refund-id',
+      async run({ assert }) {
+        // Not every refund resource names its sale — the refund itself is then
+        // the only id the event carries
+        const result = parseWebhook({
+          id: 'WH-refund-onetime-no-sale',
+          event_type: 'PAYMENT.SALE.REFUNDED',
+          resource: { id: 'REFUND-OT-BARE' },
+        });
+
+        assert.equal(result.category, 'one-time', 'No billing agreement → one-time refund');
+        assert.equal(result.resourceId, 'REFUND-OT-BARE', 'Resource ID falls back to the refund ID');
+        assert.equal(result.uid, null, 'A refund carrying no custom_id resolves its uid downstream');
       },
     },
 

@@ -8,6 +8,7 @@ const fetch = require('wonderful-fetch');
  *   1. Transition events (mutually exclusive, one per webhook):
  *      new-subscription (no trial) → purchase
  *      new-subscription (trial)    → start_trial
+ *      subscription-winback        → purchase
  *      payment-recovered           → purchase (recurring)
  *      purchase-completed          → purchase (one-time)
  *
@@ -74,6 +75,13 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
 
     if (transitionName === 'new-subscription') {
       return { ...base, reason: 'first-purchase', value, isRecurring: false };
+    }
+
+    // A win-back is a returning customer buying again — a purchase, at what they
+    // actually paid. Its checkout arrives on a payment event, so without this the
+    // renewal branch below claimed it and reported recurring revenue ([#218]).
+    if (transitionName === 'subscription-winback') {
+      return { ...base, reason: 'winback-purchase', value, isRecurring: false };
     }
 
     if (transitionName === 'payment-recovered') {
@@ -179,6 +187,7 @@ function fireGA4({ resolved, currency, uid, processor, ctx, Manager }) {
 const META_EVENTS = {
   'trial-started': 'StartTrial',
   'first-purchase': 'Purchase',
+  'winback-purchase': 'Purchase',
   'payment-recovered': 'Subscribe',
   'renewal': 'Subscribe',
   'one-time-purchase': 'Purchase',
@@ -249,6 +258,7 @@ function fireMeta({ resolved, currency, uid, processor, ctx, config }) {
 const TIKTOK_EVENTS = {
   'trial-started': 'Subscribe',
   'first-purchase': 'CompletePayment',
+  'winback-purchase': 'CompletePayment',
   'payment-recovered': 'Subscribe',
   'renewal': 'Subscribe',
   'one-time-purchase': 'CompletePayment',

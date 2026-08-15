@@ -104,7 +104,7 @@ module.exports = {
    * @param {object} req - The raw HTTP request
    * @returns {object} { eventId, eventType, category, resourceType, resourceId, raw, uid }
    *   - category: 'subscription' | 'one-time' | null (null = skip)
-   *   - resourceType: 'subscription' | 'invoice' | 'session'
+   *   - resourceType: 'subscription' | 'invoice' | 'session' | 'charge'
    *   - resourceId: ID to fetch from processor API
    */
   parseWebhook(req) {
@@ -189,8 +189,13 @@ module.exports = {
         resourceType = 'invoice';
         resourceId = invoiceId;
       } else {
-        // One-time payment refund — skip for now (no subscription to update)
-        category = null;
+        // One-time payment refund — no subscription, no invoice, so the charge
+        // itself is the resource. Dropping it (category = null) meant the refund
+        // of a one-time purchase never entered the pipeline at all
+        // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+        category = 'one-time';
+        resourceType = 'charge';
+        resourceId = dataObject.id;
       }
 
       uid = dataObject.metadata?.uid || null;

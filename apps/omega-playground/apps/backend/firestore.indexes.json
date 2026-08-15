@@ -85,6 +85,24 @@
       ]
     },
     {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "subscription.trial.claimed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription.trial.expires.timestampUNIX",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "marketing-campaigns",
       "queryScope": "COLLECTION",
       "fields": [

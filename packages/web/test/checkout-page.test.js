@@ -133,3 +133,56 @@ test('#18: the mobile one-screen contract survives — folds, but never the numb
   assert.ok(scss.includes('max-height: 700px'), 'the short-phone rhythm is still tuned');
   assert.ok(!/#[0-9a-f]{3,6}/i.test(scss.replace(/#fff\b|#3c4043|#f6f5f3|#ffc439|#eabc53|#e8ad2e|#333\b/g, '')), 'colors are tokens (only the sanctioned wallet-brand hexes remain)');
 });
+
+test('#233: the discount label sits outside the input-group so the field keeps its rounded left corners', async () => {
+  const pages = await build();
+  const checkout = pages.get('/payment/checkout');
+
+  // Bootstrap (and both themes' own input-group rules) round a group by CHILD
+  // POSITION: `> :not(:first-child)` squares the left corners. A label as the
+  // group's first child therefore squared the input it labels — so the label
+  // is a SIBLING of the group, not a child of it. This is a structural
+  // contract, not a style preference; putting it back re-breaks the corners.
+  const group = checkout.match(/<div class="input-group omega-checkout__discount"[^>]*>\s*([\s\S]*?)<\/div>/);
+  assert.ok(group, 'the discount input-group still renders');
+  assert.ok(!group[1].includes('<label'), 'no label inside the group — the input must be its first child');
+  assert.ok(/<input[^>]+id="discount-code"/.test(group[1]), 'and the input is what opens it');
+
+  // The label is still a real one, still pointing at the field, and still
+  // hides and shows with the group it labels.
+  assert.ok(
+    /<label for="discount-code" class="visually-hidden"[^>]*data-omega-bind="@show checkout"[^>]*hidden>/.test(checkout),
+    'the field keeps a real label, bound to the same show condition as the group',
+  );
+});
+
+test('#233: the billing cadence line is centered under the plan tiles', async () => {
+  const pages = await build();
+  const checkout = pages.get('/payment/checkout');
+
+  const cadence = checkout.match(/<div class="([^"]*omega-checkout__cadence[^"]*)"/);
+  assert.ok(cadence, 'the cadence line still renders');
+  assert.ok(cadence[1].includes('text-center'), 'it centers under the pair of plan cards, in every theme');
+});
+
+test('#234: the page carries no dev chrome of its own — the palette owns it', async () => {
+  const pages = await build();
+  const checkout = pages.get('/payment/checkout');
+
+  for (const gone of ['checkout-dev-panel', 'checkout-dev-toggle', 'checkout-dev-apply', 'data-dev-param', 'omega-checkout__dev-toggle']) {
+    assert.ok(!checkout.includes(gone), `the gear dropdown is gone: ${gone}`);
+  }
+
+  const scss = fs.readFileSync(
+    path.join(PKG, 'themes', 'classy', 'css', 'pages', 'payment', 'checkout', 'index.scss'), 'utf8',
+  );
+  assert.ok(!scss.includes('omega-checkout__dev-toggle'), 'and its style went with it');
+
+  // The controls did not vanish — they moved to the palette's section module.
+  const section = fs.readFileSync(
+    path.join(PKG, 'core', 'js', 'pages', 'payment', 'checkout', 'modules', 'dev-section.js'), 'utf8',
+  );
+  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProcessor', '_dev_recaptcha']) {
+    assert.ok(section.includes(`'${param}'`), `the palette section carries the "${param}" control`);
+  }
+});

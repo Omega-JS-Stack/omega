@@ -10,6 +10,15 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { createServiceRunner, splitReturn } = require('../src/lib/service-runner.js');
+const { CONSENT_REQUIRED } = require('../src/lib/google-auth.js');
+
+// A handler that hits the Google consent gate headlessly (#228): the throw is
+// CODED, so the runner steps the operation aside instead of failing the walk.
+const CONSENT_THROW = `module.exports = async () => {
+  const error = new Error('Google consent required (scopes: webmasters) — run the service once interactively to grant it');
+  error.code = ${JSON.stringify(CONSENT_REQUIRED)};
+  throw error;
+};`;
 
 // ─── splitReturn contract ────────────────────────────────────────────────────
 
@@ -130,6 +139,77 @@ test('runner: warned status is sticky but never downgrades an error', async () =
 
   assert.equal(result.status, 'warned');
   assert.deepEqual(result.output, { findings: ['x'], ok: true });
+});
+
+// ─── Consent gates are pending, not failures (#228) ──────────────────────────
+
+test('runner: a consent-required ensure throw warns with the ⚑ marker and the walk continues', async () => {
+  const serviceDir = stageService({
+    'ensure/consent.js': CONSENT_THROW,
+    'ensure/after.js': `module.exports = async () => ({ output: { ran: true } });`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'consent', ensure: true }, { name: 'after', ensure: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'warned');
+  assert.equal(result.error, null);
+  assert.match(result.output.consent.needsInteractive, /Google consent required/);
+  assert.equal(result.output.ran, true, 'the operations after a pending gate still run');
+});
+
+test('runner: a consent-required read throw warns, and nothing writes on top of the gate', async () => {
+  const serviceDir = stageService({
+    'read/list.js': CONSENT_THROW,
+    'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'list', read: true, write: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'warned');
+  assert.match(result.output.list.needsInteractive, /Google consent required/);
+  assert.equal(result.output.wrote, undefined);
+});
+
+test('runner: a consent-required transform throw warns instead of failing the service', async () => {
+  const serviceDir = stageService({
+    'read/list.js': `module.exports = async () => ({ count: 1 });`,
+    'transform/list.js': CONSENT_THROW,
+    'write/list.js': `module.exports = async () => ({ output: { wrote: true } });`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'list', read: true, write: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'warned');
+  assert.match(result.output.list.needsInteractive, /Google consent required/);
+  assert.equal(result.output.wrote, undefined);
+});
+
+test('runner: a consent-required write throw warns instead of failing the service', async () => {
+  const serviceDir = stageService({
+    'write/push.js': CONSENT_THROW,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'push', write: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'warned');
+  assert.equal(result.error, null);
+  assert.match(result.output.push.needsInteractive, /Google consent required/);
 });
 
 test('runner: setup can skip the whole service', async () => {

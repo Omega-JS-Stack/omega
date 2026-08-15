@@ -1,0 +1,151 @@
+/**
+ * Test: Payment Journey - Uncancel
+ * Simulates: paid active + cancellation pending → POST /payments/uncancel → cancellation cleared
+ *
+ * The test processor's uncancel() writes a Stripe-shaped `customer.subscription.updated`
+ * doc directly to payments-webhooks/{eventId}, triggering the full on-write pipeline
+ * automatically — the route itself writes no subscription state, exactly like cancel.
+ *
+ * The caller is built by the shared route harness rather than a persona: the
+ * starting state (a scheduled cancellation on the test processor) is a SHAPE, and
+ * the harness exists so one test can choose a shape without minting a persona for
+ * it. Everything downstream of the handler — the webhook doc, the on-write trigger,
+ * the transition detection, the user-doc write — is the real pipeline.
+ *
+ * Product-agnostic: resolves the first paid product from config.payment.products
+ *
+ * Run: npx omega test framework:events/payments/journey-payments-uncancel
+ */
+const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
+
+const handler = require('../../../src/manager/routes/payments/uncancel/post.js');
+
+const UID = '_test-journey-payments-uncancel';
+const RESOURCE_ID = 'sub_test_journey_uncancel';
+
+module.exports = {
+  description: 'Payment journey: uncancel endpoint → cancellation cleared',
+  type: 'suite',
+  timeout: 30000,
+
+  tests: [
+    {
+      name: 'setup-cancelled-pending-subscription',
+      async run({ firestore, assert, state, config, skip }) {
+        const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
+
+        if (!paidProduct) {
+          skip('No paid product configured in this brand');
+        }
+
+        const frequency = Object.keys(paidProduct.prices)[0];
+        const nowUNIX = Math.floor(Date.now() / 1000);
+        const periodEndUNIX = nowUNIX + (30 * 86400);
+        const startUNIX = nowUNIX - (365 * 86400);
+
+        state.uid = UID;
+        state.productId = paidProduct.id;
+        state.productName = paidProduct.name || paidProduct.id;
+        state.frequency = frequency;
+
+        // The starting state: active, paid, and scheduled to cancel at period end —
+        // the exact shape the cancel route's webhook leaves behind.
+        state.subscription = {
+          product: { id: paidProduct.id, name: state.productName },
+          status: 'active',
+          expires: { timestamp: new Date(periodEndUNIX * 1000).toISOString(), timestampUNIX: periodEndUNIX },
+          trial: { claimed: false },
+          cancellation: {
+            pending: true,
+            date: { timestamp: new Date(periodEndUNIX * 1000).toISOString(), timestampUNIX: periodEndUNIX },
+          },
+          payment: {
+            processor: 'test',
+            orderId: null,
+            resourceId: RESOURCE_ID,
+            frequency: frequency,
+            startDate: { timestamp: new Date(startUNIX * 1000).toISOString(), timestampUNIX: startUNIX },
+          },
+        };
+
+        // The pipeline reads users/{uid} for its BEFORE state, so the doc has to
+        // be the real record the transition is detected against.
+        await firestore.set(`users/${UID}`, {
+          auth: { uid: UID, email: `${UID}@example.com` },
+          roles: {},
+          subscription: state.subscription,
+        }, { merge: true });
+
+        const userDoc = await firestore.get(`users/${UID}`);
+        assert.equal(userDoc.subscription.status, 'active', 'Should start active');
+        assert.equal(userDoc.subscription.cancellation.pending, true, 'Should start pending cancellation');
+      },
+    },
+
+    {
+      name: 'call-uncancel-endpoint',
+      async run({ assert, Manager, state }) {
+        const user = buildUser(Manager, {
+          auth: { uid: UID, email: `${UID}@example.com` },
+          roles: {},
+          subscription: state.subscription,
+        });
+
+        const sent = await callHandler({
+          Manager,
+          handler,
+          functionName: 'payments-uncancel',
+          user,
+          settings: { confirmed: true },
+        });
+
+        assert.equal(sent.code, 200, `Uncancel should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        assert.equal(sent.body?.success, true, `Should return { success: true }, got ${JSON.stringify(sent.body)}`);
+      },
+    },
+
+    {
+      name: 'verify-cancellation-cleared',
+      async run({ firestore, assert, state, waitFor }) {
+        // Poll the user doc until the on-write pipeline writes the resumed state
+        await waitFor(async () => {
+          const userDoc = await firestore.get(`users/${state.uid}`);
+          return userDoc?.subscription?.cancellation?.pending === false;
+        }, 15000, 500);
+
+        const userDoc = await firestore.get(`users/${state.uid}`);
+        assert.equal(userDoc.subscription.cancellation.pending, false, 'Cancellation should no longer be pending');
+        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
+        assert.equal(userDoc.subscription.product.id, state.productId, `Product should still be ${state.productId}`);
+        assert.equal(userDoc.subscription.payment.frequency, state.frequency, `Frequency should still be ${state.frequency}`);
+        assert.equal(userDoc.subscription.payment.resourceId, RESOURCE_ID, 'Resource ID should be the same subscription');
+      },
+    },
+
+    {
+      name: 'webhook-completed-with-cancellation-removed',
+      async run({ firestore, assert, waitFor }) {
+        // The uncancel webhook reaches the pipeline and completes...
+        const snapshot = await waitFor(async () => {
+          const query = await firestore.collection('payments-webhooks')
+            .where('owner', '==', UID)
+            .where('status', '==', 'completed')
+            .limit(1)
+            .get();
+
+          return query.empty ? null : query;
+        }, 15000, 500);
+
+        const webhookDoc = snapshot.docs[0].data();
+        assert.equal(webhookDoc.status, 'completed', 'Webhook should complete');
+
+        // ...and fires cancellation-removed, the withdrawal half of the pair whose
+        // other half (pending false → true) is cancellation-requested. The handler
+        // is log-only for now: the order template carries no copy for a withdrawn
+        // cancellation, and its fallback variant would tell this subscriber their
+        // subscription was just confirmed ([#212]).
+        assert.equal(webhookDoc.transition, 'cancellation-removed', `Withdrawing a scheduled cancellation should detect cancellation-removed, got: ${webhookDoc.transition}`);
+      },
+    },
+  ],
+};

@@ -11,6 +11,18 @@ Every log line in the ecosystem carries ONE identity tag: `[@omega.js/<package>:
 The module segment is the file's identity (`push`, `watcher`, `auth:sync` — sub-modules
 join with `:`). Ratified 2026-07-29 ([#12](https://github.com/Omega-JS-Stack/omega/issues/12)).
 
+### The debug level (`OMEGA_DEBUG`)
+
+`debug` is the ONE opt-in level ([#230](https://github.com/Omega-JS-Stack/omega/issues/230)): a
+backend `ctx.debug(...)` line is dropped whole — console AND the log file — unless
+`OMEGA_DEBUG` is set (truthy STRING semantics, the house's `TEST_EXTENDED_MODE` idiom:
+`OMEGA_DEBUG=0` reads as on; read live per line). Fat payloads belong there: full user
+records, raw webhook bodies. Two related quieting rules from the same issue: boot-time
+environment notes (the TEST banner, the resolved-mode line) are suppressed under the
+emulator (`FUNCTIONS_EMULATOR`) and latched once-per-process everywhere else, and the
+`omega dev` leg output collapses consecutive duplicate lines into one plus a
+`(repeated N×)` note.
+
 ### The two surfaces
 
 - **Build-time** (CLI, gulp, tests, the manager's services): the devkit logger prints a
@@ -105,7 +117,8 @@ surface attaches it at its entry point.
 | `npm run release` | `<appRoot>/logs/ci.log` | the GH Actions release run, streamed locally |
 | Windows code-signing | `<appRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
 | **Brand root** | | |
-| `omega` (the manage cycle) · `omega dev` (the fan-out) | `<brandRoot>/logs/manage.log` | the whole service walk, or every dev leg's prefixed output |
+| `omega manage` (the service walk) | `<brandRoot>/logs/manage.log` | the whole service walk |
+| `omega dev` (the fan-out) | `<brandRoot>/logs/dev.log` | the boot walk, then every dev leg's prefixed output (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
 | the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `page.log` |
 | **This monorepo** | | |
 | every root test lane (`npm test`, `npm run test:packages`, …) | `.temp/logs/<lane>.log` | the lane's own lines plus every child command's output — `test:packages` → `.temp/logs/test-packages.log` |

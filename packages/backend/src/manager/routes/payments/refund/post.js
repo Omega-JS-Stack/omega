@@ -2,14 +2,24 @@ const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
 
+// Payments older than this are not eligible for a refund, whatever was bought.
+const REFUND_WINDOW_SECONDS = 6 * 30 * 24 * 60 * 60;
+const OUTSIDE_WINDOW_MESSAGE = 'Payments older than 6 months are not eligible for refunds';
+
 /**
  * POST /payments/refund
- * Refunds the authenticated user's subscription and cancels it immediately.
- * Requires the subscription to be cancelled or pending cancellation first.
+ * Refunds a purchase. Two subjects, one endpoint:
  *
- * Delegates to the processor (e.g., Stripe) to issue the refund and cancel.
- * The resulting webhook triggers the Firestore pipeline which updates subscription state
- * and fires the subscription-cancelled transition handler.
+ * - No `orderId` — the authenticated user's SUBSCRIPTION. Refunds the latest
+ *   payment and cancels immediately; requires the subscription to be cancelled or
+ *   pending cancellation first.
+ * - With `orderId` — a ONE-TIME purchase, named by its payments-orders doc. A
+ *   one-time purchase never touches the user doc, so the order IS the subject
+ *   ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+ *
+ * Delegates to the processor (e.g., Stripe) to issue the refund. The resulting
+ * webhook triggers the Firestore pipeline, which fires the matching transition
+ * handler (subscription-cancelled / purchase-refunded).
  * Stores the refund reason/feedback on payments-orders/{orderId}.requests.refund.
  * Requires authentication.
  */
@@ -25,6 +35,11 @@ module.exports = async ({ ctx, user, settings }) => {
   // Require explicit confirmation
   if (!confirmed) {
     return ctx.respond('Refund must be confirmed', { code: 400 });
+  }
+
+  // A named order is a one-time purchase — its own subject, its own guards
+  if (settings.orderId) {
+    return refundOneTimePurchase({ ctx, uid, settings });
   }
 
   const subscription = user.subscription;
@@ -48,13 +63,9 @@ module.exports = async ({ ctx, user, settings }) => {
   const startDateUNIX = subscription.payment?.startDate?.timestampUNIX
     || subscription.payment?.updatedBy?.date?.timestampUNIX;
 
-  if (startDateUNIX) {
-    const sixMonthsAgoUNIX = Math.floor(Date.now() / 1000) - (6 * 30 * 24 * 60 * 60);
-
-    if (startDateUNIX < sixMonthsAgoUNIX) {
-      ctx.log(`Refund rejected: uid=${uid}, payment too old (startDate=${new Date(startDateUNIX * 1000).toISOString()})`);
-      return ctx.respond('Payments older than 6 months are not eligible for refunds', { code: 400 });
-    }
+  if (!isWithinRefundWindow(startDateUNIX)) {
+    ctx.log(`Refund rejected: uid=${uid}, payment too old (startDate=${new Date(startDateUNIX * 1000).toISOString()})`);
+    return ctx.respond(OUTSIDE_WINDOW_MESSAGE, { code: 400 });
   }
 
   const processor = subscription.payment?.processor;
@@ -88,29 +99,140 @@ module.exports = async ({ ctx, user, settings }) => {
   const orderId = subscription.payment?.orderId;
 
   if (orderId) {
-    const admin = ctx.Manager.libraries.admin;
-    const now = powertools.timestamp(new Date(), { output: 'string' });
-    const nowUNIX = powertools.timestamp(now, { output: 'unix' });
-
-    await admin.firestore().doc(`payments-orders/${orderId}`).set({
-      requests: {
-        refund: {
-          reason: settings.reason || null,
-          feedback: settings.feedback || null,
-          amount: refund.amount,
-          full: refund.full,
-          date: {
-            timestamp: now,
-            timestampUNIX: nowUNIX,
-          },
-        },
-      },
-    }, { merge: true });
-
-    ctx.log(`Stored refund request on payments-orders/${orderId}: reason=${settings.reason}, amount=${refund.amount}`);
+    await storeRefundRequest({ ctx, orderId, refund, settings });
   }
 
   ctx.log(`Refund processed: uid=${uid}, processor=${processor}, sub=${resourceId}, amount=${refund.amount}, full=${refund.full}, reason=${settings.reason}`);
 
   return ctx.respond({ success: true, refund });
 };
+
+/**
+ * Refund a ONE-TIME purchase, named by its payments-orders doc.
+ *
+ * The subject is the order, not the user doc: a one-time purchase writes nothing
+ * to users/{uid}.subscription, so there is no subscription state to check and
+ * nothing to cancel — the purchase is either refundable or it is not.
+ *
+ * @param {object} options
+ * @param {object} options.ctx - RouteContext
+ * @param {string} options.uid - The caller's UID
+ * @param {object} options.settings - Resolved request settings
+ */
+async function refundOneTimePurchase({ ctx, uid, settings }) {
+  const admin = ctx.Manager.libraries.admin;
+  const orderId = settings.orderId;
+
+  const orderSnap = await admin.firestore().doc(`payments-orders/${orderId}`).get();
+  const order = orderSnap.exists ? orderSnap.data() : null;
+
+  // Missing and not-yours answer identically: an order id must never be a probe
+  // for whether somebody else's purchase exists
+  if (!order || order.owner !== uid) {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, exists=${orderSnap.exists}, owner=${order?.owner || 'null'}`);
+    return ctx.respond('Order not found', { code: 400 });
+  }
+
+  if (order.type !== 'one-time') {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, type=${order.type}`);
+    return ctx.respond('That order is not a one-time purchase', { code: 400 });
+  }
+
+  // requests.refund covers the in-app path; unified.status covers a refund issued
+  // from the processor dashboard, which arrives by webhook and writes no request
+  if (order.requests?.refund || order.unified?.status === 'refunded') {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, already refunded (request=${!!order.requests?.refund}, status=${order.unified?.status})`);
+    return ctx.respond('This purchase has already been refunded', { code: 400 });
+  }
+
+  // The purchase date is the order's creation; the last webhook write is the fallback
+  const purchasedUNIX = order.metadata?.created?.timestampUNIX
+    || order.unified?.payment?.updatedBy?.date?.timestampUNIX;
+
+  if (!isWithinRefundWindow(purchasedUNIX)) {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, purchase too old (created=${new Date(purchasedUNIX * 1000).toISOString()})`);
+    return ctx.respond(OUTSIDE_WINDOW_MESSAGE, { code: 400 });
+  }
+
+  const processor = order.processor || order.unified?.payment?.processor;
+  const resourceId = order.resourceId || order.unified?.payment?.resourceId;
+
+  if (!processor || !resourceId) {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, missing processor=${processor} or resourceId=${resourceId}`);
+    return ctx.respond('Order payment details not found', { code: 400 });
+  }
+
+  // Load the processor module
+  let processorModule;
+  try {
+    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+  } catch (e) {
+    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+  }
+
+  // Process the refund via the processor
+  let refund;
+  try {
+    refund = await processorModule.processOneTimeRefund({ resourceId, uid, order, ctx });
+  } catch (e) {
+    // The processor's own words stay in the logs — a client gets one neutral
+    // sentence, never an SDK message naming our internals ([#212]).
+    ctx.error(`Failed to process one-time refund via ${processor}: uid=${uid}, orderId=${orderId}, resource=${resourceId}, error=${e.message}`);
+    return ctx.respond('We could not process your refund right now. Please try again shortly.', { code: 500 });
+  }
+
+  await storeRefundRequest({ ctx, orderId, refund, settings });
+
+  ctx.log(`One-time refund processed: uid=${uid}, processor=${processor}, orderId=${orderId}, resource=${resourceId}, amount=${refund.amount}, reason=${settings.reason}`);
+
+  return ctx.respond({ success: true, refund });
+}
+
+/**
+ * Store the refund reason/feedback on the order doc.
+ *
+ * ONE shape for both subjects — the refund record on an order must not differ
+ * depending on which branch wrote it.
+ *
+ * @param {object} options
+ * @param {object} options.ctx - RouteContext
+ * @param {string} options.orderId - The payments-orders id
+ * @param {object} options.refund - What the processor returned ({ amount, currency, full })
+ * @param {object} options.settings - Resolved request settings (reason, feedback)
+ */
+async function storeRefundRequest({ ctx, orderId, refund, settings }) {
+  const admin = ctx.Manager.libraries.admin;
+  const now = powertools.timestamp(new Date(), { output: 'string' });
+  const nowUNIX = powertools.timestamp(now, { output: 'unix' });
+
+  await admin.firestore().doc(`payments-orders/${orderId}`).set({
+    requests: {
+      refund: {
+        reason: settings.reason || null,
+        feedback: settings.feedback || null,
+        amount: refund.amount,
+        full: refund.full,
+        date: {
+          timestamp: now,
+          timestampUNIX: nowUNIX,
+        },
+      },
+    },
+  }, { merge: true });
+
+  ctx.log(`Stored refund request on payments-orders/${orderId}: reason=${settings.reason}, amount=${refund.amount}`);
+}
+
+/**
+ * Is a payment recent enough to refund? An absent date cannot disqualify one.
+ *
+ * @param {number} [paidUNIX] - When the payment happened
+ * @returns {boolean}
+ */
+function isWithinRefundWindow(paidUNIX) {
+  if (!paidUNIX) {
+    return true;
+  }
+
+  return paidUNIX >= Math.floor(Date.now() / 1000) - REFUND_WINDOW_SECONDS;
+}

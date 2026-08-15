@@ -32,9 +32,9 @@ src/
       cron/                             # Cron job runners
         runner.js                       # Shared cron job runner (@omega.js/backend + consumer hooks)
         daily.js                        # Daily cron entry point
-        daily/{job}.js                  # Individual daily cron jobs
+        daily/{job}.js                  # Individual daily cron jobs (incl. trial-lapse-sweep.js, expire-paypal-cancellations.js)
         frequent.js                     # Frequent cron entry point
-        frequent/{job}.js               # Individual frequent cron jobs
+        frequent/{job}.js               # Individual frequent cron jobs (incl. retry-failed-webhooks.js)
       firestore/                        # Firestore triggers
         payments-webhooks/              # Webhook processing pipeline
           on-write.js                   # Orchestrator: fetch→transform→transition→write
@@ -73,11 +73,15 @@ src/
             stripe.js                 # Stripe cancel_at_period_end
             paypal.js                 # PayPal subscription cancel
             test.js                   # Test cancel (writes webhook doc)
-        refund/                       # POST /payments/refund
+        refund/                       # POST /payments/refund (subscription or one-time by orderId)
           processors/
             stripe.js                 # Stripe refund + immediate cancel
             paypal.js                 # PayPal refund + cancel
             test.js                   # Test refund (writes webhook doc)
+        uncancel/                     # POST /payments/uncancel (capability-gated; no PayPal)
+          processors/                 # Per-processor cancellation withdrawal
+        plan/                         # POST /payments/plan (plan/frequency switch)
+          processors/                 # Per-processor plan switchers
         portal/                       # POST /payments/portal
           processors/
             stripe.js                 # Stripe billing portal URL

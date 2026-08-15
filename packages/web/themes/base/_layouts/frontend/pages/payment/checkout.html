@@ -122,57 +122,6 @@ client:
         <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} logo" width="24" height="24">
         <span class="fw-semibold d-none d-sm-inline">{{ site.brand.name }}</span>
       </a>
-      {% if jekyll.environment == "development" %}
-      <!-- Dev Tools Toggle -->
-      <div id="checkout-dev-panel" class="dropdown" hidden>
-        <button id="checkout-dev-toggle" class="btn btn-outline-adaptive btn-sm omega-checkout__dev-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">{% omega_icon "gear", "fa-sm" %}</button>
-        <div id="checkout-dev-body" class="dropdown-menu dropdown-menu-end shadow-lg small p-0" style="width:280px;">
-          <div class="p-3">
-            <div class="fw-bold mb-3 text-primary">Dev Tools</div>
-            <div class="mb-2">
-              <label class="form-label mb-1 text-body-secondary">Product</label>
-              <select data-dev-param="product" class="form-select form-select-sm"></select>
-            </div>
-            <div class="mb-2">
-              <label class="form-label mb-1 text-body-secondary">Frequency</label>
-              <select data-dev-param="frequency" class="form-select form-select-sm">
-                <option value="annually">Annually</option>
-                <option value="monthly">Monthly</option>
-                <option value="weekly">Weekly</option>
-                <option value="daily">Daily</option>
-              </select>
-            </div>
-            <hr class="my-2">
-            <div class="mb-2">
-              <label class="form-label mb-1 text-body-secondary">Trial eligible</label>
-              <select data-dev-param="_dev_trialEligible" class="form-select form-select-sm">
-                <option value="">(use API)</option>
-                <option value="true">Force true</option>
-                <option value="false">Force false</option>
-              </select>
-            </div>
-            <div class="mb-2">
-              <label class="form-label mb-1 text-body-secondary">Card processor</label>
-              <select data-dev-param="_dev_cardProcessor" class="form-select form-select-sm">
-                <option value="">(auto)</option>
-                <option value="test">Test</option>
-                <option value="stripe">Stripe</option>
-                <option value="chargebee">Chargebee</option>
-              </select>
-            </div>
-            <div class="mb-2">
-              <label class="form-label mb-1 text-body-secondary">reCAPTCHA</label>
-              <select data-dev-param="_dev_recaptcha" class="form-select form-select-sm">
-                <option value="">(normal)</option>
-                <option value="invalid">Send invalid token</option>
-                <option value="empty">Send empty token</option>
-              </select>
-            </div>
-            <button id="checkout-dev-apply" class="btn btn-adaptive btn-sm w-100 fw-bold">Apply &amp; reload</button>
-          </div>
-        </div>
-      </div>
-      {% endif %}
     </div>
   </header>
 
@@ -268,8 +217,8 @@ client:
                 </div>
               </div>
 
-              <!-- Payment cadence under the tiles -->
-              <div class="small omega-checkout__cadence mt-2 omega-binding-skeleton" data-omega-bind="@show checkout.product.isSubscription">
+              <!-- Payment cadence under the tiles — centered under the pair -->
+              <div class="small omega-checkout__cadence text-center mt-2 omega-binding-skeleton" data-omega-bind="@show checkout.product.isSubscription">
                 Billed <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$-- monthly</span>
               </div>
 
@@ -347,8 +296,13 @@ client:
 
             <!-- Discount Code -->
             <div class="omega-checkout__discount-zone omega-binding-skeleton" data-omega-bind="@show checkout">
+              <!-- The label sits OUTSIDE the input-group on purpose: Bootstrap
+                   rounds a group by child position, so a label as first child
+                   made the input `:not(:first-child)` and squared its left
+                   corners (and pulled it -1px left). It keeps the group's show
+                   binding so the two still appear and hide together. -->
+              <label for="discount-code" class="visually-hidden" data-omega-bind="@show checkout" hidden>Discount code</label>
               <div class="input-group omega-checkout__discount" data-omega-bind="@show checkout" hidden>
-                <label for="discount-code" class="visually-hidden">Discount code</label>
                 <input type="text" class="form-control" id="discount-code" name="discount" placeholder="Discount code" autocomplete="off">
                 <button class="btn btn-outline-adaptive px-3" type="button" id="apply-discount" data-action="apply-discount">Apply</button>
               </div>

@@ -8,6 +8,8 @@
  *
  * Chargebee refunds are issued on invoices via POST /invoices/{id}/refund.
  * After refunding, the subscription is cancelled immediately.
+ *
+ * A one-time purchase is its own non-recurring invoice, refunded in full.
  */
 const { FULL_REFUND_DAYS } = require('../../../../libraries/payment/refund-policy.js');
 
@@ -96,6 +98,50 @@ module.exports = {
       amount: refundAmountCents / 100,
       currency: currency.toLowerCase(),
       full: isFullRefund,
+    };
+  },
+
+  /**
+   * Process a refund for a Chargebee ONE-TIME purchase
+   *
+   * A one-time purchase is a non-recurring INVOICE, and Chargebee issues refunds
+   * on invoices — the same call the subscription path makes, against the order's
+   * own invoice. Always FULL: a one-time purchase buys no billing period, so
+   * there is nothing to prorate over
+   * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+   *
+   * @param {object} options
+   * @param {string} options.resourceId - Chargebee invoice ID
+   * @param {string} options.uid - User's UID (for logging)
+   * @param {object} options.order - The payments-orders doc being refunded
+   * @param {object} options.ctx - Assistant instance for logging
+   * @returns {{ amount: number, currency: string, full: boolean }}
+   */
+  async processOneTimeRefund({ resourceId, uid, order, ctx }) {
+    const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
+    ChargebeeLib.init();
+
+    const invoiceResult = await ChargebeeLib.request(`/invoices/${resourceId}`);
+    const invoice = invoiceResult.invoice;
+    const amountCents = invoice?.amount_paid || 0;
+
+    if (amountCents <= 0) {
+      throw new Error('No refundable amount on this purchase');
+    }
+
+    await ChargebeeLib.request(`/invoices/${resourceId}/refund`, {
+      method: 'POST',
+      body: { refund_amount: amountCents },
+    });
+
+    const currency = invoice.currency_code || 'USD';
+
+    ctx.log(`Chargebee one-time refund issued: invoiceId=${resourceId}, amount=${amountCents}, orderId=${order?.id}, uid=${uid}`);
+
+    return {
+      amount: amountCents / 100,
+      currency: currency.toLowerCase(),
+      full: true,
     };
   },
 };

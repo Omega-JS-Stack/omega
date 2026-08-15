@@ -65,6 +65,19 @@ function captureLog(fn) {
   return lines.join('\n');
 }
 
+/** captureLog for an async run (the manage walk + its printed summary). */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines.join('\n');
+}
+
 function stageTokenStore(tokens) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-preflight-'));
   if (tokens) {
@@ -229,6 +242,43 @@ test('preflight verdicts: --strict → error, even interactive', () => {
   assert.equal(gates.fake.action, 'error');
 });
 
+test('preflight verdicts: a consent/scope gap carries the ⚑ pending marker; a missing-secret gap does not (#228)', () => {
+  const requires = {
+    consenty: { why: 'needs Google', env: [], scopes: ['https://www.googleapis.com/auth/webmasters'] },
+    envy: { why: 'needs a key', env: [{ name: VAR_MISSING, prompted: true }], scopes: [] },
+  };
+
+  const noStore = stageTokenStore(null);
+  const { gates } = withStreams(false, () => {
+    let result;
+    captureLog(() => {
+      result = runPreflight({ services: ['consenty', 'envy'], brandConfig: {}, brandRoot: noStore, options: {} }, { requires });
+    });
+    return result;
+  });
+
+  assert.match(gates.consenty.needsInteractive, /Google consent/,
+    'the summary ⚑ section reads this field — without it the skip is a nameless count');
+  assert.equal(gates.envy.needsInteractive, undefined,
+    'a missing secret already rides the 🔑 section; double-listing is noise');
+
+  // A store that exists but lacks the scope is the same pending human step
+  const narrowStore = stageTokenStore({
+    access_token: 'a',
+    refresh_token: 'r',
+    scopes: ['https://www.googleapis.com/auth/firebase'],
+  });
+  const narrow = withStreams(false, () => {
+    let result;
+    captureLog(() => {
+      result = runPreflight({ services: ['consenty'], brandConfig: {}, brandRoot: narrowStore, options: {} }, { requires });
+    });
+    return result;
+  });
+
+  assert.match(narrow.gates.consenty.needsInteractive, /webmasters/, 'and it names the scopes to re-consent');
+});
+
 test('preflight verdicts: nothing missing → no gates, nothing printed', () => {
   process.env[VAR_SET] = SECRET_VALUE;
   try {
@@ -272,7 +322,7 @@ test('preflight walkthrough: what/which/why/fix/rerun — and env VALUES never a
     assert.match(log, new RegExp(`${VAR_MISSING}=<value>`)); // the exact .env line
     assert.match(log, /https:\/\/example\.test\/keys/);    // where the value comes from
     assert.match(log, /Create a read-write key/);          // the hint
-    assert.match(log, new RegExp(`npm start -- --service=fake`)); // the rerun verb
+    assert.match(log, new RegExp(`npm run manage -- --service=fake`)); // the rerun verb
     assert.ok(!log.includes(VAR_SET));                     // present vars aren't nagged
     assert.ok(!log.includes(SECRET_VALUE));                // values NEVER print
   } finally {
@@ -372,6 +422,17 @@ test('runManage: --strict turns the preflight failure into a hard error', async 
   assert.equal(report.results.cloudflare.status, 'error');
   assert.match(report.results.cloudflare.error, /^preflight: /);
   assert.match(report.results.cloudflare.error, /CLOUDFLARE_TOKEN/);
+});
+
+test('runManage: a consent-gated preflight skip is NAMED in the ⚑ pending list, with its rerun hint (#228)', async () => {
+  const root = stageBrand();
+
+  const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search-console' })));
+
+  assert.match(log, /⚑ Skipped — needs an interactive run/,
+    'a consent gap belongs in the pending aggregate, not only in the walkthrough scroll-back');
+  assert.match(log, /search-console\/preflight/, 'the ⚑ line names the service');
+  assert.match(log, /npm run manage -- --service=search-console/);
 });
 
 test('runManage: the cycle continues past preflight skips (absorb, never crash)', async () => {

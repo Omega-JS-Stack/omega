@@ -68,7 +68,7 @@ module.exports = async ({ ctx, change, context }) => {
 
     // Fetch the latest resource from the processor API
     // This ensures we always work with the most current state, not stale webhook data
-    const rawFallback = raw.data?.object || {};
+    const rawFallback = extractRawResource(library, raw) || {};
     const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, ctx, eventType, config: Manager.config });
 
     // A flagged resource is the webhook's own payload, not the API's answer — say which
@@ -154,10 +154,13 @@ module.exports = async ({ ctx, change, context }) => {
     const now = powertools.timestamp(new Date(), { output: 'string' });
     const nowUNIX = powertools.timestamp(now, { output: 'unix' });
 
-    // Mark as failed with error message
+    // Mark as failed with error message, counting the attempt — the frequent cron's
+    // sweep re-flips a failed doc to pending until this count reaches its ceiling
+    // (events/cron/frequent/retry-failed-webhooks.js)
     await webhookRef.set({
       status: 'failed',
       error: e.message || String(e),
+      retryCount: (dataAfter.retryCount || 0) + 1,
     }, { merge: true });
 
     // A throw before the orderId was resolved (a fetchResource failure, an
@@ -191,6 +194,29 @@ module.exports = async ({ ctx, change, context }) => {
 };
 
 /**
+ * Read the resource out of a webhook envelope
+ *
+ * Every processor nests it somewhere else — Stripe at data.object, Chargebee at
+ * content.<type>, PayPal at resource — so each library names its own shape. Reading
+ * Stripe's here degraded every other processor's stale fallback to nothing, and a
+ * Chargebee API re-fetch failure threw instead of falling back at all.
+ *
+ * The Stripe-shaped default below serves the null-library case only (the library
+ * failed to load); every processor library, test included, exports extractResource().
+ *
+ * @param {object|null} library - Processor library (null when loading it was what failed)
+ * @param {object} raw - The raw webhook payload the processor sent
+ * @returns {object|null}
+ */
+function extractRawResource(library, raw) {
+  if (library?.extractResource) {
+    return library.extractResource(raw);
+  }
+
+  return raw?.data?.object || null;
+}
+
+/**
  * Resolve the orderId for a webhook that threw before the happy path resolved one
  *
  * @param {object} options
@@ -205,7 +231,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
     return dataAfter.orderId;
   }
 
-  const rawObject = dataAfter.raw?.data?.object;
+  const rawObject = extractRawResource(library, dataAfter.raw);
 
   if (!library?.getOrderId || !rawObject) {
     return null;
@@ -229,7 +255,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  * 4. Build order object
  * 5. Detect and dispatch transition handlers (non-blocking)
  * 6. Track analytics (non-blocking)
- * 7. Write to Firestore (user doc for subscriptions + payments-orders)
+ * 7. Write to Firestore in ONE batch (user doc for subscriptions + payments-orders + payments-intents)
  */
 async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
   const Manager = ctx.Manager;
@@ -237,10 +263,13 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   const isSubscription = category === 'subscription';
 
   // Staleness check: skip if a newer webhook already wrote to this order
+  let existingOrder = null;
+
   if (orderId) {
     const existingDoc = await admin.firestore().doc(`payments-orders/${orderId}`).get();
     if (existingDoc.exists) {
-      const existingUpdatedUNIX = existingDoc.data()?.metadata?.updated?.timestampUNIX || 0;
+      existingOrder = existingDoc.data();
+      const existingUpdatedUNIX = existingOrder.metadata?.updated?.timestampUNIX || 0;
       if (webhookReceivedUNIX < existingUpdatedUNIX) {
         ctx.log(`Stale webhook ${eventId}: received=${webhookReceivedUNIX}, existing updated=${existingUpdatedUNIX}, skipping`);
         return null;
@@ -272,7 +301,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
 
   // Transform raw resource → unified object
   const transformOptions = { config: Manager.config, eventName: eventType, eventId: eventId };
-  const unified = isSubscription
+  let unified = isSubscription
     ? library.toUnifiedSubscription(resource, transformOptions)
     : library.toUnifiedOneTime(resource, transformOptions);
 
@@ -284,6 +313,26 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   if (isSubscription && PAYMENT_DENIED_EVENTS.includes(eventType) && unified.status === 'active') {
     ctx.log(`Overriding status to suspended: ${eventType} received but provider still says active`);
     unified.status = 'suspended';
+  }
+
+  // Unified refund details from the processor library (keeps the order record and
+  // the transition handlers processor-agnostic). Both refund paths need them: the
+  // subscription email's amount, and the one-time refund's record on the order.
+  const isRefund = transitions.REFUND_EVENTS.includes(eventType);
+  const refundDetails = (isRefund && library.getRefundDetails) ? library.getRefundDetails(raw) : null;
+
+  // A refund UPDATES a purchase record — it does not redefine the purchase.
+  //
+  // A one-time refund's resource is the bare charge that moved the money back: it
+  // names no product and no price, so re-deriving the order from it degraded a
+  // completed purchase to product=unknown and price=0, and replaced the checkout
+  // resourceId with the charge id. Merge instead — the purchase stays exactly what
+  // it was, and only the refund outcome is written
+  // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+  const isOneTimeRefund = !isSubscription && isRefund && !!existingOrder?.unified;
+
+  if (isOneTimeRefund) {
+    unified = applyRefundToPurchase(existingOrder.unified, unified, { refundDetails, now, nowUNIX });
   }
 
   ctx.log(`Unified ${category}: product=${unified.product.id}, status=${unified.status}`, unified);
@@ -302,7 +351,9 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     owner: uid,
     productId: unified.product.id,
     processor: processor,
-    resourceId: resourceId,
+    // A refund event names the charge that reversed the payment, never the
+    // checkout resource the purchase was made through — keep the purchase's own
+    resourceId: isOneTimeRefund ? (existingOrder.resourceId || resourceId) : resourceId,
     unified: unified,
     attribution: intentData.attribution || {},
     discount: intentData.discount || null,
@@ -329,7 +380,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   const shouldRunHandlers = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
   const transitionName = transitions.detectTransition(category, before, unified, eventType, { previouslyCompleted });
 
-  if (!transitionName && previouslyCompleted && transitions.REFUND_EVENTS.includes(eventType)) {
+  if (!transitionName && previouslyCompleted && isRefund) {
     ctx.log(`Transition suppressed (idempotency): webhook ${eventId} already completed once, so its refund email was already sent`);
   }
 
@@ -337,11 +388,6 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     ctx.log(`Transition detected: ${category}/${transitionName} (before.status=${before?.status || 'null'}, after.status=${unified.status})`);
 
     if (shouldRunHandlers) {
-      // Extract unified refund details from the processor library (keeps handlers processor-agnostic)
-      const refundDetails = (transitionName === 'payment-refunded' && library.getRefundDetails)
-        ? library.getRefundDetails(raw)
-        : null;
-
       transitions.dispatch(transitionName, category, {
         before, after: unified, order, uid, userDoc: userData, ctx, refundDetails,
       });
@@ -356,22 +402,17 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx });
   }
 
+  // The three writes this event produces — the user's subscription, the order and
+  // the intent — land TOGETHER. As separate awaits, anything that threw between
+  // them left the state split: a user paid with no order behind it, or an order
+  // whose intent still says pending. The batch makes it all-or-nothing.
+  const batch = admin.firestore().batch();
+
   // Write unified subscription to user doc (subscriptions only)
   if (isSubscription) {
-    await admin.firestore().doc(`users/${uid}`).set({ subscription: unified }, { merge: true });
-    ctx.log(`Updated users/${uid}.subscription: status=${unified.status}, product=${unified.product.id}`);
-
-    // Sync marketing contact with updated subscription data (non-blocking)
-    if (shouldRunHandlers) {
-      const email = Manager.Email(ctx);
-      const updatedUserDoc = { ...userData, subscription: unified };
-      email.sync(updatedUserDoc)
-        .then((r) => ctx.log('Marketing sync after payment:', r))
-        .catch((e) => ctx.error('Marketing sync after payment failed:', e));
-    }
+    batch.set(admin.firestore().doc(`users/${uid}`), { subscription: unified }, { merge: true });
   }
 
-  // Write to payments-orders/{orderId}
   if (orderId) {
     const orderRef = admin.firestore().doc(`payments-orders/${orderId}`);
     const orderSnap = await orderRef.get();
@@ -387,13 +428,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
       order.metadata.created = orderSnap.data().metadata?.created || order.metadata.created;
     }
 
-    await orderRef.set(order, { merge: true });
-    ctx.log(`Updated payments-orders/${orderId}: type=${category}, uid=${uid}, eventType=${eventType}`);
-  }
+    // Write to payments-orders/{orderId}
+    batch.set(orderRef, order, { merge: true });
 
-  // Update payments-intents/{orderId} status to match webhook outcome
-  if (orderId) {
-    await admin.firestore().doc(`payments-intents/${orderId}`).set({
+    // Update payments-intents/{orderId} status to match webhook outcome
+    batch.set(admin.firestore().doc(`payments-intents/${orderId}`), {
       status: 'completed',
       metadata: {
         completed: {
@@ -402,6 +441,25 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
         },
       },
     }, { merge: true });
+  }
+
+  await batch.commit();
+
+  if (isSubscription) {
+    ctx.log(`Updated users/${uid}.subscription: status=${unified.status}, product=${unified.product.id}`);
+
+    // Sync marketing contact with updated subscription data (non-blocking)
+    if (shouldRunHandlers) {
+      const email = Manager.Email(ctx);
+      const updatedUserDoc = { ...userData, subscription: unified };
+      email.sync(updatedUserDoc)
+        .then((r) => ctx.log('Marketing sync after payment:', r))
+        .catch((e) => ctx.error('Marketing sync after payment failed:', e));
+    }
+  }
+
+  if (orderId) {
+    ctx.log(`Updated payments-orders/${orderId}: type=${category}, uid=${uid}, eventType=${eventType}`);
     ctx.log(`Updated payments-intents/${orderId}: status=completed`);
   }
 
@@ -425,6 +483,41 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     });
 
   return transitionName;
+}
+
+/**
+ * Record a refund on the unified purchase it reversed
+ *
+ * The purchase — product, price, the resource it was bought through — is kept
+ * exactly as the completed purchase wrote it. Only the outcome changes: the
+ * status, the refund itself, and which event last touched the record.
+ *
+ * @param {object} purchase - The unified one-time object already on the order
+ * @param {object} derived - The unified object derived from the refund's own resource
+ * @param {object} options
+ * @param {object|null} options.refundDetails - The library's { amount, currency, reason }
+ * @param {string} options.now - Timestamp string
+ * @param {number} options.nowUNIX - Timestamp seconds
+ * @returns {object} Unified one-time object
+ */
+function applyRefundToPurchase(purchase, derived, { refundDetails, now, nowUNIX }) {
+  return {
+    ...purchase,
+    status: 'refunded',
+    payment: {
+      ...purchase.payment,
+      refund: {
+        amount: refundDetails?.amount || null,
+        currency: refundDetails?.currency || 'USD',
+        reason: refundDetails?.reason || null,
+        date: {
+          timestamp: now,
+          timestampUNIX: nowUNIX,
+        },
+      },
+      updatedBy: derived.payment?.updatedBy || purchase.payment?.updatedBy || null,
+    },
+  };
 }
 
 /**

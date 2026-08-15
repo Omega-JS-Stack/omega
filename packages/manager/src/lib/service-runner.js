@@ -30,6 +30,29 @@ const fs = require('node:fs');
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 
+const { needsInteractiveSkip } = require('./run-gates.js');
+const { CONSENT_REQUIRED } = require('./google-auth.js');
+
+/**
+ * Class a caught error (#228): a consent gate is a pending HUMAN step, not a
+ * failure — it becomes the warned step-aside the run summary's ⚑ section
+ * names, so the walk (and an `omega dev` boot on top of it) continues.
+ * Everything else stays loud.
+ *
+ * @param {Error} error - The caught error.
+ * @param {string} operationName - The operation's output key.
+ * @returns {object|null} The needsInteractiveSkip return, or null when the
+ *   error is a real failure.
+ */
+function pendingGate(error, operationName) {
+  if (error?.code !== CONSENT_REQUIRED) {
+    return null;
+  }
+
+  console.log(`      ${chalk.yellow('⚑')} Needs an interactive run${chalk.dim(`: ${error.message}`)}`);
+  return needsInteractiveSkip(operationName, error.message);
+}
+
 /**
  * Load an operation handler from a service directory.
  *
@@ -124,6 +147,12 @@ async function runEnsure(serviceDir, operation, context, accumulators) {
 
     return { status: 'continue' };
   } catch (error) {
+    const pending = pendingGate(error, operation.name);
+    if (pending) {
+      Object.assign(accumulators.output, pending.output);
+      return { status: 'warned' };
+    }
+
     console.error(`      ${chalk.red('❌')} Ensure failed${chalk.dim(`: ${error.message}`)}`);
     return { status: 'error', error: error.message };
   }
@@ -150,6 +179,12 @@ async function runRead(serviceDir, operation, context, serviceData) {
 
     return { data: result, status: 'continue' };
   } catch (error) {
+    const pending = pendingGate(error, operation.name);
+    if (pending) {
+      // No accumulators here — the caller merges the marker
+      return { data: null, status: 'warned', output: pending.output };
+    }
+
     console.error(`      ${chalk.red('❌')} Read failed${chalk.dim(`: ${error.message}`)}`);
     return { data: null, status: 'error' };
   }
@@ -176,6 +211,11 @@ async function runTransform(serviceDir, operation, context, serviceData, readDat
     console.log(`      ${chalk.green('✓')} Transform`);
     return { data: result, status: 'continue' };
   } catch (error) {
+    const pending = pendingGate(error, operation.name);
+    if (pending) {
+      return { data: null, status: 'warned', output: pending.output };
+    }
+
     console.error(`      ${chalk.red('❌')} Transform failed${chalk.dim(`: ${error.message}`)}`);
     return { data: null, status: 'error' };
   }
@@ -210,6 +250,12 @@ async function runWrite(serviceDir, operation, context, accumulators, data) {
 
     return { status: 'continue' };
   } catch (error) {
+    const pending = pendingGate(error, operation.name);
+    if (pending) {
+      Object.assign(accumulators.output, pending.output);
+      return { status: 'warned' };
+    }
+
     console.error(`      ${chalk.red('❌')} Write failed${chalk.dim(`: ${error.message}`)}`);
     return { status: 'error', error: error.message };
   }
@@ -319,6 +365,15 @@ function createServiceRunner(options = {}) {
             if (stopOnError) break;
           }
 
+          // A pending gate (#228): carry its marker and move on — there is
+          // nothing to transform or write on top of an operation that never
+          // read
+          if (readResult.status === 'warned') {
+            Object.assign(accumulators.output, readResult.output);
+            if (overallStatus !== 'error') overallStatus = 'warned';
+            continue;
+          }
+
           // Call onRead hook if provided (e.g., to save read data to disk)
           if (readData && enrichedContext.onRead) {
             await enrichedContext.onRead(operation.name, readData);
@@ -336,6 +391,12 @@ function createServiceRunner(options = {}) {
             overallStatus = 'error';
             firstError = firstError || `${operation.name} transform failed`;
             if (stopOnError) break;
+          }
+
+          if (transformResult.status === 'warned') {
+            Object.assign(accumulators.output, transformResult.output);
+            if (overallStatus !== 'error') overallStatus = 'warned';
+            continue;
           }
 
           if (transformResult.status === 'skip') {

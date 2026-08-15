@@ -5,6 +5,12 @@
  * notice/critical/emergency). Console in any non-production environment; the
  * Firebase Cloud logger in production for levels console lacks.
  *
+ * `debug` is the ONE opt-in level ([#230](https://github.com/Omega-JS-Stack/omega/issues/230)):
+ * it writes nothing at all unless `OMEGA_DEBUG` is set in the environment. Nothing
+ * else reads a level switch — this is what lets a caller demote a fat payload
+ * (a full UserRecord, a raw webhook body) out of the normal run and still have it
+ * one env var away. Every other level is unconditional, as before.
+ *
  * Every line opens with the ONE identity tag, `[@omega.js/backend:<module>]`
  * ([#121](https://github.com/Omega-JS-Stack/omega/issues/121)) — the module
  * segment is the invocation's function name, which the ctx already knows. The
@@ -56,10 +62,23 @@ function localTimestamp(ctx) {
   return `[${time}] `;
 }
 
+// The debug switch, read LIVE on every line — a process that flips OMEGA_DEBUG
+// mid-run (the emulator's env sync, a test) gets the new answer immediately.
+function isDebugEnabled() {
+  return !!process.env.OMEGA_DEBUG;
+}
+
 const methods = {
   _log() {
     const self = this;
     const logs = [...arguments];
+
+    // Opt-in level: a debug line is dropped whole (console AND wonderful-log)
+    // unless the switch is on. First thing, before any formatting work.
+    if (logs[0] === 'debug' && !isDebugEnabled()) {
+      return;
+    }
+
     const prefix = self.logPrefix ? ` ${self.logPrefix}:` : ':';
 
     // Prepend the local time bracket (outside production only), the identity tag,

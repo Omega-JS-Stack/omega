@@ -28,9 +28,9 @@ Id `omega`, name "OMEGA", url omegajs.dev (LIVE — GitHub Pages + Cloudflare), 
 
 **Backend config is real** (flipped 2026-07-19): project `omegajs`, sdkconfig baked, `.firebaserc` real, Blaze linked to the Main Billing Account. authDomain = the BRAND host per cp268 — `omega build` self-hosts Firebase's `/__/auth/*` helper files (what the 2026-07-19 live 404 was actually missing), and a first-party authDomain keeps sign-in redirects working under browser storage partitioning.
 
-**The identity seam SELF-HEALS in the cloud service** (Ian 2026-07-19: "wrapped in npm start — self healing idempotent"): access probe → grant the manage identity via any able local gcloud account (owner first; editor+firebase.admin fallback — no-org projects refuse API owners) → re-probe through propagation. The FIRST healing run must be Ian's own `npm start` from the brand root (the session classifier refuses Claude-fired IAM mutation, even wrapped); every run after is plain reconcile.
+**The identity seam SELF-HEALS in the cloud service** (Ian 2026-07-19: "wrapped in npm start — self healing idempotent"; since [#227](https://github.com/Omega-JS-Stack/omega/issues/227), 2026-08-13, that wrapper is `npm run manage`): access probe → grant the manage identity via any able local gcloud account (owner first; editor+firebase.admin fallback — no-org projects refuse API owners) → re-probe through propagation. The FIRST healing run must be Ian's own `npm run manage` from the brand root (the session classifier refuses Claude-fired IAM mutation, even wrapped); every run after is plain reconcile.
 
-**REMAINING GATES**: that first `npm start`; the npm publish; one CI-dispatch exercise.
+**REMAINING GATES**: that first `npm run manage`; the npm publish; one CI-dispatch exercise.
 
 ## The local era
 

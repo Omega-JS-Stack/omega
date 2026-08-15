@@ -613,6 +613,17 @@ const SERVICE_ORDER = [
   'testing',         // health checks after everything else ran
 ];
 
+// The BOOT lane (#228) — what the dev legs consume every boot: local
+// redistribution only (file work, no network, no rebuilds), so `omega dev`
+// starts in about a second instead of waiting on the cloud services.
+// NOT in this list = manage lane by construction: a new service can never
+// slow the boot by default, and promoting one is a deliberate edit here.
+const BOOT_SERVICES = [
+  'workspace',       // brand structure + config health — a broken brand must not serve
+  'assets',          // derived logo/icon variants the apps read from their own dirs
+  'disperse',        // composed app .env files + signing artifacts land in the apps
+];
+
 // =============================================================================
 // OPERATIONS CONFIG - What operations to run for each service
 // =============================================================================
@@ -1001,6 +1012,7 @@ module.exports = {
   TARGET_FRAMEWORKS,
   DEFAULTS,
   SERVICE_ORDER,
+  BOOT_SERVICES,
   OPERATIONS,
   REQUIRES,
   templateObject,

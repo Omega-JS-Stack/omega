@@ -77,6 +77,14 @@ const Test = {
   },
 
   /**
+   * Extract the resource the webhook envelope carries — delegates to Stripe
+   * (test processor uses Stripe-shaped data)
+   */
+  extractResource(raw) {
+    return Stripe.extractResource(raw);
+  },
+
+  /**
    * Extract orderId — delegates to Stripe (test processor uses Stripe-shaped data)
    */
   getOrderId(resource) {

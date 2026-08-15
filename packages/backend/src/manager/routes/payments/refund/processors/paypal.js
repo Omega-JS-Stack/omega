@@ -1,6 +1,7 @@
 /**
  * PayPal refund processor
  * Refunds the most recent payment on a PayPal subscription and cancels it.
+ * A one-time purchase is refunded against its order's capture instead.
  *
  * PayPal refunds are issued against individual sale/capture transactions,
  * not against the subscription itself. We find the most recent completed
@@ -119,6 +120,59 @@ module.exports = {
       amount: refundAmount,
       currency: currency.toLowerCase(),
       full: isFullRefund,
+    };
+  },
+
+  /**
+   * Process a refund for a PayPal ONE-TIME purchase
+   *
+   * A one-time purchase is a PayPal ORDER (Orders API v2) and the money sits on
+   * its capture, so the refund is issued against that capture. Always FULL: a
+   * one-time purchase buys no billing period, so there is nothing to prorate over
+   * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+   *
+   * @param {object} options
+   * @param {string} options.resourceId - PayPal order ID
+   * @param {string} options.uid - User's UID (for logging)
+   * @param {object} options.order - The payments-orders doc being refunded
+   * @param {object} options.ctx - Assistant instance for logging
+   * @returns {{ amount: number, currency: string, full: boolean }}
+   */
+  async processOneTimeRefund({ resourceId, uid, order, ctx }) {
+    const PayPalLib = require('../../../../libraries/payment/processors/paypal.js');
+
+    const paypalOrder = await PayPalLib.request(`/v2/checkout/orders/${resourceId}`);
+    const captures = paypalOrder.purchase_units?.[0]?.payments?.captures || [];
+    const capture = captures.find(c => c.status === 'COMPLETED');
+
+    if (!capture) {
+      throw new Error(`No completed capture found for PayPal order ${resourceId}`);
+    }
+
+    const amount = parseFloat(capture.amount?.value || '0');
+    const currency = capture.amount?.currency_code || 'USD';
+
+    if (amount <= 0) {
+      throw new Error('No refundable amount on this purchase');
+    }
+
+    await PayPalLib.request(`/v2/payments/captures/${capture.id}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: {
+          value: amount.toFixed(2),
+          currency_code: currency,
+        },
+        note_to_payer: 'Purchase refund',
+      }),
+    });
+
+    ctx.log(`PayPal one-time refund issued: captureId=${capture.id}, amount=${amount}, orderId=${order?.id}, uid=${uid}`);
+
+    return {
+      amount: amount,
+      currency: currency.toLowerCase(),
+      full: true,
     };
   },
 

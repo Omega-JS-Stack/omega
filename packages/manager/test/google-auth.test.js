@@ -10,7 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint } = require('../src/lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint, CONSENT_REQUIRED } = require('../src/lib/google-auth.js');
 
 function tmpStore(tokens) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-google-auth-'));
@@ -90,6 +90,27 @@ test('google-auth: a subset grant re-consents too', async () => {
   process.env.OMEGA_NON_INTERACTIVE = '1';
   try {
     await assert.rejects(client(storePath).getAccessToken(), /Google consent required/);
+  } finally {
+    delete process.env.OMEGA_NON_INTERACTIVE;
+  }
+});
+
+test('google-auth: the headless consent throw is CODED — a pending human gate, not a failure (#228)', async () => {
+  assert.equal(typeof CONSENT_REQUIRED, 'string', 'the code is exported so the runner can match on it');
+
+  const storePath = tmpStore({
+    access_token: 'legacy-token',
+    refresh_token: 'r',
+    expiry: Date.now() + 3_600_000,
+  });
+
+  process.env.OMEGA_NON_INTERACTIVE = '1';
+  try {
+    await assert.rejects(client(storePath).getAccessToken(), (error) => {
+      assert.equal(error.code, CONSENT_REQUIRED, 'the walk classes it by code, never by message sniffing');
+      assert.match(error.message, /Google consent required/);
+      return true;
+    });
   } finally {
     delete process.env.OMEGA_NON_INTERACTIVE;
   }

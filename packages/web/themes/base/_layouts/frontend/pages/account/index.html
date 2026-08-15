@@ -1025,7 +1025,7 @@ badges:
                 <span class="me-2 flex-shrink-0">{% omega_icon "clock", "fa-md" %}</span>
                 <div>
                   <strong>Cancellation scheduled</strong>
-                  <p class="mb-0 small">Your subscription will end on <strong data-omega-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, you can reactivate through billing management.</p>
+                  <p class="mb-0 small">Your subscription will end on <strong data-omega-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, undo the cancellation below.</p>
                 </div>
               </div>
 
@@ -1046,14 +1046,38 @@ badges:
                 {% omega_icon "crown", "me-2" %}
                 <span class="button-text">Upgrade plan</span>
               </button>
-              <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.change" hidden>
+              <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.change" hidden data-bs-toggle="modal" data-bs-target="#change-plan-modal">
                 {% omega_icon "arrow-right-arrow-left", "me-2" %}
                 <span class="button-text">Change plan</span>
+              </button>
+              <button id="uncancel-plan-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.uncancel" hidden data-bs-toggle="collapse" data-bs-target="#uncancel-subscription-confirm" aria-expanded="false" aria-controls="uncancel-subscription-confirm">
+                {% omega_icon "rotate-left", "me-2" %}
+                <span class="button-text">Undo cancellation</span>
               </button>
               <button id="manage-billing-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.manage" hidden>
                 {% omega_icon "credit-card", "me-2" %}
                 <span class="button-text">Manage billing</span>
               </button>
+            </div>
+
+            <!-- Undo cancellation confirmation -->
+            <div class="collapse" id="uncancel-subscription-confirm">
+              <div class="alert alert-success d-flex align-items-start mt-3 mb-0">
+                <span class="me-2 flex-shrink-0">{% omega_icon "rotate-left", "fa-md" %}</span>
+                <div class="w-100">
+                  <strong>Keep your subscription?</strong>
+                  <p class="mb-3 small">The scheduled cancellation is withdrawn and your subscription renews as normal on <strong data-omega-bind="@text billing.alerts.cancelDate"></strong>. Nothing is charged today.</p>
+                  <div class="d-grid d-sm-flex gap-2">
+                    <button type="button" class="btn btn-adaptive btn-sm" id="uncancel-confirm-btn">
+                      {% omega_icon "circle-check", "fa-sm me-2" %}
+                      <span class="button-text">Yes, keep my subscription</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-adaptive btn-sm" data-bs-toggle="collapse" data-bs-target="#uncancel-subscription-confirm">
+                      <span>Not now</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1130,6 +1154,46 @@ badges:
                   </div>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Change Plan Modal -->
+        <div class="modal fade" id="change-plan-modal" tabindex="-1" aria-labelledby="change-plan-title" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="change-plan-title">
+                  {% omega_icon "arrow-right-arrow-left", "fa-lg me-2" %}
+                  Change plan
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p class="mb-3">
+                  You are currently on the <strong data-omega-bind="@text billing.plan.name">Current</strong> plan.
+                </p>
+
+                <fieldset>
+                  <legend class="form-label">Move to</legend>
+                  <div id="change-plan-options">
+                    <!-- Radio buttons injected by JS from the brand's plans -->
+                  </div>
+                </fieldset>
+
+                <p class="small text-muted mb-0">
+                  Your payment provider prorates the difference: you are billed or credited for the remainder of the current period, and your next invoice reflects the new plan.
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-adaptive" data-bs-dismiss="modal">
+                  <span>Cancel</span>
+                </button>
+                <button type="button" class="btn btn-adaptive" id="change-plan-confirm-btn" disabled>
+                  {% omega_icon "arrow-right-arrow-left", "me-2" %}
+                  <span class="button-text">Change plan</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

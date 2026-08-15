@@ -6,8 +6,9 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "omega",
+    "start": "omega dev",
     "dev": "omega dev",
+    "manage": "omega manage",
     "deploy": "omega deploy",
     "pipeline": "omega pipeline --require=analytics,disperse,update,bookmark"
   },

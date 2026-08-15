@@ -1,6 +1,6 @@
 // Payment Checkout Page
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPaymentConfig, getProcessors, getProductById } from '__main_assets__/js/libs/payment-config.js';
+import { getProcessors, getProductById } from '__main_assets__/js/libs/payment-config.js';
 import { fetchTrialEligibility, warmupServer, createPaymentIntent } from './modules/api.js';
 import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
@@ -8,6 +8,13 @@ import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+/* @dev-only:start */
+// The page's dev controls live in the dev palette, not on the page (#234).
+// Both imports are inside the block, so production strips them entirely.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+import { checkoutDevSection } from './modules/dev-section.js';
+/* @dev-only:end */
 
 const logger = createLogger('checkout');
 
@@ -258,8 +265,8 @@ function setupForm() {
   formManager.ready();
 
   /* @dev-only:start */
-  // Dev mode: expose debug helpers + dev tools panel
-  {
+  // Dev mode: expose debug helpers + hand the palette this page's controls
+  if (omega.isDevelopment()) {
     window._checkout = {
       get state() { return JSON.parse(JSON.stringify(state)); },
       get formData() { return formManager.getData(); },
@@ -270,46 +277,9 @@ function setupForm() {
     // it in the first argument, so a separate tag arg would print a literal %c.
     console.log(`%c${logger.tag} window._checkout available`, 'color: #2563EB');
 
-    initDevPanel();
+    // The palette renders this when the panel opens, so registering after it
+    // booted is fine — it renders as its own section in the panel's extras.
+    registerDevSection('checkout', checkoutDevSection);
   }
   /* @dev-only:end */
 }
-
-/* @dev-only:start */
-// Dev tools panel (dev mode only)
-function initDevPanel() {
-  const $panel = document.getElementById('checkout-dev-panel');
-  if (!$panel) return;
-
-  // Show the panel
-  $panel.hidden = false;
-
-  const products = getPaymentConfig().products || [];
-  const params = new URLSearchParams(window.location.search);
-
-  // Populate product dropdown
-  const $productSelect = $panel.querySelector('[data-dev-param="product"]');
-  products.forEach(p => {
-    const $option = document.createElement('option');
-    $option.value = p.id;
-    $option.textContent = `${p.name} (${p.type})`;
-    $productSelect.appendChild($option);
-  });
-
-  // Set current values from URL
-  $panel.querySelectorAll('[data-dev-param]').forEach($el => {
-    const val = params.get($el.getAttribute('data-dev-param'));
-    if (val !== null) $el.value = val;
-  });
-
-  // Apply & reload
-  document.getElementById('checkout-dev-apply').addEventListener('click', () => {
-    const newParams = new URLSearchParams();
-    $panel.querySelectorAll('[data-dev-param]').forEach($el => {
-      const val = $el.value.trim();
-      if (val) newParams.set($el.getAttribute('data-dev-param'), val);
-    });
-    window.location.search = newParams.toString();
-  });
-}
-/* @dev-only:end */

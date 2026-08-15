@@ -76,6 +76,32 @@ module.exports = {
     },
 
     {
+      name: 'win-back-tracks-a-purchase-not-a-renewal',
+      async run({ assert }) {
+        // A returning subscriber's checkout arrives on a payment event, so before
+        // the win-back transition existed this resolved as a renewal — recurring
+        // revenue reported for what is a fresh purchase
+        const resolved = analytics.resolvePaymentEvent('subscription', 'subscription-winback', 'invoice.payment_succeeded', renewedSubscription(), {});
+
+        assert.ok(resolved, 'A win-back should resolve to a trackable event');
+        assert.equal(resolved.reason, 'winback-purchase', 'Reason should be winback-purchase');
+        assert.equal(resolved.isRecurring, false, 'A win-back is a purchase, not recurring revenue');
+        assert.equal(resolved.value, 9.99, 'Value should be what the customer paid');
+      },
+    },
+
+    {
+      name: 'a-declined-checkout-tracks-nothing',
+      async run({ assert }) {
+        // No money moved — the transition exists to suppress the dunning email,
+        // not to report revenue
+        const resolved = analytics.resolvePaymentEvent('subscription', 'checkout-declined', 'invoice.payment_failed', renewedSubscription(), {});
+
+        assert.equal(resolved, null, 'A declined checkout should track nothing');
+      },
+    },
+
+    {
       name: 'non-payment-event-tracks-nothing',
       async run({ assert }) {
         const resolved = resolveRenewal('subscription_changed');

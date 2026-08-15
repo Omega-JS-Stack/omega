@@ -111,10 +111,14 @@ function buildOneTimeSession({ priceId, customer, uid, orderId, productId, strip
       price: priceId,
       quantity: 1,
     }],
+    // The charge Stripe creates behind the session inherits THIS metadata, not the
+    // session's — without the product on it, the charge a refund arrives as cannot
+    // say what was bought ([#212](https://github.com/Omega-JS-Stack/omega/issues/212))
     payment_intent_data: {
       metadata: {
         uid: uid,
         orderId: orderId,
+        productId: productId,
       },
     },
     success_url: confirmationUrl,

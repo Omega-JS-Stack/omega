@@ -359,6 +359,17 @@ const PayPal = {
   },
 
   /**
+   * Extract the resource a PayPal webhook envelope carries
+   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   *
+   * @param {object} raw - Raw PayPal webhook payload
+   * @returns {object|null}
+   */
+  extractResource(raw) {
+    return raw?.resource || null;
+  },
+
+  /**
    * Extract the internal orderId from a PayPal resource
    * Stripe stores orderId in resource.metadata.orderId, but PayPal stores it in custom_id
    *

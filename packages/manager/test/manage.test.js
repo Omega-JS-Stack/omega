@@ -12,6 +12,8 @@ const path = require('node:path');
 
 const { resolveBrandRoot, loadBrand, targetFromDirName } = require('../src/lib/brand.js');
 const { runManage } = require('../src/manage.js');
+const { CONSENT_REQUIRED } = require('../src/lib/google-auth.js');
+const { SERVICE_ORDER, BOOT_SERVICES } = require('../src/config.js');
 
 // Fixture brands must never reach a real Cloudflare/Namecheap/Google account
 // via shell-exported credentials — those services must skip in every e2e run
@@ -311,6 +313,107 @@ test('runManage: a service that ran carries its wall time, in the report and the
   const runsDir = path.join(root, '.omega', 'runs');
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(typeof run.services[0].durationMs, 'number');
+});
+
+test('runManage: a service run() that hits a consent gate warns — the walk continues, the report stays clean (#228)', async () => {
+  const root = stageBrand();
+
+  // A dead Google grant surfaces as the coded throw from inside the service,
+  // past preflight (which only knows what the token store RECORDS).
+  const servicePath = require.resolve('../src/services/github/index.js');
+  const original = require.cache[servicePath];
+  require.cache[servicePath] = {
+    id: servicePath,
+    filename: servicePath,
+    path: path.dirname(servicePath),
+    loaded: true,
+    exports: {
+      run: async () => {
+        const error = new Error('Google consent required (scopes: webmasters) — run the service once interactively to grant it');
+        error.code = CONSENT_REQUIRED;
+        throw error;
+      },
+    },
+  };
+
+  let report;
+  try {
+    report = await runManage(root, { ...FAKE_FETCH_200 });
+  } finally {
+    if (original) {
+      require.cache[servicePath] = original;
+    } else {
+      delete require.cache[servicePath];
+    }
+  }
+
+  assert.equal(report.results.github.status, 'warned', 'a pending human gate is not a failure');
+  assert.match(report.results.github.output.auth.needsInteractive, /Google consent required/);
+  assert.equal(report.results.testing.status, 'success', 'the walk ran on to the last service');
+  assert.equal(report.hasErrors, false, 'so the dev boot reading this report still starts the stack');
+});
+
+// ─── Lanes (#228) ────────────────────────────────────────────────────────────
+
+/** captureLog for an async run (the walk + its printed walkthrough/summary). */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines.join('\n');
+}
+
+test('config: the boot lane is the local slice — file work only, and every entry is a real service', () => {
+  assert.deepEqual([...BOOT_SERVICES], ['workspace', 'assets', 'disperse'],
+    'network/rebuild services stay out — a dev boot waits on this list');
+  for (const service of BOOT_SERVICES) {
+    assert.ok(SERVICE_ORDER.includes(service), `${service} is not in SERVICE_ORDER — a rename orphaned the lane list`);
+  }
+});
+
+test('runManage: lane boot walks exactly the boot services, in SERVICE_ORDER order (#228)', async () => {
+  const root = stageBrand();
+
+  const report = await runManage(root, { lane: 'boot' });
+
+  assert.deepEqual(Object.keys(report.results), ['workspace', 'assets', 'disperse'],
+    'the slow lane (cloud, campaigns, update, account…) never runs at boot');
+  assert.equal(report.hasErrors, false);
+});
+
+test('runManage: an unknown lane throws instead of silently walking everything', async () => {
+  const root = stageBrand();
+
+  await assert.rejects(() => runManage(root, { lane: 'quick' }), /Unknown lane/);
+});
+
+test('runManage: --service still wins over a lane (the more specific ask)', async () => {
+  const root = stageBrand();
+
+  const report = await runManage(root, { service: 'workspace', lane: 'boot' });
+
+  assert.deepEqual(Object.keys(report.results), ['workspace']);
+});
+
+test('runManage: on a boot lane, preflight still names what MANAGE owes — without walking or failing it (#228)', async () => {
+  const root = stageBrand();
+
+  let report;
+  const log = await captureLogAsync(async () => {
+    report = await runManage(root, { lane: 'boot' });
+  });
+
+  // The full setup's gaps are still reported…
+  assert.match(log, /⚑ Preflight/);
+  assert.match(log, /cloudflare — missing CLOUDFLARE_TOKEN/);
+  // …but a manage-lane finding never becomes a result of THIS run
+  assert.equal(report.results.cloudflare, undefined, 'an unwalked service records nothing');
+  assert.equal(report.hasErrors, false, 'and never fails the boot');
 });
 
 test('runManage: unloadable brand config fails the workspace service and stops the run', async () => {

@@ -112,6 +112,15 @@ function buildReason(finding) {
   if (finding.missingEnv.length > 0) {
     parts.push(`missing ${finding.missingEnv.map((entry) => entry.name).join(', ')} — add to the brand .env, or rerun interactively to paste`);
   }
+  parts.push(...consentParts(finding));
+
+  return `preflight: ${parts.join('; ')}`;
+}
+
+/** The consent/scope half of a finding's wording — ONE home for both users. */
+function consentParts(finding) {
+  const parts = [];
+
   if (finding.noConsent) {
     parts.push('Google consent not granted yet — rerun interactively once to consent');
   }
@@ -119,7 +128,21 @@ function buildReason(finding) {
     parts.push(`Google token missing scopes ${finding.missingScopes.map(shortScope).join(', ')} — rerun interactively for the one re-consent`);
   }
 
-  return `preflight: ${parts.join('; ')}`;
+  return parts;
+}
+
+/**
+ * The gate's human-pending summary (#228) — what the run summary's ⚑ section
+ * prints for this skip, so the item is NAMED with a rerun hint instead of
+ * counting as an anonymous "skipped". Consent/scope gaps only: a missing
+ * secret already rides the 🔑 section, and double-listing is noise.
+ *
+ * @param {object} finding - A checkService finding.
+ * @returns {string|null} The pending line, or null for env-only gaps.
+ */
+function buildPending(finding) {
+  const parts = consentParts(finding);
+  return parts.length > 0 ? parts.join('; ') : null;
 }
 
 /**
@@ -166,7 +189,7 @@ function printWalkthrough(findings, gates, tokenStore, strict) {
     if (gate.action === 'run') {
       console.log(`      ${chalk.dim('→ this run is interactive — it will ask, then continue')}`);
     } else {
-      console.log(`      ${chalk.dim('then:')}   npm start -- --service=${finding.service}   ${chalk.dim('(from the brand root)')}`);
+      console.log(`      ${chalk.dim('then:')}   npm run manage -- --service=${finding.service}   ${chalk.dim('(from the brand root)')}`);
     }
   }
 }
@@ -181,7 +204,7 @@ function printWalkthrough(findings, gates, tokenStore, strict) {
  * @param {object} params.options - Run options ({ strict?, dryRun?, … })
  * @param {object} [deps] - Test seams: { requires } replaces the REQUIRES
  *   registry, { canPrompt } the interactivity gate
- * @returns {{ findings: object[], gates: Object<string, { action: 'run'|'skip'|'error', reason: string, missingEnv: string[] }> }}
+ * @returns {{ findings: object[], gates: Object<string, { action: 'run'|'skip'|'error', reason: string, missingEnv: string[], needsInteractive?: string }> }}
  *   gates only contains entries for services with findings — everything
  *   else runs untouched
  */
@@ -211,10 +234,13 @@ function runPreflight({ services, brandConfig, brandRoot, options = {} }, deps =
     const selfHealing = finding.missingEnv.every((entry) => entry.prompted === true);
     const action = strict ? 'error' : (interactive && selfHealing ? 'run' : 'skip');
 
+    const pending = buildPending(finding);
+
     gates[finding.service] = {
       action,
       reason: buildReason(finding),
       missingEnv: finding.missingEnv.map((entry) => entry.name),
+      ...(pending ? { needsInteractive: pending } : {}),
     };
   }
 

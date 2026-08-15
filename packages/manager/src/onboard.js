@@ -332,9 +332,10 @@ function ensureGitRepo(brandRoot, brandName) {
 /** Run manage in the new brand exactly as a user would — a real child process. */
 function spawnManage(brandRoot) {
   return new Promise((resolve) => {
-    // cli-run.js self-executes when spawned as main (no separate bin).
+    // cli-run.js self-executes when spawned as main (no separate bin). The
+    // verb is explicit (#229): a bare invocation prints help and walks nothing.
     const entry = path.join(__dirname, 'cli-run.js');
-    const child = spawn(process.execPath, [entry], { cwd: brandRoot, stdio: 'inherit' });
+    const child = spawn(process.execPath, [entry, 'manage'], { cwd: brandRoot, stdio: 'inherit' });
     child.on('close', (code) => resolve(code ?? 1));
     child.on('error', () => resolve(1));
   });
@@ -363,7 +364,7 @@ function printNextSteps(answers) {
     console.log(`  1. Install each app's framework and run its setup: ${frameworks.join(', ')}`);
   }
   console.log(`  ${frameworks.length > 0 ? 2 : 1}. Fill in .env as the brand adopts external services (the stub lists every key)`);
-  console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npx omega')} to reconcile everything — rerun any time`);
+  console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npm run manage')} to reconcile everything — rerun any time`);
 }
 
 /**

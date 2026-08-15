@@ -31,7 +31,10 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  ctx.log(`onCreate: ${user.uid} (${user.email})`, user, context);
+  // The headline is one line — uid + email. The full UserRecord (passwordHash,
+  // providerData, metadata) and the event context stay reachable at debug level.
+  ctx.log(`onCreate: ${user.uid} (${user.email})`);
+  ctx.debug(`onCreate: ${user.uid} record`, user, context);
 
   // Skip anonymous users
   if (user.providerData?.every(p => p.providerId === 'anonymous')) {

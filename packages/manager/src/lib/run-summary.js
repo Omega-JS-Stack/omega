@@ -11,6 +11,7 @@
 const chalk = require('chalk').default;
 
 const { formatDuration } = require('./duration.js');
+const { stripLeadingVerb } = require('./argv.js');
 
 class RunSummary {
   constructor() {
@@ -140,7 +141,7 @@ class RunSummary {
         console.log(`      ${prefix}${chalk.bold(`${item.serviceName}/${item.operation}`)}: ${item.what}`);
       }
       for (const serviceName of [...new Set(needsInteractive.map((item) => item.serviceName))]) {
-        console.log(`      ${chalk.dim(`→ npm start -- --service=${serviceName}   (from the brand root)`)}`);
+        console.log(`      ${chalk.dim(`→ npm run manage -- --service=${serviceName}   (from the brand root)`)}`);
       }
     }
 
@@ -157,7 +158,7 @@ class RunSummary {
         console.log(`      ${prefix}${chalk.bold(item.serviceName)}: ${item.vars.join(', ')}`);
       }
       for (const serviceName of [...new Set(missingEnv.map((item) => item.serviceName))]) {
-        console.log(`      ${chalk.dim(`→ npm start -- --service=${serviceName}   (from the brand root)`)}`);
+        console.log(`      ${chalk.dim(`→ npm run manage -- --service=${serviceName}   (from the brand root)`)}`);
       }
     }
 
@@ -173,13 +174,16 @@ class RunSummary {
   }
 
   /**
-   * Build a retry command from the original argv. `npm start` is the blessed
+   * Build a retry command from the original argv. `npm run manage` is the blessed
    * form — npx can be rerouted by shell wrappers (npu) that pipe stdio and
    * kill interactivity.
    */
   _buildRetryCommand() {
-    const args = this.argv.join(' ').trim();
-    return args ? `npm start -- ${args}` : 'npm start';
+    // The `manage` script IS the verb (#229), so the leading subcommand must
+    // not ride along — `npm run manage -- manage --service=x` would run
+    // `omega manage manage`.
+    const args = stripLeadingVerb(this.argv).join(' ').trim();
+    return args ? `npm run manage -- ${args}` : 'npm run manage';
   }
 
   /**

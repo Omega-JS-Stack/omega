@@ -37,6 +37,12 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/adsense.readonly',
 ];
 
+// A headless consent gate is a PENDING HUMAN STEP, not a failure (#228): the
+// throw carries this code so the walk classes it by code — never by sniffing
+// the message — and steps the operation aside into the run summary's ⚑ list
+// instead of failing a service (and, downstream, a whole `omega dev` boot).
+const CONSENT_REQUIRED = 'OMEGA_CONSENT_REQUIRED';
+
 // How long a printed consent url stays clickable (the loopback listener's life)
 const AUTH_WINDOW_MS = 300000;
 
@@ -256,7 +262,9 @@ class GoogleOAuth2Client {
     // is watching" (#25), but OMEGA_NON_INTERACTIVE=1 beats everything.
     const { isInteractive } = require('@omega.js/devkit/prompt');
     if (process.env.OMEGA_NON_INTERACTIVE === '1' || (!isInteractive() && !process.stdout.isTTY)) {
-      throw new Error(`Google consent required (scopes: ${this.scopes.join(', ')}) — run the service once interactively to grant it; headless runs work from the cached token after that`);
+      const error = new Error(`Google consent required (scopes: ${this.scopes.join(', ')}) — run the service once interactively to grant it; headless runs work from the cached token after that`);
+      error.code = CONSENT_REQUIRED;
+      throw error;
     }
 
     // The Enter-gate keypress listener must tear down however the flow
@@ -484,4 +492,4 @@ class GoogleOAuth2Client {
   }
 }
 
-module.exports = { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint };
+module.exports = { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath, startAuthUrlReprint, CONSENT_REQUIRED };

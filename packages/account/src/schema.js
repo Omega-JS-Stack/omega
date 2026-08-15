@@ -30,6 +30,11 @@ const USER_SCHEMA = {
     trial: {
       claimed: { type: 'boolean', default: false },
       expires: '$timestamp',
+      // How the trial ENDED: 'converted' | 'lapsed' | null (still running, or never
+      // answered). `claimed` says only that a trial happened — a converted trial and a
+      // lapsed one carry identical dates — so this is the one stored conversion signal.
+      // Stamped by the trial-lapse sweep once the processor confirms which it was.
+      outcome: { type: 'string', default: null, nullable: true },
     },
     cancellation: {
       pending: { type: 'boolean', default: false },

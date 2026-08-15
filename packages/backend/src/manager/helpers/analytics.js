@@ -168,7 +168,10 @@ function Analytics(Manager, options) {
 
   // Check if we have the required properties
   if (!self.analyticsId) {
-    self.ctx.log('analytics(): Not initializing because missing analyticsId', self.analyticsId);
+    // Debug-level: a brand with no GA4 id hits this on EVERY construction (once
+    // per request, plus every seeded user) and the answer never changes — it is
+    // configuration, not news. OMEGA_DEBUG brings it back when you are hunting one.
+    self.ctx.debug('analytics(): Not initializing because missing analyticsId', self.analyticsId);
     return self;
   } else if (!self.analyticsSecret) {
     self.ctx.log('analytics(): Not initializing because missing analyticsSecret', self.analyticsSecret);

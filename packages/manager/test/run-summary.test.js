@@ -42,7 +42,7 @@ test('run-summary: needsInteractive markers aggregate into the ⚑ section with 
   assert.ok(text.includes('paste the VAPID key pair'));
   assert.ok(text.includes('firebase/authentication'));
   assert.ok(!text.includes('firebase/hosting'));
-  assert.ok(text.includes('npm start -- --service=firebase'));
+  assert.ok(text.includes('npm run manage -- --service=firebase'));
   assert.ok(!text.includes('Brand A ·')); // single brand → no prefix noise
 });
 
@@ -71,12 +71,29 @@ test('run-summary: multi-brand aggregate prefixes the brand name', () => {
   assert.ok(text.includes('Brand A · '));
 });
 
-test('run-summary: retry command is the blessed npm start form, never npx', () => {
+test('run-summary: the retry line carries the flags, never a doubled verb (#229)', () => {
+  const originalArgv = process.argv;
+  process.argv = ['node', 'cli-run.js', 'manage', '--service=payment'];
+
+  let text;
+  try {
+    const summary = new RunSummary();
+    summary.add('brand-a', 'Brand A', 'payment', { status: 'error', error: 'boom' });
+    text = captureSummary(summary);
+  } finally {
+    process.argv = originalArgv;
+  }
+
+  assert.ok(text.includes('npm run manage -- --service=payment'), 'the script already IS the verb');
+  assert.ok(!text.includes('manage -- manage'), 'a copy-pasted retry must not run `omega manage manage`');
+});
+
+test('run-summary: retry command is the blessed npm run manage form, never npx', () => {
   const summary = new RunSummary();
   summary.add('brand-a', 'Brand A', 'update', { status: 'error', error: 'boom' });
 
   const text = captureSummary(summary);
 
-  assert.ok(text.includes('npm start'));
+  assert.ok(text.includes('npm run manage'));
   assert.ok(!text.includes('npx omega-manager'));
 });

@@ -27,6 +27,7 @@ const jetpack = require('fs-jetpack');
 
 const { resolveConfigPath, hasOmegaConfig, findSecretKeys, readCompanyRoot, COMPANY_MARKER } = require('@omega.js/config');
 const { resolveBrandRoot } = require('./brand.js');
+const { stripLeadingVerb } = require('./argv.js');
 
 const DEFAULT_BRAND_ROOTS = ['./brands'];
 
@@ -185,11 +186,13 @@ function readCompanyMarker(brandRoot) {
 }
 
 /**
- * Strip the company-only flags from a raw argv so the remainder forwards to
+ * Strip the leading verb (#229 — each child spawn names `manage` itself) and
+ * the company-only flags from a raw argv, so the remainder forwards to
  * per-brand child processes verbatim (--brand/--concurrency take values in
  * both --flag=x and --flag x forms; --parallel is boolean).
  */
-function filterChildArgs(argv) {
+function filterChildArgs(rawArgv) {
+  const argv = stripLeadingVerb(rawArgv);
   const VALUE_FLAGS = new Set(['--brand', '--concurrency']);
   const BOOLEAN_FLAGS = new Set(['--parallel']);
   const out = [];

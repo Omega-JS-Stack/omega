@@ -216,6 +216,24 @@ const Chargebee = {
   },
 
   /**
+   * Extract the resource a Chargebee webhook envelope carries
+   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   *
+   * Chargebee nests it under `content`, keyed by type, and the key varies by event:
+   * subscription events carry content.subscription (alongside the invoice + customer
+   * of the same event), a non-recurring invoice event carries only content.invoice.
+   * Subscription-first is the precedence the webhook parser categorizes on.
+   *
+   * @param {object} raw - Raw Chargebee webhook payload
+   * @returns {object|null}
+   */
+  extractResource(raw) {
+    const content = raw?.content || {};
+
+    return content.subscription || content.invoice || null;
+  },
+
+  /**
    * Extract the internal orderId from a Chargebee resource
    * Checks meta_data JSON first (new), then cf_clientorderid (legacy)
    *

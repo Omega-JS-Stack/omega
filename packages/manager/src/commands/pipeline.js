@@ -157,6 +157,27 @@ function findRunRecord(brandRoot, since) {
   return { file, record: JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 
+/**
+ * The manage child's argv: the VERB first (#229 — a bare CLI prints help and
+ * walks nothing, which would leave the pipeline with no run record), then the
+ * run flags the pipeline always imposes.
+ *
+ * @param {object} [argv] - The pipeline's own options.
+ * @returns {string[]} The child invocation's arguments.
+ */
+function buildChildArgs(argv = {}) {
+  const args = ['manage', '--continue-on-error'];
+
+  if (argv.service) {
+    args.push(`--service=${argv.service}`);
+  }
+  if (argv.dryRun || argv['dry-run']) {
+    args.push('--dry-run');
+  }
+
+  return args;
+}
+
 module.exports = async (argv = {}) => {
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
@@ -166,13 +187,7 @@ module.exports = async (argv = {}) => {
   }
 
   const requireExtra = String(argv.require || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const childArgs = ['--continue-on-error'];
-  if (argv.service) {
-    childArgs.push(`--service=${argv.service}`);
-  }
-  if (argv.dryRun || argv['dry-run']) {
-    childArgs.push('--dry-run');
-  }
+  const childArgs = buildChildArgs(argv);
 
   console.log(chalk.bold('\n🧪 Pipeline — live full-cycle test (non-interactive by construction)\n'));
   console.log(`  Brand:   ${chalk.cyan(brandRoot)}`);
@@ -291,5 +306,6 @@ module.exports = async (argv = {}) => {
 module.exports.evaluatePipeline = evaluatePipeline;
 module.exports.findRunRecord = findRunRecord;
 module.exports.resolveVerifyTargets = resolveVerifyTargets;
+module.exports.buildChildArgs = buildChildArgs;
 module.exports.CORE_SERVICES = CORE_SERVICES;
 module.exports.PUBLISH_LEGS = PUBLISH_LEGS;

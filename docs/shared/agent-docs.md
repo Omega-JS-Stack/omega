@@ -20,7 +20,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 
 ## Maintenance
 
-`npm start` (the manage cycle's `workspace` service, `agents` op — `packages/manager/src/services/workspace/ensure/agents.js`, logic in `src/lib/agents-md.js`):
+`npm run manage` (the manage cycle's `workspace` service, `agents` op — `packages/manager/src/services/workspace/ensure/agents.js`, logic in `src/lib/agents-md.js`):
 
 | State found | Action |
 |---|---|

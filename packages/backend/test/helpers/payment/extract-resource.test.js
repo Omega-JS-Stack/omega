@@ -1,0 +1,94 @@
+/**
+ * Test: processor extractResource() — each library names its own webhook envelope
+ *
+ * The webhook trigger takes the stale fallback (the payload to use when the API
+ * re-fetch fails) out of the event it received. It used to read Stripe's envelope
+ * for every processor — `raw.data.object` — so a Chargebee event (`content.<type>`)
+ * or a PayPal event (`resource`) degraded to an empty fallback and the failed fetch
+ * threw instead of falling back at all ([#222]).
+ *
+ * Each library now names its own shape, and these assert the shape against the
+ * real fixtures each processor's route parser already reads.
+ */
+const assert = require('node:assert');
+const Stripe = require('../../../src/manager/libraries/payment/processors/stripe.js');
+const PayPal = require('../../../src/manager/libraries/payment/processors/paypal.js');
+const Chargebee = require('../../../src/manager/libraries/payment/processors/chargebee.js');
+const Test = require('../../../src/manager/libraries/payment/processors/test.js');
+
+const chargebeeSubscriptionCreated = require('../../fixtures/chargebee/webhook-subscription-created.json');
+const chargebeeInvoiceOneTime = require('../../fixtures/chargebee/invoice-one-time.json');
+const stripeCheckoutSession = require('../../fixtures/stripe/checkout-session-completed.json');
+
+// Stripe's fixtures are bare resources — a webhook wraps one in the event envelope
+const stripeEvent = { id: 'evt_test_session', type: 'checkout.session.completed', data: { object: stripeCheckoutSession } };
+
+module.exports = {
+  description: 'Processor extractResource() envelope shapes',
+  type: 'group',
+
+  tests: [
+    {
+      name: 'stripe-reads-data-object',
+      async run() {
+        const resource = Stripe.extractResource(stripeEvent);
+
+        assert.equal(resource.id, stripeCheckoutSession.id, 'Stripe nests its resource at data.object');
+      },
+    },
+
+    {
+      name: 'test-processor-reads-stripes-envelope',
+      async run() {
+        // The test processor BUILDS Stripe-shaped payloads, so it reads the Stripe
+        // envelope. Without its own extractResource it fell to the empty fallback —
+        // which is the whole journey lane, since every journey runs on this processor
+        const resource = Test.extractResource(stripeEvent);
+
+        assert.equal(resource.id, stripeCheckoutSession.id, 'The test processor speaks Stripe, envelope included');
+        assert.equal(Test.extractResource({ id: 'evt_empty' }), null, 'And answers nothing the same way Stripe does');
+      },
+    },
+
+    {
+      name: 'paypal-reads-resource',
+      async run() {
+        const raw = { id: 'WH-TEST', event_type: 'BILLING.SUBSCRIPTION.ACTIVATED', resource: { id: 'I-TEST', status: 'ACTIVE' } };
+        const resource = PayPal.extractResource(raw);
+
+        assert.equal(resource.id, 'I-TEST', 'PayPal carries its resource at the top-level resource key');
+      },
+    },
+
+    {
+      name: 'chargebee-reads-the-content-key-of-the-event',
+      async run() {
+        const subscription = Chargebee.extractResource(chargebeeSubscriptionCreated);
+
+        assert.equal(subscription.id, chargebeeSubscriptionCreated.content.subscription.id, 'A subscription event resolves content.subscription');
+        assert.equal(subscription.object, 'subscription', 'The resolved resource is the subscription, not the invoice beside it');
+      },
+    },
+
+    {
+      name: 'chargebee-falls-to-the-invoice-when-there-is-no-subscription',
+      async run() {
+        // The one-time lane: invoice_generated for a non-recurring invoice carries no
+        // subscription at all — the same precedence parseWebhook categorizes on
+        const raw = { id: 'ev_cb_invoice_001', event_type: 'invoice_generated', content: { invoice: chargebeeInvoiceOneTime, customer: { id: 'cb_cust_001' } } };
+        const resource = Chargebee.extractResource(raw);
+
+        assert.equal(resource.id, chargebeeInvoiceOneTime.id, 'An invoice-only event resolves content.invoice');
+      },
+    },
+
+    {
+      name: 'an-envelope-with-no-resource-extracts-nothing',
+      async run() {
+        assert.equal(Chargebee.extractResource({ id: 'ev_empty', content: {} }), null, 'Chargebee: no content key, nothing to fall back to');
+        assert.equal(Stripe.extractResource({ id: 'evt_empty' }), null, 'Stripe: no data.object, nothing to fall back to');
+        assert.equal(PayPal.extractResource({ id: 'WH-empty' }), null, 'PayPal: no resource, nothing to fall back to');
+      },
+    },
+  ],
+};

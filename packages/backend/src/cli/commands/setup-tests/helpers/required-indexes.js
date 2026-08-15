@@ -69,6 +69,21 @@ module.exports = [
     ],
   },
 
+  // Trial-lapse sweep cron — claimed trials that expired inside the sweep window
+  // Query: .where('subscription.trial.claimed', '==', true)
+  //        .where('subscription.status', '==', 'active')
+  //        .where('subscription.trial.expires.timestampUNIX', '>=', floor)
+  //        .where('subscription.trial.expires.timestampUNIX', '<=', ceiling)
+  {
+    collectionGroup: 'users',
+    queryScope: 'COLLECTION',
+    fields: [
+      { fieldPath: 'subscription.trial.claimed', order: 'ASCENDING' },
+      { fieldPath: 'subscription.status', order: 'ASCENDING' },
+      { fieldPath: 'subscription.trial.expires.timestampUNIX', order: 'ASCENDING' },
+    ],
+  },
+
   // GET /marketing/campaign — list by type + sendAt range
   // Query: .where('type', '==', type).where('sendAt', '>=', start).where('sendAt', '<=', end)
   {

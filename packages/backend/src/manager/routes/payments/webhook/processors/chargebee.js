@@ -116,8 +116,17 @@ module.exports = {
         resourceType = 'subscription';
         resourceId = subscription.id;
         uid = extractUid(subscription, customer);
+      } else if (invoice) {
+        // No subscription — the refund of a one-time purchase, resolved through
+        // the invoice it refunded, the same one the one-time payment_failed branch
+        // above names. Skipping it meant that refund never entered the pipeline at
+        // all ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+        category = 'one-time';
+        resourceType = 'invoice';
+        resourceId = invoice.id;
+        uid = extractUid(null, customer);
       } else {
-        // Non-subscription refund — skip
+        // Neither a subscription nor an invoice — nothing names the purchase
         category = null;
       }
 

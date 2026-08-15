@@ -46,6 +46,19 @@ test('canPrompt: true on a TTY without dryRun, false with dryRun, false off-TTY'
   });
 });
 
+test('canPrompt: OMEGA_NON_INTERACTIVE=1 forces false on a TTY — the one headless switch (#228)', () => {
+  withStreams(true, () => {
+    assert.equal(canPrompt({}), true, 'TTY baseline');
+    process.env.OMEGA_NON_INTERACTIVE = '1';
+    try {
+      assert.equal(canPrompt({}), false);
+    } finally {
+      delete process.env.OMEGA_NON_INTERACTIVE;
+    }
+    assert.equal(canPrompt({}), true, 'restored after env cleared');
+  });
+});
+
 test('dryRunPlan: prints the canonical line and passes the result through', () => {
   const planned = { output: { list: { planned: 'create' } } };
   const { result, text } = captureLog(() => dryRunPlan('create list "News"', planned));

@@ -16,12 +16,13 @@ const { join } = require('node:path');
 const chalk = require('chalk').default;
 const { loadEnvChain } = require('@omega.js/config');
 
-const { SERVICE_ORDER, OPERATIONS } = require('./config.js');
+const { SERVICE_ORDER, BOOT_SERVICES, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
 const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { readState, writeState, writeRunOutput } = require('./lib/state.js');
 const { formatDuration } = require('./lib/duration.js');
 const { runPreflight } = require('./lib/preflight.js');
+const { CONSENT_REQUIRED } = require('./lib/google-auth.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
 // Timestamp for this process run — used in .omega/runs/{RUN_TIMESTAMP}.json
@@ -71,6 +72,14 @@ async function runService(serviceName, brand, brandState, options = {}) {
       serviceData: brandState[serviceName] || {},
     });
   } catch (error) {
+    // A consent gate thrown at setup time is a pending HUMAN step, not a
+    // failure (#228) — warned keeps the walk going and lands the item in the
+    // summary's ⚑ list instead of stopping the cycle (and any dev boot on it)
+    if (error?.code === CONSENT_REQUIRED) {
+      console.log(`  ${chalk.yellow('⚑')} ${serviceName}: ${error.message}`);
+      return { status: 'warned', output: { auth: { needsInteractive: error.message } } };
+    }
+
     console.error(`  Error in ${serviceName}: ${error.message}`);
     return { status: 'error', error: error.message };
   }
@@ -80,7 +89,8 @@ async function runService(serviceName, brand, brandState, options = {}) {
  * Run all services (in order) against the brand monorepo containing startDir.
  *
  * @param {string} startDir - Any directory inside the brand monorepo
- * @param {Object} options - { service?, continueOnError?, dryRun?, verbose?,
+ * @param {Object} options - { service?, lane? ('boot' = the local slice a dev
+ *   boot needs; omitted = every service), continueOnError?, dryRun?, verbose?,
  *   strict? (preflight failures fail hard instead of skipping),
  *   migration? (true = all, string = one), limit?, ids? (migrations service) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}
@@ -142,8 +152,18 @@ async function runManage(startDir, options = {}) {
     return { hasErrors: false, results: {}, brand, skipped: true };
   }
 
-  // Determine which services to run
-  const servicesToRun = options.service ? [options.service] : SERVICE_ORDER;
+  // Determine which services to run. --service is the most specific ask and
+  // wins outright; a lane narrows the walk to its slice (#228) — 'boot' is the
+  // local one `omega dev` runs before its legs, in SERVICE_ORDER order.
+  if (options.lane && options.lane !== 'boot') {
+    throw new Error(`Unknown lane: ${options.lane}. Available: boot`);
+  }
+
+  const servicesToRun = options.service
+    ? [options.service]
+    : (options.lane === 'boot'
+      ? SERVICE_ORDER.filter((serviceName) => BOOT_SERVICES.includes(serviceName))
+      : SERVICE_ORDER);
 
   if (options.service && !SERVICE_ORDER.includes(options.service)) {
     throw new Error(`Unknown service: ${options.service}. Available: ${SERVICE_ORDER.join(', ')}`);
@@ -165,8 +185,13 @@ async function runManage(startDir, options = {}) {
   // instead of N mid-run skips. Failing services skip (the cycle continues —
   // absorb, never crash) unless the run can collect the fix itself
   // (interactive paste/consent flows) or --strict makes them fail hard.
+  // A lane narrows the WALK, never the preflight (#228): preflight is local
+  // (env presence + token-store read, zero network), and its walkthrough is
+  // how a boot names what the full setup still owes. Gates are only consulted
+  // for the services this run actually walks, so an unwalked finding records
+  // nothing and fails nothing.
   const preflight = runPreflight({
-    services: servicesToRun,
+    services: options.service ? [options.service] : SERVICE_ORDER,
     brandConfig: brand.config,
     brandRoot,
     options,
@@ -200,6 +225,10 @@ async function runManage(startDir, options = {}) {
         status: 'skipped',
         reason: gate.reason,
         ...(gate.missingEnv.length > 0 ? { missingEnv: gate.missingEnv } : {}),
+        // A consent/scope gap is a pending HUMAN step: it rides the ⚑
+        // aggregate with its rerun hint (#228), not just the walkthrough
+        // scroll-back a dev boot's leg output buries
+        ...(gate.needsInteractive ? { output: { preflight: { needsInteractive: gate.needsInteractive } } } : {}),
       };
     } else {
       const startedAt = Date.now();

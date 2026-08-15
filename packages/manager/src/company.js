@@ -77,7 +77,9 @@ function runBrandChild(brand, childArgs, { stream, logPath }) {
     jetpack.dir(path.dirname(logPath));
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });
 
-    const child = spawn(process.execPath, [CHILD_ENTRY, ...childArgs], {
+    // The verb is the spawn's own (#229): `childArgs` carries flags only, and
+    // a bare child would print help instead of walking the brand.
+    const child = spawn(process.execPath, [CHILD_ENTRY, 'manage', ...childArgs], {
       cwd: brand.root,
       // Children pipe their output — keep chalk colors when the parent's
       // terminal has them (the log tee strips ANSI either way)

@@ -48,6 +48,22 @@ function Manager() {
 // Inherit from EventEmitter
 util.inherits(Manager, EventEmitter);
 
+// Process-level latch for the TEST-environment banner. init() can run more than
+// once in a single process (the test runner, a custom server, a re-entrant boot);
+// the banner is boot information, not per-init information, so it says its piece
+// once and then stays quiet.
+let _testBannerLogged = false;
+
+// The emulator boots a FRESH functions worker per invocation — measured on one
+// playground seed: 53 worker processes for 92 invocations, so a once-per-process
+// line still prints 53 times to announce what the emulator itself announced. The
+// test-environment boot lines are therefore silent under the emulator. They stay
+// LOUD (once) in a deployed process that resolves test mode, which is the case
+// where "this is a test environment" is an alarm, not a truism.
+function isUnderEmulator() {
+  return process.env.FUNCTIONS_EMULATOR === 'true';
+}
+
 Manager.prototype.init = function (exporter, options) {
   const self = this;
 
@@ -351,7 +367,10 @@ Manager.prototype.init = function (exporter, options) {
 
   // Handle test environment
   if (self.isTesting()) {
-    self.ctx.log('⚠️⚠️⚠️ Running in TEST environment, some features may be disabled ⚠️⚠️⚠️');
+    if (!isUnderEmulator() && !_testBannerLogged) {
+      _testBannerLogged = true;
+      self.ctx.log('⚠️⚠️⚠️ Running in TEST environment, some features may be disabled ⚠️⚠️⚠️');
+    }
 
     // Install the test-mode-file watcher exactly once. Lets the test command
     // flip env vars (currently just TEST_EXTENDED_MODE) on the running emulator
@@ -1318,14 +1337,17 @@ function setupTestModeWatcher(manager) {
   const tempDir = path.join(projectDir, TEMP_DIR_NAME);
 
   // Initial sync — apply any state the test/emulator command wrote before
-  // this process booted. Always log the resolved mode so it's obvious what
-  // the worker decided, even if no file existed (defaults to "normal").
+  // this process booted. A sync/flip is an EVENT and always says so; the
+  // resolved mode is per-worker boot noise under the emulator (see
+  // isUnderEmulator) and only announces itself outside one.
   const initial = readTestMode(projectDir);
   const changed = applyEnvFromFile(initial);
   for (const c of changed) {
     manager.ctx.log(`test-mode sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
   }
-  manager.ctx.log(`test-mode resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
+  if (!isUnderEmulator()) {
+    manager.ctx.log(`test-mode resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
+  }
 
   // Ensure .temp/ exists so we can watch the directory (fs.watch on a missing
   // path throws synchronously). Watching the directory rather than the file

@@ -6,12 +6,20 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
 
 const logger = createLogger('account:billing');
 
 let paymentConfig = null;
 let cancelFormManager = null;
 let currentAccount = null;
+
+// Whether the account's processor can do these at all is the BACKEND's answer
+// (the capability gate): we attempt the route and branch on the code that comes
+// back, never on a processor map here. A refusal retires the button for the
+// session — the billing portal is the path that works for that processor.
+let uncancelSupported = true;
+let planSwitchSupported = true;
 
 // Cancellation reasons (will be shuffled on each render)
 const CANCEL_REASONS = [
@@ -40,6 +48,8 @@ const FREQUENCY_LABELS = { daily: 'day', weekly: 'week', monthly: 'month', annua
 export async function init() {
   setupActionButtons();
   setupCancellationForm();
+  setupUncancelConfirm();
+  setupPlanSwitcher();
 }
 
 // Load billing data
@@ -141,9 +151,10 @@ function buildBillingState(account) {
       },
       buttons: {
         upgrade: !isPaid || rawStatus === 'cancelled',
-        change: resolved.active,
+        change: planSwitchSupported && resolved.active,
         manage: isPaid && rawStatus !== 'cancelled',
         cancel: isPaid && rawStatus !== 'cancelled' && !resolved.cancelling,
+        uncancel: uncancelSupported && isPaid && rawStatus === 'active' && resolved.cancelling,
       },
     },
   };
@@ -163,10 +174,11 @@ function setupActionButtons() {
     });
   }
 
+  // The plan switcher modal itself opens declaratively (data-bs-toggle), the
+  // same way the signin link modal does — this only records the intent
   if ($changeBtn) {
     $changeBtn.addEventListener('click', () => {
       trackBilling('change_plan_click');
-      window.location.href = '/pricing';
     });
   }
 
@@ -210,6 +222,219 @@ async function openBillingPortal() {
     if ($manageBtn) $manageBtn.disabled = false;
     if ($btnText) $btnText.textContent = originalText;
   }
+}
+
+// ─── Undo Cancellation ──────────────────────────────────────
+
+function setupUncancelConfirm() {
+  const $confirmBtn = document.getElementById('uncancel-confirm-btn');
+  if (!$confirmBtn) {
+    return;
+  }
+
+  $confirmBtn.addEventListener('click', () => uncancelSubscription($confirmBtn));
+}
+
+// Withdraw the scheduled cancellation so the subscription just keeps renewing.
+// Nothing is charged today — the processor resumes the existing term.
+async function uncancelSubscription($confirmBtn) {
+  const $btnText = $confirmBtn.querySelector('.button-text');
+  const originalText = $btnText?.textContent;
+
+  trackBilling('uncancel_submit');
+
+  try {
+    // Show loading state
+    $confirmBtn.disabled = true;
+    if ($btnText) $btnText.textContent = 'Resuming...';
+
+    await omega.request(`/omega/payments/uncancel`, {
+      method: 'POST',
+      timeout: 30000,
+      body: {
+        confirmed: true,
+      },
+    });
+
+    logger.log('Cancellation withdrawn:', { productId: currentAccount?.subscription?.product?.id });
+
+    // The webhook pipeline writes the real state — patch locally so the card
+    // stops saying "cancellation scheduled" the moment the route succeeds
+    const currentSub = currentAccount?.subscription;
+    if (currentSub) {
+      currentSub.cancellation = { pending: false };
+      updateUI(currentAccount);
+    }
+
+    collapseUncancelConfirm();
+
+    omega.utilities().showNotification('Your subscription will continue as normal. You were not charged today.', 'success');
+  } catch (error) {
+    logger.error('Failed to withdraw cancellation:', error);
+
+    // The processor cannot resume a subscription AT ALL (the backend's
+    // capability gate). The button is a dead end for this account, so retire it
+    // for the session — the message already points at the billing portal, which
+    // is the "Manage billing" button right beside it.
+    if (error.properties?.additional?.code === 'not-supported-by-processor') {
+      uncancelSupported = false;
+      updateUI(currentAccount);
+      collapseUncancelConfirm();
+      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+    } else {
+      omega.utilities().showNotification(error.message || 'Failed to resume your subscription. Please try again later.', 'danger');
+    }
+  } finally {
+    $confirmBtn.disabled = false;
+    if ($btnText) $btnText.textContent = originalText;
+  }
+}
+
+function collapseUncancelConfirm() {
+  const $confirm = document.getElementById('uncancel-subscription-confirm');
+  if (!$confirm) {
+    return;
+  }
+
+  const bsCollapse = bootstrap.Collapse.getInstance($confirm);
+  if (bsCollapse) bsCollapse.hide();
+}
+
+// ─── Plan Switcher ──────────────────────────────────────────
+
+function setupPlanSwitcher() {
+  const $modal = document.getElementById('change-plan-modal');
+  if (!$modal) {
+    return;
+  }
+
+  const $options = document.getElementById('change-plan-options');
+  const $confirmBtn = document.getElementById('change-plan-confirm-btn');
+
+  // Rebuild the picker every time it opens — the plan it must exclude is
+  // whatever the account is on right now
+  $modal.addEventListener('show.bs.modal', () => {
+    populatePlanOptions($options);
+    $confirmBtn.disabled = true;
+  });
+
+  // Nothing to confirm until a plan is picked
+  $options.addEventListener('change', () => {
+    $confirmBtn.disabled = !getSelectedPlan();
+  });
+
+  $confirmBtn.addEventListener('click', () => changePlan($confirmBtn, $modal));
+}
+
+// Every subscription plan the brand sells, at every frequency it sells it at,
+// minus the one the account is already on
+function populatePlanOptions($container) {
+  const subscription = currentAccount?.subscription || {};
+  const currentProductId = subscription.product?.id;
+  const currentFrequency = subscription.payment?.frequency;
+  const currency = paymentConfig?.currency || 'USD';
+
+  const options = (paymentConfig?.products || [])
+    .filter(product => (product.type || 'subscription') === 'subscription' && product.id !== 'basic')
+    .flatMap(product => getAvailableFrequencies(product).map(frequency => ({ product, frequency })))
+    .filter(({ product, frequency }) => !(product.id === currentProductId && frequency === currentFrequency));
+
+  if (options.length === 0) {
+    $container.innerHTML = '<div class="text-muted small">There are no other plans to switch to right now.</div>';
+    return;
+  }
+
+  $container.innerHTML = options.map(({ product, frequency }, i) => `
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="radio" name="change_plan_option" id="change-plan-option-${i}" value="${omega.utilities().escapeHTML(product.id)}" data-frequency="${omega.utilities().escapeHTML(frequency)}">
+      <label class="form-check-label" for="change-plan-option-${i}">
+        <strong>${omega.utilities().escapeHTML(product.name || product.id)}</strong>
+        <span class="text-muted">&mdash; ${omega.utilities().escapeHTML(formatCurrency(resolvePlanPrice(product, frequency), currency))} / ${FREQUENCY_LABELS[frequency] || frequency}</span>
+      </label>
+    </div>
+  `).join('');
+}
+
+function getSelectedPlan() {
+  const $selected = document.querySelector('input[name="change_plan_option"]:checked');
+  if (!$selected) {
+    return null;
+  }
+
+  return { productId: $selected.value, frequency: $selected.dataset.frequency };
+}
+
+// Move the live subscription onto another plan. The processor prorates the
+// difference — no cancel-and-resubscribe, no second checkout.
+async function changePlan($confirmBtn, $modal) {
+  const selection = getSelectedPlan();
+  if (!selection) {
+    return;
+  }
+
+  const $btnText = $confirmBtn.querySelector('.button-text');
+  const originalText = $btnText?.textContent;
+
+  trackBilling('change_plan_submit');
+
+  try {
+    // Show loading state
+    $confirmBtn.disabled = true;
+    if ($btnText) $btnText.textContent = 'Changing...';
+
+    await omega.request(`/omega/payments/plan`, {
+      method: 'POST',
+      timeout: 30000,
+      body: {
+        productId: selection.productId,
+        frequency: selection.frequency,
+        confirmed: true,
+      },
+    });
+
+    logger.log('Plan change requested:', selection);
+
+    // The webhook pipeline writes the real state — patch locally so the card
+    // shows the plan they just picked
+    const currentSub = currentAccount?.subscription;
+    const product = paymentConfig?.products?.find(candidate => candidate.id === selection.productId);
+    if (currentSub && product) {
+      currentSub.product = { id: product.id, name: product.name };
+      currentSub.payment = {
+        ...currentSub.payment,
+        frequency: selection.frequency,
+        price: resolvePlanPrice(product, selection.frequency),
+      };
+
+      updateUI(currentAccount);
+    }
+
+    hidePlanSwitcher($modal);
+
+    omega.utilities().showNotification(`You're now on the ${product?.name || selection.productId} plan. Your next invoice reflects the change.`, 'success');
+  } catch (error) {
+    logger.error('Failed to change plan:', error);
+
+    // Same capability gate as uncancel: the processor cannot move a live
+    // subscription at all, so retire the button for the session and let the
+    // message send them to the billing portal
+    if (error.properties?.additional?.code === 'not-supported-by-processor') {
+      planSwitchSupported = false;
+      updateUI(currentAccount);
+      hidePlanSwitcher($modal);
+      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+    } else {
+      omega.utilities().showNotification(error.message || 'Failed to change your plan. Please try again later.', 'danger');
+    }
+  } finally {
+    $confirmBtn.disabled = false;
+    if ($btnText) $btnText.textContent = originalText;
+  }
+}
+
+function hidePlanSwitcher($modal) {
+  const bsModal = bootstrap.Modal.getInstance($modal);
+  if (bsModal) bsModal.hide();
 }
 
 // ─── Cancellation Form ──────────────────────────────────────
@@ -411,6 +636,17 @@ function getDisplayName(subscription) {
   return product?.name || 'Free';
 }
 
+// A plan's price at one frequency (a price entry is either `{ amount: N }` or
+// a plain `N`, the same two shapes checkout resolves)
+function resolvePlanPrice(product, frequency) {
+  const entry = product.prices?.[frequency];
+  if (entry == null) {
+    return 0;
+  }
+
+  return typeof entry === 'object' ? (entry.amount || 0) : Number(entry) || 0;
+}
+
 function formatCurrency(amount, currency) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -447,7 +683,7 @@ function formatBytes(bytes, decimals = 2) {
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
 function shuffleArray(arr) {

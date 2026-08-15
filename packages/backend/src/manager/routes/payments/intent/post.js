@@ -39,9 +39,10 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const attribution = settings.attribution;
   const discount = settings.discount;
   const supplemental = settings.supplemental;
+  const simulate = settings.simulate;
   let trial = settings.trial;
 
-  ctx.log(`Intent request: uid=${uid}, processor=${processor}, product=${productId}, frequency=${frequency}, trial=${trial}`);
+  ctx.log(`Intent request: uid=${uid}, processor=${processor}, product=${productId}, frequency=${frequency}, trial=${trial}, simulate=${simulate || 'none'}`);
 
   // Validate product exists in config
   const product = (Manager.config.payment?.products || []).find(p => p.id === productId);
@@ -127,6 +128,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       frequency,
       trial,
       discount: resolvedDiscount,
+      simulate,
       confirmationUrl,
       cancelUrl,
       ctx,

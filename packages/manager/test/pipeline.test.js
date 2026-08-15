@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { evaluatePipeline, findRunRecord, resolveVerifyTargets, CORE_SERVICES } = require('../src/commands/pipeline.js');
+const { evaluatePipeline, findRunRecord, resolveVerifyTargets, buildChildArgs, CORE_SERVICES } = require('../src/commands/pipeline.js');
 const { runVerifyLegs } = require('../src/lib/verify-live.js');
 
 /** Full-run record where every core service is green. */
@@ -111,6 +111,16 @@ test('pipeline: verify targets follow the deploy legs; --verify alone sweeps eve
   assert.deepEqual(resolveVerifyTargets({ deploy: 'web,backend' }, ['web', 'backend']), ['web', 'backend'], 'deploying verifies what was deployed');
   assert.deepEqual(resolveVerifyTargets({ verify: true }, []), ['web'], '--verify alone is the post-hoc sweep');
   assert.deepEqual(resolveVerifyTargets({}, []), [], 'no deploy, no --verify → no sweep');
+});
+
+test('pipeline: the manage child names the verb — a bare CLI walks nothing now (#229)', () => {
+  assert.deepEqual(buildChildArgs({}), ['manage', '--continue-on-error'],
+    'the child IS the walk — without the verb it would print help and the pipeline would find no run record');
+  assert.deepEqual(
+    buildChildArgs({ service: 'payment', dryRun: true }),
+    ['manage', '--continue-on-error', '--service=payment', '--dry-run'],
+    'the verb leads; the run flags follow unchanged',
+  );
 });
 
 test('pipeline: every value-less pipeline flag is declared boolean (yargs would eat the next positional)', () => {

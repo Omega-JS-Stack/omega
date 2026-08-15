@@ -47,7 +47,7 @@ Nothing in this monorepo is ever the production brand. Topology, history, and th
 
 ## Inspecting a running system — grep the logs FIRST
 
-Every OMEGA surface tees its whole run to a file, truncated on each launch: an app's `logs/dev.log` / `logs/build.log` / `logs/test.log`, a brand root's `logs/manage.log`, the backend's `dist/emulator.log`, this monorepo's `.temp/logs/<lane>.log` and `.temp/logs/watch-all.log`, and each e2e lane's `.temp/<lane>/steps.log` (`grep '^FAIL' .temp/*/steps.log` names the failing step). Server state, build errors, test failures and emulator traffic are ALREADY on disk — never restart a dev server, emulator or watcher, and never re-run a suite, just to see output. The mechanism, the retention rule and the full path table: `docs/shared/logging.md`.
+Every OMEGA surface tees its whole run to a file, truncated on each launch: an app's `logs/dev.log` / `logs/build.log` / `logs/test.log`, a brand root's `logs/manage.log` (the manage walk) and `logs/dev.log` (the `omega dev` fan-out), the backend's `dist/emulator.log`, this monorepo's `.temp/logs/<lane>.log` and `.temp/logs/watch-all.log`, and each e2e lane's `.temp/<lane>/steps.log` (`grep '^FAIL' .temp/*/steps.log` names the failing step). Server state, build errors, test failures and emulator traffic are ALREADY on disk — never restart a dev server, emulator or watcher, and never re-run a suite, just to see output. The mechanism, the retention rule and the full path table: `docs/shared/logging.md`.
 
 ## Project state
 

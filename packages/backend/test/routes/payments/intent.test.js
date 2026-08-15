@@ -170,6 +170,25 @@ module.exports = {
     },
 
     {
+      name: 'rejects-unknown-simulate-value',
+      async run({ http, assert, config, skip }) {
+        const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
+        if (!paidProduct) {
+          skip('No paid product configured in this brand');
+        }
+
+        const response = await http.as('basic').post('backend-manager/payments/intent', {
+          processor: 'test',
+          productId: paidProduct.id,
+          frequency: 'monthly',
+          simulate: 'explode',
+        });
+
+        assert.isError(response, 400, 'simulate should be allow-listed');
+      },
+    },
+
+    {
       name: 'rejects-unknown-processor',
       async run({ http, assert, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);

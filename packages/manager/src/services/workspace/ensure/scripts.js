@@ -1,14 +1,15 @@
 /**
  * Ensure the brand root package.json carries a `deploy: 'omega deploy'`
- * script (npm scripts put node_modules/.bin on PATH, so plain `omega`
- * resolves there). Script VALUES only — no other script, key, or consumer
- * content is ever touched. Idempotent: a converged file rewrites nothing.
+ * script and the current start/manage convention (npm scripts put
+ * node_modules/.bin on PATH, so plain `omega` resolves there). Script VALUES
+ * only — no other script, key, or consumer content is ever touched.
+ * Idempotent: a converged file rewrites nothing.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
-const { healPackageScripts, DEPLOY_SCRIPT } = require('../../../lib/package-scripts.js');
+const { healPackageScripts } = require('../../../lib/package-scripts.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async ({ brandRoot, options = {} }) => {
@@ -27,15 +28,15 @@ module.exports = async ({ brandRoot, options = {} }) => {
     return { status: 'warned', output: { scripts: 'unparseable' } };
   }
 
-  const { scripts, added } = healPackageScripts(pkg);
-  if (!added) {
-    console.log(`      ${chalk.green('✓')} Root deploy script present`);
+  const { scripts, changes } = healPackageScripts(pkg);
+  if (!changes.length) {
+    console.log(`      ${chalk.green('✓')} Root scripts present`);
     return null;
   }
 
   if (options.dryRun) {
     return dryRunPlan(
-      `heal root scripts (add deploy: '${DEPLOY_SCRIPT}')`,
+      `heal root scripts (${changes.join(', ')})`,
       { output: { scripts: 'planned' } },
     );
   }
@@ -43,7 +44,7 @@ module.exports = async ({ brandRoot, options = {} }) => {
   pkg.scripts = scripts;
   jetpack.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-  console.log(`      ${chalk.green('✓')} Added script \`deploy: '${DEPLOY_SCRIPT}'\``);
+  console.log(`      ${chalk.green('✓')} Healed root scripts \`${changes.join('`, `')}\``);
 
-  return { output: { scripts: { added } } };
+  return { output: { scripts: { changed: changes } } };
 };

@@ -522,17 +522,6 @@
   }
 }
 
-// ── Dev toggle (dev builds only) ────────────────────────────────────────────
-.omega-checkout__dev-toggle {
-  width: 2.125rem;
-  height: 2.125rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
 // ── reCAPTCHA badge — bottom left, out of the payment column's way ──────────
 .grecaptcha-badge {
   bottom: 0.5rem !important;

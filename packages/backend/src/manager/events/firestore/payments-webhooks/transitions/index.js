@@ -28,7 +28,7 @@ function detectTransition(category, before, after, eventType, options) {
   }
 
   if (category === 'one-time') {
-    return detectOneTimeTransition(eventType);
+    return detectOneTimeTransition(eventType, options);
   }
 
   return null;
@@ -72,27 +72,55 @@ function detectSubscriptionTransition(before, after, eventType, options) {
     return 'new-subscription';
   }
 
-  // 2. payment-failed: active → suspended
+  // 2. subscription-winback: cancelled paid → active paid. A full cancellation
+  // leaves the paid product id in place, so a returning subscriber matched
+  // nothing here — no confirmation email, and analytics read the checkout as a
+  // renewal ([#218](https://github.com/Omega-JS-Stack/omega/issues/218)).
+  if (beforeStatus === 'cancelled' && isPaid(before) && afterStatus === 'active' && isPaid(after)) {
+    return 'subscription-winback';
+  }
+
+  // 3. checkout-declined: basic/null → suspended. Users are born active on basic,
+  // so a declined FIRST checkout reads as active → suspended and used to send the
+  // renewal-dunning email to someone who never had a subscription to dun.
+  if (isBasicOrNull(before) && afterStatus === 'suspended') {
+    return 'checkout-declined';
+  }
+
+  // 4. payment-failed: active → suspended
   if (beforeStatus === 'active' && afterStatus === 'suspended') {
     return 'payment-failed';
   }
 
-  // 3. payment-recovered: suspended → active
+  // 5. payment-recovered: suspended → active
   if (beforeStatus === 'suspended' && afterStatus === 'active') {
     return 'payment-recovered';
   }
 
-  // 4. cancellation-requested: pending flips from false → true while still active
+  // 6. cancellation-requested: pending flips from false → true while still active
   if (afterStatus === 'active' && !before?.cancellation?.pending && after.cancellation?.pending) {
     return 'cancellation-requested';
   }
 
-  // 5. subscription-cancelled: any non-cancelled → cancelled
+  // 7. cancellation-removed: pending flips from true → false on the same product
+  // while still active — the uncancel route's half of the pair above. Same product
+  // and behind payment-recovered, so a plan change or a recovery that also clears
+  // the schedule keeps its own, more meaningful, name.
+  if (
+    afterStatus === 'active'
+    && before?.cancellation?.pending
+    && !after.cancellation?.pending
+    && before.product?.id === after.product?.id
+  ) {
+    return 'cancellation-removed';
+  }
+
+  // 8. subscription-cancelled: any non-cancelled → cancelled
   if (beforeStatus !== 'cancelled' && afterStatus === 'cancelled') {
     return 'subscription-cancelled';
   }
 
-  // 6. plan-changed: both active, both paid, different product
+  // 9. plan-changed: both active, both paid, different product
   if (
     beforeStatus === 'active'
     && afterStatus === 'active'
@@ -111,9 +139,27 @@ function detectSubscriptionTransition(before, after, eventType, options) {
  * Simpler than subscriptions — no before/after comparison needed
  *
  * @param {string} eventType - Webhook event type
+ * @param {object} [options] - { previouslyCompleted } — this webhook doc already completed once
  * @returns {string|null} Transition name
  */
-function detectOneTimeTransition(eventType) {
+function detectOneTimeTransition(eventType, options) {
+  // Idempotency: EVERY transition on this side is detected from the event type
+  // alone, so a webhook doc processed a second time (a redelivery, or a doc put
+  // back to pending) would re-dispatch its handler — and email the customer about
+  // the same purchase or refund twice. The subscription side guards its
+  // event-type-only path the same way.
+  if (options?.previouslyCompleted) {
+    return null;
+  }
+
+  // Refunds first, and by event type alone — a one-time purchase has no
+  // before/after state to diff, the event IS the transition. The strings are the
+  // same processor strings the subscription side reads
+  // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+  if (REFUND_EVENTS.includes(eventType)) {
+    return 'purchase-refunded';
+  }
+
   // Stripe
   if (eventType === 'checkout.session.completed') {
     return 'purchase-completed';
