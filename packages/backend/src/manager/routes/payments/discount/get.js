@@ -13,10 +13,13 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond({ valid: false }, { code: 200 });
   }
 
+  // A code is percent-based or amount-based (Stripe's two coupon shapes) — the
+  // caller reads whichever field is present
   return ctx.respond({
     valid: true,
     code: result.code,
     percent: result.percent,
+    amount: result.amount,
     duration: result.duration,
   });
 };

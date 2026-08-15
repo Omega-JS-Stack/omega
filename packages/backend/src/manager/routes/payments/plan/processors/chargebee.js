@@ -33,6 +33,19 @@ module.exports = {
     // Deterministic item price ID: {itemId}-{frequency} — the checkout's own convention
     const itemPriceId = `${chargebeeItemId}-${frequency}`;
 
+    // A switch never grants, resets, or extends a trial ([#237]): a subscription
+    // still IN its trial keeps the end date it already had, restated on the
+    // update so the new item price cannot reopen or close the trial.
+    //
+    // The date comes from the LIVE subscription, never from our own user doc —
+    // exactly like the Stripe branch reads the item it is replacing. A user doc
+    // that lags the provider would otherwise make this route MOVE the trial it
+    // is meant to preserve, or restate an end date Chargebee has already passed
+    // (a 400). A trial that is over is left alone (encodeFormData drops the null).
+    const current = await ChargebeeLib.request(`/subscriptions/${resourceId}`);
+    const live = current.subscription || current;
+    const trialEnd = live.status === 'in_trial' ? (live.trial_end || null) : null;
+
     await ChargebeeLib.request(`/subscriptions/${resourceId}/update_for_items`, {
       method: 'POST',
       body: {
@@ -40,9 +53,10 @@ module.exports = {
           item_price_id: [itemPriceId],
           quantity: [1],
         },
+        trial_end: trialEnd,
       },
     });
 
-    ctx.log(`Chargebee plan switched: sub=${resourceId}, uid=${uid}, itemPriceId=${itemPriceId} (${product.id}/${frequency})`);
+    ctx.log(`Chargebee plan switched: sub=${resourceId}, uid=${uid}, itemPriceId=${itemPriceId} (${product.id}/${frequency}), trialEnd=${trialEnd || 'none'}`);
   },
 };

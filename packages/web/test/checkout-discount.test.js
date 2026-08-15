@@ -40,7 +40,7 @@ function bundleOnce() {
     stdin: {
       contents: [
         `export { applyDiscountCode } from './discount.js';`,
-        `export { state } from './state.js';`,
+        `export { state, buildBindingsState } from './state.js';`,
       ].join('\n'),
       resolveDir: MODULES_DIR,
       loader: 'js',
@@ -74,11 +74,19 @@ function bundleOnce() {
   return building;
 }
 
+// The plan the summary prices against: $100 a year, the state's default cycle.
+const PRODUCT = { id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10, annually: 100 } };
+
 /**
  * Apply one code against a stubbed server answer; hand back the discount UI
- * state, the mutated state, and the request the module actually made.
+ * state, the mutated state, the request the module actually made, and the
+ * bindings the receipt would have rendered from it.
+ *
+ * @param {string} code - what the shopper typed
+ * @param {object} answer - the server's validate() body
+ * @param {object} [product] - the product on the page (defaults to PRODUCT)
  */
-async function applyCode(code, answer) {
+async function applyCode(code, answer, product = PRODUCT) {
   await bundleOnce();
 
   const calls = [];
@@ -105,10 +113,18 @@ async function applyCode(code, answer) {
   delete require.cache[require.resolve(BUNDLE)];
   const bundle = require(BUNDLE);
 
+  bundle.state.product = product;
+
   const renders = [];
   await bundle.applyDiscountCode(code, () => renders.push(bundle.state.discountUI));
 
-  return { ui: bundle.state.discountUI, state: bundle.state, calls, renders };
+  return {
+    ui: bundle.state.discountUI,
+    state: bundle.state,
+    calls,
+    renders,
+    bindings: bundle.buildBindingsState().checkout,
+  };
 }
 
 test('discount: a code the server accepts is applied, not rejected', async () => {
@@ -134,14 +150,49 @@ test('discount: the validate call asks wonderful-fetch to parse the body', async
   );
 });
 
+test('discount: a percent code prices the receipt against the percent', async () => {
+  // The shape that always worked, pinned beside the amount shape below: the
+  // two must stay computed the same way.
+  const { bindings } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20, duration: 'once' });
+
+  assert.strictEqual(bindings.discount.hasDiscount, true, 'the receipt shows a discount row');
+  assert.strictEqual(bindings.discount.label, '20%', 'labelled by the percent it takes off');
+  assert.strictEqual(bindings.discount.amount, '20.00', '20% of $100');
+  assert.strictEqual(bindings.pricing.total, '$80.00', 'and the total is what the card will be charged');
+});
+
+test('discount: an amount code is money off, not an undefined percent', async () => {
+  // The backend also issues FLAT codes — `{ amount: 10, duration: 'once' }`,
+  // no `percent` key at all (the seeded WELCOME10OFF). The client read
+  // `result.percent`, so the message said "undefined% off" and the summary
+  // reported no discount at all — while the backend went on to charge one.
+  const { ui, state, bindings } = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
+
+  assert.strictEqual(ui.success, true, 'a valid flat code is applied');
+  assert.strictEqual(ui.message, 'Discount applied: $10.00 off', 'and says what it takes off, in the page\'s money format');
+  assert.strictEqual(state.discountAmount, 10, 'the amount is what the receipt prices against');
+  assert.strictEqual(state.discountPercent, 0, 'there is no percent in this shape');
+
+  assert.strictEqual(bindings.discount.hasDiscount, true, 'the receipt shows the discount the backend WILL charge');
+  assert.strictEqual(bindings.discount.amount, '10.00', '$10 off the first charge');
+  assert.strictEqual(bindings.discount.label, 'WELCOME10OFF', 'labelled by the code — "$10.00" beside "-$10.00" says it twice');
+  assert.strictEqual(bindings.pricing.total, '$90.00', '$100 less $10 due today');
+  assert.match(bindings.pricing.termsText, /first payment only/, 'and the first-payment-only note still rides along');
+
+  assert.ok(!JSON.stringify(bindings).includes('undefined'), 'no binding renders the word undefined');
+});
+
 test('discount: a code the server rejects still lands the error message', async () => {
-  const { ui, state } = await applyCode('nope', { valid: false });
+  const { ui, state, bindings } = await applyCode('nope', { valid: false });
 
   assert.strictEqual(ui.error, true, 'an invalid code is still an error');
   assert.strictEqual(ui.success, false, 'and never a success');
   assert.strictEqual(ui.message, 'Invalid discount code', 'with the message the bindings show');
   assert.strictEqual(state.discountCode, null, 'nothing is carried into the intent call');
   assert.strictEqual(state.discountPercent, 0, 'and the receipt keeps full price');
+  assert.strictEqual(state.discountAmount, 0, 'in either shape');
+  assert.strictEqual(bindings.discount.hasDiscount, false, 'so the receipt shows no discount row');
+  assert.strictEqual(bindings.pricing.total, '$100.00', 'and charges full price');
 });
 
 test('discount: an empty code asks for one instead of calling the server', async () => {

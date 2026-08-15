@@ -193,6 +193,24 @@ function handlePlanSelection(button) {
     return;
   }
 
+  // A signed-in subscriber switching plans has nothing to check out: the live
+  // subscription moves, prorated, from the billing page's change-plan modal.
+  // The account page opens on its billing tab and the section reads these
+  // params back to open that modal preselected ([#236]).
+  //
+  // This returns BEFORE the add-to-cart pair below on purpose: no cart is
+  // involved and no purchase follows, so firing `add_to_cart` at three
+  // networks would put a conversion event on every plan switch.
+  if (button.dataset.planAction === 'switch') {
+    const switchUrl = new URL('/dashboard/account', window.location.origin);
+    switchUrl.searchParams.set('product', planId);
+    switchUrl.searchParams.set('frequency', billingType);
+    switchUrl.hash = 'billing';
+
+    window.location.href = switchUrl.toString();
+    return;
+  }
+
   // Get plan name and price for analytics
   const card = button.closest('.card');
   const planNameElement = card?.querySelector('.h3, .h2, .card-title');
@@ -379,13 +397,27 @@ function setupCurrentPlanIndicator() {
       $currentButton.classList.add('btn-adaptive');
     }
 
+    // A subscription with a cancellation already scheduled cannot switch at
+    // all — the processors swap the price and leave the schedule standing, so
+    // the backend refuses it and the billing page hides its Change button
+    // ([#237]). Offering "Switch to this plan" here would promise a move that
+    // ends in a modal that will not open: those buttons keep the CTA they were
+    // authored with.
+    if (state.account?.subscription?.cancellation?.pending === true) {
+      return;
+    }
+
     // Update other subscription buttons to "Switch to this plan" — one-time
-    // products and the enterprise contact button keep their own CTAs
+    // products and the enterprise contact button keep their own CTAs. The
+    // stamped action is what re-routes the click: a subscriber switching plans
+    // is not buying a second one, so the button goes to the billing page's own
+    // switcher rather than through checkout ([#236]).
     document.querySelectorAll('button[data-plan-id]').forEach(($button) => {
       if ($button.dataset.planId === resolved.plan || $button.dataset.planId === 'enterprise' || $button.dataset.planType !== 'subscription') {
         return;
       }
       $button.textContent = 'Switch to This Plan';
+      $button.dataset.planAction = 'switch';
     });
   });
 }

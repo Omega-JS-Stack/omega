@@ -167,6 +167,7 @@ The `transitions/index.js` module compares the **before** state (current `users/
 | `new-subscription` | basic/null → active paid | `transitions/subscription/new-subscription.js` | `confirmation` |
 | `subscription-winback` | cancelled paid → active paid | `transitions/subscription/subscription-winback.js` | `confirmation` (delegates to `new-subscription.js`) |
 | `checkout-declined` | basic/null → suspended | `transitions/subscription/checkout-declined.js` | none — log only |
+| `checkout-declined` | cancelled paid → suspended (a win-back that declines) | `transitions/subscription/checkout-declined.js` | none — log only |
 | `payment-failed` | active → suspended | `transitions/subscription/payment-failed.js` | `payment-failed` |
 | `payment-recovered` | suspended → active | `transitions/subscription/payment-recovered.js` | `payment-recovered` |
 | `cancellation-requested` | pending=false → pending=true | `transitions/subscription/cancellation-requested.js` | `cancellation-requested` |
@@ -174,9 +175,9 @@ The `transitions/index.js` module compares the **before** state (current `users/
 | `subscription-cancelled` | non-cancelled → cancelled | `transitions/subscription/subscription-cancelled.js` | `cancelled` |
 | `plan-changed` | active product A → active product B | `transitions/subscription/plan-changed.js` | `plan-changed` |
 
-**Order is behavior.** `payment-refunded` is checked first, from the event type alone (a refund may not move the subscription's state at all). The other nine are an ordered ladder — most specific first — and the table lists them in that order. Two placements carry the weight:
+**Order is behavior.** `payment-refunded` is checked first, from the event type alone (a refund may not move the subscription's state at all). The rest are an ordered ladder — most specific first — and the table lists them in that order (`checkout-declined` is reached by two rules, hence two rows). Two placements carry the weight:
 
-- `subscription-winback` and `checkout-declined` sit **ahead of** `payment-failed`. Users are born active on `basic`, and a full cancellation leaves the paid product id in place, so without them a returning subscriber matched nothing (no confirmation email, and analytics read the checkout as a renewal) and a declined FIRST checkout read as active → suspended and sent renewal-dunning copy to someone who never had access to lose.
+- `subscription-winback` and both `checkout-declined` rules sit **ahead of** `payment-failed`. Users are born active on `basic`, and a full cancellation leaves the paid product id in place, so without them a returning subscriber matched nothing (no confirmation email, and analytics read the checkout as a renewal) and a declined FIRST checkout read as active → suspended and sent renewal-dunning copy to someone who never had access to lose. The cancelled-paid → suspended rule closes the last branch of that pair: a win-back whose payment declines used to match no rule at all, so the webhook completed with no transition, no log and no analytics ([#223](https://github.com/Omega-JS-Stack/omega/issues/223)).
 - `cancellation-removed` sits **behind** `payment-recovered` and requires the same product, so a recovery or a plan change that also clears the schedule keeps its own, more meaningful, name.
 
 Two transitions are deliberately log-only:
@@ -240,7 +241,18 @@ Delegates to the processor — Stripe clears `cancel_at_period_end`, Chargebee c
 
 Moves a live subscription to another product and/or billing frequency without cancel-and-resubscribe. Input: `productId`, `frequency`, `confirmed`.
 
-Guards: authenticated, `confirmed: true`, an active paid subscription, and a target that is a subscription product the brand sells at that frequency and is not the plan the caller is already on.
+Guards: authenticated, `confirmed: true`, an active paid subscription with no cancellation scheduled, and a target that is a subscription product the brand sells at that frequency and is not the plan the caller is already on.
+
+Two of those refusals carry a **machine-readable code** on the `omega-properties` header's `additional.code`, the same shape the [capability gate](#capability-gating) ships under — the client branches on the code, never on the sentence:
+
+| Code | When | Why it is a refusal |
+|---|---|---|
+| `already-on-plan` | Same product AND same frequency — **or** the same product when `payment.frequency` is unrecorded | A no-op costs a real processor call and a real webhook. Same product at a DIFFERENT *recorded* frequency is a real switch and stays allowed; with nothing recorded to compare, `'monthly' === undefined` is false and the no-op would sail through, so every cadence of the current product is refused until the backend records one. |
+| `cancellation-pending` | `cancellation.pending === true` | The processors swap the PRICE, never the schedule — a switch here would land the caller on a new plan still set to end at period end, silently. Undo the cancellation first. |
+
+**The guards never lean on the client's filtering.** The billing page hides Change while a cancellation is pending and renders the current plan disabled, but that is courtesy: the modal's own filter silently missed whenever `payment.frequency` was unrecorded, which is how a same-plan switch reached the processor in the first place ([#237](https://github.com/Omega-JS-Stack/omega/issues/237)).
+
+**A switch never grants, resets, or extends a trial** (Ian 2026-08-14). A mid-trial switch CARRIES the trial over — same original end date, new plan — and `trial.claimed` stays claimed. The route writes no state, so each processor's `switchPlan()` preserves it through the swap — and each one restates the date from the **live provider object**, never from our own user doc, which can lag the provider and would make the preserving route the thing that MOVED the trial: Stripe restates `trial_end` off the subscription it already retrieved to find the item, and Chargebee GETs `/subscriptions/{id}` and restates that object's `trial_end` when its status is `in_trial`. A trial already over is left alone in both (Stripe rejects a past `trial_end`, and its dates stay on the object anyway). The test processor carries `trial_start`/`trial_end` onto the event it fabricates — and, while the trial is live, sets the current period TO the trial period, the way Stripe reports a trialing subscription: the cancel processors read that `trial.expires === expires` equality to decide a cancellation is immediate, so a fabricated 30-day period would have broken trial-cancel immediacy after a switch. Fabricating the trial dates as null is exactly what ended a live trial on switch: the unified transform reads `trial.claimed` straight off the event. PayPal's `revise` takes no trial parameter — its trial is derived from the plan's `TRIAL` billing cycle anchored to the original `start_time`, so a revise cannot extend a trial past what it would have been from day one, but an unequal trial LENGTH on the target plan can still shift the end date.
 
 | Processor | How it switches |
 |---|---|
@@ -408,7 +420,7 @@ A refund with no subscription behind it is the refund of a **one-time purchase**
 | **PayPal** | `PAYMENT.SALE.REFUNDED` with no billing agreement | `sale` — the sale it reversed (`resource.sale_id` or `resource.id`) |
 | **Chargebee** | `payment_refunded` with no subscription in `content` | `invoice` — the invoice it refunded |
 
-PayPal has no `sale` branch in its library's `fetchResource()` yet, so a PayPal one-time refund rides the flagged **stale fallback** (the webhook's own `resource`) rather than a fresh API read — tracked as a follow-up ([#224](https://github.com/Omega-JS-Stack/omega/issues/224)).
+PayPal's `fetchResource()` handles `'sale'` the same way, and it is a two-step read: it GETs the v1 sale (`/v1/payments/sale/{id}`) the refund reversed, and a v1 sale carries **no `custom_id`** — so when the sale names a `parent_payment`, that payment is fetched too and its transaction's `custom` (or `custom_id`) is folded onto the sale, which is the only place `uid`/`orderId`/`productId` live. The fold is best-effort, the way the subscription case's plan fetch is: an unreadable parent payment still returns the LIVE sale rather than demoting the event to the stale payload. Before this branch existed, every PayPal one-time refund threw "Unknown resource type" and rode the flagged **stale fallback**, logging a processor-unreachable error for a fetch that was never attempted ([#224](https://github.com/Omega-JS-Stack/omega/issues/224)).
 
 ## Product Configuration
 
@@ -512,6 +524,8 @@ PayPal has no cancel-at-period-end, so a cancelled PayPal subscription serves ou
 
 It takes the pipeline's staleness discipline too: each candidate is re-read at its turn, and anything a webhook has since written — a newer `payment.updatedBy` stamp on the subscription, a newer `metadata.updated` on the order, a status that is no longer a pending cancellation — makes the cron stand down rather than overwrite the newer truth.
 
+Its candidate query (`subscription.payment.processor` + `subscription.cancellation.pending`) needs a composite index on `users`, registered in the same SSOT — it shipped without one, so the cron worked only in brands where the index had been hand-created ([#225](https://github.com/Omega-JS-Stack/omega/issues/225)).
+
 ## Webhook Verification
 
 Two layers gate `POST /payments/webhook`:
@@ -544,6 +558,22 @@ Verification never needs the processor's API key: `STRIPE_WEBHOOK_SECRET` is the
 The `test` processor generates Stripe-shaped data and auto-fires webhooks to the local server. Only available in non-production environments. Use `processor: 'test'` in intent requests during testing. The test webhook processor delegates to Stripe's parser since it generates Stripe-shaped payloads.
 
 Both doors enforce that: the intent side throws inside `intent/processors/test.js`, and `POST /payments/webhook?processor=test` answers 403 in production (the webhook processors receive only the raw request, so the route's dispatch layer carries the guard). Real processors are unaffected — a provider dashboard points at `POST /omega/payments/webhook?processor=<processor>&key=<OMEGA_WEBHOOK_KEY>`, where the shared key is the outer layer and the processor's own signature is the boundary ([Webhook Verification](#webhook-verification)).
+
+### Discounts and the first charge
+
+`discountCodes.applyToAmount(amount, discount)` is the one home of the **discounted-charge** computation — `percent` maps to Stripe's `percent_off`, `amount` to its `amount_off` (dollars here, cents there) — and every place that needs "what is the customer charged today" calls it: the intent route's confirmation URL, the test processor's fabricated payloads, the analytics value resolver, and the `new-subscription` / `purchase-completed` email totals. (Promo *savings* — the amount taken off, not the amount charged — is a different quantity and stays inline at its two email sites.)
+
+Only the FIRST charge moves. Every code is `duration: 'once'`, so `users/{uid}.subscription.payment.price` keeps the full renewal price from config; the discount itself is recorded on the order (`order.discount`), which is what analytics reads.
+
+**The confirmation URL's `amount` is the ROUTE's job, not a processor's** ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)). `buildConfirmationUrl()` in `routes/payments/intent/post.js` applies the validated discount, so the number is right on every processor. That placement is load-bearing: a real processor applies its coupon on its own hosted page and never revisits this URL, so doing the math processor-side left a discounted Stripe checkout landing on the confirmation page quoting the LIST price — and the client's tracking modules read that param straight into GA4/pixel revenue. A trial quotes `$0` and a coupon takes its cut off nothing.
+
+The test processor's remaining share is the **payload it fabricates**, carrying the coupon the way Stripe reports it: a Stripe-shaped `discount` on the subscription, `amount_total` + `total_details.amount_discount` on a one-time session, and the discounted `amount_due` on a declined checkout's failed first invoice.
+
+**Both coupon shapes reach the real processors.** A code in `discount-codes.js` carries either `percent` or `amount` (flat dollars), and each processor builds its provider's own form: Stripe gets `percent_off`, or `amount_off` in CENTS with the `currency` beside it (Stripe rejects an amount coupon without one); Chargebee gets `discount_type: 'percentage'` + `discount_percentage`, or `'fixed_amount'` + `discount_amount` in the currency's minor unit + `currency_code`. Currency is `payment.currency` (default `USD`). The deterministic coupon id differs per shape (`BEM_{CODE}_{n}OFF_ONCE` vs `BEM_{CODE}_{n}AMTOFF_ONCE`) so one code can never collide with the other form, and the percent id is unchanged, so coupons already live in a brand's provider account keep resolving. Both builders are proven on the params they ask the provider to create; live-provider verification is a Stage 3 item ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+
+**A `validate()` result OMITS the shape a code does not have** — it never carries `amount: undefined` — because the result is not just read, it is WRITTEN: `POST /payments/intent` persists it as `payments-intents/{orderId}.discount`, and firebase-admin refuses a document containing an undefined value, throwing synchronously *after* the processor has already created the real checkout session. Readers branch with `discountCodes.promoShape(discount)` → `'percent' | 'amount' | null`. The `null` arm is not defensive padding: a discount read back off an order written before the amount field existed is `valid` with neither shape, and the confirmation-email transitions are dispatched fire-and-forget, so reading a missing shape there costs the customer their receipt silently.
+
+The order email quotes the shape it was given: `promoPercent` renders "15% off", `promoAmount` renders "$10.00 off", `promoSavings` is what the code actually took off (floored at the charge — a $10 code against a $4.99 charge saves $4.99, not $10), and a shapeless discount renders no promo line at all while the totals stand at full price.
 
 ### Simulating a declined checkout
 

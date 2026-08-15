@@ -29,7 +29,7 @@ const MAX_FILES_SHOWN = 10;
 // Mirrors @omega.js/backend: getApiUrl() serves from the `api.` subdomain and
 // mounts its routes under /omega (packages/backend route prefix)
 const API_SUBDOMAIN = 'api';
-const API_HEALTH_PATH = '/omega/test/health';
+const API_HEALTH_PATH = '/omega/health';
 
 const FETCH_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',

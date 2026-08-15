@@ -162,10 +162,18 @@ function readGraph(manifestUrl) {
   const seen = new Map();
   const visit = (file) => {
     if (seen.has(file)) return;
+    // A bundled string literal can LOOK like a sibling chunk without being
+    // one. Skipping it degrades to a plain assertion failure below; reading it
+    // would blow the suite up with an ENOENT instead.
+    if (!fs.existsSync(file)) return;
     const content = fs.readFileSync(file, 'utf8');
     seen.set(file, content);
-    // Shared chunks (chunk-HASH) AND dynamic-import chunks (_theme-HASH, dev-HASH, ...)
-    for (const m of content.matchAll(/["']([^"']*chunks\/[\w.-]+-[A-Z0-9]+\.js)["']/g)) {
+    // Shared chunks (chunk-HASH) AND dynamic-import chunks (_theme-HASH,
+    // dev-HASH, ...). An entry names them through the `chunks/` dir; a chunk
+    // names its PEERS by bare relative path ("./chunk-HASH.js"), and a module
+    // shared by two entries lives exactly there — miss it and the graph reads
+    // as if the shared code vanished.
+    for (const m of content.matchAll(/["']((?:[^"']*chunks\/|\.\/)[\w.-]+-[A-Z0-9]+\.js)["']/g)) {
       visit(path.resolve(path.dirname(file), m[1]));
     }
   };

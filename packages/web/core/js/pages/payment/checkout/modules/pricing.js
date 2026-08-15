@@ -7,7 +7,11 @@ function resolvePrice(prices, key) {
   return typeof entry === 'object' ? (entry.amount || 0) : Number(entry) || 0;
 }
 
-export function calculatePrices({ product, frequency, discountPercent, trialEligible }) {
+// A discount code comes in one of TWO shapes, and the server returns exactly
+// one of them: `discountPercent` (a share of the price) or `discountAmount` (a
+// flat sum, `flatDiscount` here — the RETURNED `discountAmount` is the money
+// that actually came off, which is what the receipt row prices against).
+export function calculatePrices({ product, frequency, discountPercent, discountAmount: flatDiscount, trialEligible }) {
   if (!product) {
     return { subtotal: 0, discountAmount: 0, trialDiscountAmount: 0, total: 0, recurring: 0 };
   }
@@ -28,7 +32,14 @@ export function calculatePrices({ product, frequency, discountPercent, trialElig
   }
 
   const subtotal = basePrice;
-  const discountAmount = (subtotal * discountPercent) / 100;
+
+  // Both shapes are ONE subtraction from the same subtotal: a percent of it,
+  // or a flat sum off it. Clamped to [0, subtotal] so $10 off a $4.99 product
+  // is free rather than four cents owed back the other way.
+  const raw = discountPercent > 0
+    ? (subtotal * discountPercent) / 100
+    : (flatDiscount || 0);
+  const discountAmount = Math.min(Math.max(raw, 0), subtotal);
   const afterDiscount = subtotal - discountAmount;
 
   let trialDiscountAmount = 0;

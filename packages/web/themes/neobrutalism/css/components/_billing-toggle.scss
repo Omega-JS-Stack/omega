@@ -1,0 +1,74 @@
+// Neobrutalism Theme — Billing cadence toggle
+// The `omega-billing-toggle` segmented control, wherever it renders: the
+// pricing page's Monthly|Annually switch AND the account page's change-plan
+// modal (`core/js/pages/dashboard/account/sections/billing.js`) build the same
+// markup, so the skin lives in the MAIN bundle — page-scoped, the modal wore
+// the undressed classy floor while the pricing page was themed ([#236] QA
+// round 3). Structure comes from the classy floor partial imported in
+// _theme.scss; these rules land after and win.
+
+.omega-billing-toggle {
+  padding: 0;
+  gap: 0;
+  border-radius: 0;
+  background: var(--nb-surface);
+  @include nb-border();
+  @include nb-shadow(md);
+
+  // The segment labels are .btn: flatten the theme's hard-shadow button and
+  // let the checked state fill ink with the yellow accent.
+  .btn {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    color: var(--bs-body-color);
+    font-family: $nb-font-display;
+    font-weight: 700;
+    padding: 0.85rem 1.25rem;
+
+    &:active {
+      transform: none;
+      box-shadow: none;
+    }
+
+    & + .btn-check + .btn {
+      border-left: $nb-border-width solid var(--nb-border-color);
+    }
+  }
+
+  // Hover goes through the RADIO on purpose. Bootstrap's own segment
+  // neutraliser (`.btn-check + .btn:hover`, which resets the label to its
+  // resting colours) is (0,3,0), and every theme PAGE sheet re-emits Bootstrap
+  // after the main bundle — so a plain `.omega-billing-toggle .btn:hover`, the
+  // same (0,3,0), lost the tie on /pricing and the segments went dead on
+  // hover. Reached through `.btn-check` this is (0,4,0) and wins on every
+  // surface the toggle renders on.
+  .btn-check + .btn:hover {
+    background: var(--nb-surface-alt);
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-check:checked + .btn {
+    background: #111111;
+    color: var(--nb-accent-yellow);
+  }
+
+  // The moving thumb (shared segmented engine) sits under the labels
+  .omega-segmented__thumb {
+    border-radius: 0;
+    background: #111111;
+  }
+
+  .omega-billing-toggle__save {
+    font-family: $nb-font-mono;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 0;
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    border-color: var(--nb-border-color);
+  }
+}

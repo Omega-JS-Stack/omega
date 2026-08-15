@@ -5,6 +5,14 @@
  * the uncancel button, and the only state that may ever offer it is a live paid
  * subscription that is scheduled to end.
  *
+ * Plus the DETAILS row beside them (`billing.details.*`): every paid state owes
+ * the user its price, its cadence, and an honest date line. It used to gate on
+ * `resolved.active && hasValidBilling`, so a cancelled or cancelling account —
+ * the two states where "when does this end?" is the whole question — showed
+ * nothing at all ([#236]). QA round 3 pins the next layer: all three slots
+ * RENDER in every paid state, and a value the subscription never recorded says
+ * so with the muted placeholder instead of dropping out of the row.
+ *
  * The module is browser code behind two bundler aliases (`@omega.js/client`,
  * `__main_assets__/*`), so the harness drives the REAL file through esbuild —
  * the convention auth-policy.test.js and dev-palette.test.js set — over a
@@ -122,7 +130,12 @@ async function billingStateFor(account) {
     querySelectorAll: () => [],
     addEventListener: () => {},
   };
-  globalThis.window = {};
+  // A billing page with no plan-switch request in its URL — the section reads
+  // `?product=` on load ([#236]), and a browser always has a location to read.
+  globalThis.window = {
+    location: { pathname: '/dashboard/account', search: '', hash: '#billing' },
+    history: { replaceState: () => {} },
+  };
   globalThis.__omegaClient = client;
 
   // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and
@@ -138,9 +151,13 @@ async function billingStateFor(account) {
 test('billing buttons: only a live subscription scheduled to end offers undo', async () => {
   const cases = [
     {
+      // Change is NOT offered here: the backend refuses a switch under a
+      // scheduled cancellation (`cancellation-pending`, #237), because the
+      // processors swap the price and leave the schedule standing. Undo
+      // cancellation is the honest button.
       what: 'a cancelling subscription',
       account: paidAccount({ status: 'active', cancellation: { pending: true, date: { timestampUNIX: HOUR_FROM_NOW } } }),
-      buttons: { upgrade: false, change: true, manage: true, cancel: false, uncancel: true },
+      buttons: { upgrade: false, change: false, manage: true, cancel: false, uncancel: true },
     },
     {
       what: 'a plain active subscription',
@@ -163,21 +180,122 @@ test('billing buttons: only a live subscription scheduled to end offers undo', a
       buttons: { upgrade: false, change: false, manage: true, cancel: true, uncancel: false },
     },
     {
-      // A trial cancellation is IMMEDIATE — there is no scheduled end to undo,
-      // which is exactly why the gate reads resolveSubscription().cancelling
-      // rather than the raw cancellation.pending flag.
+      // BOTH gates read the raw cancellation.pending flag, not
+      // resolveSubscription().cancelling (which is `pending && !trialing`).
+      // A trialing subscription CAN carry a scheduled cancellation — the
+      // processor's own billing portal schedules one — and reading the derived
+      // flag offered this account neither Change nor Undo: a dead end.
       what: 'a trial with a cancellation requested',
       account: paidAccount({
         status: 'active',
         trial: { claimed: true, expires: { timestampUNIX: HOUR_FROM_NOW } },
         cancellation: { pending: true, date: { timestampUNIX: HOUR_FROM_NOW } },
       }),
-      buttons: { upgrade: false, change: true, manage: true, cancel: true, uncancel: false },
+      buttons: { upgrade: false, change: false, manage: true, cancel: true, uncancel: true },
     },
   ];
 
   for (const testCase of cases) {
     const state = await billingStateFor(testCase.account);
     assert.deepStrictEqual(state.buttons, testCase.buttons, testCase.what);
+  }
+});
+
+const TERM_END = Math.floor(Date.now() / 1000) + (86400 * 20);
+const ENDED_AT = Math.floor(Date.now() / 1000) - 86400;
+
+/** The date exactly as the section formats it. */
+function shown(timestampUNIX) {
+  return new Date(timestampUNIX * 1000).toLocaleDateString();
+}
+
+// The three slots of the details row, as the bindings receive them: a known
+// value at full ink, an unknown one carrying the placeholder's own class.
+const INK = 'omega-billing-detail';
+const MUTED = 'omega-billing-detail omega-billing-detail--unknown';
+
+/** The details state for one row, spelled out slot by slot. */
+function row({ dateLabel, date, amount, cadence }) {
+  return {
+    visible: true,
+    dateLabel: dateLabel,
+    date: date || 'Unknown',
+    dateClass: date ? INK : MUTED,
+    amount: amount || 'Unknown',
+    amountClass: amount ? INK : MUTED,
+    cadence: cadence || 'Unknown',
+    cadenceClass: cadence ? INK : MUTED,
+  };
+}
+
+test('billing details: every paid state shows all three slots — price, cadence, honest date', async () => {
+  const cases = [
+    {
+      // The repro (Ian, cancel journey): a cancelled account's card said the
+      // subscription had ended and then showed no price, no cadence and no
+      // date — the one screen that owes you "ended when?".
+      what: 'an ended subscription says when it ended',
+      account: paidAccount({ status: 'cancelled', cancellation: { pending: false, date: { timestampUNIX: ENDED_AT } } }),
+      details: row({ dateLabel: 'Ended', date: shown(ENDED_AT), amount: '$10.00', cadence: 'Monthly' }),
+    },
+    {
+      what: 'a scheduled cancellation says how long access lasts',
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, cancellation: { pending: true, date: { timestampUNIX: TERM_END } } }),
+      details: row({ dateLabel: 'Access until', date: shown(TERM_END), amount: '$10.00', cadence: 'Monthly' }),
+    },
+    {
+      what: 'a live subscription renews',
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END } }),
+      details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '$10.00', cadence: 'Monthly' }),
+    },
+    {
+      // Nothing is scheduled while the payment is failing, so no date is
+      // CLAIMED — but the slot still renders, named and placeheld, because a
+      // row that silently loses a third of itself reads as broken.
+      what: 'a suspended subscription names the date slot without claiming a date',
+      account: paidAccount({ status: 'suspended', expires: { timestampUNIX: TERM_END } }),
+      details: row({ dateLabel: 'Next billing', date: '', amount: '$10.00', cadence: 'Monthly' }),
+    },
+    {
+      what: 'an ended subscription with no date on record keeps the slot, placeheld',
+      account: paidAccount({ status: 'cancelled', expires: {}, cancellation: { pending: false } }),
+      details: row({ dateLabel: 'Ended', date: '', amount: '$10.00', cadence: 'Monthly' }),
+    },
+    {
+      what: 'a subscription with no recorded price places the amount, never prints undefined',
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { processor: 'stripe' } }),
+      details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '', cadence: '' }),
+    },
+    {
+      what: 'a price with no recorded cadence places the cadence alone',
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 10, processor: 'stripe' } }),
+      details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '$10.00', cadence: '' }),
+    },
+    {
+      // The QA persona behind this round (_test-journey-flows-cancel): a live
+      // subscription whose doc carries neither price nor frequency. Two of the
+      // three slots used to vanish, leaving one date beside a blank half-row.
+      what: 'the hollow persona places BOTH unknown slots and still dates the renewal',
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 0, frequency: null, processor: 'test' } }),
+      details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '', cadence: '' }),
+    },
+    {
+      // Free accounts are unchanged: the whole row stays hidden, so what the
+      // slots would have said never reaches a screen.
+      what: 'a free account has no billing details at all',
+      account: { subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } },
+      details: { ...row({ dateLabel: 'Next billing', date: '', amount: '', cadence: '' }), visible: false },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const state = await billingStateFor(testCase.account);
+    assert.deepStrictEqual(state.details, testCase.details, testCase.what);
+
+    // Nothing a subscription failed to record may reach the user as a
+    // language-level accident.
+    for (const [slot, value] of Object.entries(state.details)) {
+      assert.ok(!/undefined|NaN/.test(String(value)), `${testCase.what}: ${slot} must never print an internal blank`);
+    }
   }
 });

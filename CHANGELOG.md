@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#236](../../issues/236) — The billing plan-switch modal is a real product surface: cadence toggle matching the pricing page, feature cards with hover detail, the current plan grayed and disabled, and always-rendered detail slots that say "Unknown" instead of vanishing.
+- [#236](../../issues/236) — The pricing page's switch buttons open the account billing modal preselected to that plan and cadence, then clean their query params so refresh does not re-open it.
+- [#263](../../issues/263) — Journey and lifecycle test personas seed like real purchases: catalog-resolved price and frequency, cycle-true expiries, and matching order fixtures created at boot.
+
+### Fixed
+- [#239](../../issues/239) — The test processor applies discount codes to charged amounts end-to-end: percent and flat codes fold into the first charge, real-processor coupons carry both shapes, and checkout/confirmation display the discounted price. Orders keep the list price with the discount recorded beside it.
+- [#237](../../issues/237) — `/payments/plan` rejects a switch to the plan the account already has, and a mid-trial plan switch carries the trial end date over instead of restarting or dropping it.
+- [#238](../../issues/238) — The development-only routes left production: they now live under `/omega/health` behind one gate with no carve-outs, and the unauthenticated `/test/usage` write path is gone. A dot-segment bypass of the gate was proven and closed with a containment guard.
+- [#235](../../issues/235) — The `_dev_cardProcessor` checkout URL override no longer survives production bundles; the read sits inside a dev-only block that strips at build.
+- [#223](../../issues/223) — A declined win-back checkout now matches a transition rule, so the decline is recorded instead of falling through the pipeline silently.
+- [#224](../../issues/224) — The PayPal library resolves sale resources, so one-time refunds ride real payload data instead of the flagged stale fallback.
+- [#225](../../issues/225) — The PayPal expiry cron's query has its required-indexes entry, so a fresh project deploys with the index instead of failing at first run.
 
 ## [0.29.0] - 2026-08-14
 ### Added

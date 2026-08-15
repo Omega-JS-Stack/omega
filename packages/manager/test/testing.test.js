@@ -20,7 +20,7 @@ const { compareVersions, installedVersion, parseWorkingTree } = require('../src/
 const service = require('../src/services/testing/index.js');
 
 const HOMEPAGE = 'https://fixture-brand.test';
-const API_URL = 'https://api.fixture-brand.test/omega/test/health';
+const API_URL = 'https://api.fixture-brand.test/omega/health';
 const GH_CMD = 'gh run list --repo sandbox-org/fixture-brand --limit 1 --json status,conclusion,name';
 const GIT_CMD = 'git status --porcelain -- .';
 

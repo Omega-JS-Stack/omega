@@ -97,7 +97,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       return ctx.respond(`Invalid discount code: ${discount}`, { code: 400 });
     }
     resolvedDiscount = discountResult;
-    ctx.log(`Discount validated: code=${resolvedDiscount.code}, percent=${resolvedDiscount.percent}, duration=${resolvedDiscount.duration}`);
+    ctx.log(`Discount validated: code=${resolvedDiscount.code}, percent=${resolvedDiscount.percent}, amount=${resolvedDiscount.amount}, duration=${resolvedDiscount.duration}`);
   }
 
   // Generate order ID
@@ -106,7 +106,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   ctx.log(`Generated orderId=${orderId}`);
 
   // Build redirect URLs
-  const confirmationUrl = buildConfirmationUrl(Manager.project.websiteUrl, { product, productId, productType, frequency, processor, trial, orderId });
+  const confirmationUrl = buildConfirmationUrl(Manager.project.websiteUrl, { product, productId, productType, frequency, processor, trial, orderId, discount: resolvedDiscount });
   const cancelUrl = buildCancelUrl(Manager.project.websiteUrl, { productId, frequency });
 
   // Load the processor module
@@ -180,16 +180,30 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
 
 /**
  * Build the confirmation/success redirect URL
+ *
+ * `amount` is what the customer is charged TODAY, not the list price: the
+ * confirmation page hands that param straight to the client's analytics modules,
+ * so quoting the list price on a discounted checkout over-reports revenue to
+ * GA4/pixels. The discount comes off HERE rather than in a processor, because a
+ * real processor applies the coupon on its own hosted page and never revisits
+ * this URL — quoting it processor-side would have left every Stripe checkout
+ * reporting the full price ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
  */
-function buildConfirmationUrl(baseUrl, { product, productId, productType, frequency, processor, trial, orderId }) {
-  const amount = productType === 'subscription'
+function buildConfirmationUrl(baseUrl, { product, productId, productType, frequency, processor, trial, orderId, discount }) {
+  const listPrice = productType === 'subscription'
     ? (product.prices?.[frequency] || 0)
     : (product.prices?.once || 0);
+
+  // A trial charges nothing today; otherwise a validated coupon comes off the
+  // first charge (every code is duration: 'once' — the renewal stays full price)
+  const amount = trial && product.trial?.days
+    ? 0
+    : discountCodes.applyToAmount(listPrice, discount);
 
   const url = new URL('/payment/confirmation', baseUrl);
   url.searchParams.set('productId', productId);
   url.searchParams.set('productName', product.name || productId);
-  url.searchParams.set('amount', trial && product.trial?.days ? '0' : String(amount));
+  url.searchParams.set('amount', String(amount));
   url.searchParams.set('currency', 'USD');
   url.searchParams.set('frequency', frequency || 'once');
   url.searchParams.set('paymentMethod', processor);
@@ -215,3 +229,7 @@ function buildCancelUrl(baseUrl, { productId, frequency }) {
 
   return url.toString();
 }
+
+// Exported for testing — the discounted `amount` is a processor-independent
+// promise of this route, not of whichever processor happens to run
+module.exports.buildConfirmationUrl = buildConfirmationUrl;

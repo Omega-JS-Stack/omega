@@ -10,6 +10,67 @@ const { merge } = require('lodash');
 const JSON5 = require('json5');
 const User = require('./user.js');
 
+// The `test/` route folder is DEVELOPMENT-ONLY: it exists to exercise the
+// framework (echo the settings engine, increment a usage counter, reset a
+// seeded persona), and nothing in it belongs at a production URL.
+// There are no exceptions: the one route that used to need a carve-out here —
+// the liveness + version probe @omega.js/manager's live API check reads on a
+// PRODUCTION host — is a real route now, `routes/health`.
+const DEV_ONLY_ROUTE_FOLDER = 'test';
+
+/**
+ * The route path's segments, normalized the SAME way the loader's
+ * path.resolve() below will read it. BackendRouter takes this straight off the
+ * request URL, so every decision must key off the normalized form or a caller
+ * walks past it with `./`, `//` or `x/../` and still lands on the handler.
+ * @param {string} routeName - Route path (e.g. 'test/usage', './test/usage')
+ * @returns {string[]} Segments ('x/../test/usage' → ['test', 'usage'])
+ */
+function normalizeRouteSegments(routeName) {
+  return path.posix
+    .normalize(String(routeName || '').replace(/\.js$/, '').toLowerCase())
+    .split('/')
+    .filter((segment) => segment && segment !== '.');
+}
+
+/**
+ * Whether a route path names something OUTSIDE the routes directory. A leading
+ * `..` is refused even when it climbs back in (`../routes/test/usage` resolves
+ * right back to `routes/test/usage`, walking past every folder-level gate), and
+ * an absolute path is refused because path.resolve() would hand it the whole
+ * filesystem — `/omega/../schemas/test/usage` otherwise require()s a schema
+ * module as a handler.
+ * @param {string} routeName - Route path
+ * @returns {boolean}
+ */
+function isRouteOutsideRoutesDir(routeName) {
+  const raw = String(routeName || '').replace(/\.js$/, '');
+
+  if (path.posix.isAbsolute(raw)) {
+    return true;
+  }
+
+  return normalizeRouteSegments(raw)[0] === '..';
+}
+
+/**
+ * Whether a route must be refused because it belongs to a development-only
+ * folder and this is production. ONE guard for the whole folder instead of a
+ * copy per handler, so a NEW `routes/test/*` file is gated the day it lands.
+ * @param {string} routeName - Route path (e.g. 'test/usage', 'user/sign-up')
+ * @param {string} environment - Manager.getEnvironment() ('development' | 'testing' | 'production')
+ * @returns {boolean}
+ */
+function isDevOnlyRouteBlocked(routeName, environment) {
+  const segments = normalizeRouteSegments(routeName);
+
+  if (segments[0] !== DEV_ONLY_ROUTE_FOLDER) {
+    return false;
+  }
+
+  return environment === 'production';
+}
+
 function Middleware(m, req, res) {
   const self = this;
 
@@ -29,6 +90,27 @@ Middleware.prototype.run = function (libPath, options) {
 
   return cors(req, res, async () => {
     const ctx = Manager.RouteContext({req: req, res: res});
+
+    // A route path may only ever name a handler INSIDE the routes directory.
+    // It arrives off the request URL, and the loader below feeds it straight to
+    // path.resolve() — so refuse anything that climbs out FIRST, before any
+    // folder-level gate keys off a path that resolve() would rewrite.
+    if (isRouteOutsideRoutesDir(libPath)) {
+      ctx.log(`Middleware.run(): Refused ${libPath} — a route path may not escape the routes directory`);
+
+      return ctx.respond('Not found', {code: 404});
+    }
+
+    // Development-only route folders are 404'd in production. This is the one
+    // place BOTH request paths converge — the deployed omega_api function
+    // (Manager._processMiddleware) and the local express server
+    // (Manager.setupCustomServer) — so gating here gates every test route at
+    // once, including any added later.
+    if (isDevOnlyRouteBlocked(libPath, ctx.getEnvironment())) {
+      ctx.log(`Middleware.run(): Refused ${libPath} — the ${DEV_ONLY_ROUTE_FOLDER}/ route folder is development-only`);
+
+      return ctx.respond('Not found', {code: 404});
+    }
 
     // Set options
     options = options || {};
@@ -270,5 +352,12 @@ function safeStringify(obj, maxLength = 100) {
   const truncated = JSON.parse(JSON.stringify(obj, (key, value) => truncate(value)));
   return JSON.stringify(truncated);
 }
+
+// Static, alongside User.resolveSubscription's precedent — the dev-only
+// decision is pure, so tests exercise it directly with a real Manager's
+// getEnvironment() rather than through a hand-rolled request.
+Middleware.isDevOnlyRouteBlocked = isDevOnlyRouteBlocked;
+Middleware.isRouteOutsideRoutesDir = isRouteOutsideRoutesDir;
+Middleware.DEV_ONLY_ROUTE_FOLDER = DEV_ONLY_ROUTE_FOLDER;
 
 module.exports = Middleware;

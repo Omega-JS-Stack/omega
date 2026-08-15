@@ -146,8 +146,8 @@ const PayPal = {
    *
    * For orders: captures the payment first (moves funds), then returns the captured order
    *
-   * @param {string} resourceType - 'subscription' or 'order'
-   * @param {string} resourceId - PayPal resource ID (e.g., 'I-xxx' or order ID)
+   * @param {string} resourceType - 'subscription', 'order', or 'sale'
+   * @param {string} resourceId - PayPal resource ID (e.g., 'I-xxx', an order ID, or a sale ID)
    * @param {object} rawFallback - Fallback data from webhook payload
    * @param {object} context - Additional context (e.g., { config })
    * @returns {object} Full PayPal resource object
@@ -177,6 +177,46 @@ const PayPal = {
         });
 
         return captured;
+      }
+
+      if (resourceType === 'sale') {
+        // The refund of a one-time purchase names the SALE it reversed. A v1 sale
+        // carries the money and the payment behind it, never our custom_id — the
+        // parent payment's transaction is the only place uid/orderId/productId
+        // live, so fold it onto the sale the way the subscription case folds its
+        // plan ([#224](https://github.com/Omega-JS-Stack/omega/issues/224)).
+        const sale = await this.request(`/v1/payments/sale/${resourceId}`);
+
+        // v1 sometimes spells the field `custom` — normalize before deciding a
+        // second read is needed, so identifiers already in hand are never dropped
+        if (!sale.custom_id && sale.custom) {
+          sale.custom_id = sale.custom;
+        }
+
+        if (!sale.custom_id && sale.parent_payment) {
+          try {
+            const payment = await this.request(`/v1/payments/payment/${sale.parent_payment}`);
+            const transaction = payment.transactions?.[0];
+            const custom = transaction?.custom_id || transaction?.custom || null;
+
+            if (custom) {
+              sale.custom_id = custom;
+            }
+          } catch (e) {
+            // Parent payment fetch failed — the sale itself is still the live
+            // answer, but without a folded custom_id the pipeline cannot name the
+            // order this refund hits, so the miss must be visible in the logs.
+            const message = `paypal fetchResource(sale/${resourceId}) could not read parent payment ${sale.parent_payment} for identifiers: ${e?.message || e}`;
+
+            if (context?.ctx?.warn) {
+              context.ctx.warn(message);
+            } else {
+              console.warn(`[@omega.js/backend:payment:paypal] ${message}`);
+            }
+          }
+        }
+
+        return sale;
       }
 
       throw new Error(`Unknown resource type: ${resourceType}`);

@@ -44,6 +44,47 @@ button *, a * {
 }
 
 // ============================================
+// Tooltips are decoration, never a surface
+// ============================================
+// Bootstrap appends a shown tooltip to `document.body` (tooltip.js: `container:
+// false` resolves to the body), so it is neither a descendant of the thing it
+// describes nor covered by that thing's rules — it just floats over it, fully
+// hit-testable. Two bugs fall out of that, both reported on the change-plan
+// modal's cards ([#236] QA round 4): the tooltip does not inherit the card's
+// `cursor: pointer`, so the pointer died in a horizontal strip above the
+// hovered feature bullet (default placement is `top` — right between the card
+// head and the feature list), and a click landing in that strip hit the
+// tooltip instead of the card, so the plan was not picked.
+//
+// A Bootstrap tooltip cannot be interactive in the first place — it is bound to
+// `hover focus` and hides the moment the pointer leaves its trigger — so making
+// it inert costs nothing and fixes every surface that carries one (the pricing
+// page's plan cards run the same triggers). Popovers, which CAN hold
+// interactive content, are a different class and keep their events.
+.tooltip {
+  pointer-events: none;
+}
+
+// ============================================
+// Feature-list check
+// ============================================
+// The tick beside a feature bullet, on EVERY surface that lists features: the
+// pricing page's plan cards, its enterprise band, and the account page's
+// change-plan modal. A one-line-tall box, so the glyph centers on the FIRST
+// line of its feature text (a baseline + magic margin drifted the moment a
+// feature wrapped). Ink comes from Bootstrap's `.text-success` in the markup.
+//
+// One home on purpose: this rule shipped three times, declaration for
+// declaration, in two theme partials and a page sheet.
+.omega-feature-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 1.5em; // = the feature list's line-height
+}
+
+// ============================================
 // Filter Utilities
 // ============================================
 

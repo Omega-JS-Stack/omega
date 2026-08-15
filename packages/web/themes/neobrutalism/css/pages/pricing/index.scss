@@ -2,75 +2,14 @@
 // The theme forks no pricing layout (#177 phase 3): the BASE page renders
 // (omega-price-card grid, omega-billing-toggle, the omega-band enterprise
 // strip, the feature-comparison table, the FAQ duo) and this file dresses it
-// neobrutalist: hard square segmented toggle, ink-framed cards on offset
-// shadows, the yellow "Most popular" plan, the framed comparison ledger.
-// Structure comes from the classy floor partials in the main bundle; these
-// page rules land after and win. Compiles standalone: theme tokens + mixins
-// via loadPaths.
+// neobrutalist: ink-framed cards on offset shadows, the yellow "Most popular"
+// plan, the framed comparison ledger. Structure comes from the classy floor
+// partials in the main bundle; these page rules land after and win. The hard
+// square BILLING TOGGLE is not here: it renders on the account page too, so
+// its skin lives in css/components/_billing-toggle.scss, in the main bundle
+// ([#236]). Compiles standalone: theme tokens + mixins via loadPaths.
 @use 'config' as *;
 @import 'css/base/mixins';
-
-// ============================================
-// Billing toggle: hard square segmented control
-// ============================================
-.omega-billing-toggle {
-  padding: 0;
-  gap: 0;
-  border-radius: 0;
-  background: var(--nb-surface);
-  @include nb-border();
-  @include nb-shadow(md);
-
-  // The segment labels are .btn: flatten the theme's hard-shadow button and
-  // let the checked state fill ink with the yellow accent.
-  .btn {
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: transparent;
-    color: var(--bs-body-color);
-    font-family: $nb-font-display;
-    font-weight: 700;
-    padding: 0.85rem 1.25rem;
-
-    &:hover {
-      background: var(--nb-surface-alt);
-      transform: none;
-      box-shadow: none;
-    }
-
-    &:active {
-      transform: none;
-      box-shadow: none;
-    }
-
-    & + .btn-check + .btn {
-      border-left: $nb-border-width solid var(--nb-border-color);
-    }
-  }
-
-  .btn-check:checked + .btn {
-    background: #111111;
-    color: var(--nb-accent-yellow);
-  }
-
-  // The moving thumb (shared segmented engine) sits under the labels
-  .omega-segmented__thumb {
-    border-radius: 0;
-    background: #111111;
-  }
-
-  .omega-billing-toggle__save {
-    font-family: $nb-font-mono;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    border-radius: 0;
-    background: var(--nb-accent-yellow);
-    color: #111111;
-    border-color: var(--nb-border-color);
-  }
-}
 
 // ============================================
 // Plan cards: ink frames on hard shadows, the popular plan goes yellow

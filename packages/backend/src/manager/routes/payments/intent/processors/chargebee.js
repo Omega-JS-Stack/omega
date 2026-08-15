@@ -138,9 +138,25 @@ async function createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, prod
 /**
  * Resolve or create a Chargebee coupon for a discount code
  * Uses a deterministic ID so the same code always maps to the same coupon
+ *
+ * A code is percent-based or amount-based, and Chargebee spells the second one
+ * `discount_type: 'fixed_amount'` with `discount_amount` in the currency's MINOR
+ * unit (cents — the same unit this file's one-time `charges.amount` uses) plus the
+ * `currency_code` it applies in. The two shapes carry different ids so a code can
+ * never collide with the other form, and the percent id is byte-identical to what
+ * it has always been, so coupons already live in a brand's site keep resolving
+ * ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
+ *
+ * Verified against the params the API is asked to create, not against Chargebee:
+ * live-provider verification is a Stage 3 item, the same trust level as the rest
+ * of this processor ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  */
 async function resolveChargebeeCoupon(ChargebeeLib, discount, ctx) {
-  const couponId = `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
+  const isAmount = discount.amount > 0;
+  const currency = (ctx.Manager?.config?.payment?.currency || 'USD').toUpperCase();
+  const couponId = isAmount
+    ? `BEM_${discount.code}_${discount.amount}AMTOFF_ONCE`
+    : `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
 
   try {
     // Check if coupon already exists
@@ -159,11 +175,20 @@ async function resolveChargebeeCoupon(ChargebeeLib, discount, ctx) {
     method: 'POST',
     body: {
       id: couponId,
-      name: `${discount.code} (${discount.percent}% off first payment)`,
-      discount_type: 'percentage',
-      discount_percentage: discount.percent,
       duration_type: 'one_time',
       apply_on: 'invoice_amount',
+      ...(isAmount
+        ? {
+          name: `${discount.code} (${discount.amount.toFixed(2)} ${currency} off first payment)`,
+          discount_type: 'fixed_amount',
+          discount_amount: Math.round(discount.amount * 100),
+          currency_code: currency,
+        }
+        : {
+          name: `${discount.code} (${discount.percent}% off first payment)`,
+          discount_type: 'percentage',
+          discount_percentage: discount.percent,
+        }),
     },
   });
 

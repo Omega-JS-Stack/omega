@@ -182,7 +182,7 @@ class TestRunner {
     process.stdout.write(chalk.gray('  Checking server health... '));
 
     try {
-      const response = await http.get('omega/test/health');
+      const response = await http.get('omega/health');
 
       if (response.success) {
         console.log(chalk.green('✓'));

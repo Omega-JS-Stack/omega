@@ -25,8 +25,8 @@ module.exports = {
     {
       name: 'omega_api-health-responds-over-hosting-rewrite',
       async run({ http, assert }) {
-        const response = await http.get('omega/test/health');
-        assert.isSuccess(response, 'omega_api /test/health should respond through the emulator');
+        const response = await http.get('omega/health');
+        assert.isSuccess(response, 'omega_api /health should respond through the emulator');
       },
     },
   ],

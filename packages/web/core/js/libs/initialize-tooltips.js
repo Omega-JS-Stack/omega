@@ -8,9 +8,13 @@
  * (`__main_assets__/js/libs/initialize-tooltips.js`) — same lane as the
  * chart helper beside it — and `window.bootstrap` is already global by the
  * time a theme's DOM-ready handler calls this.
+ *
+ * @param {ParentNode} [$root] - the subtree to scan; markup injected AFTER the
+ *   page-load pass (the change-plan modal's feature bullets) passes its own
+ *   container so only the new triggers are wired.
  */
-export default function initializeTooltips() {
-  const $tooltipTriggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+export default function initializeTooltips($root = document) {
+  const $tooltipTriggers = $root.querySelectorAll('[data-bs-toggle="tooltip"]');
 
   // If no tooltips found, exit early
   if ($tooltipTriggers.length === 0) {

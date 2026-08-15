@@ -1205,20 +1205,13 @@ main > section.omega-photo-lead-band:first-of-type {
     line-height: 1.5;
     color: var(--omega-ink-muted);
 
+    // The bullet's check is `.omega-feature-check` — one home in
+    // core/css/core/_utilities.scss, shared with the plan cards above and the
+    // account page's change-plan modal.
     li {
       display: flex;
       align-items: flex-start;
       gap: 0.5rem;
-    }
-
-    // One-line-tall box so the glyph centers on the FIRST line of its text
-    // (same rule as the price card's check)
-    .omega-band__check {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      height: 1.5em;
     }
 
     .cursor-help {

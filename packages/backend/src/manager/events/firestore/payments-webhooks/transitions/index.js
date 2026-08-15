@@ -87,6 +87,18 @@ function detectSubscriptionTransition(before, after, eventType, options) {
     return 'checkout-declined';
   }
 
+  // 3b. checkout-declined, the win-back branch: cancelled paid → suspended. A full
+  // cancellation leaves the paid product id in place, so a returning subscriber
+  // whose payment declines matched NOTHING — not the rule above (before must be
+  // basic), not subscription-winback (after must be active), not payment-failed
+  // (before must be active) — and the webhook completed with no log and no
+  // analytics ([#223](https://github.com/Omega-JS-Stack/omega/issues/223)). Same
+  // handler as above: the user is standing at the checkout watching it fail, so it
+  // logs and sends no dunning email.
+  if (beforeStatus === 'cancelled' && isPaid(before) && afterStatus === 'suspended') {
+    return 'checkout-declined';
+  }
+
   // 4. payment-failed: active → suspended
   if (beforeStatus === 'active' && afterStatus === 'suspended') {
     return 'payment-failed';

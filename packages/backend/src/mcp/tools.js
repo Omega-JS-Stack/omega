@@ -545,7 +545,7 @@ module.exports = [
     description: 'Check if the @omega.js/backend server is running and responding',
     role: 'public',
     method: 'GET',
-    path: 'test/health',
+    path: 'health',
     annotations: { title: 'Check server health', readOnlyHint: true },
     inputSchema: {
       type: 'object',

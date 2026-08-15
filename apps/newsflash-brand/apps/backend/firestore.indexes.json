@@ -115,6 +115,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "subscription.payment.processor",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription.cancellation.pending",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

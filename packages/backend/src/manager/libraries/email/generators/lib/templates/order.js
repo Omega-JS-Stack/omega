@@ -157,8 +157,15 @@ function _summary(event, order, data, theme) {
   }
 
   if (computed.promoCode) {
+    // A code is percent-based or amount-based (the two shapes a processor coupon
+    // comes in) — quote whichever it is, the amount in the same money format the
+    // rows around it use ([#239](https://github.com/Omega-JS-Stack/omega/issues/239))
+    const promoOff = computed.promoPercent != null
+      ? `${computed.promoPercent}% off`
+      : `$${computed.promoAmount} off`;
+
     rows.push(_row(
-      `<span style="color: #16a34a;">${escape(computed.promoCode)} &ndash; ${computed.promoPercent}% off</span>`,
+      `<span style="color: #16a34a;">${escape(computed.promoCode)} &ndash; ${promoOff}</span>`,
       `<span style="color: #16a34a;">&minus;$${computed.promoSavings || '0.00'}</span>`,
     ));
   }

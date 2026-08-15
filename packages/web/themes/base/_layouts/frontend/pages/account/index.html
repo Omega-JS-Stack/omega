@@ -997,14 +997,23 @@ badges:
               </p>
             </div>
 
-            <!-- Billing details (next billing, amount) -->
+            <!-- Billing details — EVERY slot shows in EVERY paid state: the
+                 price, the cadence and the date line. A slot the subscription
+                 does not record says so with the muted placeholder instead of
+                 dropping out and leaving the row looking half-built. The
+                 date's LABEL is the claim it makes (renews / access until /
+                 ended / next billing), so a cancelled account can still say
+                 when it ended, and a suspended one claims no date at all. -->
             <div id="billing-details" class="mb-3" data-omega-bind="@show billing.details.visible" hidden>
               <div class="row small text-muted">
-                <div class="col-sm-6 mb-1">
-                  <strong>Next billing:&nbsp;</strong> <span data-omega-bind="@text billing.details.nextDate"></span>
+                <div class="col-sm-4 mb-1">
+                  <strong><span data-omega-bind="@text billing.details.dateLabel">Renews</span>:&nbsp;</strong> <span data-omega-bind="@text billing.details.date, @attr class billing.details.dateClass"></span>
                 </div>
-                <div class="col-sm-6 mb-1">
-                  <strong>Amount:&nbsp;</strong> <span data-omega-bind="@text billing.details.amount"></span>
+                <div class="col-sm-4 mb-1">
+                  <strong>Amount:&nbsp;</strong> <span data-omega-bind="@text billing.details.amount, @attr class billing.details.amountClass"></span>
+                </div>
+                <div class="col-sm-4 mb-1">
+                  <strong>Billing cycle:&nbsp;</strong> <span data-omega-bind="@text billing.details.cadence, @attr class billing.details.cadenceClass"></span>
                 </div>
               </div>
             </div>
@@ -1174,12 +1183,26 @@ badges:
                   You are currently on the <strong data-omega-bind="@text billing.plan.name">Current</strong> plan.
                 </p>
 
+                <!-- Cadence toggle — injected by JS, opening on the cadence
+                     the account is billed at. One card per plan below follows
+                     it; a brand selling a single cadence gets no toggle. -->
+                <div id="change-plan-cadence" class="d-flex justify-content-center mb-4"></div>
+
                 <fieldset>
                   <legend class="form-label">Move to</legend>
                   <div id="change-plan-options">
-                    <!-- Radio buttons injected by JS from the brand's plans -->
+                    <!-- Plan cards injected by JS from the brand's plans -->
                   </div>
                 </fieldset>
+
+                <!-- The switcher shows each plan's headline features; the full
+                     story (every feature, the comparison table) is the pricing page -->
+                <p class="small mb-3">
+                  <a href="/pricing" target="_blank" rel="noopener" aria-label="Compare plans on the pricing page (opens in a new tab)">
+                    Compare plans
+                    {% omega_icon "arrow-up-right-from-square", "fa-xs ms-1" %}
+                  </a>
+                </p>
 
                 <p class="small text-muted mb-0">
                   Your payment provider prorates the difference: you are billed or credited for the remainder of the current period, and your next invoice reflects the new plan.

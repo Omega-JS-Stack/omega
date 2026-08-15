@@ -180,6 +180,53 @@ module.exports = {
     },
 
     {
+      name: 'order template renders a percent promo line',
+      async run({ assert }) {
+        const result = await render('order', {
+          content: {
+            event: 'confirmation',
+            id: 'ORD-PERCENT',
+            type: 'subscription',
+            unified: {
+              product: { id: 'premium', name: 'Premium' },
+              payment: { price: 49.99, frequency: 'monthly' },
+            },
+            _computed: { promoCode: 'WELCOME15', promoPercent: 15, promoSavings: '7.50', totalToday: '42.49' },
+          },
+        });
+
+        assert.ok(result.html.includes('WELCOME15'), 'order: the redeemed code renders');
+        assert.ok(result.html.includes('15% off'), 'order: a percent code reads as "15% off"');
+        assert.ok(result.html.includes('7.50'), 'order: the savings render');
+      },
+    },
+
+    {
+      name: 'order template renders an amount promo line as money, not a percent',
+      async run({ assert }) {
+        // A flat-dollar code has no percent to quote — the line used to render
+        // "undefined% off" for one ([#239](https://github.com/Omega-JS-Stack/omega/issues/239))
+        const result = await render('order', {
+          content: {
+            event: 'confirmation',
+            id: 'ORD-AMOUNT',
+            type: 'subscription',
+            unified: {
+              product: { id: 'premium', name: 'Premium' },
+              payment: { price: 49.99, frequency: 'monthly' },
+            },
+            _computed: { promoCode: 'WELCOME10OFF', promoAmount: '10.00', promoSavings: '10.00', totalToday: '39.99' },
+          },
+        });
+
+        assert.ok(result.html.includes('WELCOME10OFF'), 'order: the redeemed code renders');
+        assert.ok(result.html.includes('$10.00 off'), 'order: an amount code reads as "$10.00 off", formatted like every other amount');
+        assert.ok(!result.html.includes('% off'), 'order: an amount code never quotes a percentage');
+        assert.ok(!result.html.includes('undefined'), 'order: nothing renders as undefined');
+      },
+    },
+
+    {
       name: 'feedback template renders',
       async run({ assert }) {
         const result = await render('feedback');

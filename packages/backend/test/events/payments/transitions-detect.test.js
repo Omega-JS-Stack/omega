@@ -147,6 +147,36 @@ module.exports = {
     },
 
     {
+      name: 'detects-a-declined-win-back-checkout',
+      async run({ assert }) {
+        // The win-back branch of the same moment: a full cancellation leaves the
+        // PAID product id on the user doc, so a returning subscriber whose payment
+        // declines is cancelled paid → suspended — not the rule above (before must
+        // be basic), not subscription-winback (after must be active), not
+        // payment-failed (before must be active). It matched nothing at all, and
+        // the webhook completed with no log and no analytics
+        // ([#223](https://github.com/Omega-JS-Stack/omega/issues/223))
+        const after = paidSubscription();
+        after.status = 'suspended';
+
+        const detected = transitions.detectSubscriptionTransition(cancelledSubscription(), after, 'customer.subscription.created');
+
+        assert.equal(detected, 'checkout-declined', 'cancelled paid → suspended should detect checkout-declined');
+      },
+    },
+
+    {
+      name: 'a-returning-subscriber-who-pays-is-still-a-win-back',
+      async run({ assert }) {
+        // The declined-win-back rule sits BEHIND subscription-winback — the same
+        // before state, and only the outcome tells them apart
+        const detected = transitions.detectSubscriptionTransition(cancelledSubscription(), paidSubscription(), 'customer.subscription.created');
+
+        assert.equal(detected, 'subscription-winback', 'cancelled paid → active paid should still detect subscription-winback');
+      },
+    },
+
+    {
       name: 'a-paying-subscriber-still-gets-payment-failed',
       async run({ assert }) {
         // The decline rule sits in FRONT of payment-failed, so this is the one

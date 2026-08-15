@@ -2,62 +2,14 @@
 // The theme forks no pricing layout: the BASE page renders (omega-price-card
 // grid, omega-billing-toggle, the omega-band enterprise strip, the
 // feature-comparison table, the FAQ duo) and this file dresses it as the
-// "subscription desk": pill toggle with the volt save chip, the vermilion
-// "Most popular" stamp, serif prices, framed comparison table. Structure
-// comes from the classy floor partials in the main bundle; these page rules
-// land after and win. Compiles standalone: theme tokens + mixins via
-// loadPaths.
+// "subscription desk": the vermilion "Most popular" stamp, serif prices,
+// framed comparison table. Structure comes from the classy floor partials in
+// the main bundle; these page rules land after and win. The pill BILLING
+// TOGGLE is not here: it renders on the account page too, so its skin lives in
+// css/components/_billing-toggle.scss, in the main bundle ([#236]). Compiles
+// standalone: theme tokens + mixins via loadPaths.
 @use 'config' as *;
 @import 'css/base/mixins';
-
-// ============================================
-// Billing toggle: pill segmented control
-// ============================================
-.omega-billing-toggle {
-  padding: 0.35rem;
-  gap: 0.35rem;
-  border: var(--nf-border);
-  border-radius: 50rem;
-  background: var(--bs-card-bg);
-  box-shadow: none;
-
-  // The segment labels are .btn: flatten the theme's hard-shadow pill and
-  // let the checked state fill ink.
-  .btn {
-    border: 0;
-    box-shadow: none;
-    background: transparent;
-    color: var(--bs-body-color);
-    font-weight: 700;
-    padding: 0.5rem 1.25rem;
-
-    &:hover {
-      background: var(--omega-surface-2);
-      transform: none;
-    }
-  }
-
-  .btn-check:checked + .btn {
-    background: var(--omega-ink);
-    color: var(--omega-ground);
-  }
-
-  // The moving thumb (shared segmented engine) sits under the labels
-  .omega-segmented__thumb {
-    border-radius: 50rem;
-    background: var(--omega-ink);
-  }
-
-  .omega-billing-toggle__save {
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    background: var(--nf-volt);
-    color: var(--nf-volt-ink);
-    border-color: var(--nf-volt);
-  }
-}
 
 // ============================================
 // Plan cards: framed paper with the vermilion Editor's pick

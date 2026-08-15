@@ -141,9 +141,25 @@ function buildOneTimeSession({ priceId, customer, uid, orderId, productId, strip
 /**
  * Resolve or create a Stripe coupon for a discount code
  * Uses a deterministic ID so the same code always maps to the same coupon
+ *
+ * Stripe coupons come in two shapes and a code is one or the other: `percent_off`,
+ * or `amount_off` in the currency's MINOR unit (cents) with a `currency` beside it
+ * — Stripe rejects an amount coupon without one. The two shapes carry different
+ * ids so a code can never collide with the other form, and the percent id is
+ * byte-identical to what it has always been, so coupons already live in a brand's
+ * account keep resolving instead of duplicating under a new id
+ * ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
+ *
+ * Verified against the params the SDK is asked to create, not against Stripe:
+ * live-provider verification is a Stage 3 item, the same trust level as the rest
+ * of this processor ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  */
 async function resolveStripeCoupon(stripe, discount, ctx) {
-  const couponId = `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
+  const isAmount = discount.amount > 0;
+  const currency = ctx.Manager?.config?.payment?.currency || 'USD';
+  const couponId = isAmount
+    ? `BEM_${discount.code}_${discount.amount}AMTOFF_ONCE`
+    : `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
 
   try {
     // Check if coupon already exists
@@ -162,9 +178,17 @@ async function resolveStripeCoupon(stripe, discount, ctx) {
   // Stripe returns the cached response for 24 hours.
   await stripe.coupons.create({
     id: couponId,
-    percent_off: discount.percent,
     duration: 'once',
-    name: `${discount.code} (${discount.percent}% off first payment)`,
+    ...(isAmount
+      ? {
+        amount_off: Math.round(discount.amount * 100),
+        currency: currency.toLowerCase(),
+        name: `${discount.code} (${discount.amount.toFixed(2)} ${currency.toUpperCase()} off first payment)`,
+      }
+      : {
+        percent_off: discount.percent,
+        name: `${discount.code} (${discount.percent}% off first payment)`,
+      }),
   }, {
     idempotencyKey: `backend-coupon-${couponId}`,
   });

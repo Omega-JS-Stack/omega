@@ -56,19 +56,25 @@ test('#11: no check site paints its own tick a local color', () => {
   assert.ok(!/\.omega-compare__yes\s*\{/.test(css), 'the comparison yes-mark dropped its local green');
   assert.match(css, /\.omega-auth__aside-row svg\s*\{(?:(?!color)[^}])*\}/, 'the signup benefit check dropped its local grey');
   assert.ok(
-    !/\.omega-price-card__check\s*\{[^}]*color:/.test(css),
+    !/\.omega-feature-check\s*\{[^}]*color:/.test(css),
     'the plan-feature check dropped its local accent',
   );
 });
 
-test('#10: the plan-feature check is a one-line box, not a magic margin', () => {
+test('#10: the plan-feature check is a one-line box, not a magic margin — and one home', () => {
   const css = compileBundle('classy');
-  const rule = css.match(/\.omega-price-card__features li \.omega-price-card__check\s*\{[^}]*\}/)[0];
+  const rule = css.match(/\.omega-feature-check\s*\{[^}]*\}/)[0];
 
   assert.match(rule, /display: inline-flex/, 'the check is its own box');
   assert.match(rule, /align-items: center/, 'the glyph centers inside it');
   assert.match(rule, /height: 1\.5em/, 'the box is exactly one line of the feature list tall');
   assert.ok(!/margin-top/.test(rule), 'the baseline nudge is gone');
+
+  // The rule shipped three times, declaration for declaration (plan card,
+  // enterprise band, the account page's change-plan modal). `.omega-feature-
+  // check` is the one home now, so a per-surface copy is a regression.
+  assert.ok(!css.includes('.omega-price-card__check'), 'the plan card keeps no private copy');
+  assert.ok(!css.includes('.omega-band__check'), 'the enterprise band keeps no private copy');
 });
 
 // A catalog with plan features + a comparison table (the check-heaviest page)
@@ -100,7 +106,7 @@ test('#44: the check surfaces stamp text-success on plan features, comparison, s
 
   const pricing = pages.get('/pricing');
   assert.ok(pricing, '/pricing built');
-  assert.match(pricing, /omega-price-card__check text-success/, 'plan-feature checks carry the success class');
+  assert.match(pricing, /omega-feature-check text-success/, 'plan-feature checks carry the success class');
   assert.match(pricing, /omega-compare__yes text-success/, 'comparison yes-marks carry the success class');
   assert.ok(!pricing.includes('omega-check'), 'no page still stamps the retired seam class');
 

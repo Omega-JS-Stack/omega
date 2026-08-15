@@ -35,11 +35,25 @@ module.exports = {
       throw new Error(`Stripe subscription ${resourceId} has no subscription item to update`);
     }
 
-    await stripe.subscriptions.update(resourceId, {
+    const update = {
       items: [{ id: itemId, price: priceId }],
       proration_behavior: 'create_prorations',
-    });
+    };
 
-    ctx.log(`Stripe plan switched: sub=${resourceId}, uid=${uid}, item=${itemId}, price=${priceId} (${product.id}/${frequency})`);
+    // A switch never grants, resets, or extends a trial ([#237]): a subscription
+    // still IN its trial keeps the end date it already had, sent back to Stripe
+    // explicitly so the carry-over is this route's statement rather than a
+    // default we inherit. A trial that already ended is left alone — Stripe
+    // rejects a trial_end in the past, and its dates stay on the object anyway.
+    const nowUNIX = Math.floor(Date.now() / 1000);
+    const trialing = current.status === 'trialing' && current.trial_end > nowUNIX;
+
+    if (trialing) {
+      update.trial_end = current.trial_end;
+    }
+
+    await stripe.subscriptions.update(resourceId, update);
+
+    ctx.log(`Stripe plan switched: sub=${resourceId}, uid=${uid}, item=${itemId}, price=${priceId} (${product.id}/${frequency}), trialEnd=${trialing ? current.trial_end : 'none'}`);
   },
 };

@@ -72,38 +72,50 @@ function readGraph(outDir, manifestUrl) {
   return [...seen.values()].join('\n');
 }
 
+// The real checkout page's bundle graph, built the way a brand builds it.
+async function buildCheckoutGraph(dev, name) {
+  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+  const outDir = path.join(PKG, '.omega', `${name}-${process.pid}`);
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const manifest = await buildAssets({
+    layers: [...themeRoots, path.join(PKG, 'core')],
+    themeRoots,
+    sectionRoots: themeRoots,
+    themesDir: path.join(PKG, 'themes'),
+    coreDir: path.join(PKG, 'core'),
+    outDir,
+    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+    dev,
+    only: 'js',
+  });
+  const graph = readGraph(outDir, manifest.js.pages['payment/checkout/index']);
+  fs.rmSync(outDir, { recursive: true, force: true });
+  return graph;
+}
+
 test('the checkout page ships no `_dev_decline` to production (#226)', async () => {
   // The decline arm is a URL param now, so the ONLY thing keeping it out of a
   // real checkout is the @dev-only block around the read (modules/api.js) and
   // around the section import (index.js). #235 is the standing proof that a
   // dev param read OUTSIDE a block survives the strip, so this asserts on the
   // real production build rather than on the source.
-  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
-
-  const build = async (dev, name) => {
-    const outDir = path.join(PKG, '.omega', `${name}-${process.pid}`);
-    fs.rmSync(outDir, { recursive: true, force: true });
-    const manifest = await buildAssets({
-      layers: [...themeRoots, path.join(PKG, 'core')],
-      themeRoots,
-      sectionRoots: themeRoots,
-      themesDir: path.join(PKG, 'themes'),
-      coreDir: path.join(PKG, 'core'),
-      outDir,
-      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
-      dev,
-      only: 'js',
-    });
-    const graph = readGraph(outDir, manifest.js.pages['payment/checkout/index']);
-    fs.rmSync(outDir, { recursive: true, force: true });
-    return graph;
-  };
-
-  const devGraph = await build(true, 'strip-checkout-dev-out');
+  const devGraph = await buildCheckoutGraph(true, 'strip-checkout-dev-out');
   assert.ok(devGraph.includes('_dev_decline'), 'the dev build carries the param — otherwise this proves nothing');
   assert.ok(devGraph.includes('Decline next checkout'), 'and the palette control that applies it');
 
-  const prodGraph = await build(false, 'strip-checkout-prod-out');
+  const prodGraph = await buildCheckoutGraph(false, 'strip-checkout-prod-out');
   assert.ok(!prodGraph.includes('_dev_decline'), 'production never reads the decline param');
   assert.ok(!prodGraph.includes('Decline next checkout'), 'and carries none of the control that sets it');
+});
+
+test('the checkout page ships no `_dev_cardProcessor` to production (#235)', async () => {
+  // resolveProcessor() honoured the param outside any block, so a production
+  // checkout let a visitor point their own payment at another processor. The
+  // read belongs behind the same triple gate as the decline arm — this asserts
+  // on the real production build, not on the source.
+  const devGraph = await buildCheckoutGraph(true, 'strip-processor-dev-out');
+  assert.ok(devGraph.includes('_dev_cardProcessor'), 'the dev build carries the param — otherwise this proves nothing');
+
+  const prodGraph = await buildCheckoutGraph(false, 'strip-processor-prod-out');
+  assert.ok(!prodGraph.includes('_dev_cardProcessor'), 'production never reads the card-processor override');
 });

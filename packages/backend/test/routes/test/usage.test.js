@@ -345,5 +345,58 @@ module.exports = {
         );
       },
     },
+
+    // Test 13: A negative amount clamps to 0 instead of DECREMENTING the
+    // counter — the route keys usage off the caller's uid OR their IP, so
+    // without the clamp an unauthenticated caller could zero their own bucket
+    // (#238). Last in the suite: it must not move the counters the
+    // accumulation tests above assert on.
+    {
+      name: 'negative-amount-clamps-to-zero',
+      async run({ http, assert }) {
+        const response = await http.as('basic').post('backend-manager/test/usage', {
+          amount: -5,
+        });
+
+        assert.isSuccess(response, 'A negative amount should be accepted and clamped, not rejected');
+        assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
+
+        assert.equal(
+          response.data.after.monthly,
+          response.data.before.monthly,
+          'Monthly must not go down'
+        );
+        assert.equal(
+          response.data.after.daily,
+          response.data.before.daily,
+          'Daily must not go down'
+        );
+        assert.equal(
+          response.data.after.total,
+          response.data.before.total,
+          'Total must not go down'
+        );
+      },
+    },
+
+    // Test 14: The same clamp for an UNAUTHENTICATED caller, whose usage doc is
+    // keyed by IP — the exact bucket the unclamped amount let anyone reset.
+    {
+      name: 'negative-amount-clamps-for-unauthenticated-callers',
+      async run({ http, assert }) {
+        const response = await http.as('none').post('backend-manager/test/usage', {
+          amount: -5,
+        });
+
+        assert.isSuccess(response, 'Unauthenticated increment should succeed');
+        assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
+        assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
+        assert.equal(
+          response.data.after.monthly,
+          response.data.before.monthly,
+          'Monthly must not go down'
+        );
+      },
+    },
   ],
 };

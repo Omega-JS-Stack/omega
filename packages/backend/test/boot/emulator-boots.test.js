@@ -19,17 +19,17 @@ module.exports = {
     {
       name: 'omega_api-health-responds-over-hosting-rewrite',
       async run({ http, assert }) {
-        const response = await http.get('omega/test/health');
-        assert.isSuccess(response, 'omega_api /test/health should respond through the emulator hosting rewrite');
+        const response = await http.get('omega/health');
+        assert.isSuccess(response, 'omega_api /health should respond through the emulator hosting rewrite');
       },
     },
     {
       name: 'manager-booted-in-functions-runtime',
       async run({ http, assert }) {
-        // /test/health is served by the omega_api function, which only exists if
+        // /health is served by the omega_api function, which only exists if
         // Manager.init() ran in the fixture's functions runtime. A success here
         // means the local @omega.js/backend (symlinked into the fixture) booted.
-        const response = await http.get('omega/test/health');
+        const response = await http.get('omega/health');
         assert.isSuccess(response, 'Manager.init() should have wired omega_api in the fixture functions runtime');
       },
     },

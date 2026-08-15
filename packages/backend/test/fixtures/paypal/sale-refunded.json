@@ -1,0 +1,38 @@
+{
+  "id": "36C825357G211812K",
+  "state": "refunded",
+  "amount": {
+    "total": "9.99",
+    "currency": "USD",
+    "details": {
+      "subtotal": "9.99"
+    }
+  },
+  "payment_mode": "INSTANT_TRANSFER",
+  "protection_eligibility": "ELIGIBLE",
+  "protection_eligibility_type": "ITEM_NOT_RECEIVED_ELIGIBLE,UNAUTHORIZED_PAYMENT_ELIGIBLE",
+  "transaction_fee": {
+    "value": "0.59",
+    "currency": "USD"
+  },
+  "parent_payment": "PAY-2WU81746H8127823WKUYQ2WQ",
+  "create_time": "2026-03-04T10:10:30Z",
+  "update_time": "2026-03-04T10:41:12Z",
+  "links": [
+    {
+      "href": "https://api.sandbox.paypal.com/v1/payments/sale/36C825357G211812K",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api.sandbox.paypal.com/v1/payments/sale/36C825357G211812K/refund",
+      "rel": "refund",
+      "method": "POST"
+    },
+    {
+      "href": "https://api.sandbox.paypal.com/v1/payments/payment/PAY-2WU81746H8127823WKUYQ2WQ",
+      "rel": "parent_payment",
+      "method": "GET"
+    }
+  ]
+}

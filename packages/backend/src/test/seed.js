@@ -129,12 +129,21 @@ async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) 
   }
   logLn(chalk.green(`✓ (${result.created} created)`));
 
-  // 4. Fetch private keys
+  // 4. Stand up the personas' purchase records. Creating an account writes a user
+  // doc and nothing else, so a persona seeded with a bought subscription arrives
+  // naming a `payments-orders` doc that does not exist — the same fixtures the dev
+  // reset route re-seeds per persona (routes/test/reset-account), from the same
+  // definitions — a project's own `test/_init.js` personas included.
+  log(chalk.gray('  Seeding persona order fixtures... '));
+  const orderIds = await testAccounts.seedOrderFixtures(admin, config, initHooks.accounts);
+  logLn(chalk.green(`✓ (${orderIds.length} orders)`));
+
+  // 5. Fetch private keys
   const accounts = await testAccounts.fetchPrivateKeys(
     admin, domain, config, initHooks.accounts,
   );
 
-  // 5. Run setup hooks (_init.js setup functions)
+  // 6. Run setup hooks (_init.js setup functions)
   for (const setup of initHooks.setups) {
     log(chalk.gray('  Running test/_init.js setup... '));
     try {

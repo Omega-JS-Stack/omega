@@ -16,7 +16,11 @@ export const state = {
   // User selections
   frequency: 'annually',
   discountCode: null,
+  // A code takes off a PERCENT of the price or a flat AMOUNT of money — the
+  // server returns one shape or the other, so exactly one of these is ever
+  // non-zero
   discountPercent: 0,
+  discountAmount: 0,
   trialEligible: false,
 
   // UI state
@@ -27,10 +31,18 @@ export const state = {
 // Resolve which processor handles a payment method
 export function resolveProcessor(paymentMethod) {
   if (paymentMethod === 'card') {
-    // Dev override
-    const urlParams = new URLSearchParams(window.location.search);
-    const forced = urlParams.get('_dev_cardProcessor');
-    if (forced) return forced;
+    /* @dev-only:start */
+    {
+      // The dev palette's card-processor override, a URL param like every
+      // other checkout dev control. The read lives INSIDE the block, so
+      // production never looks and the literal never reaches a real bundle
+      // (#235) — a visitor can't point a real checkout at another processor.
+      if (omega.isDevelopment()) {
+        const forced = new URLSearchParams(window.location.search).get('_dev_cardProcessor');
+        if (forced) return forced;
+      }
+    }
+    /* @dev-only:end */
 
     // Prefer Stripe, fall back to Chargebee
     if (state.processors?.stripe?.publishableKey) return 'stripe';
@@ -85,6 +97,11 @@ export function buildBindingsState() {
   // Frequency display text map
   const frequencyLabels = { daily: 'daily', weekly: 'weekly', monthly: 'monthly', annually: 'annually' };
 
+  // A discount is in force in EITHER shape. Reading only the percent reported
+  // no discount for a flat code, so the receipt showed full price while the
+  // backend went on to charge the discounted one.
+  const hasDiscount = state.discountPercent > 0 || state.discountAmount > 0;
+
   return {
     checkout: {
       product: {
@@ -113,7 +130,7 @@ export function buildBindingsState() {
         recurringAmount: formatCurrency(prices.recurring),
         recurringPeriod: frequencyLabels[cycle] || cycle,
         showTerms: isSubscription,
-        termsText: buildTermsText(product, cycle, hasFreeTrial, prices, state.discountPercent > 0),
+        termsText: buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount),
       },
       trial: {
         show: hasFreeTrial,
@@ -122,8 +139,11 @@ export function buildBindingsState() {
         discountAmount: prices.trialDiscountAmount.toFixed(2),
       },
       discount: {
-        hasDiscount: state.discountPercent > 0,
-        percent: state.discountPercent > 0 ? `${state.discountPercent}%` : '',
+        hasDiscount: hasDiscount,
+        // What the receipt row's parenthetical says. A percent names itself;
+        // a flat code names ITSELF, because "Discount ($10.00) −$10.00" says
+        // the same number twice.
+        label: state.discountPercent > 0 ? `${state.discountPercent}%` : (state.discountCode || ''),
         amount: prices.discountAmount.toFixed(2),
         loading: state.discountUI.loading,
         success: state.discountUI.success,
@@ -151,8 +171,10 @@ export function buildBindingsState() {
   };
 }
 
-// Format a number as currency, or return placeholder
-function formatCurrency(amount) {
+// Format a number as currency, or return placeholder. Exported because it is
+// the page's ONE money format: the discount module's success message speaks it
+// too ("$10.00 off"), rather than growing a second one.
+export function formatCurrency(amount) {
   if (amount == null || isNaN(amount)) return '$--';
   return `$${Number(amount).toFixed(2)}`;
 }

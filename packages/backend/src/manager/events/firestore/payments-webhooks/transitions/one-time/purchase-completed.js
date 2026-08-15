@@ -3,15 +3,25 @@
  * Triggered when a one-time payment checkout completes (checkout.session.completed with mode=payment)
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
+const discountCodes = require('../../../../../libraries/payment/discount-codes.js');
 
 module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
   const brandName = ctx.Manager.config.brand?.name || '';
   const productName = after.product?.name || '';
 
-  // Pre-compute discount values for the email template
+  // Pre-compute discount values for the email template. The total goes through
+  // applyToAmount() — its one home — for BOTH coupon shapes: gating it on a
+  // percent quoted the full list price on an amount code's receipt
+  // ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
+  // The promo LINE is keyed off the shape the code actually carries. An order
+  // written before the amount field existed comes back valid with NEITHER, and
+  // this handler is dispatched fire-and-forget — reading a shape that isn't
+  // there would cost the customer their confirmation email, silently.
   const price = parseFloat(after.payment?.price || 0);
   const discount = order.discount;
-  const hasPromoDiscount = discount?.valid === true && discount?.percent > 0;
+  const hasPromoDiscount = discount?.valid === true;
+  const promoShape = discountCodes.promoShape(discount);
+  const firstCharge = discountCodes.applyToAmount(price, discount);
 
   ctx.log(`Transition [one-time/purchase-completed]: uid=${uid}, resourceId=${after.payment?.resourceId}, discount=${hasPromoDiscount ? discount.code : 'none'}`);
 
@@ -26,14 +36,21 @@ module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
         ...order,
         _computed: {
           date: formatDate(new Date().toISOString()),
-          ...(hasPromoDiscount && {
+          ...(promoShape && {
             promoCode: discount.code,
-            promoPercent: discount.percent,
-            promoSavings: (price * discount.percent / 100).toFixed(2),
+            // The savings line quotes the code's own terms; the flat-dollar one
+            // is what it actually took off, which floors at the charge itself
+            ...(promoShape === 'percent'
+              ? {
+                promoPercent: discount.percent,
+                promoSavings: (price * discount.percent / 100).toFixed(2),
+              }
+              : {
+                promoAmount: discount.amount.toFixed(2),
+                promoSavings: (price - firstCharge).toFixed(2),
+              }),
           }),
-          totalToday: hasPromoDiscount
-            ? (price - (price * discount.percent / 100)).toFixed(2)
-            : price.toFixed(2),
+          totalToday: firstCharge.toFixed(2),
         },
       },
     },

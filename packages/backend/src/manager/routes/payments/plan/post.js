@@ -15,6 +15,11 @@ const loadProcessor = require('../../../libraries/load-processor.js');
  * subscription exports switchPlan(), one that cannot simply lacks the export, and
  * the route refuses before dispatch rather than letting the caller discover it as
  * a provider error ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+ *
+ * A switch NEVER grants, resets, or extends a trial (Ian 2026-08-14,
+ * [#237](https://github.com/Omega-JS-Stack/omega/issues/237)): a mid-trial switch
+ * carries the trial over — same original end date, new plan. The route writes no
+ * state, so each processor's switchPlan() is what preserves it through the swap.
  */
 module.exports = async ({ ctx, Manager, user, settings }) => {
   // Require authentication
@@ -37,6 +42,18 @@ module.exports = async ({ ctx, Manager, user, settings }) => {
   if (!subscription || subscription.status !== 'active' || subscription.product?.id === 'basic') {
     ctx.log(`Plan change rejected: uid=${uid}, status=${subscription?.status}, product=${subscription?.product?.id}`);
     return ctx.respond('No active paid subscription found', { code: 400 });
+  }
+
+  // A cancellation already in flight is a decision of its own. The processors
+  // swap the PRICE, never the schedule, so a switch here would land the caller
+  // on a new plan still set to end at period end — silently. Undo the
+  // cancellation first; that is the honest button ([#237]).
+  if (subscription.cancellation?.pending === true) {
+    ctx.log(`Plan change rejected: uid=${uid}, cancellation pending`);
+    return ctx.respond('Your subscription is scheduled to cancel. Undo the cancellation before changing plans.', {
+      code: 400,
+      additional: { code: 'cancellation-pending' },
+    });
   }
 
   // Validate the target product against the brand's own config — the same
@@ -64,13 +81,26 @@ module.exports = async ({ ctx, Manager, user, settings }) => {
     return ctx.respond(`Product '${productId}' is not sold ${frequency}`, { code: 400 });
   }
 
-  // The switch has to BE a switch: same product at the same frequency is a no-op
+  // The switch has to BE a switch: same product at the same frequency is a
+  // no-op, and dispatching one costs a real processor call and a real webhook.
+  // The guard lives HERE and never leans on the client's own filtering — the
+  // modal's filter silently misses when the recorded frequency is absent
+  // ([#236]), and the trial the no-op switch used to end was real.
+  //
+  // An UNRECORDED current frequency refuses the whole product: `'monthly' ===
+  // undefined` is false, so a pair comparison alone would sail the no-op through
+  // to a real processor call — the exact state the QA repro was in. Both cadences
+  // are refused until the backend records one, mirroring the modal's own
+  // conservatism ([#236]).
   const currentProductId = subscription.product?.id;
   const currentFrequency = subscription.payment?.frequency;
 
-  if (productId === currentProductId && frequency === currentFrequency) {
-    ctx.log(`Plan change rejected: uid=${uid}, already on product=${productId}, frequency=${frequency}`);
-    return ctx.respond('You are already on that plan', { code: 400 });
+  if (productId === currentProductId && (!currentFrequency || frequency === currentFrequency)) {
+    ctx.log(`Plan change rejected: uid=${uid}, already on product=${productId}, frequency=${frequency} (current frequency: ${currentFrequency || 'unrecorded'})`);
+    return ctx.respond('You are already on that plan', {
+      code: 400,
+      additional: { code: 'already-on-plan' },
+    });
   }
 
   const processor = subscription.payment?.processor;

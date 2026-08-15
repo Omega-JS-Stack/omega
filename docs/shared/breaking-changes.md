@@ -55,6 +55,7 @@ input, not its implementation. The legacy repos stay read-only reference
 | Per-request object | `BackendAssistant`; handler signature `module.exports = async ({ assistant, settings, analytics }) => …` | `RouteContext`; handler signature `module.exports = async ({ ctx, settings, analytics }) => …` | Rename the destructured argument and every `assistant.` call site (`ctx.respond`, `ctx.log`, `ctx.request`) in each custom route, event, and cron handler |
 | Environment | `BACKEND_MANAGER_KEY`, `BACKEND_MANAGER_WEBHOOK_KEY`, `BEM_TEST_RUNNER`, `BEM_HTTPS_PORT` | `OMEGA_ADMIN_KEY`, `OMEGA_WEBHOOK_KEY`, `OMEGA_TEST_RUNNER`, `OMEGA_HTTPS_PORT` | Rename in `.env`, in CI secrets, and in anything that reads them. Values carry over unchanged |
 | CLI | `bm` / `bem` / `backend-manager` / `mgr` bins | `omega` / `omg` / `mgr` (one dispatcher; a backend's `functions/` dir resolves to the backend CLI) | Replace the bin name in npm scripts and workflows |
+| `test/*` routes | Every route under `routes/test/` served at its production URL | The whole `test/` route folder 404s outside dev/testing, with zero carve-outs; contract in the backend's `docs/routes.md` ([#238](https://github.com/Omega-JS-Stack/omega/issues/238)) | Use `/omega/health` for liveness (a real route, public, no input echoed) — not `/omega/test/health`. A brand whose own `routes/test/*` route must serve in production moves it out of the `test/` folder; debug routes belong in `test/` and are gated by default |
 
 ## `electron-manager` → `@omega.js/desktop`
 

@@ -9,27 +9,129 @@ const TEST_ACCOUNT_PASSWORD = 'omega-test-password';
 /**
  * Resolve the first paid subscription product from config
  * Falls back to 'premium' if no config or no paid products found
+ *
+ * PAID means the catalog SELLS it — a plan with prices. The free tier is not
+ * always named `basic` (a brand may call it `reader`), and a persona seeded onto
+ * a free tier that the seeder believed was paid carries no price to quote.
  */
 function getFirstPaidProduct(config) {
   const products = config?.payment?.products || [];
-  const paid = products.find(p => p.type === 'subscription' && p.id !== 'basic');
+  const paid = products.find(p => p.type === 'subscription' && p.id !== 'basic' && p.prices);
   return paid
     ? { id: paid.id, name: paid.name }
     : { id: 'premium', name: 'Premium' };
 }
 
+// How long each billing cadence runs — the SAME periods the test processor's
+// fabricated subscriptions are given (routes/payments/intent/processors/test.js
+// FREQUENCY_TO_PERIOD), so a seeded term matches what a real cycle records.
+const CYCLE_DAYS = { daily: 1, weekly: 7, monthly: 30, annually: 365 };
+
 /**
- * Helper to create a future expiration date for premium subscriptions
+ * Helper to create the expiration date of the billing cycle a live paid
+ * subscription is currently in — a real term runs to the end of the cycle it is
+ * billed on, never to a date a decade out no processor would ever record.
  * User() checks subscription.expires to determine if subscription is active
  * If expires is in the past (or default 1970), subscription gets downgraded to basic
+ *
+ * @param {string} [frequency] - Billing cadence ('monthly', 'annually', ...)
  */
-function getFutureExpires(years = 10) {
-  const futureDate = new Date();
-  futureDate.setFullYear(futureDate.getFullYear() + years);
+function getCycleExpires(frequency = 'monthly') {
+  const days = CYCLE_DAYS[frequency] || CYCLE_DAYS.monthly;
+  const cycleEnd = new Date(Date.now() + (days * 86400 * 1000));
   return {
-    timestamp: futureDate.toISOString(),
-    timestampUNIX: Math.floor(futureDate.getTime() / 1000),
+    timestamp: cycleEnd.toISOString(),
+    timestampUNIX: Math.floor(cycleEnd.getTime() / 1000),
   };
+}
+
+/**
+ * Resolve what a plan costs and how often it bills, from the brand's own catalog:
+ * the cadence it is listed at first and the price carried there. This is the SAME
+ * read the unified transforms make (`config.payment.products[].prices[frequency]`
+ * — libraries/payment/processors/stripe.js resolvePrice), so a seeded purchase can
+ * never quote a number the brand does not sell. No catalog, or a plan with no
+ * prices, resolves to nulls — never a hand-typed figure that would drift.
+ *
+ * @param {object} [config] - @omega.js/backend config
+ * @param {string} productId - Product id to price
+ * @returns {{ frequency: string|null, price: number|null }}
+ */
+function getPlanPricing(config, productId) {
+  const product = (config?.payment?.products || []).find(p => p.id === productId);
+  const prices = product?.prices || {};
+  const frequency = Object.keys(prices)[0] || null;
+
+  return {
+    frequency,
+    price: frequency ? prices[frequency] : null,
+  };
+}
+
+/**
+ * Resolve a seeded subscription against the brand catalog — the one place the
+ * hardcoded persona shapes meet the config, used by BOTH the account definitions
+ * and the order fixtures so a persona and its purchase record can never disagree.
+ *
+ * Three resolutions, all of them catalog reads:
+ *   1. The placeholder `premium` product becomes the brand's actual first paid plan.
+ *   2. A persona that BOUGHT a subscription (it holds a paid plan, or carries the
+ *      payment record of one it has since lapsed from) gets the price and cadence
+ *      of that plan. A free account that never bought anything is left alone.
+ *   3. A LIVE paid term ends when its billing cycle does, not a decade out.
+ *
+ * @param {object} [subscription] - The persona's seeded subscription block
+ * @param {object} [config] - @omega.js/backend config
+ * @returns {object} Resolved copy (the input is never mutated)
+ */
+function resolveSeededSubscription(subscription, config) {
+  const resolved = JSON.parse(JSON.stringify(subscription || {}));
+
+  if (!resolved.product) {
+    return resolved;
+  }
+
+  const paidProduct = getFirstPaidProduct(config);
+
+  if (resolved.product.id === 'premium') {
+    resolved.product.id = paidProduct.id;
+    resolved.product.name = paidProduct.name;
+  }
+
+  const payment = resolved.payment || {};
+  const boughtSomething = resolved.product.id !== 'basic'
+    || Boolean(payment.processor || payment.resourceId || payment.orderId);
+
+  if (!boughtSomething) {
+    return resolved;
+  }
+
+  // The plan that was bought: the one being held, or — for a persona whose term
+  // ran out and dropped it back to basic — the paid plan it lapsed from.
+  const planId = resolved.product.id !== 'basic' ? resolved.product.id : paidProduct.id;
+  const pricing = getPlanPricing(config, planId);
+
+  // A plan the catalog does not price (a project's own persona, a brand with no
+  // catalog) is left exactly as seeded — nulls are not billing data, so none are
+  // written, not even onto a persona that already carries a payment record.
+  if (!pricing.frequency) {
+    return resolved;
+  }
+
+  resolved.payment = {
+    ...payment,
+    frequency: payment.frequency || pricing.frequency,
+    price: payment.price ?? pricing.price,
+  };
+
+  // Only a term that is still running gets re-dated: a lapsed persona's expired
+  // term is the state it exists to represent.
+  const nowUNIX = Math.floor(Date.now() / 1000);
+  if (resolved.expires?.timestampUNIX > nowUNIX) {
+    resolved.expires = getCycleExpires(resolved.payment.frequency);
+  }
+
+  return resolved;
 }
 
 /**
@@ -85,7 +187,7 @@ const STATIC_ACCOUNTS = {
     email: '_test.premium-active@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getFutureExpires() },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() },
     },
   },
   'premium-expired': {
@@ -103,7 +205,7 @@ const STATIC_ACCOUNTS = {
     email: '_test.premium-suspended@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'suspended', expires: getFutureExpires() },
+      subscription: { product: { id: 'premium' }, status: 'suspended', expires: getCycleExpires() },
     },
   },
   'premium-cancelling': {
@@ -112,7 +214,7 @@ const STATIC_ACCOUNTS = {
     email: '_test.premium-cancelling@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: true } },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true } },
     },
   },
   // Post-refund end state (N6 persona): the refund webhook cancels the subscription —
@@ -134,7 +236,7 @@ const STATIC_ACCOUNTS = {
     email: '_test.delete@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getFutureExpires() }, // Active subscription - deletion should be blocked initially
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() }, // Active subscription - deletion should be blocked initially
     },
   },
   'delete-by-admin': {
@@ -419,7 +521,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-no-processor@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: null, resourceId: null } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: null, resourceId: null } },
     },
   },
   'cancel-already-pending': {
@@ -428,7 +530,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-already-pending@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: true }, payment: { processor: 'stripe', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { processor: 'stripe', resourceId: 'sub_test_fake' } },
     },
   },
   'cancel-unknown-processor': {
@@ -437,7 +539,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-unknown-processor@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
     },
   },
   'cancel-too-young': {
@@ -446,7 +548,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-too-young@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
     },
   },
   'cancel-suspended': {
@@ -466,7 +568,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-no-order@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_no_order', startDate: getPastExpires() } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_no_order', startDate: getPastExpires() } },
     },
   },
   // Dedicated accounts for portal validation tests
@@ -476,7 +578,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.portal-no-processor@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), payment: { processor: null, resourceId: null } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { processor: null, resourceId: null } },
     },
   },
   'portal-unknown-processor': {
@@ -485,7 +587,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.portal-unknown-processor@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
     },
   },
   // Dedicated accounts for refund validation tests
@@ -495,7 +597,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.refund-active-no-cancel@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake' } },
     },
   },
   'refund-no-processor': {
@@ -534,7 +636,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.refund-no-order@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: true }, payment: { processor: 'test', resourceId: 'sub_test_refund_no_order', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { processor: 'test', resourceId: 'sub_test_refund_no_order', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
     },
   },
   'route-refund-success': {
@@ -593,7 +695,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.resolve-premium-active@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getFutureExpires() },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() },
     },
   },
   'resolve-premium-expired': {
@@ -692,7 +794,7 @@ const JOURNEY_ACCOUNTS = {
       subscription: {
         product: { id: 'premium' },
         status: 'active',
-        expires: getFutureExpires(),
+        expires: getCycleExpires(),
         cancellation: { pending: false },
         payment: { processor: 'test', resourceId: 'sub_test_journey_flows_cancel', orderId: '_test-order-journey-flows-cancel', startDate: getPastExpires() },
       },
@@ -806,7 +908,6 @@ function seededConsent() {
  * @returns {object} Account definitions with resolved emails
  */
 function getAccountDefinitions(domain, config, extraAccounts) {
-  const paidProduct = getFirstPaidProduct(config);
   const accounts = {};
 
   const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
@@ -814,10 +915,11 @@ function getAccountDefinitions(domain, config, extraAccounts) {
   for (const [key, account] of Object.entries(all)) {
     const properties = JSON.parse(JSON.stringify(account.properties || {}));
 
-    // Replace hardcoded 'premium' product with the actual first paid product from config
-    if (properties.subscription?.product?.id === 'premium') {
-      properties.subscription.product.id = paidProduct.id;
-      properties.subscription.product.name = paidProduct.name;
+    // Resolve the seeded subscription against the brand catalog: the real paid
+    // product, and — for a persona that bought one — its price, cadence and the
+    // end of the cycle it is being billed on.
+    if (properties.subscription) {
+      properties.subscription = resolveSeededSubscription(properties.subscription, config);
     }
 
     // STATIC personas are ESTABLISHED users: born signup-processed with
@@ -1231,12 +1333,87 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
 }
 
 /**
+ * Build a persona's canonical purchase record — the `payments-orders/{orderId}`
+ * document its seeded subscription names. Pure: the shape only, no writes.
+ *
+ * The record is the persona's own resolved subscription in `unified` (that IS what
+ * a purchase writes to the order — events/firestore/payments-webhooks/on-write.js
+ * writes the same unified object to both the user doc and the order), plus the
+ * `metadata` and `requests` blocks that order carries, and the plan that was BOUGHT:
+ * the plan the persona holds, or — for one whose term lapsed and dropped it back to
+ * basic — the paid plan it lapsed from.
+ *
+ * @param {string} key - Account key in TEST_ACCOUNTS (e.g. 'journey-flows-cancel')
+ * @param {object} [config] - @omega.js/backend config (resolves the paid product)
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js, keyed
+ *   by id — a project persona's seeded order is as real as a framework one's
+ * @returns {{ orderId: string, doc: object }|null} null when the persona bought nothing
+ */
+function buildOrderFixture(key, config, extraAccounts) {
+  const account = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) }[key];
+
+  if (!account) {
+    throw new Error(`No seeded persona named ${key} — there is no order fixture to seed`);
+  }
+
+  const subscription = resolveSeededSubscription(account.properties?.subscription, config);
+  const payment = subscription.payment || {};
+
+  if (!payment.orderId) {
+    return null;
+  }
+
+  // The plan the order records is the persona's own — the fallback is only for a
+  // persona sitting on basic today because the paid term it bought ran out.
+  const product = subscription.product?.id !== 'basic'
+    ? subscription.product
+    : getFirstPaidProduct(config);
+
+  const now = new Date();
+  const stamp = { timestamp: now.toISOString(), timestampUNIX: Math.floor(now.getTime() / 1000) };
+
+  return {
+    orderId: payment.orderId,
+    doc: {
+      id: payment.orderId,
+      type: 'subscription',
+      owner: account.uid,
+      productId: product.id,
+      processor: payment.processor,
+      resourceId: payment.resourceId,
+      unified: {
+        ...subscription,
+        product: { id: product.id, name: product.name },
+      },
+      // A real order carries the cancel/refund requests the routes write onto it
+      // and the stamps of the event that last touched it. Nothing has requested
+      // anything of a seeded order, and no webhook wrote it — the seed did.
+      requests: {
+        cancellation: null,
+        refund: null,
+      },
+      metadata: {
+        created: { ...stamp },
+        updated: { ...stamp },
+        updatedBy: {
+          event: {
+            name: 'seed',
+            id: null,
+          },
+        },
+      },
+    },
+  };
+}
+
+/**
  * Seed a persona's canonical purchase record — the `payments-orders/{orderId}` doc
- * that account seeding itself never writes. Persona seeding writes user docs and
+ * that account creation itself never writes. Creating a persona writes a user doc and
  * NOTHING else, so a seeded subscription arrives without the order record every real
- * purchase leaves behind, and two backend surfaces read exactly that record: the test
- * cancel processor (it reads the plan's processor product id off the LIVE order) and
- * the per-owner trial-eligibility query (any prior subscription order disqualifies).
+ * purchase leaves behind, and three backend surfaces read exactly that record: the test
+ * cancel processor (it reads the plan's processor product id off the LIVE order), the
+ * test webhook library (it rebuilds a processor subscription from the order's `unified`)
+ * and the per-owner trial-eligibility query (any prior subscription order disqualifies).
  *
  * Only the personas whose seed carries `subscription.payment.orderId` have a purchase
  * record; everything else is a no-op (a pristine account has bought nothing).
@@ -1248,36 +1425,43 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
  * @param {object} admin - Firebase admin instance (pointed at the emulator)
  * @param {string} key - Account key in TEST_ACCOUNTS (e.g. 'journey-flows-cancel')
  * @param {object} [config] - @omega.js/backend config (resolves the paid product)
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
  * @returns {Promise<object|null>} `{ orderId, status }`, or null when the persona carries no order
  */
-async function seedOrderFixture(admin, key, config) {
-  const account = TEST_ACCOUNTS[key];
+async function seedOrderFixture(admin, key, config, extraAccounts) {
+  const fixture = buildOrderFixture(key, config, extraAccounts);
 
-  if (!account) {
-    throw new Error(`No seeded persona named ${key} — there is no order fixture to seed`);
-  }
-
-  const subscription = account.properties?.subscription || {};
-  const payment = subscription.payment || {};
-
-  if (!payment.orderId) {
+  if (!fixture) {
     return null;
   }
 
-  const paidProduct = getFirstPaidProduct(config);
-  const status = subscription.status;
+  await admin.firestore().doc(`payments-orders/${fixture.orderId}`).set(fixture.doc, { merge: true });
 
-  await admin.firestore().doc(`payments-orders/${payment.orderId}`).set({
-    id: payment.orderId,
-    type: 'subscription',
-    owner: account.uid,
-    productId: paidProduct.id,
-    processor: payment.processor,
-    resourceId: payment.resourceId,
-    unified: { product: { id: paidProduct.id, name: paidProduct.name }, status },
-  }, { merge: true });
+  return { orderId: fixture.orderId, status: fixture.doc.unified.status };
+}
 
-  return { orderId: payment.orderId, status };
+/**
+ * Seed EVERY persona's purchase record — the boot-seed counterpart of the
+ * per-persona reset (routes/test/reset-account). A seeded subscription naming an
+ * order the emulator never carried is a broken purchase: the cancel processor
+ * resolves no plan, and trial eligibility answers as if nothing was ever bought.
+ *
+ * A project's own personas (`test/_init.js` accounts) are seeded on exactly the
+ * same terms — their subscriptions are resolved by the same seeder, so their
+ * orders must be stood up by it too.
+ *
+ * @param {object} admin - Firebase admin instance (pointed at the emulator)
+ * @param {object} [config] - @omega.js/backend config (resolves the paid product)
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
+ * @returns {Promise<string[]>} The order ids seeded
+ */
+async function seedOrderFixtures(admin, config, extraAccounts) {
+  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const seeded = await Promise.all(
+    Object.keys(all).map((key) => seedOrderFixture(admin, key, config, extraAccounts)),
+  );
+
+  return seeded.filter(Boolean).map((order) => order.orderId);
 }
 
 /**
@@ -1297,10 +1481,13 @@ module.exports = {
   TEST_DATA,
   TEST_ACCOUNT_PASSWORD,
   getFirstPaidProduct,
+  getPlanPricing,
   getAccountDefinitions,
   fetchPrivateKeys,
   deleteTestUsers,
   createAccount,
   createTestAccounts,
+  buildOrderFixture,
   seedOrderFixture,
+  seedOrderFixtures,
 };

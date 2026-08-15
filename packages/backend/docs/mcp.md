@@ -51,7 +51,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections g
 | `create_backup` | admin | `POST /admin/backup` | Create a Firestore backup |
 | `run_hook` | admin | `POST /admin/hook` | Execute a custom hook |
 | `generate_uuid` | admin | `POST /general/uuid` | Generate a UUID |
-| `health_check` | public | `GET /test/health` | Check server health |
+| `health_check` | public | `GET /health` | Check server health |
 
 ## Tool Annotations
 

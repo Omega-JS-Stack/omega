@@ -253,7 +253,7 @@ faqs:
                   <ul class="omega-price-card__features">
                     {% for feature in plan.commonFeatures %}
                       <li>
-                        <span class="omega-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
+                        <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
                         <span>
                           {% if feature.value == 'Unlimited' %}
                             Unlimited
@@ -282,7 +282,7 @@ faqs:
                     <ul class="omega-price-card__features">
                       {% for feature in plan.extraFeatures %}
                         <li>
-                          <span class="omega-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
+                          <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
                           <span>
                             {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
                               {{ feature.value }}
@@ -367,7 +367,7 @@ faqs:
           <ul class="omega-band__features">
             {% for feature in _enterprise.features %}
               <li>
-                <span class="omega-band__check text-success">{% omega_icon "check", "fa-sm" %}</span>
+                <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
                 <span>
                   {% if feature.value == 'Unlimited' %}
                     Unlimited
@@ -429,7 +429,7 @@ faqs:
               <ul class="omega-price-card__features">
                 {% for feature in product.features %}
                   <li>
-                    <span class="omega-price-card__check text-success">{% omega_icon "check", "fa-sm" %}</span>
+                    <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
                     <span>
                       {% if feature.value == 'Unlimited' %}
                         Unlimited

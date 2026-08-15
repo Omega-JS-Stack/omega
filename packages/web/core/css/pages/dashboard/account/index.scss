@@ -86,6 +86,119 @@
   }
 }
 
+// Billing details row — the price, the cadence and the date line, one slot
+// each, all three drawn in every paid state. The VALUES sit at full ink
+// against their muted labels; a value the subscription never recorded falls
+// back to the muted ink, so the placeholder reads as "not known" instead of
+// passing for a fact ([#236] QA round 3).
+#billing-details {
+  .omega-billing-detail {
+    color: var(--omega-ink);
+  }
+
+  .omega-billing-detail--unknown {
+    color: var(--omega-ink-muted);
+  }
+}
+
+// Change-plan modal — ONE card per plan, the cadence toggle above them
+// picking which price each card shows. The radio is Bootstrap's
+// visually-hidden `.btn-check`, so the card carries the visual state while the
+// keyboard still drives a real radio group (the checkout's plan tiles read the
+// same way).
+#change-plan-options {
+  .omega-plan-option + .omega-plan-option {
+    margin-top: 0.75rem;
+  }
+
+  // The WHOLE card is the click target (the section's click handler picks it
+  // from anywhere inside), so the whole card carries the pointer — the head is
+  // a thin strip, and an arrow over the rest of it read as dead space.
+  .omega-plan-card {
+    padding: 0.875rem 1rem;
+    background: var(--omega-surface);
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-m);
+    cursor: pointer;
+    transition: border-color var(--omega-speed) var(--omega-ease), box-shadow var(--omega-speed) var(--omega-ease);
+  }
+
+  .omega-plan-card__head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .omega-plan-card__name {
+    font-weight: 600;
+    color: var(--omega-ink);
+  }
+
+  .omega-plan-card__price {
+    margin-left: auto;
+    color: var(--omega-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .omega-plan-card__per {
+    color: var(--omega-ink-muted);
+    font-size: 0.875em;
+  }
+
+  // The bullet's check is `.omega-feature-check` — one home in
+  // core/css/core/_utilities.scss, shared with the pricing page's plan cards
+  // and its enterprise band.
+  .omega-plan-card__features {
+    margin: 0.625rem 0 0;
+    font-size: 0.875rem;
+    color: var(--omega-ink-muted);
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+
+  .btn-check:checked + .omega-plan-card {
+    border-color: var(--omega-ink);
+    box-shadow: 0 0 0 1px var(--omega-ink);
+  }
+
+  .btn-check:focus-visible + .omega-plan-card {
+    outline: 2px solid var(--omega-accent);
+    outline-offset: 2px;
+  }
+
+  // The plan in force: still on the list (it is a fact worth seeing) but drawn
+  // as the one card a click cannot reach. The accent read as SELECTED, so it
+  // is gone from here entirely — a recessed neutral well, the strong line so
+  // the edge survives the fill in light mode, and a faded content block. Its
+  // label points at a disabled radio, so the browser refuses the click on its
+  // own.
+  .omega-plan-card--current {
+    background: var(--omega-surface-2);
+    border-color: var(--omega-line-strong);
+    cursor: default;
+
+    // The FADE does the muting, so what sits under it stays full `--omega-ink`
+    // — 0.7 lands the text at the muted ink's own weight instead of below it,
+    // in both modes. The badge is outside the fade: the one crisp thing left.
+    .omega-plan-card__per,
+    .omega-plan-card__features {
+      color: var(--omega-ink);
+    }
+
+    .omega-plan-card__name,
+    .omega-plan-card__price,
+    .omega-plan-card__features {
+      opacity: 0.7;
+    }
+  }
+}
+
 // Shared styles for data-request and delete sections
 #data-request-section,
 #delete-section,

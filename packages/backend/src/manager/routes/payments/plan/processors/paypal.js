@@ -10,6 +10,14 @@
  * The plan id is resolved from config at runtime (product + frequency → the
  * matching active PayPal plan), the same resolution the checkout uses, so a
  * switch lands on exactly the plan a fresh subscription would have.
+ *
+ * Trials ([#237]): revise takes no trial parameter, so unlike Stripe and
+ * Chargebee there is nothing to restate here. PayPal exposes no trial dates at
+ * all — the library derives them from the PLAN's `TRIAL` billing cycle anchored
+ * to the subscription's original `start_time` — so a revise cannot extend a
+ * trial past what it would have been from day one. It can still shift the end
+ * date when the target plan's trial is a different LENGTH; a brand that prices
+ * unequal trials on PayPal needs the plans reconciled, not this route patched.
  */
 module.exports = {
   /**

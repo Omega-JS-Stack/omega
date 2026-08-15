@@ -71,6 +71,34 @@ Immutable fields (`id`, `owner`, `stats`, `metadata.created`) should NOT be edit
 - `admin.firestore().doc('collection/id')` shorthand for Firestore access ([firestore.md](firestore.md))
 - Timestamps under `metadata.{created,updated}` ([firestore.md](firestore.md#document-metadata))
 
+### The `test/` route folder is development-only
+
+`routes/test/*` — the framework's own routes AND any a consumer adds under that folder — answers **404 in production**. The guard lives once in `Middleware.run()` (`src/manager/helpers/middleware.js`, `isDevOnlyRouteBlocked()`), the single place both request paths converge (the deployed `omega_api` function and the local express server), so a NEW test route is gated the day it lands instead of the day somebody remembers to copy a guard. Under the emulator (`isDevelopment()`/`isTesting()`) every one of them serves normally.
+
+**Zero carve-outs.** The one route that used to need one — the liveness probe — is a real route now: see below.
+
+Put debug/echo/reset routes in `test/` and they are safe by default. A route that must answer in production does NOT belong there.
+
+Both the gate and the module loader read the route path **normalized** (`path.posix.normalize`, lowercased, `.js` dropped), because it arrives straight off the request URL — `./test/usage`, `.//test/usage` and `x/../test/usage` all resolve to the same handler and are all gated the same. A route path may also never escape the routes directory: a leading `..` or an absolute path is a flat 404, even when it climbs back in (`../routes/test/usage`) — `isRouteOutsideRoutesDir()`, same file.
+
+### `GET /health` — the liveness probe
+
+**`GET /omega/health`** (`src/manager/routes/health/get.js`) is the deployed backend's liveness + version endpoint. It is **public** (no auth) and **echoes no request input** — the payload is a fixed set of fields read from the Manager, never from the request:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-14T00:00:00.000Z",
+  "environment": "production",
+  "projectId": "your-project",
+  "version": "1.4.0",
+  "backendVersion": "5.9.0",
+  "testExtendedMode": false
+}
+```
+
+`omega manage`'s live API check reads it on a real host (`@omega.js/manager`'s testing service) and the test runner reads it to confirm the emulator's project and mode. `test/health` still serves the same handler in dev/testing for anything that has not moved yet, but it is a `test/` route — **404 in production** like the rest of the folder. Point liveness checks at `/omega/health`.
+
 ### Functions entry point (`functions/index.js`)
 
 ```javascript

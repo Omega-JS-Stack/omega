@@ -55,3 +55,23 @@ test('discount percent reduces total and recurring', () => {
   assert.strictEqual(prices.total, 8, 'total after discount');
   assert.strictEqual(prices.recurring, 8, 'recurring carries the discount');
 });
+
+test('discount amount comes off the charge the same way a percent does', () => {
+  // The server issues flat codes too — `{ amount: 10 }` with no percent key.
+  // Both shapes are one subtraction from the same subtotal.
+  const product = { id: 'premium', type: 'subscription', prices: { monthly: 25 } };
+  const prices = calculatePrices({ product, frequency: 'monthly', discountAmount: 10, trialEligible: false });
+
+  assert.strictEqual(prices.discountAmount, 10, 'the code\'s face value comes off');
+  assert.strictEqual(prices.total, 15, 'total after discount');
+  assert.strictEqual(prices.recurring, 15, 'recurring carries it, exactly as a percent does');
+});
+
+test('a discount never becomes a credit: it is capped at the price', () => {
+  // $10 off a $4.99 product is free, never negative four cents owed back.
+  const product = { id: 'credits', type: 'one-time', prices: { once: 4.99 } };
+  const prices = calculatePrices({ product, frequency: 'monthly', discountAmount: 10, trialEligible: false });
+
+  assert.strictEqual(prices.discountAmount, 4.99, 'the discount stops at the subtotal');
+  assert.strictEqual(prices.total, 0, 'the floor is free, not a negative total');
+});

@@ -226,22 +226,14 @@
     line-height: 1.5;
     color: var(--omega-ink-muted);
 
+    // The bullet's check is `.omega-feature-check` — one home in
+    // core/css/core/_utilities.scss, shared with the enterprise band and the
+    // account page's change-plan modal.
     li {
       display: flex;
       align-items: flex-start;
       gap: 0.6875rem;
       padding-block: 0.5rem;
-
-      // The check is a one-line-tall box so the glyph centers on the FIRST
-      // line of its feature text (the old baseline + magic margin drifted as
-      // soon as a feature wrapped). Ink comes from Bootstrap's `.text-success`.
-      .omega-price-card__check {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        height: 1.5em; // = this list's line-height
-      }
     }
 
     // Config-defined feature definitions — dotted underline + tooltip

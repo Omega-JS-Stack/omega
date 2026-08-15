@@ -1,4 +1,5 @@
 const fetch = require('wonderful-fetch');
+const discountCodes = require('../../../libraries/payment/discount-codes.js');
 
 /**
  * Payment analytics tracking
@@ -118,8 +119,10 @@ function resolveActualValue(price, isTrial, discount) {
     return 0;
   }
 
-  if (discount?.valid === true && discount?.percent > 0) {
-    return parseFloat((price - (price * discount.percent / 100)).toFixed(2));
+  // Both coupon shapes count — gating on `percent` alone reported the LIST price
+  // as revenue for an amount-based code while the customer paid less
+  if (discount?.valid === true) {
+    return discountCodes.applyToAmount(price, discount);
   }
 
   return price;

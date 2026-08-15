@@ -6,7 +6,8 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
-import { getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
+import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
+import { FREQUENCIES, getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
 
 const logger = createLogger('account:billing');
 
@@ -44,6 +45,35 @@ const STATUS_CONFIG = {
 
 const FREQUENCY_LABELS = { daily: 'day', weekly: 'week', monthly: 'month', annually: 'year' };
 
+// The cadence toggle's segment copy — the same wording the pricing page's
+// billing toggle uses, for the same catalog frequencies.
+const CADENCE_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', annually: 'Annually' };
+
+// The details row's slots always render, so a value the subscription never
+// recorded needs something to SAY: one placeholder word for every slot, drawn
+// in the muted ink so it reads as "not known" rather than as a fact ([#236] QA
+// round 3). Never an empty gap, and never `undefined`/`NaN`.
+//
+// Both class names are spelled out in FULL, never composed: the purge pass
+// reads the built JS as content, and a class it only ever sees assembled at
+// runtime is a class it deletes.
+const UNKNOWN_DETAIL = 'Unknown';
+const DETAIL_CLASS = 'omega-billing-detail';
+const UNKNOWN_DETAIL_CLASS = 'omega-billing-detail omega-billing-detail--unknown';
+
+// How many bullets a plan option shows in the switcher. The modal is a billing
+// ACTION, not the pricing page — "Compare plans" carries the full story.
+const HEADLINE_FEATURE_LIMIT = 4;
+
+// The cadence the switcher is currently showing prices at. Set from the
+// account's own cadence every time the modal opens, then by the toggle.
+let switcherFrequency = null;
+
+// The plan the PRICING page sent us here to switch to (`?product=&frequency=`),
+// held from the moment the URL is read until the billing tab is on screen —
+// a modal cannot open inside a section that is still `d-none`.
+let pendingSwitch = null;
+
 // Initialize billing section
 export async function init() {
   setupActionButtons();
@@ -62,11 +92,12 @@ export async function loadData(account, sharedPaymentConfig) {
   currentAccount = account;
 
   updateUI(account);
+  readPlanSwitchRequest();
 }
 
 // Called when section is shown
 export function onShow() {
-  // Nothing needed
+  openRequestedPlanSwitch();
 }
 
 // ─── UI Update ──────────────────────────────────────────────
@@ -104,21 +135,41 @@ function buildBillingState(account) {
 
   // Pre-format alert dates
   const cancelTimestamp = subscription.cancellation?.date?.timestampUNIX;
-  const cancelDate = (cancelTimestamp && cancelTimestamp > 0)
-    ? new Date(cancelTimestamp * 1000).toLocaleDateString()
-    : 'the end of your billing period';
+  const cancelDate = formatDate(cancelTimestamp) || 'the end of your billing period';
+  const trialEndDate = formatDate(subscription.trial?.expires?.timestampUNIX);
 
-  const trialEndUnix = subscription.trial?.expires?.timestampUNIX;
-  const trialEndDate = (trialEndUnix && trialEndUnix > 0)
-    ? new Date(trialEndUnix * 1000).toLocaleDateString()
-    : null;
-
-  // Pre-format billing details
+  // Pre-format billing details. EVERY paid state owes the user its price, its
+  // cadence and a date line — the row used to gate on `resolved.active &&
+  // hasValidBilling`, so a cancelled or cancelling account, the two states
+  // where "when does this end?" IS the question, showed nothing at all
+  // ([#236]). Every slot now RENDERS in every paid state: a piece the
+  // subscription does not record shows the placeholder (the QA persona whose
+  // doc carries neither price nor frequency dropped two of the three slots and
+  // left the row looking half-built).
   const nextBillingUnix = subscription.expires?.timestampUNIX;
   const amount = subscription.payment?.price;
   const currency = paymentConfig?.currency || 'USD';
   const frequency = subscription.payment?.frequency;
-  const hasValidBilling = nextBillingUnix && nextBillingUnix > 0 && amount;
+  const amountText = (typeof amount === 'number' && amount > 0) ? formatCurrency(amount, currency) : '';
+  const cadenceText = CADENCE_LABELS[frequency] || frequency || '';
+
+  // The date line's LABEL is the claim it makes, so only a renewing
+  // subscription may say "renews": a scheduled cancellation says how long
+  // access lasts, an ended one says when it ended, and a suspended one — where
+  // nothing is scheduled while a payment is failing — names the slot without
+  // claiming a date for it.
+  let dateLabel = 'Next billing';
+  let dateValue = '';
+  if (configKey === 'cancelled') {
+    dateLabel = 'Ended';
+    dateValue = formatDate(cancelTimestamp) || formatDate(nextBillingUnix);
+  } else if (subscription.cancellation?.pending === true) {
+    dateLabel = 'Access until';
+    dateValue = formatDate(cancelTimestamp) || formatDate(nextBillingUnix);
+  } else if (configKey === 'active') {
+    dateLabel = 'Renews';
+    dateValue = formatDate(nextBillingUnix);
+  }
 
   return {
     billing: {
@@ -141,23 +192,48 @@ function buildBillingState(account) {
         cancelling: resolved.cancelling,
         trialing: resolved.trialing,
         cancelDate: cancelDate,
-        trialEndDate: trialEndDate || '',
+        trialEndDate: trialEndDate,
         trialHasEndDate: !!trialEndDate,
       },
       details: {
-        visible: resolved.active && !!hasValidBilling,
-        nextDate: hasValidBilling ? new Date(nextBillingUnix * 1000).toLocaleDateString() : '',
-        amount: hasValidBilling ? `${formatCurrency(amount, currency)} / ${FREQUENCY_LABELS[frequency] || 'month'}` : '',
+        visible: isPaid,
+        dateLabel: dateLabel,
+        date: dateValue || UNKNOWN_DETAIL,
+        dateClass: detailClass(dateValue),
+        amount: amountText || UNKNOWN_DETAIL,
+        amountClass: detailClass(amountText),
+        cadence: cadenceText || UNKNOWN_DETAIL,
+        cadenceClass: detailClass(cadenceText),
       },
       buttons: {
         upgrade: !isPaid || rawStatus === 'cancelled',
-        change: planSwitchSupported && resolved.active,
+        change: canChangePlan(account),
         manage: isPaid && rawStatus !== 'cancelled',
         cancel: isPaid && rawStatus !== 'cancelled' && !resolved.cancelling,
-        uncancel: uncancelSupported && isPaid && rawStatus === 'active' && resolved.cancelling,
+        // Undo reads the SAME raw flag Change does, not `resolved.cancelling`
+        // (which is `pending && !trialing`): a TRIALING subscription with a
+        // scheduled cancellation is reachable — the processor's own billing
+        // portal schedules one — and reading the derived flag left that account
+        // with neither button, a dead end on its own billing page.
+        uncancel: uncancelSupported && isPaid && rawStatus === 'active' && subscription.cancellation?.pending === true,
       },
     },
   };
+}
+
+// Is a plan switch on the table at all? ONE home for the rule, read by the
+// Change button and by the pricing page's preselect alike — a modal that opens
+// on a plan the button would not have offered is the same bug twice.
+//
+// Change is hidden while a cancellation is scheduled: the processors swap the
+// price, never the schedule, so the backend refuses the switch outright
+// (`cancellation-pending`, [#237]). Undo cancellation is the honest button in
+// that state, and this reads the SAME raw flag the backend guard does so the
+// two can never disagree.
+function canChangePlan(account) {
+  return planSwitchSupported
+    && omega.auth().resolveSubscription(account).active
+    && account?.subscription?.cancellation?.pending !== true;
 }
 
 // ─── Action Buttons ──────────────────────────────────────────
@@ -308,12 +384,23 @@ function setupPlanSwitcher() {
     return;
   }
 
+  const $cadence = document.getElementById('change-plan-cadence');
   const $options = document.getElementById('change-plan-options');
   const $confirmBtn = document.getElementById('change-plan-confirm-btn');
 
-  // Rebuild the picker every time it opens — the plan it must exclude is
-  // whatever the account is on right now
+  // Rebuild the picker every time it opens — the plan it must exclude, and the
+  // cadence it opens on, are whatever the account is on right now
   $modal.addEventListener('show.bs.modal', () => {
+    switcherFrequency = defaultCadence();
+    renderCadenceToggle($cadence);
+    populatePlanOptions($options);
+    $confirmBtn.disabled = true;
+  });
+
+  // Flipping the cadence re-prices every card, which rebuilds the radios: the
+  // pick does not survive it, so neither does the enabled Confirm button
+  $cadence.addEventListener('change', (event) => {
+    switcherFrequency = event.target.value;
     populatePlanOptions($options);
     $confirmBtn.disabled = true;
   });
@@ -323,36 +410,345 @@ function setupPlanSwitcher() {
     $confirmBtn.disabled = !getSelectedPlan();
   });
 
+  // The WHOLE card is the target, not just the head: the feature list and the
+  // card's padding are most of its area, and they were dead space — worst on
+  // touch, where the head is a thin strip. Two things keep their own clicks: a
+  // label (the browser already checks the radio for it, and doing it again
+  // would fire a second change event) and a feature's hover explanation, whose
+  // tooltip a stretched overlay would have swallowed entirely.
+  $options.addEventListener('click', (event) => {
+    if (event.target.closest('[data-bs-toggle="tooltip"]') || event.target.closest('label')) {
+      return;
+    }
+
+    const $card = event.target.closest('.omega-plan-card');
+    const $radio = $card?.previousElementSibling;
+
+    if (!$radio || $radio.disabled || $radio.checked) {
+      return;
+    }
+
+    $radio.checked = true;
+    $radio.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
   $confirmBtn.addEventListener('click', () => changePlan($confirmBtn, $modal));
 }
 
-// Every subscription plan the brand sells, at every frequency it sells it at,
-// minus the one the account is already on
+// ─── Arriving from the pricing page ─────────────────────────
+
+// The pricing page's "Switch to this plan" button lands here naming the plan it
+// meant: `/dashboard/account?product=<id>&frequency=<cadence>#billing`
+// ([#236]). Reading it is one thing and acting on it is another — the modal
+// cannot open while the billing section is still `d-none` — so the request is
+// read the moment the account loads and honoured when the tab is on screen.
+//
+// The params are consumed ONCE and struck from the URL right here: a refresh
+// (or a back to this page) must not reopen a modal the user already closed.
+function readPlanSwitchRequest() {
+  const params = new URLSearchParams(window.location.search || '');
+  const productId = params.get('product');
+
+  if (!productId) {
+    return;
+  }
+
+  pendingSwitch = { productId: productId, frequency: params.get('frequency') };
+
+  params.delete('product');
+  params.delete('frequency');
+
+  const query = params.toString();
+  window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`);
+}
+
+// Open the switcher on the plan the pricing page named. A state that cannot
+// switch at all lands on the billing tab plainly: while a cancellation is
+// scheduled the Change button is hidden (the backend refuses the switch), and
+// opening the modal anyway would offer a move that cannot happen.
+function openRequestedPlanSwitch() {
+  const request = pendingSwitch;
+  pendingSwitch = null;
+
+  const $modal = document.getElementById('change-plan-modal');
+  if (!request || !$modal || !canChangePlan(currentAccount)) {
+    return;
+  }
+
+  // Bootstrap's show() fires `show.bs.modal`, which is what renders the toggle
+  // and the cards — so the picking below happens over the real thing.
+  bootstrap.Modal.getOrCreateInstance($modal).show();
+
+  // The cadence goes FIRST: flipping it re-prices and rebuilds every card, so
+  // a plan picked before it would not survive the rebuild.
+  if (request.frequency) {
+    pickRadio(document.getElementById('change-plan-cadence'), (radio) => radio.value === request.frequency);
+  }
+
+  // Exactly the mechanism a card click uses — check the radio, announce it —
+  // so Confirm arms the way it would have by hand.
+  pickRadio(document.getElementById('change-plan-options'), (radio) => radio.value === request.productId && !radio.disabled);
+}
+
+// Check one radio inside a container and announce it the way a click does. The
+// match is a PREDICATE, never a selector built from the URL.
+function pickRadio($container, matches) {
+  const $radio = [...($container?.querySelectorAll('input[type="radio"]') || [])].find(matches);
+
+  if (!$radio || $radio.checked) {
+    return;
+  }
+
+  $radio.checked = true;
+  $radio.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+// The plans a live subscription can move to: the brand's subscription
+// products, minus the free tier (leaving a paid plan is CANCELLING, not
+// switching) and minus one-time purchases. The enterprise tier excludes
+// itself — it carries no prices, so it is on sale at no cadence.
+function switchableProducts() {
+  return (paymentConfig?.products || [])
+    .filter(product => (product.type || 'subscription') === 'subscription' && product.id !== 'basic');
+}
+
+// Every cadence the brand actually sells a switchable plan at, shortest first.
+function availableCadences() {
+  const sold = new Set(switchableProducts().flatMap(product => getAvailableFrequencies(product)));
+
+  return FREQUENCIES.filter(frequency => sold.has(frequency));
+}
+
+// The cadence the modal opens on: the one the account is billed at, whenever
+// the brand still sells it. A subscription with no recorded frequency opens on
+// monthly, and a brand that doesn't sell monthly opens on its shortest cadence.
+function defaultCadence() {
+  const cadences = availableCadences();
+  const current = currentAccount?.subscription?.payment?.frequency;
+
+  if (current && cadences.includes(current)) {
+    return current;
+  }
+
+  return cadences.includes('monthly') ? 'monthly' : (cadences[0] || 'monthly');
+}
+
+// The one cadence control, in the pricing page's own vocabulary
+// (`omega-billing-toggle`): a segmented group of real radios that re-prices
+// every card. A brand selling a single cadence gets no toggle — there is
+// nothing to toggle between.
+function renderCadenceToggle($container) {
+  const cadences = availableCadences();
+
+  // Nothing rendered means nothing reserved either — an empty container still
+  // held its bottom margin, so a single-cadence brand opened on a gap.
+  if (cadences.length < 2) {
+    $container.innerHTML = '';
+    $container.classList.add('d-none');
+    return;
+  }
+
+  $container.classList.remove('d-none');
+
+  const savings = annualSavingsPercent();
+
+  const segments = cadences.map((frequency) => {
+    const id = `change-plan-cadence-${frequency}`;
+    const save = (frequency === 'annually' && savings > 0)
+      ? ` <span class="omega-chip omega-chip--accent omega-billing-toggle__save ms-1">Save ${savings}%</span>`
+      : '';
+
+    return `
+      <input type="radio" class="btn-check" name="change_plan_cadence" id="${id}" value="${omega.utilities().escapeHTML(frequency)}" autocomplete="off"${frequency === switcherFrequency ? ' checked' : ''}>
+      <label class="btn" for="${id}">${CADENCE_LABELS[frequency] || frequency}${save}</label>
+    `;
+  }).join('');
+
+  // `data-omega-segmented` is the pricing page's own attribute: the motion
+  // engine injects the thumb and glides it under the checked segment. The
+  // engine's MutationObserver would find this node eventually, but the modal
+  // renders and opens in the same tick — scanning the container here is the
+  // deterministic path, and adoption is idempotent (`omegaSegmentedReady`
+  // makes a second pass a no-op). The thumb measures 0 while the modal is
+  // still hidden and the engine's own ResizeObserver re-places it the moment
+  // Bootstrap shows the dialog.
+  $container.innerHTML = `<div class="omega-billing-toggle" role="group" aria-label="Billing cadence" data-omega-segmented>${segments}</div>`;
+
+  omega.library?.().motion?.scan($container);
+}
+
+// The honest annual discount: the best saving the catalog really offers across
+// the plans on sale, the same arithmetic the pricing page's badge runs
+// (`packages/web/src/pricing.js`). Annual pricing that doesn't beat twelve
+// months of monthly earns no tag.
+function annualSavingsPercent() {
+  let best = 0;
+
+  for (const product of switchableProducts()) {
+    const monthly = resolvePlanPrice(product, 'monthly');
+    const annually = resolvePlanPrice(product, 'annually');
+
+    if (monthly <= 0 || annually <= 0) {
+      continue;
+    }
+
+    const percent = Math.round((1 - (annually / (monthly * 12))) * 100);
+    if (percent > best) {
+      best = percent;
+    }
+  }
+
+  return best;
+}
+
+// ONE card per plan the brand sells at the cadence the toggle is on — the
+// price on the card follows the toggle, so the same plan never occupies two
+// rows ([#236] round 2). The plan the account is already on RENDERS —
+// greyed out, badged "Current plan", not selectable — rather than
+// disappearing: a plan list missing the plan you are on reads as a bug, and
+// dropping it was what let a no-op switch through when the recorded frequency
+// was absent.
 function populatePlanOptions($container) {
   const subscription = currentAccount?.subscription || {};
   const currentProductId = subscription.product?.id;
   const currentFrequency = subscription.payment?.frequency;
   const currency = paymentConfig?.currency || 'USD';
+  const frequency = switcherFrequency;
 
-  const options = (paymentConfig?.products || [])
-    .filter(product => (product.type || 'subscription') === 'subscription' && product.id !== 'basic')
-    .flatMap(product => getAvailableFrequencies(product).map(frequency => ({ product, frequency })))
-    .filter(({ product, frequency }) => !(product.id === currentProductId && frequency === currentFrequency));
+  const options = switchableProducts()
+    .filter(product => getAvailableFrequencies(product).includes(frequency))
+    .map(product => ({
+      product: product,
+      current: isCurrentPlan(product.id, frequency, currentProductId, currentFrequency),
+    }));
+
+  // Bootstrap keeps ONE instance per element and never learns the element is
+  // gone: the bullets below are about to be replaced (every open, every
+  // cadence flip), so retire their tooltips first or each pass leaks a set.
+  disposeTooltips($container);
 
   if (options.length === 0) {
     $container.innerHTML = '<div class="text-muted small">There are no other plans to switch to right now.</div>';
     return;
   }
 
-  $container.innerHTML = options.map(({ product, frequency }, i) => `
-    <div class="form-check mb-2">
-      <input class="form-check-input" type="radio" name="change_plan_option" id="change-plan-option-${i}" value="${omega.utilities().escapeHTML(product.id)}" data-frequency="${omega.utilities().escapeHTML(frequency)}">
-      <label class="form-check-label" for="change-plan-option-${i}">
-        <strong>${omega.utilities().escapeHTML(product.name || product.id)}</strong>
-        <span class="text-muted">&mdash; ${omega.utilities().escapeHTML(formatCurrency(resolvePlanPrice(product, frequency), currency))} / ${FREQUENCY_LABELS[frequency] || frequency}</span>
-      </label>
+  const list = options.map(({ product, current }, i) => {
+    // The bullets sit OUTSIDE the label (a list is not phrasing content), so the
+    // radio points at them with aria-describedby — otherwise a screen reader
+    // hears the plan's name and price and never its features.
+    const featuresId = `change-plan-features-${i}`;
+    const features = renderPlanFeatures(product, featuresId);
+    const id = `change-plan-option-${i}`;
+
+    return `
+    <div class="omega-plan-option">
+      <input class="btn-check" type="radio" name="change_plan_option" id="${id}" value="${omega.utilities().escapeHTML(product.id)}" data-frequency="${omega.utilities().escapeHTML(frequency)}" autocomplete="off"${current ? ' disabled' : ''}${features ? ` aria-describedby="${featuresId}"` : ''}>
+      <div class="omega-plan-card${current ? ' omega-plan-card--current' : ''}">
+        <label class="omega-plan-card__head" for="${id}">
+          <span class="omega-plan-card__name">${omega.utilities().escapeHTML(product.name || product.id)}</span>
+          ${current ? '<span class="omega-chip omega-plan-card__badge">Current plan</span>' : ''}
+          <span class="omega-plan-card__price">${omega.utilities().escapeHTML(formatCurrency(resolvePlanPrice(product, frequency), currency))}<span class="omega-plan-card__per"> / ${FREQUENCY_LABELS[frequency] || frequency}</span></span>
+        </label>
+        ${features}
+      </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  // Every card IS the current plan — a brand that sells a single plan. The
+  // card still renders (the plan you are on is a fact worth seeing), with the
+  // sentence that explains why nothing here is pickable.
+  const nothingToPick = options.every(option => option.current)
+    ? '<div class="text-muted small mt-3">There are no other plans to switch to right now.</div>'
+    : '';
+
+  $container.innerHTML = `${list}${nothingToPick}`;
+
+  // The bullets are freshly injected, so the page-load pass never saw them
+  initializeTooltips($container);
+}
+
+// Retire the tooltips of a container whose contents are about to be replaced.
+function disposeTooltips($container) {
+  $container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(($el) => {
+    bootstrap.Tooltip.getInstance($el)?.dispose();
+  });
+}
+
+// Is this option the plan the account is on right now? When the subscription
+// carries no recorded frequency, the product id alone decides — deliberately
+// conservative, so BOTH cadences disable instead of offering a switch the
+// backend's same-plan guard would refuse anyway ([#237]).
+function isCurrentPlan(productId, frequency, currentProductId, currentFrequency) {
+  if (productId !== currentProductId) {
+    return false;
+  }
+
+  return !currentFrequency || frequency === currentFrequency;
+}
+
+// A plan's headline features, straight off the SAME `payment.products` catalog
+// the pricing page composes its cards from — the config is the only home of this
+// copy — and presented the way the pricing card presents them: a green check,
+// the resolved value, and the feature's definition on hover behind the same
+// dotted underline. A feature's value falls back to the product's matching
+// limit, and -1 is the catalog's "unlimited" sentinel.
+//
+// The definition is ALSO spelled out for assistive tech: a tooltip is
+// hover/focus text on an element that is neither, and these bullets are a
+// radio's description rather than a stop of their own.
+function renderPlanFeatures(product, id) {
+  const features = (product.features || []).slice(0, HEADLINE_FEATURE_LIMIT);
+
+  if (features.length === 0) {
+    return '';
+  }
+
+  const items = features.map((feature) => {
+    const value = feature.value === undefined ? product.limits?.[feature.id] : feature.value;
+    const definition = resolveFeatureDefinition(feature);
+    let prefix = '';
+
+    // A value only prints when it SAYS something. `true` means "included" —
+    // which the check already says — and so do `false`, `''` and absent, which
+    // used to print themselves literally ("false Priority support"). A number
+    // always prints, zero included: "0 Seats" beside a check is the honest
+    // reading. Same visible output as the pricing composer's rule.
+    if (value === -1) {
+      prefix = 'Unlimited ';
+    } else if (typeof value === 'number') {
+      prefix = `${value.toLocaleString()} `;
+    } else if (typeof value === 'string' && value !== '') {
+      prefix = `${value} `;
+    }
+
+    const name = omega.utilities().escapeHTML(feature.name);
+    const explained = definition
+      ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${omega.utilities().escapeHTML(definition)}">${name}</span><span class="visually-hidden"> &mdash; ${omega.utilities().escapeHTML(definition)}</span>`
+      : name;
+
+    return `<li><span class="omega-feature-check text-success"><i class="fa-solid fa-check fa-sm"></i></span><span>${omega.utilities().escapeHTML(prefix)}${explained}</span></li>`;
+  });
+
+  return `<ul class="omega-plan-card__features list-unstyled mb-0" id="${id}">${items.join('')}</ul>`;
+}
+
+// A feature's explanation, authored ONCE in the catalog: a definition on any
+// product's copy of a feature explains every other copy, exactly as the pricing
+// page's composer backfills them (`packages/web/src/pricing.js`).
+function resolveFeatureDefinition(feature) {
+  if (feature.definition) {
+    return feature.definition;
+  }
+
+  for (const product of paymentConfig?.products || []) {
+    const match = (product.features || []).find(other => other.id === feature.id && other.definition);
+    if (match) {
+      return match.definition;
+    }
+  }
+
+  return null;
 }
 
 function getSelectedPlan() {
@@ -645,6 +1041,20 @@ function resolvePlanPrice(product, frequency) {
   }
 
   return typeof entry === 'object' ? (entry.amount || 0) : Number(entry) || 0;
+}
+
+// How one details slot is drawn: a known value at full ink, an unknown one in
+// the muted placeholder's own class.
+function detailClass(value) {
+  return value ? DETAIL_CLASS : UNKNOWN_DETAIL_CLASS;
+}
+
+// A UNIX timestamp as the local short date, or '' when there is no date to
+// show — the caller decides what an absent date means for its own line.
+function formatDate(timestampUNIX) {
+  return (timestampUNIX && timestampUNIX > 0)
+    ? new Date(timestampUNIX * 1000).toLocaleDateString()
+    : '';
 }
 
 function formatCurrency(amount, currency) {

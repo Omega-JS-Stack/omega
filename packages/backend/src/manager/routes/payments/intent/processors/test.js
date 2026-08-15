@@ -1,5 +1,6 @@
 const fetch = require('wonderful-fetch');
 const powertools = require('node-powertools');
+const discountCodes = require('../../../../libraries/payment/discount-codes.js');
 
 // A declined subscription fires two events, and the second one reads what the
 // first one wrote — how long it waits for that, and how often it looks
@@ -22,13 +23,14 @@ module.exports = {
    * @param {string} options.productId - Product ID from config
    * @param {string} options.frequency - 'monthly', 'annually', 'weekly', or 'daily' (subscriptions only)
    * @param {boolean} options.trial - Whether to include a trial period (subscriptions only)
+   * @param {object} options.discount - Validated discount from discount-codes.validate(), or null
    * @param {string} options.simulate - Checkout outcome to simulate ('decline'), or null for success
    * @param {string} options.confirmationUrl - Success redirect URL
    * @param {string} options.cancelUrl - Cancel redirect URL
    * @param {object} options.ctx - Assistant instance
    * @returns {object} { id, url, raw }
    */
-  async createIntent({ uid, orderId, product, productId, frequency, trial, simulate, confirmationUrl, ctx }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, simulate, confirmationUrl, ctx }) {
     // Guard: test processor is not available in production
     if (ctx.isProduction()) {
       throw new Error('Test processor is not available in production');
@@ -38,10 +40,10 @@ module.exports = {
     const declined = simulate === 'decline';
 
     if (productType === 'subscription') {
-      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, declined, confirmationUrl, ctx });
+      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, confirmationUrl, ctx });
     }
 
-    return createOneTimeIntent({ uid, orderId, product, productId, declined, confirmationUrl, ctx });
+    return createOneTimeIntent({ uid, orderId, product, productId, discount, declined, confirmationUrl, ctx });
   },
 };
 
@@ -52,7 +54,7 @@ module.exports = {
  * A declined checkout mirrors what a real processor does: the subscription is
  * created in a dunning state (past_due → suspended) and its first invoice fails.
  */
-async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, declined, confirmationUrl, ctx }) {
+async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, confirmationUrl, ctx }) {
   // Generate IDs
   const timestamp = Date.now();
   const sessionId = `_test-cs-${timestamp}`;
@@ -98,6 +100,17 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
     subscription.current_period_end = subscription.trial_end;
   }
 
+  // What the coupon leaves on the first invoice — Stripe reports that reduced
+  // amount back on its own events, so the fabricated ones carry it too. The route
+  // owns the confirmation URL's amount; this is the PAYLOAD's
+  // ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)). The renewal keeps
+  // the full config price — a 'once' coupon only touches the first charge.
+  const firstCharge = discountCodes.applyToAmount(product.prices?.[frequency] || 0, discount);
+
+  if (discount) {
+    subscription.discount = buildStripeDiscount(discount);
+  }
+
   // Build Stripe-shaped event
   const event = {
     id: eventId,
@@ -105,7 +118,7 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
     data: { object: subscription },
   };
 
-  ctx.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}, declined=${!!declined}`);
+  ctx.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}, declined=${!!declined}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
 
   // Auto-fire webhook
   if (declined) {
@@ -120,7 +133,7 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
           orderId,
           invoiceId,
           eventId: `${eventId}-invoice`,
-          amountDue: Math.round((product.prices?.[frequency] || 0) * 100),
+          amountDue: Math.round(firstCharge * 100),
           billingReason: 'subscription_create',
           subscriptionId,
         }),
@@ -144,7 +157,7 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
  * A declined checkout still creates the session — the payment is what fails, so
  * a failed manual invoice goes out in place of the completed session.
  */
-async function createOneTimeIntent({ uid, orderId, product, productId, declined, confirmationUrl, ctx }) {
+async function createOneTimeIntent({ uid, orderId, product, productId, discount, declined, confirmationUrl, ctx }) {
   // Validate that a price exists
   if (!product.prices?.once) {
     throw new Error(`No one-time price configured for ${product.id}`);
@@ -156,6 +169,10 @@ async function createOneTimeIntent({ uid, orderId, product, productId, declined,
   const invoiceId = `_test-in-${timestamp}`;
   const eventId = `_test-evt-${timestamp}`;
 
+  // The single charge this purchase makes, after the coupon Stripe would have
+  // applied at its own checkout ([#239](https://github.com/Omega-JS-Stack/omega/issues/239))
+  const firstCharge = discountCodes.applyToAmount(product.prices.once || 0, discount);
+
   // Build Stripe-shaped checkout session object
   const session = {
     id: sessionId,
@@ -164,9 +181,16 @@ async function createOneTimeIntent({ uid, orderId, product, productId, declined,
     status: 'complete',
     payment_status: 'paid',
     metadata: { uid, orderId, productId },
-    amount_total: Math.round((product.prices.once || 0) * 100),
+    amount_total: Math.round(firstCharge * 100),
     currency: 'usd',
   };
+
+  // What Stripe's session reports about the money the coupon took off
+  if (discount) {
+    session.total_details = {
+      amount_discount: Math.round(((product.prices.once || 0) - firstCharge) * 100),
+    };
+  }
 
   // Build Stripe-shaped event
   const event = declined
@@ -185,7 +209,7 @@ async function createOneTimeIntent({ uid, orderId, product, productId, declined,
       data: { object: session },
     };
 
-  ctx.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}, declined=${!!declined}`);
+  ctx.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}, declined=${!!declined}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
 
   // Auto-fire webhook
   fireWebhook({ event, ctx });
@@ -194,6 +218,31 @@ async function createOneTimeIntent({ uid, orderId, product, productId, declined,
     id: sessionId,
     url: confirmationUrl,
     raw: { id: sessionId, object: 'checkout.session', mode: 'payment' },
+  };
+}
+
+/**
+ * Build the Stripe-shaped discount a coupon leaves on the resource
+ *
+ * Stripe attaches the coupon it applied to the subscription, so a reader of the
+ * webhook can see WHICH code moved the amount. `amount` is dollars on our side and
+ * cents on Stripe's, the same as `percent` → `percent_off`.
+ *
+ * @param {object} discount - Validated discount from discount-codes.validate()
+ * @returns {object} Stripe-shaped discount object
+ */
+function buildStripeDiscount(discount) {
+  return {
+    id: `_test-di-${discount.code}`,
+    object: 'discount',
+    coupon: {
+      id: `_test-coupon-${discount.code}`,
+      object: 'coupon',
+      name: discount.code,
+      percent_off: discount.percent || null,
+      amount_off: discount.amount ? Math.round(discount.amount * 100) : null,
+      duration: discount.duration || 'once',
+    },
   };
 }
 
