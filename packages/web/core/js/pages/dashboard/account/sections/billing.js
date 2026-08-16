@@ -77,6 +77,7 @@ let pendingSwitch = null;
 // Initialize billing section
 export async function init() {
   setupActionButtons();
+  setupTrialCancelWarning();
   setupCancellationForm();
   setupUncancelConfirm();
   setupPlanSwitcher();
@@ -113,7 +114,10 @@ export function onShow() {
 /* @dev-only:end */
 
 function updateUI(account) {
-  omega.bindings().update(buildBillingState(account));
+  const state = buildBillingState(account);
+
+  omega.bindings().update(state);
+  syncCancelTriggerToggle(state.billing.cancelWarning.show);
   updateUsageInfo(account);
 }
 
@@ -171,6 +175,16 @@ function buildBillingState(account) {
     dateValue = formatDate(nextBillingUnix);
   }
 
+  // One home for "is cancelling on the table at all" — the button and the trial
+  // warning that gates it both read it (#267)
+  const canCancel = isPaid && rawStatus !== 'cancelled' && !resolved.cancelling;
+
+  // And one home for "this cancel would end a TRIAL", read by the warning dialog
+  // AND by the questionnaire copy behind it (#267). Two rules would eventually
+  // disagree, and a form contradicting the dialog that opened it is the bug the
+  // dialog exists to fix.
+  const trialCancel = canCancel && resolved.trialing;
+
   return {
     billing: {
       plan: {
@@ -205,11 +219,27 @@ function buildBillingState(account) {
         cadence: cadenceText || UNKNOWN_DETAIL,
         cadenceClass: detailClass(cadenceText),
       },
+      // Cancelling a TRIAL ends access immediately (#267), which is the
+      // opposite of what the questionnaire's own copy promises — so a trial is
+      // told before it answers questions, never after. The gate reads the
+      // cancel button's OWN flag rather than restating its rule: a warning that
+      // could disagree with the button it guards is the bug twice.
+      cancelWarning: {
+        show: trialCancel,
+        trialEndDate: trialEndDate,
+        hasTrialEndDate: !!trialEndDate,
+      },
+      // The questionnaire the warning hands the customer to: its explanation and
+      // the checkbox they must tick both state what THIS cancel does, so a trial
+      // is never asked to attest to access it will not get.
+      cancelForm: {
+        trial: trialCancel,
+      },
       buttons: {
         upgrade: !isPaid || rawStatus === 'cancelled',
         change: canChangePlan(account),
         manage: isPaid && rawStatus !== 'cancelled',
-        cancel: isPaid && rawStatus !== 'cancelled' && !resolved.cancelling,
+        cancel: canCancel,
         // Undo reads the SAME raw flag Change does, not `resolved.cancelling`
         // (which is `pending && !trialing`): a TRIALING subscription with a
         // scheduled cancellation is reachable — the processor's own billing
@@ -831,6 +861,112 @@ async function changePlan($confirmBtn, $modal) {
 function hidePlanSwitcher($modal) {
   const bsModal = bootstrap.Modal.getInstance($modal);
   if (bsModal) bsModal.hide();
+}
+
+// ─── Trial Cancel Warning ───────────────────────────────────
+
+// Cancelling a free trial ends access IMMEDIATELY (#267) — the opposite of what
+// the questionnaire's own copy promises — so a trial is told before it answers
+// questions. The "Cancel subscription" link opens the questionnaire
+// declaratively, and that toggle CANNOT be intercepted from the button:
+// Bootstrap's collapse data-api is a delegate on `document`, and its
+// EventHandler passes `isDelegated` straight through as `useCapture`, so it
+// runs on the way DOWN (`document` → button) and has already opened the
+// accordion before any listener on the button — capture or bubble — is
+// reached. Taking `data-bs-toggle` off the button is the only thing that stops
+// it, which is what syncCancelTriggerToggle() does for a cancel that owes a
+// warning; the listener below then owns that button's clicks outright. A paid
+// cancel keeps the attribute, is never intercepted, and behaves exactly as it
+// did.
+function setupTrialCancelWarning() {
+  const $trigger = document.getElementById('cancel-subscription-trigger-btn');
+  const $modal = document.getElementById('cancel-trial-warning-modal');
+
+  if (!$trigger || !$modal) {
+    return;
+  }
+
+  const $accordion = document.getElementById('cancel-subscription-accordion');
+
+  $trigger.addEventListener('click', (event) => {
+    if (!needsTrialCancelWarning()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    // The button is a TOGGLE, and half of a toggle is closing. With the
+    // questionnaire already open the warning has been shown and answered, so
+    // this click only shuts it — warning again would leave the accordion with
+    // no way closed at all.
+    if ($accordion?.classList.contains('show')) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).hide();
+      return;
+    }
+
+    // Open FIRST, count second: trackBilling() reaches for the analytics
+    // globals directly, and a blocked snippet must never be able to leave this
+    // button doing nothing at all.
+    bootstrap.Modal.getOrCreateInstance($modal).show();
+    trackBilling('cancel_trial_warning_shown');
+  }, true);
+
+  // While the gate holds the trigger, Bootstrap does not count it as one of the
+  // collapse's triggers and stops keeping its expanded state honest. Mirror it
+  // off the collapse itself, which covers every way the questionnaire opens or
+  // shuts — this button, "Keep my plan" inside it, and the auto-collapse after
+  // a cancel goes through.
+  $accordion?.addEventListener('shown.bs.collapse', () => setCancelTriggerExpanded($trigger, true));
+  $accordion?.addEventListener('hidden.bs.collapse', () => setCancelTriggerExpanded($trigger, false));
+
+  document.getElementById('cancel-trial-continue-btn')?.addEventListener('click', () => {
+    bootstrap.Modal.getInstance($modal)?.hide();
+
+    if ($accordion) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).show();
+    }
+
+    trackBilling('cancel_trial_warning_continue');
+  });
+
+  document.getElementById('cancel-trial-keep-btn')?.addEventListener('click', () => {
+    trackBilling('cancel_trial_warning_keep');
+  });
+}
+
+// The declarative collapse toggle on the "Cancel subscription" button: ON for
+// every cancel that goes straight to the questionnaire, OFF for one that owes a
+// warning first (#267). Bootstrap re-reads `[data-bs-toggle="collapse"]` from
+// the document on every click, so the attribute IS the switch — and it is
+// driven from the SAME state that decides whether the warning is owed at all,
+// so the markup and the gate can never disagree.
+function syncCancelTriggerToggle(warningOwed) {
+  const $trigger = document.getElementById('cancel-subscription-trigger-btn');
+
+  if (!$trigger) {
+    return;
+  }
+
+  if (warningOwed) {
+    $trigger.removeAttribute('data-bs-toggle');
+  } else {
+    $trigger.setAttribute('data-bs-toggle', 'collapse');
+  }
+}
+
+// What Bootstrap's own `_addAriaAndCollapsedClass` would do for this trigger,
+// for the states where it no longer tracks it.
+function setCancelTriggerExpanded($trigger, isOpen) {
+  $trigger.classList.toggle('collapsed', !isOpen);
+  $trigger.setAttribute('aria-expanded', isOpen);
+}
+
+// Does the account on screen owe a warning before the questionnaire? Read off
+// the SAME state the bindings render, so the gate and the button it guards can
+// never disagree.
+function needsTrialCancelWarning() {
+  return buildBillingState(currentAccount).billing.cancelWarning.show === true;
 }
 
 // ─── Cancellation Form ──────────────────────────────────────

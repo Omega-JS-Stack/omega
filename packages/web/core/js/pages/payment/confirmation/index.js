@@ -2,6 +2,7 @@
 import { state, buildBindingsState } from './modules/state.js';
 import { trackPurchaseIfNeeded } from './modules/tracking.js';
 import { triggerCelebration } from './modules/celebration.js';
+import { verifyPurchase, initialStatus } from './modules/verify.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -36,10 +37,8 @@ async function initializeConfirmation() {
   // Track purchase (if track=true param present)
   // trackPurchaseIfNeeded(state);
 
-  // Trigger celebration animation
-  await triggerCelebration();
-
-  // Subscribe to push notifications on CTA click (requires user gesture)
+  // Subscribe to push notifications on CTA click (requires user gesture).
+  // Wired before the verification wait so the CTAs are live immediately.
   document.querySelectorAll('.btn').forEach(($btn) => {
     $btn.addEventListener('click', () => {
       omega.notifications().subscribe().catch((e) => {
@@ -47,6 +46,29 @@ async function initializeConfirmation() {
       });
     }, { once: true });
   });
+
+  // The redirect is the processor's CLAIM; entitlement is granted by the
+  // webhook, which lands after the browser does — or never (#232). Hold the
+  // page in `processing` until the account itself carries the purchase. A
+  // purchase that opened already answered has no poll to wait on and nothing to
+  // wait for auth for — it rendered its receipt in the update above.
+  if (state.status === 'processing') {
+    await new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
+
+    // ONE reveal: the update that answers the page is the update that brings
+    // the order details with it, and the celebration rides that same flip —
+    // numbers arriving seconds before the confetti read as broken (Ian's QA).
+    state.status = await verifyPurchase(state);
+    updateUI();
+
+    if (state.status !== 'confirmed') {
+      logger.warn(`Purchase not confirmed against the account state: orderId=${state.orderId}, product=${state.productId}`);
+      return;
+    }
+  }
+
+  // Trigger celebration animation — only for a purchase that really landed
+  await triggerCelebration();
 }
 
 // Parse URL parameters into minimal state
@@ -61,5 +83,6 @@ function parseUrlParams() {
   state.frequency = urlParams.get('frequency') || '';
   state.paymentMethod = urlParams.get('paymentMethod') || '';
   state.hasFreeTrial = urlParams.get('trial') === 'true';
+  state.status = initialStatus(state);
   state.loaded = true;
 }

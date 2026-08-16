@@ -11,7 +11,7 @@ function resolvePrice(prices, key) {
 // one of them: `discountPercent` (a share of the price) or `discountAmount` (a
 // flat sum, `flatDiscount` here — the RETURNED `discountAmount` is the money
 // that actually came off, which is what the receipt row prices against).
-export function calculatePrices({ product, frequency, discountPercent, discountAmount: flatDiscount, trialEligible }) {
+export function calculatePrices({ product, frequency, discountPercent, discountAmount: flatDiscount, discountDuration, trialEligible }) {
   if (!product) {
     return { subtotal: 0, discountAmount: 0, trialDiscountAmount: 0, total: 0, recurring: 0 };
   }
@@ -53,11 +53,19 @@ export function calculatePrices({ product, frequency, discountPercent, discountA
     total = afterDiscount;
   }
 
+  // The code's `duration` decides how far the discount reaches (#254). Every
+  // configured code is `duration: 'once'` and the backend prices the renewal at
+  // full list (discount-codes.js `applyToAmount()` — the FIRST charge only, via a
+  // Stripe `once` coupon), so reducing the recurring line promised a renewal
+  // price we never honor. An absent duration reads as 'once': the conservative
+  // side of a promise. Anything else is a code that really does ride every cycle.
+  const discountRecurs = !!discountDuration && discountDuration !== 'once';
+
   return {
     subtotal,
     discountAmount,
     trialDiscountAmount,
     total,
-    recurring: afterDiscount,
+    recurring: discountRecurs ? afterDiscount : subtotal,
   };
 }

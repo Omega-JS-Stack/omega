@@ -12,17 +12,47 @@ layout: frontend/core/cover
 <section class="col-12 col-md-10 col-lg-8 col-xl-6 mw-md">
   <div class="card omega-receipt">
     <div class="card-body p-4 p-md-5">
-      <!-- The moment -->
+      <!-- The moment — one of three. The redirect is the processor's CLAIM;
+           entitlement is granted by the webhook, which lands after the browser
+           does, so the page opens in `processing` and only the confirmed block
+           is allowed to say the payment went through (#232). -->
       <div class="text-center mb-5">
-        <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg omega-receipt__check mb-3">
-          {% omega_icon "check", "fa-md" %}
-        </span>
-        <h1 class="omega-display omega-display--section mb-2">You're <em>in</em>. Thank you!</h1>
-        <p class="omega-quiet mb-0">Payment received. A receipt is on its way to your inbox.</p>
+        <!-- The wait is real work, so it MOVES: the chip holds the framework's
+             spinner idiom instead of a still clock (Ian's QA, 2026-08-15). A
+             reduced-motion visitor gets the same chip held still, labeled by
+             the headline and line below it (docs/shared/theming.md). -->
+        <div data-omega-bind="@show confirmation.verification.processing">
+          <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg mb-3">
+            <span class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Confirming your payment...</span>
+            </span>
+          </span>
+          <h1 class="omega-display omega-display--section mb-2">Confirming your <em>payment</em></h1>
+          <p class="omega-quiet mb-0">One moment while your payment finishes processing.</p>
+        </div>
+
+        <div data-omega-bind="@show confirmation.verification.confirmed" hidden>
+          <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg omega-receipt__check mb-3">
+            {% omega_icon "check", "fa-md" %}
+          </span>
+          <h1 class="omega-display omega-display--section mb-2">You're <em>in</em>. Thank you!</h1>
+          <p class="omega-quiet mb-0">Payment received. A receipt is on its way to your inbox.</p>
+        </div>
+
+        <div data-omega-bind="@show confirmation.verification.timedOut" hidden>
+          <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg mb-3">
+            {% omega_icon "circle-exclamation", "fa-md" %}
+          </span>
+          <h1 class="omega-display omega-display--section mb-2">Still <em>processing</em></h1>
+          <p class="omega-quiet mb-0">Your payment is taking longer than usual to confirm. Nothing is lost. If your account has not updated shortly, <a href="/contact">contact support</a> with the order number below.</p>
+        </div>
       </div>
 
-      <!-- The receipt -->
-      <div class="omega-receipt__panel mb-5">
+      <!-- The receipt — part of the ANSWER, not of the wait. It starts hidden
+           and reveals with the confirmed (or timed-out) moment, so the order
+           numbers never sit on screen beside "Confirming your payment" (#232).
+           A timeout DOES reveal it: the order number is what support asks for. -->
+      <div class="omega-receipt__panel mb-5" data-omega-bind="@hide confirmation.verification.processing" hidden>
         <div class="omega-receipt__row omega-binding-skeleton" data-omega-bind="@show confirmation">
           <span class="omega-micro">Order</span>
           <span class="font-monospace fw-semibold" data-omega-bind="@text confirmation.order.id">Loading...</span>
@@ -43,8 +73,8 @@ layout: frontend/core/cover
         </div>
       </div>
 
-      <!-- What happens now -->
-      <div class="mb-5">
+      <!-- What happens now — the same claim in prose, so it waits with the receipt -->
+      <div class="mb-5" data-omega-bind="@hide confirmation.verification.processing" hidden>
         <span class="omega-micro d-block mb-3">What happens now</span>
         <div class="omega-rowlist">
           <div class="omega-rowlist__item">
@@ -53,7 +83,7 @@ layout: frontend/core/cover
               <span><strong>Your receipt lands by email</strong>, order confirmation included.</span>
             </span>
           </div>
-          <div class="omega-rowlist__item">
+          <div class="omega-rowlist__item" data-omega-bind="@show confirmation.verification.confirmed" hidden>
             <span class="d-inline-flex align-items-center gap-3">
               <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "unlock", "fa-sm" %}</span>
               <span><strong>Everything's unlocked</strong>: your plan is live in <a href="/dashboard/account">your account</a>.</span>

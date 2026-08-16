@@ -18,6 +18,7 @@
     "./flows": "./src/flows.js",
     "./icons": "./src/icons.js",
     "./actions-secrets": "./src/actions-secrets.js",
+    "./ci-workflows": "./src/ci-workflows.js",
     "./defaults-engine": "./src/defaults-engine.js",
     "./framework-deps": "./src/framework-deps.js",
     "./merge-line-files": "./src/merge-line-files.js",

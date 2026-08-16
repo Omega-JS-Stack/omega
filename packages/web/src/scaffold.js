@@ -13,7 +13,8 @@
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
-const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { composeAppWorkflows } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
 const { collectEnvSecrets, renderSecretsBlock } = require('./github-secrets.js');
 const { PATHS } = require('./paths.js');
@@ -63,14 +64,15 @@ function scaffoldDefaults(options) {
   // `{{ githubSecrets }}` token. `overwrite: true` means every setup
   // re-renders it, so the block heals like every other scaffolded default.
   const workflow = FILE_MAP['.github/workflows/build.yml'];
-  fileMap['.github/workflows/build.yml'] = {
-    ...workflow,
-    template: {
-      ...workflow.template,
-      githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ appDir: options.outputDir }))),
-    },
+  const workflowTokens = {
+    ...workflow.template,
+    githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ appDir: options.outputDir }))),
   };
-  if (!resolveSeedMode(options.outputDir).standalone) {
+  fileMap['.github/workflows/build.yml'] = { ...workflow, template: workflowTokens };
+
+  const seed = resolveSeedMode(options.outputDir);
+  const defaultsDir = options.defaultsDir || PATHS.scaffold;
+  if (!seed.standalone) {
     // Say which mode applied ([#95](https://github.com/Omega-JS-Stack/omega/issues/95)):
     // the branch below rewrites what setup scaffolds, and a silent branch made
     // a missing config template and a missing AGENTS.md read as a bug.
@@ -85,16 +87,32 @@ function scaffoldDefaults(options) {
     // rules; consumer content is never destroyed). Standalone apps keep them.
     fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
+    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-app
+    // .github/workflows/ in a brand monorepo can never fire. It is composed
+    // into the brand root below instead — scoped to this app's path.
+    fileMap['.github/**/*'] = { skip: true };
   } else {
     logger.log('standalone app — full config template scaffolded; the per-app agent docs land here');
   }
 
-  return applyDefaults({
-    defaultsDir: options.defaultsDir || PATHS.scaffold,
+  const result = applyDefaults({
+    defaultsDir,
     outputDir: options.outputDir,
     fileMap,
     logger: options.logger,
   });
+
+  if (!seed.standalone) {
+    composeAppWorkflows({
+      sourceDir: path.join(defaultsDir, '.github', 'workflows'),
+      appDir: options.outputDir,
+      brandRoot: seed.brandRoot,
+      transform: (contents) => renderTemplate(contents, workflowTokens),
+      logger,
+    });
+  }
+
+  return result;
 }
 
 module.exports = { scaffoldDefaults, FILE_MAP, NODE_VERSION };

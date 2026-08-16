@@ -1,3 +1,5 @@
+const isTrialing = require('../_is-trialing.js');
+
 /**
  * Stripe cancel processor
  * Cancels a subscription — immediately if trialing, at period end otherwise.
@@ -20,11 +22,7 @@ module.exports = {
     const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
     const stripe = StripeLib.init();
 
-    const isTrialing = subscription?.trial?.claimed
-      && subscription?.status === 'active'
-      && subscription?.trial?.expires?.timestampUNIX === subscription?.expires?.timestampUNIX;
-
-    if (isTrialing) {
+    if (isTrialing(subscription)) {
       await stripe.subscriptions.cancel(resourceId);
       ctx.log(`Stripe cancel immediate (trialing): sub=${resourceId}, uid=${uid}`);
     } else {

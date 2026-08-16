@@ -47,24 +47,55 @@ test('subscription: frequency price + free trial zeroes today, recurring stays',
   assert.strictEqual(monthly.total, 9.99, 'no trial: today = the cycle price');
 });
 
-test('discount percent reduces total and recurring', () => {
+test('discount percent: a once code comes off today only, the renewal stays list price', () => {
+  // #254: the receipt used to reduce BOTH lines, promising a discounted renewal
+  // the backend never honors — every configured code is `duration: 'once'`, the
+  // Stripe coupon is a once coupon, and the terms line already says "first
+  // payment only". Due-today carries the discount; recurring is list price.
   const product = { id: 'premium', type: 'subscription', prices: { monthly: 10 } };
-  const prices = calculatePrices({ product, frequency: 'monthly', discountPercent: 20, trialEligible: false });
+  const prices = calculatePrices({ product, frequency: 'monthly', discountPercent: 20, discountDuration: 'once', trialEligible: false });
 
   assert.strictEqual(prices.discountAmount, 2, '20% of $10');
-  assert.strictEqual(prices.total, 8, 'total after discount');
-  assert.strictEqual(prices.recurring, 8, 'recurring carries the discount');
+  assert.strictEqual(prices.total, 8, 'total due today carries the discount');
+  assert.strictEqual(prices.recurring, 10, 'the renewal is list price — a once code does not ride');
 });
 
-test('discount amount comes off the charge the same way a percent does', () => {
+test('discount amount: a once code comes off today only, exactly as a percent does', () => {
   // The server issues flat codes too — `{ amount: 10 }` with no percent key.
-  // Both shapes are one subtraction from the same subtotal.
+  // The amount shape mirrored the percent shape's math deliberately, so it
+  // inherited this bug and is fixed with it (#254).
   const product = { id: 'premium', type: 'subscription', prices: { monthly: 25 } };
-  const prices = calculatePrices({ product, frequency: 'monthly', discountAmount: 10, trialEligible: false });
+  const prices = calculatePrices({ product, frequency: 'monthly', discountAmount: 10, discountDuration: 'once', trialEligible: false });
 
   assert.strictEqual(prices.discountAmount, 10, 'the code\'s face value comes off');
-  assert.strictEqual(prices.total, 15, 'total after discount');
-  assert.strictEqual(prices.recurring, 15, 'recurring carries it, exactly as a percent does');
+  assert.strictEqual(prices.total, 15, 'total due today carries the discount');
+  assert.strictEqual(prices.recurring, 25, 'the renewal is list price — exactly as the percent shape');
+});
+
+test('an absent duration is read as `once` — the receipt never promises an unhonored renewal', () => {
+  // A code that reaches the page without a duration gets the conservative read
+  // in BOTH shapes: discount today, list price at renewal.
+  const product = { id: 'premium', type: 'subscription', prices: { monthly: 10 } };
+
+  const percent = calculatePrices({ product, frequency: 'monthly', discountPercent: 20, trialEligible: false });
+  assert.strictEqual(percent.total, 8, 'today still carries it');
+  assert.strictEqual(percent.recurring, 10, 'the renewal stays list price');
+
+  const amount = calculatePrices({ product, frequency: 'monthly', discountAmount: 4, trialEligible: false });
+  assert.strictEqual(amount.total, 6, 'today still carries it');
+  assert.strictEqual(amount.recurring, 10, 'the renewal stays list price');
+});
+
+test('a recurring-duration code does ride every cycle — duration is read, not assumed', () => {
+  // Proves the rule is the code's own `duration`, not a hardcoded "never".
+  const product = { id: 'premium', type: 'subscription', prices: { monthly: 10 } };
+
+  const forever = calculatePrices({ product, frequency: 'monthly', discountPercent: 20, discountDuration: 'forever', trialEligible: false });
+  assert.strictEqual(forever.total, 8, 'today carries it');
+  assert.strictEqual(forever.recurring, 8, 'and so does the renewal');
+
+  const repeating = calculatePrices({ product, frequency: 'monthly', discountAmount: 4, discountDuration: 'repeating', trialEligible: false });
+  assert.strictEqual(repeating.recurring, 6, 'a repeating code rides the renewal too');
 });
 
 test('a discount never becomes a credit: it is capped at the price', () => {

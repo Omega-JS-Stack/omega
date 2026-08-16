@@ -76,7 +76,6 @@ async function initializeCheckout() {
     const urlParams = new URLSearchParams(window.location.search);
     const productId = urlParams.get('product');
     const frequencyParam = urlParams.get('frequency');
-    const _dev_trialEligible = urlParams.get('_dev_trialEligible');
 
     if (!productId) {
       throw new Error('Product ID is missing from URL.');
@@ -128,10 +127,20 @@ async function initializeCheckout() {
     // Trial eligibility
     let trialEligible = trialResult.status === 'fulfilled' ? trialResult.value : false;
 
-    // Dev override for trial
-    if (_dev_trialEligible && omega.isDevelopment()) {
-      trialEligible = _dev_trialEligible === 'true';
+    /* @dev-only:start */
+    {
+      // The dev palette's trial-eligibility override, a URL param like every
+      // other checkout dev control. The read lives INSIDE the block, so
+      // production never looks and the literal never reaches a real bundle
+      // (#245) — the last triple-gate violation on this page.
+      if (omega.isDevelopment()) {
+        const _dev_trialEligible = urlParams.get('_dev_trialEligible');
+        if (_dev_trialEligible) {
+          trialEligible = _dev_trialEligible === 'true';
+        }
+      }
     }
+    /* @dev-only:end */
 
     // Only eligible if product also supports trials
     state.trialEligible = trialEligible && (product.trial?.days > 0);

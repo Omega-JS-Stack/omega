@@ -89,6 +89,32 @@ test('backend functions dir: functions/.env is the app layer, brand discovered t
   assert.strictEqual(process.env.ENVT2_Y, 'brand');
 });
 
+test('backend dist dir: dist/.env is the app layer, brand discovered through the dist/ normalization', (t) => {
+  // `omega test` resolves the cascade from the staged dist/ (the runner's
+  // functions dir for the run). Without the dist/ normalization the walk
+  // looked for apps/ one level too low, so the brand layer came back null and
+  // the run died on a missing secret that was sitting at the brand root —
+  // exactly where the D15 cascade says to keep it
+  // ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
+  const root = makeFixture('env-dist', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVT2D_X=brand\nENVT2D_Y=brand\n',
+    'brand/apps/backend/dist/.env': 'ENVT2D_X=dist\n',
+  });
+  cleanup(t, root, ['ENVT2D_X', 'ENVT2D_Y']);
+
+  const distDir = path.join(root, 'brand', 'apps', 'backend', 'dist');
+  const { chain, loaded } = loadEnv(distDir);
+
+  assert.strictEqual(chain.app, path.join(distDir, '.env'));
+  assert.strictEqual(chain.brand, path.join(root, 'brand', '.env'));
+  assert.strictEqual(chain.company, null);
+  assert.strictEqual(loaded.length, 2);
+
+  assert.strictEqual(process.env.ENVT2D_X, 'dist');
+  assert.strictEqual(process.env.ENVT2D_Y, 'brand');
+});
+
 // ─── Partial chains ───
 
 test('standalone project: app .env only; a project with no .env at all loads nothing and never throws', (t) => {

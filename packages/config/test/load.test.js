@@ -621,6 +621,38 @@ test('company layer: secrets in the company file hard-fail before any merge', (t
   assert.throws(() => loadConfig(path.join(brandRoot, 'apps', 'backend'), 'backend'), /Secret-shaped keys/);
 });
 
+test('company layer: a standalone project resolves its marker from dist/ as well as functions/', (t) => {
+  // `omega test` loads a backend's config from its STAGED dist/, and a
+  // standalone project has no brand root to resolve the marker through — so
+  // the marker walk normalizing only `functions/` left dist/ looking for
+  // .omega/company.json inside the build output, where nothing ever writes
+  // one, and the company layer silently vanished
+  // ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
+  const workspace = makeFixture('company-standalone-dist', {
+    'company/config/omega.json5': `{ monitoring: { org: 'acme-co' } }`,
+    'project/config/omega.json5': `{ brand: { id: 'acme' }, targets: { backend: {} } }`,
+    'project/dist/config/omega.json5': `{ brand: { id: 'acme' }, targets: { backend: {} } }`,
+    'project/functions/config/omega.json5': `{ brand: { id: 'acme' }, targets: { backend: {} } }`,
+  });
+  cleanup(t, workspace);
+
+  const companyRoot = path.join(workspace, 'company');
+  const projectRoot = path.join(workspace, 'project');
+  fs.mkdirSync(path.join(projectRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+
+  const companyFile = path.join(companyRoot, 'config', 'omega.json5');
+
+  // The project root and its functions/ dir already resolved it.
+  assert.strictEqual(loadConfig(projectRoot, 'backend').files.company, companyFile);
+  assert.strictEqual(loadConfig(path.join(projectRoot, 'functions'), 'backend').files.company, companyFile);
+
+  // ...and the staged dist/ now resolves the same layer.
+  const staged = loadConfig(path.join(projectRoot, 'dist'), 'backend');
+  assert.strictEqual(staged.files.company, companyFile);
+  assert.strictEqual(staged.config.monitoring.org, 'acme-co');
+});
+
 test('company layer: composeTargetConfig freezes it into the upload (the walk-up dies at the deploy boundary)', (t) => {
   const { workspace, brandRoot } = makeCompanyFixture('company-compose');
   cleanup(t, workspace);

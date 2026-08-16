@@ -28,8 +28,8 @@ const { readCompanyRoot } = require('./company.js');
  *
  * `startDir` is the dir whose .env is the app layer — the project root for
  * web/desktop/extension, the functions dir for a backend (its .env rides
- * the deploy artifact). Brand discovery normalizes functions/ → app root,
- * same as the config loader.
+ * the deploy artifact). Brand discovery normalizes an app subdir (functions/,
+ * dist/) → app root, same as the config loader.
  *
  * @param {string} startDir
  * @returns {{ app: string, brand: string|null, company: string|null }}

@@ -17,10 +17,9 @@ const path = require('node:path');
 const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 
 const logger = new Logger('omega:deploy');
-
-const WORKFLOW = 'build.yml';
 
 /**
  * The GitHub Pages custom domain: brand.url's bare host. Shared by the
@@ -145,6 +144,14 @@ module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
   const project = require(path.join(process.cwd(), 'package.json'));
+
+  // Inside a brand monorepo the app's CI lives in the BRAND ROOT's workflows
+  // dir under a per-app name (#265) — dispatch what setup actually composed.
+  const WORKFLOW = composedWorkflowName({
+    appDir: process.cwd(),
+    brandRoot: require('@omega.js/config').resolveSeedMode(process.cwd()).brandRoot,
+    workflow: 'build.yml',
+  });
 
   // Direct deploys build LOCALLY and push only the built output — local
   // file: packages are fine there (the monorepo model). The guard below

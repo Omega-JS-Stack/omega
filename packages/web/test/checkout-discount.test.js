@@ -77,6 +77,10 @@ function bundleOnce() {
 // The plan the summary prices against: $100 a year, the state's default cycle.
 const PRODUCT = { id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10, annually: 100 } };
 
+// The same plan sold with a free trial, for the cases where the trial is what
+// changes the sentence the receipt writes.
+const TRIAL_PRODUCT = { ...PRODUCT, trial: { days: 14 } };
+
 /**
  * Apply one code against a stubbed server answer; hand back the discount UI
  * state, the mutated state, the request the module actually made, and the
@@ -85,8 +89,9 @@ const PRODUCT = { id: 'premium', name: 'Premium', type: 'subscription', prices: 
  * @param {string} code - what the shopper typed
  * @param {object} answer - the server's validate() body
  * @param {object} [product] - the product on the page (defaults to PRODUCT)
+ * @param {object} [options] - `trialEligible`, the flag the trial routes read
  */
-async function applyCode(code, answer, product = PRODUCT) {
+async function applyCode(code, answer, product = PRODUCT, { trialEligible = false } = {}) {
   await bundleOnce();
 
   const calls = [];
@@ -114,6 +119,7 @@ async function applyCode(code, answer, product = PRODUCT) {
   const bundle = require(BUNDLE);
 
   bundle.state.product = product;
+  bundle.state.trialEligible = trialEligible;
 
   const renders = [];
   await bundle.applyDiscountCode(code, () => renders.push(bundle.state.discountUI));
@@ -180,6 +186,66 @@ test('discount: an amount code is money off, not an undefined percent', async ()
   assert.match(bindings.pricing.termsText, /first payment only/, 'and the first-payment-only note still rides along');
 
   assert.ok(!JSON.stringify(bindings).includes('undefined'), 'no binding renders the word undefined');
+});
+
+test('discount: a once code discounts today and leaves the renewal at list price (#254)', async () => {
+  // The receipt used to reduce the recurring row too, so a $100 plan with a
+  // 15% code advertised a $85 renewal the backend charges $100 for. The
+  // server's own `duration` is what decides it now, in BOTH code shapes.
+  const percent = await applyCode('welcome15', { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' });
+
+  assert.strictEqual(percent.state.discountDuration, 'once', 'the server\'s duration reaches the state');
+  assert.strictEqual(percent.bindings.pricing.total, '$85.00', 'the discount comes off today');
+  assert.strictEqual(percent.bindings.pricing.recurringAmount, '$100.00', 'the renewal is the price we will actually charge');
+  assert.match(percent.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'and the terms line quotes the same renewal');
+
+  const amount = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
+
+  assert.strictEqual(amount.bindings.pricing.total, '$90.00', 'the flat shape comes off today the same way');
+  assert.strictEqual(amount.bindings.pricing.recurringAmount, '$100.00', 'and leaves the renewal at list price too');
+});
+
+test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)', async () => {
+  // The trial terms line names the charge that lands when the trial ends, and
+  // that charge IS the first invoice — the one the `once` coupon is attached to
+  // (intent/processors/stripe.js sends `discounts: [{ coupon }]` alongside
+  // `trial_period_days`). Quoting list price there promised a bigger first
+  // charge than the card will actually see, which is the #254 mistake pointing
+  // the other way.
+  const { bindings } = await applyCode(
+    'welcome15',
+    { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' },
+    TRIAL_PRODUCT,
+    { trialEligible: true },
+  );
+
+  assert.strictEqual(bindings.pricing.total, '$0.00', 'nothing is due today — it is a free trial');
+  assert.match(bindings.pricing.termsText, /charged \$85\.00/, 'the first charge after the trial carries the discount');
+  assert.match(bindings.pricing.termsText, /renews at \$100\.00/, 'and every renewal after it is list price');
+});
+
+test('discount: a trial with no code quotes list price, unchanged (#254)', async () => {
+  const { bindings } = await applyCode('nope', { valid: false }, TRIAL_PRODUCT, { trialEligible: true });
+
+  assert.strictEqual(bindings.discount.hasDiscount, false, 'no discount was applied');
+  assert.match(bindings.pricing.termsText, /charged \$100\.00/, 'so the first charge is the list price');
+  assert.ok(!/renews at/.test(bindings.pricing.termsText), 'and there is no second price to explain');
+});
+
+test('trial: the length is the catalog\'s number, never a framework constant (#273)', async () => {
+  // A trial is CATALOG data, so every sentence that names its length reads the
+  // product — the message AND the renewal date the terms line computes. Pinned
+  // with a 3-day plan precisely because 3 is not the constant the fallbacks
+  // used to reach for.
+  const short = { ...PRODUCT, trial: { days: 3 } };
+  const { bindings } = await applyCode('nope', { valid: false }, short, { trialEligible: true });
+
+  assert.strictEqual(bindings.trial.message, 'Start your 3-day free trial today!', 'the message states the real length');
+
+  const renewal = new Date();
+  renewal.setDate(renewal.getDate() + 3);
+  const formatted = renewal.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  assert.ok(bindings.pricing.termsText.includes(formatted), 'and the first charge lands 3 days out, not 7');
 });
 
 test('discount: a code the server rejects still lands the error message', async () => {

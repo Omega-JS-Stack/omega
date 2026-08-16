@@ -225,7 +225,28 @@ module.exports = async function ({ before, after, uid, userDoc, admin, ctx, Mana
 
 ## Subscription Management Routes
 
-Owned, cross-provider endpoints for managing a live subscription. Like `POST /payments/cancel`, they write **no subscription state** — they delegate to the processor and let the resulting webhook drive the pipeline.
+Owned, cross-provider endpoints for managing a live subscription. They write **no subscription state** — they delegate to the processor and let the resulting webhook drive the pipeline.
+
+### POST /payments/cancel
+
+Ends the caller's subscription: at the close of the current billing period normally, **immediately when the subscription is still in its free trial** (Ian's ruling, 2026-08-15 — we do not keep serving a trial we know will not convert). Input: `reason`, `feedback`, `confirmed`, and the privileged `skipGuards`.
+
+Guards: authenticated, `confirmed: true`, an active or suspended paid subscription, no cancellation already pending, a known processor and resource id, and the **24-hour young-subscription guard**. `skipGuards` is honored only for an admin or outside a real deployment (the suites and the dev palette cancel seeded subscriptions minutes old); every other caller is ignored, loudly.
+
+**A trial is exempt from the 24-hour guard.** That guard exists to stop a cancellation racing a PAID checkout that is still settling, and a trial has no payment to settle — blocking it told the most common trial behavior there is, cancelling the same day you started, that the subscription "is still being set up" ([#267](https://github.com/Omega-JS-Stack/omega/issues/267)).
+
+**"Still inside the trial" has ONE definition**, `routes/payments/cancel/_is-trialing.js` — the trial is claimed, the subscription is `active`, and `expires` still equals `trial.expires` (conversion moves `expires` out to the end of the first paid period while `trial.expires` stays put, so the two stop matching the moment real money is involved; an expiry missing on both sides reads false, because a guard must never be waived by absent data). The route and all four cancel processors consult that one function, which is what keeps the guard waiver and the cancel mode from disagreeing — they were three per-processor copies of the same comparison before.
+
+How each processor performs the immediate half:
+
+| Processor | Trial cancel | Paid cancel |
+|---|---|---|
+| **Stripe** | `subscriptions.cancel()` — the subscription ends now | `subscriptions.update({ cancel_at_period_end: true })` |
+| **Chargebee** | `cancel_for_items` with `cancel_option: 'immediately'` | the same call with `end_of_term` |
+| **PayPal** | the one cancel endpoint, with a trial `reason` — immediacy is enforced on OUR side (below) | the same endpoint; the remaining paid term rides as `cancellation.pending` |
+| **test** | fabricates `customer.subscription.deleted` | fabricates `customer.subscription.updated` with `cancel_at_period_end` |
+
+**PayPal has no second cancel mode**, so the immediacy lives in the unified transform: `calculatePeriodEnd()` returns null for a subscription still inside its trial WINDOW (the trial end computed from `start_time` + the plan's `TRIAL` cycle is still ahead), so the cancellation webhook resolves it to `cancelled` with nothing pending and no future expiry. Reading the payment record instead handed a cancelled trialer a full paid period whenever the plan charged a setup fee on day zero — `billing_info.last_payment` exists during a trial, and it is not a billing period.
 
 ### POST /payments/uncancel
 
@@ -252,7 +273,7 @@ Two of those refusals carry a **machine-readable code** on the `omega-properties
 
 **The guards never lean on the client's filtering.** The billing page hides Change while a cancellation is pending and renders the current plan disabled, but that is courtesy: the modal's own filter silently missed whenever `payment.frequency` was unrecorded, which is how a same-plan switch reached the processor in the first place ([#237](https://github.com/Omega-JS-Stack/omega/issues/237)).
 
-**A switch never grants, resets, or extends a trial** (Ian 2026-08-14). A mid-trial switch CARRIES the trial over — same original end date, new plan — and `trial.claimed` stays claimed. The route writes no state, so each processor's `switchPlan()` preserves it through the swap — and each one restates the date from the **live provider object**, never from our own user doc, which can lag the provider and would make the preserving route the thing that MOVED the trial: Stripe restates `trial_end` off the subscription it already retrieved to find the item, and Chargebee GETs `/subscriptions/{id}` and restates that object's `trial_end` when its status is `in_trial`. A trial already over is left alone in both (Stripe rejects a past `trial_end`, and its dates stay on the object anyway). The test processor carries `trial_start`/`trial_end` onto the event it fabricates — and, while the trial is live, sets the current period TO the trial period, the way Stripe reports a trialing subscription: the cancel processors read that `trial.expires === expires` equality to decide a cancellation is immediate, so a fabricated 30-day period would have broken trial-cancel immediacy after a switch. Fabricating the trial dates as null is exactly what ended a live trial on switch: the unified transform reads `trial.claimed` straight off the event. PayPal's `revise` takes no trial parameter — its trial is derived from the plan's `TRIAL` billing cycle anchored to the original `start_time`, so a revise cannot extend a trial past what it would have been from day one, but an unequal trial LENGTH on the target plan can still shift the end date.
+**A switch never grants, resets, or extends a trial** (Ian 2026-08-14). A mid-trial switch CARRIES the trial over — same original end date, new plan — and `trial.claimed` stays claimed. The route writes no state, so each processor's `switchPlan()` preserves it through the swap — and each one restates the date from the **live provider object**, never from our own user doc, which can lag the provider and would make the preserving route the thing that MOVED the trial: Stripe restates `trial_end` off the subscription it already retrieved to find the item, and Chargebee GETs `/subscriptions/{id}` and restates that object's `trial_end` when its status is `in_trial`. A trial already over is left alone in both (Stripe rejects a past `trial_end`, and its dates stay on the object anyway). The test processor carries `trial_start`/`trial_end` onto the event it fabricates — and, while the trial is live, sets the current period TO the trial period, the way Stripe reports a trialing subscription: the cancel flow's shared classifier ([`_is-trialing.js`](#post-paymentscancel), read by the route and every processor) decides a cancellation is immediate on that `trial.expires === expires` equality, so a fabricated 30-day period would have broken trial-cancel immediacy after a switch. Fabricating the trial dates as null is exactly what ended a live trial on switch: the unified transform reads `trial.claimed` straight off the event. PayPal's `revise` takes no trial parameter — its trial is derived from the plan's `TRIAL` billing cycle anchored to the original `start_time`, so a revise cannot extend a trial past what it would have been from day one, but an unequal trial LENGTH on the target plan can still shift the end date.
 
 | Processor | How it switches |
 |---|---|

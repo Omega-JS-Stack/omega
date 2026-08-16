@@ -43,7 +43,7 @@ Auto-loaded from [src/gulp/tasks/](../src/gulp/tasks/) via [src/gulp/main.js](..
 | Task | Source | Purpose |
 |---|---|---|
 | `defaults` | [tasks/defaults.js](../src/gulp/tasks/defaults.js) | Copy framework defaults from `dist/defaults/` to consumer project on first run / setup. See [defaults.md](defaults.md). |
-| `distribute` | [tasks/distribute.js](../src/gulp/tasks/distribute.js) | Copy consumer's `src/` files (HTML, manifest, locales, etc.) to `dist/` |
+| `distribute` | [tasks/distribute.js](../src/gulp/tasks/distribute.js) | Copy consumer's `src/` files (HTML, manifest, locales, **static images**, etc.) to `dist/` |
 | `sass` | [tasks/sass.js](../src/gulp/tasks/sass.js) | Compile SCSS → CSS bundles with the load-path system (see [css.md](css.md)) |
 | `webpack` | [tasks/webpack.js](../src/gulp/tasks/webpack.js) | Bundle JS per component entry point with Babel transpilation |
 | `html` | [tasks/html.js](../src/gulp/tasks/html.js) | Run views through the two-step templating system (see [templating.md](templating.md)) |
@@ -52,6 +52,10 @@ Auto-loaded from [src/gulp/tasks/](../src/gulp/tasks/) via [src/gulp/main.js](..
 | `package` | [tasks/package.js](../src/gulp/tasks/package.js) | Bundle dist/ into packaged/<browser>/raw + zip; runs `build:pre` / `build:post` hooks ([hooks.md](hooks.md)) |
 | `serve` | [tasks/serve.js](../src/gulp/tasks/serve.js) | Dev server: WebSocket-based live reload, watches `src/` |
 | `audit` | [tasks/audit.js](../src/gulp/tasks/audit.js) | Build-pipeline-specific checks (icons exist, manifest is valid, etc.) |
+
+### Static assets
+
+`distribute` copies everything under `src/` EXCEPT what another task owns: `.js` (webpack), `.css/.scss/.sass` (sass), and `src/views/**/*.html` (the html task). Static images (`.png`, `.jpg`, `.svg`, `.webp`, …) copy as-is, byte-for-byte — this framework ships no imagemin task, so nothing else would carry them to `dist/` ([#259](https://github.com/Omega-JS-Stack/omega/issues/259)). Consumers never need a `hooks/build/pre.js` copy step for images.
 
 ## Webpack
 
@@ -96,6 +100,15 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 4. **Zip** to `packaged/<browser>/<name>.zip`
 5. **Post-hook** — runs `hooks/build:post.js`
 6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
+
+### Manifest compilation rules
+
+The compiled manifest is the source manifest merged with the framework defaults ([src/config/manifest.json](../src/config/manifest.json)), then adjusted per target:
+
+- **Declared beats default.** The defaults only fill keys your `src/manifest.json` never wrote — including arrays. An array you declare REPLACES the default (an empty array ships nothing), which is the only way to drop a framework default such as `externally_connectable`'s dev origin from a production build ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)).
+- **Icons are pruned to what the build minted** — a manifest pointing at an icon that isn't there is an extension Chrome refuses to load.
+- **chromium / opera** — `background.scripts` dropped (MV3 service worker).
+- **firefox** — `background.service_worker` becomes `background.scripts`; `side_panel` becomes `sidebar_action` (Firefox has no side panel key) and the `sidePanel` permission is dropped; packaging FAILS unless `browser_specific_settings.gecko.id` is set, because Firefox cannot identify, sign, or update an add-on without one ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
 
 ## Build modes
 

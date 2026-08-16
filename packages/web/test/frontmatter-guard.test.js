@@ -94,6 +94,40 @@ test('a page may set `client` in frontmatter — it reaches resolved.client, lay
   }
 });
 
+// #247 — two SHIPPED layout contracts read page frontmatter: the redirect
+// layout's `redirect.url` (documented in docs/web/index.md) and body.html's
+// `prerender_icons`. Both worked only from defaults/ and _layouts/ (exempt
+// from the /pages/ guard), so a consumer's own page lost them silently — a
+// redirect page bounced to site.url instead of its target.
+test('#247: a consumer page keeps redirect and prerender_icons through the guard', async () => {
+  const { tmp, consumerDir } = makeConsumer([
+    'redirect:',
+    '  url: "https://example.com/target"',
+    'prerender_icons:',
+    '  - rocket',
+  ], 'modules/utilities/redirect');
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...parts) => warnings.push(parts.join(' '));
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-shipped-keys');
+    const html = pages.get('/');
+    assert.ok(html, 'page built');
+
+    assert.ok(html.includes('data-url="https://example.com/target"'), 'the page redirect.url reaches the redirect config');
+    assert.ok(!html.includes(`data-url="${bareData.url}"`), 'the layout never falls back to site.url when the page names a target');
+    assert.ok(html.includes('data-icon="rocket"'), 'the page prerender_icons list reaches the prerendered-icons block');
+
+    assert.ok(
+      !warnings.some((line) => line.includes('ignoring frontmatter content keys')),
+      `neither key is treated as smuggled content: ${warnings.join(' | ')}`,
+    );
+  } finally {
+    console.warn = originalWarn;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('meta-only frontmatter (meta, sitemap, append) builds clean', async () => {
   const { tmp, consumerDir } = makeConsumer([
     'meta:',

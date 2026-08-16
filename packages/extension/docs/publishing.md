@@ -47,6 +47,8 @@ EDGE_API_KEY="..."
 2. Generate JWT credentials at "Manage API Keys"
 3. `FIREFOX_EXTENSION_ID` matches the `id` field in your manifest's `browser_specific_settings.gecko.id`
 
+> **`browser_specific_settings.gecko.id` is required to BUILD, not just to publish.** Packaging the firefox target fails with an actionable error until `src/manifest.json` declares one — Firefox cannot identify, sign, or update an add-on without it. The same pass translates the chrome-only panel keys (`side_panel` → `sidebar_action`, `sidePanel` permission dropped), so the firefox artifact is a real firefox artifact ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
+
 ### Microsoft Edge Add-ons
 
 1. Sign up for the [Microsoft Edge Add-ons Partner Center](https://partner.microsoft.com/dashboard/microsoftedge)

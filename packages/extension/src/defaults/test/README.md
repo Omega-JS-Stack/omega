@@ -17,7 +17,7 @@ Match the framework's four layers — OMEGA Extension's test runner discovers fi
 
 Every feature ships with tests at every layer it has a surface in — logic (`build`/`background`), UI (`view`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
 
-Tests that hit REAL external services (Firebase, push, network) are skipped by default — gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across @omega.js/backend/BXM/UJM/EM. Never mock the external service — skip it in-source.
+Tests that hit REAL external services (Firebase, push, network) are skipped by default — gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across every OMEGA framework (@omega.js/backend, @omega.js/extension, @omega.js/web, @omega.js/desktop). Never mock the external service — skip it in-source.
 
 ## Quick example
 

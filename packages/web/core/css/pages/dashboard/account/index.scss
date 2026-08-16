@@ -219,8 +219,13 @@
     color: inherit;
     cursor: pointer;
 
-    &:focus {
-      outline: none;
+    // The reset above strips the button's chrome, so the browser's default
+    // ring has nothing left to draw around and the trigger used to lose focus
+    // entirely ([#243]). The page's own ring recipe replaces it, on
+    // :focus-visible so only the keyboard sees it.
+    &:focus-visible {
+      outline: 2px solid var(--omega-accent);
+      outline-offset: 2px;
     }
   }
 }

@@ -20,6 +20,7 @@ const PERSONAS = [
   { localpart: '_test.admin', label: 'Admin' },
   { localpart: '_test.basic', label: 'Basic' },
   { localpart: '_test.premium-active', label: 'Premium' },
+  { localpart: '_test.premium-trialing', label: 'Trialing' },
   { localpart: '_test.premium-expired', label: 'Expired' },
   { localpart: '_test.premium-suspended', label: 'Suspended' },
   { localpart: '_test.premium-cancelling', label: 'Cancelling' },
@@ -282,7 +283,7 @@ export default function devPalette() {
       window.location.reload();
     } catch (error) {
       personaSelect.dataset.busy = 'false';
-      who.textContent = `✕ ${error.message} — is the backend emulator running? (npm run emulator)`;
+      who.textContent = `✕ ${error.message}. Is the backend emulator running? (npm run emulator)`;
     }
   });
 
@@ -312,7 +313,7 @@ export default function devPalette() {
       window.location.reload();
     } catch (error) {
       reset.dataset.busy = 'false';
-      who.textContent = `✕ ${error.message} — is the backend emulator running? (npm run emulator)`;
+      who.textContent = `✕ ${error.message}. Is the backend emulator running? (npm run emulator)`;
     }
   });
 

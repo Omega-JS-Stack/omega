@@ -26,8 +26,9 @@ const input = [
   'src/**/*',
 
   // Files to exclude
-  // Images handled by imagemin
-  '!src/**/*.{jpg,jpeg,png,gif,svg,webp}',
+  // NOTE: images are NOT excluded — this framework ships no imagemin task, so
+  // excluding them only meant a consumer's static images never reached dist/
+  // and every project copied them by hand from a build:pre hook (#259).
   // JS files handled by webpack
   '!src/**/*.js',
   // CSS/SCSS files handled by sass task
@@ -168,3 +169,4 @@ module.exports = series(
   distribute,
   distributeWatcher
 );
+module.exports.distribute = distribute;

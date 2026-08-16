@@ -3,7 +3,7 @@
 Ian's durable rulings, migrated verbatim from PROGRESS.md's Rulings lane when the board retired (v4 migration, 2026-07-27). These bind all work in this monorepo; new rulings land here (or in AGENTS.md when they are architecture). Per-item decisions live on their issues.
 
 - Ian 2026-07-21: adblock-safe naming — the ad system speaks vert EVERYWHERE (paths, DOM, collection, API, modules); only ads.txt, Google's own ad* tokens, `advertising` config key say ad
-- Ian 2026-07-21: "DO NOT USE EM DASHES… REWRITE EVERYTHING TO MAKE SENSE WITHUT IT" — site/brand copy never uses em dashes; manual rewrites, not deletions
+- Ian 2026-07-21: "DO NOT USE EM DASHES… REWRITE EVERYTHING TO MAKE SENSE WITHUT IT" — site/brand copy never uses em dashes; manual rewrites, not deletions. Operating home with scope + exemptions: docs/shared/theming.md § Copy register (2026-08-15)
 - Ian 2026-07-10: continuous mode — iterate/build/test autonomously, checkpoint after checkpoint; stop only for serious errors or genuinely-Ian decisions
 - Ian 2026-07-19: "I refuse to run a single command — wrap it in npm start, self healing idempotent" — absorb, never hand back; blocked one-offs = framework gaps; wrapped verbs only
 - Ian 2026-07-20: mirrored-implementation rule — same feature, same shape, every framework (cp242 deploys enforced it)

@@ -10,6 +10,7 @@ const compiler = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
 const filter = require('gulp-filter').default;
+const { resolveThemeId } = require('../../lib/theme.js');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -17,6 +18,11 @@ const project = Manager.getPackage('project');
 const config = Manager.getConfig('project');
 const rootPathPackage = Manager.getRootPath('main');
 const rootPathProject = Manager.getRootPath('project');
+
+// Themes are per-framework (#261) — a shared theme.id naming a WEB theme falls
+// back to the extension's default instead of dying on a raw sass import error.
+const themesDir = path.resolve(rootPathPackage, 'dist/assets/themes');
+const themeId = resolveThemeId(config.theme?.id, { themesDir, logger });
 
 // Define bundle files separately for easier tracking
 const bundleFiles = [
@@ -70,7 +76,7 @@ function sass(complete) {
   generateComponentScss();
 
   // Compile
-  let stream = src(input, { sourcemaps: true })
+  const stream = src(input, { sourcemaps: true })
     // Skip files based on configuration
     .pipe(filter(file => !shouldSkip(file.path), { restore: true }))
     // Compile SASS
@@ -80,7 +86,7 @@ function sass(complete) {
         path.resolve(rootPathPackage, 'dist/assets/css'),
 
         // So we can use "@use 'theme' as *;" which resolves to the active theme
-        path.resolve(rootPathPackage, 'dist/assets/themes', config.theme?.id || 'classy'),
+        path.resolve(themesDir, themeId),
 
         // So we can load _component-specific.scss from the project's dist
         path.resolve(rootPathProject, 'dist/assets/css'),
@@ -139,8 +145,8 @@ function sass(complete) {
         // ❌ DO NOT GENERATE: components/pages.bundle.css
         // ✓ DO GENERATE: components/pages/index.bundle.css, components/pages/pricing.bundle.css, etc.
 
-        const isInPages = file.dirname.includes(path.sep + 'pages' + path.sep)
-          || file.dirname.endsWith(path.sep + 'pages')
+        const isInPages = file.dirname.includes(`${path.sep}pages${path.sep}`)
+          || file.dirname.endsWith(`${path.sep}pages`)
           || file.dirname === 'pages';
 
         if (file.basename === 'index' && !isInPages) {

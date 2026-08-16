@@ -9,6 +9,7 @@ const wp = require('webpack');
 const ReplacePlugin = require('../plugins/webpack/replace.js');
 const stripDevBlocksLoader = require.resolve('../loaders/webpack/strip-dev-blocks.js');
 const version = require('wonderful-version');
+const { resolveThemeId } = require('../../lib/theme.js');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -17,6 +18,11 @@ const manifest = Manager.getManifest();
 const config = Manager.getConfig();
 const rootPathPackage = Manager.getRootPath('main');
 const rootPathProject = Manager.getRootPath('project');
+
+// Themes are per-framework (#261) — a shared theme.id naming a WEB theme falls
+// back to the extension's default instead of aliasing a directory that isn't there.
+const themesDir = path.resolve(rootPathPackage, 'dist/assets/themes');
+const themeId = resolveThemeId(config.theme?.id, { themesDir, logger });
 
 // Define bundle files separately for easier tracking
 const bundleFiles = [
@@ -126,7 +132,7 @@ function getSettings() {
         '__project_assets__': path.resolve(process.cwd(), 'src/assets'),
 
         // For importing the theme
-        '__theme__': path.resolve(rootPathPackage, 'dist/assets/themes', config.theme?.id || 'classy'),
+        '__theme__': path.resolve(themesDir, themeId),
       },
       // Add module resolution paths
       modules: makeResolveModules(process.cwd(), rootPathPackage),

@@ -25,9 +25,16 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    (core/js/core/appearance.js) beats it in both directions. **Names are the
    stable API; values are the skin.**
 2. **Mechanics** — `core/css/shell/_index.scss` (the `.omega-shell` app
-   chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px) and
-   `core/css/motion/_index.scss` (below). Both paint exclusively through
-   tokens so a skin restyles them without touching structure.
+   chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px),
+   `core/css/motion/_index.scss` (below), and `core/css/components/_index.scss`
+   (the shared component vocabulary: `omega-chip` and its `--accent`/`--ink`
+   modifiers). All three paint exclusively through tokens so a skin restyles
+   them without touching structure, and all three emit BEFORE the theme so a
+   skin's own rules win. **Promotion rule
+   ([#242](https://github.com/Omega-JS-Stack/omega/issues/242))**: a component
+   the BASE layer renders belongs in the component sheet, never in one theme's
+   partials — the icon-CSS ruling (presentation SSOT in the shared sheet).
+   Theme-only components (classy's marketing vocabulary) stay in their theme.
 3. **Theme** — `themes/<id>/`, a skin over `themes/base` (the structural
    `omega-*` markup layer every theme chain terminates at; classy is the
    flagship and the default skin). classy v2's `css/base/_root.scss` bridges Bootstrap's CSS
@@ -60,8 +67,10 @@ platform rail).
 
 ## brand.color → the accent ramps
 
-`omega.json5 → brand.color` drives `composeBrandTokens()`
-(`packages/web/src/brand-tokens.js`): a light ramp plus a **dark-mode variant**
+`omega.json5 → brand.color` is an optional hex string (`#RGB` / `#RRGGBB`,
+schema-validated since [#272](https://github.com/Omega-JS-Stack/omega/issues/272);
+unset leaves the token sheet's neutral placeholder standing) and it drives
+`composeBrandTokens()` (`packages/web/src/brand-tokens.js`): a light ramp plus a **dark-mode variant**
 (darker brands lift into a legible lightness band for the charcoal ground;
 already-light brands pass through). `core/_includes/core/head.html` emits both
 as inline `:root` blocks AFTER the css bundles — same three-stamp plumbing as
@@ -133,7 +142,8 @@ proven:
   `layout/footer` (the shared footer include speaks `omega-footer`
   vocabulary on every page — the floor supplies structure, the theme
   re-inks it), `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
-  `components/receipt`, `components/badges` (chips/dot-status). Import
+  `components/receipt`, `components/badges` (dot-status; the chip left for the
+  core component sheet in #242, so every theme gets it with no floor at all). Import
   EARLY (the floor sits UNDER the theme's voice, so later theme rules win
   collisions like classy's `.badge` base). Live models:
   `themes/newsflash/_theme.scss`, `themes/neobrutalism/_theme.scss`.
@@ -315,6 +325,30 @@ Resilience rules (load-bearing):
   runtime-stamped and never visible to the content scan. **New
   runtime-stamped classes must live in the `omega-` namespace** (or join the
   safelist explicitly).
+
+**Every loading state carries a visible animation** (Ian 2026-08-15). Any
+surface that WAITS — a poll, a fetch, a build, a webhook that has not landed —
+shows an animated waiting indicator: the Bootstrap `spinner-border` idiom
+(`role="status"` plus a `visually-hidden` label; `spinner-border-lg` for a
+full-panel wait) for a spinner, the binding skeleton's shimmer for
+placeholder content. Bare text alone is never a waiting state: with nothing
+moving, a page that is working looks broken. Under `prefers-reduced-motion`
+the indicator swaps to a STATIC state that still says what is happening —
+park the loop (`animation: none`) and keep visible copy naming the wait
+beside it, because vendored Bootstrap only slows its own spinner, so the page
+rendering one owns the park (the confirmation page's
+`core/css/pages/payment/confirmation/index.scss` is the reference).
+
+## Copy register
+
+Product copy — every string a visitor reads: layout and section copy,
+section-defaults `json5`, and the JS string literals that render into the
+page — **never uses em dashes**. Use a comma, a semicolon, a period, or
+parentheses instead, whichever the sentence actually wants (Ian 2026-08-15).
+The rule is about COPY, not about code: comments, `docs/`, frontmatter
+headers, and `logger.*` messages are not rendered and are untouched, and a
+bare `—` standing in as a placeholder glyph or a range separator is
+typography rather than a sentence.
 
 ## classy v2 (the flagship skin)
 

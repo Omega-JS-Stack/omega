@@ -11,9 +11,14 @@
  * fiction (Plus/Pro/Max, fake social proof) anywhere in the output.
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { test } = require('node:test');
 const { composePricing } = require('../src/pricing.js');
-const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
+const { buildSite, buildWith: sharedBuildWith, miniData, BARE } = require('./lib/build.js');
+
+const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
 // Namespace this file's Eleventy output dirs (test files run concurrently)
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'pricing-test');
@@ -229,7 +234,37 @@ test('classy: marketing chrome defaults ship ON (Ian 2026-07-11 — social proof
   assert.ok(html.includes('5M'), 'default social proof');
   assert.ok(html.includes('Sarah Johnson'), 'default testimonials');
   assert.ok(html.includes('Can I cancel at any time?'), 'default FAQs');
-  assert.ok(html.includes('7-day money-back guarantee'), 'guarantee line default');
+  // The guarantee line is brand copy now (#273) — it renders only for a brand
+  // that states one, and never invents a refund window.
+  assert.ok(!html.includes('omega-guarantee-icon'), 'no guarantee line without brand copy');
+});
+
+// The brand-copy lane for the guarantee (#273): the site-wide directory-data
+// layer, which deep-merges over the engine-composed resolved.pricing.
+test('#273: a brand that states a guarantee gets the line back', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-guarantee-'));
+  const consumerDir = path.join(tmp, 'src');
+  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+  fs.writeFileSync(
+    path.join(consumerDir, 'src.11tydata.json'),
+    JSON.stringify({ pricing: { guarantee: 'Backed by our 30-day promise' } }),
+  );
+  fs.writeFileSync(
+    path.join(consumerDir, 'pages', 'pricing.md'),
+    ['---', 'layout: blueprint/pricing', 'permalink: /pricing', '---', ''].join('\n'),
+  );
+
+  try {
+    const pages = await buildSite(consumerDir, { ...bareData, payment: CATALOG }, {}, 'pricing-guarantee');
+    const html = pages.get('/pricing');
+    assert.ok(html.includes('Backed by our 30-day promise'), 'the brand-stated guarantee renders');
+    assert.ok(html.includes('omega-guarantee-icon'), 'with its shield');
+    // Same gate for the FAQ aside's decoration of that promise (#273).
+    assert.ok(/money-back guarantee/i.test(html), 'the FAQ aside chip comes back with it');
+    assert.ok(/refunded/i.test(html), 'and so does the refund fragment');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('composePricing: the enterprise product leaves the grid (issue #44 item 8)', () => {
@@ -341,4 +376,136 @@ test('classy: consumer frontmatter still overrides presentation (consumer surfac
   const html = pages.get('/pricing');
   assert.ok(html.includes('The right plans,'), 'template hero default');
   assert.ok(html.includes('for the right price'), 'template hero accent default');
+});
+
+/** Heading levels inside <main>, in document order. @returns {number[]} */
+function headingLevels(html) {
+  const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  return [...main.matchAll(/<h([1-6])[\s>]/g)].map((m) => Number(m[1]));
+}
+
+// #270 — the cards band is the SHELL's, not the consumer page's, so every
+// brand on the blueprint shipped the same skip: the h1 was followed straight
+// by the h3 card names with no h2 between them.
+test('#270: the pricing shell never skips a heading level (h1 → h3)', async () => {
+  const pages = await buildWith({ ...miniData, payment: CATALOG });
+  const levels = headingLevels(pages.get('/pricing'));
+
+  assert.strictEqual(levels[0], 1, 'the page opens on its single h1');
+  assert.strictEqual(levels[1], 2, 'the cards band carries an h2 under it');
+  levels.forEach((level, i) => {
+    if (i === 0) return;
+    assert.ok(level <= levels[i - 1] + 1, `heading ${i} (h${level}) does not skip past h${levels[i - 1]}`);
+  });
+
+  const html = pages.get('/pricing');
+  assert.ok(/<h2 class="visually-hidden">/.test(html), 'the band heading is visually hidden — the design is unchanged');
+});
+
+// #273 — the defaults shipped a "7-day money-back guarantee" line beside a
+// "14-day free trial" FAQ answer: contradictory, and both invented for any
+// catalog. Trial copy now derives from the catalog (rendered only when it has
+// one), and the refund claims are gone — a refund policy is brand copy.
+const NO_TRIAL = { products: CATALOG.products.map((product) => ({ ...product, trial: undefined })) };
+
+test('#273: the trial FAQ derives from the catalog — a 14-day trial states 14 days', async () => {
+  const pages = await buildWith({ ...miniData, payment: CATALOG });
+  const html = pages.get('/pricing');
+
+  assert.ok(html.includes('Is there a free trial?'), 'the trial FAQ renders for a catalog that has one');
+  assert.ok(/14-day free trial/.test(html), 'and states the catalog\'s real number');
+  assert.ok(!/\d+-day money-back guarantee/.test(html), 'no invented money-back guarantee anywhere');
+  assert.ok(!html.includes('What is your refund policy?'), 'no invented refund policy in the framework defaults');
+
+  // The FAQ aside's decorative twins are the same claim in chrome — a refund
+  // promise the framework cannot make for a brand.
+  assert.ok(!/money-back guarantee/i.test(html), 'no money-back chip in the FAQ aside');
+  assert.ok(!/refunded/i.test(html), 'no refund fragment in the FAQ aside');
+  // What the framework DOES know still ships: the plan-switch route prorates.
+  assert.ok(html.includes('prorated'), 'the proration behavior is real product copy and stays');
+});
+
+test('#273: a catalog with no trial renders no trial copy at all', async () => {
+  const pages = await buildWith({ ...miniData, payment: NO_TRIAL });
+  const html = pages.get('/pricing');
+
+  assert.ok(!html.includes('Is there a free trial?'), 'no trial in the catalog → no trial FAQ');
+  assert.ok(!/free trial/i.test(html), 'and no trial claim anywhere on the page');
+  assert.ok(html.includes('Can I cancel at any time?'), 'the honest defaults still ship');
+
+  const schema = JSON.parse(html.match(/<script id="omega-schema-faq-page"[^>]*>([\s\S]*?)<\/script>/)[1]);
+  assert.ok(schema.mainEntity.every((entry) => entry.acceptedAnswer.text.trim() !== ''), 'the FAQPage schema carries no empty answers');
+});
+
+// #273 follow-up — the page speaks ONE trial number ("every paid plan starts
+// with a N-day free trial"), so that number only exists when the paid plans
+// agree. A catalog whose paid plans carry different trials (or one without a
+// trial at all) states nothing universal.
+const MIXED_TRIALS = {
+  products: [
+    { id: 'starter', name: 'Starter', prices: { monthly: 5 }, trial: { days: 14 } },
+    { id: 'pro', name: 'Pro', prices: { monthly: 20 } },
+  ],
+};
+const UNIFORM_TRIALS = {
+  products: [
+    { id: 'starter', name: 'Starter', prices: { monthly: 5 }, trial: { days: 14 } },
+    { id: 'pro', name: 'Pro', prices: { monthly: 20 }, trial: { days: 14 } },
+  ],
+};
+
+test('composePricing: the universal trial number needs unanimity among paid plans', () => {
+  assert.strictEqual(composePricing(MIXED_TRIALS).trialDays, 0, 'paid plans disagreeing → no number the page can speak');
+  assert.strictEqual(composePricing(UNIFORM_TRIALS).trialDays, 14, 'every paid plan on 14 days → 14');
+  assert.strictEqual(
+    composePricing(CATALOG).trialDays,
+    14,
+    'a free plan carries no trial to disagree with — the paid plans decide',
+  );
+  assert.strictEqual(composePricing(NO_TRIAL).trialDays, 0, 'no trial anywhere → 0');
+});
+
+test('#273 follow-up: a mixed-trial catalog claims no universal trial', async () => {
+  const pages = await buildWith({ ...miniData, payment: MIXED_TRIALS });
+  const html = pages.get('/pricing');
+
+  assert.ok(!html.includes('Is there a free trial?'), 'paid plans disagree → no trial FAQ');
+  assert.ok(!/\d+-day free trial/.test(html), 'and no universal trial claim anywhere');
+  // The per-plan truth is untouched: the plan that HAS a trial still says so.
+  assert.ok(html.includes('Get free trial'), 'the trialing plan keeps its own CTA');
+
+  const uniform = await buildWith({ ...miniData, payment: UNIFORM_TRIALS }, {}, 'pricing-uniform-trial');
+  const uniformHtml = uniform.get('/pricing');
+  assert.ok(uniformHtml.includes('Is there a free trial?'), 'a catalog that agrees keeps the FAQ');
+  assert.ok(/14-day free trial/.test(uniformHtml), 'and states the shared number');
+});
+
+// #270 follow-up — the enterprise band is the SHELL's too, and its title is an
+// h3: an enterprise-only catalog renders no plans band, so nothing supplied the
+// h2 between the hero h1 and that h3.
+const ENTERPRISE_ONLY = {
+  products: [
+    {
+      id: 'enterprise',
+      name: 'Bindery',
+      enterprise: true,
+      tagline: 'for organizations that need their own terms',
+      url: '/contact',
+      features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+    },
+  ],
+};
+
+test('#270 follow-up: an enterprise-only catalog never skips a heading level', async () => {
+  const pages = await buildWith({ ...miniData, payment: ENTERPRISE_ONLY }, {}, 'pricing-enterprise-only');
+  const html = pages.get('/pricing');
+  const levels = headingLevels(html);
+
+  assert.ok(html.includes('omega-band--enterprise'), 'the enterprise row is the only band on the page');
+  assert.strictEqual(levels[0], 1, 'the page opens on its single h1');
+  assert.strictEqual(levels[1], 2, 'the enterprise band carries an h2 under it');
+  levels.forEach((level, i) => {
+    if (i === 0) return;
+    assert.ok(level <= levels[i - 1] + 1, `heading ${i} (h${level}) does not skip past h${levels[i - 1]}`);
+  });
 });

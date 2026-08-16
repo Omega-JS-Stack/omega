@@ -74,6 +74,27 @@ test('lane: a failing lane leaves the failure in the log file', (t) => {
   assert.match(contents, /✗ lane probe-fail/);
 });
 
+// #211 — a lane is the LOADED context: its children run against every other
+// package's suite, so the watch-deadline knob the web suites read is exported
+// here. A solo `node --test <file>` never goes through a lane and keeps the
+// tight base deadline.
+test('lane: every child runs with the watch-deadline scale exported', () => {
+  const run = runLane(['probe', 'node -e "console.log(process.env.OMEGA_TEST_DEADLINE_SCALE)"']);
+
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /^3$/m, 'the lane default: 30s solo → 90s under load');
+});
+
+test('lane: an explicitly set scale is passed through untouched', () => {
+  const run = spawnSync(process.execPath, [LANE, 'probe', 'node -e "console.log(process.env.OMEGA_TEST_DEADLINE_SCALE)"'], {
+    encoding: 'utf8',
+    env: { ...process.env, CI: '', GITHUB_ACTIONS: '', OMEGA_TEST_DEADLINE_SCALE: '5' },
+  });
+
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /^5$/m, 'the caller (or an outer lane) owns the value once it is set');
+});
+
 test('lane: a new run truncates the previous run\'s log file', (t) => {
   const label = `probe-truncate-${process.pid}`;
   t.after(() => fs.rmSync(logFilePath(label), { force: true }));

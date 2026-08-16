@@ -1,0 +1,43 @@
+{
+  "id": "1Y107995F1096980P",
+  "status": "COMPLETED",
+  "amount": {
+    "currency_code": "USD",
+    "value": "9.99"
+  },
+  "note_to_payer": "Refunded per customer request",
+  "seller_payable_breakdown": {
+    "gross_amount": {
+      "currency_code": "USD",
+      "value": "9.99"
+    },
+    "paypal_fee": {
+      "currency_code": "USD",
+      "value": "0.59"
+    },
+    "net_amount": {
+      "currency_code": "USD",
+      "value": "9.40"
+    },
+    "total_refunded_amount": {
+      "currency_code": "USD",
+      "value": "9.99"
+    }
+  },
+  "invoice_id": "ord-test-456",
+  "custom_id": "uid:test-user-123,orderId:ord-test-456,productId:credits-100",
+  "create_time": "2026-03-04T10:41:12Z",
+  "update_time": "2026-03-04T10:41:12Z",
+  "links": [
+    {
+      "href": "https://api.sandbox.paypal.com/v2/payments/refunds/1Y107995F1096980P",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api.sandbox.paypal.com/v2/payments/captures/2GG279541U471931P",
+      "rel": "up",
+      "method": "GET"
+    }
+  ]
+}

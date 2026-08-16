@@ -84,7 +84,7 @@ async function enterEditMode() {
   const $formCard = document.getElementById('editor-form-card');
   const $loading = document.getElementById('editor-loading');
 
-  if ($note) $note.textContent = 'Editing a live post — title and body are editable, frontmatter is preserved';
+  if ($note) $note.textContent = 'Editing a live post. Title and body are editable, frontmatter is preserved';
   if ($submitText) $submitText.textContent = 'Save changes';
 
   // Create-only fields don't apply on edit — hide them and drop their
@@ -212,11 +212,11 @@ function showSuccess(response, payload) {
 
   if ($detail) {
     if (response?.deployDispatched === true) {
-      $detail.textContent = 'A site build was dispatched — it goes live when the build finishes.';
+      $detail.textContent = 'A site build was dispatched. It goes live when the build finishes.';
     } else if (payload.deploy === false) {
-      $detail.textContent = 'Deploy skipped — the commit rides the next site build.';
+      $detail.textContent = 'Deploy skipped. The commit rides the next site build.';
     } else {
-      $detail.textContent = 'The commit landed, but the build dispatch could not be confirmed — check the repo\'s Actions.';
+      $detail.textContent = 'The commit landed, but the build dispatch could not be confirmed. Check the repo\'s Actions.';
     }
   }
 

@@ -18,6 +18,169 @@ const { createChildLog } = require('../utils/attach-log-file');
 // `emulators.ui.enabled`), so no `--ui` flag here — that flag only exists on `:exec`.
 const EMULATOR_FLAGS = '--only functions,firestore,auth,database,hosting,pubsub';
 
+// The pid record this run writes when its stack is up — the sweep's primary
+// ownership proof ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
+const PID_RECORD_FILE = 'emulator-pids.json';
+
+// How long a recorded pid stays evidence. The record is rewritten at boot and
+// again at shutdown, so a live run's is always seconds old; anything older
+// belongs to a run that died without teardown. Pids get RECYCLED, and a
+// recorded pid is a kill order the sweep acts on without further proof — past
+// this bound the number is no longer known to name the process it named.
+const PID_RECORD_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+// A command line that belongs to emulator machinery. Deliberately broad: it
+// only ever narrows a candidate that ALREADY named this project id.
+const EMULATOR_COMMAND = /emulator|firebase/i;
+
+/**
+ * Does this command line name the given project as an ARGUMENT?
+ *
+ * Substring matching would be wrong twice over: `demo-x` appears inside
+ * `demo-x-staging` (a different project), and a repo path containing the brand
+ * name is not a project id at all. Only `--project <id>` / `--project_id <id>`
+ * (space or `=`) counts — the form the firestore emulator actually publishes.
+ * @param {string} command - Full command line from ps.
+ * @param {string} projectId - The project id to look for.
+ * @returns {boolean}
+ */
+function commandNamesProject(command, projectId) {
+  const escaped = projectId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  return new RegExp(`--project(?:_id)?[= ]${escaped}(?:\\s|$)`).test(command);
+}
+
+/**
+ * Can this process be PROVEN to be an emulator process of THIS project?
+ *
+ * The sweep used to signal whatever was listening on its ports, which
+ * terminated another project's live emulator sharing the hub/storage ports
+ * ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)). Occupying a
+ * port is not ownership; only these two proofs are:
+ *
+ *   1. The pid record this run wrote when it spawned the stack. Primary,
+ *      because the java emulators name no project on their own — and they
+ *      reparent to PID 1 when orphaned, so the record made while they were
+ *      still attached is the only surviving link.
+ *   2. A command line that is emulator machinery AND names this project id
+ *      (the firestore emulator's `--project_id`), which covers a leftover from
+ *      an earlier run of the same project that no live record mentions.
+ *
+ * Anything else is somebody else's process and is left running.
+ * @param {object} candidate - { pid, command } as read from ps.
+ * @param {object} [ownership] - { pids: number[], projectId: string|null }.
+ * @returns {boolean}
+ */
+function isOwnedEmulatorProcess(candidate, ownership) {
+  const pid = Number(candidate?.pid);
+  const command = String(candidate?.command || '');
+
+  // PID 1 is init, and a non-numeric row is a parse failure — never candidates.
+  if (!Number.isInteger(pid) || pid <= 1) {
+    return false;
+  }
+
+  if ((ownership?.pids || []).some((recorded) => Number(recorded) === pid)) {
+    return true;
+  }
+
+  const projectId = ownership?.projectId;
+
+  if (!projectId) {
+    return false;
+  }
+
+  return EMULATOR_COMMAND.test(command) && commandNamesProject(command, projectId);
+}
+
+/**
+ * Should the PRE-BOOT reaper SIGKILL this process?
+ *
+ * Two proofs, both required. ORPHANED: reparented to PID 1, so the firebase
+ * parent that would tear it down is gone — a live sibling stack never matches
+ * and the allocator bumps around it as before. OURS: the same ownership matcher
+ * the post-shutdown sweep runs on. The reaper used to take a command line
+ * matching /emulator|firebase/i as sufficient, which is a NAME, not ownership —
+ * that killed another session's reload watcher and another brand's orphans
+ * ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)).
+ * @param {{pid: number|string, ppid: number|string, command: string}} candidate - One ps row.
+ * @param {{pids: number[], projectId: string|null}} ownership - This project's evidence.
+ * @returns {boolean}
+ */
+function isReapableOrphan(candidate, ownership) {
+  if (Number(candidate?.ppid) !== 1) {
+    return false;
+  }
+
+  return isOwnedEmulatorProcess(candidate, ownership);
+}
+
+/**
+ * The ownership a pid record still supports, given its age.
+ *
+ * The pids are only evidence while they are known to name the processes they
+ * named at spawn: the record is never deleted, so a run days later reads the
+ * last one, and by then the OS may have handed those numbers to anything. The
+ * project id is not pid-based — a command line naming this project proves
+ * itself at any age — so it survives an expiry.
+ * @param {object|null} record - The parsed pid-record file.
+ * @param {number} [now] - Epoch ms to age against (defaults to Date.now()).
+ * @returns {{pids: number[], projectId: string|null, rootPid: number|null}}
+ */
+function ownershipFromRecord(record, now) {
+  const startedAt = Date.parse(record?.startedAt);
+  const fresh = Number.isFinite(startedAt) && (now || Date.now()) - startedAt < PID_RECORD_MAX_AGE_MS;
+
+  return {
+    pids: fresh && Array.isArray(record?.pids) ? record.pids : [],
+    projectId: record?.projectId || null,
+    rootPid: record?.rootPid || null,
+  };
+}
+
+/**
+ * Every descendant pid of `rootPid`, from one ps snapshot.
+ *
+ * Taken while the stack is UP: firebase-tools puts each java emulator in its
+ * own process group and they reparent to PID 1 once orphaned, so neither the
+ * group nor the parent link survives the moment the sweep needs it.
+ * @param {number} rootPid - The spawned child's pid.
+ * @returns {number[]} rootPid plus every descendant, deduped.
+ */
+function collectDescendantPids(rootPid) {
+  const { execSync } = require('child_process');
+  const children = new Map();
+
+  try {
+    const rows = execSync('ps -A -o pid=,ppid=', { encoding: 'utf8' }).trim().split('\n');
+
+    for (const row of rows) {
+      const [pid, ppid] = row.trim().split(/\s+/).map(Number);
+
+      if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+
+      if (!children.has(ppid)) children.set(ppid, []);
+      children.get(ppid).push(pid);
+    }
+  } catch (error) {
+    return [rootPid];
+  }
+
+  const collected = new Set([rootPid]);
+  const queue = [rootPid];
+
+  while (queue.length > 0) {
+    for (const child of children.get(queue.shift()) || []) {
+      if (collected.has(child)) continue;
+
+      collected.add(child);
+      queue.push(child);
+    }
+  }
+
+  return [...collected];
+}
+
 class EmulatorCommand extends BaseCommand {
   async execute() {
     // The emulator IS the backend's dev leg under brand-root `omega dev`, so it
@@ -115,7 +278,7 @@ class EmulatorCommand extends BaseCommand {
       // Kill any orphaned Java processes left on THIS run's ports.
       // SIGINT listener stays active so Ctrl+C spam during the sweep
       // doesn't kill us before orphans are cleaned up.
-      await this.killOrphanedEmulatorProcesses(emulatorPorts, { sweepShared: bumped.length === 0 });
+      await this.terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared: bumped.length === 0 });
       process.removeListener('SIGINT', onSigint);
       this.log(chalk.gray('  Emulator stopped.\n'));
       if (sigintCount > 0) {
@@ -247,10 +410,17 @@ class EmulatorCommand extends BaseCommand {
     // emulator grandchildren squatting the classic ports FOREVER — the
     // shutdown sweep only covers that run's RESOLVED map, and allocation
     // just bumps around squatters (95a: two stale generations cross-talking
-    // with a live run's functions emulator). Reap by the one signature that
-    // can't be a sibling's live stack: an emulator process whose parent is
-    // gone. Live listeners stay untouched and bump as before.
-    this.reapOrphanedEmulators(Object.values(wanted));
+    // with a live run's functions emulator). Reaped by two proofs together:
+    // orphaned (parent gone, so it can't be a sibling's live stack) AND
+    // provably this project's — the crashed run's own pid record, or a
+    // command line naming this project
+    // ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)). Live
+    // listeners and other projects' leftovers stay untouched and bump as before.
+    const recorded = this.readEmulatorOwnership();
+    this.reapOrphanedEmulators(Object.values(wanted), {
+      pids: recorded.pids,
+      projectId: this.loadProjectId(projectDir) || recorded.projectId,
+    });
 
     const { ports: emulatorPorts, bumped } = await resolvePorts({
       wanted,
@@ -420,6 +590,18 @@ class EmulatorCommand extends BaseCommand {
       )),
     ]);
 
+    // The stack is UP and every java emulator exists — record the pids now, so
+    // the post-shutdown sweep can prove which orphans are its own instead of
+    // signaling whatever holds a port
+    // ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)). Non-fatal:
+    // without a record the sweep falls back to command-line proof and spares
+    // anything it cannot place.
+    try {
+      this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir));
+    } catch (error) {
+      this.logWarning(`Could not record emulator pids (${error.message}) — the orphan sweep will only spare, never over-reach`);
+    }
+
     // shutdown() signals the entire emulator process group (sh + firebase + java
     // grandchildren), waits up to 10s for clean exit, then escalates to SIGKILL.
     //
@@ -450,6 +632,15 @@ class EmulatorCommand extends BaseCommand {
       if (shutdownDone) {
         return;
       }
+
+      // 0. Re-record the pid set while the tree is still attached. The boot
+      // snapshot misses anything spawned since (function runtime workers come
+      // and go), and once the parent is gone the descendants reparent to PID 1
+      // — this is the last moment ownership is readable
+      // ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
+      try {
+        this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir));
+      } catch (error) { /* the boot record still stands */ }
 
       // 1. Signal the process group (sh + firebase + direct children)
       if (child.exitCode === null && child.signalCode === null) {
@@ -516,7 +707,7 @@ class EmulatorCommand extends BaseCommand {
       process.removeListener('SIGINT', onSigint);
       await shutdown();
       await exitPromise;
-      await this.killOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
+      await this.terminateOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
 
       if (cmdExit.code !== 0) {
         throw Object.assign(new Error(`Command exited with code ${cmdExit.code}`), { code: cmdExit.code });
@@ -524,7 +715,7 @@ class EmulatorCommand extends BaseCommand {
     } catch (e) {
       process.removeListener('SIGINT', onSigint);
       await shutdown();
-      await this.killOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
+      await this.terminateOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
       throw e;
     }
   }
@@ -548,25 +739,84 @@ class EmulatorCommand extends BaseCommand {
   }
 
   /**
-   * Kill any processes still listening on THIS RUN's emulator ports after
+   * The project this stack serves, read from the brand config. Lenient like
+   * loadPortPins() — a missing/broken config means no project id, which the
+   * ownership matcher treats as "no evidence", never a boot failure.
+   */
+  loadProjectId(projectDir) {
+    try {
+      const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
+      const functionsDir = path.join(projectDir, 'dist');
+      if (!hasOmegaConfig(functionsDir)) {
+        return null;
+      }
+      return loadConfig(functionsDir, 'backend').config.cloud?.config?.projectId || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * The ownership evidence this run can offer the sweep: the pids it recorded
+   * when its stack came up, and the project it belongs to. Recorded pids age
+   * out — see ownershipFromRecord().
+   * @returns {{pids: number[], projectId: string|null, rootPid: number|null}}
+   */
+  readEmulatorOwnership() {
+    return ownershipFromRecord(jetpack.read(this.getTempPath(PID_RECORD_FILE), 'json'));
+  }
+
+  /**
+   * Record the stack's pids while it is UP, so the post-shutdown sweep can
+   * prove which orphans are its own
+   * ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
+   * @param {number} rootPid - The spawned child's pid.
+   * @param {string|null} projectId - The project this stack serves.
+   */
+  writeEmulatorPidRecord(rootPid, projectId) {
+    const existing = this.readEmulatorOwnership();
+
+    // UNION with what this run already recorded: a later snapshot can only see
+    // what is still attached, and a child that orphaned in between is exactly
+    // the one the sweep exists for. Pids of processes that have since exited
+    // cost nothing — signaling one is a caught ESRCH.
+    const previous = existing.pids.length > 0 && existing.rootPid === rootPid ? existing.pids : [];
+    const pids = [...new Set([...previous, ...collectDescendantPids(rootPid)])];
+
+    jetpack.write(this.getTempPath(PID_RECORD_FILE), {
+      pids: pids,
+      projectId: projectId || null,
+      rootPid: rootPid,
+      startedAt: new Date().toISOString(),
+    });
+
+    return pids;
+  }
+
+  /**
+   * Terminate processes still listening on THIS RUN's emulator ports after
    * shutdown. Firebase-tools spawns Java emulators (Firestore, Database,
    * PubSub) that often survive SIGTERM/SIGKILL of the firebase node process.
    * This sweep runs AFTER the main child exits, so anything still on these
    * ports is orphaned.
    *
-   * N7: the sweep takes the RESOLVED port map — sweeping firebase.json
-   * defaults after a bumped run would kill ANOTHER brand's live emulator
-   * (the exact behavior allocation removes). No map → no sweep. The shared
-   * hub (4400) + storage (9199) ports are swept only on a defaults run
-   * (`sweepShared`) — on a bumped run they belong to the incumbent.
+   * Ownership is PROVEN per process, never inferred from the port: the sweep
+   * used to signal whatever was listening and took down another project's live
+   * emulator on the shared hub/storage ports
+   * ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)). A port only
+   * decides where to LOOK; isOwnedEmulatorProcess() decides what to signal.
+   *
+   * N7: the sweep takes the RESOLVED port map — no map → no sweep. The shared
+   * hub (4400) + storage (9199) ports are looked at only on a defaults run
+   * (`sweepShared`); on a bumped run they belong to the incumbent.
    */
-  killOrphanedEmulatorProcesses(emulatorPorts, { sweepShared = true } = {}) {
+  terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared = true } = {}) {
     if (!emulatorPorts) {
       return;
     }
 
     // `https` is OUR in-process TLS proxy (closed with the child), never an
-    // orphaned java emulator — sweeping it would SIGKILL this very process
+    // orphaned java emulator — sweeping it would signal this very process
     // on a close-timing race.
     const { https: _httpsPort, ...sweepable } = emulatorPorts;
     const ports = Object.values(sweepable);
@@ -574,38 +824,61 @@ class EmulatorCommand extends BaseCommand {
       ports.push(4400, 9199);
     }
 
+    const ownership = this.readEmulatorOwnership();
+
     // Synchronous sweep — no async delays that Ctrl+C spam can interrupt.
     const { execSync } = require('child_process');
-    let killed = 0;
+    let terminated = 0;
+    let spared = 0;
+
     for (const port of ports) {
       try {
         const pids = execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
           .trim().split('\n').filter(Boolean);
         for (const pid of pids) {
           try {
+            const command = execSync(`ps -o command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
+
+            if (!isOwnedEmulatorProcess({ pid: pid, command: command }, ownership)) {
+              spared++;
+              continue;
+            }
+
             process.kill(Number(pid), 'SIGKILL');
-            killed++;
-          } catch (e) { /* already dead */ }
+            terminated++;
+          } catch (e) { /* vanished mid-check, or already gone */ }
         }
       } catch (e) { /* no process on this port */ }
     }
 
-    if (killed > 0) {
-      this.log(chalk.gray(`  Cleaned up ${killed} orphaned emulator process${killed > 1 ? 'es' : ''}.`));
+    if (terminated > 0) {
+      this.log(chalk.gray(`  Cleaned up ${terminated} orphaned emulator process${terminated > 1 ? 'es' : ''}.`));
+    }
+
+    if (spared > 0) {
+      this.log(chalk.gray(`  Left ${spared} process${spared > 1 ? 'es' : ''} on these ports alone — not this project's emulator.`));
     }
   }
 
   /**
    * Pre-boot reaper for CRASHED-run leftovers: kill processes squatting the
-   * wanted ports (plus the shared hub/storage ports) that look like emulator
-   * machinery AND are reparented to PID 1 — the firebase parent that spawned
-   * them is gone, so nothing will ever tear them down. A sibling brand's
-   * LIVE emulator keeps its firebase parent alive and never matches; the
-   * allocator bumps around it exactly as before.
+   * wanted ports (plus the shared hub/storage ports) that are reparented to
+   * PID 1 — the firebase parent that spawned them is gone, so nothing will
+   * ever tear them down — AND can be PROVEN to be this project's.
+   *
+   * Ownership is the same bar the post-shutdown sweep clears: a name matching
+   * /emulator|firebase/i is not evidence, so the reaper no longer kills
+   * another brand's orphans or another session's reload watcher on ports it
+   * merely wants ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)).
+   * A sibling brand's LIVE emulator keeps its parent and never matches either;
+   * the allocator bumps around both exactly as before.
+   * @param {number[]} ports - The wanted port map's values.
+   * @param {{pids: number[], projectId: string|null}} ownership - This project's evidence.
    */
-  reapOrphanedEmulators(ports) {
+  reapOrphanedEmulators(ports, ownership) {
     const { execSync } = require('child_process');
     let reaped = 0;
+    let spared = 0;
 
     for (const port of [...new Set([...(ports || []), 4400, 9199])]) {
       try {
@@ -616,12 +889,14 @@ class EmulatorCommand extends BaseCommand {
             const info = execSync(`ps -o ppid=,command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
             const match = info.match(/^\s*(\d+)\s+(.*)$/s);
             if (!match) continue;
-            const parentGone = Number(match[1]) === 1;
-            const looksLikeEmulator = /emulator|firebase/i.test(match[2]);
-            if (parentGone && looksLikeEmulator) {
-              process.kill(Number(pid), 'SIGKILL');
-              reaped++;
+
+            if (!isReapableOrphan({ pid: pid, ppid: match[1], command: match[2] }, ownership)) {
+              spared++;
+              continue;
             }
+
+            process.kill(Number(pid), 'SIGKILL');
+            reaped++;
           } catch (e) { /* vanished mid-check */ }
         }
       } catch (e) { /* port free */ }
@@ -630,7 +905,18 @@ class EmulatorCommand extends BaseCommand {
     if (reaped > 0) {
       this.log(chalk.gray(`  Reaped ${reaped} orphaned emulator process${reaped > 1 ? 'es' : ''} left by a previous crashed run.`));
     }
+
+    if (spared > 0) {
+      this.log(chalk.gray(`  Left ${spared} process${spared > 1 ? 'es' : ''} on these ports alone — not this project's crash leftovers.`));
+    }
   }
 }
+
+// Static, alongside Middleware's precedent — the ownership decision is pure,
+// so tests exercise it directly with real `ps` rows instead of live processes.
+EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;
+EmulatorCommand.isReapableOrphan = isReapableOrphan;
+EmulatorCommand.ownershipFromRecord = ownershipFromRecord;
+EmulatorCommand.collectDescendantPids = collectDescendantPids;
 
 module.exports = EmulatorCommand;

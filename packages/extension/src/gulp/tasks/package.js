@@ -205,6 +205,27 @@ const TARGETS = {
   firefox: {
     // Firefox - uses scripts array, no service_worker
     adjustManifest: (manifest) => {
+      // Firefox REFUSES an add-on it cannot identify, and an id assigned at
+      // submission time can never be updated from a self-hosted build — a
+      // packaged, submittable-looking artifact that is dead on arrival (#264).
+      // A declared id is authoritative. Missing, it is DERIVED from the brand
+      // config (deterministic per brand) so a fresh scaffold builds out of the
+      // box; only a project with no brand facts at all still fails loudly.
+      if (!manifest.browser_specific_settings?.gecko?.id) {
+        let host = null;
+        try { host = new URL(config.brand?.url).hostname; } catch (e) { /* no brand url — fall through to brand.id */ }
+        host = host || (config.brand?.id ? `${config.brand.id}.extension` : null);
+
+        if (!host) {
+          throw new Error('Cannot package the firefox artifact: browser_specific_settings.gecko.id is missing — declare it in src/manifest.json (e.g. { browser_specific_settings: { gecko: { id: \'my-extension@example.com\' } } })');
+        }
+
+        manifest.browser_specific_settings = manifest.browser_specific_settings || {};
+        manifest.browser_specific_settings.gecko = manifest.browser_specific_settings.gecko || {};
+        manifest.browser_specific_settings.gecko.id = `extension@${host}`;
+        logger.log(`firefox: no gecko id declared; derived ${manifest.browser_specific_settings.gecko.id} from the brand config. Declare browser_specific_settings.gecko.id in src/manifest.json before publishing — the id must stay stable across releases.`);
+      }
+
       if (manifest.background) {
         if (manifest.background.service_worker) {
           if (!manifest.background.scripts) {
@@ -213,6 +234,24 @@ const TARGETS = {
           delete manifest.background.service_worker;
         }
       }
+
+      // Chrome's side panel is `side_panel` + the `sidePanel` permission;
+      // Firefox has neither — it ships the same surface as `sidebar_action`.
+      // Shipping the chrome keys packaged fine and left the panel unreachable (#264).
+      if (manifest.side_panel) {
+        if (manifest.side_panel.default_path && !manifest.sidebar_action) {
+          manifest.sidebar_action = {
+            default_panel: manifest.side_panel.default_path,
+            default_title: manifest.action?.default_title || manifest.name,
+          };
+        }
+        delete manifest.side_panel;
+      }
+
+      if (Array.isArray(manifest.permissions)) {
+        manifest.permissions = manifest.permissions.filter((permission) => permission !== 'sidePanel');
+      }
+
       return manifest;
     },
   },
@@ -297,19 +336,16 @@ async function compileManifest(outputDir, target) {
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP 1: Apply defaults (shared across all targets)
     // ═══════════════════════════════════════════════════════════════════════════
+    // A declared consumer value is AUTHORITATIVE — the defaults only fill keys
+    // the consumer never wrote. Arrays used to UNION with the default, so a
+    // framework-default entry could never be removed: an extension declaring an
+    // empty `externally_connectable` still shipped the dev origin in every
+    // production build (#260). An empty array is a decision, not an omission.
     getKeys(defaultConfig).forEach(key => {
       const defaultValue = key.split('.').reduce((o, k) => (o || {})[k], defaultConfig);
       const userValue = key.split('.').reduce((o, k) => (o || {})[k], manifest);
 
-      if (Array.isArray(defaultValue) && Array.isArray(userValue)) {
-        // Merge arrays
-        const mergedArray = Array.from(new Set([...defaultValue, ...userValue]));
-        key.split('.').reduce((o, k, i, arr) => {
-          if (i === arr.length - 1) o[k] = mergedArray;
-          else o[k] = o[k] || {};
-          return o[k];
-        }, manifest);
-      } else if (userValue === undefined) {
+      if (userValue === undefined) {
         // Apply default if user value doesn't exist
         key.split('.').reduce((o, k, i, arr) => {
           if (i === arr.length - 1) o[k] = defaultValue;
@@ -744,6 +780,9 @@ module.exports.packageFn = packageFn;
 module.exports.compileManifest = compileManifest;
 module.exports.generateBuildJs = generateBuildJs;
 module.exports.compileLocales = compileLocales;
+// The browser targets the package lane builds — the one list the CI workflow's
+// artifact upload is checked against (it ships packaged/<target>/extension.zip).
+module.exports.TARGETS = TARGETS;
 
 // Run hooks
 async function hook(file, index) {

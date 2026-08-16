@@ -57,6 +57,11 @@ const CONFIG_LOCATIONS = [
   path.join('config', FILE_NAME),
 ];
 
+// Dirs a caller can resolve FROM that are one level below the app root: a
+// backend's runtime cwd (functions/) and its staged build output (dist/, where
+// `omega test` runs). Both normalize up before the brand walk.
+const APP_SUBDIRS = ['functions', 'dist'];
+
 /**
  * Resolve the omega.json5 path for a project dir.
  * @param {string} projectDir - The project root (app root in a brand monorepo).
@@ -108,16 +113,20 @@ function readConfigFile(absolutePath) {
  * actually carries a config (a plain `apps` folder outside a brand monorepo
  * has none, so the walk-up is a no-op there). The env cascade (env.js) walks
  * the same way — this is the ONE definition of the hierarchy.
- * @param {string} projectDir - The app dir (or its functions/ dir).
+ * @param {string} projectDir - The app dir (or one of its APP_SUBDIRS: functions/, dist/).
  * @returns {string|null} Absolute brand root, or null outside a brand monorepo.
  */
 function findBrandRoot(projectDir) {
   let appDir = path.resolve(projectDir);
 
   // A backend's runtime cwd is its functions/ dir (Cloud Functions and the
-  // emulator both boot there) — the app root is one level up. Mirrors the
-  // functions/config/omega.json5 entry in CONFIG_LOCATIONS.
-  if (path.basename(appDir) === 'functions') {
+  // emulator both boot there), and `omega test` resolves from the staged
+  // dist/ — the app root is one level up from either. Mirrors the
+  // functions/config/omega.json5 entry in CONFIG_LOCATIONS. Without dist/
+  // here the walk looked for apps/ one level too low, so a brand-root .env
+  // never joined the cascade
+  // ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
+  if (APP_SUBDIRS.includes(path.basename(appDir))) {
     appDir = path.dirname(appDir);
   }
 
@@ -141,12 +150,17 @@ function findBrandConfigPath(projectDir) {
  * authored once at the company root. The marker sits at the BRAND root, so
  * apps resolve it through their brand; a brand root (or standalone project)
  * reads its own. Same rule as the .env cascade (env.js).
- * @param {string} projectDir - App dir, brand root, or a functions/ dir.
+ * @param {string} projectDir - App dir, brand root, or an APP_SUBDIR of one (functions/, dist/).
  * @returns {string|null} Absolute company omega.json5 path, or null.
  */
 function findCompanyConfigPath(projectDir) {
   let dir = path.resolve(projectDir);
-  if (path.basename(dir) === 'functions') dir = path.dirname(dir);
+  // Same normalization as findBrandRoot: a marker is stamped at the app/brand
+  // root, never inside the runtime cwd or the staged build output. Reading
+  // only `functions/` left a STANDALONE project resolving from dist/ (the view
+  // `omega test` loads) looking for the marker inside dist/, so its company
+  // layer vanished ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
+  if (APP_SUBDIRS.includes(path.basename(dir))) dir = path.dirname(dir);
 
   const markerRoot = findBrandRoot(dir) || dir;
   const companyRoot = readCompanyRoot(markerRoot);

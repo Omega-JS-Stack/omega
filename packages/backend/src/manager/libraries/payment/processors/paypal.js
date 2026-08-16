@@ -179,6 +179,14 @@ const PayPal = {
         return captured;
       }
 
+      if (resourceType === 'capture') {
+        // The v2 twin of the sale branch below. A capture created by this
+        // framework's own v2 Orders flow carries our custom_id directly, so
+        // there is nothing to fold — one read is the whole answer
+        // ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+        return await this.request(`/v2/payments/captures/${resourceId}`);
+      }
+
       if (resourceType === 'sale') {
         // The refund of a one-time purchase names the SALE it reversed. A v1 sale
         // carries the money and the payment behind it, never our custom_id — the
@@ -444,10 +452,17 @@ const PayPal = {
    * @returns {{ amount: string|null, currency: string, reason: string|null }}
    */
   getRefundDetails(raw) {
+    const resource = raw?.resource;
+
     return {
-      amount: raw?.resource?.amount?.total || raw?.resource?.total_refunded_amount?.value || null,
-      currency: raw?.resource?.amount?.currency || 'USD',
-      reason: raw?.resource?.reason_code || null,
+      // v1 spells the amount `total`/`currency`, v2 spells it
+      // `value`/`currency_code` — a v2 capture refund read only the v1
+      // spelling and landed a null amount on the order record and the
+      // customer's refund email
+      // ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+      amount: resource?.amount?.total || resource?.amount?.value || resource?.total_refunded_amount?.value || null,
+      currency: resource?.amount?.currency || resource?.amount?.currency_code || 'USD',
+      reason: resource?.reason_code || null,
     };
   },
 
@@ -502,6 +517,29 @@ function parseCustomId(customId) {
 }
 
 /**
+ * Is this subscription still INSIDE its free trial?
+ *
+ * The trial WINDOW is the answer, not the payment record: conversion happens at
+ * the trial's end, so a subscription whose trial end is still ahead of it cannot
+ * have converted, whatever money has changed hands. A plan carrying a setup fee
+ * charges one on day zero, and reading that fee as a paid billing period is what
+ * made a cancelled trial look like a paid term with time left on it
+ * ([#267](https://github.com/Omega-JS-Stack/omega/issues/267)).
+ *
+ * A trial with no computable end (no `start_time`) reads FALSE — this decides
+ * whether access is revoked, and missing data must never be the thing that
+ * revokes it.
+ *
+ * @param {object} raw - Raw PayPal subscription (with _plan attached)
+ * @returns {boolean}
+ */
+function isInTrial(raw) {
+  const trial = resolveTrial(raw);
+
+  return !!(trial.claimed && trial.expires.timestampUNIX > Math.floor(Date.now() / 1000));
+}
+
+/**
  * Calculate when the current billing period ends based on last payment + interval
  * Used for cancelled subs to determine remaining access time
  *
@@ -509,6 +547,14 @@ function parseCustomId(customId) {
  * @returns {Date|null} Period end date, or null if cannot be calculated
  */
 function calculatePeriodEnd(raw) {
+  // A TRIAL has no paid period to serve out, so cancelling one ends access NOW
+  // (Ian's ruling, 2026-08-15 — we do not keep serving a trial we know will not
+  // convert). This is the ONE place the three cancelled-subscription readers
+  // below share, so status, cancellation and expiry can never disagree about it.
+  if (isInTrial(raw)) {
+    return null;
+  }
+
   const lastPayment = raw.billing_info?.last_payment?.time;
 
   if (!lastPayment) {

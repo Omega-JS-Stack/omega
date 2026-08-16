@@ -119,3 +119,15 @@ test('the checkout page ships no `_dev_cardProcessor` to production (#235)', asy
   const prodGraph = await buildCheckoutGraph(false, 'strip-processor-prod-out');
   assert.ok(!prodGraph.includes('_dev_cardProcessor'), 'production never reads the card-processor override');
 });
+
+test('the checkout page ships no `_dev_trialEligible` to production (#245)', async () => {
+  // initializeCheckout() read the param outside any block, so the literal rode
+  // into the production graph while every other checkout dev param stayed out.
+  // Never exploitable — the apply site was always behind omega.isDevelopment()
+  // — but the read belongs behind the same triple gate as the rest (#235/#226).
+  const devGraph = await buildCheckoutGraph(true, 'strip-trial-dev-out');
+  assert.ok(devGraph.includes('_dev_trialEligible'), 'the dev build carries the param — otherwise this proves nothing');
+
+  const prodGraph = await buildCheckoutGraph(false, 'strip-trial-prod-out');
+  assert.ok(!prodGraph.includes('_dev_trialEligible'), 'production never reads the trial-eligibility override');
+});

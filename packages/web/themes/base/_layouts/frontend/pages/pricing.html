@@ -66,13 +66,16 @@ faqs:
     text: "FAQs"
   headline: "Frequently asked <em>questions</em>"
   subheadline: "Everything you need to know about {{ site.brand.name }} billing & subscriptions."
+  # Trial copy DERIVES from the catalog (#273): the answer renders empty when
+  # no product carries `trial.days`, and the renderers drop answerless items —
+  # so a brand with no trial ships no trial claim. A refund policy is brand
+  # copy, never a framework default: the defaults state only what the catalog
+  # knows.
   items:
     - question: "Can I cancel at any time?"
       answer: "Yes, you can cancel anytime, no questions asked. However, we would highly appreciate it if you could give us some feedback so we can improve."
     - question: "Is there a free trial?"
-      answer: "Yes, there is a 14-day free trial of the paid plans. You can cancel your subscription at any time during the trial period for a full refund."
-    - question: "What is your refund policy?"
-      answer: "We offer a 14-day free trial of the premium plans. You can cancel any time during your trial for a full refund. After the trial period, you can cancel and you may receive a prorated refund for the remaining time on your subscription."
+      answer: "{% if resolved.pricing.trialDays > 0 %}Yes, every paid plan starts with a {{ resolved.pricing.trialDays }}-day free trial, and you can cancel any time before it ends.{% endif %}"
 ---
 
 {% comment %}
@@ -160,6 +163,11 @@ faqs:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-12">
+        {% comment %} The band's heading (#270): the card names are h3s, so
+        without it the page skips from the hero h1 straight to h3. Visually
+        hidden — the design carries the band by its cards, not a title. {% endcomment %}
+        <h2 class="visually-hidden">Subscription plans</h2>
+
         {% if _show_toggle %}
           {% if resolved.pricing.savingsPercent > 0 %}
             {% assign _savings = resolved.pricing.savingsPercent %}
@@ -341,10 +349,15 @@ faqs:
           {% endfor %}
         </div>
 
-        <p class="small text-center omega-quiet mb-0" data-omega-reveal>
-          <span class="omega-guarantee-icon me-1">{% omega_icon "shield-halved" %}</span>
-          {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
-        </p>
+        {% comment %} The guarantee line is BRAND copy (#273): a refund window
+        is a policy the framework cannot know, so there is no default — a brand
+        sets pricing.guarantee and the line appears. {% endcomment %}
+        {% iftruthy resolved.pricing.guarantee %}
+          <p class="small text-center omega-quiet mb-0" data-omega-reveal>
+            <span class="omega-guarantee-icon me-1">{% omega_icon "shield-halved" %}</span>
+            {{ resolved.pricing.guarantee }}
+          </p>
+        {% endiftruthy %}
 
       </div>
     </div>
@@ -357,6 +370,11 @@ faqs:
      marked enterprise: true; no such product, no row) -->
 <section class="pt-0">
   <div class="container">
+    {% comment %} The band's heading (#270): its title is an h3, and an
+    enterprise-only catalog renders no plans band above it — so the h2 rides
+    here too. Visually hidden — the row carries itself. {% endcomment %}
+    <h2 class="visually-hidden">Enterprise</h2>
+
     <div class="omega-band omega-band--enterprise" data-omega-reveal>
       <div class="omega-band__body">
         <h3 class="omega-band__title">{{ _enterprise.name }}</h3>
@@ -560,35 +578,50 @@ faqs:
 {% endiftruthy %}
 
 <!-- FAQ Section (consumer-provided: faqs.items) -->
-{% iftruthy resolved.faqs.items %}
+{% comment %} An answerless item is a DERIVED one whose condition didn't hold
+(#273 — the trial FAQ on a catalog with no trial): it drops out of the
+accordion here and out of the FAQPage schema in core/foot.html. The test is
+`!= ''` on purpose — `!= blank` does not filter inside where_exp here.
+{% endcomment %}
+{% assign _faqs = resolved.faqs.items | where_exp: "faq", "faq.answer != ''" %}
+{% assign _faq_count = _faqs | size %}
+{% if _faq_count > 0 %}
 <section>
   <div class="container">
     <div class="omega-duo">
       <div class="omega-duo__aside omega-section-head" data-omega-reveal>
         {% component "heading/section-head", superheadline: resolved.faqs.superheadline.text, headline: resolved.faqs.headline | default: "Frequently asked <em>questions</em>", sub: resolved.faqs.subheadline %}
 
-        <!-- The guarantee, as an object (no invented numbers — C2) -->
+        {% comment %} The billing object states what the framework KNOWS: the
+        plan-switch route really does prorate. Its refund half — the fragment
+        and the floating chip — is the same brand copy as the guarantee line
+        above (#273), so it rides the same `pricing.guarantee` gate and the
+        object drops its chip clearance with it. {% endcomment %}
         <div class="omega-object position-relative pe-4 mt-4 d-none d-lg-block">
-          <div class="omega-fragment pb-5">
+          <div class="omega-fragment{% iftruthy resolved.pricing.guarantee %} pb-5{% endiftruthy %}">
             <span class="omega-micro omega-fragment__label">How billing behaves</span>
             <div class="omega-fragment__msg">
               <span class="omega-fragment__msg-mark">{% omega_icon "arrows-rotate", "fa-xs" %}</span>
               <span>Switch plans anytime, <strong>prorated</strong> automatically</span>
             </div>
-            <div class="omega-fragment__msg">
-              <span class="omega-fragment__msg-mark">{% omega_icon "rotate-left", "fa-xs" %}</span>
-              <span>Changed your mind? <strong>Refunded.</strong></span>
+            {% iftruthy resolved.pricing.guarantee %}
+              <div class="omega-fragment__msg">
+                <span class="omega-fragment__msg-mark">{% omega_icon "rotate-left", "fa-xs" %}</span>
+                <span>Changed your mind? <strong>Refunded.</strong></span>
+              </div>
+            {% endiftruthy %}
+          </div>
+          {% iftruthy resolved.pricing.guarantee %}
+            <div class="omega-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
+              <span class="omega-dot omega-status--ok"></span>
+              Money-back guarantee
             </div>
-          </div>
-          <div class="omega-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
-            <span class="omega-dot omega-status--ok"></span>
-            Money-back guarantee
-          </div>
+          {% endiftruthy %}
         </div>
       </div>
 
       <div class="accordion omega-faq" id="faqAccordion" data-omega-reveal>
-        {% for faq in resolved.faqs.items %}
+        {% for faq in _faqs %}
           <div class="accordion-item">
             <h2 class="accordion-header">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
@@ -606,6 +639,6 @@ faqs:
     </div>
   </div>
 </section>
-{% endiftruthy %}
+{% endif %}
 
 {{ content | omega_content_format }}

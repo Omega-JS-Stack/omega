@@ -9,6 +9,15 @@ const powertools = require('node-powertools');
 const { merge } = require('lodash');
 const JSON5 = require('json5');
 const User = require('./user.js');
+const redactSecret = require('./redact-secret.js');
+
+// The channels a credential arrives on, one-to-one with the lanes
+// context/authenticate.js reads: the bearer/API-key header, the admin key, the
+// __session cookie, and the two payload keys. Anything here is rendered
+// presence + last-4 before it reaches a log line
+// ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
+const CREDENTIAL_HEADERS = ['authorization', 'omega-admin-key', 'cookie'];
+const CREDENTIAL_DATA_KEYS = ['apikey', 'authenticationtoken'];
 
 // The `test/` route folder is DEVELOPMENT-ONLY: it exists to exercise the
 // framework (echo the settings engine, increment a usage counter, reset a
@@ -162,8 +171,8 @@ Middleware.prototype.run = function (libPath, options) {
     const strippedUrl = stripUrl(url);
 
     // Log
-    ctx.log(`Middleware.process(): Request (${geolocation.ip || 'unknown'} @ ${geolocation.country || '?'}, ${geolocation.region || '?'}, ${geolocation.city || '?'}) [${method} > ${strippedUrl}]`, safeStringify(data));
-    ctx.log(`Middleware.process(): Headers`, safeStringify(headers));
+    ctx.log(`Middleware.process(): Request (${geolocation.ip || 'unknown'} @ ${geolocation.country || '?'}, ${geolocation.region || '?'}, ${geolocation.city || '?'}) [${method} > ${strippedUrl}]`, safeStringify(redactDataForLog(data)));
+    ctx.log(`Middleware.process(): Headers`, safeStringify(redactHeadersForLog(headers)));
 
     // Set paths
     const routesDir = path.resolve(options.routesDir, libPath.replace('.js', ''));
@@ -218,7 +227,7 @@ Middleware.prototype.run = function (libPath, options) {
     // Log working user
     const workingUser = ctx.getUser();
     const resolvedSub = User.resolveSubscription(workingUser);
-    ctx.log(`Middleware.process(): User (${workingUser.auth.uid}, ${workingUser.auth.email}, ${workingUser.subscription.product.id}=${workingUser.subscription.status} (resolved: ${resolvedSub.plan})):`, safeStringify(workingUser));
+    ctx.log(`Middleware.process(): User (${workingUser.auth.uid}, ${workingUser.auth.email}, ${workingUser.subscription.product.id}=${workingUser.subscription.status} (resolved: ${resolvedSub.plan})):`, safeStringify(projectUserForLog(workingUser)));
 
     // Setup analytics
     if (options.setupAnalytics) {
@@ -340,6 +349,87 @@ function stripUrl(url) {
   return `${newUrl.host}${newUrl.pathname}`.replace(/\/$/, '');
 }
 
+/**
+ * The user projection a log line may carry: who the caller is, the plan the
+ * request runs under, and the roles that gate it.
+ *
+ * Built by ALLOW-LIST, not by redacting known-secret keys. The raw document
+ * carries `api.privateKey` — a live credential — so logging the doc wrote a
+ * durable copy of every caller's key into Cloud Logging on every authenticated
+ * request. An allow-list also means a field added to the account schema later
+ * stays off the line until somebody puts it here deliberately.
+ * @param {object} user - The user document (ctx.getUser())
+ * @returns {object} { id, plan: { id, status }, roles: string[] }
+ */
+function projectUserForLog(user) {
+  const roles = user?.roles && typeof user.roles === 'object' ? user.roles : {};
+
+  return {
+    id: user?.auth?.uid || null,
+    plan: {
+      id: user?.subscription?.product?.id || null,
+      status: user?.subscription?.status || null,
+    },
+    // Names of the ENABLED roles only. `roles` is a $passthrough group, so a
+    // consumer can hang an arbitrary value off it; emitting names keeps any
+    // such value off the line.
+    roles: Object.keys(roles).filter((role) => roles[role] === true),
+  };
+}
+
+/**
+ * A COPY of `source` with every credential channel rendered by `render`.
+ * A copy because ctx.request.headers IS req.headers and ctx.request.data is
+ * what the route handler reads next — redacting in place would break the
+ * authentication the line is describing.
+ * @param {object} source - Headers or request data.
+ * @param {string[]} channels - Lower-cased key names to redact.
+ * @param {function} render - (value, key) → the string to log instead.
+ * @returns {object} A shallow copy, credential channels replaced.
+ */
+function redactChannels(source, channels, render) {
+  const object = source && typeof source === 'object' ? source : {};
+  const redacted = { ...object };
+
+  for (const key of Object.keys(object)) {
+    if (channels.includes(key.toLowerCase())) {
+      redacted[key] = render(`${object[key] || ''}`, key.toLowerCase());
+    }
+  }
+
+  return redacted;
+}
+
+/**
+ * The headers a log line may carry. An API key authenticates as
+ * `Authorization: Bearer <api.privateKey>`, so the raw headers line wrote a
+ * live credential into Cloud Logging on every API-key request
+ * ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)). The auth scheme
+ * survives — it says WHICH lane the caller used, which is the diagnostic value
+ * of the line — and the credential after it does not.
+ * @param {object} headers - ctx.request.headers
+ * @returns {object} A copy safe to log.
+ */
+function redactHeadersForLog(headers) {
+  return redactChannels(headers, CREDENTIAL_HEADERS, (value, key) => {
+    const scheme = key === 'authorization' ? /^(\S+\s+)(.+)$/.exec(value) : null;
+
+    return scheme ? `${scheme[1]}${redactSecret(scheme[2])}` : redactSecret(value);
+  });
+}
+
+/**
+ * The request data a log line may carry: the two payload credential lanes
+ * (`apiKey`, `authenticationToken`) redacted, every other field intact — the
+ * line is the primary request trace and stays readable
+ * ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
+ * @param {object} data - ctx.request.data
+ * @returns {object} A copy safe to log.
+ */
+function redactDataForLog(data) {
+  return redactChannels(data, CREDENTIAL_DATA_KEYS, (value) => redactSecret(value));
+}
+
 // Helper to safely stringify objects by truncating long strings (like base64)
 function safeStringify(obj, maxLength = 100) {
   const truncate = (value) => {
@@ -358,6 +448,9 @@ function safeStringify(obj, maxLength = 100) {
 // getEnvironment() rather than through a hand-rolled request.
 Middleware.isDevOnlyRouteBlocked = isDevOnlyRouteBlocked;
 Middleware.isRouteOutsideRoutesDir = isRouteOutsideRoutesDir;
+Middleware.projectUserForLog = projectUserForLog;
+Middleware.redactHeadersForLog = redactHeadersForLog;
+Middleware.redactDataForLog = redactDataForLog;
 Middleware.DEV_ONLY_ROUTE_FOLDER = DEV_ONLY_ROUTE_FOLDER;
 
 module.exports = Middleware;

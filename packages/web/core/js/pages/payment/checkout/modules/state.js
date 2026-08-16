@@ -21,6 +21,9 @@ export const state = {
   // non-zero
   discountPercent: 0,
   discountAmount: 0,
+  // How far the code reaches: 'once' (the first payment only, what every
+  // configured code is) vs a duration that rides every renewal (#254)
+  discountDuration: null,
   trialEligible: false,
 
   // UI state
@@ -135,7 +138,10 @@ export function buildBindingsState() {
       trial: {
         show: hasFreeTrial,
         hasFreeTrial: hasFreeTrial && prices.total === 0,
-        message: hasFreeTrial ? `Start your ${product?.trial?.days || 7}-day free trial today!` : '',
+        // The length is the CATALOG's, never a framework constant (#273): a
+        // trial the product doesn't sell fails `hasFreeTrial` and the sentence
+        // never renders, so there is no number left to invent.
+        message: hasFreeTrial ? `Start your ${product.trial.days}-day free trial today!` : '',
         discountAmount: prices.trialDiscountAmount.toFixed(2),
       },
       discount: {
@@ -189,8 +195,10 @@ function buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount) {
   const periodAdjectiveMap = { daily: 'daily', weekly: 'weekly', monthly: 'monthly', annually: 'annual' };
   const periodText = periodAdjectiveMap[cycle] || cycle;
   const renewalDate = new Date();
+  // Same catalog number the trial message states (#273) — the date the first
+  // charge lands on is the trial's own length, not a default one.
   const daysToAdd = hasFreeTrial
-    ? (product.trial?.days || 7)
+    ? product.trial.days
     : (FREQUENCY_DAYS[cycle] || 30);
   renewalDate.setDate(renewalDate.getDate() + daysToAdd);
 
@@ -203,7 +211,18 @@ function buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount) {
   const discountNote = hasDiscount ? ' Discount code applies to first payment only and is not available with PayPal.' : '';
 
   if (hasFreeTrial) {
-    return `You won't be charged for your free trial. On ${formatted}, your ${periodText} subscription will start and you'll be charged ${formatCurrency(prices.recurring)} plus applicable tax. Cancel anytime before then.${discountNote}`;
+    // The charge that lands when the trial ends is the FIRST invoice, and a
+    // first-payment code is attached to exactly that one (the intent route
+    // sends the `once` coupon alongside the trial — intent/processors/
+    // stripe.js). So the trial line prices the first charge DISCOUNTED and
+    // names the renewal price separately; quoting list price here promised a
+    // bigger first charge than the card will see (#254).
+    const firstCharge = prices.subtotal - prices.discountAmount;
+    const renewalNote = firstCharge !== prices.recurring
+      ? ` It renews at ${formatCurrency(prices.recurring)} after that.`
+      : '';
+
+    return `You won't be charged for your free trial. On ${formatted}, your ${periodText} subscription will start and you'll be charged ${formatCurrency(firstCharge)} plus applicable tax.${renewalNote} Cancel anytime before then.${discountNote}`;
   }
 
   return `Your ${periodText} subscription will start today and renew on ${formatted} for ${formatCurrency(prices.recurring)} plus applicable tax. Cancel anytime.${discountNote}`;

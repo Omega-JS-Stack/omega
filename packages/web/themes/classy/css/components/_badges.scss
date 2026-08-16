@@ -6,36 +6,10 @@
   z-index: 100;
 }
 
-// ============================================
-// Chip — the hairline micro-pill (counts, SPONSORED, NEW, env tags)
-// ============================================
-.omega-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.1875rem 0.5625rem;
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--omega-ink-muted);
-  background: var(--omega-surface-2);
-  border: 1px solid var(--omega-line);
-  border-radius: var(--omega-radius-pill, 50rem);
-  white-space: nowrap;
-}
-
-.omega-chip--accent {
-  color: var(--omega-accent);
-  background: var(--omega-accent-subtle);
-  border-color: transparent;
-}
-
-.omega-chip--ink {
-  color: var(--omega-ground);
-  background: var(--omega-ink);
-  border-color: var(--omega-ink);
-}
+// The CHIP moved to the core component sheet (#242 —
+// core/css/components/_index.scss): base-layer markup renders it, so its
+// structure is shared vocabulary, not a classy component. Re-skin it here if
+// classy ever wants its own chip; the core rules land before this file.
 
 // ============================================
 // Status pill — dot + label

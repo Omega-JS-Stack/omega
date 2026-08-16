@@ -70,8 +70,12 @@ const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team',
 // `theme` (shell chrome config, e.g. main class), `schema` (JSON-LD SEO) and
 // `client` (the @omega.js/client settings blob — auth policy, cookie consent,
 // chatsy…) are page PRESENTATION/machinery config, not band content — legal.
+// `redirect` (the modules/utilities/redirect layout's target — docs/web/index.md)
+// and `prerender_icons` (core/body.html's icon prerender list) are layout
+// MACHINERY a page configures the same way: shipped contracts that worked only
+// from defaults/ and _layouts/ until #247 — a consumer page lost them silently.
 const PAGE_FRONTMATTER_ALLOW = new Set([
-  'meta', 'schema', 'theme', 'client', 'append', 'sitemap', 'templateEngineOverride', 'eleventyExcludeFromCollections',
+  'meta', 'schema', 'theme', 'client', 'append', 'sitemap', 'redirect', 'prerender_icons', 'templateEngineOverride', 'eleventyExcludeFromCollections',
 ]);
 
 // Deep merge shared with the section tag's defaults ← data ← args chain —

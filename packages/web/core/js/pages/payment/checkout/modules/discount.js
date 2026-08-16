@@ -20,6 +20,7 @@ function clearDiscount() {
   state.discountCode = null;
   state.discountPercent = 0;
   state.discountAmount = 0;
+  state.discountDuration = null;
 }
 
 /**
@@ -50,6 +51,9 @@ export async function applyDiscountCode(code, updateUI) {
       state.discountCode = result.code;
       state.discountPercent = result.percent || 0;
       state.discountAmount = result.amount || 0;
+      // The server's own term for the code — the receipt prices the renewal
+      // off it rather than assuming the discount rides forever (#254)
+      state.discountDuration = result.duration || null;
       state.discountUI = { loading: false, success: true, error: false, message: `Discount applied: ${describeDiscount(result)}` };
     } else {
       clearDiscount();

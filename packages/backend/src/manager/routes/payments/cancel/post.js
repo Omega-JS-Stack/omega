@@ -2,6 +2,7 @@ const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
 const isAlreadyGone = require('./_processor-errors.js');
+const isTrialing = require('./_is-trialing.js');
 
 /**
  * POST /payments/cancel
@@ -45,9 +46,16 @@ module.exports = async ({ ctx, user, settings }) => {
     ctx.warn(`Ignoring skipGuards on cancel: uid=${uid} is not permitted to bypass the cancellation guards`);
   }
 
-  // Guard: subscription younger than 24 hours (privileged callers may bypass via skipGuards)
+  // Guard: subscription younger than 24 hours (privileged callers may bypass via skipGuards).
+  //
+  // A TRIAL is exempt ([#267](https://github.com/Omega-JS-Stack/omega/issues/267)):
+  // the guard exists to stop a cancellation racing a PAID checkout that is still
+  // settling, and a trial has no payment to settle. Blocking it told the most
+  // common trial behavior there is — cancelling the same day you started — that
+  // the subscription "is still being set up".
+  const trialing = isTrialing(subscription);
   const startDateUNIX = subscription.payment?.startDate?.timestampUNIX;
-  if (!skipGuards && startDateUNIX) {
+  if (!skipGuards && !trialing && startDateUNIX) {
     const ageMs = Date.now() - (startDateUNIX * 1000);
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
     if (ageMs < twentyFourHoursMs) {
@@ -135,7 +143,7 @@ module.exports = async ({ ctx, user, settings }) => {
     ctx.log(`Stored cancellation request on payments-orders/${orderId}: reason=${settings.reason}`);
   }
 
-  ctx.log(`Cancel scheduled: uid=${uid}, processor=${processor}, sub=${resourceId}, reason=${settings.reason}`);
+  ctx.log(`Cancel ${trialing ? 'immediate (trialing)' : 'scheduled'}: uid=${uid}, processor=${processor}, sub=${resourceId}, reason=${settings.reason}`);
 
   return ctx.respond({ success: true });
 };

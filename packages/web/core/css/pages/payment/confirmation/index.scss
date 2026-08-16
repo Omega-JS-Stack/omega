@@ -1,2 +1,14 @@
 // Order Confirmation Page Styles
-// This file can be deleted - all styles replaced with Bootstrap classes
+// The page is Bootstrap classes throughout; the one rule here is the waiting
+// moment's reduced-motion deal.
+
+// The processing moment spins while the webhook lands. Vendored Bootstrap only
+// SLOWS its spinner under reduced motion (upstream's own behavior, which the
+// vendored sheet keeps), so the page that renders one owns the park: a
+// reduced-motion visitor gets the indicator held still, labeled by the headline
+// and the line beneath it (docs/shared/theming.md).
+@media (prefers-reduced-motion: reduce) {
+  .omega-receipt .spinner-border {
+    animation: none;
+  }
+}

@@ -22,6 +22,15 @@ const { teeLog } = require('./tee-log');
 
 const [label, ...commands] = process.argv.slice(2);
 
+// Watch-deadline scale (#211): a lane runs its children against every other
+// suite on the machine, and the rebuild-watching web tests time out on LOAD,
+// not on breakage (eight sightings, always green standalone). Every child
+// inherits the multiplier — 30s solo becomes 90s in a lane — unless the caller
+// (or an outer lane) already set one. Solo `node --test <file>` never comes
+// through here, so it keeps the tight deadline that surfaces a real
+// regression fast.
+const DEADLINE_SCALE = '3';
+
 if (!label || commands.length === 0) {
   console.error('Usage: node scripts/lane.js <label> "<command>" ["<command>" …]');
   process.exit(1);
@@ -47,10 +56,16 @@ function formatDuration(ms) {
  */
 function run(command) {
   return new Promise((resolve) => {
+    const env = {
+      ...(process.stdout.isTTY ? { FORCE_COLOR: '1' } : {}),
+      ...process.env,
+      OMEGA_TEST_DEADLINE_SCALE: process.env.OMEGA_TEST_DEADLINE_SCALE || DEADLINE_SCALE,
+    };
+
     const child = spawn(command, {
       shell: true,
       stdio: ['inherit', 'pipe', 'pipe'],
-      env: process.stdout.isTTY ? { FORCE_COLOR: '1', ...process.env } : process.env,
+      env,
     });
 
     // setEncoding decodes across chunk boundaries — a multi-byte char split by

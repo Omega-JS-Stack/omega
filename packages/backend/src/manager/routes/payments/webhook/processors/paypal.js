@@ -29,6 +29,18 @@ const SUPPORTED_EVENTS = new Set([
 
   // One-time order events
   'CHECKOUT.ORDER.APPROVED',
+
+  // v2 capture refunds. One-time purchases this framework creates go through
+  // v2 Orders, and a v2 capture refunds as PAYMENT.CAPTURE.REFUNDED — never the
+  // v1 PAYMENT.SALE.REFUNDED above, so this list used to drop every refund of a
+  // modern PayPal purchase ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+  //
+  // The siblings stay OUT, reviewed with the same issue: CAPTURE.COMPLETED /
+  // PENDING / DENIED describe the capture this framework performs itself inside
+  // fetchResource('order'), so accepting them would process one purchase twice.
+  // CAPTURE.REVERSED is a money-out event like a refund, but nothing here has
+  // ever exercised it — it needs its own payload before it is accepted.
+  'PAYMENT.CAPTURE.REFUNDED',
 ]);
 
 module.exports = {
@@ -116,6 +128,19 @@ module.exports = {
       }
 
       uid = parseUidFromCustomId(resource.custom_id);
+
+    } else if (eventType === 'PAYMENT.CAPTURE.REFUNDED') {
+      // The v2 twin of the branch above: a one-time purchase made through v2
+      // Orders refunds as a capture refund. The resource is a v2 Refund, which
+      // names the CAPTURE it reversed through its HATEOAS `up` link — there is
+      // no parent_payment to walk, and the capture reads back at
+      // /v2/payments/captures/{id} carrying our custom_id directly
+      // ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+      category = 'one-time';
+      resourceType = 'capture';
+      resourceId = resource.capture_id || parseCaptureIdFromLinks(resource.links) || resource.id;
+
+      uid = parseUidFromCustomId(resource.custom_id);
     }
 
     return {
@@ -129,6 +154,27 @@ module.exports = {
     };
   },
 };
+
+/**
+ * The capture id a v2 Refund's HATEOAS links name.
+ *
+ * PayPal v2 resources point UP at what they came from: a refund's `up` link is
+ * the capture it reversed. Only a link that is actually a captures endpoint
+ * counts — the same `up` rel names the ORDER on other resources.
+ * @param {Array} links - The resource's `links` array
+ * @returns {string|null} The capture id, or null when no link names one
+ */
+function parseCaptureIdFromLinks(links) {
+  for (const link of links || []) {
+    const match = String(link?.href || '').match(/\/v2\/payments\/captures\/([^/?#]+)/);
+
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
 
 /**
  * Parse uid from PayPal custom_id format: uid:{uid},orderId:{orderId}

@@ -1,3 +1,5 @@
+const isTrialing = require('../_is-trialing.js');
+
 /**
  * Chargebee cancel processor
  * Cancels a subscription — immediately if trialing, at period end otherwise.
@@ -20,11 +22,7 @@ module.exports = {
     const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
     ChargebeeLib.init();
 
-    const isTrialing = subscription?.trial?.claimed
-      && subscription?.status === 'active'
-      && subscription?.trial?.expires?.timestampUNIX === subscription?.expires?.timestampUNIX;
-
-    if (isTrialing) {
+    if (isTrialing(subscription)) {
       // Immediate cancel for trials
       await ChargebeeLib.request(`/subscriptions/${resourceId}/cancel_for_items`, {
         method: 'POST',

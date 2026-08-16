@@ -479,7 +479,7 @@ before the report prints.
 | `cloudflare` (the purge `zone`) | **`edge.providers.cloudflare`** — one cloudflare home, shared with the manager's zone reconciliation (#23) |
 | `advertising.google-adsense` (flat or under `providers`) | **`advertising.providers.adsense`** with camelCase slots (`displaySlot`, `inArticleSlot`, `inFeedSlot`, `multiplexSlot`) — provider ids drop the vendor prefix (#23) |
 | `permalink`, `pagination`, `collections`, `defaults`, `generators` | `targets.web.<same key>` (codemod rule 8's home — engine consumption of custom collections rides the consumer-theme waves) |
-| UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` — `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs) |
+| UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` — `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs), and `purgecss.safelist` is LIVE too ([#250](https://github.com/Omega-JS-Stack/omega/issues/250)): schema-known (`{ standard, deep, greedy, keyframes }` arrays, or a bare array for `standard`), it merges over the framework's built-in safelist in the purge pass |
 | UJM-json `webpack`, `gems`; `_config.yml` Jekyll machinery (`plugins`, `exclude`, …) | dropped, noted in the report |
 | secret-shaped keys anywhere | dropped + warned — move to `.env` |
 

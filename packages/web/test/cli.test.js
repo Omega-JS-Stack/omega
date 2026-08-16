@@ -216,6 +216,43 @@ test('scaffold: inside a brand monorepo the per-app agent docs never scaffold an
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('scaffold: a brand app scaffolds NO per-app .github/ — its CI composes into the brand root (#265)', () => {
+  const root = tmpConsumer();
+  const brandRoot = path.join(root, 'brand');
+  const appDir = path.join(brandRoot, 'apps', 'website');
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(path.join(appDir, '.env'), 'CLOUDFLARE_TOKEN=cf\n');
+
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+
+  // GitHub runs workflows from the repo root ONLY — a per-app copy is dead.
+  assert.ok(!fs.existsSync(path.join(appDir, '.github')), 'no per-app .github/ in a brand monorepo');
+
+  const composedPath = path.join(brandRoot, '.github', 'workflows', 'website-build.yml');
+  assert.ok(fs.existsSync(composedPath), 'the app workflow composed into the brand root');
+
+  const composed = fs.readFileSync(composedPath, 'utf8');
+  // The scoping MECHANISM is devkit's (`working-directory`, block or per step);
+  // what web owes the brand is that CI runs the app, not the repo root.
+  assert.match(composed, /working-directory: apps\/website/, 'run steps execute in the app dir');
+  assert.match(composed, /^name: .+ \(apps\/website\)$/m, 'the Actions list tells the apps apart');
+  assert.match(composed, /^ {2}group: website-\$\{\{ github\.ref \}\}$/m, 'per-app concurrency — one app never cancels another');
+
+  // The scaffold's own token pass still ran: node version + the .env secrets block.
+  assert.ok(composed.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'the node version templated');
+  assert.ok(composed.includes('CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'), 'the app .env reached the composed env block');
+  assert.ok(!composed.includes('{{ githubSecrets }}'), 'no unrendered token survives');
+
+  // Idempotent: a setup rerun rewrites that one file and never adds another.
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.deepStrictEqual(fs.readdirSync(path.join(brandRoot, '.github', 'workflows')), ['website-build.yml'], 'one file per app, rerun-stable');
+  assert.strictEqual(fs.readFileSync(composedPath, 'utf8'), composed, 'the rerun composed the same bytes');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('bin: `omega setup` end-to-end in a fresh consumer (real process, real bin)', () => {
   const root = tmpConsumer();
   execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega'), 'setup'], { cwd: root, stdio: 'pipe' });

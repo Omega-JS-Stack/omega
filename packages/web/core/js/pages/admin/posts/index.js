@@ -68,7 +68,7 @@ async function loadPosts() {
     renderStats();
 
     if (posts.length === 0) {
-      showEmpty('No posts yet — write the first one from the editor');
+      showEmpty('No posts yet. Write the first one from the editor');
       return;
     }
 

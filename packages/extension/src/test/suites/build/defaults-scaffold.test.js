@@ -166,5 +166,45 @@ module.exports = {
         ctx.expect(jetpack.read(path.join(appDir, 'AGENTS.md'))).toContain('VPN');
       },
     },
+    {
+      // GitHub runs workflows from the repo root ONLY, so the per-app copy a
+      // brand monorepo used to get never fired: no CI build, no store publish (#265).
+      name: 'brand app scaffolds NO per-app .github/ — its CI composes into the brand root',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
+        const brandRoot = path.join(tmp, 'brand');
+        jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(brandRoot, 'apps', 'extension');
+        jetpack.dir(appDir);
+
+        scaffoldDefaults({ outputDir: appDir });
+
+        ctx.expect(jetpack.exists(path.join(appDir, '.github'))).toBe(false);
+
+        const composed = path.join(brandRoot, '.github', 'workflows', 'extension-publish.yml');
+        ctx.expect(jetpack.exists(composed)).toBe('file');
+
+        const contents = jetpack.read(composed);
+        // Runs from the repo root, scoped to this app
+        ctx.expect(contents).toContain('working-directory: apps/extension');
+        // The site-token pass still renders (the pinned consumer Node version)
+        ctx.expect(contents).toContain(`NODE_VERSION: '22'`);
+        ctx.expect(contents.includes('[versions.node]')).toBe(false);
+
+        // Idempotent: a setup rerun updates that one file, never adds another
+        scaffoldDefaults({ outputDir: appDir });
+        ctx.expect(jetpack.list(path.join(brandRoot, '.github', 'workflows'))).toEqual(['extension-publish.yml']);
+      },
+    },
+    {
+      name: 'standalone app keeps its own .github/workflows (its app dir IS the repo root)',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
+
+        scaffoldDefaults({ outputDir: tmp });
+
+        ctx.expect(jetpack.exists(path.join(tmp, '.github', 'workflows', 'publish.yml'))).toBe('file');
+      },
+    },
   ],
 };

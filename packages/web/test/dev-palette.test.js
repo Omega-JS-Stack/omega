@@ -228,12 +228,25 @@ test('dev palette: the four billing-journey personas are offered beside the life
   // The lifecycle personas the journeys joined, not replaced.
   assert.ok(option('Premium'), 'the existing personas should still be offered');
 
+  // The steady-state mid-trial persona (#301) sits among the lifecycle states,
+  // between the plan it is trialing and the state a lapsed one lands in.
+  const trialing = option('Trialing');
+  assert.ok(trialing, 'the palette should offer the mid-trial persona');
+  assert.strictEqual(trialing.value, '_test.premium-trialing', 'it signs in as the seeded trialing persona');
+  assert.strictEqual(
+    trialing.title,
+    '_test.premium-trialing@playground.omegajs.dev',
+    'on the brand domain like every other persona',
+  );
+  assert.strictEqual(options.indexOf(trialing), options.indexOf(option('Premium')) + 1, 'it follows Premium');
+  assert.strictEqual(options.indexOf(option('Expired')), options.indexOf(trialing) + 1, 'and precedes Expired');
+
   // The list opens on a placeholder, not on whichever persona happens to be
   // first — picking one has to be a deliberate choice.
   const [first] = options;
   assert.strictEqual(first.value, '', 'the first option is a placeholder');
   assert.strictEqual(first.disabled, true, 'and it is not selectable');
-  assert.strictEqual(options.length, 12, 'one placeholder plus the eleven personas');
+  assert.strictEqual(options.length, 13, 'one placeholder plus the twelve personas');
 });
 
 test('dev palette: choosing a persona signs it in and reloads', async () => {

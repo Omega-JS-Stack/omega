@@ -1,4 +1,5 @@
 const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture } = require('../../src/test/test-accounts.js');
+const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialing.js');
 
 /**
  * Test: the seeded personas' billing data ([#263](https://github.com/Omega-JS-Stack/omega/issues/263))
@@ -218,6 +219,60 @@ module.exports = {
           assert.equal(subscription.payment, undefined, `Persona '${key}' never bought anything, so it carries no payment record`);
           assert.equal(buildOrderFixture(key, config), null, `Persona '${key}' must have no order behind it`);
         }
+      },
+    },
+
+    // The steady-state mid-trial persona ([#301](https://github.com/Omega-JS-Stack/omega/issues/301)):
+    // a subscriber inside the trial the catalog offers, which only reads as one
+    // if its term ends exactly when the trial does — the equality
+    // routes/payments/cancel/_is-trialing.js tells a running trial from a
+    // converted one by.
+    {
+      name: 'the-trialing-persona-is-inside-its-trial',
+      async run({ assert, config, skip }) {
+        if (!paidPlan(config)) {
+          skip('No paid subscription product configured in this brand');
+        }
+
+        const plan = getFirstPaidProduct(config);
+        const definition = getAccountDefinitions('example.com', config)['premium-trialing'];
+
+        assert.ok(definition, 'The seeder must define a mid-trial persona');
+
+        const subscription = definition.properties.subscription;
+
+        assert.equal(subscription.product.id, plan.id, 'The trialing persona holds the catalog\'s paid plan');
+        assert.equal(subscription.status, 'active', 'A live trial IS an active subscription — the processors\' trialing status maps to active');
+        assert.equal(subscription.trial.claimed, true, 'The trial has been claimed');
+        assert.equal(subscription.trial.outcome, null, 'A trial that is still running has not ended in anything yet');
+        assert.equal(
+          subscription.expires.timestampUNIX,
+          subscription.trial.expires.timestampUNIX,
+          'The term ends exactly when the trial does — the equality that makes it read as trialing',
+        );
+        assert.ok(isTrialing(subscription), 'The cancel flow must read this persona as trialing');
+
+        // The trial runs for as long as the BRAND offers it on that plan, not a
+        // hand-typed length the catalog never promised.
+        const catalogDays = (config.payment?.products || []).find((product) => product.id === plan.id)?.trial?.days || 14;
+        const remaining = (subscription.trial.expires.timestampUNIX - Math.floor(Date.now() / 1000)) / 86400;
+
+        assert.ok(
+          Math.abs(remaining - catalogDays) < 1,
+          `The trial must run the catalog's ${catalogDays} days (got ${Math.round(remaining)})`,
+        );
+
+        // And the purchase record behind it carries the same trial (the order's
+        // `unified` IS the subscription).
+        const fixture = buildOrderFixture('premium-trialing', config);
+
+        assert.ok(fixture, 'The trialing persona names an order, so it must have one');
+        assert.equal(fixture.doc.unified.trial.claimed, true, 'The purchase record shows the subscription was bought on a trial');
+        assert.equal(
+          fixture.doc.unified.expires.timestampUNIX,
+          subscription.expires.timestampUNIX,
+          'The order records the same term the persona holds',
+        );
       },
     },
   ],

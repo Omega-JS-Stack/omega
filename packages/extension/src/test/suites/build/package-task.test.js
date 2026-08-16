@@ -7,6 +7,11 @@
 //      version — it used to package the raw JSON5 source manifest and finish green).
 //   3. The icon prune drops only icons the build never minted, in BOTH legal
 //      shapes of `action.default_icon` (path string, or size→path map).
+//   4. A declared consumer array is AUTHORITATIVE over the framework default —
+//      an empty externally_connectable ships no origins (#260).
+//   5. The firefox artifact is a real firefox artifact: chrome-only panel keys
+//      translate to sidebar_action, and a missing gecko id derives from the
+//      brand config — failing loudly only when there is nothing to derive (#264).
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
@@ -264,6 +269,262 @@ module.exports = {
         } finally {
           fs.rmSync(buildJsTmp, { recursive: true, force: true });
           fs.rmSync(localeTmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'externally_connectable: an explicitly EMPTY consumer array ships NO origins (#260)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'dist/manifest.json': MANIFEST(`externally_connectable: { matches: [] }`) },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            const outputDir = path.join(tmp, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            // The dev origin the framework default carries never reaches the artifact
+            ctx.expect(m.externally_connectable).toBeUndefined();
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'externally_connectable: a consumer array REPLACES the default, absent keeps it (#260)',
+      run: async (ctx) => {
+        const declared = stageProject({
+          files: { 'dist/manifest.json': MANIFEST(`externally_connectable: { matches: ['https://example.com/*'] }`) },
+        });
+        const absent = stageProject({
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no externally_connectable anywhere'`) },
+        });
+        try {
+          await inProject(declared, async (task) => {
+            const outputDir = path.join(declared, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.externally_connectable.matches).toEqual(['https://example.com/*']);
+          });
+
+          await inProject(absent, async (task) => {
+            const outputDir = path.join(absent, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.externally_connectable.matches).toEqual(['http://localhost:4000/*']);
+          });
+        } finally {
+          fs.rmSync(declared, { recursive: true, force: true });
+          fs.rmSync(absent, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'background.scripts: a declared consumer array REPLACES the framework bundle entry (#260)',
+      run: async (ctx) => {
+        const declared = stageProject({
+          files: {
+            'dist/manifest.json': MANIFEST(`
+              background: { scripts: ['assets/js/my-background.js'] },
+              browser_specific_settings: { gecko: { id: 'staged@example.com' } },
+            `),
+          },
+        });
+        const absent = stageProject({
+          files: {
+            'dist/manifest.json': MANIFEST(`browser_specific_settings: { gecko: { id: 'staged@example.com' } }`),
+          },
+        });
+
+        try {
+          await inProject(declared, async (task) => {
+            const outputDir = path.join(declared, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+
+            // The framework's own bundle is NOT unioned back in — a consumer
+            // that swaps the background entry ships only what it declared
+            ctx.expect(m.background.scripts).toEqual(['assets/js/my-background.js']);
+            ctx.expect(m.background.service_worker).toBeUndefined();
+          });
+
+          await inProject(absent, async (task) => {
+            const outputDir = path.join(absent, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+
+            // Declaring nothing still gets the framework bundle
+            ctx.expect(m.background.scripts).toEqual(['assets/js/components/background.bundle.js']);
+          });
+        } finally {
+          fs.rmSync(declared, { recursive: true, force: true });
+          fs.rmSync(absent, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'gecko.data_collection_permissions.required: a declared consumer array REPLACES the default (#260)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: {
+            'dist/manifest.json': MANIFEST(`
+              browser_specific_settings: {
+                gecko: {
+                  id: 'staged@example.com',
+                  data_collection_permissions: { required: ['none'] },
+                },
+              },
+            `),
+          },
+        });
+
+        try {
+          await inProject(tmp, async (task) => {
+            const outputDir = path.join(tmp, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const permissions = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'))
+              .browser_specific_settings.gecko.data_collection_permissions;
+
+            // Firefox reads `none` as "collects nothing" — unioning the
+            // framework's authenticationInfo back in would declare a data
+            // collection the extension does not do
+            ctx.expect(permissions.required).toEqual(['none']);
+            // The key the consumer left alone still carries the default
+            ctx.expect(permissions.optional).toEqual(['technicalAndInteraction']);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the publish workflow uploads the zips the package task actually writes (#265)',
+      run: async (ctx) => {
+        const workflow = fs.readFileSync(path.join(SRC, 'defaults', '.github', 'workflows', 'publish.yml'), 'utf8');
+        const tmp = stageProject({});
+
+        try {
+          // packageZip writes packaged/<target>/extension.zip, one per target.
+          // The release step used to upload packaged/extension.zip — a path no
+          // build has ever produced, so the composed run died on its last step.
+          ctx.expect(workflow).not.toContain('packaged/extension.zip');
+
+          const referenced = [...workflow.matchAll(/packaged\/[^\s"']*extension\.zip/g)].map((match) => match[0]);
+          ctx.expect(referenced.length).toBeGreaterThan(0);
+
+          const shellGlob = referenced.find((reference) => reference.includes('*'));
+          ctx.expect(shellGlob).toBeDefined();
+
+          const matcher = new RegExp(`^${shellGlob.replace(/\./g, '\\.').replace(/\*/g, '[^/]+')}$`);
+
+          await inProject(tmp, async (task) => {
+            const targets = Object.keys(task.TARGETS);
+            ctx.expect(targets.length).toBeGreaterThan(0);
+
+            for (const target of targets) {
+              ctx.expect(matcher.test(`packaged/${target}/extension.zip`)).toBe(true);
+            }
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'firefox: side_panel maps to sidebar_action, the sidePanel permission is dropped, chromium keeps both (#264)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: {
+            'dist/manifest.json': MANIFEST(`
+              permissions: ['sidePanel', 'storage'],
+              side_panel: { default_path: 'views/sidepanel/index.html' },
+              browser_specific_settings: { gecko: { id: 'staged@example.com' } },
+            `),
+          },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            const firefoxDir = path.join(tmp, 'out-firefox');
+            await task.compileManifest(firefoxDir, 'firefox');
+            const firefox = JSON.parse(fs.readFileSync(path.join(firefoxDir, 'manifest.json'), 'utf8'));
+
+            // Chrome-only panel keys are gone; firefox's own key carries the panel
+            ctx.expect(firefox.side_panel).toBeUndefined();
+            ctx.expect(firefox.sidebar_action.default_panel).toBe('views/sidepanel/index.html');
+            ctx.expect(firefox.permissions).toEqual(['storage']);
+            // The background translation firefox already did stays intact
+            ctx.expect(firefox.background.service_worker).toBeUndefined();
+            ctx.expect(firefox.background.scripts).toContain('assets/js/components/background.bundle.js');
+
+            const chromiumDir = path.join(tmp, 'out-chromium');
+            await task.compileManifest(chromiumDir, 'chromium');
+            const chromium = JSON.parse(fs.readFileSync(path.join(chromiumDir, 'manifest.json'), 'utf8'));
+
+            ctx.expect(chromium.side_panel.default_path).toBe('views/sidepanel/index.html');
+            ctx.expect(chromium.permissions).toContain('sidePanel');
+            ctx.expect(chromium.sidebar_action).toBeUndefined();
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'firefox: a missing browser_specific_settings.gecko.id FAILS the compile (#264)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no gecko id anywhere'`) },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            let thrown = null;
+            await task.compileManifest(path.join(tmp, 'out-firefox'), 'firefox').catch((e) => { thrown = e; });
+            ctx.expect(thrown).toBeInstanceOf(Error);
+            // Actionable: names the key and what to put in it
+            ctx.expect(thrown.message).toMatch(/browser_specific_settings\.gecko\.id/);
+            ctx.expect(fs.existsSync(path.join(tmp, 'out-firefox', 'manifest.json'))).toBe(false);
+
+            // The same source still packages for chromium — the gate is firefox's alone
+            await task.compileManifest(path.join(tmp, 'out-chromium'), 'chromium');
+            ctx.expect(fs.existsSync(path.join(tmp, 'out-chromium', 'manifest.json'))).toBe(true);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'firefox: a missing gecko id DERIVES from the brand config — url host first, brand id fallback (#264)',
+      run: async (ctx) => {
+        // A fresh scaffold declares no gecko id but always has brand facts —
+        // its first build must produce a working firefox artifact, not a throw.
+        const withUrl = stageProject({
+          config: `{ brand: { id: 'staged-brand', name: 'Staged', url: 'https://staged.example.com' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no gecko id declared'`) },
+        });
+        const idOnly = stageProject({
+          config: `{ brand: { id: 'staged-brand', name: 'Staged' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no gecko id declared'`) },
+        });
+
+        try {
+          await inProject(withUrl, async (task) => {
+            const outputDir = path.join(withUrl, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.browser_specific_settings.gecko.id).toBe('extension@staged.example.com');
+          });
+
+          await inProject(idOnly, async (task) => {
+            const outputDir = path.join(idOnly, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.browser_specific_settings.gecko.id).toBe('extension@staged-brand.extension');
+          });
+        } finally {
+          fs.rmSync(withUrl, { recursive: true, force: true });
+          fs.rmSync(idOnly, { recursive: true, force: true });
         }
       },
     },

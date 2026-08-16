@@ -690,6 +690,69 @@ module.exports = {
     },
 
     {
+      name: 'combo-cancelled-during-a-trial-keeps-no-access',
+      async run({ assert }) {
+        // Cancelling a trial ends access NOW (Ian's ruling, 2026-08-15 — #267).
+        // A trial can still carry a `last_payment`: a plan with a setup fee
+        // charges one on day zero. Pricing the "remaining period" off that
+        // payment handed a cancelled trialer a full paid month for free.
+        const threeDaysAgo = new Date(Date.now() - (3 * 24 * 60 * 60 * 1000)).toISOString();
+
+        const result = toUnifiedSubscription({
+          id: 'I-TRIAL-CANCEL',
+          status: 'CANCELLED',
+          status_update_time: new Date().toISOString(),
+          start_time: threeDaysAgo,
+          billing_info: { last_payment: { amount: { currency_code: 'USD', value: '1.0' }, time: threeDaysAgo } },
+          _plan: {
+            product_id: 'PROD-plus',
+            billing_cycles: [
+              { tenure_type: 'TRIAL', frequency: { interval_unit: 'DAY', interval_count: 1 }, total_cycles: 14 },
+              { tenure_type: 'REGULAR', frequency: { interval_unit: 'MONTH', interval_count: 1 } },
+            ],
+          },
+        });
+
+        assert.equal(result.trial.claimed, true, 'the subscription is three days into a fourteen-day trial');
+        assert.equal(result.status, 'cancelled', 'a cancelled trial is cancelled NOW, setup fee or not');
+        assert.equal(result.cancellation.pending, false, 'there is no paid period to serve out');
+        assert.ok(
+          result.expires.timestampUNIX <= Math.floor(Date.now() / 1000),
+          'and no future expiry is handed out',
+        );
+      },
+    },
+
+    {
+      name: 'combo-cancelled-after-the-trial-converted-serves-out-the-period',
+      async run({ assert }) {
+        // The other half: once the trial has converted, the customer HAS paid
+        // for the period they are in, and cancelling still runs to its end.
+        const sixtyDaysAgo = new Date(Date.now() - (60 * 24 * 60 * 60 * 1000)).toISOString();
+        const fiveDaysAgo = new Date(Date.now() - (5 * 24 * 60 * 60 * 1000)).toISOString();
+
+        const result = toUnifiedSubscription({
+          id: 'I-CONVERTED-CANCEL',
+          status: 'CANCELLED',
+          status_update_time: new Date().toISOString(),
+          start_time: sixtyDaysAgo,
+          billing_info: { last_payment: { amount: { currency_code: 'USD', value: '9.99' }, time: fiveDaysAgo } },
+          _plan: {
+            product_id: 'PROD-plus',
+            billing_cycles: [
+              { tenure_type: 'TRIAL', frequency: { interval_unit: 'DAY', interval_count: 1 }, total_cycles: 14 },
+              { tenure_type: 'REGULAR', frequency: { interval_unit: 'MONTH', interval_count: 1 } },
+            ],
+          },
+        });
+
+        assert.equal(result.status, 'active', 'a paid period still runs to its end');
+        assert.equal(result.cancellation.pending, true, 'so the cancellation is pending, not done');
+        assert.ok(result.expires.timestampUNIX > Math.floor(Date.now() / 1000), 'with the period end as the expiry');
+      },
+    },
+
+    {
       name: 'combo-expired-subscription',
       async run({ assert }) {
         const result = toUnifiedSubscription({

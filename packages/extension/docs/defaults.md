@@ -36,6 +36,20 @@ const FILE_MAP = {
 
 Engine built-ins (no rule needed): `_.foo` → `.foo` renames, `.gitkeep` creates the directory without copying the file, `.DS_Store` never copies, archive dirs (non-final `_x` segments) never ship, and every write is skipped when the content is unchanged. On top of the per-rule handling, the task's site-token pass (`[ site.x ]` brackets) runs on `html/md/liquid/json/yml/yaml` files via the engine's `transform` hook.
 
+## Brand monorepos
+
+When the app sits inside a brand monorepo (`{brand}/apps/{app}` — the `@omega.js/config` seed mode), `scaffoldDefaults` adjusts the map: the app-layer `config/omega.json5` is skipped (the brand root's `targets.*` is the home), per-app docs retire to the brand root, and **`.github/**` never scaffolds**. GitHub executes workflows from the REPO ROOT's `.github/workflows/` only, so a per-app copy is dead on arrival — no CI build, no store publish, silently ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)).
+
+Instead, setup composes the framework's workflow into the brand root as `.github/workflows/<app>-<workflow>.yml` (`extension-publish.yml`) via the shared devkit `ci-workflows` module:
+
+- every `run:` step that follows its job's `actions/checkout` is scoped to the app (a per-step `working-directory: apps/extension`), while `uses:` actions still run at the repo root, which is what checkout wants. Per step, not a workflow-level `defaults.run.working-directory`: that also scopes the steps running BEFORE the checkout (the git config step), where the app dir does not exist yet — the job dies on step 1;
+- an action's inputs ignore `working-directory:` entirely, so the path-bearing ones on post-checkout `uses:` steps are rewritten to the app dir from an explicit per-action table (`actions/cache`/`upload-artifact`/`download-artifact` `path`, `peaceiris/actions-gh-pages` `publish_dir`), as are `hashFiles()` patterns, which glob from the workspace root wherever they sit. The extension template uses none of them today — it carries only checkout and setup-node — so its composed file differs from the template by the `working-directory:` lines alone;
+- each app gets its own concurrency group, so one app's deploy never cancels another's;
+- the file is regenerated from the template on every setup — a rerun updates that one file and can never duplicate a job;
+- an app-level copy left by an older setup is deleted when it is still the untouched framework file, and KEPT with a warning when it differs from the current template (your edits, or an older framework version) — the warning names the composed file to compare it against.
+
+Scoping is by working directory, not a `paths:` trigger filter: OMEGA workflows carry no push triggers by design (deliberate deploys), and a path filter on a dispatch-only workflow filters nothing. `omega deploy` dispatches the composed name in a brand, the plain `publish.yml` standalone.
+
 ## Why the underscore prefix?
 
 Files like `_.gitignore`, `_.env` are stored with a `_` prefix in `src/defaults/` so they don't interfere with @omega.js/extension's own development (the framework repo doesn't want its `.env` overwritten by the template) and so npm's tarball filter doesn't drop them. The engine strips the leading `_` on copy.

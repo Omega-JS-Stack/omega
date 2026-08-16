@@ -39,10 +39,86 @@ module.exports = {
       name: 'any-field-option-marks-a-leaf',
       async run({ assert }) {
         for (const key of FIELD_OPTIONS) {
+          // `types` carries a declared shape of its own — see the schema-shaped
+          // cases below ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+          if (key === 'types') continue;
+
           assert.equal(isFieldNode({ [key]: undefined }), true, `${key} marks a leaf`);
         }
         // `available` is legacy-declarative-only but still a leaf marker.
         assert.equal(isFieldNode({ available: false }), true);
+      },
+    },
+
+    {
+      name: 'types-marks-a-leaf-only-when-it-is-a-list-of-type-strings',
+      async run({ assert }) {
+        // The declaration form: an array of type names.
+        assert.equal(isFieldNode({ types: ['string'] }), true);
+        assert.equal(isFieldNode({ types: ['string', 'number'], default: 'x' }), true);
+
+        // A field literally NAMED `types` — its value is a field node, not a
+        // type list, so the node holding it is a GROUP
+        // ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+        assert.equal(isFieldNode({ types: { types: ['array'], default: [] } }), false);
+        assert.equal(isFieldNode({ types: { nested: { types: ['string'] } } }), false);
+      },
+    },
+
+    {
+      name: 'a-malformed-types-key-throws-instead-of-resolving-away',
+      async run({ assert }) {
+        // The shape rule that fixed #256 came with a silent failure mode: a
+        // `types` that is neither a declaration nor a nested node read as a
+        // GROUP, the walk found no leaf under it, and the field vanished from
+        // the output — where the powertools engine used to throw. A schema is
+        // author-written code, so a broken one is a programmer error and fails
+        // loudly, naming the path.
+        const malformed = [
+          ['a string', { types: 'string' }],
+          ['a list with a non-string entry', { types: ['string', 5] }],
+          ['an empty list', { types: [] }],
+          ['an explicit undefined', { types: undefined }],
+          ['a number', { types: 7 }],
+        ];
+
+        for (const [label, node] of malformed) {
+          let threw = false;
+
+          try {
+            isFieldNode(node, 'profile.tags');
+          } catch (e) {
+            threw = true;
+            assert.equal(e.message.includes('profile.tags'), true, `${label}: the error names the path — ${e.message}`);
+            assert.equal(e.message.includes('types'), true, `${label}: the error names the key — ${e.message}`);
+          }
+
+          assert.equal(threw, true, `${label} must not resolve away silently`);
+        }
+      },
+    },
+
+    {
+      name: 'a-malformed-types-key-stops-the-whole-walk',
+      async run({ assert }) {
+        // Reached the way it happens for real: a route's schema, walked. The
+        // sibling fields must NOT resolve either — a half-resolved settings
+        // object is what made this silent in the first place.
+        const schema = {
+          name: { types: ['string'], default: 'untitled' },
+          tags: { types: 'array', default: [] },
+        };
+
+        let threw = false;
+
+        try {
+          resolveSchema({ name: 'set-a' }, schema);
+        } catch (e) {
+          threw = true;
+          assert.equal(e.message.includes('tags'), true, `the error names the path — ${e.message}`);
+        }
+
+        assert.equal(threw, true, 'a malformed leaf resolved silently');
       },
     },
 
@@ -94,11 +170,37 @@ module.exports = {
     },
 
     {
-      name: 'a-field-node-at-the-root-walks-as-the-empty-path',
+      name: 'the-schema-root-is-never-a-leaf',
       async run({ assert }) {
-        assert.deepEqual(walk({ types: ['string'] }).map(([path]) => path), ['']);
-        // ...and resolveSchema drops it — there is no key to set it onto.
+        // A marker key at the ROOT names a FIELD, never the whole schema — the
+        // root has no key to resolve onto, so reading it as a leaf swallowed
+        // every sibling ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+        assert.deepEqual(walk({ types: ['string'] }).map(([path]) => path), []);
         assert.deepEqual(resolveSchema({}, { types: ['string'] }), {});
+      },
+    },
+
+    {
+      name: 'a-root-field-named-types-resolves-with-every-sibling',
+      async run({ assert }) {
+        // The StudyMonkey port's schema: the whole thing used to collapse to a
+        // single leaf and resolve to {}, so every request 400'd
+        // ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+        const schema = {
+          types: { types: ['array'], default: [] },
+          name: { types: ['string'], default: 'untitled' },
+          count: { types: ['number'], default: 0 },
+        };
+
+        assert.deepEqual(walk(schema).map(([path]) => path), ['types', 'name', 'count']);
+
+        assert.deepEqual(
+          resolveSchema({ types: ['flashcard'], name: 'set-a', count: 3 }, schema),
+          { types: ['flashcard'], name: 'set-a', count: 3 },
+        );
+
+        // ...and the same schema with nothing sent resolves every default.
+        assert.deepEqual(resolveSchema({}, schema), { types: [], name: 'untitled', count: 0 });
       },
     },
 
@@ -148,6 +250,49 @@ module.exports = {
         assert.equal(resolveFieldValue(5, { types: ['number'], max: 0 }), 0);
         // No min declared → negatives pass straight through.
         assert.equal(resolveFieldValue(-5, { types: ['number'] }), -5);
+      },
+    },
+
+    {
+      name: 'non-finite-numbers-resolve-to-the-default',
+      async run({ assert }) {
+        // NaN and ±Infinity are `number` to typeof, so the type check accepted
+        // them and every bound comparison against NaN is false — the clamp
+        // never fired and a NaN reached sinks like usage.increment(), where it
+        // poisons every later comparison
+        // ([#244](https://github.com/Omega-JS-Stack/omega/issues/244)).
+        const node = { types: ['number'], min: 0, default: 7 };
+
+        assert.equal(resolveFieldValue(NaN, node), 7, 'NaN takes the default');
+        assert.equal(resolveFieldValue(Infinity, node), 7, 'Infinity takes the default');
+        assert.equal(resolveFieldValue(-Infinity, node), 7, '-Infinity takes the default');
+
+        // Multi-typed and unbounded fields go the same way.
+        assert.equal(resolveFieldValue(NaN, { types: ['number', 'string'], default: 'fallback' }), 'fallback');
+        assert.equal(resolveFieldValue(NaN, { types: ['number'], default: 0 }), 0);
+
+        // A string that coerces to a non-finite number lands there too.
+        assert.equal(resolveFieldValue('Infinity', { types: ['number'], default: 7 }), 7);
+
+        // Finite numbers are untouched — including the bounds cases.
+        assert.equal(resolveFieldValue(-5, node), 0, 'a finite number still clamps');
+        assert.equal(resolveFieldValue(42, node), 42);
+        assert.equal(resolveFieldValue(0, node), 0);
+      },
+    },
+
+    {
+      name: 'a-non-finite-number-in-a-resolved-schema-never-reaches-the-output',
+      async run({ assert }) {
+        // The reachable path: JSON5.parse() accepts a bare NaN out of the
+        // multipart json field, so this is a real request shape.
+        const resolved = resolveSchema(
+          { amount: NaN, label: 'x' },
+          { amount: { types: ['number'], min: 0, default: 1 }, label: { types: ['string'] } },
+        );
+
+        assert.deepEqual(resolved, { amount: 1, label: 'x' });
+        assert.equal(Number.isFinite(resolved.amount), true);
       },
     },
 

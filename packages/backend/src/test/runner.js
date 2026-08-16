@@ -219,11 +219,11 @@ class TestRunner {
   }
 
   /**
-   * Verify the running emulator belongs to this project. Tries the Firebase
-   * Emulator Hub (localhost:4400) first — it always knows the project ID
-   * regardless of @omega.js/backend version. Falls back to the health endpoint's projectId
-   * field (added in @omega.js/backend 5.3.3+). Returns true (= mismatch, abort) if the
-   * project IDs differ.
+   * Verify the running emulator belongs to this project. The hub's
+   * GET /emulators carries no projectId (confirmed against firebase-tools 15.x),
+   * so that leg always comes back empty; the health endpoint's projectId field
+   * (added in @omega.js/backend 5.3.3+) is the working source. Returns true
+   * (= mismatch, abort) if the project IDs differ.
    */
   async checkProjectMismatch(healthData) {
     const expectedProjectId = this.options.cloud?.config?.projectId;

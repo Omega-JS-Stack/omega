@@ -155,7 +155,7 @@ export function graphSlot(id, height = 320, definition = '') {
   }
 
   if (!graphReady()) {
-    return '<p class="omega-micro text-body-secondary mb-0">graph library unavailable — the diagram could not be drawn</p>';
+    return '<p class="omega-micro text-body-secondary mb-0">graph library unavailable; the diagram could not be drawn</p>';
   }
 
   return `<div id="${id}" style="min-height: ${Number(height)}px;" data-series="${escapeAttribute(definition)}"></div>`;

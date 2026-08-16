@@ -89,7 +89,7 @@
 {% endiftruthy %}
 
 <!-- Chatsy (if used) -->
-{% iftruthy resolved.client.chatsy.enabled %}
+{% iftruthy resolved.inbound.chat.providers.chatsy.enabled %}
   <link rel="preconnect" href="https://chatsy.ai" crossorigin/>
   <link rel="dns-prefetch" href="https://chatsy.ai"/>
 {% endiftruthy %}

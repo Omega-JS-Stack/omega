@@ -1104,8 +1104,11 @@ badges:
         </div>
 
         <!-- Cancel Subscription (only visible for paid users) -->
+        <!-- Opens the questionnaire declaratively, as it always has. A TRIALING
+             subscription is intercepted in JS first — cancelling ends the trial
+             on the spot (#267) — and paid cancels are untouched. -->
         <div id="cancel-subscription-trigger" class="text-center" data-omega-bind="@show billing.buttons.cancel" hidden>
-          <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
+          <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" id="cancel-subscription-trigger-btn" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
             {% omega_icon "xmark", "fa-xs me-1" %}
             Cancel subscription
           </button>
@@ -1117,8 +1120,16 @@ badges:
               <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% omega_icon "ban", "fa-md me-2" %} Cancel your subscription</h6>
             </div>
             <div class="card-body">
-              <p class="card-text small text-muted">
+              <!-- What this cancel actually does. A TRIAL ends on the spot
+                   (#267), so the questionnaire says so rather than repeating the
+                   paid promise the warning dialog just contradicted. Both
+                   variants read the ONE flag; the paid copy is the default
+                   render, so a page whose JS never runs shows today's text. -->
+              <p class="card-text small text-muted" data-omega-bind="@hide billing.cancelForm.trial">
                 If you cancel, your subscription will remain active until the end of your current billing period. After that, you'll be downgraded to the free plan and will lose access to premium features. You can resubscribe at any time.
+              </p>
+              <p class="card-text small text-muted" data-omega-bind="@show billing.cancelForm.trial" hidden>
+                If you cancel, your free trial ends immediately and you'll be downgraded to the free plan right away; there is no remaining period to use up. You won't be charged, and you can resubscribe at any time.
               </p>
 
               <form id="cancel-subscription-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -1141,7 +1152,8 @@ badges:
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="cancel-confirm-checkbox" name="confirm_cancellation" required>
                     <label class="form-check-label" for="cancel-confirm-checkbox">
-                      I confirm I want to cancel my subscription and agree to the <a href="/legal/terms" target="_blank">Terms of Service</a>. I understand my access will continue until the end of the current billing period, after which I'll be moved to the free plan.
+                      <span data-omega-bind="@hide billing.cancelForm.trial">I confirm I want to cancel my subscription and agree to the <a href="/legal/terms" target="_blank">Terms of Service</a>. I understand my access will continue until the end of the current billing period, after which I'll be moved to the free plan.</span>
+                      <span data-omega-bind="@show billing.cancelForm.trial" hidden>I confirm I want to cancel my free trial and agree to the <a href="/legal/terms" target="_blank">Terms of Service</a>. I understand my access ends immediately and I'll be moved to the free plan right away.</span>
                     </label>
                     <div class="invalid-feedback">You must confirm before cancelling.</div>
                   </div>
@@ -1168,6 +1180,44 @@ badges:
         </div>
 
         <!-- Change Plan Modal -->
+        <!-- Trial cancel warning — shown BEFORE the questionnaire, and only for
+             a trial. A trial cancel takes effect immediately (#267), the exact
+             opposite of the accordion's own "until the end of your billing
+             period" copy, so the consequence is stated while the choice is
+             still open. "Keep my trial" is the dismiss; confirming opens the
+             questionnaire the paid flow goes straight to. -->
+        <div class="modal fade" id="cancel-trial-warning-modal" tabindex="-1" aria-labelledby="cancel-trial-warning-title" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title text-danger" id="cancel-trial-warning-title">
+                  {% omega_icon "triangle-exclamation", "fa-lg me-2" %}
+                  This ends your trial now
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p class="mb-3">
+                  Cancelling during a free trial ends your access <strong>immediately</strong>, not at the end of the trial.
+                </p>
+                <p class="mb-0" data-omega-bind="@show billing.cancelWarning.hasTrialEndDate" hidden>
+                  Keep it and you stay on your current plan free until <strong data-omega-bind="@text billing.cancelWarning.trialEndDate">your trial ends</strong>. You will not be charged before then, and you can cancel any time.
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal" id="cancel-trial-keep-btn">
+                  {% omega_icon "circle-check", "fa-sm me-2" %}
+                  Keep my trial
+                </button>
+                <button type="button" class="btn btn-outline-adaptive" id="cancel-trial-continue-btn">
+                  {% omega_icon "ban", "fa-sm me-2" %}
+                  Cancel anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="modal fade" id="change-plan-modal" tabindex="-1" aria-labelledby="change-plan-title" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">

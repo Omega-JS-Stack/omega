@@ -1,4 +1,5 @@
 const powertools = require('node-powertools');
+const isTrialing = require('../_is-trialing.js');
 
 /**
  * Test cancel processor
@@ -48,13 +49,11 @@ module.exports = {
       : null;
 
     // Detect if user is on a trial
-    const isTrialing = subscription?.trial?.claimed
-      && subscription?.status === 'active'
-      && subscription?.trial?.expires?.timestampUNIX === subscription?.expires?.timestampUNIX;
+    const trialing = isTrialing(subscription);
 
     // Trialing: immediate cancel (customer.subscription.deleted)
     // Non-trialing: cancel at period end (customer.subscription.updated)
-    const eventType = isTrialing
+    const eventType = trialing
       ? 'customer.subscription.deleted'
       : 'customer.subscription.updated';
     const eventId = `_test-evt-cancel-${timestamp}`;
@@ -62,16 +61,17 @@ module.exports = {
     const subscriptionObj = {
       id: resourceId,
       object: 'subscription',
-      status: isTrialing ? 'canceled' : 'active',
-      metadata: { uid, orderId },
-      cancel_at_period_end: !isTrialing,
-      cancel_at: isTrialing ? now : periodEnd,
-      canceled_at: isTrialing ? now : null,
-      current_period_end: isTrialing ? now : periodEnd,
+      status: trialing ? 'canceled' : 'active',
+      // A seeded persona may have no order; Firestore rejects undefined outright.
+      metadata: { uid, orderId: orderId || null },
+      cancel_at_period_end: !trialing,
+      cancel_at: trialing ? now : periodEnd,
+      canceled_at: trialing ? now : null,
+      current_period_end: trialing ? now : periodEnd,
       current_period_start: now - (30 * 86400),
       start_date: now - (30 * 86400),
-      trial_start: isTrialing ? (now - 86400) : null,
-      trial_end: isTrialing ? now : null,
+      trial_start: trialing ? (now - 86400) : null,
+      trial_end: trialing ? now : null,
       plan: { product: stripeProductId, interval: 'month' },
     };
 
@@ -108,6 +108,6 @@ module.exports = {
       },
     });
 
-    ctx.log(`Test cancel processor: wrote payments-webhooks/${eventId} (${eventType}) for sub=${resourceId}, uid=${uid}, trialing=${isTrialing}`);
+    ctx.log(`Test cancel processor: wrote payments-webhooks/${eventId} (${eventType}) for sub=${resourceId}, uid=${uid}, trialing=${trialing}`);
   },
 };

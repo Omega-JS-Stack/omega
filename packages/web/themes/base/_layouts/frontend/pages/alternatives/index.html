@@ -1,6 +1,10 @@
 ---
 layout: frontend/core/base
 
+# Trial copy DERIVES from the catalog (#273): `resolved.pricing.trialDays` is
+# the number the catalog's paid plans agree on (0 = none). A trial is never a
+# framework default, so with no trial the CTA speaks in neutral words.
+
 # Hero Section
 hero:
   tagline: "Compare & choose"
@@ -63,9 +67,9 @@ cta:
     icon: "rocket"
     text: "Get started"
   headline: "Ready to make the switch?"
-  subheadline: "Join thousands of happy users who chose {{ site.brand.name }}. Start your free trial today. No credit card required."
+  subheadline: "Join thousands of happy users who chose {{ site.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
   primary_button:
-    text: "Start free trial"
+    text: "{% if resolved.pricing.trialDays > 0 %}Start free trial{% else %}Get started{% endif %}"
     href: "/pricing"
   secondary_button:
     text: "Talk to sales"

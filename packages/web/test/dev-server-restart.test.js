@@ -28,8 +28,8 @@ const { registerTemplateWatchTargets, devServerOptions } = require('../src/comma
 
 // A rebuild is chokidar's write-settle window plus one build of this (tiny)
 // fixture; the deadline is the point at which "the edit never landed" is the
-// only remaining explanation.
-const REBUILD_DEADLINE_MS = 30000;
+// only remaining explanation. It scales with the lane's load knob (#211).
+const REBUILD_DEADLINE_MS = require('./lib/deadlines.js').rebuildDeadlineMs();
 const POLL_MS = 50;
 // Consecutive quiet polls (no build running) that mean the watch loop is done
 // — the restart, if one is coming, rides the END of the rebuild (Eleventy

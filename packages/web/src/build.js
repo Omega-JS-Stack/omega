@@ -149,7 +149,7 @@ async function buildSite(options) {
 
   // ---- PurgeCSS over the rendered HTML
   if (!options.skipPurge) {
-    await phase('purge', () => purgeCss({ outDir: options.outDir, manifest }));
+    await phase('purge', () => purgeCss({ outDir: options.outDir, manifest, purgecss: options.siteData.purgecss }));
   }
 
   timings.total = Number(process.hrtime.bigint() - started) / 1e9;

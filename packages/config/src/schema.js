@@ -131,6 +131,13 @@ const SHARED_SCHEMA = [
     description: 'Postal address (line1, line2, city, region, postalCode, country). Legal pages + email footers.',
   },
   {
+    path:        'brand.color',
+    type:        'string',
+    required:    false,
+    match:       /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/,
+    description: 'Brand accent color as a hex string (#RGB or #RRGGBB). @omega.js/web composes the --omega-accent ramps (light + dark) from it; unset leaves the theme\'s neutral placeholder standing.',
+  },
+  {
     path:        'brand.images',
     type:        'object',
     required:    false,
@@ -624,6 +631,42 @@ const TARGET_SCHEMAS = {
       type:        'object',
       required:    false,
       description: "The brand's own content collections (#207): collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
+    },
+    {
+      path:        'purgecss',
+      type:        'object',
+      required:    false,
+      description: 'PurgeCSS post-pass settings for the production css bundle.',
+    },
+    {
+      path:        'purgecss.safelist',
+      type:        'object|array',
+      required:    false,
+      description: "Selectors the content scan cannot see, merged OVER the framework's own safelist (#250). The object form takes PurgeCSS's lanes (standard, deep, greedy, keyframes); a bare array is PurgeCSS's shorthand for `standard`.",
+    },
+    {
+      path:        'purgecss.safelist.standard',
+      type:        'array',
+      required:    false,
+      description: 'Exact class names to keep (strings; PurgeCSS also accepts a regex here).',
+    },
+    {
+      path:        'purgecss.safelist.deep',
+      type:        'array',
+      required:    false,
+      description: 'Patterns (strings, compiled to RegExp) whose matching selectors keep their descendants too.',
+    },
+    {
+      path:        'purgecss.safelist.greedy',
+      type:        'array',
+      required:    false,
+      description: 'Patterns (strings, compiled to RegExp) keeping every selector that contains a match — the lane for a runtime-stamped namespace.',
+    },
+    {
+      path:        'purgecss.safelist.keyframes',
+      type:        'array',
+      required:    false,
+      description: 'Patterns (strings, compiled to RegExp) naming @keyframes to keep.',
     },
   ],
 

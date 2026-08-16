@@ -60,11 +60,15 @@
     extension_pages: "script-src 'self'; object-src 'self'; worker-src 'self';",
   },
 
-  // Web accessible resources
-  externally_connectable: {
-    matches: [
-    ],
-  },
+  // Origins allowed to message this extension. DECLARING the key is
+  // authoritative — an empty array ships NO origins at all, including the
+  // framework default that lets the local website talk to the extension.
+  // Leave it out to keep the default.
+  // externally_connectable: {
+  //   matches: [
+  //     'https://example.com/*',
+  //   ],
+  // },
 
   // Web accessible resources
   web_accessible_resources: [
@@ -108,7 +112,8 @@
   // IDs
   browser_specific_settings: {
     gecko: {
-      // id: 'my-addon@example.com',
+      // REQUIRED for the firefox artifact — packaging fails without it.
+      id: 'extension@playground.omegajs.dev',
       // strict_min_version: '91.0',
       data_collection_permissions: {
         required: ['authenticationInfo'],

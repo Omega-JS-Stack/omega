@@ -9,6 +9,7 @@
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { after, test } = require('node:test');
 const { buildAssets, purgeCss, resolvePageAsset } = require('../src/assets.js');
@@ -345,4 +346,47 @@ test('fonts: the layer union is pruned to css-referenced faces — sibling theme
   fs.rmSync(OUT, { recursive: true, force: true });
   await build(['classy', 'base']);
   assert.ok(fs.existsSync(path.join(OUT, 'assets', 'fonts', 'newsreader-normal-latin.woff2')), 'the classy chain keeps its own faces');
+});
+
+// #249 — the js/modules lane is FRAMEWORK-only (core + theme layers). A UJM
+// consumer's src/assets/js/modules/ is ordinary shared code: sweeping it into
+// the standalone-IIFE lane either broke the build (`Could not resolve
+// "@omega.js/client"`) or, worse, succeeded into the wrong lane.
+test('#249: a consumer js/modules/ dir stays out of the module-bundle lane, with one loud warning', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-consumer-modules-'));
+  const siteLayer = path.join(tmp, 'assets');
+  fs.mkdirSync(path.join(siteLayer, 'js', 'modules'), { recursive: true });
+  fs.writeFileSync(
+    path.join(siteLayer, 'js', 'modules', 'foo.js'),
+    "import { Manager } from '@omega.js/client';\nexport const foo = () => Manager;\n",
+  );
+
+  const outDir = path.join(PKG, '.omega', `assets-consumer-modules-${process.pid}`);
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+  const warnings = [];
+  try {
+    await buildAssets({
+      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+      themeRoots,
+      themesDir: path.join(PKG, 'themes'),
+      coreDir: path.join(PKG, 'core'),
+      outDir,
+      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+      warn: (message) => warnings.push(message),
+      only: 'js',
+    });
+
+    const modulesDir = path.join(outDir, 'assets', 'js', 'modules');
+    assert.ok(!fs.existsSync(path.join(modulesDir, 'foo.bundle.js')), 'the consumer file is never swept into the lane');
+    assert.ok(fs.existsSync(path.join(modulesDir, 'redirect.bundle.js')), 'framework layers still bundle their modules');
+
+    const warning = warnings.filter((line) => line.includes('js/modules'));
+    assert.equal(warning.length, 1, `exactly one warning: ${warnings.join(' | ')}`);
+    assert.ok(warning[0].includes(path.join(siteLayer, 'js', 'modules')), 'the warning names the offending directory');
+    assert.ok(warning[0].includes('js/libs/'), 'the warning names the js/libs/ convention');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
 });

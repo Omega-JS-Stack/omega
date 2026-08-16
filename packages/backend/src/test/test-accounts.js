@@ -45,6 +45,27 @@ function getCycleExpires(frequency = 'monthly') {
   };
 }
 
+// How long a seeded trial runs when the plan it is on names no length of its own
+// — the trial the framework's own catalogs offer.
+const DEFAULT_TRIAL_DAYS = 14;
+
+/**
+ * Helper to create the expiration date of a trial that is still RUNNING — a
+ * subscription inside its free trial ends when the trial does (the processors
+ * bill nothing until then: routes/payments/intent/processors/test.js sets
+ * `current_period_end` to `trial_end`), so this dates BOTH `trial.expires` and
+ * the subscription's own `expires`.
+ *
+ * @param {number} [days] - Trial length in days (the plan's `trial.days`)
+ */
+function getTrialExpires(days) {
+  const trialEnd = new Date(Date.now() + ((days || DEFAULT_TRIAL_DAYS) * 86400 * 1000));
+  return {
+    timestamp: trialEnd.toISOString(),
+    timestampUNIX: Math.floor(trialEnd.getTime() / 1000),
+  };
+}
+
 /**
  * Resolve what a plan costs and how often it bills, from the brand's own catalog:
  * the cadence it is listed at first and the price carried there. This is the SAME
@@ -78,7 +99,8 @@ function getPlanPricing(config, productId) {
  *   2. A persona that BOUGHT a subscription (it holds a paid plan, or carries the
  *      payment record of one it has since lapsed from) gets the price and cadence
  *      of that plan. A free account that never bought anything is left alone.
- *   3. A LIVE paid term ends when its billing cycle does, not a decade out.
+ *   3. A LIVE paid term ends when its billing cycle does, not a decade out — or,
+ *      for a term still inside its free trial, when the TRIAL does.
  *
  * @param {object} [subscription] - The persona's seeded subscription block
  * @param {object} [config] - @omega.js/backend config
@@ -127,7 +149,17 @@ function resolveSeededSubscription(subscription, config) {
   // Only a term that is still running gets re-dated: a lapsed persona's expired
   // term is the state it exists to represent.
   const nowUNIX = Math.floor(Date.now() / 1000);
-  if (resolved.expires?.timestampUNIX > nowUNIX) {
+  if (resolved.trial?.claimed && resolved.expires?.timestampUNIX > nowUNIX) {
+    // A term still INSIDE its free trial ends when the TRIAL does, not when a
+    // billing cycle nobody has been charged for yet would. The two dates being
+    // the SAME is the whole signal: routes/payments/cancel/_is-trialing.js tells
+    // a running trial from a converted one by exactly that equality, so both are
+    // dated off the trial the catalog offers on this plan.
+    const product = (config?.payment?.products || []).find((p) => p.id === planId);
+
+    resolved.expires = getTrialExpires(product?.trial?.days);
+    resolved.trial.expires = { ...resolved.expires };
+  } else if (resolved.expires?.timestampUNIX > nowUNIX) {
     resolved.expires = getCycleExpires(resolved.payment.frequency);
   }
 
@@ -188,6 +220,23 @@ const STATIC_ACCOUNTS = {
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() },
+    },
+  },
+  // Mid-trial ([#301](https://github.com/Omega-JS-Stack/omega/issues/301)): a
+  // subscriber INSIDE the free trial the catalog offers on the paid plan —
+  // claimed, nothing charged yet, and the term ending exactly when the trial
+  // does (the seeder dates both off `trial.days`). Status is `active`, not
+  // "trialing": the unified transforms map a processor's trialing status to
+  // active (libraries/payment/processors/stripe.js resolveStatus) and the trial
+  // block carries the trial fact — which is what
+  // routes/payments/cancel/_is-trialing.js reads.
+  'premium-trialing': {
+    id: 'premium-trialing',
+    uid: '_test-premium-trialing',
+    email: '_test.premium-trialing@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getTrialExpires(), cancellation: { pending: false }, trial: { claimed: true, expires: getTrialExpires(), outcome: null }, payment: { processor: 'test', resourceId: 'sub_test_premium_trialing', orderId: '_test-order-premium-trialing', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
     },
   },
   'premium-expired': {
@@ -1093,6 +1142,16 @@ async function createAccount(admin, account) {
  * @param {object} account - Definition with uid, resolved email, name
  */
 async function importGoogleAccount(admin, account) {
+  // Clear the uid first — the emulator refuses an import over an existing
+  // localId, and these personas carry no user doc, so the wipe's
+  // Firestore-driven delete never reaches them. A back-to-back suite run
+  // against a warm emulator therefore failed the ENTIRE seed here, which reads
+  // as a red suite while nothing is broken
+  // ([#241](https://github.com/Omega-JS-Stack/omega/issues/241)). Deleting
+  // rather than skipping keeps the import authoritative: the record that lands
+  // is always the definition above, never whatever a previous run left.
+  await admin.auth().deleteUser(account.uid).catch(() => {});
+
   const result = await admin.auth().importUsers([{
     uid: account.uid,
     email: account.email,
@@ -1487,6 +1546,7 @@ module.exports = {
   deleteTestUsers,
   createAccount,
   createTestAccounts,
+  importGoogleAccount,
   buildOrderFixture,
   seedOrderFixture,
   seedOrderFixtures,

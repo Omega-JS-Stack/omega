@@ -24,6 +24,13 @@ One exception: `core/js/modules/*.js` build in a second esbuild pass as
 standalone IIFEs, and that pass does not carry the alias plugin, so files in
 that lane import a library by relative path (`../libs/logger.js`).
 
+That second pass is a FRAMEWORK lane — core and theme layers only ([#249](https://github.com/Omega-JS-Stack/omega/issues/249)).
+A consumer's own `js/modules/` is left out of it entirely (the build prints one
+warning naming the directory): its constraints — standalone IIFE, fixed URL, no
+`@omega.js/client` — are the framework's, not a consumer's. Consumer shared code
+belongs in `src/assets/js/libs/`, imported normally from `js/main.js` or a page
+module.
+
 ## The consumer rule: import the helper, never the library
 
 charts.js and graph.js state it, and it holds for both: chart.js and mermaid are

@@ -13,6 +13,12 @@ export const state = {
   paymentMethod: '',
   hasFreeTrial: false,
 
+  // Whether the purchase has actually landed in the account yet (#232). The
+  // page opens UNSURE — the redirect is the processor's claim, and the webhook
+  // that grants entitlement arrives after the browser does.
+  // 'processing' | 'confirmed' | 'timeout'
+  status: 'processing',
+
   // UI state
   loaded: false,
 };
@@ -51,10 +57,19 @@ export function buildBindingsState() {
         currency: state.currency,
       },
       subscription: {
-        show: isSubscription,
+        // "Your subscription is now active" is a claim about the account, so it
+        // waits for the account to say so (#232)
+        show: isSubscription && state.status === 'confirmed',
         hasFreeTrial: state.hasFreeTrial,
         billingCycle: billingCycleText,
         infoText: subscriptionInfoText,
+      },
+      // Which of the three moments the page is rendering (#232). Only
+      // `confirmed` may say the words "payment received".
+      verification: {
+        processing: state.status === 'processing',
+        confirmed: state.status === 'confirmed',
+        timedOut: state.status === 'timeout',
       },
       loaded: state.loaded,
     },

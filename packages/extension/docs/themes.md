@@ -25,6 +25,18 @@ Set in `config/omega.json5`:
 
 Webpack's `__theme__` alias resolves to the package's `dist/assets/themes/<id>/` so consumer JS can do `import '__theme__/_theme.js'` and get the right theme's entry point. SCSS gets the same via the `theme` load-path entry (see [css.md](css.md)).
 
+### theme.id is shared; the theme SET is per-framework
+
+`theme.id` is a shared omega.json5 key, but each framework ships its own themes — a brand whose WEBSITE theme is a consumer-local id has nothing under the extension's `dist/assets/themes/<id>/`. Both resolve sites (the sass load path and webpack's `__theme__`) go through [src/lib/theme.js](../src/lib/theme.js): an id this framework doesn't ship falls back to `classy` with ONE warning naming `theme.id`, the unknown value, and the extension's valid themes — never a raw sass `Can't find stylesheet to import` ([#261](https://github.com/Omega-JS-Stack/omega/issues/261)). Give the extension its own theme without touching the brand's:
+
+```jsonc
+{
+  targets: {
+    extension: { theme: { id: 'classy' } },
+  },
+}
+```
+
 ## Theme structure
 
 ```

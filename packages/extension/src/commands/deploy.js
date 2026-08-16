@@ -12,12 +12,20 @@ const { execSync } = require('node:child_process');
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('deploy');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
-
-const WORKFLOW = 'publish.yml';
+const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+const { resolveSeedMode } = require('@omega.js/config');
 
 module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
+
+  // Inside a brand monorepo the app's CI lives in the BRAND ROOT's workflows
+  // dir under a per-app name (#265) — dispatch what setup actually composed.
+  const WORKFLOW = composedWorkflowName({
+    appDir: process.cwd(),
+    brandRoot: resolveSeedMode(process.cwd()).brandRoot,
+    workflow: 'publish.yml',
+  });
 
   // Linked local packages (tree-wide file: specs — cp194) → the LOCAL lane
   // automatically: build + store-publish from this machine with the linked

@@ -1,4 +1,5 @@
 const BaseCommand = require('./base-command');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -11,6 +12,132 @@ const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test
 const EmulatorCommand = require('./emulator');
 // The rules SCHEMA version — setup.js owns it, this is the second generator.
 const { RULES_VERSION } = require('./setup');
+
+// The Firebase emulator hub — fixed, not part of the N7-allocated map.
+const HUB_PORT = 4400;
+
+// Where a running hub publishes WHO it is: firebase-tools writes
+// `${os.tmpdir()}/hub-<projectId>.json` ({version, origins, pid}) for the life
+// of the stack. The file name IS the identity — the hub's own
+// `GET /emulators` answers a map of emulator → listen info and has never
+// carried a project id, so the read that asked it for one always came back
+// empty ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
+const HUB_LOCATOR_PREFIX = 'hub-';
+const HUB_LOCATOR_SUFFIX = '.json';
+
+/**
+ * Does a process with this pid exist right now?
+ *
+ * Signal 0 checks for existence without delivering anything. EPERM means it
+ * exists and belongs to another user — still alive, which is the question.
+ * @param {number} pid
+ * @returns {boolean}
+ */
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 1) {
+    return false;
+  }
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+/**
+ * The project id of the emulator whose HUB is listening on `hubPort`, read
+ * from the locator files firebase-tools publishes.
+ *
+ * A locator only counts when it claims THIS port and its pid is still alive —
+ * firebase-tools does not always remove the file, so a crashed run's leftover
+ * would otherwise name a hub that is long gone. Two live claims on one port
+ * mean one of them is a stale file whose pid got recycled, and nothing says
+ * which: ambiguous reads as unproven, the same safe fall-through as no file at
+ * all ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
+ * @param {number} hubPort - The hub port to identify.
+ * @param {string} [tmpDir] - Where locators live (defaults to os.tmpdir()).
+ * @returns {string|null} The project id, or null when unproven.
+ */
+function readHubLocatorProjectId(hubPort, tmpDir) {
+  const dir = tmpDir || os.tmpdir();
+  const claimants = new Set();
+
+  for (const name of jetpack.list(dir) || []) {
+    if (!name.startsWith(HUB_LOCATOR_PREFIX) || !name.endsWith(HUB_LOCATOR_SUFFIX)) {
+      continue;
+    }
+
+    const projectId = name.slice(HUB_LOCATOR_PREFIX.length, -HUB_LOCATOR_SUFFIX.length);
+    if (!projectId) {
+      continue;
+    }
+
+    let locator;
+    try {
+      locator = jetpack.read(path.join(dir, name), 'json');
+    } catch (error) {
+      continue; // Not a locator, or half-written
+    }
+
+    const onThisPort = (locator?.origins || []).some((origin) => {
+      try {
+        return Number(new URL(origin).port) === Number(hubPort);
+      } catch (error) {
+        return false;
+      }
+    });
+
+    if (onThisPort && isProcessAlive(Number(locator.pid))) {
+      claimants.add(projectId);
+    }
+  }
+
+  return claimants.size === 1 ? [...claimants][0] : null;
+}
+
+/**
+ * Adopt the emulator already listening on our functions port, or allocate
+ * fresh ports and boot our own?
+ *
+ * A bare port probe answered "something is listening", which the run read as
+ * "our emulator is up" — so another brand's stack on the classic ports got
+ * adopted and the run died on a health fetch against the wrong project
+ * ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)). Adoption now
+ * needs PROOF of identity: unproven falls through to the N7 bump path, which
+ * relocates around the incumbent exactly as a second brand's boot does.
+ * @param {object} evidence
+ * @param {boolean} evidence.portInUse - Something is listening on the functions port.
+ * @param {boolean} [evidence.ownsPortsFile] - This project's own live ports file publishes that port.
+ * @param {string|null} evidence.runningProjectId - Project id the listener reports (null when unreadable).
+ * @param {string|null} evidence.expectedProjectId - Project id this run belongs to.
+ * @returns {{adopt: boolean, reason: string, runningProjectId: string|null}}
+ */
+function decideEmulatorAdoption({ portInUse, ownsPortsFile, runningProjectId, expectedProjectId }) {
+  const decision = { adopt: false, reason: 'no-emulator', runningProjectId: runningProjectId || null };
+
+  if (!portInUse) {
+    return decision;
+  }
+
+  // This project's .temp/ports.json, written by OUR emulator and read only
+  // while its writer is alive. The hub is NOT allocated by N7, so a bumped run
+  // shares it with whoever booted first — this is the proof that still holds.
+  if (ownsPortsFile) {
+    return { ...decision, adopt: true, reason: 'ports-file' };
+  }
+
+  if (!runningProjectId || !expectedProjectId) {
+    return { ...decision, reason: 'unidentified' };
+  }
+
+  if (runningProjectId !== expectedProjectId) {
+    return { ...decision, reason: 'project-mismatch' };
+  }
+
+  return { ...decision, adopt: true, reason: 'project-match' };
+}
 
 class TestCommand extends BaseCommand {
   async execute() {
@@ -104,13 +231,27 @@ class TestCommand extends BaseCommand {
       isFrameworkSelfTest: isSelfTest, // gates the boot/ smoke layer (excluded for consumers)
     };
 
-    // Check if emulator is already running
-    const emulatorRunning = this.isEmulatorRunning(emulatorPorts);
+    // Adopt the running emulator only when it PROVES it is ours — a listener on
+    // the functions port is not evidence of ownership
+    // ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
+    const portInUse = this.isEmulatorRunning(emulatorPorts);
+    const adoption = decideEmulatorAdoption({
+      portInUse: portInUse,
+      ownsPortsFile: !!publishedPorts && publishedPorts.functions === emulatorPorts.functions,
+      runningProjectId: portInUse ? this.readRunningProjectId(emulatorPorts) : null,
+      expectedProjectId: projectConfig.cloud?.config?.projectId || null,
+    });
 
-    if (emulatorRunning) {
+    if (adoption.adopt) {
       this.log(chalk.cyan('Running tests against EXISTING emulator'));
       await this.runTestsDirectly(this.buildTestCommand(testConfig), functionsDir, emulatorPorts);
     } else {
+      if (adoption.reason === 'project-mismatch') {
+        this.log(chalk.yellow(`  Port ${emulatorPorts.functions} belongs to project "${adoption.runningProjectId}", not "${projectConfig.cloud?.config?.projectId}" — booting this project's own emulator on free ports.`));
+      } else if (adoption.reason === 'unidentified') {
+        this.log(chalk.yellow(`  Port ${emulatorPorts.functions} is in use by a listener that does not identify itself — booting this project's own emulator on free ports.`));
+      }
+
       this.log(chalk.cyan('Starting emulator and running tests...'));
       // The command is built INSIDE runEmulatorTests, after boot — allocation
       // may bump ports, and a pre-built command would bake the stale ones.
@@ -361,6 +502,18 @@ class TestCommand extends BaseCommand {
   }
 
   /**
+   * The project id the emulator listening on our ports belongs to, read from
+   * the hub locator firebase-tools publishes for a running stack. Anything
+   * unproven (no locator, a dead pid, two live claims) comes back null, which
+   * the decision above treats as "unidentified", never as "ours".
+   * @param {object} emulatorPorts - The resolved port map.
+   * @returns {string|null} The running emulator's project id.
+   */
+  readRunningProjectId(emulatorPorts) {
+    return readHubLocatorProjectId(emulatorPorts?.hub || HUB_PORT);
+  }
+
+  /**
    * Signal the running emulator process to roll emulator.log.
    *
    * Mechanism: write a sentinel file at emulator.log.reset. The emulator command
@@ -552,5 +705,12 @@ class TestCommand extends BaseCommand {
     process.exit(testExitCode);
   }
 }
+
+// Static, alongside Middleware's precedent — the adopt-or-bump decision is
+// pure, so tests exercise it directly instead of through a booted emulator, and
+// the identity read takes a tmp dir so real locator files can stand in for a
+// running hub.
+TestCommand.decideEmulatorAdoption = decideEmulatorAdoption;
+TestCommand.readHubLocatorProjectId = readHubLocatorProjectId;
 
 module.exports = TestCommand;

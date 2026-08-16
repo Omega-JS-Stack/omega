@@ -243,12 +243,25 @@ function composePricing(payment) {
     }
   }
 
+  // The catalog's trial, as ONE number the page can speak (#273). The copy it
+  // feeds is UNIVERSAL ("every paid plan starts with a N-day free trial"), so
+  // the number only exists when every paid plan agrees on it: a catalog whose
+  // paid plans carry different trials (or one without a trial at all) speaks
+  // no universal number → 0, and trial copy renders nowhere, exactly like a
+  // catalog with no trial. Free plans carry nothing to disagree with, and the
+  // per-plan `plan.trialDays` still states each plan's own truth.
+  const paidPlans = plans.filter((plan) => !plan.free);
+  const trialDays = paidPlans.length > 0 && paidPlans.every((plan) => plan.trialDays === paidPlans[0].trialDays)
+    ? paidPlans[0].trialDays
+    : 0;
+
   return {
     plans: plans,
     oneTime: oneTime,
     enterprise: enterprise,
     billing: billing,
     savingsPercent: savingsPercent,
+    trialDays: trialDays,
     comparison: composeComparison(plans),
   };
 }

@@ -414,3 +414,43 @@ test('formatErrors renders a numbered block; empty list renders empty', () => {
   assert.strictEqual(formatErrors([]), '');
   assert.strictEqual(formatErrors(['a', 'b']), '  1. a\n  2. b');
 });
+
+// #272 — brand.color is documented (packages/web/README.md) and consumed by
+// the engine (head.html builds the --omega-accent ramps from it), so the
+// schema owes it a shape: the ramp composer reads a hex string.
+test('brand.color is optional, hex-validated when present', () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, brand: { ...VALID.brand, color: '#4F46E5' } }).errors, [], 'a 6-digit hex passes');
+  assert.deepStrictEqual(validateConfig({ ...VALID, brand: { ...VALID.brand, color: '#f0a' } }).errors, [], 'the 3-digit form passes');
+  assert.deepStrictEqual(validateConfig(VALID).errors, [], 'absence stays valid');
+
+  const junk = validateConfig({ ...VALID, brand: { ...VALID.brand, color: 'indigo' } });
+  assert.ok(junk.errors.some((e) => e.includes('config.brand.color') && e.includes('does not match')), `a non-hex color fails loudly: ${junk.errors.join(' | ')}`);
+
+  const typed = validateConfig({ ...VALID, brand: { ...VALID.brand, color: 0x4F46E5 } });
+  assert.ok(typed.errors.some((e) => e.includes('config.brand.color has wrong type')), 'a number is not a color');
+});
+
+// #250 — the purge pass now READS targets.web.purgecss.safelist
+// (packages/web/src/assets.js mergeSafelist), so the schema owes it a shape:
+// the object form's lanes and the array shorthand PurgeCSS itself accepts.
+test('targets.web.purgecss.safelist is declared — both accepted shapes pass, a mistyped one is loud', () => {
+  const lanes = validateConfig({
+    ...VALID,
+    purgecss: { safelist: { standard: ['collapse'], deep: ['^tooltip'], greedy: ['^brand-'], keyframes: ['^fade'] } },
+  }, { target: 'web' });
+  assert.deepStrictEqual(lanes.errors, [], 'every lane takes an array of string patterns');
+
+  // PurgeCSS's own shorthand: a bare array IS the standard lane.
+  assert.deepStrictEqual(validateConfig({ ...VALID, purgecss: { safelist: ['collapse'] } }, { target: 'web' }).errors, [], 'the array shorthand passes');
+  assert.deepStrictEqual(validateConfig(VALID, { target: 'web' }).errors, [], 'absence stays valid');
+
+  // The typo that used to purge a brand's classes silently.
+  const bare = validateConfig({ ...VALID, purgecss: { safelist: 'brand-' } }, { target: 'web' });
+  assert.ok(bare.errors.some((e) => e.includes('config.purgecss.safelist has wrong type')), `a bare string is not a safelist: ${bare.errors.join(' | ')}`);
+
+  const lane = validateConfig({ ...VALID, purgecss: { safelist: { greedy: '^brand-' } } }, { target: 'web' });
+  assert.ok(lane.errors.some((e) => e.includes('config.purgecss.safelist.greedy has wrong type')), `a lane takes an array, not one pattern: ${lane.errors.join(' | ')}`);
+
+  const section = validateConfig({ ...VALID, purgecss: ['collapse'] }, { target: 'web' });
+  assert.ok(section.errors.some((e) => e.includes('config.purgecss has wrong type')), 'the section itself is an object');
+});

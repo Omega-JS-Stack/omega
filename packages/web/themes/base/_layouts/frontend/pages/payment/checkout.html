@@ -222,12 +222,16 @@ client:
                 Billed <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$-- monthly</span>
               </div>
 
-              <!-- Subscription note (default: money-back guarantee, replaced by trial if eligible) -->
-              <div class="omega-checkout__note mt-3"
-                   data-omega-bind="@show !checkout.trial.show">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "shield-halved", "fa-sm" %}</span>
-                <span>Backed by our 7-day money-back guarantee.</span>
-              </div>
+              <!-- Subscription note — the BRAND's guarantee copy (#273: a
+                   refund window is a policy the framework cannot know), shown
+                   when no trial replaces it. No stated guarantee, no note. -->
+              {% iftruthy resolved.pricing.guarantee %}
+                <div class="omega-checkout__note mt-3"
+                     data-omega-bind="@show !checkout.trial.show">
+                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "shield-halved", "fa-sm" %}</span>
+                  <span>{{ resolved.pricing.guarantee }}</span>
+                </div>
+              {% endiftruthy %}
 
               <!-- Free Trial Note -->
               <div class="omega-checkout__note omega-checkout__note--ok mt-3"
@@ -374,10 +378,14 @@ client:
     </div>
   </form>
 
-  <!-- Trust foot + help — one quiet line each, shared by both breakpoints -->
+  <!-- Trust foot + help — one quiet line each, shared by both breakpoints.
+       The refund chip rides the brand's `pricing.guarantee` gate (#273); the
+       other two state facts the framework owns. -->
   <div class="omega-checkout__trust mt-3 mt-lg-4">
     <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
-    <span>{% omega_icon "shield-halved", "fa-xs" %} 7-day money-back guarantee</span>
+    {% iftruthy resolved.pricing.guarantee %}
+      <span>{% omega_icon "shield-halved", "fa-xs" %} Money-back guarantee</span>
+    {% endiftruthy %}
     <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
   </div>
   <div class="text-center mt-1 mt-lg-3">

@@ -24,6 +24,8 @@ Liquid form.
 #   client                          per-page @omega.js/client settings (auth…)
 #   sitemap                         false keeps the page out of sitemap.xml
 #   append                          extra markup appended for this page
+#   redirect                        url / querystring for the redirect layout
+#   prerender_icons                 icons rendered into the page up front
 #   templateEngineOverride          the engine, when it isn't inferred
 #   eleventyExcludeFromCollections  keep the page out of collections
 #

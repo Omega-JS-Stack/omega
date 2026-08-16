@@ -2,11 +2,13 @@
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('defaults');
 const watcherLogger = Manager.logger('defaults:watcher');
+const workflowLogger = Manager.logger('defaults:workflows');
 const { watch, series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { composeAppWorkflows } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -143,7 +145,8 @@ function scaffoldDefaults(options) {
   // targets-only seed kept resurrecting deleted app files on every setup).
   const fileMap = { ...FILE_MAP };
   const { resolveSeedMode } = require('@omega.js/config');
-  if (!resolveSeedMode(outputDir).standalone) {
+  const seed = resolveSeedMode(outputDir);
+  if (!seed.standalone) {
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
     // BRAND ROOT is the one doc home — per-app AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
@@ -154,9 +157,13 @@ function scaffoldDefaults(options) {
     fileMap['CLAUDE.md'] = { retire: true };
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
+    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-app
+    // .github/workflows/ in a brand monorepo can never fire. It is composed
+    // into the brand root below instead — scoped to this app's path.
+    fileMap['.github/**/*'] = { skip: true };
   }
 
-  return applyDefaults({
+  const result = applyDefaults({
     defaultsDir: path.join(rootPathPackage, 'dist', 'defaults'),
     outputDir,
     files: options.files || null,
@@ -164,6 +171,18 @@ function scaffoldDefaults(options) {
     transform: siteTokenTransform,
     logger,
   });
+
+  if (!seed.standalone) {
+    composeAppWorkflows({
+      sourceDir: path.join(rootPathPackage, 'dist', 'defaults', '.github', 'workflows'),
+      appDir: outputDir,
+      brandRoot: seed.brandRoot,
+      transform: (contents, name) => siteTokenTransform(contents, { name }),
+      logger: workflowLogger,
+    });
+  }
+
+  return result;
 }
 
 // Main task

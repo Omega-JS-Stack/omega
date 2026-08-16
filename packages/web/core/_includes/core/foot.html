@@ -237,6 +237,12 @@
 {% endiftruthy %}
 {% endcomment %}
 
+<!-- The brand's schema.org type — the node every other block cross-references
+     as "<site.url>#<type>". `brand.type` is optional config, so it carries the
+     framework default here (#271): an empty type shipped invalid structured
+     data ("@type": "") and collapsed every @id anchor to a bare "#". -->
+{% assign brand-type = site.brand.type | default: "Organization" %}
+
 <!-- Schema - Breadcrumbs -->
 <!-- Only include the https://schema.org if size > -1 because it throws an error on Google Search Console if the itemListElement is empty -->
 {% assign breadcrumbs = page.url | split: "/" %}
@@ -272,8 +278,8 @@
 <script id="omega-schema-brand" type="application/ld+json">
   {
     "@context": "http://schema.org",
-    "@type": "{{ site.brand.type }}",
-    "@id": "{{ site.url }}#{{ site.brand.type }}",
+    "@type": "{{ brand-type }}",
+    "@id": "{{ site.url }}#{{ brand-type }}",
     "url": "{{ site.url }}",
     "name": "{{ site.brand.name | omega_json_escape }}",
     "description": "{{ site.brand.description | omega_json_escape }}",
@@ -344,7 +350,7 @@
       "query-input": "required name=search_term_string"
     },
     "publisher": {
-      "@id": "{{ site.url }}#{{ site.brand.type }}"
+      "@id": "{{ site.url }}#{{ brand-type }}"
     }
   }
 </script>
@@ -368,7 +374,7 @@
         "url": "{%- omega_member resolved.post.author, "url" -%}#Person"
       },
       "publisher": {
-        "@id": "{{ site.url }}#{{ resolved.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       },
       "isPartOf": {
         "@id": "{{ site.url }}/blog"
@@ -400,7 +406,7 @@
       },
       "jobTitle": "Blog Author",
       "worksFor": {
-        "@id": "{{ site.url }}#{{ site.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       }
       {% comment %}
       "sameAs": [
@@ -433,7 +439,7 @@
         "{{ site.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
       ],
       "brand": {
-        "@id": "{{ site.url }}#{{ site.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       },
       "offers": {
         "@type": "Offer",
@@ -476,10 +482,10 @@
         "availability": "https://schema.org/InStock"
       },
       "provider": {
-        "@id": "{{ site.url }}#{{ site.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       },
       "publisher": {
-        "@id": "{{ site.url }}#{{ site.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       },
       "image": "{% omega_external site.brand.images.brandmark %}",
       {% iftruthy sa.features %}
@@ -508,7 +514,7 @@
       "description": "{{ resolved.meta.description | omega_liquify }}",
       "mainEntity": {
         "@type": "Organization",
-        "@id": "{{ site.url }}#{{ site.brand.type }}"
+        "@id": "{{ site.url }}#{{ brand-type }}"
       }
     }
   </script>
@@ -526,6 +532,12 @@
     {% assign faq_items = resolved.alternative.faqs.items %}
     {% assign faq_size = faq_items | size %}
   {% endif %}
+  {%- comment -%} An answerless item is a DERIVED one whose condition didn't
+  hold (#273 — the pricing trial FAQ on a catalog with no trial). It renders
+  nowhere on the page, so it never enters the schema either. The test is `!= ''`
+  on purpose — `!= blank` does not filter inside where_exp here. {%- endcomment -%}
+  {% assign faq_items = faq_items | where_exp: "item", "item.answer != ''" %}
+  {% assign faq_size = faq_items | size %}
   {% if faq_size > 0 %}
     <script id="omega-schema-faq-page" type="application/ld+json">
       {

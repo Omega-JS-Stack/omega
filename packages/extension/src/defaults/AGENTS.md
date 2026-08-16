@@ -50,7 +50,8 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 - `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here; they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
 - `config/messages.json`: i18n source. Auto-translated to 16 languages at build time via the Claude CLI (only missing keys regenerated).
 - `config/description.md`: store-listing description (used by the publish step).
-- `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension.
+- `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension. Anything you DO declare wins outright — an array you write replaces the framework's, and an empty one ships nothing. The firefox artifact needs `browser_specific_settings.gecko.id` (packaging fails without it) and gets `side_panel` translated to `sidebar_action` automatically.
+- `src/assets/images/`: static images. They copy to `dist/` as-is — no hook, no imagemin step.
 - `src/views/<context>/index.html`: per-context HTML (popup / options / sidepanel / pages).
 - `src/assets/js/components/<context>/index.js`: per-context script entry. One-line bootstrap of `@omega.js/extension/<context>`.
 - `src/assets/css/components/<context>/index.scss`: per-context styles.

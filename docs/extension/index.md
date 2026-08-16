@@ -112,7 +112,7 @@ Required setup: `brand.url` in config (background.js watches that host for the /
 - **Webpack** — bundles each `src/assets/js/components/<name>/index.js` with Babel transpilation. Custom `__theme__` alias resolves to the active theme. Template-replacement plugin substitutes `%%% version %%%` / `%%% brand.name %%%` / etc.
 - **Sass** — load-path resolution lets consumer SCSS `@use 'omega-extension'` / `@use 'theme'` / `@use 'components/popup'` without long relative paths. See [docs/css.md](../../packages/extension/docs/css.md).
 - **HTML templating** — two-pass `{{ }}` replacement: view first, then outer page-template. Vars: `brand.name`, `brand.url`, `page.title`, `theme.appearance`, `version`, `cacheBust`. See [docs/templating.md](../../packages/extension/docs/templating.md).
-- **Packaging** ([gulp/package.js](../../packages/extension/src/gulp/tasks/package.js)) — per-browser manifest normalization (JSON5 → strict JSON), zip, optional auto-publish.
+- **Packaging** ([gulp/package.js](../../packages/extension/src/gulp/tasks/package.js)) — per-browser manifest normalization (JSON5 → strict JSON), zip, optional auto-publish. A DECLARED consumer value beats the framework default, arrays included — an empty array ships nothing, the only way to drop a default like `externally_connectable`'s dev origin ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)). The firefox target translates the chrome-only panel keys (`side_panel` → `sidebar_action`) and REFUSES to emit an artifact without `browser_specific_settings.gecko.id` ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
 
 See [docs/build-system.md](../../packages/extension/docs/build-system.md).
 
@@ -126,11 +126,11 @@ See [docs/build-system.md](../../packages/extension/docs/build-system.md).
 
 ### Themes
 
-Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`. See [docs/themes.md](../../packages/extension/docs/themes.md).
+Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`. `theme.id` is a SHARED config key while the theme SET is per-framework, so both resolve sites (sass load path, webpack `__theme__`) go through [src/lib/theme.js](../../packages/extension/src/lib/theme.js): an id this framework doesn't ship falls back to `classy` with one warning naming the key, the value, and the valid set — override per target with `targets.extension.theme.id` ([#261](https://github.com/Omega-JS-Stack/omega/issues/261)). See [docs/themes.md](../../packages/extension/docs/themes.md).
 
 ### Defaults system
 
-`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. See [docs/defaults.md](../../packages/extension/docs/defaults.md).
+`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so setup composes the app's CI into the brand root as `.github/workflows/<app>-publish.yml` — app-scoped, per-app concurrency, regenerated (never duplicated) on every setup, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
 
 ### Auto-translation
 

@@ -14,6 +14,11 @@
 // driven by the shared @omega.js/client motion engine. Same position rule.
 @use 'motion/index' as omega-motion;
 
+// Shared component vocabulary (C3) — structural css for the `omega-*` markup
+// the BASE layer emits (the chip, #242), token-painted. Same position rule:
+// before the theme, so a skin overrides it.
+@use 'components/index' as omega-components;
+
 // Forward the theme (allows consuming project to configure it).
 // `omega:theme` resolves _theme.scss through the layer chain
 // (active theme → classy) — never relatively.

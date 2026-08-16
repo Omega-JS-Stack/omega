@@ -36,11 +36,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
+const Logger = require('@omega.js/devkit/logger');
 const { frameworkDependencyNames, frameworkDepsPattern } = require('@omega.js/devkit/framework-deps');
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
 const { checkThemeVocabulary } = require('./theme-vocabulary.js');
+
+// Variables
+const logger = new Logger('assets');
 
 // A page file is an ENTRY when it's a per-page index.js/index.scss, or a flat
 // file at most two segments below pages/ (pages/index.js, pages/blog/[slug].js).
@@ -152,7 +156,7 @@ function resolvePageAsset(map, base) {
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
  * @param {function} [options.warn] - warning sink for the theme fall-through
- *   guard (default the devkit logger)
+ *   guard and the consumer js/modules/ notice (default the devkit logger)
  * @param {'css'|'js'} [options.only] - rebuild just one half (dev watcher
  *   narrowing: a css-only rebuild writes no js files, so the dev server
  *   hot-swaps stylesheets instead of full-reloading; dev's stable names make
@@ -274,8 +278,35 @@ async function buildAssets(options) {
     // and carry no manifest key. Standalone IIFEs — no boot stub, no shared
     // chunk — so modules here must not import @omega.js/client (a second
     // inlined client copy would break the cross-bundle singleton).
+    //
+    // The lane is FRAMEWORK-only (core + theme layers, #249): a consumer's own
+    // `js/modules/` is ordinary shared code, and the constraints above are not
+    // ones a consumer signed up for — a file importing @omega.js/client failed
+    // the whole build, and one that didn't succeeded into the wrong lane.
+    // Consumer shared code goes in `js/libs/`, which the main/page bundles
+    // import normally (docs/web/libs.md).
+    const frameworkLayers = new Set([...themeRoots, options.coreDir]);
+    const frameworkJsDirs = options.layers
+      .filter((layer) => frameworkLayers.has(layer))
+      .map((layer) => path.join(layer, 'js'))
+      .filter((dir) => fs.existsSync(dir));
+
+    const claimed = options.layers
+      .filter((layer) => !frameworkLayers.has(layer))
+      .map((layer) => path.join(layer, 'js', 'modules'))
+      .filter((dir) => fs.existsSync(dir) && fs.readdirSync(dir).some((file) => file.endsWith('.js')));
+    if (claimed.length) {
+      const warn = options.warn || logger.warn.bind(logger);
+      warn(
+        `js/modules/ is a FRAMEWORK asset lane (standalone IIFE bundles at fixed URLs) — these `
+        + `directories are not built: ${claimed.join(', ')}\n`
+        + `  the fix: move your shared modules to js/libs/ and import them from js/main.js or a page module\n`
+        + `  contract: docs/web/libs.md`,
+      );
+    }
+
     const moduleEntries = {};
-    for (const [rel, abs] of collectLayered(jsDirs, /^modules\/[^/]+\.js$/)) {
+    for (const [rel, abs] of collectLayered(frameworkJsDirs, /^modules\/[^/]+\.js$/)) {
       moduleEntries[`modules/${path.basename(rel, '.js')}.bundle`] = abs;
     }
     if (Object.keys(moduleEntries).length) {
@@ -385,12 +416,63 @@ async function buildAssets(options) {
   return manifest;
 }
 
+// The framework's own safelist — what no content scan can see (see purgeCss).
+// It is the DEFAULT, not the whole truth: a brand's `targets.web.purgecss`
+// safelist merges over it (#250).
+const PURGE_SAFELIST = { greedy: [/omega-/], standard: ['collapse', 'collapsing', 'show', 'showing', 'fade'] };
+
+/**
+ * Compile one configured pattern-lane entry. `new RegExp`'s own throw names
+ * neither the lane nor the pattern, so a typo in omega.json5 (an unclosed
+ * character class) surfaced as an anonymous SyntaxError mid-build — this
+ * attributes it to the exact config key that carries it.
+ * @param {string|RegExp} pattern - one safelist entry
+ * @param {string} lane - the safelist lane (deep/greedy/keyframes)
+ * @returns {RegExp}
+ * @throws {Error} naming targets.web.purgecss.safelist.<lane> and the pattern
+ */
+function toSafelistPattern(pattern, lane) {
+  if (pattern instanceof RegExp) return pattern;
+  try {
+    return new RegExp(pattern);
+  } catch (error) {
+    throw new Error(
+      `targets.web.purgecss.safelist.${lane}: "${pattern}" is not a valid regular expression `
+      + `— ${error.message}`,
+    );
+  }
+}
+
+/**
+ * Merge a config-supplied PurgeCSS safelist over the framework defaults.
+ * Config is JSON5, so its patterns are STRINGS — the pattern lanes
+ * (greedy/deep/keyframes) take RegExp, so strings become one there; `standard`
+ * takes both. The array form is PurgeCSS's own shorthand for `standard`.
+ * @param {object|Array} [configured] - targets.web.purgecss.safelist
+ * @returns {object} a PurgeCSS safelist object
+ */
+function mergeSafelist(configured) {
+  if (!configured) return PURGE_SAFELIST;
+  const extra = Array.isArray(configured) ? { standard: configured } : configured;
+  const merged = { ...PURGE_SAFELIST };
+  for (const [lane, patterns] of Object.entries(extra)) {
+    if (!Array.isArray(patterns) || !patterns.length) continue;
+    const values = lane === 'standard'
+      ? patterns
+      : patterns.map((pattern) => toSafelistPattern(pattern, lane));
+    merged[lane] = [...(merged[lane] || []), ...values];
+  }
+  return merged;
+}
+
 /**
  * PurgeCSS post-pass: strip unused selectors from the MAIN css bundle using
  * the rendered HTML AND the built JS as content.
  * @param {object} options
  * @param {string} options.outDir
  * @param {object} options.manifest - from buildAssets()
+ * @param {object} [options.purgecss] - the resolved config's `purgecss` section
+ *   (`targets.web.purgecss`): `{ safelist: { standard, deep, greedy, keyframes } }`
  * @returns {Promise<{ before: number, after: number }>}
  */
 async function purgeCss(options) {
@@ -412,7 +494,8 @@ async function purgeCss(options) {
     // Bootstrap's JS-toggled transition classes — added at runtime, absent
     // from the rendered HTML the content scan reads, so without the safelist
     // the collapse/fade transitions get purged and snap.
-    safelist: { greedy: [/omega-/], standard: ['collapse', 'collapsing', 'show', 'showing', 'fade'] },
+    // A brand adds its own on top through targets.web.purgecss.safelist.
+    safelist: mergeSafelist(options.purgecss && options.purgecss.safelist),
   });
 
   fs.writeFileSync(cssFile, results[0].css);

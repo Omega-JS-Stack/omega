@@ -8,6 +8,7 @@
  */
 
 const safeCompare = require('../safe-compare.js');
+const redactSecret = require('../redact-secret.js');
 
 const methods = {
   async authenticate(options) {
@@ -157,17 +158,6 @@ const methods = {
     }
   },
 };
-
-// Presence + last-4 only — full secrets in log lines land in Cloud Logging
-function redactSecret(value) {
-  const string = `${value || ''}`;
-
-  if (!string) {
-    return '(empty)';
-  }
-
-  return `***${string.slice(-4)} (${string.length} chars)`;
-}
 
 const isJWT = (token) => {
   const { jwtDecode } = require('jwt-decode');

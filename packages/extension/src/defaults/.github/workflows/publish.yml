@@ -74,9 +74,12 @@ jobs:
 
       # Artifact channel = GitHub releases (D9 addendum 2) — the same channel
       # desktop distributes from, and where CMS download links point. Store
-      # uploads happen in the build step when credentials are present; the zip
-      # here is the durable, downloadable fallback for manual store uploads.
-      - name: Upload package to GitHub release
+      # uploads happen in the build step when credentials are present; the zips
+      # here are the durable, downloadable fallback for manual store uploads.
+      # The build writes one per browser target (packaged/<target>/extension.zip);
+      # a release asset is named by its basename, so each is copied to a
+      # target-stamped name before upload instead of clobbering the others.
+      - name: Upload packages to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -84,4 +87,8 @@ jobs:
           TAG="extension-v$VERSION"
           gh release view "$TAG" >/dev/null 2>&1 \
             || gh release create "$TAG" --title "Extension v$VERSION" --notes "Browser extension package for v$VERSION (built from ${{ github.sha }})."
-          gh release upload "$TAG" packaged/extension.zip --clobber
+          for zip in packaged/*/extension.zip; do
+            target=$(basename "$(dirname "$zip")")
+            cp "$zip" "packaged/extension-$target.zip"
+            gh release upload "$TAG" "packaged/extension-$target.zip" --clobber
+          done

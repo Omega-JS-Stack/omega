@@ -128,7 +128,7 @@ export function chartSlot(id, height = 220, series = []) {
   }
 
   if (!chartsReady()) {
-    return '<p class="omega-micro text-body-secondary mb-0">chart library unavailable — the figures are in the table</p>';
+    return '<p class="omega-micro text-body-secondary mb-0">chart library unavailable; the figures are in the table</p>';
   }
 
   return `<div style="position: relative; height: ${Number(height)}px;" data-series="${series.map(Number).join(',')}"><canvas id="${id}"></canvas></div>`;

@@ -305,6 +305,9 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   pointer, copied when missing), config/omega.json5 seeds then
   JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +
   .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
+  Inside a brand monorepo that CI workflow is composed into the BRAND ROOT
+  as `.github/workflows/<app>-build.yml` — scoped to the app's dir, its own
+  concurrency group — because GitHub runs workflows from the repo root only.
   NO pages are copied — the default set stays virtual. package.json scripts
   sync to the omega commands.
 - **Migration (`omega migrate`)** — one command converts a UJM consumer in
@@ -418,6 +421,22 @@ Consumer page frontmatter still overrides presentation per-page (hero copy,
 `pricing.guarantee`, `pricing.price_per_unit`); the framework ships NO
 fictional defaults (the dispersal-era `### ALL PAGES ###` marker convention
 is dead — pinned by a contract test).
+
+Trial and refund claims are GATED — the framework states neither on its own
+([#273](https://github.com/Omega-JS-Stack/omega/issues/273)). A trial is
+catalog data: `resolved.pricing.trialDays` is the one number a page may speak
+UNIVERSALLY ("every paid plan starts with an N-day free trial"), so it exists
+only when every PAID plan agrees on it — a catalog whose paid plans carry
+different trials, or one selling no trial, resolves `0` and every universal
+trial sentence (the pricing FAQ, the alternatives index and detail pages, the
+checkout) renders empty and drops out, taking its FAQ accordion row and
+FAQPage schema entry with it. Free plans have nothing to disagree with, and
+each card still states its own `plan.trialDays`. A refund window is NOT
+catalog data: money-back copy renders only from the brand's own
+`pricing.guarantee`, so an absent guarantee means no window is promised
+anywhere. Neither number is ever a framework default — the checkout's trial
+sentence and renewal date read the product's real `trial.days`, never a
+constant.
 
 ## Responsive images (the imagemin successor)
 

@@ -2,6 +2,12 @@
 layout: frontend/core/base
 
 # Alternative page defaults - shared content lives here so competitor pages only need competitor-specific data
+#
+# Trial copy DERIVES from the catalog and refund copy from the brand (#273):
+# `resolved.pricing.trialDays` is the number the catalog's paid plans agree on
+# (0 = none) and `resolved.pricing.guarantee` is the brand's own refund words.
+# Neither is a framework default — an answer whose condition doesn't hold
+# renders empty and drops out of the accordion (and the FAQPage schema).
 alternative:
   competitor:
     name: "Competitor"
@@ -12,7 +18,7 @@ alternative:
     headline_accent: "{{ resolved.alternative.competitor.name }}"
     description: "Looking for a {{ resolved.alternative.competitor.name }} alternative? See why thousands of users choose {{ site.brand.name }} for a faster, more powerful experience."
     primary_button:
-      text: "Try free for 14 days"
+      text: "{% if resolved.pricing.trialDays > 0 %}Try free for {{ resolved.pricing.trialDays }} days{% else %}Get started{% endif %}"
       href: "/pricing"
     secondary_button:
       text: "See all features"
@@ -94,13 +100,13 @@ alternative:
       - question: "Can I import my data from {{ resolved.alternative.competitor.name }}?"
         answer: "Yes! We offer a one-click migration tool that imports all your projects, files, and settings. The entire process takes just a few minutes."
       - question: "Is there a free trial?"
-        answer: "Absolutely. You get a full 14-day free trial with access to all premium features. No credit card required to start."
+        answer: "{% if resolved.pricing.trialDays > 0 %}Absolutely. Every paid plan starts with a {{ resolved.pricing.trialDays }}-day free trial with access to all premium features, and you can cancel any time before it ends.{% endif %}"
       - question: "How does pricing compare to {{ resolved.alternative.competitor.name }}?"
         answer: "Our plans start at the same price point but include significantly more features. Most teams find they save money by switching because they no longer need additional tools."
       - question: "What if I need help migrating?"
         answer: "Our support team is available 24/7 to help with your migration. We also offer dedicated onboarding sessions for teams of 10+ members."
       - question: "Can I cancel anytime?"
-        answer: "Yes, you can cancel your subscription at any time with no questions asked. We also offer a 30-day money-back guarantee."
+        answer: "Yes, you can cancel your subscription at any time with no questions asked.{% if resolved.pricing.guarantee %} {{ resolved.pricing.guarantee }}{% endif %}"
   section_cta:
     text: "Get started free"
     href: "/pricing"
@@ -110,9 +116,9 @@ alternative:
       text: "Make the switch"
     headline: "Ready to leave"
     headline_accent: "{{ resolved.alternative.competitor.name }} behind?"
-    subheadline: "Join thousands who chose {{ site.brand.name }}. Start your free trial today. No credit card required."
+    subheadline: "Join thousands who chose {{ site.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
     primary_button:
-      text: "Start free trial"
+      text: "{% if resolved.pricing.trialDays > 0 %}Start free trial{% else %}Get started{% endif %}"
       href: "/pricing"
     secondary_button:
       text: "Talk to sales"
@@ -296,9 +302,15 @@ alternative:
 
 {% section "marketing/stats", items: alt.stats %}{% slot after %}{{ section_cta_block }}{% endslot %}{% endsection %}
 <!-- ═══ FAQ ═══ -->
-{% assign faqs_size = alt.faqs.items | size %}
+{% comment %} An answerless item is a DERIVED one whose condition didn't hold
+(#273 — the trial FAQ on a catalog with no trial): it drops out of the
+accordion here and out of the FAQPage schema in core/foot.html. The test is
+`!= ''` on purpose — `!= blank` does not filter inside where_exp here.
+{% endcomment %}
+{% assign _faqs = alt.faqs.items | where_exp: "faq", "faq.answer != ''" %}
+{% assign faqs_size = _faqs | size %}
 {% if faqs_size > 0 %}
-  {% section "marketing/faq", data: alt.faqs, variant: "center" %}
+  {% section "marketing/faq", data: alt.faqs, items: _faqs, variant: "center" %}
 {% endif %}
 
 <!-- ═══ CTA band ═══ -->

@@ -10,6 +10,7 @@ const paypalProcessor = require('../../../../src/manager/routes/payments/webhook
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
 const FIXTURE_SUBSCRIPTION_ACTIVE = require('../../../fixtures/paypal/subscription-active.json');
+const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
 
 function parseWebhook(event) {
   return paypalProcessor.parseWebhook({ body: event });
@@ -89,6 +90,33 @@ module.exports = {
       name: 'supports-checkout-order-approved',
       async run({ assert }) {
         assert.ok(paypalProcessor.isSupported('CHECKOUT.ORDER.APPROVED'), 'Should support CHECKOUT.ORDER.APPROVED');
+      },
+    },
+
+    {
+      name: 'supports-payment-capture-refunded',
+      async run({ assert }) {
+        // One-time purchases this framework creates go through v2 Orders, and a
+        // v2 capture refunds as PAYMENT.CAPTURE.REFUNDED — not the v1
+        // PAYMENT.SALE.REFUNDED the accepted list stopped at. Dropping it meant
+        // a refund of a modern PayPal purchase never entered the pipeline at
+        // all ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+        assert.ok(paypalProcessor.isSupported('PAYMENT.CAPTURE.REFUNDED'), 'Should support PAYMENT.CAPTURE.REFUNDED');
+      },
+    },
+
+    {
+      name: 'the-sibling-capture-events-stay-unsupported',
+      async run({ assert }) {
+        // Reviewed with #240 and deliberately left out. COMPLETED/PENDING/DENIED
+        // describe the capture this framework performs ITSELF inside
+        // fetchResource('order'), so accepting them would process one purchase
+        // twice. REVERSED is a money-out event like a refund, but nothing has
+        // ever exercised it here — it needs its own payload and its own issue
+        // rather than a guess folded into this one.
+        for (const eventType of ['PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.PENDING', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.REVERSED']) {
+          assert.equal(paypalProcessor.isSupported(eventType), false, `${eventType} should not be accepted yet`);
+        }
       },
     },
 
@@ -561,6 +589,85 @@ module.exports = {
         assert.equal(result.resourceId, '5UX02069M9686893E', 'Resource ID from fixture');
         assert.equal(result.uid, 'test-user-123', 'UID from fixture purchase_units custom_id');
         assert.equal(result.eventType, 'CHECKOUT.ORDER.APPROVED', 'Event type should match');
+      },
+    },
+
+    // ─── PAYMENT.CAPTURE.REFUNDED — the v2 one-time refund ───
+
+    {
+      name: 'fixture-capture-refunded-is-a-one-time-refund',
+      async run({ assert }) {
+        // The v2 refund resource names the CAPTURE it reversed through its
+        // HATEOAS `up` link — there is no parent_payment to walk, and the
+        // capture reads back at /v2/payments/captures/{id}
+        // ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
+        const result = parseWebhook({
+          id: 'WH-fixture-capture-refund',
+          event_type: 'PAYMENT.CAPTURE.REFUNDED',
+          resource: FIXTURE_CAPTURE_REFUNDED,
+        });
+
+        assert.equal(result.category, 'one-time', 'Category should be one-time');
+        assert.equal(result.resourceType, 'capture', 'The capture the refund reversed is the resource');
+        assert.equal(result.resourceId, '2GG279541U471931P', 'Resource ID is the capture from the up link');
+        assert.equal(result.uid, 'test-user-123', 'UID from the refund custom_id');
+        assert.equal(result.eventType, 'PAYMENT.CAPTURE.REFUNDED', 'Event type should match');
+      },
+    },
+
+    {
+      name: 'capture-refunded-reads-an-explicit-capture-id-first',
+      async run({ assert }) {
+        const result = parseWebhook({
+          id: 'WH-capture-refund-explicit',
+          event_type: 'PAYMENT.CAPTURE.REFUNDED',
+          resource: {
+            id: 'REFUND-V2',
+            capture_id: 'CAPTURE-EXPLICIT',
+            custom_id: 'uid:user-capture,orderId:ord-capture,productId:credits-100',
+            links: [{ href: 'https://api.paypal.com/v2/payments/captures/CAPTURE-FROM-LINK', rel: 'up', method: 'GET' }],
+          },
+        });
+
+        assert.equal(result.resourceId, 'CAPTURE-EXPLICIT', 'An explicit capture_id wins over the link');
+        assert.equal(result.uid, 'user-capture', 'UID from custom_id');
+      },
+    },
+
+    {
+      name: 'capture-refunded-without-a-capture-link-falls-back-to-the-refund-id',
+      async run({ assert }) {
+        // Nothing names the capture: the refund itself is the only id the event
+        // carries, same fallback the v1 sale path takes.
+        const result = parseWebhook({
+          id: 'WH-capture-refund-bare',
+          event_type: 'PAYMENT.CAPTURE.REFUNDED',
+          resource: { id: 'REFUND-BARE' },
+        });
+
+        assert.equal(result.category, 'one-time', 'Still a one-time refund');
+        assert.equal(result.resourceId, 'REFUND-BARE', 'Resource ID falls back to the refund ID');
+        assert.equal(result.uid, null, 'A refund carrying no custom_id resolves its uid downstream');
+      },
+    },
+
+    {
+      name: 'capture-refunded-ignores-links-that-are-not-captures',
+      async run({ assert }) {
+        // A `up` link pointing at the ORDER (not a capture) is not a capture id.
+        const result = parseWebhook({
+          id: 'WH-capture-refund-order-link',
+          event_type: 'PAYMENT.CAPTURE.REFUNDED',
+          resource: {
+            id: 'REFUND-ORDER-LINK',
+            links: [
+              { href: 'https://api.paypal.com/v2/payments/refunds/REFUND-ORDER-LINK', rel: 'self', method: 'GET' },
+              { href: 'https://api.paypal.com/v2/checkout/orders/ORDER-123', rel: 'up', method: 'GET' },
+            ],
+          },
+        });
+
+        assert.equal(result.resourceId, 'REFUND-ORDER-LINK', 'Only a captures link names a capture');
       },
     },
   ],

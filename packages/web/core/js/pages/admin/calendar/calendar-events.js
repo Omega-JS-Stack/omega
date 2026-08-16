@@ -149,7 +149,7 @@ export default class CalendarEvents {
         const isEmail = $radio.value === 'email';
         $emailFields.classList.toggle('d-none', !isEmail);
         $pushFields.classList.toggle('d-none', isEmail);
-        $subjectHint.textContent = isEmail ? '(email subject line)' : '(notification body — campaign name is used as title)';
+        $subjectHint.textContent = isEmail ? '(email subject line)' : '(notification body; campaign name is used as title)';
       });
     });
   }
@@ -328,7 +328,7 @@ export default class CalendarEvents {
     const settings = campaign.settings || {};
 
     document.getElementById('campaign-results-title-text').textContent =
-      `${settings.name || 'Campaign'} — ${campaign.status === 'sent' ? 'Sent' : 'Failed'}`;
+      `${settings.name || 'Campaign'} (${campaign.status === 'sent' ? 'Sent' : 'Failed'})`;
 
     // Show retry button for failed campaigns
     document.getElementById('btn-retry-campaign').classList.toggle('d-none', campaign.status !== 'failed');

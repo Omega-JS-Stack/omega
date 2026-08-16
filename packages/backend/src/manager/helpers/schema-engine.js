@@ -15,7 +15,9 @@
  *     reference; this engine clones defaults per request and returns them clean.
  *   - Sound leaf detection: a node is a field when it carries any field option —
  *     powertools' walk only terminated on no-default nodes because its own pollution
- *     added `default`/`value` to them first.
+ *     added `default`/`value` to them first. A `types` key that is neither a type
+ *     list nor a nested node throws, naming the path: a malformed leaf is an author
+ *     error, and reading it as a group resolved the field away silently.
  *   - min/max enforce ONLY when declared (Ian, cp84): powertools' `min || 0` /
  *     `max || Infinity` clamped negatives to 0 on every undeclared-min number field
  *     and made declared 0-bounds vanish. Now: no min → negatives pass through;
@@ -39,13 +41,50 @@ const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'c
 const LEAF_KEYS = [...FIELD_OPTIONS, 'available'];
 
 /**
- * Whether a declarative schema node is a field (leaf) rather than a nested group.
- * @param {*} node - Schema node
+ * Whether `types` holds a DECLARATION (a non-empty list of type names) rather
+ * than a field named `types`.
+ * @param {*} value - The node's `types` value
  * @returns {boolean}
  */
-function isFieldNode(node) {
+function isTypeList(value) {
+  return Array.isArray(value) && value.length > 0 && value.every((type) => typeof type === 'string');
+}
+
+/**
+ * Whether a declarative schema node is a field (leaf) rather than a nested group.
+ *
+ * `types` decides on SHAPE, not on presence: a schema declaring a field
+ * literally named `types` (`{types: {types: ['array']}, name: {...}}`) used to
+ * read as one leaf, so the whole schema resolved to {} and every request 400'd
+ * ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)). A declaration
+ * is always a list of type names; a nested NODE under that key is a field
+ * named `types`; anything else is neither, and a schema is author-written code
+ * — so it THROWS rather than reading as a group whose field then silently
+ * resolves away (`{types: 'string'}` used to strip its own leaf; the powertools
+ * engine it replaced threw).
+ * @param {*} node - Schema node
+ * @param {string} [path] - Dot path of the node, for the error message
+ * @returns {boolean}
+ * @throws {Error} When `types` is neither a type list nor a nested node
+ */
+function isFieldNode(node, path) {
   if (!node || typeof node !== 'object' || Array.isArray(node)) {
     return false;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(node, 'types')) {
+    if (isTypeList(node.types)) {
+      return true;
+    }
+
+    // A field literally named `types`, or a group of them.
+    if (node.types && typeof node.types === 'object' && !Array.isArray(node.types)) {
+      return false;
+    }
+
+    const received = node.types === undefined ? 'undefined' : JSON.stringify(node.types);
+
+    throw new Error(`Invalid schema at "${path || '(root)'}": \`types\` must be a non-empty array of type names (or a nested field node named "types"), received ${received}`);
   }
 
   return LEAF_KEYS.some((key) => Object.prototype.hasOwnProperty.call(node, key));
@@ -62,7 +101,10 @@ function isFieldNode(node) {
 function iterateSchema(schema, fn, path) {
   path = path || '';
 
-  if (isFieldNode(schema)) {
+  // The ROOT is never a leaf: a marker key there names a FIELD, and there is no
+  // key to resolve the root onto anyway — reading it as a leaf swallowed every
+  // sibling ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+  if (path && isFieldNode(schema, path)) {
     fn(path, schema);
     return;
   }
@@ -89,11 +131,6 @@ function resolveSchema(settings, schema) {
   const output = {};
 
   iterateSchema(schema, (path, node) => {
-    // A field node at the schema root has no key to set — nothing to resolve onto
-    if (!path) {
-      return;
-    }
-
     _.set(output, path, resolveFieldValue(_.get(settings, path), node));
   });
 
@@ -112,11 +149,23 @@ function enforceValidTypes(value, types, def) {
     return typeof value === type || (type === 'array' && Array.isArray(value));
   });
 
-  if (types.length === 1 && types[0] !== 'any') {
-    return isValidType ? value : powertools.force(value, types[0]);
+  const resolved = types.length === 1 && types[0] !== 'any'
+    ? (isValidType ? value : powertools.force(value, types[0]))
+    : (isValidType ? value : def);
+
+  // NaN and ±Infinity are `number` to typeof, so the check above accepts them
+  // and enforceMinMax's comparisons against NaN are all false — the clamp never
+  // fires and the value flows to sinks like usage.increment(), where it poisons
+  // every later limit comparison
+  // ([#244](https://github.com/Omega-JS-Stack/omega/issues/244)). A non-finite
+  // number is never a usable value: it takes the default, like any other
+  // rejected input. Checked AFTER coercion, which can produce one of its own
+  // (force('Infinity', 'number')).
+  if (typeof resolved === 'number' && !Number.isFinite(resolved)) {
+    return def;
   }
 
-  return isValidType ? value : def;
+  return resolved;
 }
 
 /**
