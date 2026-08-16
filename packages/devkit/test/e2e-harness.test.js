@@ -230,7 +230,7 @@ test('boot bumps a taken site port via the allocator and serves there', async ()
   }
 });
 
-test('preparePage wires console capture and injects the resolved emulator map', async () => {
+test('preparePage wires console capture and injects the resolved emulator map as a FALLBACK (#300)', async () => {
   const root = makeTempBrand([]);
   const harness = new E2eHarness(root);
   harness.emulatorPorts = { auth: 9199, firestore: 8180, hosting: 5099 };
@@ -247,7 +247,8 @@ test('preparePage wires console capture and injects the resolved emulator map', 
   assert.deepEqual(events.sort(), ['console', 'pageerror'], 'console capture wired');
   assert.equal(injections.length, 1);
   assert.deepEqual(injections[0].ports, { auth: 9199, firestore: 8180, hosting: 5099 });
-  // The injected function must set the runtime channel the client reads
+  // The injected function must set the runtime channel the client reads for
+  // the keys a page's own chrome does NOT carry (a static build carries none)
   const win = {};
   const originalWindow = global.window;
   global.window = win;

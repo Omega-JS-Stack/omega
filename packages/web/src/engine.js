@@ -671,10 +671,18 @@ function buildConfig(eleventyConfig, options) {
   // `dev` rides the jekyll global into the Configuration chrome (N7): `omega
   // dev` passes { ports } with the resolved map; production builds pass
   // nothing → null, and @omega.js/client falls back to the classic ports.
-  eleventyConfig.addGlobalData('jekyll', {
+  //
+  // A FUNCTION `dev` is a LIVE map, re-read on every render — the sibling
+  // backend's ports file is pid-stamped and deleted on shutdown, so the map a
+  // boot-time read produced is wrong the moment the emulator boots late or
+  // restarts on bumped numbers, and the browser has no other channel
+  // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). Global data
+  // registered as a function is evaluated per build, so every re-render bakes
+  // what is running RIGHT NOW.
+  eleventyConfig.addGlobalData('jekyll', () => ({
     environment: options.environment || 'development',
-    dev: options.dev || null,
-  });
+    dev: (typeof options.dev === 'function' ? options.dev() : options.dev) || null,
+  }));
   eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
 
   // ---- Image cache-breaker (dev AND prod): every local <img>/<source> URL

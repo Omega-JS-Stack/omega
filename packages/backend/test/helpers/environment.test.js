@@ -17,6 +17,17 @@
  *   - The ctx forwards each method to its Manager (identical results).
  */
 
+// The local port a getter must answer with: the RESOLVED one the CLI injected
+// into this runner child (OMEGA_<NAME>_PORT, the #291 map), classic default
+// when unset. Pinning the classic numbers here failed every bumped run — a
+// second stack on 5001/5002 moves the whole map and the getters move with it
+// ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)). A getter that
+// hardcodes its port still fails these: on a bumped run it answers the classic
+// number while this reads the injected one.
+function localPort(name, classic) {
+  return process.env[`OMEGA_${name}_PORT`] || classic;
+}
+
 // Run a thunk with the env-detection vars cleared, restoring them afterward. These are
 // the only inputs getEnvironment() reads, so clearing them gives a clean slate per case.
 function withEnv(overrides, fn) {
@@ -163,11 +174,12 @@ module.exports = {
     {
       name: 'getApiUrl: localhost in development AND testing, prod otherwise',
       async run({ Manager, assert }) {
+        const hosting = `http://localhost:${localPort('HOSTING', 5002)}`;
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-          assert.equal(Manager.getApiUrl(), 'http://localhost:5002', 'dev → localhost');
+          assert.equal(Manager.getApiUrl(), hosting, 'dev → localhost');
         });
         withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-          assert.equal(Manager.getApiUrl(), 'http://localhost:5002', 'testing → localhost');
+          assert.equal(Manager.getApiUrl(), hosting, 'testing → localhost');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
           assert.match(Manager.getApiUrl(), /^https:\/\/api\./, 'prod → api.<domain>');
@@ -178,18 +190,19 @@ module.exports = {
       name: 'getApiUrl: explicit env arg overrides current environment',
       async run({ Manager, assert }) {
         // Under the test harness we're in 'testing', but an explicit arg forces the mapping.
-        assert.equal(Manager.getApiUrl('development'), 'http://localhost:5002', "arg 'development' → localhost");
+        assert.equal(Manager.getApiUrl('development'), `http://localhost:${localPort('HOSTING', 5002)}`, "arg 'development' → localhost");
         assert.match(Manager.getApiUrl('production'), /^https:\/\/api\./, "arg 'production' → prod");
       },
     },
     {
       name: 'getFunctionsUrl: localhost in development AND testing, cloudfunctions otherwise',
       async run({ Manager, assert }) {
+        const functions = new RegExp(`^http://localhost:${localPort('FUNCTIONS', 5001)}/`);
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-          assert.match(Manager.getFunctionsUrl(), /^http:\/\/localhost:5001\//, 'dev → localhost:5001');
+          assert.match(Manager.getFunctionsUrl(), functions, `dev → localhost:${localPort('FUNCTIONS', 5001)}`);
         });
         withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-          assert.match(Manager.getFunctionsUrl(), /^http:\/\/localhost:5001\//, 'testing → localhost:5001');
+          assert.match(Manager.getFunctionsUrl(), functions, `testing → localhost:${localPort('FUNCTIONS', 5001)}`);
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
           assert.match(Manager.getFunctionsUrl(), /cloudfunctions\.net$/, 'prod → cloudfunctions.net');
@@ -204,18 +217,19 @@ module.exports = {
         // shares the same mkcert default → https. Unset → both sides plain http.
         // Controlled explicitly in BOTH directions so ambient env can't skew it.
         const savedHttpsPort = process.env.OMEGA_HTTPS_PORT;
+        const website = localPort('WEBSITE', 4000);
         try {
           delete process.env.OMEGA_HTTPS_PORT;
           withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-            assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'dev → localhost:4000');
+            assert.equal(Manager.getWebsiteUrl(), `http://localhost:${website}`, `dev → localhost:${website}`);
           });
           withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-            assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'testing → localhost:4000');
+            assert.equal(Manager.getWebsiteUrl(), `http://localhost:${website}`, `testing → localhost:${website}`);
           });
 
           process.env.OMEGA_HTTPS_PORT = '5002';
           withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-            assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'dev behind the https proxy → https website');
+            assert.equal(Manager.getWebsiteUrl(), `https://localhost:${website}`, 'dev behind the https proxy → https website');
           });
 
           withEnv({ ENVIRONMENT: 'production' }, () => {

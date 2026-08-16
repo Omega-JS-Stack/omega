@@ -10,6 +10,7 @@ const ReplacePlugin = require('../plugins/webpack/replace.js');
 const stripDevBlocksLoader = require.resolve('../loaders/webpack/strip-dev-blocks.js');
 const version = require('wonderful-version');
 const { resolveThemeId } = require('../../lib/theme.js');
+const { readSiblingPorts, envPorts } = require('@omega.js/config');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -472,6 +473,12 @@ function getTemplateReplaceOptions() {
   options.webManagerConfiguration = JSON.stringify({
     environment: options.environment || 'production',
     buildTime: now,
+    // The local stack's resolved ports (N7) — same bake, same reason as
+    // build.js's blob: an extension page has no other way to learn a bumped
+    // emulator port ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+    ...(options.environment === 'production'
+      ? {}
+      : { dev: { ports: { ...readSiblingPorts(rootPathProject), ...envPorts() } } }),
     brand: {
       id: options.brand?.id || 'extension',
       name: options.brand?.name || 'Extension',

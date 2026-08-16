@@ -88,6 +88,13 @@ test('appInstance: brand apps resolve through the dir walk (functions/ normalize
   assert.strictEqual(appInstance(path.join(root, 'apps', 'website-admin'), 'web'), 'admin');
   assert.strictEqual(appInstance(path.join(root, 'apps', 'backend', 'functions'), 'backend'), 'main');
 
+  // The staged dist/ normalizes up the same way: reading `dist` as the app dir
+  // name resolved every instance to main, so a second instance's staged view
+  // silently took the main instance's config
+  // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+  assert.strictEqual(appInstance(path.join(root, 'apps', 'website-admin', 'dist'), 'web'), 'admin');
+  assert.strictEqual(appInstance(path.join(root, 'apps', 'website', 'dist'), 'web'), 'main');
+
   // A STANDALONE project whose dir happens to look suffixed stays main
   const standalone = makeFixture('website-admin', {
     'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { web: {} } }`,
@@ -200,6 +207,16 @@ test('loadConfig: the instance entry is the target layer — scoped to ITS app d
   assert.strictEqual(admin.config.brand.url, 'https://acme.test', 'sibling shared keys survive the merge');
   assert.strictEqual(admin.config.monitoring.dsn, 'https://admin-override.example.com');
   assert.strictEqual(admin.config.id, undefined);
+
+  // The APP_SUBDIRS views of the same app resolve the same instance — the
+  // dist/ leg was missing, so a staged resolution answered `main` and merged
+  // the wrong instance's layer
+  // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+  for (const subdir of ['functions', 'dist']) {
+    const staged = loadConfig(path.join(root, 'apps', 'website-admin', subdir), 'web');
+    assert.strictEqual(staged.instance, 'admin', `${subdir}/ resolves its app dir's instance`);
+    assert.strictEqual(staged.config.flavor, 'console');
+  }
 });
 
 test('loadConfig: app shared/target layers still merge ABOVE the instance entry', (t) => {

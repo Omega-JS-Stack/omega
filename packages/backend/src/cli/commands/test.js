@@ -7,7 +7,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
-const { readPortsFile } = require('@omega.js/config');
+const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
 // The rules SCHEMA version — setup.js owns it, this is the second generator.
@@ -478,11 +478,37 @@ class TestCommand extends BaseCommand {
   buildTestCommand(testConfig) {
     const testScriptPath = path.join(__dirname, '..', '..', 'test', 'run-tests.js');
 
+    // The RESOLVED port map, minus the TLS front. The runner loads route
+    // handlers IN-PROCESS, so its Manager's URL getters answer from
+    // OMEGA_*_PORT the same way a function worker's do — unset, they fell back
+    // to the classic 5002, which under `omega emulator`'s HTTPS default is the
+    // mkcert proxy, not hosting: the test processor's auto-webhook followed the
+    // proxy's 307 to https and died on a cert this process has no CA for
+    // ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)). `https` is
+    // deliberately dropped — the runner is a plain-http client of the stack
+    // (its own apiUrl already is), so it gets hosting's internal port.
+    const { https: _tlsFront, ...plainHttpPorts } = testConfig.emulatorPorts;
+
     // Pass entire config as base64-encoded JSON to avoid shell escaping issues
     const testEnv = {
+      ...portsToEnv(plainHttpPorts),
       OMEGA_TEST_CONFIG: Buffer.from(JSON.stringify(testConfig)).toString('base64'),
       FIRESTORE_EMULATOR_HOST: `127.0.0.1:${testConfig.emulatorPorts.firestore}`,
       FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${testConfig.emulatorPorts.auth}`,
+      // The project the emulator booted with — resolved from the same config
+      // the emulator command boots on (loadProjectConfig hard-fails without it).
+      // The runner's admin app and the wipe's auth bulk-clear both read it, and
+      // the wipe's URL names a project the emulator answers 200 for whether it
+      // knows it or not: without this the wipe cleared a project nothing in the
+      // run ever touched and reported success
+      // ([#292](https://github.com/Omega-JS-Stack/omega/issues/292)).
+      GCLOUD_PROJECT: testConfig.cloud.config.projectId,
+      // GCLOUD_PROJECT alone makes the child's init-time environment read as
+      // production (nothing else marks it yet: runner.js stamps its own
+      // OMEGA_TEST_MODE only later, inside run()), which wakes the
+      // firebase-functions logger compat shim and turns every test line into
+      // JSON. Say what this process IS before Manager.init() looks.
+      OMEGA_TEST_MODE: 'true',
     };
 
     const envString = Object.entries(testEnv)

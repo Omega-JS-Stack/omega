@@ -73,9 +73,12 @@ framework defaults ← company ← brand shared ← brand targets[target] ← ap
   see below). It layers exactly like the brand file (company shared ← company `targets[target]`)
   minus its `brands` key, which is company plumbing and never inherits. An unstamped brand has no
   company layer; the resolved result reports the file it used as `files.company`.
-- **`projectDir` may be a backend's `functions/` dir** (@omega.js/backend's runtime cwd): the brand
-  walk-up treats the app root as one level up, so `loadConfig(functionsDir, 'backend')`
-  and `loadConfig(appRoot, 'backend')` resolve identically.
+- **`projectDir` may be one of an app's SUBDIRS** — `functions/` (@omega.js/backend's runtime cwd)
+  or `dist/` (its staged build output, the view `omega test` loads): every walk (brand root,
+  company marker, app-layer fallback, instance id, compose, `resolveBrandRoot`) treats the app root
+  as one level up, so `loadConfig(functionsDir, 'backend')`, `loadConfig(distDir, 'backend')` and
+  `loadConfig(appRoot, 'backend')` resolve identically. A staged `config/omega.json5` inside either
+  subdir is the deployed runtime's own view, never an authored app layer.
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
   `config.platforms`; frameworks never read through `config.targets.<type>.…`.
 - **Any shared key inside a target entry overrides it for that surface** — a desktop-only
@@ -221,16 +224,27 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   allocator (the backend emulator boot) writes it; siblings of the same brand
   (`omega test` against a running emulator, the e2e harness) read it; cleared on clean
   shutdown.
+- **Sibling map** — `readSiblingPorts(appDir)` merges every OTHER app's live ports file
+  in the same brand (a running backend's emulator map) for the app that asks. Read at
+  USE time, never cached: the file appears when the backend boots and changes when it
+  restarts.
 - **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
-  children; `envPort(name)` reads them. URL getters resolve env → classic default.
-- **Browser channel (cp89)** — browser code can read neither env nor files, so it gets
-  two channels, runtime winning: `omega dev` bakes `dev: { ports }` into the
-  Configuration chrome (its resolved website port + a live sibling backend's map read
-  from that app's ports file — boot the backend first for a complete map; a page built
-  before the backend booted picks it up on the next rebuild). Drivers that learn the
-  map only after the chrome was baked set `window.__OMEGA_DEV_PORTS__` instead (the
-  devkit e2e harness — the site builds BEFORE the emulator boots). `@omega.js/client`
-  resolves runtime global → chrome `dev.ports` → classic defaults; its dev `getApiUrl`
+  children; `envPort(name)` reads one, `envPorts(env)` reads the whole map back out.
+  URL getters resolve env → classic default.
+- **Browser channel (cp89, [#300](https://github.com/Omega-JS-Stack/omega/issues/300))** —
+  browser code can read neither env nor files, so a surface BAKES the map into its
+  client config: `omega dev` writes `dev: { ports }` into the Configuration chrome
+  PER RENDER (its resolved website port with the sibling backend's map merged over it),
+  and its auth-emulator proxy resolves the target port per REQUEST — so a backend that
+  boots after the dev server, or an emulator that restarts onto bumped numbers, lands
+  in the next render instead of never. Desktop (`OMEGA_BUILD_JSON.config.dev`) and
+  extension (`build.js` + the page config blob) bake the same map at build time, from
+  the sibling file plus the env channel; production builds bake none. Drivers serving a
+  STATIC build set `window.__OMEGA_DEV_PORTS__` (the devkit e2e harness — the site
+  builds before the emulator boots), which is a FALLBACK: it fills only what a page's
+  chrome omits, so a side channel no real browser has can never hide a broken real one.
+  `@omega.js/client` resolves chrome `dev.ports` → runtime global → classic defaults,
+  and warns loudly (dev only) naming every port it had to assume; its dev `getApiUrl`
   speaks plain http to a mapped `hosting` (the emulator serves http), https to a mapped
   `https` (`mgr serve`'s mkcert proxy), and keeps the classic
   `https://localhost:5002` serve assumption when no map was provided. Dev mode

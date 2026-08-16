@@ -160,9 +160,15 @@ class E2eHarness {
 
   /**
    * Wire a puppeteer page into the harness: console capture + the resolved
-   * emulator port map as `window.__OMEGA_DEV_PORTS__` (N7's runtime channel —
-   * the site was BUILT before the emulator booted, so the baked chrome can't
-   * know bumped ports; @omega.js/client gives this global top precedence).
+   * emulator port map as `window.__OMEGA_DEV_PORTS__`.
+   *
+   * That global is a FALLBACK, not an override (#300). This harness serves a
+   * STATIC build made before the emulator booted, so its pages carry no
+   * `dev.ports` chrome at all and the injection is the only map they can get.
+   * A page served by a real dev server carries the live map itself, and
+   * @omega.js/client lets that baked chrome win — otherwise this side channel
+   * (which no real browser has) would hide a broken real one, which is exactly
+   * how bumped-port breakage stayed green through every e2e run.
    * Call after boot() and before the first page.goto().
    */
   async preparePage(page) {

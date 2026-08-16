@@ -8,6 +8,7 @@ const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
 const { execute, getKeys } = require('node-powertools');
 const JSON5 = require('json5');
+const { readSiblingPorts, envPorts } = require('@omega.js/config');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -72,6 +73,16 @@ async function generateBuildJs(outputDir) {
 
         // Brand configuration (from config/omega.json5 or manifest)
         brand: config.brand || {},
+
+        // The local stack's resolved ports (N7). An extension context has no
+        // env and no filesystem, so this bake is its ONLY channel: the sibling
+        // backend's published map plus anything a parent injected on the env
+        // channel, resolved per build so a rebuild follows a restarted
+        // emulator ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+        // Production packages carry none — there is no local stack to reach.
+        ...(Manager.getEnvironment() === 'production'
+          ? {}
+          : { dev: { ports: { ...readSiblingPorts(rootPathProject), ...envPorts() } } }),
 
         // Cloud (firebase) config in the CANONICAL `cloud.config` shape —
         // what @omega.js/client prefers and the only shape background.js

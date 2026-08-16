@@ -19,9 +19,11 @@ const {
   writePortsFile,
   readPortsFile,
   clearPortsFile,
+  readSiblingPorts,
   envName,
   portsToEnv,
   envPort,
+  envPorts,
 } = require('../src/ports.js');
 
 /** Bind a real blocker on a port; returns close(). host defaults to
@@ -174,6 +176,46 @@ test('ports file: absent and malformed both read as null', () => {
   assert.equal(readPortsFile(dir), null);
 });
 
+// ---- sibling ports (the map an app hands its browser code)
+
+test('readSiblingPorts: merges live sibling maps, skips own app dir and dead pids, empty without brand root', () => {
+  // Brand layout: <root>/config/omega.json5 + apps/{backend,website}
+  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'ports-test-brand-'));
+  fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{}');
+  const backend = path.join(brand, 'apps', 'backend');
+  const website = path.join(brand, 'apps', 'website');
+  fs.mkdirSync(path.join(backend, '.temp'), { recursive: true });
+  fs.mkdirSync(path.join(website, '.temp'), { recursive: true });
+
+  // Live backend map (our own pid = definitely alive)
+  fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
+    ports: { hosting: 5003, auth: 9099 }, pid: process.pid, startedAt: 'x',
+  }));
+  // Own app's file must be skipped even with a live pid (a previous run of THIS server)
+  fs.writeFileSync(path.join(website, '.temp', 'ports.json'), JSON.stringify({
+    ports: { website: 4999 }, pid: process.pid, startedAt: 'x',
+  }));
+
+  assert.deepEqual(readSiblingPorts(website), { hosting: 5003, auth: 9099 });
+
+  // A restarted emulator republishes new numbers — the NEXT read carries them
+  // (the whole reason this is a use-time read, #300)
+  fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
+    ports: { hosting: 5004, auth: 9100 }, pid: process.pid, startedAt: 'x',
+  }));
+  assert.deepEqual(readSiblingPorts(website), { hosting: 5004, auth: 9100 });
+
+  // Dead-pid sibling map is a crash leftover — ignored
+  fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
+    ports: { hosting: 5003 }, pid: 999999999, startedAt: 'x',
+  }));
+  assert.deepEqual(readSiblingPorts(website), {});
+
+  // Standalone consumer (no brand root) → empty map, caller falls back to classics
+  assert.deepEqual(readSiblingPorts(makeTempProject()), {});
+});
+
 // ---- env mapping
 
 test('envName / portsToEnv / envPort round-trip', () => {
@@ -184,6 +226,17 @@ test('envName / portsToEnv / envPort round-trip', () => {
   assert.equal(envPort('auth', env), 9100);
   assert.equal(envPort('firestore', env), null);
   assert.equal(envPort('hosting', { OMEGA_HOSTING_PORT: 'garbage' }), null);
+});
+
+test('envPorts: the whole injected map back out, garbage and foreign vars dropped', () => {
+  assert.deepEqual(envPorts(portsToEnv({ hosting: 5102, auth: 9100 })), { hosting: 5102, auth: 9100 });
+  assert.deepEqual(envPorts({
+    OMEGA_AUTH_PORT: '9100',
+    OMEGA_HOSTING_PORT: 'garbage',
+    OMEGA_TEST_MODE: 'true',
+    PORT: '3000',
+  }), { auth: 9100 });
+  assert.deepEqual(envPorts({}), {});
 });
 
 // ---- classic defaults sanity

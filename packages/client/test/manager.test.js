@@ -155,7 +155,7 @@ describe('Dev ports (N7)', () => {
     assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5004');
   });
 
-  it('should let the runtime channel (window.__OMEGA_DEV_PORTS__) win over the chrome', async () => {
+  it('should let the BAKED CHROME win over the runtime channel, which only fills what the chrome omits (#300)', async () => {
     const Manager = getManager();
     await Manager.initialize({
       ...TEST_CONFIG,
@@ -163,9 +163,47 @@ describe('Dev ports (N7)', () => {
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
       dev: { ports: { functions: 5003, hosting: 5004 } },
     });
-    global.window.__OMEGA_DEV_PORTS__ = { functions: 5103, hosting: 5104 };
-    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5103/my-project/us-central1');
-    assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5104');
+    // The chrome is written per render by the dev server that served this page
+    // — a driver's injected map is a fallback for pages that carry none, and
+    // must never be able to mask a wrong (or right) baked map
+    global.window.__OMEGA_DEV_PORTS__ = { functions: 5103, hosting: 5104, auth: 9199 };
+    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5003/my-project/us-central1');
+    assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5004');
+    assert.strictEqual(Manager._devPorts().auth, 9199, 'a key the chrome omits still comes from the fallback');
+  });
+
+  it('should say out loud which dev ports are assumptions, and stay quiet when every one is resolved (#300)', async () => {
+    const Manager = getManager();
+    const realWarn = console.warn;
+    let warnings = [];
+    console.warn = (...args) => warnings.push(args.join(' '));
+    const portLines = () => warnings.filter((line) => line.includes('No resolved dev port'));
+
+    try {
+      // Only this server's own port resolved — every emulator number is a guess
+      await Manager.initialize({
+        ...TEST_CONFIG,
+        environment: 'development',
+        dev: { ports: { website: 4001 } },
+      });
+      Manager._warnClassicPortAssumption();
+      assert.strictEqual(portLines().length, 1, 'ONE line, not one per port');
+      assert.match(portLines()[0], /^\[@omega\.js\/client:firebase\]/, 'through the client logger (the tag contract)');
+      assert.match(portLines()[0], /auth, firestore, functions, hosting/);
+      assert.match(portLines()[0], /auth :9099/);
+      assert.match(portLines()[0], /talking to IT, not your stack/);
+
+      warnings = [];
+      await Manager.initialize({
+        ...TEST_CONFIG,
+        environment: 'development',
+        dev: { ports: { auth: 9100, firestore: 8081, functions: 5002, hosting: 5003 } },
+      });
+      Manager._warnClassicPortAssumption();
+      assert.strictEqual(portLines().length, 0, 'a fully resolved map says nothing');
+    } finally {
+      console.warn = realWarn;
+    }
   });
 
   it('should prefer an https (mkcert proxy) entry over plain-http hosting', async () => {

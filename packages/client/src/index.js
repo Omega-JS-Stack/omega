@@ -524,8 +524,8 @@ class Manager {
     // frontend; production builds (environment=production) never connect. There is
     // deliberately NO live-Firebase opt-out for dev — build production locally if you
     // truly need live. Ports come from the resolved dev map when one was provided
-    // (N7: `dev.ports` chrome / `window.__OMEGA_DEV_PORTS__`), classic defaults
-    // otherwise.
+    // (N7: the `dev.ports` chrome, then `window.__OMEGA_DEV_PORTS__` for the keys it
+    // omits), classic defaults otherwise — and an assumed port says so out loud.
     // Both connects live HERE, immediately after the instances are created: the auth
     // module reads accounts via `manager.firebaseFirestore` directly, so connecting
     // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
@@ -534,6 +534,7 @@ class Manager {
     if (this.isDevelopment()) {
       const ports = this._devPorts();
       const authEmulatorUrl = this._authEmulatorUrl();
+      this._warnClassicPortAssumption();
       firebaseLogger.log(`Connecting to emulators (auth ${authEmulatorUrl}, firestore :${ports.firestore})`);
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
@@ -597,21 +598,43 @@ class Manager {
   }
 
   // The dev port map a page was actually GIVEN (N7), without fallbacks — two
-  // channels, runtime wins: `config.dev.ports` is baked into the Configuration
-  // chrome by `omega dev` at render time; `window.__OMEGA_DEV_PORTS__` is
-  // injected at runtime by drivers that know the live map after the chrome was
-  // baked (the devkit e2e harness sets it via evaluateOnNewDocument). Presence
-  // of a key here means a RESOLVED fact about a live stack; absence means
-  // "assume the classics".
+  // channels, and the BAKED CHROME WINS: `config.dev.ports` is written by
+  // `omega dev` at render time, so it is the live map of the stack this page
+  // was served by. `window.__OMEGA_DEV_PORTS__` is a driver-injected fallback
+  // for pages whose chrome carries nothing — a statically built site the
+  // devkit e2e harness serves, say — and it must not be able to OVERRIDE the
+  // real channel, or a green suite proves only the side channel
+  // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). Presence of
+  // a key means a RESOLVED fact about a live stack; absence means "assume the
+  // classics".
   _providedDevPorts() {
     return {
-      ...(this.config.dev?.ports || {}),
       ...(typeof window !== 'undefined' && window.__OMEGA_DEV_PORTS__ || {}),
+      ...(this.config.dev?.ports || {}),
     };
   }
 
   _devPorts() {
     return { ...DEV_PORT_FALLBACKS, ...this._providedDevPorts() };
+  }
+
+  // One loud line, dev only, when a port is an ASSUMPTION rather than a
+  // resolved fact (#300). Nothing identity-checks what answers on a classic
+  // port, so a neighbouring project's emulator holding it reads as an auth
+  // mystery (`auth/user-not-found` for hours) instead of a port problem. This
+  // says which numbers are guesses, before the first connect.
+  _warnClassicPortAssumption() {
+    const provided = this._providedDevPorts();
+    const assumed = Object.keys(DEV_PORT_FALLBACKS).filter((name) => !provided[name]);
+    if (!assumed.length) {
+      return;
+    }
+
+    firebaseLogger.warn(
+      `No resolved dev port for ${assumed.join(', ')}; assuming the classic ${assumed.map((name) => `${name} :${DEV_PORT_FALLBACKS[name]}`).join(', ')}. `
+      + 'If another project\'s emulator holds those ports, this page is talking to IT, not your stack. '
+      + 'Boot the backend with `omega dev` (or `omega emulator`) so the resolved map reaches the page.',
+    );
   }
 
   // Where the auth emulator answers FROM THE BROWSER'S POINT OF VIEW (#156).

@@ -92,20 +92,20 @@ function instanceAppDir(target, id) {
 }
 
 /**
- * Resolve THIS project dir's instance id for a target: functions/ dirs
- * normalize up to their app root, and only apps inside a brand monorepo
- * resolve through the dir-name walk — a standalone project (whose dir name
- * is arbitrary) is always `main`.
- * @param {string} projectDir - App root (or its functions/ dir).
+ * Resolve THIS project dir's instance id for a target: APP_SUBDIR dirs
+ * (functions/, dist/) normalize up to their app root, and only apps inside a
+ * brand monorepo resolve through the dir-name walk — a standalone project
+ * (whose dir name is arbitrary) is always `main`.
+ * @param {string} projectDir - App root (or one of its APP_SUBDIRS).
  * @param {string} target - Canonical target name.
  * @returns {string} The instance id.
  */
 function appInstance(projectDir, target) {
   // Local require to avoid a load-time cycle (load.js requires this module)
-  const { findBrandRoot } = require('./load.js');
+  const { findBrandRoot, APP_SUBDIRS } = require('./load.js');
 
   let appRoot = path.resolve(projectDir);
-  if (path.basename(appRoot) === 'functions') {
+  if (APP_SUBDIRS.includes(path.basename(appRoot))) {
     appRoot = path.dirname(appRoot);
   }
 

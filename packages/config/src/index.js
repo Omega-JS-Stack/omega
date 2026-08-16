@@ -34,7 +34,7 @@ const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
 const { parseRepoSlug, brandRepoName, brandRepoOwner } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
-const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
+const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
 const { APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceAppDir, appInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
 
 module.exports = {
@@ -106,9 +106,11 @@ module.exports = {
   writePortsFile,
   readPortsFile,
   clearPortsFile,
+  readSiblingPorts,
   envName,
   portsToEnv,
   envPort,
+  envPorts,
 
   // Multi-instance targets (_attic/plans/multi-instance-targets.md): normalization
   // is the ONE iteration mechanism — object form = [{ id: 'main', ...entry }]

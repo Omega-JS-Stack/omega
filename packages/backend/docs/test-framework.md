@@ -96,6 +96,12 @@ Nothing in the CLI's adoption decision aborts. An unadopted port means the run b
   Port 5001 is in use by a listener that does not identify itself — booting this project's own emulator on free ports.
 ```
 
+## The stack the runner child resolves
+
+The runner loads route handlers **in-process** (journey suites call them directly), so its `Manager` builds URLs from `OMEGA_*_PORT` exactly like a function worker does. The test command therefore hands the child the **resolved** port map — bumped ports and all — minus the `https` front: the runner carries no mkcert CA and talks plain http to the stack, hosting's internal port included.
+
+Unset, those getters fell back to the classic defaults, and `omega emulator` puts the mkcert TLS proxy on classic 5002. The test processor's auto-webhook (`Manager.getApiUrl()` in `routes/payments/intent/processors/test.js`) followed the proxy's plain-http 307 to https and died on the untrusted cert — every declined-winback and reactivation journey failed against a two-terminal HTTPS emulator while passing when `omega test` booted its own ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)).
+
 ## Cross-project API calls (single-emulator limitation)
 
 Some routes fan out to **other @omega.js/backend backends** — e.g. a sponsorship submission on `itw-creative-works` publishes a guest post to `ultimate-jekyll`'s `POST /admin/post`. Only **one** Firebase emulator can run locally at a time, so these cross-project calls **always hit the live deployed target**, even in test/dev mode.
@@ -113,7 +119,7 @@ What the runner wipes pre-test (in [src/test/test-accounts.js](../src/test/test-
 
 1. **`meta/stats`** doc ensured (required for on-create batch writes).
 2. **The ENTIRE emulator Firestore** — every top-level collection, flushed recursively (`flushEmulatorFirestore()` → `listCollections()` + `recursiveDelete()`). The emulator DB is 100% test data, so a full flush is the simplest correct clean slate — no per-collection allowlist to maintain. **SAFETY: it only runs when `FIRESTORE_EMULATOR_HOST` is set** (which the test command always sets); if absent it is a no-op, so it can never wipe a real project.
-3. **Firebase Auth test users** — all `TEST_ACCOUNTS` uids deleted (Auth is a separate store from Firestore, so this still runs explicitly).
+3. **Firebase Auth test users** — the emulator's auth store cleared in bulk (Auth is a separate store from Firestore, so this still runs explicitly). The bulk-clear URL names a **project**, and the emulator answers `200` for a project it has never heard of, so the id is resolved from the admin app this process reads and writes through (`resolveWipeProjectId()`), never defaulted: a `GCLOUD_PROJECT` that disagrees with it aborts the wipe, and so does having no id at all. The runner's child env carries `GCLOUD_PROJECT` from the same config the emulator booted with — without it the wipe cleared an empty `demo-test` store and reported the personas deleted while every import-only account survived ([#292](https://github.com/Omega-JS-Stack/omega/issues/292)).
 4. **Realtime Database** — the `_test` namespace removed in full (`admin.database().ref('_test').remove()`, guarded — RTDB is optional).
 
 After the flush, `test/_init.js`'s `setup()` reseeds fixtures into the empty DB.

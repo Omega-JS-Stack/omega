@@ -128,6 +128,59 @@ module.exports = {
       },
     },
     {
+      name: 'build.js bakes the sibling backend\'s resolved emulator ports, and never in production (#300)',
+      run: async (ctx) => {
+        // An extension context has no env and no filesystem — the bake is its
+        // ONLY channel to a bumped emulator. Stage the app inside a real brand
+        // with a live backend ports file beside it.
+        const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-ports-brand-'));
+        fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
+        fs.mkdirSync(path.join(brand, 'apps', 'backend', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'apps', 'backend', '.temp', 'ports.json'), JSON.stringify({
+          ports: { auth: 9100, firestore: 8081, hosting: 5003 }, pid: process.pid, startedAt: 'x',
+        }));
+
+        const app = path.join(brand, 'apps', 'extension');
+        fs.mkdirSync(app, { recursive: true });
+        fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
+
+        // The runner itself exports OMEGA_TEST_MODE, and getEnvironment() reads
+        // it BEFORE OMEGA_BUILD_MODE — a "production" bake under omega test is
+        // otherwise a testing bake (the auth-emulator-gate bakeConfig idiom).
+        const ENV_KEYS = ['OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV'];
+        const bake = async (mode) => {
+          const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+          ENV_KEYS.forEach((key) => delete process.env[key]);
+          if (mode === 'production') process.env.OMEGA_BUILD_MODE = 'true';
+          try {
+            return await inProject(app, async (task) => {
+              const outputDir = path.join(app, 'packaged', mode, 'raw');
+              await task.generateBuildJs(outputDir);
+              return JSON.parse(fs.readFileSync(path.join(outputDir, 'build.json'), 'utf8')).config;
+            });
+          } finally {
+            ENV_KEYS.forEach((key) => {
+              if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+            });
+          }
+        };
+
+        try {
+          const dev = await bake('development');
+          ctx.expect(dev.dev.ports.auth).toBe(9100);
+          ctx.expect(dev.dev.ports.firestore).toBe(8081);
+          ctx.expect(dev.dev.ports.hosting).toBe(5003);
+
+          // A packaged build has no local stack to reach — no map ships
+          const production = await bake('production');
+          ctx.expect(production.dev).toBe(undefined);
+        } finally {
+          fs.rmSync(brand, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'a versionless app FAILS the package task (no green build, no raw JSON5 manifest)',
       run: async (ctx) => {
         const tmp = stageProject({

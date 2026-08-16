@@ -92,11 +92,11 @@ function hasOmegaConfig(projectDir) {
     return true;
   }
 
-  // Mirror loadConfig's functions/ → app-root fallback so probe and load
+  // Mirror loadConfig's APP_SUBDIR → app-root fallback so probe and load
   // always agree — a probe-false/load-success split makes framework gates
   // proceed with an empty config (the cp142-class failure this probe exists
   // to prevent).
-  return path.basename(path.resolve(projectDir)) === 'functions'
+  return APP_SUBDIRS.includes(path.basename(path.resolve(projectDir)))
     && resolveConfigPath(path.dirname(path.resolve(projectDir))) !== null;
 }
 
@@ -207,8 +207,10 @@ function resolveBrandRoot(startDir) {
 
   while (true) {
     // A backend's functions/ dir carries the app's config (functions/config/)
-    // but is never a root itself — its app dir one level up is.
-    if (path.basename(dir) !== 'functions' && resolveConfigPath(dir)) {
+    // but is never a root itself — its app dir one level up is. Its staged
+    // dist/ carries the same compose output and is no more a root than
+    // functions/ is ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+    if (!APP_SUBDIRS.includes(path.basename(dir)) && resolveConfigPath(dir)) {
       const grandparent = path.dirname(path.dirname(dir));
       const isAppOfBrand = path.basename(path.dirname(dir)) === 'apps'
         && fs.existsSync(path.join(grandparent, 'config', FILE_NAME));
@@ -286,13 +288,14 @@ function loadConfig(projectDir, target, options) {
     throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
   }
 
-  // From a functions/ dir the app layer is its own config/omega.json5 (the
-  // STAGED compose — the deployed runtime's view). Before any stage exists,
-  // fall back to the app root's authored file one level up, so a bare
-  // emulator/loadConfig from the functions cwd sees the same layers the
+  // From an APP_SUBDIR (functions/, dist/) the app layer is its own
+  // config/omega.json5 (the STAGED compose — the deployed runtime's view).
+  // Before any stage exists, fall back to the app root's authored file one
+  // level up, so a bare emulator/loadConfig from the functions cwd — or a test
+  // run resolving from the not-yet-staged dist/ — sees the same layers the
   // stage would compose.
   let appPath = resolveConfigPath(projectDir);
-  if (!appPath && path.basename(path.resolve(projectDir)) === 'functions') {
+  if (!appPath && APP_SUBDIRS.includes(path.basename(path.resolve(projectDir)))) {
     appPath = resolveConfigPath(path.dirname(path.resolve(projectDir)));
   }
   const brandPath = findBrandConfigPath(projectDir);
@@ -325,7 +328,7 @@ function loadConfig(projectDir, target, options) {
   // dir → main). Only brand-monorepo apps resolve through the walk — a
   // standalone project's dir name is arbitrary and always means main.
   let appRoot = path.resolve(projectDir);
-  if (path.basename(appRoot) === 'functions') {
+  if (APP_SUBDIRS.includes(path.basename(appRoot))) {
     appRoot = path.dirname(appRoot);
   }
   const instance = target && brandPath ? instanceIdFromDirName(path.basename(appRoot), target) : MAIN_INSTANCE;
@@ -376,7 +379,7 @@ function loadConfig(projectDir, target, options) {
  * loadConfig since cp121c): an app with no omega.json5 of its own composes
  * from the brand file alone. Standalone projects still require their file.
  *
- * @param {string} projectDir - App root or its functions/ dir.
+ * @param {string} projectDir - App root or one of its APP_SUBDIRS (functions/, dist/).
  * @param {string} target - Canonical target the upload serves ('backend').
  * @returns {{ config: object, files: { app: string|null, brand: string|null, company: string|null } }}
  *   `files.brand` null = no brand layer above the app (already self-contained);
@@ -388,12 +391,12 @@ function composeTargetConfig(projectDir, target) {
     throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
   }
 
-  // Compose is a BUILD-time op over the AUTHORED layers: a functions/ dir
-  // normalizes up to its app root, so a previously-staged
-  // functions/config/omega.json5 (compose OUTPUT) can never read back in as
-  // an app layer — that would freeze brand edits behind the last stage.
+  // Compose is a BUILD-time op over the AUTHORED layers: an APP_SUBDIR
+  // (functions/, dist/) normalizes up to its app root, so a previously-staged
+  // config/omega.json5 (compose OUTPUT) can never read back in as an app
+  // layer — that would freeze brand edits behind the last stage.
   let appRoot = path.resolve(projectDir);
-  if (path.basename(appRoot) === 'functions') {
+  if (APP_SUBDIRS.includes(path.basename(appRoot))) {
     appRoot = path.dirname(appRoot);
   }
 
@@ -436,4 +439,4 @@ function composeTargetConfig(projectDir, target) {
   return { config, files: { app: appPath, brand: brandPath, company: companyPath } };
 }
 
-module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS };
+module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, APP_SUBDIRS };

@@ -16,7 +16,10 @@
  * busy = hard error, never a silent bump. The
  * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
  * website port are injected into the page chrome as `dev.ports` so
- * @omega.js/client connects to the stack that is ACTUALLY running.
+ * @omega.js/client connects to the stack that is ACTUALLY running — read PER
+ * RENDER, and per request for the auth-emulator proxy, because a backend that
+ * boots after this server (or restarts onto bumped ports) is the normal case
+ * ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
  *
  * `omega dev --local` first links every @omega.js framework the brand uses to
  * the local Omega monorepo (file: installs, idempotent) and starts the
@@ -29,7 +32,7 @@ const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const {
   CLASSIC_PORTS, isPortFree, resolvePorts, envPort,
-  readPortsFile, writePortsFile, clearPortsFile,
+  readSiblingPorts, writePortsFile, clearPortsFile,
   findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
@@ -68,7 +71,10 @@ module.exports = async function (options) {
   const siteData = loadSiteData(paths.root);
   const clientEntry = resolveClientEntry();
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
-  const devPorts = { ...readSiblingPorts(paths.root), website: port };
+  // LIVE, never a snapshot: both the baked page chrome and the auth-emulator
+  // proxy resolve the sibling backend's map at use time (#300).
+  const devPorts = devPortsOption(paths.root, port);
+  const authPort = () => devPorts().ports.auth;
 
   // HTTPS (same contract as the backend's serve/emulator): the PUBLIC website
   // port speaks TLS through the shared mkcert proxy; eleventy sits on an
@@ -242,7 +248,7 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      eleventyConfig.setServerOptions(devServerOptions(paths.out, devPorts.auth));
+      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort));
       // Arms the watch registration for the config build below — the engine's
       // captured reads are what fill it in (#200). The reset union goes to
       // Eleventy, the rescan union to the light content watcher; a config
@@ -260,7 +266,7 @@ module.exports = async function (options) {
         activeTheme,
         assetManifest: manifest,
         environment: 'development',
-        dev: { ports: devPorts, authEmulatorProxy: true },
+        dev: devPorts,
       });
     },
   });
@@ -336,19 +342,22 @@ const SERVER_OPTIONS = new Map();
  * burst raced a queued build's restart against a socket the previous one had
  * not released yet: ERR_SERVER_ALREADY_LISTEN, process dead. Nothing here
  * varies during a session — the middleware closes over outDir and the auth
- * port, both fixed at boot — so the cache is the whole fix: Eleventy's
+ * port RESOLVER, both fixed at boot — so the cache is the whole fix: Eleventy's
  * DeepCopy of the object shares the middleware array and its function
  * references, and the identical object compares equal across every reset.
  * @param {string} outDir
- * @param {number} [authPort] - the auth emulator port to proxy (classic 9099)
+ * @param {number|function} [authPort] - the auth emulator port to proxy, or a
+ *   GETTER resolving it per request (the live map, #300); a getter keys as
+ *   `live`, since a session runs exactly one dev server and the getter's
+ *   identity would otherwise change on every config reset
  * @returns {object} setServerOptions() payload
  */
 function devServerOptions(outDir, authPort) {
-  const key = `${outDir} ${authPort}`;
+  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort}`;
 
   if (!SERVER_OPTIONS.has(key)) {
     SERVER_OPTIONS.set(key, {
-      middleware: [devAuthEmulator(authPort || CLASSIC_PORTS.auth), devCleanUrls(outDir), devImageFallback(outDir)],
+      middleware: [devAuthEmulator(authPort), devCleanUrls(outDir), devImageFallback(outDir)],
       watch: [
         path.join(outDir, 'assets', 'css'),
         path.join(outDir, 'assets', 'js'),
@@ -495,11 +504,18 @@ function watchRescanTargets(targets) {
  * out-of-band action links; the two googleapis.com prefixes are the REST
  * surface, which the SDK addresses as `<emulator origin>/<apiHost><path>`.
  * None of them can collide with a page URL.
- * @param {number} authPort
+ *
+ * The target port is resolved PER REQUEST (#300). With the proxy on, this —
+ * not the baked `dev.ports` — is where every auth call actually goes, so a
+ * boot-time number kept sending sign-ins to whatever emulator held the
+ * classic 9099 (a neighbouring project's, in the report) long after this
+ * brand's suite came up bumped.
+ * @param {number|function} [authPort] - the port, or a getter for the live one
  * @returns {function} connect-style middleware
  */
 function devAuthEmulator(authPort) {
   const prefixes = ['/emulator', '/identitytoolkit.googleapis.com', '/securetoken.googleapis.com'];
+  const resolvePort = () => (typeof authPort === 'function' ? authPort() : authPort) || CLASSIC_PORTS.auth;
 
   // Hop-by-hop framing headers belong to THIS connection, not the upstream's —
   // copying them makes Node chunk a body it is already re-chunking.
@@ -539,12 +555,13 @@ function devAuthEmulator(authPort) {
       return next();
     }
 
+    const port = resolvePort();
     const upstream = http.request({
       host: '127.0.0.1',
-      port: authPort,
+      port,
       method: req.method,
       path: req.url,
-      headers: { ...req.headers, host: `127.0.0.1:${authPort}` },
+      headers: { ...req.headers, host: `127.0.0.1:${port}` },
     }, (upstreamRes) => {
       answer(res, upstreamRes.statusCode, upstreamRes.headers);
       upstreamRes.pipe(res);
@@ -554,9 +571,9 @@ function devAuthEmulator(authPort) {
     // external condition, not our bug: answer the auth call with a 502 that
     // names the port instead of hanging the request.
     upstream.on('error', (error) => {
-      logger.error(`Auth emulator proxy: ${pathname} → :${authPort} failed (${error.message})`);
+      logger.error(`Auth emulator proxy: ${pathname} → :${port} failed (${error.message})`);
       answer(res, 502, { 'content-type': 'text/plain; charset=utf-8' });
-      res.end(Buffer.from(`Auth emulator on port ${authPort} is not reachable`));
+      res.end(Buffer.from(`Auth emulator on port ${port} is not reachable`));
     });
 
     return req.pipe(upstream);
@@ -686,33 +703,21 @@ function loadPortPins(root) {
 }
 
 /**
- * Merge the live ports files of sibling apps in the same brand (a running
- * backend's resolved emulator map). Dead-pid leftovers are ignored by
- * readPortsFile; our own app dir is skipped (a previous run of THIS server).
- * No brand root (standalone consumer) → empty map, client falls back to the
- * classic ports.
+ * The `dev` chrome the engine bakes into every page — as a GETTER, called per
+ * render (#300). The sibling backend's published map (its live emulator
+ * ports) merges OVER this server's own website port, so the browser always
+ * connects to the stack that is actually running: a backend that booted after
+ * this server, or an emulator that restarted onto bumped numbers, lands in
+ * the very next render instead of never.
+ * @param {string} root - this app's root (its own ports file is skipped)
+ * @param {number} port - the resolved website port
+ * @returns {function} () => the dev chrome object
  */
-function readSiblingPorts(root) {
-  const brandRoot = findBrandRoot(root);
-  if (!brandRoot) {
-    return {};
-  }
-
-  const appsDir = path.join(brandRoot, 'apps');
-  const merged = {};
-
-  for (const entry of fs.existsSync(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }) : []) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) {
-      continue;
-    }
-    const appDir = path.join(appsDir, entry.name);
-    if (path.resolve(appDir) === path.resolve(root)) {
-      continue;
-    }
-    Object.assign(merged, readPortsFile(appDir) || {});
-  }
-
-  return merged;
+function devPortsOption(root, port) {
+  return () => ({
+    ports: { ...readSiblingPorts(root), website: port },
+    authEmulatorProxy: true,
+  });
 }
 
 /**
@@ -723,7 +728,7 @@ function readSiblingPorts(root) {
 // Exposed for tests (the command function stays the main export)
 module.exports.resolveWebsitePort = resolveWebsitePort;
 module.exports.websiteWantedPort = websiteWantedPort;
-module.exports.readSiblingPorts = readSiblingPorts;
+module.exports.devPortsOption = devPortsOption;
 module.exports.devServerOptions = devServerOptions;
 module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;

@@ -320,6 +320,30 @@ test('resolveBrandRoot: a standalone config-carrying project resolves to itself'
   assert.equal(resolveBrandRoot(path.join(root, 'src', 'pages')), root);
 });
 
+test('resolveBrandRoot: a STAGED dist/ is never a root — its app dir (and the brand above it) is', (t) => {
+  // dist/config/omega.json5 is compose OUTPUT, the same shape functions/ has
+  // carried since the src/dist pillar. The walk skipped only `functions`, so
+  // a resolution from a staged dist/ stopped there and named the build output
+  // as the project root ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+  const root = makeFixture('walk-staged-dist', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' } }`,
+    'apps/backend/config/omega.json5': `{ targets: { backend: {} } }`,
+    'apps/backend/dist/config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { backend: {} } }`,
+  });
+  cleanup(t, root);
+
+  assert.equal(resolveBrandRoot(path.join(root, 'apps', 'backend', 'dist')), root);
+
+  // Standalone: the project root, never its own staged output
+  const standalone = makeFixture('walk-staged-dist-standalone', {
+    'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: {} } }`,
+    'dist/config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: {} } }`,
+  });
+  cleanup(t, standalone);
+
+  assert.equal(resolveBrandRoot(path.join(standalone, 'dist')), standalone);
+});
+
 test('resolveBrandRoot: a brand nested inside a larger workspace apps/ dir still resolves as a brand root (sandbox shape)', (t) => {
   const workspace = makeFixture('walk-nested', {
     // No workspace-level config — apps/ here is NOT a brand's apps dir
@@ -442,6 +466,24 @@ test('composeTargetConfig: app dir and its functions/ dir compose identically; n
     composeTargetConfig(path.join(appDir, 'functions'), 'backend').config,
   );
 
+  // ...and its staged dist/ too. Compose is a BUILD-time op over the AUTHORED
+  // layers, so a dist/ that already holds a previous compose must normalize up
+  // exactly as functions/ does — reading that output back as the app layer
+  // would freeze brand edits behind the last stage
+  // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+  const distDir = path.join(appDir, 'dist');
+  fs.mkdirSync(path.join(distDir, 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(distDir, 'config', 'omega.json5'),
+    JSON.stringify({ ...composeTargetConfig(appDir, 'backend').config, shade: 'stale-stage' }, null, 2),
+  );
+
+  assert.deepStrictEqual(
+    composeTargetConfig(distDir, 'backend').config,
+    composeTargetConfig(appDir, 'backend').config,
+  );
+  assert.strictEqual(composeTargetConfig(distDir, 'backend').files.app, path.join(appDir, 'config', 'omega.json5'));
+
   const solo = makeFixture('compose-solo', {
     'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: { flavor: 'solo-target' } } }`,
   });
@@ -541,6 +583,36 @@ test('hasOmegaConfig mirrors loadConfig\'s functions/ → app-root fallback', (t
   const bare = makeFixture('probe-functions-bare', { 'functions/index.js': `// runtime` });
   cleanup(t, bare);
   assert.strictEqual(hasOmegaConfig(path.join(bare, 'functions')), false);
+});
+
+test('standalone project: an unstaged dist/ resolves the app config exactly as functions/ does', (t) => {
+  // `omega test` resolves a backend from its STAGED dist/, but the stage is
+  // written by the run — before it exists the dir is empty. The functions/ leg
+  // of that fallback was hardcoded, so the same resolution from dist/ threw
+  // while functions/ succeeded, and a STANDALONE project (no brand root above
+  // to recover through) could not load its own app config
+  // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
+  const root = makeFixture('probe-dist-fallback', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { backend: { probe: { value: 'app-target' } } } }`,
+    'dist/index.js': `// staged output, no config staged yet`,
+    'functions/index.js': `// runtime`,
+  });
+  cleanup(t, root);
+
+  const distDir = path.join(root, 'dist');
+  const functionsDir = path.join(root, 'functions');
+
+  assert.strictEqual(hasOmegaConfig(distDir), true);
+  assert.strictEqual(loadConfig(distDir, 'backend').config.brand.id, 'acme');
+  assert.deepStrictEqual(
+    loadConfig(distDir, 'backend').config,
+    loadConfig(functionsDir, 'backend').config,
+  );
+
+  // A dist dir with NO config anywhere above stays false, same as functions/
+  const bare = makeFixture('probe-dist-bare', { 'dist/index.js': `// staged output` });
+  cleanup(t, bare);
+  assert.strictEqual(hasOmegaConfig(path.join(bare, 'dist')), false);
 });
 
 // ─── The company layer (#54 — the documented chain's lowest authored layer) ───

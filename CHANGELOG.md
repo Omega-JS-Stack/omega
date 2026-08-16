@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Fixed
+- [#282](../../issues/282) — The confirmation page reads a one-time buy as a purchase: `frequency=once` stops rendering the subscription sentence with its cadence slots empty, the receipt labels an item instead of a plan, and the one-time note says nothing renews.
+- [#283](../../issues/283) — A blocked analytics script can no longer kill a billing action: `trackBilling()` asks for gtag, fbq and ttq per provider, so undo cancellation, plan change, upgrade and the billing portal all run with the snippets missing.
+- [#300](../../issues/300) — The browser learns bumped emulator ports: the dev server reads the sibling backend's resolved map per render (and per request for the auth proxy), desktop and extension bake the same map, and a page falling back to classic ports says so loudly instead of failing as an auth mystery.
+- [#292](../../issues/292) — The test wipe clears the project it is actually testing: the runner's env carries `GCLOUD_PROJECT`, the auth bulk-clear resolves its project from the admin app, and a disagreeing id aborts the wipe instead of reporting a clean slate the emulator never gave.
+- [#299](../../issues/299) — A staged `dist/` resolves config exactly like `functions/`: every remaining walk (probe, app-layer fallback, instance id, compose, brand-root search) normalizes both, so a standalone app loading from its build output finds its own config and its own instance.
+- [#304](../../issues/304) — Stopping the emulator takes the java emulators with it: the stop path signals the pids it recorded at boot (never one recycled onto another brand's jar), sweeps the orphans that record missed, then reports any port still held. A boot that never comes up runs the same teardown.
+- [#291](../../issues/291) — `omega test` against an HTTPS `omega emulator` passes the payment journeys: the runner child carries the resolved plain-http port map, never the TLS front, so the test processor's auto-webhook reaches hosting instead of dying on the proxy's certificate.
 
 ## [0.31.0] 2026-08-15
 ### Added

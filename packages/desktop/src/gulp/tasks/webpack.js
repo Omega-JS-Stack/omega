@@ -7,6 +7,7 @@ const path = require('path');
 const glob = require('glob').globSync;
 const webpack = require('webpack');
 const jetpack = require('fs-jetpack');
+const { readSiblingPorts, envPorts } = require('@omega.js/config');
 
 const projectRoot   = Manager.getRootPath('project');
 const frameworkRoot = Manager.getRootPath();
@@ -57,9 +58,18 @@ module.exports = function webpackTask(done) {
   const isProd = mode.environment === 'production';
   const config = Manager.getConfig();
 
+  // The renderer's @omega.js/client reads `config.dev.ports` to reach the
+  // local stack (N7). A renderer has no env and no filesystem walk of its
+  // own, so the map has to be BAKED — the sibling backend's published map
+  // (this brand's live emulator suite) plus anything a parent injected on the
+  // env channel, resolved on every build so a rebuild picks up a restarted
+  // emulator ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+  // Never in production: a packaged app has no local stack.
+  const dev = isProd ? null : { ports: { ...readSiblingPorts(projectRoot), ...envPorts() } };
+
   // OMEGA_BUILD_JSON — frozen at build time, accessible at runtime as window/globalThis.OMEGA_BUILD_JSON.
   const buildJson = {
-    config,
+    config: dev ? { ...config, dev } : config,
     package: Manager.getPackage('project'),
     mode,
     builtAt: new Date().toISOString(),

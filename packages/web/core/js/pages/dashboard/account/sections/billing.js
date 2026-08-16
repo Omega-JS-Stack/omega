@@ -1242,16 +1242,28 @@ function shuffleArray(arr) {
 
 // ─── Tracking ────────────────────────────────────────────────
 
+// Counting a billing action may never COST the customer that action ([#283]).
+// An ad blocker does not stub these snippets, it stops them loading, so the
+// names are simply never defined — and every caller here counts before it acts,
+// so one ReferenceError turned "Undo cancellation" into a dead button. Each
+// provider is asked for on its own: blockers work per list, so a page with
+// Google allowed and Meta blocked still counts what it can.
 function trackBilling(action) {
-  gtag('event', 'billing_action', {
-    action: action,
-  });
-  fbq('trackCustom', 'BillingAction', {
-    action: action,
-  });
-  ttq.track('ViewContent', {
-    content_id: `billing-${action}`,
-    content_type: 'product',
-    content_name: `Billing ${action}`,
-  });
+  if (typeof gtag === 'function') {
+    gtag('event', 'billing_action', {
+      action: action,
+    });
+  }
+  if (typeof fbq === 'function') {
+    fbq('trackCustom', 'BillingAction', {
+      action: action,
+    });
+  }
+  if (typeof ttq !== 'undefined' && typeof ttq.track === 'function') {
+    ttq.track('ViewContent', {
+      content_id: `billing-${action}`,
+      content_type: 'product',
+      content_name: `Billing ${action}`,
+    });
+  }
 }

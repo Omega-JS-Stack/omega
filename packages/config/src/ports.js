@@ -22,6 +22,7 @@
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+const { findBrandRoot } = require('./load.js');
 
 // The classic defaults every framework has always used — allocation starts
 // here, and single-brand dev never leaves them.
@@ -188,6 +189,45 @@ function clearPortsFile(projectDir) {
 }
 
 /**
+ * Merge the live ports files of the sibling apps in the same brand — a
+ * running backend's resolved emulator map, as the website/desktop/extension
+ * app beside it sees it. Dead-pid leftovers are ignored by readPortsFile; the
+ * caller's OWN app dir is skipped (a previous run of the same process).
+ *
+ * Read at USE time, never once at boot: the ports file is pid-stamped and
+ * deleted on shutdown, so a boot-time read races the sibling that has not
+ * booted yet and goes stale the moment an emulator restarts on new numbers
+ * ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+ *
+ * No brand root (standalone consumer) → empty map, and the caller falls back
+ * to the classic ports.
+ * @param {string} appDir - The reading app's root (its own file is skipped).
+ * @returns {object} Merged name → port map.
+ */
+function readSiblingPorts(appDir) {
+  const brandRoot = findBrandRoot(appDir);
+  if (!brandRoot) {
+    return {};
+  }
+
+  const appsDir = path.join(brandRoot, 'apps');
+  const merged = {};
+
+  for (const entry of fs.existsSync(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }) : []) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) {
+      continue;
+    }
+    const dir = path.join(appsDir, entry.name);
+    if (path.resolve(dir) === path.resolve(appDir)) {
+      continue;
+    }
+    Object.assign(merged, readPortsFile(dir) || {});
+  }
+
+  return merged;
+}
+
+/**
  * Env-var name for a port ('auth' → 'OMEGA_AUTH_PORT').
  * @param {string} name - Port name.
  * @returns {string} Env var name.
@@ -221,6 +261,29 @@ function envPort(name, env = process.env) {
   return Number.isInteger(port) && port > 0 ? port : null;
 }
 
+/**
+ * Every `OMEGA_<NAME>_PORT` in an environment as a resolved map — the inverse
+ * of portsToEnv, for a spawned child reading the whole map its parent
+ * injected rather than one name at a time.
+ * @param {object} [env] - Env object (defaults to process.env).
+ * @returns {object} Name → port map (lowercased names, invalid values dropped).
+ */
+function envPorts(env = process.env) {
+  const ports = {};
+  for (const key of Object.keys(env)) {
+    const match = /^OMEGA_([A-Z0-9]+)_PORT$/.exec(key);
+    if (!match) {
+      continue;
+    }
+    const name = match[1].toLowerCase();
+    const port = envPort(name, env);
+    if (port) {
+      ports[name] = port;
+    }
+  }
+  return ports;
+}
+
 module.exports = {
   CLASSIC_PORTS,
   isPortFree,
@@ -228,7 +291,9 @@ module.exports = {
   writePortsFile,
   readPortsFile,
   clearPortsFile,
+  readSiblingPorts,
   envName,
   portsToEnv,
   envPort,
+  envPorts,
 };

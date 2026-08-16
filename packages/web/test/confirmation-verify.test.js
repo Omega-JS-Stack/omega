@@ -485,11 +485,14 @@ test('#232 QA: the timeout keeps the order reference but nothing celebratory', a
   assert.strictEqual(timedOut.verification.confirmed, false, 'and nothing says the payment landed');
   assert.strictEqual(timedOut.subscription.show, false, 'no "your subscription is active" on a timeout');
 
-  // The celebratory rows live inside the confirmed block, so revealing the
-  // receipt on a timeout reveals no congratulation with it.
+  // The celebratory rows live behind gates that both include `confirmed`
+  // (subscription.show / purchase.show, #282), so revealing the receipt on a
+  // timeout reveals no congratulation with it.
   const page = await confirmationPage();
   const unlockedTag = enclosingTag(page, "Everything's unlocked");
-  assert.match(unlockedTag, /@show confirmation\.verification\.confirmed/, 'the unlocked row belongs to the confirmed moment');
+  assert.match(unlockedTag, /@show confirmation\.subscription\.show/, 'the plan row belongs to a confirmed subscription');
+  const purchaseTag = enclosingTag(page, 'your purchase is ready');
+  assert.match(purchaseTag, /@show confirmation\.purchase\.show/, 'the purchase row belongs to a confirmed one-time buy');
 });
 
 /**

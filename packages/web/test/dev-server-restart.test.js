@@ -179,6 +179,15 @@ test('the dev-server options are ONE object for the session', () => {
     devServerOptions('/tmp/site-out', 9099) === first,
     'every config reset must hand Eleventy the identical options object — a rebuilt one carries fresh middleware closures, which deepStrictEqual can only read as "changed"',
   );
+
+  // The live auth-port getter is what `omega dev` actually passes (#300), and a
+  // config reset re-evaluates the callback that closes over it — two DISTINCT
+  // getter identities must still resolve to the one cached object
+  const live = devServerOptions('/tmp/site-out-live', () => 9099);
+  assert.ok(
+    devServerOptions('/tmp/site-out-live', () => 9200) === live,
+    'a getter keys as `live`, so its identity can never restart the server',
+  );
 });
 
 test('a config reset does not restart the dev server', async (t) => {

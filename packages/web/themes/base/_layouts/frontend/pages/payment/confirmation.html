@@ -59,7 +59,7 @@ layout: frontend/core/cover
         </div>
 
         <div class="omega-receipt__row omega-binding-skeleton" data-omega-bind="@show confirmation">
-          <span class="omega-micro">Plan</span>
+          <span class="omega-micro" data-omega-bind="@text confirmation.order.itemLabel">Plan</span>
           <span class="fw-semibold" data-omega-bind="@text confirmation.order.productName">Loading...</span>
         </div>
 
@@ -70,6 +70,12 @@ layout: frontend/core/cover
 
         <div data-omega-bind="@show confirmation.subscription.show" hidden>
           <div class="omega-receipt__note small" data-omega-bind="@text confirmation.subscription.infoText"></div>
+        </div>
+
+        <!-- A one-time buy renews nothing, so it gets its own note instead of
+             the subscription sentence with empty cycle slots (#282) -->
+        <div data-omega-bind="@show confirmation.purchase.show" hidden>
+          <div class="omega-receipt__note small" data-omega-bind="@text confirmation.purchase.infoText"></div>
         </div>
       </div>
 
@@ -83,10 +89,19 @@ layout: frontend/core/cover
               <span><strong>Your receipt lands by email</strong>, order confirmation included.</span>
             </span>
           </div>
-          <div class="omega-rowlist__item" data-omega-bind="@show confirmation.verification.confirmed" hidden>
+          <!-- "Your plan" is subscription language, so the row branches with
+               the notes above: plan copy for subscriptions, purchase copy for
+               a one-time buy (#282). Both gates already include `confirmed`. -->
+          <div class="omega-rowlist__item" data-omega-bind="@show confirmation.subscription.show" hidden>
             <span class="d-inline-flex align-items-center gap-3">
               <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "unlock", "fa-sm" %}</span>
               <span><strong>Everything's unlocked</strong>: your plan is live in <a href="/dashboard/account">your account</a>.</span>
+            </span>
+          </div>
+          <div class="omega-rowlist__item" data-omega-bind="@show confirmation.purchase.show" hidden>
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "unlock", "fa-sm" %}</span>
+              <span><strong>Everything's unlocked</strong>: your purchase is ready in <a href="/dashboard/account">your account</a>.</span>
             </span>
           </div>
           <div class="omega-rowlist__item">

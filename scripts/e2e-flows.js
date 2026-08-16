@@ -562,7 +562,20 @@ async function payWithTestCard(page, siteUrl, params) {
   const query = new URLSearchParams({ frequency: 'monthly', _dev_cardProcessor: 'test', ...params });
   await page.goto(`${siteUrl}/payment/checkout?${query}`, { waitUntil: 'networkidle2' });
   await page.waitForSelector('#checkout-form[data-form-state="ready"]', { timeout: 60000 });
-  await clickElement(page, '#checkout-form button[data-payment-method="card"]:not([hidden])');
+
+  // One click is not enough on the trial page: its eligibility answer
+  // re-renders the terms a beat after ready and the form manager swallows any
+  // click landing in that window ("Click prevented (disabled)"). A swallowed
+  // click is a no-op, so re-click until the redirect actually starts.
+  const cardButton = '#checkout-form button[data-payment-method="card"]:not([hidden])';
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await clickElement(page, cardButton);
+    const redirected = await page.waitForFunction(
+      () => window.location.pathname.startsWith('/payment/confirmation'),
+      { timeout: 8000 },
+    ).then(() => true).catch(() => false);
+    if (redirected) break;
+  }
   await page.waitForFunction(
     () => window.location.pathname.startsWith('/payment/confirmation'),
     { timeout: 90000 },

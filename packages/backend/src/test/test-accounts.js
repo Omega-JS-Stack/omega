@@ -1243,6 +1243,51 @@ async function flushEmulatorFirestore(admin) {
 }
 
 /**
+ * The project whose auth store the wipe clears.
+ *
+ * The bulk-clear URL names a PROJECT, and the Auth emulator answers 200 for a
+ * project it has never heard of — so a wrong id reads as a successful wipe
+ * while every account survives. The id used to be
+ * `process.env.GCLOUD_PROJECT || 'demo-test'` and the test runner's env never
+ * carried GCLOUD_PROJECT, so every run cleared the empty `demo-test` store and
+ * reported the personas deleted
+ * ([#292](https://github.com/Omega-JS-Stack/omega/issues/292)).
+ *
+ * The authoritative identity is the one THIS process reads and writes through:
+ * the admin app's own project id. GCLOUD_PROJECT must AGREE with it, else this
+ * throws rather than reporting a wipe that never happened. In the runner the
+ * two share an ancestry (run-tests.js seeds the admin app from GCLOUD_PROJECT
+ * when it is set), so the disagreement arm is defense-in-depth for callers
+ * that initialize admin themselves. Nothing to resolve throws for the same
+ * reason: the silent default was the bug.
+ *
+ * @param {object} [admin] - Firebase admin instance (its default app names the project).
+ * @param {object} [env] - Environment to read GCLOUD_PROJECT from (defaults to process.env).
+ * @returns {string} The project id to clear.
+ */
+function resolveWipeProjectId(admin, env) {
+  let fromAdmin = null;
+  try {
+    fromAdmin = admin.app().options.projectId || null;
+  } catch (e) {
+    fromAdmin = null; // No admin, or no default app — the env is the only source left.
+  }
+
+  const fromEnv = (env || process.env).GCLOUD_PROJECT || null;
+
+  if (fromAdmin && fromEnv && fromAdmin !== fromEnv) {
+    throw new Error(`Refusing to wipe: GCLOUD_PROJECT is "${fromEnv}" but this process reads and writes project "${fromAdmin}" — clearing "${fromEnv}" would report success while every account survives`);
+  }
+
+  const projectId = fromAdmin || fromEnv;
+  if (!projectId) {
+    throw new Error('Refusing to wipe: no project id to clear (neither the admin app nor GCLOUD_PROJECT names one) — a default here clears a store this run never touches and reports success');
+  }
+
+  return projectId;
+}
+
+/**
  * Delete all test users (both Auth and Firestore)
  * Uses TEST_ACCOUNTS (+ any project-defined accounts) as the source of truth for
  * which UIDs to delete. Deleting Auth users triggers on-delete which handles
@@ -1268,18 +1313,32 @@ async function deleteTestUsers(admin, extraAccounts) {
   // the freshly-written doc (80% repro rate in stress tests). The bulk API
   // clears the auth store without triggering event handlers at all.
   const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-  const projectId = process.env.GCLOUD_PROJECT || 'demo-test';
 
   if (authHost) {
+    // Resolved OUTSIDE the try: an unresolvable/disagreeing project id must
+    // abort the wipe, not fall through to the individual deletes below. The URL
+    // is a no-op against any other project and the emulator answers 200 to it
+    // anyway (#292).
+    const projectId = resolveWipeProjectId(admin);
+
     try {
       const url = `http://${authHost}/emulator/v1/projects/${projectId}/accounts`;
-      await fetch(url, { method: 'DELETE' });
+      const response = await fetch(url, { method: 'DELETE' });
+
+      // A refused clear is not a clear. Falling through to the individual
+      // deletes below is the same recovery a transport error gets.
+      if (!response.ok) {
+        throw new Error(`Auth bulk-clear for project "${projectId}" answered ${response.status}`);
+      }
 
       // Count all known accounts as deleted (the bulk API doesn't return per-user results)
       const allAccounts = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
       results.deleted = Object.values(allAccounts).map(a => a.uid);
     } catch (e) {
-      // Bulk clear failed — fall back to individual deletes
+      // Bulk clear failed — fall back to individual deletes. Say why out loud:
+      // the individual path races auth:on-delete (the documented flake), so a
+      // silent downgrade turns a loud HTTP refusal into an unexplained flaky run.
+      console.warn(`Auth bulk-clear failed (${e.message}); falling back to individual deletes, which can race auth:on-delete`);
       const allAccounts = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
       await _deleteAccountsIndividually(admin, allAccounts, results);
     }
@@ -1543,6 +1602,7 @@ module.exports = {
   getPlanPricing,
   getAccountDefinitions,
   fetchPrivateKeys,
+  resolveWipeProjectId,
   deleteTestUsers,
   createAccount,
   createTestAccounts,

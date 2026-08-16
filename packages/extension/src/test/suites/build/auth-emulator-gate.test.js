@@ -108,8 +108,9 @@ module.exports = {
       run: (ctx) => {
         const calls = BACKGROUND.match(/connectAuthEmulator\(/g) || [];
         ctx.expect(calls.length).toBe(1);
-        ctx.expect(/if \(this\.isTesting\(\)\) \{\s*this\.authLogger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{AUTH_EMULATOR_PORT\}`/.test(BACKGROUND)).toBe(true);
-        // Classic auth port — a SW can't read a bumped OMEGA_AUTH_PORT
+        ctx.expect(/if \(this\.isTesting\(\)\) \{\s*const port = this\.config\?\.dev\?\.ports\?\.auth \|\| AUTH_EMULATOR_PORT;\s*this\.authLogger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{port\}`/.test(BACKGROUND)).toBe(true);
+        // The baked map first (#300 — a SW can't read a bumped OMEGA_AUTH_PORT,
+        // so build.js carries it), the classic port as the fallback
         ctx.expect(BACKGROUND).toMatch(/const AUTH_EMULATOR_PORT = 9099;/);
       },
     },

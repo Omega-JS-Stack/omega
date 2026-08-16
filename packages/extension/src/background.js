@@ -25,8 +25,10 @@ const installLogger = new LoggerLite('install');
 const CACHE_WARMING_ENABLED = false;
 
 // Auth emulator port for TESTING builds. An extension context has no
-// `process.env`, so a bumped port can't reach here — the auth-emulator lane
-// pins the classic default (mirrors url-helpers' classic-5002 hosting note).
+// `process.env`, so the resolved map arrives BAKED in build.js's `dev.ports`
+// ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)); the classic
+// default is the fallback for a build made with no stack up (mirrors
+// url-helpers' classic-5002 hosting note).
 const AUTH_EMULATOR_PORT = 9099;
 
 // Import build config at the top level (synchronous)
@@ -439,8 +441,9 @@ class Manager {
     // move @omega.js/client makes for emulator runs. Only a build baked with
     // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
     if (this.isTesting()) {
-      this.authLogger.log(`Testing build — connecting auth to the emulator on :${AUTH_EMULATOR_PORT}`);
-      connectAuthEmulator(this.libraries.firebaseAuth, `http://localhost:${AUTH_EMULATOR_PORT}`, { disableWarnings: true });
+      const port = this.config?.dev?.ports?.auth || AUTH_EMULATOR_PORT;
+      this.authLogger.log(`Testing build — connecting auth to the emulator on :${port}`);
+      connectAuthEmulator(this.libraries.firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
     }
 
     // Set up auth state change listener (background is source of truth)

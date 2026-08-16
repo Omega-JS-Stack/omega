@@ -13,7 +13,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { resolveWebsitePort, websiteWantedPort, readSiblingPorts } = require('../src/commands/dev.js');
+const { resolveWebsitePort, websiteWantedPort, devPortsOption } = require('../src/commands/dev.js');
+const { buildWith, miniData } = require('./lib/build.js');
 
 function occupy(port) {
   return new Promise((resolve) => {
@@ -111,10 +112,10 @@ test('websiteWantedPort: single-object brands and config-less dirs stay on the c
   assert.equal(websiteWantedPort(os.tmpdir()), 4000, 'no config → classic base, never a dev-loop failure');
 });
 
-// ---- readSiblingPorts
+// ---- devPortsOption (the live dev chrome the engine bakes per render)
 
-test('merges live sibling maps, skips own app dir and dead pids, empty without brand root', () => {
-  // Brand layout: <root>/config/omega.json5 + apps/{backend,website}
+/** A brand with a website app and a backend publishing `ports`. */
+function bumpedBrand(ports) {
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-brand-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{}');
@@ -122,27 +123,55 @@ test('merges live sibling maps, skips own app dir and dead pids, empty without b
   const website = path.join(brand, 'apps', 'website');
   fs.mkdirSync(path.join(backend, '.temp'), { recursive: true });
   fs.mkdirSync(path.join(website, '.temp'), { recursive: true });
-
-  // Live backend map (our own pid = definitely alive)
-  fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
-    ports: { hosting: 5003, auth: 9099 }, pid: process.pid, startedAt: 'x',
+  const publish = (map) => fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
+    ports: map, pid: process.pid, startedAt: 'x',
   }));
-  // Own app's file must be skipped even with a live pid (a previous run of THIS server)
-  fs.writeFileSync(path.join(website, '.temp', 'ports.json'), JSON.stringify({
-    ports: { website: 4999 }, pid: process.pid, startedAt: 'x',
-  }));
+  publish(ports);
+  return { brand, backend, website, publish };
+}
 
-  assert.deepEqual(readSiblingPorts(website), { hosting: 5003, auth: 9099 });
+test('devPortsOption: the backend map merges OVER the website\'s own, re-read on every call (#300)', () => {
+  const { website, publish } = bumpedBrand({ auth: 9100, firestore: 8081, hosting: 5003 });
 
-  // Dead-pid sibling map is a crash leftover — ignored
-  fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
-    ports: { hosting: 5003 }, pid: 999999999, startedAt: 'x',
-  }));
-  assert.deepEqual(readSiblingPorts(website), {});
+  const dev = devPortsOption(website, 4001);
+  assert.deepEqual(dev(), {
+    ports: { auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
+    authEmulatorProxy: true,
+  }, 'the sibling backend map rides along with this server\'s own port');
 
-  // Standalone consumer (no brand root) → empty map, client falls back to classics
+  // The emulator restarted onto different numbers — the NEXT read carries them
+  // (a boot-time read would still be handing out 9100 here)
+  publish({ auth: 9200, firestore: 8181, hosting: 5103 });
+  assert.deepEqual(dev().ports, { auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
+
+  // A website-only dev session still publishes its own port, never a stale guess
   const standalone = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-standalone-'));
-  assert.deepEqual(readSiblingPorts(standalone), {});
+  assert.deepEqual(devPortsOption(standalone, 4000)().ports, { website: 4000 });
+});
+
+test('the rendered dev page carries the BUMPED emulator ports, refreshed per render (#300)', async () => {
+  const { website, publish } = bumpedBrand({ auth: 9100, firestore: 8081, hosting: 5003 });
+  const dev = devPortsOption(website, 4001);
+
+  const first = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-render-1');
+  const html = first.get('/');
+  assert.ok(html, 'the dev page rendered');
+  const baked = JSON.parse(html.match(/dev: (\{.*?\}),\n/s)[1]);
+  assert.deepEqual(baked.ports, { auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
+    'the browser is handed the map of the stack that is ACTUALLY running');
+
+  // Emulator restart between renders: the next render bakes the new numbers,
+  // because the ports file is read at render time and not once at boot
+  publish({ auth: 9200, firestore: 8181, hosting: 5103 });
+  const second = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-render-2');
+  const rebaked = JSON.parse(second.get('/').match(/dev: (\{.*?\}),\n/s)[1]);
+  assert.deepEqual(rebaked.ports, { auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
+});
+
+test('a production build bakes no dev chrome at all', async () => {
+  const pages = await buildWith(miniData, { environment: 'production' }, 'dev-ports-render-prod');
+  // Minified output — the chrome is `dev:null`, so no port map can ever ship
+  assert.ok(pages.get('/').includes('environment:"production",dev:null,'));
 });
 
 test('devServerOptions: auth-emulator proxy + clean-url + image fallback middleware + live-reload watch on the built asset trees', () => {
@@ -157,6 +186,45 @@ test('devServerOptions: auth-emulator proxy + clean-url + image fallback middlew
     path.join('/tmp/site-out', 'assets', 'css'),
     path.join('/tmp/site-out', 'assets', 'js'),
   ]);
+});
+
+test('devAuthEmulator middleware: the proxy target follows the LIVE map, per request (#300)', async (t) => {
+  const { devServerOptions } = require('../src/commands/dev.js');
+  const open = [];
+  t.after(() => Promise.all(open.map((server) => new Promise((resolve) => server.close(resolve)))));
+
+  // Two real stand-in emulators: the "foreign" one squatting the port this
+  // session started on, and this brand's, which came up later on a bumped one
+  const listen = async (label) => {
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end(label);
+    });
+    await new Promise((resolve) => server.listen({ port: 0, host: '127.0.0.1' }, resolve));
+    open.push(server);
+    return { server, port: server.address().port };
+  };
+  const foreign = await listen('foreign-emulator');
+  const ours = await listen('our-emulator');
+
+  // The live map: empty at boot (the backend had not published yet), then the
+  // brand's own suite lands on its bumped port
+  let live = foreign.port;
+  const middleware = devServerOptions('/tmp/site-out-live', () => live).middleware[0];
+  const site = http.createServer((req, res) => middleware(req, res, () => {
+    res.writeHead(200);
+    res.end('site');
+  }));
+  await new Promise((resolve) => site.listen({ port: 0, host: '127.0.0.1' }, resolve));
+  open.push(site);
+  const url = `http://127.0.0.1:${site.address().port}/identitytoolkit.googleapis.com/v1/accounts:lookup?key=k`;
+  const get = async () => (await fetch(url, { signal: AbortSignal.timeout(5000) })).text();
+
+  assert.equal(await get(), 'foreign-emulator');
+
+  live = ours.port;
+  assert.equal(await get(), 'our-emulator',
+    'no dev-server restart: the very next auth call goes to the stack that is running now');
 });
 
 test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to flat .html files', () => {
