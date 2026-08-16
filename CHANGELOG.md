@@ -5,15 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.32.0] 2026-08-16
 ### Added
-- [#268](../../issues/268) — A save offer now stands between "Cancel subscription" and the questionnaire: a paid subscriber is pitched a discount on their next cycle, accepting applies it and calls the cancel off, declining carries on unchanged. The offer is the brand's (`payment.winback`, 50% off by default), claimable once, applied by Stripe.
+- [#268](../../issues/268) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — A save offer now stands between "Cancel subscription" and the questionnaire: a paid subscriber is pitched a discount on their next cycle, accepting applies it and calls the cancel off, declining carries on unchanged. The offer is the brand's (`payment.winback`, 50% off by default), claimable once, applied by Stripe.
 
 ### Fixed
-- [#306](../../issues/306) — One guarded analytics helper is the SSOT for gtag, fbq and ttq across web core, and every call site routes through it, so a blocked provider can no longer throw mid-action and take the refund, data request or install click with it.
-- [#309](../../issues/309) — The dev-only `window._billing.test(account)` renders as the account it was handed and stashes the real one, so a synthetic trialing render keeps the trial-cancel trigger alive and `_billing.restore()` always comes back to the real account.
-- [#303](../../issues/303) — Every theme gets the dashboard chrome the base layer renders: `.btn-icon` and the `.omega-search` ⌘K pill (input and shortcut badge) moved from classy's partials to the core component sheet, so newsflash and neobrutalism stop painting a native button box beside the breadcrumb and a cream-slab `kbd`.
-- [#307](../../issues/307) — The `omega` dispatcher's brand-root rule learns `dist/`: running the CLI inside a staged backend's build output dispatches as the backend framework, not as a brand, matching the config loader's own rule.
-- [#308](../../issues/308) — `omega emulator` (and every staging command) run from the framework package itself refuses loudly instead of wiping `packages/backend/dist` and dying on a missing config, so the framework CLI stays bootable.
+- [#306](../../issues/306) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — One guarded analytics helper is the SSOT for gtag, fbq and ttq across web core, and every call site routes through it, so a blocked provider can no longer throw mid-action and take the refund, data request or install click with it.
+- [#309](../../issues/309) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — The dev-only `window._billing.test(account)` renders as the account it was handed and stashes the real one, so a synthetic trialing render keeps the trial-cancel trigger alive and `_billing.restore()` always comes back to the real account.
+- [#303](../../issues/303) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — Every theme gets the dashboard chrome the base layer renders: `.btn-icon` and the `.omega-search` ⌘K pill (input and shortcut badge) moved from classy's partials to the core component sheet, so newsflash and neobrutalism stop painting a native button box beside the breadcrumb and a cream-slab `kbd`.
+- [#307](../../issues/307) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — The `omega` dispatcher's brand-root rule learns `dist/`: running the CLI inside a staged backend's build output dispatches as the backend framework, not as a brand, matching the config loader's own rule.
+- [#308](../../issues/308) [`0f35477c`](../../commit/0f35477c) Thanks [@ianwieds]! — `omega emulator` (and every staging command) run from the framework package itself refuses loudly instead of wiping `packages/backend/dist` and dying on a missing config, so the framework CLI stays bootable.
 
 ## [0.31.1] 2026-08-16
 ### Fixed
