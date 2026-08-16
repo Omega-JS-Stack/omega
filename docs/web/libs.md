@@ -58,6 +58,7 @@ diagram, and do not add chart.js or mermaid to an app's dependencies.
 | Module | What it is | Key exports |
 |---|---|---|
 | `admin-helpers.js` | Formatting and stat-cell helpers for the admin pages: relative timestamps, capitalization, and writing a settled Firestore count-aggregation result (or an inline error) into a stat element | `formatTimeAgo`, `capitalize`, `setStatValue`, `setStatSubValue` |
+| `analytics.js` | The ONE way core code reaches the pixel globals ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)). Detail below | `trackGoogle`, `trackMeta`, `trackTikTok`, `identifyTikTok` |
 | `charts.js` | Chart.js behind framework helpers: lazy load, token colors, a slot to draw into, four chart builders. Detail below | `loadCharts`, `chartsReady`, `chartColors`, `resolveColor`, `chartSlot`, `barChart`, `stackedBarChart`, `doughnutChart`, `lineChart` |
 | `dev.js` | Development-only helpers, imported by `runtime/boot.js` only when `manager.isDevelopment()`: a click logger, `window.logOpeningTags()` and `window.changeTheme()`, a breakpoint logger on resize, and logging interceptors installed over `gtag` / `fbq` / `ttq` | default export: a function that installs all of it |
 | `graph.js` | mermaid behind framework helpers, on the charts contract: a definition in, an SVG out. Detail below | `loadGraph`, `graphReady`, `graphTheme`, `graphSlot`, `drawGraph` |
@@ -67,6 +68,40 @@ diagram, and do not add chart.js or mermaid to an app's dependencies.
 | `prerendered-icons.js` | Pulls icon HTML out of the page's `#prerendered-icons` block by `data-icon` name: the JS-context equivalent of `{% omega_icon %}`, taking the same optional class string, and returning `''` when the icon was not prerendered | `getPrerenderedIcon(iconName, classes)` |
 | `recaptcha.js` | reCAPTCHA v3 for any public form posting to a recaptcha-gated backend route (checkout payment intent, newsletter capture): lazy script load through `omega.dom().loadScript()`, then a token per action. Site key: `omega.config.captcha.providers.recaptcha.siteKey` | `initializeRecaptcha(siteKey)`, `getRecaptchaToken(action)` |
 | `sale-name.js` | Picks the promotion name for a date. Holidays (Black Friday, Cyber Monday, Christmas, Easter) run a window of 7 days before to 3 days after their core date, and a later holiday only takes over once the earlier one's core date has passed; with no holiday active it falls back to the season (`Spring Sale`, and `End of Summer Sale` past 70% of the season), then to a plain `Sale` | `getSaleName(date)`, `getUpcomingSales(startDate, endDate)`, default `{ getSaleName, getUpcomingSales }` |
+
+### analytics.js
+
+`gtag`, `fbq` and `ttq` are page-level snippets (`core/_includes/core/foot.html`),
+and an ad blocker does not stub them: it keeps them from ever being defined, so a
+BARE call throws a ReferenceError. Every one of these calls sits in front of the
+thing the customer just pressed, so the throw takes the action with it. That was
+the billing card's dead "Undo cancellation" button
+([#283](https://github.com/Omega-JS-Stack/omega/issues/283)), found again in 19
+other files ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)).
+
+`typeof` against an undeclared name is the one check that does not throw, and
+every provider is checked on its own, because blockers work per list: a page that
+lost Meta still counts Google. Each export is a pass-through of the provider's
+own call, so a call site reads the way it always did:
+
+```js
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+
+trackGoogle('event', 'refund_action', { action: 'submit' });
+trackMeta('trackCustom', 'RefundAction', { action: 'submit' });
+trackTikTok('ViewContent', { content_id: 'refund-submit', content_type: 'product' });
+```
+
+`trackGoogle` and `trackMeta` are variadic, because gtag and fbq are single
+command functions and take more than events (`set`, `init`). `ttq` is an object
+of methods, so each method the framework uses gets its own export:
+`trackTikTok(event, properties)` and `identifyTikTok(properties)`.
+
+The module is the SSOT, and `test/analytics-blocked.test.js` keeps it one: a
+guard test greps every file under `core/js` for a bare `gtag(` / `fbq(` / `ttq.`,
+so the pattern cannot regrow a page module at a time. Two files may name the
+globals — this module, which IS the guard, and `dev.js`, which wraps whatever the
+page loaded rather than reaching for a name that may not be there.
 
 ### charts.js
 

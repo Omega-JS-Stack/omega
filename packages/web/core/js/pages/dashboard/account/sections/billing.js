@@ -7,6 +7,7 @@ import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES, getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
 
 const logger = createLogger('account:billing');
@@ -21,6 +22,13 @@ let currentAccount = null;
 // session — the billing portal is the path that works for that processor.
 let uncancelSupported = true;
 let planSwitchSupported = true;
+let winbackSupported = true;
+
+// The save offer (#268) is made ONCE per session. Accepting it applies a real
+// discount to a live subscription and declining it is an answer, so a customer
+// who reopens the cancel flow goes straight to the questionnaire — the offer is
+// a pitch, not a toll gate on the cancel button.
+let winbackOfferAnswered = false;
 
 // Cancellation reasons (will be shuffled on each render)
 const CANCEL_REASONS = [
@@ -78,6 +86,7 @@ let pendingSwitch = null;
 export async function init() {
   setupActionButtons();
   setupTrialCancelWarning();
+  setupWinbackOffer();
   setupCancellationForm();
   setupUncancelConfirm();
   setupPlanSwitcher();
@@ -105,10 +114,37 @@ export function onShow() {
 
 /* @dev-only:start */
 {
+  // The console helper renders a made-up account into the card. It has to set
+  // `currentAccount` too, because the render is only half of the card's
+  // behavior: the trial-cancel gate re-reads the account on every click, and a
+  // synthetic trialing render that left the real account in place stripped the
+  // trigger's declarative toggle while the gate said no warning was owed — a
+  // dead cancel button ([#309]). The real account is STASHED, once, so
+  // `restore()` always has it back; a bare assignment would lose it to the
+  // previous synthetic one.
+  let realAccount = null;
+  let testing = false;
+
   window._billing = {
-    test: (account) => updateUI(account),
+    test: (account) => {
+      if (!testing) {
+        realAccount = currentAccount;
+        testing = true;
+      }
+
+      currentAccount = account;
+      updateUI(account);
+    },
     state: () => buildBillingState(currentAccount),
-    restore: () => { if (currentAccount) updateUI(currentAccount); },
+    restore: () => {
+      if (testing) {
+        currentAccount = realAccount;
+        realAccount = null;
+        testing = false;
+      }
+
+      if (currentAccount) updateUI(currentAccount);
+    },
   };
 }
 /* @dev-only:end */
@@ -117,7 +153,11 @@ function updateUI(account) {
   const state = buildBillingState(account);
 
   omega.bindings().update(state);
-  syncCancelTriggerToggle(state.billing.cancelWarning.show);
+  // BOTH pre-questionnaire steps ride the same switch: the trial warning (#267)
+  // and the save offer (#268) each need the declarative collapse toggle off the
+  // trigger, and they are mutually exclusive by state, so the toggle is off
+  // whenever either is owed.
+  syncCancelTriggerToggle(state.billing.cancelWarning.show || state.billing.winbackOffer.show);
   updateUsageInfo(account);
 }
 
@@ -185,6 +225,21 @@ function buildBillingState(account) {
   // dialog exists to fix.
   const trialCancel = canCancel && resolved.trialing;
 
+  // The save offer (#268): pitched to a PAID cancel, before the questionnaire.
+  // A trial is never offered a discount on a cycle it has not paid for — its
+  // access ends today (#267), so "off your next month" is the wrong sentence —
+  // which is what keeps the two gates from ever wanting the same click.
+  //
+  // The offer itself is the brand's, resolved at BUILD time from omega.json5
+  // (`payment.winback`, @omega.js/config's resolveWinbackOffer): the 50%-off
+  // default has one home and the browser never applies one of its own.
+  const offer = paymentConfig?.winback;
+  const offerable = canCancel
+    && !trialCancel
+    && offer?.enabled === true
+    && winbackSupported
+    && !winbackOfferAnswered;
+
   return {
     billing: {
       plan: {
@@ -234,6 +289,13 @@ function buildBillingState(account) {
       // is never asked to attest to access it will not get.
       cancelForm: {
         trial: trialCancel,
+      },
+      // The save offer the customer reads before the questionnaire (#268). Its
+      // wording is built here, from the brand's own numbers and the cadence the
+      // subscription is billed at, so the markup carries no discount at all.
+      winbackOffer: {
+        show: offerable,
+        headline: offerable ? winbackHeadline(offer, subscription.payment?.frequency) : '',
       },
       buttons: {
         upgrade: !isPaid || rawStatus === 'cancelled',
@@ -905,9 +967,9 @@ function setupTrialCancelWarning() {
       return;
     }
 
-    // Open FIRST, count second: trackBilling() reaches for the analytics
-    // globals directly, and a blocked snippet must never be able to leave this
-    // button doing nothing at all.
+    // Open FIRST, count second: counting is the analytics providers' business
+    // and this dialog is the customer's, so a blocked snippet must never be
+    // able to leave this button doing nothing at all.
     bootstrap.Modal.getOrCreateInstance($modal).show();
     trackBilling('cancel_trial_warning_shown');
   }, true);
@@ -967,6 +1029,158 @@ function setCancelTriggerExpanded($trigger, isOpen) {
 // never disagree.
 function needsTrialCancelWarning() {
   return buildBillingState(currentAccount).billing.cancelWarning.show === true;
+}
+
+// ─── Winback Offer ──────────────────────────────────────────
+
+// A customer who starts cancelling a PAID subscription is pitched a discount on
+// the next cycle before they are asked why they are leaving (#268). The system
+// already read a returning subscriber as a purchase (the `subscription-winback`
+// transition); this is the offer made while they are still here to keep.
+//
+// The gate is #267's, for the same reason: the "Cancel subscription" link opens
+// the questionnaire through Bootstrap's collapse data-api, which is a delegate
+// on `document` running in the CAPTURE phase, so the only thing that stops it is
+// taking `data-bs-toggle` off the button (syncCancelTriggerToggle) — and this
+// listener then owns that button's clicks. The two gates never contend: a trial
+// cancel is warned, a paid cancel is offered, and `offersWinback()` reads the
+// same state the button does.
+function setupWinbackOffer() {
+  const $trigger = document.getElementById('cancel-subscription-trigger-btn');
+  const $modal = document.getElementById('cancel-winback-modal');
+
+  if (!$trigger || !$modal) {
+    return;
+  }
+
+  const $accordion = document.getElementById('cancel-subscription-accordion');
+
+  $trigger.addEventListener('click', (event) => {
+    if (!offersWinback()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Half of a toggle is closing: with the questionnaire already open this
+    // click only shuts it, exactly as the trial gate handles its own.
+    if ($accordion?.classList.contains('show')) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).hide();
+      return;
+    }
+
+    // Open FIRST, count second — a blocked analytics snippet must never be able
+    // to leave this button doing nothing ([#283], [#306]).
+    bootstrap.Modal.getOrCreateInstance($modal).show();
+    trackBilling('winback_offer_shown');
+  }, true);
+
+  document.getElementById('cancel-winback-decline-btn')?.addEventListener('click', () => {
+    retireWinbackOffer();
+
+    bootstrap.Modal.getInstance($modal)?.hide();
+
+    if ($accordion) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).show();
+    }
+
+    trackBilling('winback_offer_declined');
+  });
+
+  const $acceptBtn = document.getElementById('cancel-winback-accept-btn');
+
+  $acceptBtn?.addEventListener('click', () => acceptWinbackOffer($acceptBtn, $modal, $accordion));
+}
+
+// Apply the discount to the live subscription and call the cancel off. The
+// route talks to the processor; the webhook pipeline writes whatever state
+// changes, so nothing is patched locally here — the subscription the customer
+// keeps is the one they already had.
+async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
+  const $btnText = $acceptBtn.querySelector('.button-text');
+  const originalText = $btnText?.textContent;
+
+  try {
+    // Show loading state
+    $acceptBtn.disabled = true;
+    if ($btnText) $btnText.textContent = 'Applying...';
+
+    await omega.request(`/omega/payments/winback`, {
+      method: 'POST',
+      timeout: 30000,
+      body: {
+        confirmed: true,
+      },
+    });
+
+    logger.log('Winback offer accepted:', { productId: currentAccount?.subscription?.product?.id });
+
+    retireWinbackOffer();
+
+    bootstrap.Modal.getInstance($modal)?.hide();
+
+    trackBilling('winback_offer_accepted');
+
+    omega.utilities().showNotification('Your discount is applied to your next bill. Nothing else changes, and you can still cancel any time.', 'success');
+  } catch (error) {
+    logger.error('Failed to apply the winback offer:', error);
+
+    // Same capability gate uncancel and plan-switch ride: the processor cannot
+    // discount a live subscription at all, or the claim has nowhere to be
+    // recorded — either way the offer is a dead end for this account, so
+    // retire it and open the questionnaire — a customer who came here to
+    // cancel must never be left in a dialog that cannot answer them.
+    const deadEndCodes = ['not-supported-by-processor', 'offer-not-claimable'];
+    if (deadEndCodes.includes(error.properties?.additional?.code)) {
+      winbackSupported = false;
+      retireWinbackOffer();
+
+      bootstrap.Modal.getInstance($modal)?.hide();
+
+      if ($accordion) {
+        bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).show();
+      }
+
+      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+    } else {
+      // A failure is not a decline: the dialog stays up so the same button can
+      // be pressed again.
+      omega.utilities().showNotification(error.message || 'We could not apply your discount right now. Please try again later.', 'danger');
+    }
+  } finally {
+    $acceptBtn.disabled = false;
+    if ($btnText) $btnText.textContent = originalText;
+  }
+}
+
+// The offer has been answered — re-render so the trigger gets its declarative
+// collapse toggle back and the next click opens the questionnaire directly.
+function retireWinbackOffer() {
+  winbackOfferAnswered = true;
+
+  updateUI(currentAccount);
+}
+
+// Is a save offer owed before the questionnaire? Read off the SAME state the
+// bindings render, so the gate and the dialog can never disagree.
+function offersWinback() {
+  return buildBillingState(currentAccount).billing.winbackOffer.show === true;
+}
+
+// What the offer SAYS, in the brand's own numbers: a percentage or a flat
+// amount off, and the cadence the subscription is actually billed at. A
+// permanent cut does not promise a single cycle.
+function winbackHeadline(offer, frequency) {
+  const off = offer.amount > 0
+    ? formatCurrency(offer.amount, paymentConfig?.currency || 'USD')
+    : `${offer.percent}%`;
+
+  if (offer.duration === 'forever') {
+    return `Stay and get ${off} off for as long as you stay`;
+  }
+
+  return `Stay and get ${off} off your next ${FREQUENCY_LABELS[frequency] || 'cycle'}`;
 }
 
 // ─── Cancellation Form ──────────────────────────────────────
@@ -1245,25 +1459,20 @@ function shuffleArray(arr) {
 // Counting a billing action may never COST the customer that action ([#283]).
 // An ad blocker does not stub these snippets, it stops them loading, so the
 // names are simply never defined — and every caller here counts before it acts,
-// so one ReferenceError turned "Undo cancellation" into a dead button. Each
-// provider is asked for on its own: blockers work per list, so a page with
-// Google allowed and Meta blocked still counts what it can.
+// so one ReferenceError turned "Undo cancellation" into a dead button. The
+// guard this card was given first is now the framework's ONE analytics helper
+// ([#306]), which asks for each provider on its own: blockers work per list, so
+// a page with Google allowed and Meta blocked still counts what it can.
 function trackBilling(action) {
-  if (typeof gtag === 'function') {
-    gtag('event', 'billing_action', {
-      action: action,
-    });
-  }
-  if (typeof fbq === 'function') {
-    fbq('trackCustom', 'BillingAction', {
-      action: action,
-    });
-  }
-  if (typeof ttq !== 'undefined' && typeof ttq.track === 'function') {
-    ttq.track('ViewContent', {
-      content_id: `billing-${action}`,
-      content_type: 'product',
-      content_name: `Billing ${action}`,
-    });
-  }
+  trackGoogle('event', 'billing_action', {
+    action: action,
+  });
+  trackMeta('trackCustom', 'BillingAction', {
+    action: action,
+  });
+  trackTikTok('ViewContent', {
+    content_id: `billing-${action}`,
+    content_type: 'product',
+    content_name: `Billing ${action}`,
+  });
 }

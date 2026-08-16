@@ -36,6 +36,13 @@ const FRAMEWORKS = [
 
 const MANAGER = '@omega.js/manager';
 
+// Dirs that are a VIEW of the app one level up, never a context of their own:
+// a backend's runtime cwd (functions/) and its staged build output (dist/,
+// which carries a COMPOSED config/omega.json5 that would otherwise read as a
+// brand root). Stdlib twin of @omega.js/config's APP_SUBDIRS — that module is
+// the canonical list ([#307](https://github.com/Omega-JS-Stack/omega/issues/307)).
+const APP_SUBDIRS = ['functions', 'dist'];
+
 function readPackage(dir) {
   try {
     return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
@@ -52,12 +59,14 @@ function frameworksOf(pkg) {
 
 /**
  * Is `dir` a brand-monorepo root? Carries a config/omega.json5 that is not
- * itself an APP of a brand above it (directly under an apps/ dir whose parent
- * also carries a brand config). Stdlib twin of @omega.js/config's
- * resolveBrandRoot rule — that module is the canonical definition; this copy
- * exists because the dispatcher cannot depend on @omega.js/config.
+ * itself an APP_SUBDIR view (functions/, dist/) and not an APP of a brand above
+ * it (directly under an apps/ dir whose parent also carries a brand config).
+ * Stdlib twin of @omega.js/config's resolveBrandRoot rule — that module is the
+ * canonical definition; this copy exists because the dispatcher cannot depend
+ * on @omega.js/config.
  */
 function isBrandRoot(dir) {
+  if (APP_SUBDIRS.includes(path.basename(path.resolve(dir)))) return false;
   if (!fs.existsSync(path.join(dir, 'config', 'omega.json5'))) return false;
 
   const parent = path.dirname(dir);
@@ -177,4 +186,4 @@ async function run({ hostName, hostRun }) {
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, isBrandRoot, APP_SUBDIRS, FRAMEWORKS, MANAGER };

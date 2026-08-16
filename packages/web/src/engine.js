@@ -15,6 +15,7 @@ const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
+const { resolveWinbackOffer } = require('@omega.js/config/winback');
 const Logger = require('@omega.js/devkit/logger');
 const reads = require('@omega.js/devkit/reads');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
@@ -170,7 +171,13 @@ function buildConfig(eleventyConfig, options) {
     site.client.firebase.messaging.config = site.client.firebase.messaging.config || {};
     site.client.firebase.messaging.config.vapidKey = site.cloud.messaging.vapidKey;
   }
-  if (site.payment) site.client.payment = site.payment;
+  // The cancel-flow save offer (#268) is RESOLVED here, not in the browser: the
+  // framework default (50% off the next cycle) has ONE home in @omega.js/config,
+  // and the backend's apply route resolves the same section through the same
+  // function — so the dialog the customer reads and the coupon the processor
+  // creates can never name different numbers. The spread leaves site.payment
+  // itself alone; templates and the pricing composer read the brand's section.
+  if (site.payment) site.client.payment = { ...site.payment, winback: resolveWinbackOffer(site.payment) };
 
   // Pricing view-model (C2): payment.products is the ONLY plan source — the
   // seed surfaces as resolved.pricing (cascade still lets consumer frontmatter

@@ -6,6 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -248,19 +249,19 @@ function resetAutoAdvance($slideshow) {
 function trackDownloadClick(platform, downloadName, downloadUrl) {
   console.log('Download clicked:', platform, downloadName, downloadUrl);
 
-  gtag('event', 'download', {
+  trackGoogle('event', 'download', {
     platform: platform,
     download_name: downloadName,
     download_url: downloadUrl,
   });
 
-  fbq('trackCustom', 'Download', {
+  trackMeta('trackCustom', 'Download', {
     content_name: downloadName,
     content_category: platform,
     content_type: 'download',
   });
 
-  ttq.track('Download', {
+  trackTikTok('Download', {
     content_id: `download-${platform}`,
     content_type: 'product',
     content_name: downloadName,

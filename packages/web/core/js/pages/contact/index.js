@@ -6,6 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -156,21 +157,21 @@ function setupFormScrolling() {
 
 // Tracking functions
 function trackContactSpam() {
-  gtag('event', 'contact_form_spam', {
+  trackGoogle('event', 'contact_form_spam', {
     content_type: 'honeypot',
   });
 }
 
 function trackContactFormSubmit(subject) {
-  gtag('event', 'generate_lead', {
+  trackGoogle('event', 'generate_lead', {
     lead_source: 'contact_form',
     subject: subject,
   });
-  fbq('track', 'Lead', {
+  trackMeta('track', 'Lead', {
     content_name: 'Contact Form',
     content_category: subject,
   });
-  ttq.track('Contact', {
+  trackTikTok('Contact', {
     content_id: 'contact-form',
     content_type: 'product',
     content_name: 'Contact Form',

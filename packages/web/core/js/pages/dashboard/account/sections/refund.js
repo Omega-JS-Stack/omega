@@ -5,6 +5,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Refund reasons (will be shuffled on each render)
 const REFUND_REASONS = [
@@ -143,13 +144,13 @@ function shuffleArray(arr) {
 // ─── Tracking ───────────────────────────────────────────────
 
 function trackRefund(action) {
-  gtag('event', 'refund_action', {
+  trackGoogle('event', 'refund_action', {
     action: action,
   });
-  fbq('trackCustom', 'RefundAction', {
+  trackMeta('trackCustom', 'RefundAction', {
     action: action,
   });
-  ttq.track('ViewContent', {
+  trackTikTok('ViewContent', {
     content_id: `refund-${action}`,
     content_type: 'product',
     content_name: `Refund ${action}`,

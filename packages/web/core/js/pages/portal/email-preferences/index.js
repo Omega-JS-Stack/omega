@@ -7,6 +7,7 @@ import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -168,13 +169,13 @@ function setupForm() {
 
 // Tracking
 function trackEmailPreference(action) {
-  gtag('event', `email_${action}`, {
+  trackGoogle('event', `email_${action}`, {
     content_type: 'email_preferences',
   });
-  fbq('trackCustom', action === 'unsubscribe' ? 'EmailUnsubscribe' : 'EmailResubscribe', {
+  trackMeta('trackCustom', action === 'unsubscribe' ? 'EmailUnsubscribe' : 'EmailResubscribe', {
     content_name: 'Email Preferences',
   });
-  ttq.track('ViewContent', {
+  trackTikTok('ViewContent', {
     content_id: `email-${action}`,
     content_type: 'product',
   });

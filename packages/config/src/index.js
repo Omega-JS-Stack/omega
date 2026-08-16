@@ -32,6 +32,7 @@ const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js')
 const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
+const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
 const { parseRepoSlug, brandRepoName, brandRepoOwner } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
@@ -75,6 +76,12 @@ module.exports = {
 
   // Template surface
   toSiteGlobal,
+
+  // The cancel-flow save offer (#268) — ONE home for the 50%-off default, read
+  // by the backend's apply route and baked into the web client blob at build
+  resolveWinbackOffer,
+  WINBACK_OFFER_DEFAULTS,
+  WINBACK_DURATIONS,
 
   // Brand repo derivation from the shared repo.providers.github block, overlaid
   // by a target's own github entry (backend: targets.backend.github.repo slug —

@@ -48,12 +48,12 @@ module.exports = {
 
         // ...referenced the way the monorepo's functions dirs do it
         const functionsPath = path.join(tmp, 'functions');
-        jetpack.write(path.join(functionsPath, 'package.json'), JSON.stringify({
+        jetpack.write(path.join(functionsPath, 'package.json'), `${JSON.stringify({
           name: 'test-functions',
           version: '0.0.1',
           private: true,
           dependencies: { '@omega.js/fakepkg': 'file:../fakepkg' },
-        }, null, 2) + '\n');
+        }, null, 2)}\n`);
 
         const staging = await stageLocalPackages({ functionsPath });
 
@@ -204,6 +204,34 @@ module.exports = {
         jetpack.write(path.join(tmp, 'package.json'), JSON.stringify({ name: 'x', private: true }));
         jetpack.remove(path.join(tmp, 'src'));
         assert.ok(/backend apps are src-first/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing src/ instructs the src-first move');
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: 'stage-functions-refuses-the-framework-package-itself',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        // The framework package's own shape: a package.json named
+        // @omega.js/backend beside a src/ dir — which is exactly what an app
+        // root looks like to the stage. `npx omega emulator` from inside the
+        // framework (no app context to dispatch to) walked straight in, wiped
+        // the framework's OWN dist/ and then died on the missing omega.json5,
+        // leaving the CLI unbootable until `npm run prepare` (#308).
+        jetpack.write(path.join(tmp, 'package.json'), JSON.stringify({ name: '@omega.js/backend', private: true }));
+        jetpack.write(path.join(tmp, 'src', 'index.js'), '// framework source');
+        jetpack.write(path.join(tmp, 'dist', 'index.js'), '// prepared output');
+
+        const messageOf = (fn) => {
+          try { fn(); return ''; } catch (e) { return e.message; }
+        };
+        const message = messageOf(() => stageFunctions({ projectDir: tmp }));
+
+        assert.ok(/@omega\.js\/backend framework package/.test(message), `refusal names the framework package: ${message}`);
+        assert.ok(/npm run prepare/.test(message), 'refusal names how the framework dist/ is built');
+        assert.equal(jetpack.read(path.join(tmp, 'dist', 'index.js')), '// prepared output', 'refusal lands BEFORE the wipe — the prepared dist/ survives');
 
         jetpack.remove(tmp);
       },

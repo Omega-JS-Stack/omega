@@ -4,6 +4,7 @@
 
 // Libraries
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -91,18 +92,18 @@ function setupInstallTracking() {
 function trackInstallClick(browser, installUrl) {
   console.log('Extension install clicked:', browser, installUrl);
 
-  gtag('event', 'extension_install', {
+  trackGoogle('event', 'extension_install', {
     browser: browser,
     install_url: installUrl,
   });
 
-  fbq('trackCustom', 'ExtensionInstall', {
+  trackMeta('trackCustom', 'ExtensionInstall', {
     content_name: `${browser} extension`,
     content_category: browser,
     content_type: 'extension',
   });
 
-  ttq.track('Download', {
+  trackTikTok('Download', {
     content_id: `extension-${browser}`,
     content_type: 'product',
     content_name: `${browser} extension`,

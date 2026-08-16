@@ -12,7 +12,8 @@
     "./validate": "./src/validate.js",
     "./load": "./src/load.js",
     "./env": "./src/env.js",
-    "./site-global": "./src/site-global.js"
+    "./site-global": "./src/site-global.js",
+    "./winback": "./src/winback.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

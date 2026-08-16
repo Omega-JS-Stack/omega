@@ -1,5 +1,6 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { trackGoogle, trackMeta, identifyTikTok } from '__main_assets__/js/libs/analytics.js';
 
 const logger = createLogger('auth');
 
@@ -251,20 +252,20 @@ function setAnalyticsUserId(user) {
   // Short-circuit if no user
   if (!userId) {
     // Clear user ID when logged out
-    gtag('set', { user_id: null });
+    trackGoogle('set', { user_id: null });
 
     // Facebook Pixel - Clear advanced matching
-    fbq('init', metaPixelId, {});
+    trackMeta('init', metaPixelId, {});
 
     // TikTok Pixel - Clear user data
-    ttq.identify({});
+    identifyTikTok({});
 
     // Return early
     return;
   }
 
   // Google Analytics 4 - Set user ID and user properties
-  gtag('set', {
+  trackGoogle('set', {
     user_id: userId,
     user_properties: {
       email_domain: email ? email.split('@')[1] : undefined
@@ -272,7 +273,7 @@ function setAnalyticsUserId(user) {
   });
 
   // Facebook Pixel - Set advanced matching with user data
-  fbq('init', metaPixelId, {
+  trackMeta('init', metaPixelId, {
     external_id: userId,
     // em: email ? btoa(email.toLowerCase().trim()) : undefined,
     em: email,
@@ -280,7 +281,7 @@ function setAnalyticsUserId(user) {
   });
 
   // TikTok Pixel - Identify user
-  ttq.identify({
+  identifyTikTok({
     external_id: userId,
     // email: email ? btoa(email.toLowerCase().trim()) : undefined,
     email: email,

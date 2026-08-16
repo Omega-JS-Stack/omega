@@ -8,6 +8,7 @@
  *     type:        'string' | 'boolean' | 'number' | 'integer' | 'array' | 'object',
  *     required:    true | false | (config) => bool,
  *     min:         Number,                // only checked when value present + number
+ *     max:         Number,                // only checked when value present + number
  *     match:       RegExp,                // only checked when value present + string
  *     enum:        [...],                 // only checked when value present
  *     description: 'What the field drives.',
@@ -23,6 +24,8 @@
  * entries come from EM's schema (desktop) and the sandbox brand's real @omega.js/backend
  * config (backend), never from guesses.
  */
+
+const { WINBACK_DURATIONS } = require('./winback.js');
 
 // Canonical target names — the only keys allowed under `targets`.
 // Key presence in a config's `targets` object = "this brand enables this
@@ -301,6 +304,34 @@ const SHARED_SCHEMA = [
     type:        'array',
     required:    false,
     description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), url, features [{ id, name, icon, definition, value }].',
+  },
+  {
+    path:        'payment.winback.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'The cancel-flow save offer (#268), shown before the cancellation questionnaire. Defaults ON — false is the whole off switch, and the cancel flow goes straight to the questionnaire.',
+  },
+  {
+    path:        'payment.winback.percent',
+    type:        'integer',
+    required:    false,
+    min:         1,
+    max:         100,
+    description: 'Whole percentage off the next cycle the save offer pitches. Defaults to 50. Mutually exclusive with payment.winback.amount.',
+  },
+  {
+    path:        'payment.winback.amount',
+    type:        'number',
+    required:    false,
+    min:         0.01,
+    description: "Flat amount off the next cycle (payment.currency's major unit, e.g. 10 = $10), instead of a percentage. Mutually exclusive with payment.winback.percent.",
+  },
+  {
+    path:        'payment.winback.duration',
+    type:        'string',
+    required:    false,
+    enum:        WINBACK_DURATIONS,
+    description: "How long the accepted offer lasts: 'once' (the next cycle only, the default) or 'forever' (a permanent price cut).",
   },
 
   // ── monitoring (role: error monitoring; D12 provider-discriminated) ──────

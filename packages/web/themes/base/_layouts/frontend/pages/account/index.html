@@ -1180,6 +1180,44 @@ badges:
         </div>
 
         <!-- Change Plan Modal -->
+        <!-- Winback offer — shown BEFORE the questionnaire, and only for a PAID
+             cancel (#268). The customer is pitched a discount on the next cycle
+             while they are still here to keep; accepting applies it and calls
+             the cancel off, declining opens the questionnaire unchanged. The
+             offer is the BRAND's (payment.winback in omega.json5), so the number
+             is bound from state and never spelled out here. -->
+        <div class="modal fade" id="cancel-winback-modal" tabindex="-1" aria-labelledby="cancel-winback-title" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="cancel-winback-title">
+                  {% omega_icon "gift", "fa-lg me-2" %}
+                  <span data-omega-bind="@text billing.winbackOffer.headline">Stay and save on your next bill</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p class="mb-3">
+                  Before you go, we would rather keep you than lose you. Take the discount and your plan carries on with everything you have now.
+                </p>
+                <p class="mb-0">
+                  Nothing else changes, and you can still cancel any time.
+                </p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-adaptive" id="cancel-winback-accept-btn">
+                  {% omega_icon "circle-check", "fa-sm me-2" %}
+                  <span class="button-text">Keep my plan and save</span>
+                </button>
+                <button type="button" class="btn btn-outline-adaptive" id="cancel-winback-decline-btn">
+                  {% omega_icon "ban", "fa-sm me-2" %}
+                  No thanks, cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Trial cancel warning — shown BEFORE the questionnaire, and only for
              a trial. A trial cancel takes effect immediately (#267), the exact
              opposite of the accordion's own "until the end of your billing

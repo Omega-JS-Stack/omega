@@ -2,12 +2,15 @@
  * The billing card's ACTIONS survive blocked analytics
  * ([#283](https://github.com/Omega-JS-Stack/omega/issues/283)).
  *
- * `trackBilling()` (`core/js/pages/dashboard/account/sections/billing.js`)
- * reaches for `gtag`, `fbq` and `ttq` as bare globals. An ad blocker does not
+ * `trackBilling()` (`core/js/pages/dashboard/account/sections/billing.js`) used
+ * to reach for `gtag`, `fbq` and `ttq` as bare globals. An ad blocker does not
  * stub them, it keeps the snippets from ever defining them, so the first call
- * throws a ReferenceError — and because the counting runs BEFORE the work on
- * every one of these paths, the button the customer pressed does nothing at
- * all. Undoing a cancellation is the worst of them: the route is never called.
+ * threw a ReferenceError — and because the counting runs BEFORE the work on
+ * every one of these paths, the button the customer pressed did nothing at
+ * all. Undoing a cancellation was the worst of them: the route was never
+ * called. The guard is now the framework's own analytics helper
+ * ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)), which this
+ * suite still holds to the behavior #283 pinned.
  *
  * What this suite pins, both directions:
  *  - with all three globals undefined, every billing action still runs;

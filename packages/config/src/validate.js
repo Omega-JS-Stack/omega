@@ -114,6 +114,12 @@ function runSchema(config, schema) {
       errors.push(`config.${rule.path} ${value} is below the minimum ${rule.min}${why}`);
     }
 
+    // ─── Max check (numbers) ────────────────────────────────────────────────
+    if (typeof rule.max === 'number' && typeof value === 'number' && value > rule.max) {
+      const why = rule.description ? ` — ${rule.description}` : '';
+      errors.push(`config.${rule.path} ${value} is above the maximum ${rule.max}${why}`);
+    }
+
     // ─── Match check (strings) ──────────────────────────────────────────────
     if (rule.match && typeof value === 'string' && !rule.match.test(value)) {
       const why = rule.description ? ` — ${rule.description}` : '';
@@ -269,6 +275,16 @@ function validateConfig(config, options) {
 
   // ─── authDomain is the brand's own host (cp268) ────────────────────────
   validateAuthDomain(config).forEach((error) => errors.push(error));
+
+  // ─── the winback offer is ONE shape (#268) ─────────────────────────────
+  // A coupon is percent-based or amount-based everywhere in the payment stack,
+  // and the schema walker checks fields one at a time, so the pair rule lives
+  // here. Two shapes on one offer has no honest reading — a processor would
+  // have to pick — so it fails the config instead.
+  const winback = config ? getPath(config, 'payment.winback') : undefined;
+  if (isPlainObject(winback) && typeof winback.percent === 'number' && typeof winback.amount === 'number') {
+    errors.push('config.payment.winback sets both percent and amount — a save offer is one shape or the other, never both');
+  }
 
   // ─── retired keys (#142) ───────────────────────────────────────────────
   findRetiredKeys(config).forEach(({ path, replacement, why }) => {

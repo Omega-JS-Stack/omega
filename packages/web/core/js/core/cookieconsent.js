@@ -1,4 +1,5 @@
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Cookie Consent Module
 export default function () {
@@ -310,11 +311,11 @@ export default function () {
 
   // Tracking functions
   function trackCookieBannerShown() {
-    gtag('event', 'cookie_banner_show', {
+    trackGoogle('event', 'cookie_banner_show', {
       event_category: 'consent'
     });
-    fbq('trackCustom', 'CookieBannerShow');
-    ttq.track('ViewContent', {
+    trackMeta('trackCustom', 'CookieBannerShow');
+    trackTikTok('ViewContent', {
       content_id: 'cookie-banner-show',
       content_type: 'product',
       content_name: 'Cookie Banner Show'
@@ -322,12 +323,12 @@ export default function () {
   }
 
   function trackCookieAccepted() {
-    gtag('event', 'cookie_consent_accept', {
+    trackGoogle('event', 'cookie_consent_accept', {
       event_category: 'consent',
       consent_type: config.type
     });
-    fbq('trackCustom', 'CookieConsentAccept');
-    ttq.track('ClickButton', {
+    trackMeta('trackCustom', 'CookieConsentAccept');
+    trackTikTok('ClickButton', {
       content_id: 'cookie-consent-accept',
       content_type: 'product',
       content_name: 'Cookie Consent Accept'
@@ -335,12 +336,12 @@ export default function () {
   }
 
   function trackCookieDenied() {
-    gtag('event', 'cookie_consent_deny', {
+    trackGoogle('event', 'cookie_consent_deny', {
       event_category: 'consent',
       consent_type: config.type
     });
-    fbq('trackCustom', 'CookieConsentDeny');
-    ttq.track('ClickButton', {
+    trackMeta('trackCustom', 'CookieConsentDeny');
+    trackTikTok('ClickButton', {
       content_id: 'cookie-consent-deny',
       content_type: 'product',
       content_name: 'Cookie Consent Deny'
@@ -348,14 +349,14 @@ export default function () {
   }
 
   function trackCookieAutoAccepted(trigger) {
-    gtag('event', 'cookie_consent_auto_accept', {
+    trackGoogle('event', 'cookie_consent_auto_accept', {
       event_category: 'consent',
       trigger: trigger
     });
-    fbq('trackCustom', 'CookieConsentAutoAccept', {
+    trackMeta('trackCustom', 'CookieConsentAutoAccept', {
       trigger: trigger
     });
-    ttq.track('ViewContent', {
+    trackTikTok('ViewContent', {
       content_id: 'cookie-consent-auto-accept',
       content_type: 'product',
       content_name: 'Cookie Consent Auto Accept'
@@ -363,11 +364,11 @@ export default function () {
   }
 
   function trackCookiePolicyReopened() {
-    gtag('event', 'cookie_policy_reopen', {
+    trackGoogle('event', 'cookie_policy_reopen', {
       event_category: 'consent'
     });
-    fbq('trackCustom', 'CookiePolicyReopen');
-    ttq.track('ClickButton', {
+    trackMeta('trackCustom', 'CookiePolicyReopen');
+    trackTikTok('ClickButton', {
       content_id: 'cookie-policy-reopen',
       content_type: 'product',
       content_name: 'Cookie Policy Reopen'

@@ -82,6 +82,8 @@ src/
           processors/                 # Per-processor cancellation withdrawal
         plan/                         # POST /payments/plan (plan/frequency switch)
           processors/                 # Per-processor plan switchers
+        winback/                      # POST /payments/winback (cancel-flow save offer; capability-gated: Stripe + test)
+          processors/                 # Per-processor next-cycle discounts
         portal/                       # POST /payments/portal
           processors/
             stripe.js                 # Stripe billing portal URL

@@ -28,7 +28,9 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px),
    `core/css/motion/_index.scss` (below), and `core/css/components/_index.scss`
    (the shared component vocabulary: `omega-chip` and its `--accent`/`--ink`
-   modifiers). All three paint exclusively through tokens so a skin restyles
+   modifiers, plus the app-chrome pair the base topbar/sidebar renders —
+   `.btn-icon`, the square ghost icon button, and `.omega-search`, the ⌘K field
+   with its input and its `kbd` shortcut badge). All three paint exclusively through tokens so a skin restyles
    them without touching structure, and all three emit BEFORE the theme so a
    skin's own rules win. **Promotion rule
    ([#242](https://github.com/Omega-JS-Stack/omega/issues/242))**: a component
@@ -147,6 +149,14 @@ proven:
   EARLY (the floor sits UNDER the theme's voice, so later theme rules win
   collisions like classy's `.badge` base). Live models:
   `themes/newsflash/_theme.scss`, `themes/neobrutalism/_theme.scss`.
+  NOT in the floor and never needed there: `components/buttons` and
+  `components/forms` are Sass-config coupled, so the two app-chrome pieces they
+  used to hide — `.btn-icon` and `.omega-search` — moved to the core component
+  sheet in [#303](https://github.com/Omega-JS-Stack/omega/issues/303). A sibling
+  theme that skipped them rendered a native UA button box beside the breadcrumb
+  and a native search field with reboot's inverted `kbd` (a solid cream slab on
+  a dark skin). Anything else a base surface renders takes the same route: the
+  core sheet, never a widened floor.
 
 **The guard ([#98](https://github.com/Omega-JS-Stack/omega/issues/98))**: the web
 asset lane reads the COMPILED main bundle for three sentinels the two lanes both

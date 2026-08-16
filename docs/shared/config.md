@@ -38,7 +38,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
                     email: { providers: { replyify: { enabled, agentId, templateAgentId, updateAgentInfo, plan, discount } } } },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
   advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
-  payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […] },
+  payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
   monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
@@ -291,6 +291,40 @@ must equal the resolved brand host: the instance's own `url` when it has one, el
 host is what keeps redirect sign-in working under browser storage partitioning; the web
 build emits those helper files), and any other mismatch fails naming both values. Absent
 passes, and `demo-*` (emulator-only) projects are exempt.
+
+## The cancel-flow save offer (`payment.winback`) — #268
+
+When a customer starts cancelling a PAID subscription, the billing card pitches a
+discount on the next cycle before it asks them why they are leaving. Accepting applies
+the discount through the processor's own coupon plumbing and calls the cancel off;
+declining opens the cancellation questionnaire unchanged.
+
+The offer is the brand's, and **a brand that writes nothing gets one anyway**: 50% off
+the next cycle, that cycle only.
+
+| Key | Type | Default | What it does |
+|-----|------|---------|--------------|
+| `payment.winback.enabled` | boolean | `true` | The whole off switch. `false` skips the step and the cancel flow goes straight to the questionnaire |
+| `payment.winback.percent` | integer 1-100 | `50` | Whole percentage off. Mutually exclusive with `amount` |
+| `payment.winback.amount` | number > 0 | — | Flat amount off in `payment.currency`'s major unit (`10` = $10). Mutually exclusive with `percent` |
+| `payment.winback.duration` | `'once'` \| `'forever'` | `'once'` | `once` discounts the next cycle only; `forever` is a permanent price cut |
+
+Setting **both** `percent` and `amount` is a validation error: a coupon is one shape or
+the other everywhere in the payment stack, and two shapes on one offer has no honest
+reading.
+
+`resolveWinbackOffer(payment)` is the ONE home of these defaults. The backend's
+`POST /payments/winback` route resolves the brand's section through it, and the web
+build bakes the same call into the client blob (`site.client.payment.winback`), so the
+dialog the customer reads and the coupon the processor creates can never name different
+numbers — the browser never applies a default of its own.
+
+Not every processor can discount a subscription that is already running. Stripe can
+(the coupon plumbing the checkout already uses); PayPal has no discount object at all
+and Chargebee has no way to reach a live subscription with one through existing
+plumbing. Those two refuse with `not-supported-by-processor`, and the billing card
+retires the offer for the session and opens the questionnaire — a subscriber can always
+still cancel.
 
 ## Tri-state provisioning values (#33)
 

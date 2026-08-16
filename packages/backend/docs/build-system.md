@@ -49,6 +49,8 @@ apps/<brand>/apps/backend/
 
 The @omega.js/backend library itself has one build step: `npm run prepare` copies `src/` → `dist/` via prepare-package (`npm run prepare:watch` for watch mode). Consumers always require from `dist/`. This mirrors the framework-side prepare step in EM/BXM/UJM.
 
+**The framework package is never a stage target.** Its root looks like an app root to the stage (a `package.json` beside a `src/`), so an `omega` verb run from inside the framework itself — no app context, so the dispatcher runs the host CLI — used to re-stage the framework's OWN `dist/`: prepare-package's output wiped, then a hard stop on the missing `omega.json5`, leaving the CLI unbootable until the next `npm run prepare` ([#308](https://github.com/Omega-JS-Stack/omega/issues/308)). `stageFunctions` now refuses by name BEFORE the wipe (`Refusing to stage <dir>: that is the @omega.js/backend framework package itself…`). The framework self-test is unaffected: `npx omega test` here retargets to the bundled fixture project before anything stages ([test-boot-layer.md](test-boot-layer.md)).
+
 At publish time, a `prepublishOnly` script first removes the self-test fixture's runtime `node_modules` — its `@omega.js/backend` symlink points back at the repo root, which would send prepare-package's publish-time cleanup walk into an infinite cycle. The symlinks are throwaway; the next `npx omega test` self-test regenerates them (see [test-boot-layer.md](test-boot-layer.md)).
 
 ## Log files

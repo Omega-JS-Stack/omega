@@ -1,6 +1,7 @@
 // Libraries
 import merge from 'lodash/merge.js';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Exit Popup Module
 export default function () {
@@ -250,18 +251,18 @@ export default function () {
 
   // Tracking functions
   function trackExitPopupShown() {
-    gtag('event', 'exit_popup_show', {
+    trackGoogle('event', 'exit_popup_show', {
       event_category: 'engagement',
       event_label: config.title,
       page_path: window.location.pathname
     });
 
-    fbq('trackCustom', 'ExitPopupShow', {
+    trackMeta('trackCustom', 'ExitPopupShow', {
       content_name: 'Exit Popup Show',
       page_path: window.location.pathname
     });
 
-    ttq.track('ViewContent', {
+    trackTikTok('ViewContent', {
       content_id: 'exit-popup-show',
       content_type: 'product',
       content_name: 'Exit Popup Show'
@@ -269,18 +270,18 @@ export default function () {
   }
 
   function trackExitPopupClick() {
-    gtag('event', 'exit_popup_click', {
+    trackGoogle('event', 'exit_popup_click', {
       event_category: 'engagement',
       event_label: config.okButton?.text || 'OK',
       destination_url: config.okButton?.link
     });
 
-    fbq('track', 'Lead', {
+    trackMeta('track', 'Lead', {
       content_name: 'Exit Popup Click',
       content_category: config.title
     });
 
-    ttq.track('ClickButton', {
+    trackTikTok('ClickButton', {
       content_id: 'exit-popup-click',
       content_type: 'product',
       content_name: 'Exit Popup Click'
@@ -288,16 +289,16 @@ export default function () {
   }
 
   function trackExitPopupDismissed() {
-    gtag('event', 'exit_popup_dismiss', {
+    trackGoogle('event', 'exit_popup_dismiss', {
       event_category: 'engagement',
       event_label: config.title
     });
 
-    fbq('trackCustom', 'ExitPopupDismiss', {
+    trackMeta('trackCustom', 'ExitPopupDismiss', {
       content_name: 'Exit Popup Dismiss'
     });
 
-    ttq.track('ViewContent', {
+    trackTikTok('ViewContent', {
       content_id: 'exit-popup-dismiss',
       content_type: 'product',
       content_name: 'Exit Popup Dismiss'

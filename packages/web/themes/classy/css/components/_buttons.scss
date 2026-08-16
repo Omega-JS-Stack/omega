@@ -137,27 +137,9 @@
   }
 }
 
-// ============================================
-// Icon button — square ghost (topbar, toolbars)
-// ============================================
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.125rem;
-  height: 2.125rem;
-  padding: 0;
-  color: var(--omega-ink-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--omega-radius-s);
-
-  &:hover {
-    color: var(--omega-ink);
-    background: var(--omega-surface-2);
-    border-color: var(--omega-line);
-  }
-}
+// Icon button — square ghost (topbar, toolbars): promoted to the core
+// component sheet in #303, because the BASE app chrome renders it on every
+// theme (core/css/components/_index.scss).
 
 // ============================================
 // Utility accent bridge (text/bg/borders follow brand.color)

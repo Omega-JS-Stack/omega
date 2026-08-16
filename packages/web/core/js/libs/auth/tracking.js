@@ -1,25 +1,27 @@
 // Auth analytics — GA4 + Facebook Pixel + TikTok Pixel events for the three
 // auth outcomes. The pixel globals (gtag/fbq/ttq) are page-level stubs the
-// analytics loader replaces when consented.
+// analytics loader replaces when consented, and a blocker leaves them
+// undefined — so every provider is reached through the guarded helper (#306).
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 export function trackLogin(method, user) {
   const userId = user.uid;
   const methodName = method.charAt(0).toUpperCase() + method.slice(1);
 
   // Google Analytics 4
-  gtag('event', 'login', {
+  trackGoogle('event', 'login', {
     method: method,
     user_id: userId,
   });
 
   // Facebook Pixel
-  fbq('trackCustom', 'Login', {
+  trackMeta('trackCustom', 'Login', {
     content_name: `Account Login ${methodName}`,
     method: method,
   });
 
   // TikTok Pixel
-  ttq.track('Login', {
+  trackTikTok('Login', {
     content_id: `account-login-${method}`,
     content_type: 'product',
     content_name: `Account Login ${methodName}`,
@@ -31,19 +33,19 @@ export function trackSignup(method, user) {
   const methodName = method.charAt(0).toUpperCase() + method.slice(1);
 
   // Google Analytics 4
-  gtag('event', 'sign_up', {
+  trackGoogle('event', 'sign_up', {
     method: method,
     user_id: userId,
   });
 
   // Facebook Pixel
-  fbq('track', 'CompleteRegistration', {
+  trackMeta('track', 'CompleteRegistration', {
     content_name: `Account Registration ${methodName}`,
     method: method,
   });
 
   // TikTok Pixel
-  ttq.track('CompleteRegistration', {
+  trackTikTok('CompleteRegistration', {
     content_id: `account-registration-${method}`,
     content_type: 'product',
     content_name: `Account Registration ${methodName}`,
@@ -52,19 +54,19 @@ export function trackSignup(method, user) {
 
 export function trackPasswordReset() {
   // Google Analytics 4
-  gtag('event', 'password_reset', {
+  trackGoogle('event', 'password_reset', {
     method: 'email',
     status: 'success',
   });
 
   // Facebook Pixel
-  fbq('trackCustom', 'PasswordReset', {
+  trackMeta('trackCustom', 'PasswordReset', {
     method: 'email',
     status: 'success',
   });
 
   // TikTok Pixel
-  ttq.track('SubmitForm', {
+  trackTikTok('SubmitForm', {
     content_id: 'password-reset',
     content_type: 'product',
     content_name: 'Password Reset',

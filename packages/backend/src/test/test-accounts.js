@@ -517,6 +517,15 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
+  'route-winback-success': {
+    id: 'route-winback-success',
+    uid: '_test-route-winback-success',
+    email: '_test.route-winback-success@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
   'journey-payments-portal-route': {
     id: 'journey-payments-portal-route',
     uid: '_test-journey-payments-portal-route',

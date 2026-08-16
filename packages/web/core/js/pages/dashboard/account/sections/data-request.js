@@ -5,6 +5,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 let formManager = null;
 let downloadFormManager = null;
@@ -218,13 +219,13 @@ function showRequestForm() {
 
 // Tracking
 function trackDataRequest(action) {
-  gtag('event', 'data_request', {
+  trackGoogle('event', 'data_request', {
     action: action,
   });
-  fbq('trackCustom', 'DataRequest', {
+  trackMeta('trackCustom', 'DataRequest', {
     action: action,
   });
-  ttq.track('ViewContent', {
+  trackTikTok('ViewContent', {
     content_id: `data-request-${action}`,
     content_type: 'product',
     content_name: `Data Request ${action}`,

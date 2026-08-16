@@ -87,6 +87,17 @@ function stageFunctions(options) {
     throw new Error(`No src/ under ${projectDir} — backend apps are src-first: authored code lives in src/ and dist/ is staged output (run npx omega setup to scaffold, or move your functions code into src/)`);
   }
 
+  // The FRAMEWORK package is not an app: its own root carries a package.json
+  // beside a src/ dir, so it passes both checks above. A stray `npx omega
+  // <verb>` inside it (no app context, so the dispatcher runs the host CLI)
+  // otherwise wiped the framework's own dist/ — prepare-package's output, the
+  // CLI it is running from — and then died on the missing omega.json5, leaving
+  // the CLI unbootable ([#308](https://github.com/Omega-JS-Stack/omega/issues/308)).
+  // Refuse BEFORE the wipe: there is no app here to stage.
+  if (appPackage.name === frameworkPackage.name) {
+    throw new Error(`Refusing to stage ${projectDir}: that is the ${frameworkPackage.name} framework package itself, not a backend app. Its dist/ is build output of \`npm run prepare\`, never a stage target. Run omega commands from a backend APP root (the directory with src/ and config/omega.json5).`);
+  }
+
   // ─── Wipe previous stage (preserve runtime artifacts) ─────────────────────
   for (const entry of jetpack.list(distDir) || []) {
     if (PRESERVE.some((pattern) => pattern.test(entry))) continue;
@@ -138,13 +149,13 @@ function stageFunctions(options) {
     engines: appPackage.engines || { node: String(parseInt(frameworkPackage.omega.functionsRuntime, 10)) },
     dependencies,
   };
-  jetpack.write(path.join(distDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
+  jetpack.write(path.join(distDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   staged.push('package.json (derived)');
 
   // ─── Composed config → the runtime's own view ────────────────────────────
   jetpack.write(
     path.join(distDir, 'config', 'omega.json5'),
-    CONFIG_BANNER + JSON.stringify(config, null, 2) + '\n',
+    `${CONFIG_BANNER}${JSON.stringify(config, null, 2)}\n`,
   );
   staged.push('config/omega.json5 (composed)');
 

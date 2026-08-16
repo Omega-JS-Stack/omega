@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTarget, isBrandRoot, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, APP_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
@@ -96,6 +96,69 @@ test('isBrandRoot: true at a brand root, false for an app-of-brand config dir', 
   assert.equal(isBrandRoot(path.join(DISPATCH, 'brand')), true);
   assert.equal(isBrandRoot(path.join(DISPATCH, 'brand', 'apps', 'rogue')), false);
   assert.equal(isBrandRoot(path.join(DISPATCH, 'brand', 'apps', 'site')), false);
+});
+
+// ─── APP_SUBDIRS: functions/ and dist/ are app VIEWS, never roots (#307) ─────
+
+/**
+ * A backend app staged by `omega build`: the app root declares the framework,
+ * and dist/ carries the GENERATED tree — a derived manifest (runtime
+ * dependencies only, so a devDependency-declared framework is absent from it)
+ * beside the composed config/omega.json5.
+ * @returns {{ brandRoot: string, appDir: string, distDir: string }}
+ */
+function makeStagedBackend() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-staged-'));
+  const brandRoot = path.join(scratch, 'acme');
+  const appDir = path.join(brandRoot, 'apps', 'backend-app');
+  const distDir = path.join(appDir, 'dist');
+
+  fs.mkdirSync(path.join(brandRoot, '.git'), { recursive: true }); // bound the walk
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.mkdirSync(path.join(distDir, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "acme" } }\n');
+  fs.writeFileSync(
+    path.join(appDir, 'package.json'),
+    JSON.stringify({ name: 'acme-backend', devDependencies: { '@omega.js/backend': '*' } })
+  );
+  fs.writeFileSync(
+    path.join(distDir, 'package.json'),
+    JSON.stringify({ name: 'acme-backend-functions', dependencies: { 'firebase-admin': '^13.0.0' } })
+  );
+  fs.writeFileSync(
+    path.join(distDir, 'config', 'omega.json5'),
+    '// Staged by `omega build`\n{ "brand": { "id": "acme" } }\n'
+  );
+
+  return { brandRoot, appDir, distDir };
+}
+
+test('findTarget: inside a staged backend\'s dist/ walks up to the app root (#307)', () => {
+  const { appDir, distDir } = makeStagedBackend();
+
+  assert.deepEqual(findTarget(distDir), {
+    kind: 'framework',
+    name: '@omega.js/backend',
+    dir: appDir,
+  });
+});
+
+test('isBrandRoot: an APP_SUBDIR view (functions/, dist/) is never a brand root, config or not (#307)', () => {
+  const { distDir } = makeStagedBackend();
+  assert.equal(isBrandRoot(distDir), false, 'a staged dist/ carries a composed config but is output, not a root');
+
+  // functions/ — the pre-pillar runtime cwd, same rule (both live in APP_SUBDIRS)
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-functions-'));
+  fs.mkdirSync(path.join(scratch, 'functions', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(scratch, 'functions', 'config', 'omega.json5'), '{ brand: { id: "legacy" } }\n');
+  assert.equal(isBrandRoot(path.join(scratch, 'functions')), false);
+});
+
+test('APP_SUBDIRS: the stdlib twin mirrors @omega.js/config\'s canonical list (#307)', () => {
+  // The dispatcher cannot REQUIRE @omega.js/config (it is vendored into every
+  // framework dist), so the list is copied — this pins the copy to the
+  // canonical one so the twin can never drift again.
+  assert.deepEqual(APP_SUBDIRS, require('@omega.js/config/load').APP_SUBDIRS);
 });
 
 // ─── Repo boundary (#73) ─────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 // Purchase analytics tracking for confirmation page
-// All three platforms tracked together, no conditional checks
+// All three platforms tracked together, each guarded on its own (#306)
 import omega from '@omega.js/client';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Build common item array for tracking
 function buildItems(state) {
@@ -19,7 +20,7 @@ function trackPurchase(state) {
   const items = buildItems(state);
 
   // Google Analytics 4
-  gtag('event', 'purchase', {
+  trackGoogle('event', 'purchase', {
     transaction_id: state.orderId,
     value: state.amount,
     currency: state.currency,
@@ -27,7 +28,7 @@ function trackPurchase(state) {
   });
 
   // Facebook Pixel
-  fbq('track', 'Purchase', {
+  trackMeta('track', 'Purchase', {
     content_ids: [state.productId],
     content_name: state.productName || state.productId,
     content_type: 'product',
@@ -37,7 +38,7 @@ function trackPurchase(state) {
   });
 
   // TikTok Pixel
-  ttq.track('CompletePayment', {
+  trackTikTok('CompletePayment', {
     content_id: state.productId,
     content_type: 'product',
     content_name: state.productName || state.productId,

@@ -283,9 +283,23 @@ Two of those refusals carry a **machine-readable code** on the `omega-properties
 
 The webhook that follows fires the existing `plan-changed` transition.
 
+### POST /payments/winback
+
+Applies the cancel-flow **save offer** to a live subscription, so the cancel the customer started never happens ([#268](https://github.com/Omega-JS-Stack/omega/issues/268)). The billing card pitches it before the cancellation questionnaire; accepting calls this route, declining opens the questionnaire unchanged. Input: `confirmed`.
+
+The offer is the **brand's**, not this route's: `payment.winback` in omega.json5, resolved by `@omega.js/config`'s `resolveWinbackOffer()` — 50% off the next cycle when a brand configures nothing, `enabled: false` to turn it off entirely ([docs/shared/config.md](../../../docs/shared/config.md#the-cancel-flow-save-offer-paymentwinback--268)). The web build resolves the same section through the same function into its client blob, so the dialog and the coupon can never name different numbers.
+
+Guards: authenticated, `confirmed: true`, the offer enabled for this brand, an ACTIVE paid subscription that is **not** inside its free trial (`_is-trialing.js` — a trial cancel is immediate and nothing has been paid, so there is no next cycle to discount) and has no cancellation scheduled, a known processor, and **an order doc carrying no claim yet**.
+
+The offer reaches the processor as a discount-codes `validate()` result (`libraries/payment/winback.js`), so the coupon plumbing is the checkout's: Stripe's `StripeLib.resolveCoupon()` builds the same deterministic, reused coupon a discount code does, and `subscriptions.update({ discounts: [...] })` attaches it. Stripe's `discounts` parameter **replaces** every discount already on the subscription rather than adding to them, so an existing coupon is dropped when the offer's lands. The subscription itself is untouched — same plan, same cadence, same renewal date — and the route writes no subscription state.
+
+**Claimed once.** `payments-orders/{orderId}.requests.winback` records the discount and when it was taken, and a second call is refused against that same document — an offer takeable every time the cancel dialog opens is a permanent discount nobody agreed to. A subscription carrying no `payment.orderId` has nowhere to record the claim, so it is refused before dispatch with `offer-not-claimable` on `omega-properties` (`additional.code`) instead of being handed an offer this route cannot remember. The accept is also recorded server-side (`ctx.analytics.event('payments/winback', …)`), which is what the experiment is measured with against the existing `subscription-winback` transition baseline; the client counts offer-shown and offer-declined, which never reach a server.
+
+**Only Stripe and the test processor apply it.** PayPal has no coupon or discount object at all, and Chargebee has coupons but no existing plumbing that reaches a LIVE subscription with one (`update_for_items` REPLACES the subscription's items, so carrying a coupon through it would mean restating the live item set on every offer — a re-pricing risk taken for a discount). Both declare that by exporting nothing, and the billing card retires the offer for the session and opens the questionnaire on the refusal, so a subscriber on either can always still cancel.
+
 ### Capability gating
 
-Both routes are capability-gated the same way: **a processor module that supports the operation exports it; one that cannot lacks the export.** PayPal's `uncancel/processors/paypal.js` is deliberately empty for exactly this reason (the file still has to exist, or the route would answer "Unknown processor" — a different and wrong statement).
+All three routes are capability-gated the same way: **a processor module that supports the operation exports it; one that cannot lacks the export.** PayPal's `uncancel/processors/paypal.js` and both `winback/processors/{paypal,chargebee}.js` are deliberately empty for exactly this reason (the file still has to exist, or the route would answer "Unknown processor" — a different and wrong statement).
 
 The route checks the export and refuses **before dispatch**, so the caller never discovers the limit as a provider error:
 
@@ -376,6 +390,14 @@ module.exports = {
 ```javascript
 module.exports = {
   async switchPlan({ resourceId, uid, subscription, product, productType, frequency, ctx }) { /* move the subscription */ },
+};
+```
+
+**Winback processor** (`routes/payments/winback/processors/{processor}.js`) — optional, same gate; `discount` is a discount-codes `validate()` result built from the brand's `payment.winback`:
+
+```javascript
+module.exports = {
+  async applyOffer({ resourceId, uid, subscription, discount, ctx }) { /* discount the next cycle */ },
 };
 ```
 

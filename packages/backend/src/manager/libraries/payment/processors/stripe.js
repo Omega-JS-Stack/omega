@@ -323,6 +323,81 @@ const Stripe = {
   },
 
   /**
+   * Resolve or create a Stripe coupon for a discount
+   * Uses a deterministic ID so the same discount always maps to the same coupon
+   *
+   * Stripe coupons come in two shapes and a discount is one or the other:
+   * `percent_off`, or `amount_off` in the currency's MINOR unit (cents) with a
+   * `currency` beside it — Stripe rejects an amount coupon without one. The two
+   * shapes carry different ids so a code can never collide with the other form,
+   * and the `_ONCE` ids are byte-identical to what they have always been, so
+   * coupons already live in a brand's account keep resolving instead of
+   * duplicating under a new id
+   * ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
+   *
+   * TWO callers now: the checkout's discount codes and the cancel flow's save
+   * offer ([#268](https://github.com/Omega-JS-Stack/omega/issues/268)), which is
+   * also the only reason `duration` is read off the discount rather than fixed —
+   * an offer a brand configured as `forever` is a permanent price cut and gets
+   * its own coupon, never the one-cycle one.
+   *
+   * Verified against the params the SDK is asked to create, not against Stripe:
+   * live-provider verification is a Stage 3 item, the same trust level as the
+   * rest of this library ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+   *
+   * @param {object} discount - A discount-codes validate() result (or the save offer as one)
+   * @param {object} ctx - Assistant instance for logging + the brand's currency
+   * @returns {Promise<string>} The Stripe coupon id
+   */
+  async resolveCoupon(discount, ctx) {
+    const stripe = this.init();
+
+    const isAmount = discount.amount > 0;
+    const duration = discount.duration || 'once';
+    const currency = ctx.Manager?.config?.payment?.currency || 'USD';
+    const scope = duration.toUpperCase();
+    const appliesTo = duration === 'once' ? 'first payment' : 'every payment';
+    const couponId = isAmount
+      ? `BEM_${discount.code}_${discount.amount}AMTOFF_${scope}`
+      : `BEM_${discount.code}_${discount.percent}OFF_${scope}`;
+
+    try {
+      // Check if coupon already exists
+      await stripe.coupons.retrieve(couponId);
+      ctx.log(`Stripe coupon exists: ${couponId}`);
+      return couponId;
+    } catch (e) {
+      if (e.code !== 'resource_missing') {
+        throw e;
+      }
+    }
+
+    // Create the coupon
+    // Idempotency key uses the deterministic couponId so concurrent requests for
+    // the same discount don't race each other into a duplicate-create error.
+    // Stripe returns the cached response for 24 hours.
+    await stripe.coupons.create({
+      id: couponId,
+      duration: duration,
+      ...(isAmount
+        ? {
+          amount_off: Math.round(discount.amount * 100),
+          currency: currency.toLowerCase(),
+          name: `${discount.code} (${discount.amount.toFixed(2)} ${currency.toUpperCase()} off ${appliesTo})`,
+        }
+        : {
+          percent_off: discount.percent,
+          name: `${discount.code} (${discount.percent}% off ${appliesTo})`,
+        }),
+    }, {
+      idempotencyKey: `backend-coupon-${couponId}`,
+    });
+
+    ctx.log(`Stripe coupon created: ${couponId}`);
+    return couponId;
+  },
+
+  /**
    * Transform a raw Stripe one-time payment resource into a unified shape
    * Mirrors subscription structure: { product, status, payment: { ... } }
    *

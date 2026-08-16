@@ -140,51 +140,9 @@
   }
 }
 
-// ============================================
-// Search pill — the topbar ⌘K field
-// ============================================
-.omega-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 26rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.84375rem;
-  color: var(--omega-ink-faint);
-  background: var(--omega-surface-2);
-  border: 1px solid var(--omega-line);
-  border-radius: var(--omega-radius-m);
-  cursor: text;
-  transition:
-    border-color var(--omega-speed) var(--omega-ease),
-    background-color var(--omega-speed) var(--omega-ease);
-
-  &:hover,
-  &:focus-within {
-    background: var(--omega-surface);
-    border-color: var(--omega-line-strong);
-  }
-
-  input {
-    flex: 1;
-    min-width: 0;
-    padding: 0;
-    font-size: inherit;
-    color: var(--omega-ink);
-    background: transparent;
-    border: 0;
-    outline: 0;
-
-    &::placeholder {
-      color: var(--omega-ink-faint);
-    }
-  }
-
-  kbd {
-    margin-inline-start: auto;
-  }
-}
+// Search pill — the topbar ⌘K field: promoted to the core component sheet in
+// #303, because the BASE app chrome renders it on every theme
+// (core/css/components/_index.scss).
 
 // ============================================
 // File drop zones (FormManager)

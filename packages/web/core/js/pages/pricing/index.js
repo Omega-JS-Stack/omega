@@ -2,6 +2,7 @@
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
 import omega from '@omega.js/client';
 import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
+import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -247,14 +248,14 @@ function handlePlanSelection(button) {
 
 // Tracking functions
 function trackPricingToggle(billingType) {
-  gtag('event', 'pricing_toggle', {
+  trackGoogle('event', 'pricing_toggle', {
     billing_type: billingType
   });
-  fbq('track', 'ViewContent', {
+  trackMeta('track', 'ViewContent', {
     content_name: 'Pricing',
     content_category: billingType
   });
-  ttq.track('ViewContent', {
+  trackTikTok('ViewContent', {
     content_id: 'pricing-page',
     content_type: 'product',
     content_name: 'Pricing Toggle'
@@ -272,14 +273,14 @@ function trackAddToCart(planId, planName, price, billingType, planType) {
   }];
 
   // Google Analytics 4
-  gtag('event', 'add_to_cart', {
+  trackGoogle('event', 'add_to_cart', {
     currency: 'USD',
     value: price,
     items: items
   });
 
   // Facebook Pixel
-  fbq('track', 'AddToCart', {
+  trackMeta('track', 'AddToCart', {
     content_ids: [planId],
     content_name: planName,
     content_type: 'product',
@@ -288,7 +289,7 @@ function trackAddToCart(planId, planName, price, billingType, planType) {
   });
 
   // TikTok Pixel
-  ttq.track('AddToCart', {
+  trackTikTok('AddToCart', {
     content_id: planId,
     content_type: 'product',
     content_name: planName,
@@ -300,13 +301,13 @@ function trackAddToCart(planId, planName, price, billingType, planType) {
 }
 
 function trackEnterpriseContact() {
-  gtag('event', 'contact_enterprise', {
+  trackGoogle('event', 'contact_enterprise', {
     from_page: 'pricing'
   });
-  fbq('track', 'Contact', {
+  trackMeta('track', 'Contact', {
     content_name: 'Enterprise Plan'
   });
-  ttq.track('Contact', {
+  trackTikTok('Contact', {
     content_id: 'enterprise-plan',
     content_type: 'product',
     content_name: 'Enterprise Plan'
