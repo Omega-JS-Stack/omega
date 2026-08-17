@@ -97,13 +97,18 @@ function paymentConfig(winback) {
 const WEEK_FROM_NOW = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
 const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
-/** A paying subscriber — the only state the offer is ever made to. */
+/**
+ * A paying subscriber — the only state the offer is ever made to. The payment
+ * block carries the PROCESSOR DETAILS a real checkout writes (`processor` and
+ * `resourceId`), because the apply route needs them to reach the subscription
+ * at all and the pitch is gated on them ([#311]).
+ */
 function paidAccount(subscription) {
   return {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
@@ -116,7 +121,7 @@ function trialingAccount() {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
     },
@@ -417,7 +422,7 @@ test('#268: the offer names the brand\'s own number and the cycle it applies to'
   const quarter = await wireCancelFlow(paidAccount(), { winback: { percent: 25 } });
   assert.strictEqual(quarter.state().billing.winbackOffer.headline, 'Stay and get 25% off your next month');
 
-  const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, processor: 'stripe' } }));
+  const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, processor: 'stripe', resourceId: 'sub_live_premium' } }));
   assert.strictEqual(annual.state().billing.winbackOffer.headline, 'Stay and get 50% off your next year', 'the cycle word follows the subscription, not the copy');
 
   const amount = await wireCancelFlow(paidAccount(), { winback: { amount: 10 } });
@@ -427,6 +432,34 @@ test('#268: the offer names the brand\'s own number and the cycle it applies to'
   assert.strictEqual(forever.state().billing.winbackOffer.headline, 'Stay and get 50% off for as long as you stay', 'a permanent cut does not promise one cycle');
 });
 
+test('#311: a subscription with no processor payment details is never pitched the offer', async () => {
+  // Paid, active, and unreachable: an admin-granted plan or an imported record
+  // carries no `payment.processor` / `payment.resourceId`, so the apply route
+  // has nothing to send a discount to and can only refuse. Pitching it anyway
+  // put the customer in a dialog whose only button 400s, so the gate reads the
+  // fields the accept path needs — and the cancel they came for is one click.
+  const cases = [
+    { what: 'no processor details at all', payment: { frequency: 'monthly', price: 10 } },
+    { what: 'a processor but no resource', payment: { frequency: 'monthly', price: 10, processor: 'stripe' } },
+    { what: 'a resource but no processor', payment: { frequency: 'monthly', price: 10, resourceId: 'sub_live_premium' } },
+  ];
+
+  for (const { what, payment } of cases) {
+    const { opened, requests, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount({ payment: payment }));
+
+    assert.strictEqual(state().billing.buttons.cancel, true, `${what}: the subscription can still be cancelled`);
+    assert.strictEqual(state().billing.winbackOffer.show, false, `${what}: but no offer stands in front of it`);
+
+    const event = clickTrigger();
+
+    assert.deepStrictEqual(opened, [], `${what}: no dialog opened`);
+    assert.strictEqual(event.propagationStopped, false, `${what}: the declarative collapse handles the click`);
+    assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', `${what}: the trigger keeps its Bootstrap toggle`);
+    assert.strictEqual(isAccordionOpen(), true, `${what}: and the questionnaire opens on the first click`);
+    assert.deepStrictEqual(requests, [], `${what}: nothing called the apply route`);
+  }
+});
+
 test('#268: a refusal the account cannot answer retires the offer and lets the cancel through', async () => {
   // The same capability gate uncancel and plan-switch ride: the BACKEND answers
   // whether this account can take the offer at all, and a refusal must never
@@ -434,10 +467,21 @@ test('#268: a refusal the account cannot answer retires the offer and lets the c
   // code is one branch, so each is proven through it — including the one a
   // PAST CLAIMANT hits, who is pitched again because the client reads the
   // account and the claim lives on the order doc ([#310]).
+  //
+  // The route now names EVERY refusal ([#311]), and all but the unconfirmed
+  // request are dead ends for this account — the brand turned the offer off,
+  // the subscription is not the state the offer is for, or it carries no
+  // processor to discount through. None of them change on a retry.
   const deadEnds = [
     { code: 'not-supported-by-processor', message: 'Your payment provider cannot apply this offer.' },
     { code: 'offer-not-claimable', message: 'This offer is not available on your subscription.' },
     { code: 'offer-already-claimed', message: 'You have already claimed this offer' },
+    { code: 'offer-disabled', message: 'This offer is not available' },
+    { code: 'no-active-subscription', message: 'No active paid subscription found' },
+    { code: 'trial-not-eligible', message: 'This offer is not available on a free trial' },
+    { code: 'cancellation-pending', message: 'Your subscription is already scheduled to cancel' },
+    { code: 'missing-payment-details', message: 'Subscription payment details not found' },
+    { code: 'unknown-processor', message: 'Unknown processor: not-a-processor' },
   ];
 
   for (const { code, message } of deadEnds) {
@@ -464,6 +508,24 @@ test('#268: a failed apply leaves the offer on screen to try again', async () =>
   assert.ok(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up');
   assert.strictEqual(isAccordionOpen(), false, 'and a failure is never read as a decline');
   assert.strictEqual(notifications.at(-1).message, outage.message);
+});
+
+test('#311: a refusal a retry CAN fix keeps the offer armed', async () => {
+  // Being coded is not being a dead end. `confirmation-required` says the
+  // request went out without its confirmation — the same button sending it
+  // again is exactly the fix — so it must never retire the offer the way an
+  // account-state refusal does.
+  const unconfirmed = Object.assign(new Error('Accepting the offer must be confirmed'), {
+    properties: { additional: { code: 'confirmation-required' } },
+  });
+  const { opened, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: unconfirmed });
+
+  clickTrigger();
+  await clickById('cancel-winback-accept-btn');
+
+  assert.ok(!opened.includes('modal-hide:cancel-winback-modal'), 'the dialog stays up');
+  assert.strictEqual(state().billing.winbackOffer.show, true, 'and the offer is still on the table');
+  assert.strictEqual(isAccordionOpen(), false, 'a fixable failure is never read as a decline');
 });
 
 test('#268: a state that cannot cancel is never offered anything', async () => {

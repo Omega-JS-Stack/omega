@@ -1,5 +1,5 @@
 ---
-layout: frontend/core/base
+layout: blueprint/collection/document
 doc:
   title: "Getting started"
   description: "Install it and ship something."

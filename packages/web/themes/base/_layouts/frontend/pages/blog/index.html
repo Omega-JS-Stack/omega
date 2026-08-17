@@ -139,6 +139,14 @@ newsletter_cta:
       </article>
     {% endif %}
 
+    {% comment %} The grid's heading (#315): the cards' names are h3s, and page 1
+      covers them with the featured post's h2 — a paginated page renders no
+      feature, so it needs its own. Visually hidden, the term-page idiom
+      (frontend/pages/blog/tags/tag.html). {% endcomment %}
+    {% if _featured == nil and post_count > 0 %}
+      <h2 class="visually-hidden">More posts</h2>
+    {% endif %}
+
     <div class="row g-4 gy-5 mb-5" data-omega-reveal-stagger="60">
       {% for post in paginator.posts %}
         {% if _featured and post.url == _featured.url %}{% continue %}{% endif %}

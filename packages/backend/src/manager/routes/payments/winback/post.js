@@ -29,6 +29,20 @@ const isTrialing = require('../cancel/_is-trialing.js');
  * simply lacks the export, and the route refuses before dispatch rather than
  * letting the caller discover it as a provider error
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+ *
+ * EVERY refusal here carries a machine-readable code on the response properties
+ * (`additional.code`), not just the capability gate's
+ * ([#311](https://github.com/Omega-JS-Stack/omega/issues/311)): the client
+ * pitches the offer off the ACCOUNT alone, so a state it cannot see — an
+ * admin-granted subscription with no processor details, a brand that turned the
+ * offer off since the page loaded — reaches accept, and a refusal it cannot name
+ * leaves the customer in a dialog arming a retry that can never succeed. The
+ * codes, in the order they are refused: `confirmation-required`,
+ * `offer-disabled`, `no-active-subscription`, `trial-not-eligible`,
+ * `cancellation-pending`, `missing-payment-details`, `unknown-processor`,
+ * `not-supported-by-processor`, `offer-not-claimable`, `offer-already-claimed`.
+ * All but the first are dead ends for that account: the billing card retires the
+ * offer on them and opens the questionnaire the customer came for.
  * Requires authentication.
  */
 module.exports = async ({ ctx, user, settings }) => {
@@ -42,7 +56,10 @@ module.exports = async ({ ctx, user, settings }) => {
 
   // Require explicit confirmation
   if (!confirmed) {
-    return ctx.respond('Accepting the offer must be confirmed', { code: 400 });
+    return ctx.respond('Accepting the offer must be confirmed', {
+      code: 400,
+      additional: { code: 'confirmation-required' },
+    });
   }
 
   // The brand's own offer. A brand that turned it off has no offer to apply, and
@@ -52,7 +69,10 @@ module.exports = async ({ ctx, user, settings }) => {
 
   if (!offer.enabled) {
     ctx.log(`Winback rejected: uid=${uid}, the save offer is disabled for this brand`);
-    return ctx.respond('This offer is not available', { code: 400 });
+    return ctx.respond('This offer is not available', {
+      code: 400,
+      additional: { code: 'offer-disabled' },
+    });
   }
 
   const subscription = user.subscription;
@@ -61,7 +81,10 @@ module.exports = async ({ ctx, user, settings }) => {
   // a suspended or already-ended one
   if (!subscription || subscription.status !== 'active' || subscription.product?.id === 'basic') {
     ctx.log(`Winback rejected: uid=${uid}, status=${subscription?.status}, product=${subscription?.product?.id}`);
-    return ctx.respond('No active paid subscription found', { code: 400 });
+    return ctx.respond('No active paid subscription found', {
+      code: 400,
+      additional: { code: 'no-active-subscription' },
+    });
   }
 
   // A TRIAL is never offered this: cancelling a trial ends access immediately
@@ -69,22 +92,36 @@ module.exports = async ({ ctx, user, settings }) => {
   // that state needs. The billing card gates the same way, off the same rule.
   if (isTrialing(subscription)) {
     ctx.log(`Winback rejected: uid=${uid}, subscription is still in its free trial`);
-    return ctx.respond('This offer is not available on a free trial', { code: 400 });
+    return ctx.respond('This offer is not available on a free trial', {
+      code: 400,
+      additional: { code: 'trial-not-eligible' },
+    });
   }
 
   // The offer is made BEFORE the questionnaire, so a subscription already
   // scheduled to end is past it. Undo cancellation is the honest verb there.
   if (subscription.cancellation?.pending === true) {
     ctx.log(`Winback rejected: uid=${uid}, cancellation already pending`);
-    return ctx.respond('Your subscription is already scheduled to cancel', { code: 400 });
+    return ctx.respond('Your subscription is already scheduled to cancel', {
+      code: 400,
+      additional: { code: 'cancellation-pending' },
+    });
   }
 
   const processor = subscription.payment?.processor;
   const resourceId = subscription.payment?.resourceId;
 
+  // A paid, active subscription can still carry NO processor details at all —
+  // granted by an admin, imported, a webhook backfill that never landed — and
+  // the client pitches what the account says, which is "paid and active". There
+  // is nothing to send a discount to, and no retry adds the details, so the
+  // refusal is a dead end the billing card retires the offer on ([#311]).
   if (!processor || !resourceId) {
     ctx.log(`Winback rejected: uid=${uid}, missing processor=${processor} or resourceId=${resourceId}`);
-    return ctx.respond('Subscription payment details not found', { code: 400 });
+    return ctx.respond('Subscription payment details not found', {
+      code: 400,
+      additional: { code: 'missing-payment-details' },
+    });
   }
 
   // Load the processor module
@@ -92,7 +129,10 @@ module.exports = async ({ ctx, user, settings }) => {
   try {
     processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown processor: ${processor}`, {
+      code: 400,
+      additional: { code: 'unknown-processor' },
+    });
   }
 
   // The capability gate. A missing export is the processor saying it cannot

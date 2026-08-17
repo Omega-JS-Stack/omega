@@ -27,7 +27,7 @@ const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections, BUILT_IN_COLLECTIONS } = require('./collections.js');
 const { applyCollectionLimits } = require('./limit-collections.js');
-const { readCollections, collectionPages } = require('./dynamic-pages.js');
+const { readCollections, collectionPages, applyDocumentData } = require('./dynamic-pages.js');
 const { resolvePageAsset } = require('./assets.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
@@ -396,6 +396,15 @@ function buildConfig(eleventyConfig, options) {
     // `_<collection>/` belongs to that collection, the brand's own included.
     const collection = allCollections.find((entry) => inputPath.includes(`/${entry.dir}/`));
     if (collection) data.tags = [collection.name];
+
+    // A BRAND collection's documents (#317): the built-ins ship their own
+    // blueprint layouts and meta, a declared collection's documents get theirs
+    // here — the collection block their layout renders from, and per-document
+    // meta. A document that falls back to the site's title and description is
+    // the indexable duplication #312 fixed one layer up.
+    if (collection && dynamicCollections.includes(collection)) {
+      applyDocumentData(collection, data, site.brand && site.brand.name);
+    }
 
     // The meta-only guard: real files under pages/ may carry ONLY meta keys
     // in frontmatter. readOwnFrontmatter already filters the plumbing set

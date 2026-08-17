@@ -1,9 +1,9 @@
 ---
-layout: frontend/core/base
+layout: blueprint/collection/document
 doc:
   title: "The API"
   description: "Endpoints, payloads, errors."
-  category: "Reference"
+  category: "reference"
 ---
 
 The API reference.

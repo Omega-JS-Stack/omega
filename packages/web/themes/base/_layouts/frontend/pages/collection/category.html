@@ -8,15 +8,19 @@ category_empty: "Nothing in this category yet."
 ---
 
 <!-- ═══ Masthead ═══ -->
+{% comment %} The term as it DISPLAYS: the aggregation keeps the documents' own
+   spelling ("guides"), and the generated page's meta title-cases the same way
+   — one presentation of one term (#312). {% endcomment %}
+{% assign category_name = category.name | omega_title_case %}
 <section class="omega-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
       <a href="{{ resolved.collection.base }}">{{ resolved.collection.title }}</a>
       <span>/</span>
-      <span>{{ category.name }}</span>
+      <span>{{ category_name }}</span>
     </div>
 
-    {% component "heading/masthead", headline: category.name, sub: resolved.collection.description %}
+    {% component "heading/masthead", headline: category_name, sub: resolved.collection.description %}
   </div>
 </section>
 

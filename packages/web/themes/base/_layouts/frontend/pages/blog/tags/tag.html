@@ -44,6 +44,12 @@ hero:
       {% endfor %}
     {% endfor %}
 
+    {% comment %} The grid's heading (#313): the cards' names are h3s, so
+      without it the page skips from the masthead h1 straight to h3. Visually
+      hidden — the blog index carries its h2 as the featured post's title, and
+      a term page has no feature, only the grid. {% endcomment %}
+    <h2 class="visually-hidden">Posts tagged {{ tag_name }}</h2>
+
     <div class="row g-4 mb-5" data-omega-reveal-stagger="60">
       {% for post in filtered_posts %}
         <div class="col-xl-4 col-lg-6 col-md-12" data-omega-reveal>

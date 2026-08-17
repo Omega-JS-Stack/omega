@@ -1,0 +1,50 @@
+---
+layout: frontend/core/base
+
+# ═══ One document of a brand's own collection (#207). The engine fills the
+# collection block into every document under `_<name>/`, so ONE layout serves
+# docs, guides, recipes, portfolios — exactly like its listing/category
+# siblings.
+---
+
+{% comment %} A document keeps its own fields under the namespace of the
+   configured category field (doc.category → doc.title); a bare `title` is the
+   flat spelling, and the same pair names the page's meta (#317). {% endcomment %}
+{% assign entry = resolved[resolved.collection.namespace] %}
+{% assign document_title = entry.title | default: resolved.title | default: resolved.collection.title %}
+{% assign document_description = entry.description | default: resolved.description %}
+
+<!-- ═══ Masthead ═══ -->
+<section class="omega-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="{{ resolved.collection.base }}">{{ resolved.collection.title }}</a>
+      <span>/</span>
+      <span>{{ document_title }}</span>
+    </div>
+
+    {% component "heading/masthead", headline: document_title, sub: document_description %}
+  </div>
+</section>
+
+<!-- ═══ The document itself ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="omega-prose" data-omega-reveal>
+          {{ content | omega_content_format }}
+        </div>
+      </div>
+    </div>
+
+    <div class="row justify-content-center mt-5">
+      <div class="col-12 text-center">
+        <a href="{{ resolved.collection.base }}" class="btn btn-outline-adaptive">
+          {% omega_icon "arrow-left", "fa-sm me-2" %}
+          All {{ resolved.collection.title }}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

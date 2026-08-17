@@ -19,9 +19,15 @@
  * payments-orders/{orderId}.requests.winback, so the second call is refused
  * against the same document the first one wrote.
  *
+ * EVERY refusal carries a branchable code on `omega-properties`
+ * ([#311](https://github.com/Omega-JS-Stack/omega/issues/311)): the client
+ * pitches the offer off the account alone, so any refusal it cannot name leaves
+ * the customer in a dialog arming a retry that can never succeed. Each guard
+ * below asserts its own code for that reason.
+ *
  * Run: npx omega test framework:routes/payments/winback
  */
-const { buildUser, callHandler, recordingResponse } = require('./_route-harness.js');
+const { buildUser, recordingResponse } = require('./_route-harness.js');
 const winback = require('../../../src/manager/libraries/payment/winback.js');
 
 const handler = require('../../../src/manager/routes/payments/winback/post.js');
@@ -66,24 +72,14 @@ function subscriber(Manager, { uid, product, processor, resourceId, orderId, pen
   });
 }
 
-function acceptOffer(Manager, user, settings) {
-  return callHandler({
-    Manager,
-    handler,
-    functionName: 'payments-winback',
-    user,
-    settings: { confirmed: true, ...(settings || {}) },
-  });
-}
-
 /**
- * The same direct call with the `omega-properties` header captured — the
+ * A direct call with the `omega-properties` header captured — the
  * branchable half of a 4xx rides that header, so a test asserting a CODE reads
  * it (plan.test.js's technique, for the same gate).
  *
  * @returns {Promise<{ sent: object, properties: object|null }>}
  */
-async function acceptOfferReadingProperties(Manager, user) {
+async function acceptOfferReadingProperties(Manager, user, settings) {
   const res = recordingResponse();
   const headers = {};
 
@@ -96,7 +92,7 @@ async function acceptOfferReadingProperties(Manager, user) {
   const req = { method: 'POST', headers: { 'content-type': 'application/json' }, query: {}, body: {} };
   const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-winback' });
 
-  await handler({ ctx, Manager, user, settings: { confirmed: true }, libraries: Manager.libraries });
+  await handler({ ctx, Manager, user, settings: { confirmed: true, ...(settings || {}) }, libraries: Manager.libraries });
 
   return {
     sent: res.sent,
@@ -200,10 +196,31 @@ module.exports = {
 
         await withOffer(Manager, { enabled: false }, async () => {
           const user = subscriber(Manager, { uid: '_test-winback-disabled', product });
-          const sent = await acceptOffer(Manager, user);
+          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
           assert.equal(sent.code, 400, 'Should refuse an offer the brand turned off');
+          assert.equal(
+            properties?.additional?.code,
+            'offer-disabled',
+            'the refusal carries a code the billing card can branch on',
+          );
         });
+      },
+    },
+
+    {
+      name: 'refuses-an-unconfirmed-request',
+      async run({ Manager, assert, config, skip }) {
+        const product = paidProduct(config, skip);
+        const user = subscriber(Manager, { uid: '_test-winback-unconfirmed', product });
+        const { sent, properties } = await acceptOfferReadingProperties(Manager, user, { confirmed: false });
+
+        assert.equal(sent.code, 400, 'Should refuse a request that confirms nothing');
+        assert.equal(
+          properties?.additional?.code,
+          'confirmation-required',
+          'and says which refusal it was — the ONE code a retry can actually fix',
+        );
       },
     },
 
@@ -218,9 +235,14 @@ module.exports = {
         const product = paidProduct(config, skip);
         const user = subscriber(Manager, { uid: '_test-winback-trial', product, trial: true });
 
-        const sent = await acceptOffer(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
         assert.equal(sent.code, 400, 'Should refuse a subscription still inside its free trial');
+        assert.equal(
+          properties?.additional?.code,
+          'trial-not-eligible',
+          'the refusal carries a code the billing card can branch on',
+        );
       },
     },
 
@@ -230,9 +252,14 @@ module.exports = {
         const product = paidProduct(config, skip);
         const user = subscriber(Manager, { uid: '_test-winback-pending', product, pending: true });
 
-        const sent = await acceptOffer(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
         assert.equal(sent.code, 400, 'Should refuse when the cancellation is already scheduled');
+        assert.equal(
+          properties?.additional?.code,
+          'cancellation-pending',
+          'the refusal carries the same code the plan switch refuses that state with',
+        );
       },
     },
 
@@ -242,21 +269,44 @@ module.exports = {
         const product = paidProduct(config, skip);
         const user = subscriber(Manager, { uid: '_test-winback-suspended', product, status: 'suspended' });
 
-        const sent = await acceptOffer(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
         assert.equal(sent.code, 400, 'Should refuse a subscription that is not active');
+        assert.equal(
+          properties?.additional?.code,
+          'no-active-subscription',
+          'the refusal carries a code the billing card can branch on',
+        );
       },
     },
 
     {
       name: 'refuses-missing-payment-details',
       async run({ Manager, assert, config, skip }) {
+        // An ADMIN-GRANTED or imported subscription is paid and active with no
+        // processor details on it at all, and the client pitches what it can
+        // read — so this refusal needs a code as much as the capability gate
+        // does ([#311]): without one, accepting shows an error toast and leaves
+        // the dialog armed for a retry that can never succeed. HALF the details
+        // is the same dead end, so each half is proven on its own.
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-no-processor', product, processor: null, resourceId: null });
+        const halves = [
+          { what: 'processor', processor: null, resourceId: 'sub_test_winback_guard' },
+          { what: 'resourceId', processor: 'test', resourceId: null },
+          { what: 'both', processor: null, resourceId: null },
+        ];
 
-        const sent = await acceptOffer(Manager, user);
+        for (const { what, processor, resourceId } of halves) {
+          const user = subscriber(Manager, { uid: `_test-winback-no-${what}`, product, processor, resourceId });
+          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
-        assert.equal(sent.code, 400, 'Should refuse when the subscription names no processor');
+          assert.equal(sent.code, 400, `missing ${what}: Should refuse a subscription the route cannot reach a processor with`);
+          assert.equal(
+            properties?.additional?.code,
+            'missing-payment-details',
+            `missing ${what}: the refusal carries a code the billing card can branch on`,
+          );
+        }
       },
     },
 
@@ -266,9 +316,14 @@ module.exports = {
         const product = paidProduct(config, skip);
         const user = subscriber(Manager, { uid: '_test-winback-unknown', product, processor: 'not-a-processor' });
 
-        const sent = await acceptOffer(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
         assert.equal(sent.code, 400, 'Should refuse a processor that does not exist');
+        assert.equal(
+          properties?.additional?.code,
+          'unknown-processor',
+          'the refusal carries a code the billing card can branch on',
+        );
       },
     },
 

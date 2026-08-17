@@ -11,13 +11,16 @@
  *     pagination and one page per category at the URL contract, with the
  *     documents themselves under the same base — and a consumer page at any of
  *     those permalinks takes the URL over
+ *  5. every generated page carries its OWN meta — a category page that falls
+ *     back to the site title/description is indexable duplication (#312)
+ *  6. and so does every DOCUMENT, which also opens with its own h1 (#317)
  */
 const assert = require('node:assert');
 const path = require('node:path');
 const { test, before } = require('node:test');
 
 const { buildSite, PKG } = require('./lib/build.js');
-const { readCollections } = require('../src/dynamic-pages.js');
+const { readCollections, applyDocumentData } = require('../src/dynamic-pages.js');
 const { readLimits } = require('../src/limit-collections.js');
 
 const FIXTURE = path.join(PKG, 'test', 'fixtures', 'collections-site');
@@ -28,6 +31,18 @@ const SITE_DATA = require(path.join(FIXTURE, 'site-data.json'));
 const DOCS = ['/docs/api', '/docs/cli', '/docs/faq', '/docs/getting-started'];
 
 const build = (collections, name) => buildSite(FIXTURE, { ...SITE_DATA, collections }, {}, name);
+
+/**
+ * The head values a page shipped.
+ * @param {string} html
+ * @returns {{ title: string, description: string }}
+ */
+function head(html) {
+  return {
+    title: (html.match(/<title>([^<]*)<\/title>/) || [])[1],
+    description: (html.match(/<meta name="description" content="([^"]*)"/) || [])[1],
+  };
+}
 
 test('an unset key declares nothing', () => {
   assert.deepStrictEqual(readCollections(undefined), []);
@@ -80,6 +95,28 @@ test('a minimal declaration resolves the whole contract', () => {
   assert.strictEqual(docs.size, 2);
   assert.strictEqual(docs.title, 'The Docs');
   assert.strictEqual(docs.description, 'Read them.');
+});
+
+test('a document names itself even when it wrote nothing to name itself with (#317)', () => {
+  const [docs] = readCollections({ docs: { field: 'doc.category' } });
+  const bare = { page: { fileSlug: 'getting-started' } };
+  applyDocumentData(docs, bare, 'CollectionsCo');
+
+  // Last resort, and still never the site's: the slug is the document's name.
+  assert.strictEqual(bare.meta.title, 'Getting Started - Docs - CollectionsCo');
+  assert.strictEqual(bare.meta.description, 'Read Getting Started in the Docs collection.');
+  assert.strictEqual(bare.collection.base, '/docs', 'and the layout gets the collection block');
+  assert.strictEqual(bare.title, 'Getting Started', 'the h1 headline agrees with the derived title, never the collection\'s');
+
+  // What the document DID write always wins.
+  const owned = {
+    page: { fileSlug: 'getting-started' },
+    doc: { title: 'Getting started', description: 'Install it.' },
+    meta: { title: 'Start here' },
+  };
+  applyDocumentData(docs, owned, 'CollectionsCo');
+  assert.strictEqual(owned.meta.title, 'Start here', 'an explicit meta.title is never rewritten');
+  assert.strictEqual(owned.meta.description, 'Install it.', 'and the document\'s own description is the description');
 });
 
 test('dev sampling accepts a declared collection, and still rejects a typo', () => {
@@ -142,6 +179,46 @@ test('one page per category, keyed by slug', () => {
   assert.ok(!guides.includes('The API'), 'and none of another term\'s');
   assert.ok(guides.includes('<title>Guides - The Docs - CollectionsCo</title>'), 'the most frequent spelling names the term');
   assert.ok(guides.includes('href="/docs"'), 'and links back to the listing');
+});
+
+test('every category page titles AND describes its own term (#312)', () => {
+  const guides = head(pages.get('/docs/categories/guides'));
+  const reference = head(pages.get('/docs/categories/reference'));
+  const listing = head(pages.get('/docs'));
+
+  // The #294 shape, one collection over: the term names the page, and the
+  // description is written per term — not the site's, not the listing's.
+  assert.strictEqual(guides.title, 'Guides - The Docs - CollectionsCo');
+  assert.strictEqual(guides.description, 'Browse all The Docs in the Guides category.');
+  assert.strictEqual(reference.description, 'Browse all The Docs in the Reference category.');
+
+  assert.notStrictEqual(guides.title, SITE_DATA.meta.title, 'never the site-wide title');
+  assert.notStrictEqual(guides.description, SITE_DATA.meta.description, 'never the site-wide description');
+  assert.notStrictEqual(guides.description, listing.description, 'and never the listing\'s — a category page is its own page');
+});
+
+test('every document page titles, describes and headlines ITSELF (#317)', () => {
+  const api = head(pages.get('/docs/api'));
+  const cli = head(pages.get('/docs/cli'));
+  const listing = head(pages.get('/docs'));
+
+  // The category page's shape, one layer down: the document names the page,
+  // and its own frontmatter description is the description.
+  assert.strictEqual(api.title, 'The API - The Docs - CollectionsCo');
+  assert.strictEqual(api.description, 'Endpoints, payloads, errors.');
+  assert.strictEqual(cli.title, 'The CLI - The Docs - CollectionsCo');
+  assert.strictEqual(cli.description, 'Every verb the CLI knows.');
+
+  assert.notStrictEqual(api.title, cli.title, 'no two documents share a title');
+  assert.notStrictEqual(api.description, cli.description, 'or a description');
+  assert.notStrictEqual(api.title, SITE_DATA.meta.title, 'never the site-wide title');
+  assert.notStrictEqual(api.description, SITE_DATA.meta.description, 'never the site-wide description');
+  assert.notStrictEqual(api.description, listing.description, 'and never the listing\'s');
+
+  // The page a reader lands on opens with its own name.
+  const h1 = (pages.get('/docs/api').match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1];
+  assert.ok(h1, 'the document page renders an h1');
+  assert.strictEqual(h1.trim(), 'The API');
 });
 
 test('the listing rails the collection\'s own categories', () => {

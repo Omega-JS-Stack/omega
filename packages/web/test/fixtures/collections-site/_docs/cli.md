@@ -1,5 +1,5 @@
 ---
-layout: frontend/core/base
+layout: blueprint/collection/document
 doc:
   title: "The CLI"
   description: "Every verb the CLI knows."

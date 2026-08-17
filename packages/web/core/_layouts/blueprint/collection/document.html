@@ -1,0 +1,9 @@
+---
+layout: frontend/pages/collection/document
+
+# One document of a brand's own collection (#207) — the engine fills the
+# collection block and the per-document meta into the document's data (#317),
+# so this layer only routes to the theme's markup.
+---
+
+{{ content | omega_content_format }}

@@ -1,11 +1,11 @@
 ---
-layout: frontend/core/base
+layout: blueprint/collection/document
 doc:
   title: "FAQ"
   description: "The questions people actually ask."
   # The list form, spelled differently — the taxonomy groups by slug and the
   # most frequent spelling names the term.
-  category: ["Reference", "guides"]
+  category: ["reference", "guides"]
 ---
 
 Frequently asked questions.

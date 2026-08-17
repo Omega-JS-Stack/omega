@@ -233,9 +233,19 @@ function buildBillingState(account) {
   // The offer itself is the brand's, resolved at BUILD time from omega.json5
   // (`payment.winback`, @omega.js/config's resolveWinbackOffer): the 50%-off
   // default has one home and the browser never applies one of its own.
+  //
+  // The offer is only pitchable to a subscription the apply route can REACH:
+  // it discounts the live subscription at the processor, so it needs the
+  // processor and the resource it holds it under. A paid, active subscription
+  // can carry neither — granted by an admin, imported, a backfill that never
+  // landed — and pitching that account an offer whose only button can 400 is a
+  // dead end in front of the cancel it came to make ([#311]).
+  const reachable = !!subscription.payment?.processor && !!subscription.payment?.resourceId;
+
   const offer = paymentConfig?.winback;
   const offerable = canCancel
     && !trialCancel
+    && reachable
     && offer?.enabled === true
     && winbackSupported
     && !winbackOfferAnswered;
@@ -1133,7 +1143,26 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
     // claimant IS pitched again) — either way the offer is a dead end for this
     // account, so retire it and open the questionnaire — a customer who came
     // here to cancel must never be left in a dialog that cannot answer them.
-    const deadEndCodes = ['not-supported-by-processor', 'offer-not-claimable', 'offer-already-claimed'];
+    //
+    // The route names every refusal ([#311]), and the rest of them are dead
+    // ends for the same reason: the brand turned the offer off since this page
+    // loaded, the subscription is not the state the offer is for (ended,
+    // suspended, trialing, already scheduled to cancel), or it carries no
+    // processor to discount through. Pressing the button again changes none of
+    // them. The one refusal LEFT OFF is `confirmation-required`: that is a
+    // request that went out without its confirmation, which the same button
+    // sending it again is the fix for.
+    const deadEndCodes = [
+      'not-supported-by-processor',
+      'offer-not-claimable',
+      'offer-already-claimed',
+      'offer-disabled',
+      'no-active-subscription',
+      'trial-not-eligible',
+      'cancellation-pending',
+      'missing-payment-details',
+      'unknown-processor',
+    ];
     if (deadEndCodes.includes(error.properties?.additional?.code)) {
       winbackSupported = false;
       retireWinbackOffer();

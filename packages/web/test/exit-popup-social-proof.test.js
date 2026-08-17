@@ -6,6 +6,9 @@
  * /assets/images/core). A brand replaces them through
  * client.exitPopup.config.avatars, and an explicit empty list falls back to
  * neutral glyph slots.
+ *
+ * The same popup's heading order (#316): it mounts on every page, so a skip
+ * inside it fails the heading-order rule on pages whose own content is clean.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -24,6 +27,24 @@ function socialProof(html) {
   assert.ok(end > -1, 'the subscriber line is part of that block');
   return html.slice(start, html.indexOf('</div>', end));
 }
+
+/** The whole popup's markup out of a rendered page. */
+function popup(html) {
+  const start = html.indexOf('<div id="modal-exit-popup"');
+  assert.ok(start > -1, 'the page mounts the exit popup');
+  const end = html.indexOf('var Configuration', start);
+  assert.ok(end > -1, 'the popup closes before the configuration blob');
+  return html.slice(start, end);
+}
+
+test('the popup\'s headings step one level at a time (#316)', async () => {
+  const pages = await buildWith(miniData, {}, 'exit-popup-headings');
+  const levels = [...popup(pages.get('/')).matchAll(/<h([1-6])\b/g)].map((match) => Number(match[1]));
+
+  // The popup titles itself h3 (it is a dialog inside a page that owns h1/h2),
+  // and the offer box is its one subsection.
+  assert.deepStrictEqual(levels, [3, 4], 'the offer title sits one level under the popup title, not two');
+});
 
 test('unconfigured: the four shipped portraits stand beside the subscriber line', async () => {
   const pages = await buildWith(miniData, {}, 'exit-popup-default');

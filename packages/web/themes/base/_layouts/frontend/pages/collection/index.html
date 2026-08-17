@@ -19,7 +19,7 @@ collection_empty: "Nothing here yet. The first entry will land right on this pag
       <nav class="omega-tabs mt-5" aria-label="{{ resolved.collection.title }} categories" data-omega-reveal>
         <a href="{{ resolved.collection.base }}" class="active">All</a>
         {% for term in terms %}
-          <a href="{{ resolved.collection.base }}/categories/{{ term.slug }}">{{ term.name }}</a>
+          <a href="{{ resolved.collection.base }}/categories/{{ term.slug }}">{{ term.name | omega_title_case }}</a>
         {% endfor %}
       </nav>
     {% endif %}
