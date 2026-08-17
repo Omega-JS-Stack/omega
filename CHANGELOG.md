@@ -5,13 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.32.2] 2026-08-16
 ### Fixed
-- [#311](../../issues/311) — The billing card no longer pitches the save offer to a subscription with no processor payment details, and every winback refusal carries a branchable code — so an accept that cannot succeed retires the offer and opens the questionnaire instead of arming a retry.
-- [#312](../../issues/312) — Generated brand-collection category pages carry their own per-term description (and keep their per-term title), ending the one-description-everywhere duplication across a collection's category pages; the term is title-cased consistently in the meta, the masthead and the category rails.
-- [#313](../../issues/313) — Blog tag and category term pages no longer skip from their h1 to the post cards' h3s: each term page carries an h2 landmark above the card list, matching the blog index's heading order.
-- [#315](../../issues/315) — Paginated blog index pages (page 2 and up) no longer skip from their h1 to the card h3s: a hidden "More posts" h2 stands in where the featured post does not render; page 1 is unchanged.
-- [#316](../../issues/316) — The exit popup's offer-box title steps h3 to h4 instead of h3 to h5, restoring the heading sequence inside the popup; the visual style is unchanged.
-- [#317](../../issues/317) — Collection document pages name themselves: per-document title and description derive from the document's own frontmatter (its `meta` keys always win), and the new `blueprint/collection/document` layout renders the masthead h1 and back link its listing and category siblings already had.
+- [#311](../../issues/311) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — The billing card no longer pitches the save offer to a subscription with no processor payment details, and every winback refusal carries a branchable code — so an accept that cannot succeed retires the offer and opens the questionnaire instead of arming a retry.
+- [#312](../../issues/312) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — Generated brand-collection category pages carry their own per-term description (and keep their per-term title), ending the one-description-everywhere duplication across a collection's category pages; the term is title-cased consistently in the meta, the masthead and the category rails.
+- [#313](../../issues/313) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — Blog tag and category term pages no longer skip from their h1 to the post cards' h3s: each term page carries an h2 landmark above the card list, matching the blog index's heading order.
+- [#315](../../issues/315) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — Paginated blog index pages (page 2 and up) no longer skip from their h1 to the card h3s: a hidden "More posts" h2 stands in where the featured post does not render; page 1 is unchanged.
+- [#316](../../issues/316) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — The exit popup's offer-box title steps h3 to h4 instead of h3 to h5, restoring the heading sequence inside the popup; the visual style is unchanged.
+- [#317](../../issues/317) [`51d4918a`](../../commit/51d4918a) Thanks [@ianwieds]! — Collection document pages name themselves: per-document title and description derive from the document's own frontmatter (its `meta` keys always win), and the new `blueprint/collection/document` layout renders the masthead h1 and back link its listing and category siblings already had.
 
 ## [0.32.1] 2026-08-16
 ### Changed
