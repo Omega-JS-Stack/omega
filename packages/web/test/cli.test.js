@@ -133,24 +133,38 @@ test('FILE_MAP: src/ is consumer-owned after seeding', () => {
   assert.strictEqual(FILE_MAP['.github/workflows/build.yml'].overwrite, true, 'CI workflow re-syncs every setup');
 });
 
-test('scaffold: inside a brand monorepo the seed is targets-only and the template never merges in (friction #1)', () => {
+test('scaffold: a brand app gets NO app-level config, a standalone app keeps its seed (#298)', () => {
   const root = tmpConsumer();
   const appDir = path.join(root, 'brand', 'apps', 'website');
+  const appConfig = path.join(appDir, 'config', 'omega.json5');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
   fs.mkdirSync(appDir, { recursive: true });
 
+  // Fresh scaffold AND the reruns setup does: the app config never appears
+  // (the old targets-only seed kept resurrecting a file the app omits).
   scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.ok(!fs.existsSync(appConfig), 'the brand root config is the app config');
 
-  const seeded = fs.readFileSync(path.join(appDir, 'config', 'omega.json5'), 'utf8');
-  assert.ok(!seeded.includes('my-brand'), 'no placeholder identity in a brand app');
-  assert.match(seeded, /targets/, 'targets-only seed');
-
-  // Rerun (setup runs repeatedly) — the full template must NOT merge under it
   scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.ok(!fs.existsSync(appConfig), 'a rerun does not re-seed it');
+
   const { config } = loadConfig(appDir, 'web');
-  assert.strictEqual(config.brand.id, 'acme', 'brand root identity resolves through the app seed');
-  assert.strictEqual(config.brand.name, 'Acme', 'no My Brand shadowing after reruns');
+  assert.strictEqual(config.brand.id, 'acme', 'brand root identity resolves for the app');
+  assert.strictEqual(config.brand.name, 'Acme', 'no My Brand shadowing');
+
+  // The app file is the standalone ESCAPE HATCH: authored, it survives setup.
+  fs.mkdirSync(path.dirname(appConfig), { recursive: true });
+  fs.writeFileSync(appConfig, '{ targets: { web: { language: "es" } } }\n');
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.strictEqual(fs.readFileSync(appConfig, 'utf8'), '{ targets: { web: { language: "es" } } }\n', 'an authored app config is never touched');
+
+  // No brand config above → the standalone lane still seeds the full template.
+  const standalone = path.join(root, 'standalone');
+  fs.mkdirSync(standalone, { recursive: true });
+  scaffoldDefaults({ outputDir: standalone, logger: quiet });
+  assert.ok(fs.existsSync(path.join(standalone, 'config', 'omega.json5')), 'a standalone app keeps the seed');
+
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -165,7 +179,7 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   assert.match(standaloneMode[0], /standalone app/, 'names the mode');
   assert.match(standaloneMode[0], /full config template/, 'names the consequence');
 
-  // Brand monorepo: the targets-only lane
+  // Brand monorepo: the no-app-config lane
   const appDir = path.join(root, 'brand', 'apps', 'website');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
@@ -176,7 +190,7 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   const brandMode = brandLines.filter((m) => /brand monorepo detected/.test(m));
   assert.strictEqual(brandMode.length, 1, 'exactly one mode line');
   assert.match(brandMode[0], /brand monorepo detected/, 'names the mode');
-  assert.match(brandMode[0], /targets-only config seed/, 'names the consequence');
+  assert.match(brandMode[0], /no app-level config seed/, 'names the consequence');
   assert.match(brandMode[0], /brand root/, 'says where the docs went');
 
   fs.rmSync(root, { recursive: true, force: true });

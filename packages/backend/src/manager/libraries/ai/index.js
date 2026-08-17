@@ -14,6 +14,7 @@ const OpenAI = require('./providers/openai.js');
 const Anthropic = require('./providers/anthropic.js');
 const ClaudeCode = require('./providers/claude-code.js');
 const TestProvider = require('./providers/test.js');
+const { emptyTokens, addTokens } = require('./tokens.js');
 
 const DEFAULT_PROVIDER = 'openai';
 
@@ -34,11 +35,7 @@ function AI(ctx, key) {
   self._defaultKey = key;
 
   // Combined token counter across all provider calls in this AI instance
-  self.tokens = {
-    total:  { count: 0, price: 0 },
-    input:  { count: 0, price: 0 },
-    output: { count: 0, price: 0 },
-  };
+  self.tokens = emptyTokens();
 
   return self;
 }
@@ -71,23 +68,11 @@ AI.prototype.request = async function (options) {
   const client = self._getProvider(provider, normalized.apiKey);
   const result = await client.request(normalized);
 
-  // Roll provider's token counts into the combined counter (best-effort — different
-  // providers report tokens slightly differently)
-  if (result?.tokens?.input?.count) {
-    self.tokens.input.count  += result.tokens.input.count  - (self._lastTokens?.[provider]?.input  || 0);
-    self.tokens.output.count += result.tokens.output.count - (self._lastTokens?.[provider]?.output || 0);
-    self.tokens.input.price  += result.tokens.input.price  - (self._lastTokens?.[provider]?.inputPrice  || 0);
-    self.tokens.output.price += result.tokens.output.price - (self._lastTokens?.[provider]?.outputPrice || 0);
-    self.tokens.total.count   = self.tokens.input.count + self.tokens.output.count;
-    self.tokens.total.price   = self.tokens.input.price + self.tokens.output.price;
-
-    self._lastTokens = self._lastTokens || {};
-    self._lastTokens[provider] = {
-      input:       result.tokens.input.count,
-      output:      result.tokens.output.count,
-      inputPrice:  result.tokens.input.price,
-      outputPrice: result.tokens.output.price,
-    };
+  // Roll THIS call's usage into the combined counter. Every provider reports the
+  // usage of the response it just received, so the add is exact and two calls in
+  // flight at once cannot read each other's numbers.
+  if (result?.tokens) {
+    addTokens(self.tokens, result.tokens);
   }
 
   return result;
@@ -147,14 +132,24 @@ AI.prototype._getProvider = function (provider, apiKey) {
  *
  * Accepts:
  *   - messages: [{ role: 'system'|'user'|'assistant', content: string }]
- *   - OR prompt.content (system) + message.content (user)
+ *   - OR prompt (object or multi-role array) + message.content (user)
  *
  * Returns options with BOTH styles populated, so OpenAI's `prompt`/`message`
- * fields and Anthropic's `messages` array both work.
+ * fields and Anthropic's `messages` array both work. The array prompt form and
+ * a non-empty messages[] are mutually exclusive — combining them throws.
  */
 function normalizeOptions(opts) {
   const out = { ...opts };
   const rules = SYSTEM_PROMPT_INJECTIONS.join('\n');
+
+  // The array prompt form cannot combine with a messages[] conversation: every
+  // provider treats a non-empty messages[] as the WHOLE conversation and ignores
+  // the prompt segments, and the segments only resolve (prompt files included)
+  // inside the provider, so there is nowhere to merge them. Silently dropping a
+  // caller's segments is worse than refusing the call.
+  if (Array.isArray(opts.prompt) && Array.isArray(opts.messages) && opts.messages.length) {
+    throw new Error('AI request: an array prompt cannot be combined with messages[]. messages[] is the whole conversation, so move the segments into it as system turns, or drop messages[].');
+  }
 
   // Structured conversations (tool-call turns, tool results, raw content
   // blocks) must NOT be flattened into prompt/message — the provider consumes
@@ -179,6 +174,13 @@ function normalizeOptions(opts) {
     return out;
   }
 
+  // The array prompt form (multi-role segments, each with its own path/content/
+  // settings) is the provider's own input shape — it must survive normalization
+  // as an array. Spreading it collapses the segments into { 0: ..., 1: ... },
+  // which the provider then reads as a single content-only segment and every
+  // prompt-file path is silently dropped.
+  const hasPromptSegments = Array.isArray(opts.prompt);
+
   if (Array.isArray(opts.messages) && opts.messages.length) {
     const system = opts.messages.find((m) => m.role === 'system');
     const userTurns = opts.messages.filter((m) => m.role !== 'system');
@@ -195,10 +197,14 @@ function normalizeOptions(opts) {
 
   // Prepend universal rules to the system prompt. Patches both representations
   // (prompt.content and messages[]) since providers read from one or the other.
-  const existing = stringifyContent(out.prompt?.content || '');
+  // On the array form the rules ride in as their own leading system segment, so
+  // every caller segment reaches the provider untouched.
+  const existing = hasPromptSegments ? '' : stringifyContent(out.prompt?.content || '');
   const merged = existing ? `${rules}\n\n${existing}` : rules;
 
-  out.prompt = { ...(out.prompt || {}), content: merged };
+  out.prompt = hasPromptSegments
+    ? [{ role: 'system', content: rules }, ...opts.prompt]
+    : { ...(out.prompt || {}), content: merged };
 
   if (Array.isArray(out.messages) && out.messages.length) {
     const systemIdx = out.messages.findIndex((m) => m.role === 'system');

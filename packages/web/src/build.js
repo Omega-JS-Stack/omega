@@ -30,7 +30,7 @@ const { PATHS } = require('./paths.js');
  * @param {string} [options.coreDir] - default: packaged core
  * @param {string} [options.defaultsDir] - default: packaged default pages
  * @param {string} [options.activeTheme] - default: siteData.theme.id
- * @param {Array<{src: string, dest: string}>} [options.staticDirs] - verbatim image copies (resolveStaticDirs), later entries win
+ * @param {Array<{src: string, dest: string}>} [options.staticDirs] - verbatim static copies (resolveStaticDirs), later entries win
  * @param {{ cacheDir: string, log?: function }} [options.imagemin] - responsive image matrix over the copied images (omit to skip — dev and `web.imagemin.enabled: false`)
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
@@ -109,7 +109,7 @@ async function buildSite(options) {
     return icons;
   });
 
-  // ---- static images: minted brand identity bridge + consumer src/assets/images
+  // ---- static assets: minted brand identity bridge + consumer src/assets
   if (options.staticDirs && options.staticDirs.length) {
     await phase('static', () => copyStaticAssets({ staticDirs: options.staticDirs, outDir: options.outDir }));
   }

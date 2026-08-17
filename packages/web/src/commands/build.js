@@ -53,7 +53,7 @@ module.exports = async function (options) {
     manifestPath: paths.manifest,
     staticDirs: resolveStaticDirs({
       brandRoot,
-      imagesDir: path.join(paths.assets, 'images'),
+      assetsDir: paths.assets,
     }),
     // Responsive image matrix (the UJM imagemin successor) — on unless the
     // brand opts out via `web.imagemin.enabled: false`. The cache is

@@ -6,7 +6,7 @@
  *  2. <title> falls back to the brand name when nothing configures
  *     meta.title (the live playground shape: config has no `meta` at all)
  *  3. static-asset channel: the minted brand identity (.omega/assets
- *     favicons/brandmark/social) + consumer src/assets/images ship
+ *     favicons/brandmark/social) + the consumer's whole src/assets tree ship
  *     verbatim; the consumer layer copies last and wins collisions
  *
  * One classy build over the contract fixture WITHOUT site.meta — the exact
@@ -50,9 +50,20 @@ before(async () => {
   mint(['.omega', 'assets', 'logo', 'brandmark', 'color-512.png'], 'minted-brandmark');
   mint(['.omega', 'assets', 'social', 'brandmark', 'color-1024.png'], 'minted-social');
 
-  // Consumer images layer — favicon.ico collides with the mint and must win
-  mint(['consumer-images', 'favicon', 'favicon.ico'], 'consumer-ico');
-  mint(['consumer-images', 'hero.png'], 'consumer-hero');
+  // Consumer asset layer — favicon.ico collides with the mint and must win
+  mint(['consumer-assets', 'images', 'favicon', 'favicon.ico'], 'consumer-ico');
+  mint(['consumer-assets', 'images', 'hero.png'], 'consumer-hero');
+  // Non-image media (#295): the live break was alarm mp3s 404ing
+  mint(['consumer-assets', 'audio', 'alarm.mp3'], 'consumer-alarm');
+  mint(['consumer-assets', 'downloads', 'guide.pdf'], 'consumer-guide');
+  // Hidden entries — Finder/editor noise sitting in src/assets is not content
+  mint(['consumer-assets', '.DS_Store'], 'finder-noise');
+  // The PIPELINE's lanes — the asset phase owns dist/assets/{js,css,fonts}
+  // (hashed bundles, and fonts pruned to referenced faces), so these must
+  // never ride the static copy
+  mint(['consumer-assets', 'js', 'main.js'], 'raw-source-must-not-ship');
+  mint(['consumer-assets', 'css', 'main.scss'], 'raw-source-must-not-ship');
+  mint(['consumer-assets', 'fonts', 'unreferenced.woff2'], 'pruned-face-must-not-return');
 
   await buildSite({
     consumerDir: SITE,
@@ -70,13 +81,13 @@ before(async () => {
     skipPurge: true,
     staticDirs: resolveStaticDirs({
       brandRoot,
-      imagesDir: path.join(brandRoot, 'consumer-images'),
+      assetsDir: path.join(brandRoot, 'consumer-assets'),
     }),
   });
 });
 
-test('resolveStaticDirs: core images first, mint bridge next, consumer images last, missing sources dropped', () => {
-  const dirs = resolveStaticDirs({ brandRoot, imagesDir: path.join(brandRoot, 'consumer-images') });
+test('resolveStaticDirs: core images first, mint bridge next, consumer layer last, missing sources dropped', () => {
+  const dirs = resolveStaticDirs({ brandRoot, assetsDir: path.join(brandRoot, 'consumer-assets') });
   assert.deepStrictEqual(dirs.map((entry) => entry.dest), [
     'assets/images/core', // framework-shipped pictures (exit-popup faces)
     'assets/images/favicon',
@@ -84,15 +95,17 @@ test('resolveStaticDirs: core images first, mint bridge next, consumer images la
     'assets/images/brand/brandmark.png',
     'assets/images/brand/social.png',
     'assets/images', // consumer layer LAST — it wins collisions
+    'assets/audio', // …and the rest of src/assets rides with it (#295)
+    'assets/downloads',
   ]);
 
   // No brand root (standalone consumer without a mint) → core + consumer layer
-  const bare = resolveStaticDirs({ brandRoot: null, imagesDir: path.join(brandRoot, 'consumer-images') });
-  assert.deepStrictEqual(bare.map((entry) => entry.dest), ['assets/images/core', 'assets/images']);
+  const bare = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(brandRoot, 'consumer-assets') });
+  assert.deepStrictEqual(bare.map((entry) => entry.dest), ['assets/images/core', 'assets/images', 'assets/audio', 'assets/downloads']);
 
   // No brand assets at all → the framework's own images still ship
   assert.deepStrictEqual(
-    resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), imagesDir: path.join(brandRoot, 'nope2') })
+    resolveStaticDirs({ brandRoot: path.join(brandRoot, 'nope'), assetsDir: path.join(brandRoot, 'nope2') })
       .map((entry) => entry.dest),
     ['assets/images/core'],
   );
@@ -108,6 +121,22 @@ test('static channel ships the minted set and the consumer layer wins collisions
   // Consumer overrides + additions
   assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'favicon', 'favicon.ico'), 'utf8'), 'consumer-ico', 'consumer file wins the collision');
   assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'images', 'hero.png'), 'utf8'), 'consumer-hero');
+});
+
+test('#295: the whole src/assets tree ships, but never the pipeline-owned lanes', () => {
+  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'audio', 'alarm.mp3'), 'utf8'), 'consumer-alarm', 'audio ships (was silently dropped: 404 on the live site)');
+  assert.strictEqual(fs.readFileSync(path.join(OUT, 'assets', 'downloads', 'guide.pdf'), 'utf8'), 'consumer-guide');
+
+  // js/, css/ and fonts/ belong to the asset phase — its hashed bundles already
+  // sit in dist/assets, and a verbatim source copy would land beside them and
+  // put the pruned font faces back
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'main.js')), 'js sources never ride the static lane');
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'css', 'main.scss')), 'css sources never ride the static lane');
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'fonts', 'unreferenced.woff2')), 'fonts never ride the static lane (the assets phase prunes unreferenced faces)');
+
+  // …and neither does hidden noise: the widened lane lists every child of
+  // src/assets, and .DS_Store shipped to dist with it
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', '.DS_Store')), 'dotfiles never ship');
 });
 
 test('the shipped favicon.ico mirrors to the site root (#161: the browser probes /favicon.ico)', () => {

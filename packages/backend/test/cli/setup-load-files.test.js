@@ -1,0 +1,69 @@
+/**
+ * Test: setup's loadFiles() reads remoteconfig.template.json from the APP ROOT
+ * ([#280](https://github.com/Omega-JS-Stack/omega/issues/280)).
+ *
+ * The read pointed at `${projectPath}/functions/`, a pre-src/dist layout path
+ * where nothing lives anymore, while the setup test that WRITES the file
+ * (setup-tests/remoteconfig-template-file.js) puts it at the app root — so
+ * `self.remoteconfigJSON` came back `{}` no matter what the file said.
+ *
+ * loadFiles() is plain file reads against a seeded temp directory — no
+ * project, no emulator.
+ *
+ * Run: npx omega test backend:cli/setup-load-files
+ */
+const path = require('path');
+const jetpack = require('fs-jetpack');
+const SetupCommand = require('../../src/cli/commands/setup.js');
+
+const REMOTECONFIG = {
+  conditions: [],
+  parameters: {
+    omega_test_parameter: { defaultValue: { value: 'seeded' } },
+  },
+};
+
+// A temp app root outside any brand tree: no omega.json5 above it, so
+// loadFiles() resolves an empty config and only the file reads run.
+function seedApp() {
+  const appPath = jetpack.tmpDir({ prefix: 'omega-setup-load-files-' }).path();
+
+  jetpack.write(path.join(appPath, 'package.json'), JSON.stringify({ name: 'seeded-app' }, null, 2));
+  jetpack.write(path.join(appPath, 'remoteconfig.template.json'), JSON.stringify(REMOTECONFIG, null, 2));
+
+  return appPath;
+}
+
+function loadFiles(appPath) {
+  const main = { firebaseProjectPath: appPath, argv: {}, options: {} };
+
+  new SetupCommand(main).loadFiles();
+
+  return main;
+}
+
+module.exports = {
+  description: 'setup loadFiles() reads the app-root remoteconfig template',
+  type: 'group',
+  timeout: 10000,
+
+  tests: [
+    {
+      name: 'remoteconfig-template-loads-from-the-app-root',
+      auth: 'none',
+
+      async run({ assert }) {
+        const appPath = seedApp();
+
+        try {
+          const main = loadFiles(appPath);
+
+          assert.deepEqual(main.remoteconfigJSON, REMOTECONFIG, 'the app-root remoteconfig.template.json must be loaded, not an empty object');
+          assert.equal(main.package.name, 'seeded-app', 'the app manifest still loads from the same root');
+        } finally {
+          jetpack.remove(appPath);
+        }
+      },
+    },
+  ],
+};

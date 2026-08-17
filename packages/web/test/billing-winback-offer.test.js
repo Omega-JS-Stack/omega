@@ -427,22 +427,31 @@ test('#268: the offer names the brand\'s own number and the cycle it applies to'
   assert.strictEqual(forever.state().billing.winbackOffer.headline, 'Stay and get 50% off for as long as you stay', 'a permanent cut does not promise one cycle');
 });
 
-test('#268: a processor that cannot apply the discount retires the offer and lets the cancel through', async () => {
+test('#268: a refusal the account cannot answer retires the offer and lets the cancel through', async () => {
   // The same capability gate uncancel and plan-switch ride: the BACKEND answers
-  // whether this account's processor can do it, and a refusal must never leave
-  // the customer stuck in a dialog with no way to cancel.
-  const refusal = Object.assign(new Error('Your payment provider cannot apply this offer.'), {
-    properties: { additional: { code: 'not-supported-by-processor' } },
-  });
-  const { opened, notifications, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
+  // whether this account can take the offer at all, and a refusal must never
+  // leave the customer stuck in a dialog with no way to cancel. Every dead-end
+  // code is one branch, so each is proven through it — including the one a
+  // PAST CLAIMANT hits, who is pitched again because the client reads the
+  // account and the claim lives on the order doc ([#310]).
+  const deadEnds = [
+    { code: 'not-supported-by-processor', message: 'Your payment provider cannot apply this offer.' },
+    { code: 'offer-not-claimable', message: 'This offer is not available on your subscription.' },
+    { code: 'offer-already-claimed', message: 'You have already claimed this offer' },
+  ];
 
-  clickTrigger();
-  await clickById('cancel-winback-accept-btn');
+  for (const { code, message } of deadEnds) {
+    const refusal = Object.assign(new Error(message), { properties: { additional: { code: code } } });
+    const { opened, notifications, clickTrigger, clickById, isAccordionOpen, state } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
 
-  assert.strictEqual(state().billing.winbackOffer.show, false, 'the offer is retired for the session');
-  assert.ok(opened.includes('modal-hide:cancel-winback-modal'), 'the dialog closes');
-  assert.strictEqual(isAccordionOpen(), true, 'and the questionnaire opens, so the cancel can still be made');
-  assert.strictEqual(notifications.at(-1).message, refusal.message, "the provider's own refusal is what the customer reads");
+    clickTrigger();
+    await clickById('cancel-winback-accept-btn');
+
+    assert.strictEqual(state().billing.winbackOffer.show, false, `${code}: the offer is retired for the session`);
+    assert.ok(opened.includes('modal-hide:cancel-winback-modal'), `${code}: the dialog closes`);
+    assert.strictEqual(isAccordionOpen(), true, `${code}: and the questionnaire opens, so the cancel can still be made`);
+    assert.strictEqual(notifications.at(-1).message, refusal.message, `${code}: the backend's own refusal is what the customer reads`);
+  }
 });
 
 test('#268: a failed apply leaves the offer on screen to try again', async () => {

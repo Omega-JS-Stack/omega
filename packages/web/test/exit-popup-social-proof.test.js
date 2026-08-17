@@ -51,7 +51,7 @@ test('the shipped portraits exist on disk and reach the built site', () => {
   }
 
   // The static channel carries core/images to the URL the include references
-  const core = resolveStaticDirs({ brandRoot: null, imagesDir: path.join(PATHS.core, 'nope') })
+  const core = resolveStaticDirs({ brandRoot: null, assetsDir: path.join(PATHS.core, 'nope') })
     .find((entry) => entry.dest === 'assets/images/core');
   assert.ok(core, 'core images are a static-copy entry');
   assert.equal(core.src, path.join(PATHS.core, 'images'));

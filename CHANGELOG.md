@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- [#278](../../issues/278) — A fresh backend's `storage.rules` scaffold denies all bucket access instead of granting the whole bucket to any signed-in user; a brand that serves files opts in per path. Existing brand files are never rewritten; the three in-repo brands were tightened by hand to match.
+
+### Fixed
+- [#285](../../issues/285) — A prompt passed to `Manager.AI()` as an array of segments survives normalization on every provider: segments and their prompt files reach OpenAI and the Claude providers with the universal injections included, and combining an array prompt with a `messages[]` conversation refuses loudly instead of silently dropping content.
+- [#287](../../issues/287) — Each `Manager.AI()` call reports its own token usage instead of a shared running counter, so parallel callers stop misattributing counts and the newsletter generator's totals stop double-counting; retried SVG attempts now accumulate into the section's usage.
+- [#286](../../issues/286) — The head's copyright character renders again: the `site.characters` set (© and its siblings) ships as engine defaults on every build, and a brand's own `characters` key wins per key.
+- [#294](../../issues/294) — Every blog tag and category page carries its own title, description and title-cased heading instead of the site-wide pair, ending the indexable duplication across hundreds of taxonomy pages on a real blog; the `omega_*` filters now work in frontmatter, where they previously no-op'd silently.
+- [#295](../../issues/295) — The static asset lane ships the whole `src/assets` tree (audio, video, downloads), not just images; the pipeline-owned `js`, `css` and `fonts` lanes and dotfiles stay out, and imagemin stays scoped to images.
+- [#297](../../issues/297) — `omega migrate` on an already-converted app exits 0, says the config step was already done, validates the config it found, and still runs the codemods; a config that will not load is a loud error, not a clean skip.
+- [#298](../../issues/298) — `omega setup` inside a brand monorepo no longer re-seeds the app-level `config/omega.json5` the brand deliberately omits, matching the other frameworks; the dead seed helper and the residue seed files in the in-repo brands are gone.
+- [#279](../../issues/279) — The backend's generated welcome page is titled "Welcome" instead of "404 Error Page".
+- [#280](../../issues/280) — Backend setup reads `remoteconfig.template.json` from the app root instead of a stale `functions/` path that always produced an empty object.
+- [#310](../../issues/310) — The winback offer's already-claimed refusal carries a branchable `offer-already-claimed` code, so a returning claimant's dialog retires the offer and opens the questionnaire instead of arming a retry that can never succeed.
 
 ## [0.32.0] 2026-08-16
 ### Added

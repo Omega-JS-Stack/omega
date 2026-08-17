@@ -3,15 +3,38 @@
  *
  * Verifies the transformation from the @omega.js/backend-facing `ai.request()` options
  * (specifically `options.prompt` in either legacy object form or array form)
- * into the eventual OpenAI HTTP payload (the `input: [...]` array).
+ * into the eventual OpenAI HTTP payload (the `input: [...]` array), including
+ * the `normalizeOptions()` hop `ai.request()` makes before the provider sees
+ * the options.
  *
- * These tests exercise the pure helpers `normalizePrompt` and `formatHistory`
- * directly — no network, no ctx required.
+ * The same prompt forms must reach the two Claude providers (anthropic,
+ * claude-code) through their shared `anthropic-format.buildMessages`, so the
+ * Claude side of each form is asserted here too.
+ *
+ * These tests exercise the pure helpers `normalizeOptions`, `normalizePrompt`,
+ * `loadContent`, `formatHistory` and `buildMessages` directly — no network, no
+ * ctx required.
  */
+const path = require('path');
+const jetpack = require('fs-jetpack');
 const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
-const { normalizePrompt, formatHistory, VALID_PROMPT_ROLES } = OpenAI._internals;
+const format = require('../../src/manager/libraries/ai/providers/anthropic-format.js');
+const AI = require('../../src/manager/libraries/ai/index.js');
+const { normalizePrompt, loadContent, formatHistory, VALID_PROMPT_ROLES } = OpenAI._internals;
+const { normalizeOptions, SYSTEM_PROMPT_INJECTIONS } = AI._internals;
 
 function noopLog() {}
+
+const FIXTURES_DIR = path.join(__dirname, '..', 'fixtures', 'ai-prompt');
+const HOUSE_STYLE_PATH = path.join(FIXTURES_DIR, 'house-style.md');
+const OPERATOR_PATH = path.join(FIXTURES_DIR, 'operator.md');
+
+// The runner has no before/after hooks (module contract: tests[] + cleanup),
+// so each test that reads from disk seeds the fixtures itself (idempotent).
+function ensureFixtures() {
+  jetpack.write(HOUSE_STYLE_PATH, 'House style for {brand}.');
+  jetpack.write(OPERATOR_PATH, 'Operator config.');
+}
 
 function baseOptions(overrides = {}) {
   return {
@@ -296,5 +319,205 @@ module.exports = {
         assert.equal(formatted[1].content[0].text, 'padded user content', 'user trimmed');
       },
     },
+
+    // ─── normalizeOptions: every prompt form survives the ai.request() hop ───
+
+    {
+      name: 'normalize-options-array-prompt-stays-an-array',
+      async run({ assert }) {
+        const out = normalizeOptions({
+          prompt: [
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'developer', content: 'operator config' },
+          ],
+          message: { content: 'hello' },
+        });
+
+        assert.equal(Array.isArray(out.prompt), true, 'array prompt stays an array');
+        assert.equal(out.prompt.length, 3, 'rules segment + the two caller segments');
+        assert.equal(out.prompt[0].role, 'system', 'rules ride as a leading system segment');
+        assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules content');
+        assert.equal(out.prompt[1].path, HOUSE_STYLE_PATH, 'caller segment path preserved');
+        assert.deepEqual(out.prompt[1].settings, { brand: 'Paperloom' }, 'caller segment settings preserved');
+        assert.equal(out.prompt[2].role, 'developer', 'caller segment role preserved');
+        assert.equal(out.prompt[2].content, 'operator config', 'caller segment content preserved');
+        assert.equal(out.prompt.content, undefined, 'segments NOT collapsed into a content-only object');
+      },
+    },
+
+    {
+      name: 'normalize-options-array-prompt-resolves-prompt-files',
+      async run({ assert }) {
+        ensureFixtures();
+
+        const out = normalizeOptions({
+          prompt: [
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'developer', path: OPERATOR_PATH },
+          ],
+        });
+        const loaded = normalizePrompt(out.prompt).map((segment) => ({
+          role: segment.role,
+          content: loadContent(segment, noopLog),
+        }));
+
+        assert.equal(loaded.length, 3, 'rules + both file-backed segments');
+        assert.equal(loaded.some((s) => s.content instanceof Error), false, 'no segment failed to load');
+        assert.equal(loaded[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules segment loaded');
+        assert.equal(loaded[1].content, 'House style for Paperloom.', 'system prompt file read and templated');
+        assert.equal(loaded[2].role, 'developer', 'developer role preserved through loading');
+        assert.equal(loaded[2].content, 'Operator config.', 'developer prompt file read');
+      },
+    },
+
+    {
+      name: 'normalize-options-array-prompt-with-messages-fails-loudly',
+      async run({ assert }) {
+        let threw = false;
+
+        try {
+          normalizeOptions({
+            prompt: [{ role: 'system', path: HOUSE_STYLE_PATH }],
+            messages: [
+              { role: 'system', content: 'caller system turn' },
+              { role: 'user',   content: 'hello' },
+            ],
+          });
+        } catch (e) {
+          threw = true;
+          assert.equal(String(e.message).includes('messages'), true, 'error names the conflicting form');
+        }
+
+        assert.equal(threw, true, 'the array prompt and messages[] cannot combine');
+      },
+    },
+
+    {
+      name: 'normalize-options-messages-system-turn-keeps-caller-content',
+      async run({ assert }) {
+        const out = normalizeOptions({
+          messages: [
+            { role: 'system', content: 'caller system turn' },
+            { role: 'user',   content: 'hello' },
+          ],
+        });
+
+        assert.equal(out.messages[0].role, 'system', 'system turn stays first');
+        assert.equal(out.messages[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules prepended');
+        assert.equal(out.messages[0].content.includes('caller system turn'), true, 'caller system content survives');
+        assert.equal(out.message.content, 'hello', 'last user turn becomes the message');
+      },
+    },
+
+    {
+      name: 'normalize-options-object-prompt-keeps-object-form',
+      async run({ assert }) {
+        const out = normalizeOptions({
+          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+          message: { content: 'hello' },
+        });
+
+        assert.equal(Array.isArray(out.prompt), false, 'object form stays an object');
+        assert.equal(out.prompt.path, HOUSE_STYLE_PATH, 'path preserved');
+        assert.deepEqual(out.prompt.settings, { brand: 'Paperloom' }, 'settings preserved');
+        assert.equal(out.prompt.content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules injected as content');
+      },
+    },
+
+    {
+      name: 'normalize-options-string-prompt-content-keeps-caller-text',
+      async run({ assert }) {
+        const out = normalizeOptions({
+          prompt: { content: 'You are a helpful assistant.' },
+          message: { content: 'hello' },
+        });
+
+        assert.equal(out.prompt.content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules prepended');
+        assert.equal(out.prompt.content.includes('You are a helpful assistant.'), true, 'caller text preserved');
+      },
+    },
+
+    // ─── anthropic-format: the same prompt forms reach the Claude providers ───
+
+    {
+      name: 'anthropic-format-array-prompt-carries-rules-and-caller-segments',
+      async run({ assert }) {
+        ensureFixtures();
+
+        const out = normalizeOptions({
+          prompt: [
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'developer', content: 'operator config' },
+          ],
+          message: { content: 'hello' },
+        });
+        const { system, messages } = format.buildMessages(out);
+
+        assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'first universal rule reaches Claude');
+        assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[1]), true, 'second universal rule reaches Claude');
+        assert.equal(system.includes('House style for Paperloom.'), true, 'prompt-file segment loaded and templated');
+        assert.equal(system.includes('operator config'), true, 'developer segment folded into the system prompt');
+        assert.deepEqual(messages, [{ role: 'user', content: 'hello' }], 'the message is the only turn');
+      },
+    },
+
+    {
+      name: 'anthropic-format-object-prompt-path-is-loaded',
+      async run({ assert }) {
+        ensureFixtures();
+
+        const out = normalizeOptions({
+          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+          message: { content: 'hello' },
+        });
+        const { system } = format.buildMessages(out);
+
+        // Claude reads the object form exactly as OpenAI does: a `path` wins over
+        // `content`, so the system prompt is the loaded file (the rules that
+        // normalizeOptions writes into `content` are dropped by that precedence
+        // on EVERY provider — pre-existing, not this path's doing)
+        assert.equal(system, 'House style for Paperloom.', 'object-form prompt file loaded and templated');
+      },
+    },
+
+    {
+      name: 'anthropic-format-array-prompt-user-segment-joins-the-user-turn',
+      async run({ assert }) {
+        const { system, messages } = format.buildMessages({
+          prompt: [
+            { role: 'system', content: 'platform rules' },
+            { role: 'user',   content: 'seed question' },
+          ],
+          message: { content: 'real question' },
+        });
+
+        assert.equal(system, 'platform rules', 'only system/developer segments feed the system prompt');
+        assert.deepEqual(
+          messages,
+          [{ role: 'user', content: 'seed question\n\nreal question' }],
+          'consecutive user content rides ONE turn (the Messages API rejects repeats)',
+        );
+      },
+    },
+
+    {
+      name: 'anthropic-format-missing-prompt-file-throws',
+      async run({ assert }) {
+        let threw = false;
+
+        try {
+          format.buildMessages({ prompt: [{ role: 'system', path: path.join(FIXTURES_DIR, 'nope.md') }] });
+        } catch (e) {
+          threw = true;
+          assert.equal(String(e.message).includes('nope.md'), true, 'error names the missing file');
+        }
+
+        assert.equal(threw, true, 'a missing prompt file fails loudly');
+      },
+    },
   ],
+
+  async cleanup() {
+    jetpack.remove(FIXTURES_DIR);
+  },
 };

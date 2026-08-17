@@ -670,6 +670,23 @@ function buildConfig(eleventyConfig, options) {
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
     ...(site.omega || {}),
   };
+  // site.characters: the literal-character set templates interpolate rather
+  // than type — head.html's copyright meta reads characters.copyright, and
+  // with nothing defining the set every page fleet-wide shipped a leading
+  // blank. The legacy _config_default.yml set carried over verbatim (#286);
+  // a brand key wins, like site.omega's.
+  site.characters = {
+    asterisk: '*',
+    'brace-left': '{',
+    'brace-right': '}',
+    'brace-both': '{}',
+    'bracket-left': '[',
+    'bracket-right': ']',
+    'bracket-both': '[]',
+    copyright: '©',
+    underscore: '_',
+    ...(site.characters || {}),
+  };
   eleventyConfig.addGlobalData('site', site);
   // og:locale wants Open Graph's language_TERRITORY form (en → en_US), and the
   // code → locale map is the devkit language SSOT — the head include cannot

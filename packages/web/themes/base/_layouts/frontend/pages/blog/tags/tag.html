@@ -7,6 +7,10 @@ hero:
 ---
 
 <!-- ═══ Masthead ═══ -->
+{% comment %} The term as it DISPLAYS: the aggregation keeps the corpus's own
+   spelling ("automation"), and the tag cloud on /blog/tags title-cases the
+   same way — one presentation of one term (#294). {% endcomment %}
+{% assign tag_name = resolved.tag.name | omega_title_case %}
 <section class="omega-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
@@ -14,10 +18,10 @@ hero:
       <span>/</span>
       <a href="/blog/tags">Tags</a>
       <span>/</span>
-      <span>{{ resolved.tag.name }}</span>
+      <span>{{ tag_name }}</span>
     </div>
 
-    {% component "heading/masthead", headline: resolved.tag.name, sub: resolved.hero.subheadline %}
+    {% component "heading/masthead", headline: tag_name, sub: resolved.hero.subheadline %}
   </div>
 </section>
 

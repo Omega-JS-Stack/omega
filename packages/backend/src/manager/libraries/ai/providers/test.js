@@ -24,6 +24,10 @@
  *   { content, output, tokens, raw, toolCalls, stopReason }
  */
 const JSON5 = require('json5');
+const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
+
+// The test provider bills nothing — counts are simulated, prices stay zero
+const MODEL_CONFIG = { input: 0, output: 0 };
 
 // The closing `]]` must not be followed by another `]` so directive values may
 // END with a JSON `]` (e.g. [[tools:[...]]]); `]]` strictly INSIDE a value is
@@ -37,11 +41,9 @@ function TestProvider(ctx, key) {
   self.Manager = ctx?.Manager;
   self.key = key || 'test';
 
-  self.tokens = {
-    total:  { count: 0, price: 0 },
-    input:  { count: 0, price: 0 },
-    output: { count: 0, price: 0 },
-  };
+  // Running counter across every call this provider instance makes. Each call
+  // reports its OWN usage — this is the instance total.
+  self.tokens = emptyTokens();
 
   return self;
 }
@@ -71,9 +73,10 @@ TestProvider.prototype.request = async function (options) {
 
   const step = steps[stepIndex] || { type: 'echo' };
 
-  // Simulated token accounting so usage/cost paths execute
+  // Simulated token accounting so usage/cost paths execute. Counted for THIS
+  // call only — the instance counter is added to once the output is known.
   const inputChars = messages.reduce((n, m) => n + stringifyLoose(m.content).length, 0) || scriptSource.length;
-  self.tokens.input.count += Math.ceil(inputChars / 4);
+  const inputCount = Math.ceil(inputChars / 4);
 
   if (step.delay) {
     await new Promise((resolve) => setTimeout(resolve, Math.min(step.delay, 30000)));
@@ -90,13 +93,14 @@ TestProvider.prototype.request = async function (options) {
       arguments: call.arguments || {},
     }));
 
-    self.tokens.output.count += 10 * toolCalls.length;
-    finalizeTokens(self.tokens);
+    const tokens = buildTokens(inputCount, 10 * toolCalls.length, MODEL_CONFIG);
+
+    addTokens(self.tokens, tokens);
 
     return {
       content: '',
       output: [],
-      tokens: self.tokens,
+      tokens: tokens,
       raw: { provider: 'test', step: stepIndex, toolCalls },
       toolCalls,
       stopReason: 'tool_use',
@@ -116,8 +120,9 @@ TestProvider.prototype.request = async function (options) {
     }
   }
 
-  self.tokens.output.count += Math.ceil(text.length / 4);
-  finalizeTokens(self.tokens);
+  const tokens = buildTokens(inputCount, Math.ceil(text.length / 4), MODEL_CONFIG);
+
+  addTokens(self.tokens, tokens);
 
   let parsed = text;
 
@@ -132,7 +137,7 @@ TestProvider.prototype.request = async function (options) {
   return {
     content: parsed,
     output: [{ type: 'text', text }],
-    tokens: self.tokens,
+    tokens: tokens,
     raw: { provider: 'test', step: stepIndex },
     toolCalls: [],
     stopReason: 'end',
@@ -220,10 +225,6 @@ function assertAllowedEnvironment(Manager) {
   }
 
   throw new Error('AI test provider is only available in development or testing environments');
-}
-
-function finalizeTokens(tokens) {
-  tokens.total.count = tokens.input.count + tokens.output.count;
 }
 
 function stringifyLoose(content) {

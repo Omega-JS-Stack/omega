@@ -214,7 +214,10 @@ class SetupCommand extends BaseCommand {
     self.package = loadJSON(`${self.firebaseProjectPath}/package.json`);
     self.firebaseJSON = loadJSON(`${self.firebaseProjectPath}/firebase.json`);
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
-    self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/remoteconfig.template.json`);
+    // App root — where setup-tests/remoteconfig-template-file.js writes it.
+    // The old `functions/` spelling is the pre-src/dist layout and always
+    // read {}.
+    self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/remoteconfig.template.json`);
     self.projectPackage = self.package;
     // Resolved through @omega.js/config (app ← brand root, no framework-defaults
     // layer). Throws on secrets/parse errors (setup IS the audit — hard

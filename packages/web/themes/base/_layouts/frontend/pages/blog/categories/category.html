@@ -7,6 +7,10 @@ hero:
 ---
 
 <!-- ═══ Masthead ═══ -->
+{% comment %} The term as it DISPLAYS: the aggregation keeps the corpus's own
+   spelling ("growth"), and the category cloud on /blog/categories title-cases
+   the same way — one presentation of one term (#294). {% endcomment %}
+{% assign category_name = resolved.category.name | omega_title_case %}
 <section class="omega-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
@@ -14,10 +18,10 @@ hero:
       <span>/</span>
       <a href="/blog/categories">Categories</a>
       <span>/</span>
-      <span>{{ resolved.category.name }}</span>
+      <span>{{ category_name }}</span>
     </div>
 
-    {% component "heading/masthead", headline: resolved.category.name, sub: resolved.hero.subheadline %}
+    {% component "heading/masthead", headline: category_name, sub: resolved.hero.subheadline %}
   </div>
 </section>
 

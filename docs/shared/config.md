@@ -555,6 +555,7 @@ const {
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]
   findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one app dir (THE hierarchy rule)
+  findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file an app with no app-layer file rides
   resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself), bounded at the nearest .git
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
   resolveEnvChain,     // (startDir) → { app, brand, company } .env paths (no loading)

@@ -6,8 +6,16 @@
  * Site-only values render against the CONSTANT site global and cache by raw
  * source — across 1030 posts most frontmatter templates repeat. Per-page
  * values (`page.*`, `resolved.*`) bypass the cache entirely.
+ *
+ * The context-free omega_* filters are registered here too: LiquidJS drops an
+ * unknown filter SILENTLY (the value passes through un-filtered), so a
+ * frontmatter value reaching for one used to lose it with no signal — the
+ * taxonomy pages' `meta.title` needs omega_title_case (#294). Only the pure
+ * filter pack: the omega_* TAGS need the collection/icon wiring the render
+ * engine owns, and nothing may render a section at frontmatter time.
  */
 const { Liquid } = require('liquidjs');
+const { FILTER_NAMES } = require('@omega.js/template-kit/filters');
 
 // Engine-machinery keys the frontmatter walker must never enter: dynamic
 // permalinks belong to Eleventy, and the rest hold globals or other
@@ -36,6 +44,7 @@ const PER_PAGE_RE = /\b(?:page|resolved)\./;
  */
 function createFrontmatterResolver(options) {
   const engine = new Liquid();
+  for (const [name, fn] of Object.entries(FILTER_NAMES)) engine.registerFilter(name, fn);
   const scope = { site: options.site };
   const cache = new Map();
 

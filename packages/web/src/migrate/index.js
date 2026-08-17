@@ -12,7 +12,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadConfig } = require('@omega.js/config');
+const { loadConfig, resolveConfigPath, findBrandConfigPath } = require('@omega.js/config');
 const { convertConfig, readLegacyConfigs, serializeOmega } = require('./config-convert.js');
 const { runCodemod, collectTemplateFiles } = require('./codemod.js');
 const { lintText } = require('./lint.js');
@@ -41,10 +41,39 @@ function runMigration(root, options = {}) {
   // ---- 1. Config conversion
   const { jekyll, ujm, files: legacySources } = readLegacyConfigs(root);
   const omegaPath = path.join(root, 'config', 'omega.json5');
+  // The legacy guard runs FIRST, and stays first: a root that still carries
+  // _config.yml / ultimate-jekyll-manager.json is MID-conversion — the
+  // omega.json5 beside (or above) it is an earlier partial run or the brand
+  // layer, and the legacy sources are the truth to convert from. Probing for a
+  // converted config before this check would skip those roots forever.
   if (!jekyll && !ujm) {
-    report.errors.push(fs.existsSync(omegaPath)
-      ? 'no legacy configs found — this project looks already migrated'
-      : 'no legacy configs found (src/_config.yml / config/ultimate-jekyll-manager.json)');
+    // Pre-converted is the fleet-standard order, not a failure
+    // ([#297](https://github.com/Omega-JS-Stack/omega/issues/297)): the brand
+    // root's omega.json5 lands first and the app's UJM configs are gone before
+    // migrate ever runs, so the config step is DONE and the codemods below are
+    // the rest of the job. Only a root with neither legacy configs NOR a
+    // resolvable omega.json5 is genuinely broken.
+    //
+    // The omega.json5 the loadConfig contract resolves for this root: its own
+    // file, else its brand root's (an app inside a brand monorepo rides the
+    // brand config alone — the app-layer file is optional there).
+    const converted = resolveConfigPath(root) || findBrandConfigPath(root);
+    if (converted) {
+      report.config = { skipped: true, path: path.relative(root, converted) };
+      // "Already converted" is a claim about a config that WORKS, so the skip
+      // branch runs the same loader validation the conversion branch does —
+      // a file that throws (unparseable, secrets, bad targets) or carries
+      // schema findings is a loud error here, never a silent exit 0.
+      try {
+        const { errors } = loadConfig(root, 'web');
+        report.config.validation = errors.map((error) => error.message || String(error));
+      } catch (e) {
+        report.config.validation = [e.message];
+      }
+      report.errors.push(...report.config.validation);
+    } else {
+      report.errors.push('no legacy configs found (src/_config.yml / config/ultimate-jekyll-manager.json)');
+    }
   } else {
     const { omega, notes } = convertConfig({ jekyll, ujm });
     report.config = { path: path.relative(root, omegaPath), sources: legacySources.map((file) => path.relative(root, file)), notes, omega };

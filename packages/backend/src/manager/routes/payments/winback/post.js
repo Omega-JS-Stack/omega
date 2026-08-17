@@ -19,10 +19,10 @@ const isTrialing = require('../cancel/_is-trialing.js');
  *
  * Claimed ONCE per subscription: the claim is recorded on
  * payments-orders/{orderId}.requests.winback, which is also what a second call
- * is refused against — an offer that could be taken every time the cancel dialog
- * opens is a permanent discount nobody agreed to. A subscription with no order
- * doc has nowhere to record it, so it is refused (`offer-not-claimable`) rather
- * than handed an offer with no memory.
+ * is refused against (`offer-already-claimed`) — an offer that could be taken
+ * every time the cancel dialog opens is a permanent discount nobody agreed to.
+ * A subscription with no order doc has nowhere to record it, so it is refused
+ * (`offer-not-claimable`) rather than handed an offer with no memory.
  *
  * Cross-provider and CAPABILITY-GATED, the same shape uncancel uses: a processor
  * that can discount a live subscription exports applyOffer(), one that cannot
@@ -134,9 +134,18 @@ module.exports = async ({ ctx, user, settings }) => {
   const orderRef = admin.firestore().doc(`payments-orders/${orderId}`);
   const orderDoc = await orderRef.get();
 
+  // A past claimant reaching the cancel flow again is pitched the offer anyway
+  // — the client reads the ACCOUNT, which carries no claim — so this refusal
+  // rides the same branchable code the two gates above do ([#310]). Without
+  // one, accepting shows an error toast and leaves the dialog armed for a retry
+  // that can never succeed; with it the billing card retires the offer and
+  // opens the questionnaire, which is what the customer came for.
   if (orderDoc.exists && orderDoc.data().requests?.winback) {
     ctx.log(`Winback rejected: uid=${uid}, offer already claimed on payments-orders/${orderId}`);
-    return ctx.respond('You have already claimed this offer', { code: 400 });
+    return ctx.respond('You have already claimed this offer', {
+      code: 400,
+      additional: { code: 'offer-already-claimed' },
+    });
   }
 
   // The offer, in the shape every downstream reader already speaks

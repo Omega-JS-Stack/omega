@@ -25,6 +25,7 @@
 const _ = require('lodash');
 const JSON5 = require('json5');
 const format = require('./anthropic-format.js');
+const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
 
 const DEFAULT_MODEL = 'claude-opus-4-7';
 const OAUTH_BETA = 'oauth-2025-04-20';
@@ -47,11 +48,9 @@ function ClaudeCode(ctx, key) {
     || self.Manager?.config?.claude_code?.oauth_token
     || process.env.CLAUDE_CODE_OAUTH_TOKEN;
 
-  self.tokens = {
-    total:  { count: 0, price: 0 },
-    input:  { count: 0, price: 0 },
-    output: { count: 0, price: 0 },
-  };
+  // Running counter across every call this provider instance makes. Each call
+  // reports its OWN usage — this is the instance total.
+  self.tokens = emptyTokens();
 
   return self;
 }
@@ -136,12 +135,11 @@ ClaudeCode.prototype.request = async function (options) {
 
   const modelConfig = MODEL_TABLE[options.model] || MODEL_TABLE[DEFAULT_MODEL];
 
-  self.tokens.input.count  += raw.usage?.input_tokens || 0;
-  self.tokens.output.count += raw.usage?.output_tokens || 0;
-  self.tokens.total.count   = self.tokens.input.count + self.tokens.output.count;
-  self.tokens.input.price   = (self.tokens.input.count * modelConfig.input) / 1_000_000;
-  self.tokens.output.price  = (self.tokens.output.count * modelConfig.output) / 1_000_000;
-  self.tokens.total.price   = self.tokens.input.price + self.tokens.output.price;
+  // Usage for THIS response, then rolled into the instance counter — the caller
+  // gets its own usage, never a running total
+  const tokens = buildTokens(raw.usage?.input_tokens, raw.usage?.output_tokens, modelConfig);
+
+  addTokens(self.tokens, tokens);
 
   let parsed = outputText;
 
@@ -152,7 +150,7 @@ ClaudeCode.prototype.request = async function (options) {
   return {
     output: raw.content || [],
     content: parsed,
-    tokens: self.tokens,
+    tokens: tokens,
     raw,
     toolCalls,
     stopReason,

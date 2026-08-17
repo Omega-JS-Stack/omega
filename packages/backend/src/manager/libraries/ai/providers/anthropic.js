@@ -10,6 +10,7 @@
 const _ = require('lodash');
 const JSON5 = require('json5');
 const format = require('./anthropic-format.js');
+const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -32,11 +33,9 @@ function Anthropic(ctx, key) {
     || process.env.ANTHROPIC_API_KEY
     || process.env.OMEGA_ANTHROPIC_API_KEY;
 
-  self.tokens = {
-    total:  { count: 0, price: 0 },
-    input:  { count: 0, price: 0 },
-    output: { count: 0, price: 0 },
-  };
+  // Running counter across every call this provider instance makes. Each call
+  // reports its OWN usage — this is the instance total.
+  self.tokens = emptyTokens();
 
   return self;
 }
@@ -118,15 +117,13 @@ Anthropic.prototype.request = async function (options) {
   const toolCalls = format.extractToolCalls(raw.content);
   const stopReason = format.mapStopReason(raw.stop_reason);
 
-  // Update token counters
+  // Usage for THIS response, then rolled into the instance counter — the caller
+  // gets its own usage, never a running total
   const modelConfig = MODEL_TABLE[options.model] || MODEL_TABLE[DEFAULT_MODEL];
 
-  self.tokens.input.count  += raw.usage?.input_tokens || 0;
-  self.tokens.output.count += raw.usage?.output_tokens || 0;
-  self.tokens.total.count   = self.tokens.input.count + self.tokens.output.count;
-  self.tokens.input.price   = (self.tokens.input.count * modelConfig.input) / 1_000_000;
-  self.tokens.output.price  = (self.tokens.output.count * modelConfig.output) / 1_000_000;
-  self.tokens.total.price   = self.tokens.input.price + self.tokens.output.price;
+  const tokens = buildTokens(raw.usage?.input_tokens, raw.usage?.output_tokens, modelConfig);
+
+  addTokens(self.tokens, tokens);
 
   // Parse JSON if requested — but never on a tool-call turn, where empty/partial
   // text is the normal intermediate state (the caller continues the loop)
@@ -139,7 +136,7 @@ Anthropic.prototype.request = async function (options) {
   return {
     output: raw.content || [],
     content: parsed,
-    tokens: self.tokens,
+    tokens: tokens,
     raw,
     toolCalls,
     stopReason,

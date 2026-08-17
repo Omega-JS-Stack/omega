@@ -9,4 +9,13 @@ pagination:
   alias: category
 permalink: "/blog/categories/{{ category.slug }}.html"
 eleventyExcludeFromCollections: true
+
+# Per-term meta (#294): without it every generated page falls back to the
+# site default title/description — a real blog ships hundreds of pages under
+# one title. UJM's blog-taxonomy generator format, kept in-page so a consumer
+# who takes this default page over owns the wording too.
+meta:
+  title: "{{ resolved.category.name | omega_title_case }} - Blog Categories - {{ site.brand.name }}"
+  description: "Browse all blog posts in the {{ resolved.category.name | omega_title_case }} category."
+  breadcrumb: "{{ resolved.category.name | omega_title_case }}"
 ---

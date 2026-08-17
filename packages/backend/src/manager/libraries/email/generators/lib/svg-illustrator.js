@@ -16,6 +16,7 @@
  *   anthropic → claude-opus (Claude is good at artistic SVG.)
  */
 const { Resvg } = require('@resvg/resvg-js');
+const { emptyTokens, addTokens } = require('../../../ai/tokens.js');
 
 const DEFAULT_PROVIDER = 'openai';
 
@@ -50,7 +51,10 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
   let svg = '';
   let fallback = false;
   let attempts = 0;
-  let lastTokens = null;
+
+  // Every attempt reports its OWN usage, so a discarded first attempt still
+  // cost money — accumulate, never overwrite, or the newsletter totals under-report
+  let tokens = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     attempts++;
@@ -68,7 +72,7 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
         moderate: false,
       });
 
-      lastTokens = result.tokens;
+      tokens = addTokens(tokens || emptyTokens(), result.tokens);
       svg = extractSvg(result.content);
 
       if (svg) {
@@ -108,7 +112,7 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
       durationMs: Date.now() - startTime,
       attempts,
       fallback,
-      tokens: lastTokens,
+      tokens: tokens,
     },
   };
 }
@@ -158,7 +162,7 @@ function extractSvg(text) {
   }
 
   // Strip markdown fences
-  let cleaned = text.trim().replace(/^```(?:svg|xml)?\s*/i, '').replace(/\s*```$/i, '');
+  const cleaned = text.trim().replace(/^```(?:svg|xml)?\s*/i, '').replace(/\s*```$/i, '');
 
   // Find first <svg ... > ... </svg>
   const match = cleaned.match(/<svg[\s\S]*?<\/svg>/i);

@@ -1,8 +1,11 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Deny-all default: the scaffold never grants a bucket it knows nothing
+    // about. A brand that serves files from Storage opts in deliberately here,
+    // with a match block per path it actually exposes.
     match /{allPaths=**} {
-      allow read, write: if request.auth!=null;
+      allow read, write: if false;
     }
   }
 }

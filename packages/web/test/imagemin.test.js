@@ -163,9 +163,9 @@ test('buildSite: imagemin phase processes the shipped images and reports back', 
   const siteData = JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8'));
 
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-imagemin-build-'));
-  const consumerImages = path.join(base, 'consumer-images');
+  const consumerAssets = path.join(base, 'consumer-assets');
   await sharp({ create: { width: 800, height: 600, channels: 3, background: { r: 60, g: 60, b: 200 } } })
-    .jpeg().toFile(path.join(jetpack.dir(consumerImages).path(), 'photo.jpg'));
+    .jpeg().toFile(path.join(jetpack.dir(path.join(consumerAssets, 'images')).path(), 'photo.jpg'));
 
   const outDir = path.join(PKG, '.omega', 'imagemin-build');
   const result = await buildSite({
@@ -174,7 +174,7 @@ test('buildSite: imagemin phase processes the shipped images and reports back', 
     outDir,
     clientEntry: path.join(PKG, '..', 'client', 'src', 'index.js'),
     skipPurge: true,
-    staticDirs: resolveStaticDirs({ brandRoot: null, imagesDir: consumerImages }),
+    staticDirs: resolveStaticDirs({ brandRoot: null, assetsDir: consumerAssets }),
     imagemin: { cacheDir: path.join(base, 'cache') },
   });
 

@@ -15,6 +15,11 @@
  * All functions are pure — no network, no SDK — so they're unit-testable
  * without an ctx.
  */
+const { normalizePrompt, loadContent } = require('../prompt.js');
+
+// loadContent logs each prompt-file read through the caller's logger; the
+// formatters are pure and carry none
+function noopLog() {}
 
 /**
  * Map normalized function-tool definitions to Anthropic tool definitions.
@@ -80,14 +85,11 @@ function buildToolChoice(choice) {
  *
  * Accepts either:
  *   - options.messages: unified turns (see module header)
- *   - options.prompt.content (system) + options.message.content (user)
+ *   - options.prompt (object OR multi-role array form) + options.message.content
  */
 function buildMessages(options) {
   if (!Array.isArray(options.messages) || !options.messages.length) {
-    return {
-      system: stringifyContent(options.prompt?.content || ''),
-      messages: [{ role: 'user', content: stringifyContent(options.message?.content || '') }],
-    };
+    return buildFromPrompt(options);
   }
 
   // System: collect system + developer turns (Anthropic has no developer role —
@@ -159,6 +161,67 @@ function buildMessages(options) {
   }
 
   return { system, messages };
+}
+
+/**
+ * Build { system, messages } from the prompt/message form.
+ *
+ * The prompt resolves through the SAME segment loader the OpenAI provider uses,
+ * so both forms behave identically here: a prompt-file `path` is read and
+ * templated, the array form keeps every segment, and the object form is the
+ * single implicit 'system' segment. system + developer segments become the
+ * system prompt (Anthropic has no developer role); user + assistant segments
+ * become turns ahead of the user message.
+ */
+function buildFromPrompt(options) {
+  const segments = normalizePrompt(options.prompt).map((segment) => {
+    // Content blocks flatten before loading — loadContent templates strings
+    const input = segment.path ? segment : { ...segment, content: stringifyContent(segment.content) };
+    const content = loadContent(input, noopLog);
+
+    if (content instanceof Error) {
+      throw new Error(`Error loading prompt[${segment.role}]: ${content.message}`);
+    }
+
+    return { role: segment.role, content: content };
+  });
+
+  const system = segments
+    .filter((s) => s.role === 'system' || s.role === 'developer')
+    .map((s) => s.content)
+    .filter(Boolean)
+    .join('\n\n');
+
+  const messages = [];
+
+  for (const segment of segments) {
+    if (segment.role === 'user' || segment.role === 'assistant') {
+      pushTextTurn(messages, segment.role, segment.content);
+    }
+  }
+
+  const message = stringifyContent(options.message?.content || '');
+
+  // An empty message still gets its turn when nothing else carries the
+  // conversation — the Messages API requires at least one
+  if (message || !messages.length) {
+    pushTextTurn(messages, 'user', message);
+  }
+
+  return { system, messages };
+}
+
+// The Messages API rejects consecutive same-role turns, so text destined for
+// one that is already open joins it instead of opening a second
+function pushTextTurn(messages, role, content) {
+  const last = messages[messages.length - 1];
+
+  if (last && last.role === role && typeof last.content === 'string') {
+    last.content = [last.content, content].filter(Boolean).join('\n\n');
+    return;
+  }
+
+  messages.push({ role: role, content: content });
 }
 
 /**

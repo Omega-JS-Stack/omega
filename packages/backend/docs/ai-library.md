@@ -14,6 +14,23 @@ Return shape (same for all providers): `{ content, output, tokens, raw }` — pl
 
 API keys: `OMEGA_OPENAI_API_KEY`, `OMEGA_ANTHROPIC_API_KEY` (process.env or config).
 
+## Prompt forms
+
+`options.prompt` takes either form, and both survive `normalizeOptions()` unchanged:
+
+- **Object** — `{ path|content, settings }`, one implicit `system` segment. The universal prompt injections are prepended to `content`.
+- **Array** — `[{ role, path|content, settings }, ...]`, one segment per role (`system` | `developer` | `user` | `assistant`, defaulting to `system`), order preserved. The injections ride in as their own leading `system` segment so caller segments (prompt-file `path` included) reach the provider. One OpenAI caveat: a trailing `user` segment followed by a `message` is popped by the consecutive-role dedupe there, while the Claude providers merge the two turns.
+
+Both forms resolve through the same segment loader on every provider — on the Claude providers (`anthropic`, `claude-code`) `system` + `developer` segments join into the `system` string and `user` + `assistant` segments become leading turns.
+
+An array prompt and a non-empty `messages[]` **cannot combine** and throw: `messages[]` is the whole conversation on every provider, so the segments would be silently dropped. Pass the segments as `system` turns inside `messages[]` instead.
+
+## Token accounting
+
+`r.tokens` is the usage of THAT call — `{ total, input, output }`, each `{ count, price }`, priced from the model table. Summing `r.tokens` across calls is therefore correct. When a call retries internally (OpenAI's `retries` / `retryTriggers`), `r.tokens` is the usage of the attempt that resolved it; the discarded attempts count only on the PROVIDER instance's totals (`provider.tokens`), not in the returned report and not in `ai.tokens`.
+
+The running totals live on the instances: `ai.tokens` counts every call made through that `Manager.AI(ctx)` instance (all providers combined), and each provider instance keeps its own. Callers never share a tokens object, so parallel requests report their own usage.
+
 ## Image generation (OpenAI)
 
 `Manager.AI(ctx).image({ prompt, ... })` generates an image via OpenAI's image model (`gpt-image-2` by default). Separate from `request()` because the return type is bytes, not text — it bypasses moderation, token accounting, schema, and prompt-normalization (none apply to image gen).
@@ -126,6 +143,8 @@ The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that r
 | File | Purpose |
 |---|---|
 | `src/manager/libraries/ai/index.js` | Unified `AI` class (dispatches by provider; structured-messages detection) |
+| `src/manager/libraries/ai/prompt.js` | Shared prompt-segment normalization + content/prompt-file loading (both prompt forms, every provider) |
+| `src/manager/libraries/ai/tokens.js` | Token accounting helpers (per-call report, running counters) |
 | `src/manager/libraries/ai/providers/openai.js` | OpenAI provider (Responses API; direct-messages mode + tool envelopes) |
 | `src/manager/libraries/ai/providers/anthropic.js` | Anthropic provider (Claude Messages API, x-api-key, API credits, native tool_use) |
 | `src/manager/libraries/ai/providers/claude-code.js` | claude-code provider (Claude Messages API, OAuth Bearer, subscription billing, native tool_use) |

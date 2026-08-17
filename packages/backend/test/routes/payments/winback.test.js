@@ -38,7 +38,7 @@ const YEAR = 365 * 24 * 60 * 60;
  * @param {object} Manager - The @omega.js/backend Manager
  * @param {object} options - uid, product, processor, resourceId, and the state overrides
  */
-function subscriber(Manager, { uid, product, processor, resourceId, pending, trial, status }) {
+function subscriber(Manager, { uid, product, processor, resourceId, orderId, pending, trial, status }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - YEAR;
   const nextMonthUNIX = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
@@ -58,6 +58,7 @@ function subscriber(Manager, { uid, product, processor, resourceId, pending, tri
       payment: {
         processor: processor === undefined ? 'test' : processor,
         resourceId: resourceId === undefined ? 'sub_test_winback_guard' : resourceId,
+        orderId: orderId === undefined ? null : orderId,
         frequency: 'monthly',
         startDate: { timestamp: new Date(lastYearUNIX * 1000).toISOString(), timestampUNIX: lastYearUNIX },
       },
@@ -299,6 +300,50 @@ module.exports = {
           assert.equal(applied.length, 0, 'and nothing reached the processor');
         } finally {
           processor.applyOffer = realApplyOffer;
+        }
+      },
+    },
+
+    {
+      name: 'refuses-a-second-claim-with-a-branchable-code',
+      async run({ Manager, assert, config, firestore, skip }) {
+        // The offer is claimed ONCE, and a past claimant who opens the cancel
+        // dialog again is pitched it anyway — the client reads the account, not
+        // the order doc. So the refusal carries a code the billing card can
+        // branch on ([#310]): without one, accepting shows an error toast and
+        // leaves the dialog armed for a retry that can never succeed.
+        const product = paidProduct(config, skip);
+        const orderId = '_test-winback-claimed-order';
+        const user = subscriber(Manager, { uid: '_test-winback-claimed', product, orderId });
+        const processor = processorModule('test');
+        const applied = [];
+        const realApplyOffer = processor.applyOffer;
+
+        // The first claim, written where the route records it
+        await firestore.set(`payments-orders/${orderId}`, {
+          requests: {
+            winback: {
+              discount: winback.toDiscount(winback.resolveOffer(Manager.config)),
+              date: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
+            },
+          },
+        }, { merge: true });
+
+        processor.applyOffer = async (options) => applied.push(options);
+
+        try {
+          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+
+          assert.equal(sent.code, 400, 'Should refuse an offer this subscription already took');
+          assert.equal(
+            properties?.additional?.code,
+            'offer-already-claimed',
+            'the refusal carries a code the billing card can branch on',
+          );
+          assert.equal(applied.length, 0, 'and the processor is never asked to discount twice');
+        } finally {
+          processor.applyOffer = realApplyOffer;
+          await firestore.delete(`payments-orders/${orderId}`);
         }
       },
     },

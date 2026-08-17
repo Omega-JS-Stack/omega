@@ -1,10 +1,11 @@
 const fetch = require('wonderful-fetch');
 const jetpack = require('fs-jetpack');
-const powertools = require('node-powertools');
 const _ = require('lodash');
 const JSON5 = require('json5');
 const path = require('path');
 const mimeTypes = require('mime-types');
+const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
+const { VALID_PROMPT_ROLES, normalizePrompt, loadContent } = require('../prompt.js');
 
 // Constants
 const DEFAULT_MODEL = 'gpt-5.4-mini';
@@ -344,20 +345,9 @@ function OpenAI(ctx, key) {
     || process.env.OPENAI_API_KEY
     || process.env.OMEGA_OPENAI_API_KEY
 
-  self.tokens = {
-    total: {
-      count: 0,
-      price: 0,
-    },
-    input: {
-      count: 0,
-      price: 0,
-    },
-    output: {
-      count: 0,
-      price: 0,
-    },
-  }
+  // Running counter across every call this provider instance makes. Each call
+  // reports its OWN usage (see attemptRequest) — this is the instance total.
+  self.tokens = emptyTokens();
 
   return self;
 }
@@ -436,7 +426,7 @@ OpenAI.prototype.request = function (options) {
     options.history.messages = options.history.messages || [];
     options.history.limit = typeof options.history.limit === 'undefined' ? 5 : options.history.limit;
 
-    let attempt = { count: 0 };
+    const attempt = { count: 0 };
 
     function _log() {
       if (!options.log)  {
@@ -625,39 +615,6 @@ function tryParse(content) {
   }
 }
 
-// Roles permitted in the `options.prompt` array. Order is canonical per the
-// OpenAI Model Spec authority hierarchy (system > developer > user > ctx).
-const VALID_PROMPT_ROLES = new Set(['system', 'developer', 'user', 'assistant']);
-
-// Normalize the `options.prompt` input into a canonical array of segments:
-//   [{ role, path, content, settings }, ...]
-//
-// Accepts:
-//   - undefined/null/empty → []
-//   - object: { path|content, settings } → wrapped as a single 'system' segment
-//   - array: [{ role, path|content, settings }, ...] → role defaults to 'system'
-//     if omitted; invalid roles throw.
-function normalizePrompt(input) {
-  const segments = Array.isArray(input)
-    ? input
-    : (input && (input.path || input.content || input.settings)) ? [input] : [];
-
-  return segments.map((segment) => {
-    const role = segment.role || 'system';
-
-    if (!VALID_PROMPT_ROLES.has(role)) {
-      throw new Error(`Invalid prompt role: ${role}. Valid roles: ${[...VALID_PROMPT_ROLES].join(', ')}`);
-    }
-
-    return {
-      role: role,
-      path: segment.path || '',
-      content: segment.content || '',
-      settings: segment.settings || {},
-    };
-  });
-}
-
 function resolveSchema(schema, _log) {
   if (!schema) {
     return undefined;
@@ -683,44 +640,6 @@ function resolveSchema(schema, _log) {
 
   const raw = jetpack.read(filePath);
   return JSON5.parse(raw);
-}
-
-function loadContent(input, _log) {
-  // console.log('*** input!!!', input.content.slice(0, 50), input.path);
-  // console.log('*** input.content', input.content.slice(0, 50));
-  // console.log('*** input.path', input.path);
-
-  let content = '';
-
-  // Load content
-  if (input.path) {
-    // Convert to array if not already
-    const pathArray = Array.isArray(input.path) ? input.path : [input.path];
-
-    // Load and concatenate all files
-    for (const path of pathArray) {
-      const exists = jetpack.exists(path);
-
-      _log('Reading prompt from path:', path);
-
-      if (!exists) {
-        return new Error(`Path ${path} not found`);
-      } else if (exists === 'dir') {
-        return new Error(`Path ${path} is a directory`);
-      }
-
-      try {
-        const fileContent = jetpack.read(path);
-        content += (content ? '\n' : '') + fileContent;
-      } catch (e) {
-        return new Error(`Error reading file ${path}: ${e}`);
-      }
-    }
-  } else {
-    content = input.content;
-  }
-
-  return powertools.template(content, input.settings).trim();
 }
 
 function loadAttachment(type, content, _log) {
@@ -1113,20 +1032,19 @@ function attemptRequest(options, self, promptSegments, message, user, moderation
     // Get model configuration
     const modelConfig = getModelConfig(options.model);
 
-    // Set token counts
-    self.tokens.input.count += (r.usage.input_tokens || 0)
-      - (r.usage.input_tokens_details.cached_tokens || 0);
-    self.tokens.output.count += r.usage.output_tokens || 0;
-    self.tokens.total.count = self.tokens.input.count + self.tokens.output.count;
+    // Set token counts + prices from THIS response, then roll them into the
+    // instance counter — the caller gets its own usage, never a running total
+    const tokens = buildTokens(
+      (r.usage.input_tokens || 0) - (r.usage.input_tokens_details.cached_tokens || 0),
+      r.usage.output_tokens || 0,
+      modelConfig,
+    );
 
-    // Set token prices
-    self.tokens.input.price = (self.tokens.input.count * modelConfig.input) / 1000000;
-    self.tokens.output.price = (self.tokens.output.count * modelConfig.output) / 1000000;
-    self.tokens.total.price = self.tokens.input.price + self.tokens.output.price;
+    addTokens(self.tokens, tokens);
 
     // Log
     _log('Response', outputText.length, typeof outputText, outputText);
-    _log('Tokens', self.tokens);
+    _log('Tokens', tokens);
 
     // Try to parse JSON response if needed — never on a tool-call turn, where
     // empty text is the normal intermediate state (the caller continues the loop)
@@ -1137,7 +1055,7 @@ function attemptRequest(options, self, promptSegments, message, user, moderation
       return resolve({
         output: content,
         content: parsed,
-        tokens: self.tokens,
+        tokens: tokens,
         moderation: moderation,
         raw: r,
         toolCalls: toolCalls,
@@ -1344,6 +1262,7 @@ module.exports = OpenAI;
 // from consumer code.
 module.exports._internals = {
   normalizePrompt,
+  loadContent,
   formatHistory,
   formatMessages,
   normalizeToolEntry,

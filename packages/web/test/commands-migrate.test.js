@@ -68,6 +68,28 @@ test('no flags means a REAL migration — config written, legacy files gone', as
   assert.match(fs.readFileSync(path.join(root, 'src', 'pages', 'index.html'), 'utf8'), /\{\{ resolved\.meta\.title \}\}/);
 });
 
+test('a pre-converted app exits ZERO so scripted pipelines survive (#297)', (t) => {
+  // The fleet-standard order: the brand root config landed first and the UJM
+  // configs are already gone, so only the codemods are left.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-converted-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'index.html'), '<h1>{{ page.resolved.meta.title }}</h1>\n');
+
+  const result = spawnSync(process.execPath, [
+    '-e',
+    `require(${JSON.stringify(COMMAND)})({})`,
+  ], { cwd: root, encoding: 'utf8' });
+  const output = result.stdout + result.stderr;
+
+  assert.strictEqual(result.status, 0, 'already converted is success');
+  assert.match(output, /already converted/, 'says why the config step was skipped');
+  assert.match(output, /Next steps:/, 'the runbook still prints');
+  assert.match(fs.readFileSync(path.join(root, 'src', 'pages', 'index.html'), 'utf8'), /\{\{ resolved\.meta\.title \}\}/, 'the codemods still ran');
+});
+
 test('a report carrying errors exits non-zero and skips the next-steps block', (t) => {
   // A tree with no legacy configs at all — runMigration reports the error.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-empty-'));

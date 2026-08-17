@@ -137,6 +137,12 @@ function findBrandRoot(projectDir) {
   return fs.existsSync(path.join(brandRoot, 'config', FILE_NAME)) ? brandRoot : null;
 }
 
+/**
+ * The BRAND layer's omega.json5 for a project dir — the file an app inside a
+ * brand monorepo rides when it has no app-layer file of its own.
+ * @param {string} projectDir - App dir, brand root, or an APP_SUBDIR of one (functions/, dist/).
+ * @returns {string|null} Absolute brand omega.json5 path, or null outside a brand.
+ */
 function findBrandConfigPath(projectDir) {
   const brandRoot = findBrandRoot(projectDir);
   return brandRoot ? path.join(brandRoot, 'config', FILE_NAME) : null;
@@ -439,4 +445,4 @@ function composeTargetConfig(projectDir, target) {
   return { config, files: { app: appPath, brand: brandPath, company: companyPath } };
 }
 
-module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, APP_SUBDIRS };
+module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, APP_SUBDIRS };

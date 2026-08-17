@@ -1127,11 +1127,13 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
     logger.error('Failed to apply the winback offer:', error);
 
     // Same capability gate uncancel and plan-switch ride: the processor cannot
-    // discount a live subscription at all, or the claim has nowhere to be
-    // recorded — either way the offer is a dead end for this account, so
-    // retire it and open the questionnaire — a customer who came here to
-    // cancel must never be left in a dialog that cannot answer them.
-    const deadEndCodes = ['not-supported-by-processor', 'offer-not-claimable'];
+    // discount a live subscription at all, the claim has nowhere to be
+    // recorded, or it was already claimed once (the offer's memory lives on the
+    // order doc, which the account this card reads never carries, so a past
+    // claimant IS pitched again) — either way the offer is a dead end for this
+    // account, so retire it and open the questionnaire — a customer who came
+    // here to cancel must never be left in a dialog that cannot answer them.
+    const deadEndCodes = ['not-supported-by-processor', 'offer-not-claimable', 'offer-already-claimed'];
     if (deadEndCodes.includes(error.properties?.additional?.code)) {
       winbackSupported = false;
       retireWinbackOffer();

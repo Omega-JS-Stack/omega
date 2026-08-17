@@ -15,6 +15,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
+const JSON5 = require('json5');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { loadConfig } = require('@omega.js/config');
@@ -362,10 +363,109 @@ test('e2e: real migration converts config, rewrites templates, removes legacy fi
     assert.ok(scss.includes("@use 'omega:main' as * with ("), 'theme-variable customization rewired to the layered importer');
     assert.ok(scss.includes('$primary: #5B47FB'), 'with-args preserved verbatim');
 
-    // Second run: nothing legacy left — reported, not destructive
+    // Second run: nothing legacy left, the config it wrote is right there —
+    // already-converted is DONE, not an error ([#297]).
     const again = runMigration(root, {});
-    assert.ok(again.errors.some((error) => error.includes('already migrated')), 'rerun reports already-migrated');
+    assert.deepStrictEqual(again.errors, [], 'a rerun is not a failure');
+    assert.strictEqual(again.config.skipped, true, 'rerun reports the config step already done');
     assert.strictEqual(again.codemod.totalEdits, 0, 'rewrites are idempotent');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// A consumer migrated in the FLEET-STANDARD order (#297): the brand root's
+// omega.json5 exists and the app's UJM configs are already gone before
+// `omega migrate` runs, so only the codemods are left to do.
+function stagePreConvertedBrandApp() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-preconverted-'));
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+
+  const appDir = path.join(root, 'apps', 'website');
+  fs.mkdirSync(path.join(appDir, 'src', 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(appDir, 'src', 'pages', 'index.html'), [
+    '---',
+    'layout: themes/[ site.theme.id ]/frontend/core/base',
+    '---',
+    '<h1>{{ page.resolved.meta.title }}</h1>',
+  ].join('\n'));
+  fs.writeFileSync(path.join(appDir, 'Gemfile'), "source 'https://rubygems.org'\n");
+  return { root, appDir };
+}
+
+test('e2e: a pre-converted app (brand config above, no legacy configs) succeeds and still codemods (#297)', () => {
+  const { root, appDir } = stagePreConvertedBrandApp();
+  try {
+    const report = runMigration(appDir, {});
+
+    assert.deepStrictEqual(report.errors, [], 'a converted config is not a failure');
+    assert.strictEqual(report.config.skipped, true, 'the config step reports itself already done');
+    assert.strictEqual(report.config.path, path.join('..', '..', 'config', 'omega.json5'), 'names the config the loader resolves');
+
+    const page = fs.readFileSync(path.join(appDir, 'src', 'pages', 'index.html'), 'utf8');
+    assert.ok(page.includes('{{ resolved.meta.title }}'), 'the codemods still ran');
+    assert.ok(page.includes('layout: frontend/core/base'), 'bracket layout rewritten');
+    assert.ok(!fs.existsSync(path.join(appDir, 'Gemfile')), 'legacy hygiene still ran');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: a pre-converted app whose config does NOT load fails loudly instead of claiming success', () => {
+  const { root, appDir } = stagePreConvertedBrandApp();
+  try {
+    // The brand file above the app is unparseable — the app has nothing legacy
+    // left, so "already converted" is the branch that must catch this.
+    fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme',\n");
+
+    const report = runMigration(appDir, {});
+
+    assert.strictEqual(report.config.skipped, true, 'still the skip branch');
+    assert.ok(report.errors.some((error) => error.includes('Failed to parse')), 'a config that will not load is a migration error, not exit 0');
+    assert.deepStrictEqual(report.config.validation, report.errors, 'the loader finding is reported on the config step too');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The mid-conversion boundary (#298): the legacy guard runs BEFORE the
+// converted-config probe. A root carrying BOTH — legacy sources and an
+// omega.json5 from an earlier partial run — is NOT done; the legacy files are
+// the truth to convert from, and hoisting the skip check above the guard would
+// strand every such root on a stale config.
+test('e2e: legacy configs beside an existing omega.json5 still convert', () => {
+  const root = stageLegacyConsumer();
+  try {
+    fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'stale', name: 'Stale' }, targets: { web: {} } }\n");
+
+    const report = runMigration(root, {});
+
+    assert.deepStrictEqual(report.errors, []);
+    assert.ok(!report.config.skipped, 'an existing omega.json5 never short-circuits a root that still has legacy sources');
+    assert.deepStrictEqual(
+      report.config.sources,
+      [path.join('src', '_config.yml'), path.join('config', 'ultimate-jekyll-manager.json')],
+      'the conversion reads the legacy files',
+    );
+
+    const written = JSON5.parse(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'));
+    assert.strictEqual(written.brand.id, 'sample', 'the stale file was rewritten from the legacy sources');
+    assert.strictEqual(written.brand.url, 'https://sample.test');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: neither a legacy config nor a resolvable omega.json5 still fails loudly (#297)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-broken-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'index.html'), '<h1>{{ page.resolved.meta.title }}</h1>\n');
+
+    const report = runMigration(root, {});
+    assert.strictEqual(report.config, null, 'nothing to report about a config that does not exist');
+    assert.ok(report.errors.some((error) => error.includes('no legacy configs found')), 'the broken state is an error');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -24,12 +24,12 @@ const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
-const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
 const { readCompanyRoot, COMPANY_MARKER } = require('./company.js');
 const { applyConfigEdits, writeConfigValues } = require('./edit.js');
 const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js');
-const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
+const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
@@ -46,6 +46,7 @@ module.exports = {
   resolveConfigPath,
   getEnabledTargets,
   findBrandRoot,
+  findBrandConfigPath,
   resolveBrandRoot,
   FILE_NAME,
   CONFIG_LOCATIONS,
@@ -66,8 +67,7 @@ module.exports = {
   applyCanonicalOrder,
   CANONICAL_TOP_LEVEL_ORDER,
 
-  // Layer-aware consumer seeding (brand-app = targets-only)
-  renderBrandAppSeed,
+  // Layer-aware consumer seeding (brand-app = no app-layer config at all)
   resolveSeedMode,
 
   // Owner hooks (config/hooks/<call-site>.js — brand root, then company root)

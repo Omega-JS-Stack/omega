@@ -19,7 +19,9 @@ module.exports = async function (options) {
   const report = runMigration(root, { check });
 
   // ---- config
-  if (report.config) {
+  if (report.config && report.config.skipped) {
+    logger.log(`Config: already converted (${report.config.path}), skipping the conversion step`);
+  } else if (report.config) {
     const verb = check ? 'would write' : 'wrote';
     logger.log(`Config: ${verb} ${report.config.path} (from ${report.config.sources.join(' + ')})`);
     for (const note of report.config.notes) logger.warn(`  note: ${note}`);
