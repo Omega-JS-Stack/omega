@@ -5,16 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.33.0] 2026-08-16
 ### Added
-- [#284](../../issues/284) — `omega setup --offline` blocks every live mutation during a scaffold run: the index deploy, the bucket lifecycle write, and campaign seeding downgrade to reported warnings naming the flag, while read-only checks (and the drift report) still run. It is a no-mutation flag, not a no-network flag.
-- [#276](../../issues/276) — `@omega.js/manager` ships the `omega`, `omg` and `mgr` bins through the shared dispatcher, so `npx omega onboard` works in a fresh brand-template clone and a brand monorepo still dispatches every bin to the right CLI regardless of npm's hoist winner.
-- [#248](../../issues/248) — `omega migrate` renames the legacy client-runtime surface (imports, `data-wm-bind`, the sign-out class, `web_manager:` frontmatter, asset-lib and service-worker specifiers, themed includes) across templates, consumer JS and section `.json` descriptors; `migrate --check` names UJM harness test files `omega test` would falsely pass, detecting them by shape.
+- [#284](../../issues/284) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — `omega setup --offline` blocks every live mutation during a scaffold run: the index deploy, the bucket lifecycle write, and campaign seeding downgrade to reported warnings naming the flag, while read-only checks (and the drift report) still run. It is a no-mutation flag, not a no-network flag.
+- [#276](../../issues/276) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — `@omega.js/manager` ships the `omega`, `omg` and `mgr` bins through the shared dispatcher, so `npx omega onboard` works in a fresh brand-template clone and a brand monorepo still dispatches every bin to the right CLI regardless of npm's hoist winner.
+- [#248](../../issues/248) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — `omega migrate` renames the legacy client-runtime surface (imports, `data-wm-bind`, the sign-out class, `web_manager:` frontmatter, asset-lib and service-worker specifiers, themed includes) across templates, consumer JS and section `.json` descriptors; `migrate --check` names UJM harness test files `omega test` would falsely pass, detecting them by shape.
 
 ### Fixed
-- [#319](../../issues/319) — The app sidebar's project-selector dropdown escapes the rail: the rail clips nothing, the nav scrolls in its own region under the pinned selector, the open menu stacks over content cards at every viewport, and a long menu scrolls internally.
-- [#289](../../issues/289) — Packaged store descriptions render `{{ brand.* }}` tokens from config at package time (English and translated variants alike) instead of shipping them literally to the store listing; a token that cannot resolve is warned about by name.
-- [#253](../../issues/253) — Classy exposes per-component theme knobs (`$headings-font-family` and the button, input, modal, toast and badge radii) as declared `!default` slots that its own rules read, so a partial theme's overrides reach the rendered surfaces instead of being silently out-cascaded; stock output is unchanged.
-- [#252](../../issues/252) — The theme-starter README names the real consumer theme home (`src/themes/<id>/`) and describes the sibling-theme route truthfully, including the one real caveat (a consumer `src/themes/base/` shadows the packaged base layer).
+- [#319](../../issues/319) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — The app sidebar's project-selector dropdown escapes the rail: the rail clips nothing, the nav scrolls in its own region under the pinned selector, the open menu stacks over content cards at every viewport, and a long menu scrolls internally.
+- [#289](../../issues/289) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — Packaged store descriptions render `{{ brand.* }}` tokens from config at package time (English and translated variants alike) instead of shipping them literally to the store listing; a token that cannot resolve is warned about by name.
+- [#253](../../issues/253) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — Classy exposes per-component theme knobs (`$headings-font-family` and the button, input, modal, toast and badge radii) as declared `!default` slots that its own rules read, so a partial theme's overrides reach the rendered surfaces instead of being silently out-cascaded; stock output is unchanged.
+- [#252](../../issues/252) [`83ee7450`](../../commit/83ee7450) Thanks [@ianwieds]! — The theme-starter README names the real consumer theme home (`src/themes/<id>/`) and describes the sibling-theme route truthfully, including the one real caveat (a consumer `src/themes/base/` shadows the packaged base layer).
 
 ## [0.32.2] 2026-08-16
 ### Fixed
