@@ -11,6 +11,11 @@ const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialin
  * was never written) renders as an empty billing panel and answers a cancel with a
  * plan nobody sells.
  *
+ * And every persona is a FULL account ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)),
+ * journey ones included: identical in shape AND in substance to a real user, so QA
+ * signed in as one sees exactly what a customer sees. The completeness cases below
+ * are what stops a persona added tomorrow from arriving half-built.
+ *
  * PURE: reads the seeder's own definitions against the brand catalog — no emulator,
  * no Firestore. What it pins is the SEED, which is what every payment suite and the
  * dev palette start from.
@@ -275,8 +280,179 @@ module.exports = {
         );
       },
     },
+
+    // Every persona is a FULL account ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)):
+    // account creation writes the schema's SHAPE and nothing else, so a persona
+    // that stopped there is a nameless account from nowhere on every surface that
+    // shows a person. This is the guard that a persona added tomorrow cannot
+    // regress to that.
+    {
+      name: 'every-persona-is-a-full-account',
+      async run({ assert, config }) {
+        const definitions = getAccountDefinitions('example.com', config);
+
+        for (const [key, definition] of Object.entries(definitions)) {
+          const { personal, activity } = definition.properties;
+
+          for (const path of REAL_ACCOUNT_LEAVES) {
+            const value = leafAt({ personal, activity }, path);
+
+            assert.ok(
+              value !== undefined && value !== null && value !== '',
+              `Persona '${key}' must carry ${path} — a real user has one`,
+            );
+          }
+
+          // The numeric leaves default to 0, which is the schema saying "unset".
+          assert.ok(personal.telephone.national > 0, `Persona '${key}' must carry a telephone number`);
+          assert.ok(personal.birthday.timestampUNIX > 0, `Persona '${key}' must carry a birthday`);
+          assert.notEqual(activity.geolocation.latitude, 0, `Persona '${key}' must be somewhere (latitude)`);
+          assert.notEqual(activity.geolocation.longitude, 0, `Persona '${key}' must be somewhere (longitude)`);
+          assert.equal(typeof activity.client.mobile, 'boolean', `Persona '${key}' signed up on a known form factor`);
+
+          // The location is ONE fact: where the request came from is where the
+          // person says they are. A persona split across two places is a bug in
+          // the seeder, and it renders as one on the account page.
+          assert.equal(personal.location.country, activity.geolocation.country, `Persona '${key}' lives where it signed up from (country)`);
+          assert.equal(personal.location.city, activity.geolocation.city, `Persona '${key}' lives where it signed up from (city)`);
+        }
+      },
+    },
+
+    // The profile is DERIVED from the persona key, never rolled — so the account
+    // QA screenshotted last week is the account in front of them today, and a
+    // reseed never shuffles who anybody is.
+    {
+      name: 'a-persona-profile-is-the-same-on-every-boot',
+      async run({ assert, config }) {
+        const first = getAccountDefinitions('example.com', config);
+        const second = getAccountDefinitions('example.com', config);
+
+        for (const key of Object.keys(first)) {
+          assert.deepEqual(
+            second[key].properties.personal,
+            first[key].properties.personal,
+            `Persona '${key}' must draw the same identity on every seed`,
+          );
+          assert.deepEqual(
+            second[key].properties.activity,
+            first[key].properties.activity,
+            `Persona '${key}' must draw the same signup context on every seed`,
+          );
+        }
+      },
+    },
+
+    // A persona bought through the TEST processor carries what that processor
+    // writes. The negative-path fixtures are excluded by construction, not by an
+    // exemption list: they name a null or unknown processor, which is the whole
+    // point of them.
+    {
+      name: 'test-processor-personas-carry-the-record-it-writes',
+      async run({ assert, config, skip }) {
+        if (!paidPlan(config)) {
+          skip('No paid subscription product configured in this brand');
+        }
+
+        const definitions = getAccountDefinitions('example.com', config);
+        const bought = Object.entries(definitions).filter(([, definition]) => definition.properties.subscription?.payment?.processor === 'test');
+
+        assert.ok(bought.length > 0, 'The seeder must define personas bought through the test processor');
+
+        for (const [key, definition] of bought) {
+          const payment = definition.properties.subscription.payment;
+
+          assert.ok(payment.resourceId, `Persona '${key}' must name the resource the processor holds its subscription under`);
+          assert.ok(payment.startDate?.timestampUNIX > 0, `Persona '${key}' must record when its subscription began`);
+          assert.ok(payment.updatedBy?.event?.name, `Persona '${key}' must name the event that last wrote its subscription`);
+          assert.ok(payment.updatedBy?.date?.timestampUNIX > 0, `Persona '${key}' must record when that event landed`);
+
+          // The write's DATE follows the term: a term that already ended cannot
+          // have been written to today (the email layer prints this stamp as the
+          // last payment date). One day of slack absorbs boundary rounding.
+          const expires = definition.properties.subscription.expires;
+          if (expires?.timestampUNIX && expires.timestampUNIX <= Math.floor(Date.now() / 1000)) {
+            assert.ok(
+              payment.updatedBy.date.timestampUNIX <= expires.timestampUNIX + 86400,
+              `Persona '${key}' ended ${expires.timestamp} but its last write claims ${payment.updatedBy.date.timestamp}`
+            );
+          }
+        }
+      },
+    },
+
+    // The reported break (#327): the dev palette's Premium persona had a resolved
+    // plan and no processor record, so every payment-gated surface skipped it —
+    // the billing panel offers the winback discount only where it can actually be
+    // applied (a processor and its resource: core/js/pages/dashboard/account/
+    // sections/billing.js), and QA read the missing pitch as a product bug.
+    {
+      name: 'the-premium-persona-is-a-real-subscriber',
+      async run({ assert, config, skip }) {
+        if (!paidPlan(config)) {
+          skip('No paid subscription product configured in this brand');
+        }
+
+        const subscription = getAccountDefinitions('example.com', config)['premium-active'].properties.subscription;
+        const payment = subscription.payment;
+
+        assert.equal(subscription.status, 'active', 'The Premium persona holds a live subscription');
+        assert.equal(subscription.product.id, getFirstPaidProduct(config).id, 'The Premium persona holds the catalog\'s paid plan');
+        assert.equal(subscription.cancellation.pending, false, 'Nothing has been cancelled — this is the steady-state subscriber');
+
+        // The winback pitch's own gate, asserted as the gate reads it.
+        assert.ok(payment.processor && payment.resourceId, 'A payment-gated surface must be able to reach this persona at its processor');
+        assert.equal(payment.processor, 'test', 'The persona is held at the TEST processor — demo-safe, never a live one');
+
+        assert.ok(payment.startDate.timestampUNIX < Math.floor(Date.now() / 1000), 'The persona subscribed in the past, not this instant');
+        assert.ok(payment.price > 0, 'The persona pays what the catalog charges');
+
+        // And the purchase behind it exists, like any real subscriber's.
+        const fixture = buildOrderFixture('premium-active', config);
+
+        assert.ok(fixture, 'The Premium persona names an order, so it must have one');
+        assert.equal(fixture.doc.owner, '_test-premium-active', 'The order belongs to the Premium persona');
+        assert.equal(fixture.doc.unified.status, 'active', 'The order records the live subscription it bought');
+      },
+    },
   ],
 };
+
+/**
+ * The leaves a REAL user doc carries a value in — the sections `routes/user/signup`
+ * fills from the request (`activity`) and the person fills in about themselves
+ * (`personal`). Every one of them is a field some surface renders.
+ */
+const REAL_ACCOUNT_LEAVES = [
+  'personal.name.first',
+  'personal.name.last',
+  'personal.gender',
+  'personal.location.country',
+  'personal.location.region',
+  'personal.location.city',
+  'personal.company.name',
+  'personal.company.position',
+  'personal.telephone.countryCode',
+  'activity.geolocation.ip',
+  'activity.geolocation.continent',
+  'activity.geolocation.country',
+  'activity.geolocation.region',
+  'activity.geolocation.city',
+  'activity.client.language',
+  'activity.client.device',
+  'activity.client.platform',
+  'activity.client.browser',
+  'activity.client.runtime',
+  'activity.client.userAgent',
+  'activity.client.url',
+];
+
+/**
+ * Read a dotted path off an object, undefined for anything missing on the way.
+ */
+function leafAt(source, path) {
+  return path.split('.').reduce((value, segment) => (value === undefined || value === null ? value : value[segment]), source);
+}
 
 /**
  * The catalog's first plan that is actually for sale. A brand that sells nothing

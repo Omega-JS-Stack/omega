@@ -13,12 +13,13 @@
   {% iftruthy args.kicker %}
     <span class="newsflash-kicker mb-1">{{ args.kicker }}</span>
   {% endiftruthy %}
-  <h3 class="h5 my-2">{{ args.title }}</h3>
   {% comment %} Generated-content tell (#208): callers pass the document's
     `generated` flag straight through, so every story row of a sample post
-    says what it is. {% endcomment %}
+    says what it is. It sits on the kicker line above the headline (#322), a
+    chip beside it rather than a band of its own. {% endcomment %}
   {% iftruthy args.generated %}
-    <span class="omega-generated-badge mb-2">TEST</span>
+    <span class="omega-chip omega-generated-badge mb-1">TEST</span>
   {% endiftruthy %}
+  <h3 class="h5 my-2">{{ args.title }}</h3>
   {% component "news/byline", author: args.author, date: args.date, readtime: args.readtime %}
 </a>

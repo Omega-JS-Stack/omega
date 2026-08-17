@@ -287,9 +287,11 @@ client:
       <div class="col-12 col-lg-5 order-2">
         <div class="omega-checkout__sticky">
           <div class="omega-checkout__summary" data-omega-reveal>
-            <div class="omega-checkout__summary-head d-none d-lg-flex">
-              <span class="omega-micro">Order summary</span>
-              <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="omega-checkout__mark filter-adaptive" alt="">
+            <div class="omega-panel-head omega-checkout__panel-head d-none d-lg-flex">
+              <h2 class="omega-checkout__panel-title mb-0">
+                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "receipt", "fa-sm" %}</span>
+                Order summary
+              </h2>
             </div>
 
             <!-- Product identity: what you get, on what cadence -->
@@ -348,13 +350,6 @@ client:
                 <span class="omega-micro">Total due today</span>
                 <span class="omega-receipt__total" data-omega-bind="@text checkout.pricing.total">$--</span>
               </div>
-
-              <div class="omega-receipt__row"
-                   data-omega-bind="@show checkout.product.isSubscription"
-                   hidden>
-                <span class="omega-micro">Recurring</span>
-                <span class="omega-checkout__recurring"><span data-omega-bind="@text checkout.pricing.recurringAmount">$--</span> <span data-omega-bind="@text checkout.pricing.recurringPeriod">monthly</span></span>
-              </div>
             </div>
 
             <!-- Subscription Terms -->
@@ -380,15 +375,16 @@ client:
 
   <!-- Trust foot + help — one quiet line each, shared by both breakpoints.
        The refund chip rides the brand's `pricing.guarantee` gate (#273); the
-       other two state facts the framework owns. -->
-  <div class="omega-checkout__trust mt-3 mt-lg-4">
+       other two state facts the framework owns. Both reveal in like every zone
+       above them (#326) — they were the page's only static block. -->
+  <div class="omega-checkout__trust mt-3 mt-lg-4" data-omega-reveal>
     <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
     {% iftruthy resolved.pricing.guarantee %}
       <span>{% omega_icon "shield-halved", "fa-xs" %} Money-back guarantee</span>
     {% endiftruthy %}
     <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
   </div>
-  <div class="text-center mt-1 mt-lg-3">
+  <div class="text-center mt-1 mt-lg-3" data-omega-reveal>
     <a href="javascript:;" class="omega-checkout__quiet-link small" id="checkout-help-button">
       {% omega_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
     </a>

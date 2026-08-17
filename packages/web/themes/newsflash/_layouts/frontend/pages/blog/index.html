@@ -90,12 +90,12 @@ newsletter_cta:
             {% if lead.post.categories[0] %}
               <span class="newsflash-kicker mb-2">{{ lead.post.categories[0] | omega_title_case }}</span>
             {% endif %}
-            <h3 class="h1 my-2">{{ lead.post.title }}</h3>
-
             {% comment %} Generated-content tell (#208): the lead splash is its
               own layout-owned form, not the story-card component, so it
-              carries the badge itself. {% endcomment %}
-            {% if lead.generated %}<span class="omega-generated-badge mb-2">TEST</span>{% endif %}
+              carries the badge itself. Kicker line, above the headline
+              (#322). {% endcomment %}
+            {% if lead.generated %}<span class="omega-chip omega-generated-badge mb-2">TEST</span>{% endif %}
+            <h3 class="h1 my-2">{{ lead.post.title }}</h3>
             {% capture lead_rt %}{% omega_readtime lead.content %}{% endcapture %}
             {% component "news/byline", author: lead.post.author, date: lead.date | date: "%b %d, %Y", readtime: lead_rt, p_class: "text-body-secondary mb-3" %}
             <span class="btn btn-outline-dark btn-sm">Read the story {% omega_icon "arrow-right", "ms-1" %}</span>

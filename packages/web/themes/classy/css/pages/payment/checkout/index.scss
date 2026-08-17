@@ -439,21 +439,6 @@
   }
 }
 
-.omega-checkout__summary-head {
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.875rem;
-  border-bottom: 1px solid var(--omega-line);
-  margin-bottom: 0.875rem;
-}
-
-.omega-checkout__mark {
-  width: 1.375rem;
-  height: 1.375rem;
-  object-fit: contain;
-}
-
 .omega-checkout__product {
   display: flex;
   align-items: baseline;
@@ -482,11 +467,6 @@
 
 .omega-checkout__row-bad {
   color: var(--omega-danger);
-}
-
-.omega-checkout__recurring {
-  color: var(--omega-ink-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 // Subscription terms — the fine print under the numbers

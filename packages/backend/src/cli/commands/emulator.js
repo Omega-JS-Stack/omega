@@ -73,6 +73,34 @@ function commandProjectId(command) {
   return match ? match[1] : null;
 }
 
+// How long a boot may take before the run declares it dead and shuts the
+// partial stack down. The default absorbs a slow port sweep — lsof stalling on
+// a network mount takes a real boot past the old 60s cap, which failed every
+// self-booting lane on such a machine
+// ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)).
+const DEFAULT_READY_TIMEOUT_MS = 180000;
+
+/**
+ * Resolve the emulator ready deadline from the environment.
+ * @param {string} [raw] - The OMEGA_EMULATOR_READY_TIMEOUT value, in ms.
+ * @returns {number} The deadline in milliseconds.
+ */
+function resolveReadyTimeout(raw) {
+  if (raw === undefined || raw === '') {
+    return DEFAULT_READY_TIMEOUT_MS;
+  }
+
+  const parsed = Number(raw);
+
+  // A junk override fails loudly instead of silently racing an unknown
+  // deadline — the same rule the #211 lane multiplier follows.
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`OMEGA_EMULATOR_READY_TIMEOUT must be a positive number of milliseconds, got "${raw}"`);
+  }
+
+  return parsed;
+}
+
 /**
  * Can this process be PROVEN to be an emulator process of THIS project?
  *
@@ -749,13 +777,15 @@ class EmulatorCommand extends BaseCommand {
       shutdownDone = true;
     };
 
-    // Race the readiness marker against a 60s timeout. A boot that never comes
+    // Race the readiness marker against a deadline. A boot that never comes
     // up has still spawned: the shell, firebase, and any jar it got as far as.
     // Throwing straight out of here left them running and handed the caller no
     // handle to stop them, so a failed boot takes the same stop path a normal
     // one does before it propagates
-    // ([#304](https://github.com/Omega-JS-Stack/omega/issues/304)).
-    const readyTimeoutMs = 60000;
+    // ([#304](https://github.com/Omega-JS-Stack/omega/issues/304)). The
+    // deadline is env-tunable and defaults high enough to absorb a slow port
+    // sweep ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)).
+    const readyTimeoutMs = resolveReadyTimeout(process.env.OMEGA_EMULATOR_READY_TIMEOUT);
     try {
       await Promise.race([
         readyPromise,
@@ -1140,6 +1170,7 @@ class EmulatorCommand extends BaseCommand {
 
 // Static, alongside Middleware's precedent — the ownership decision is pure,
 // so tests exercise it directly with real `ps` rows instead of live processes.
+EmulatorCommand.resolveReadyTimeout = resolveReadyTimeout;
 EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;
 EmulatorCommand.isStoppableEmulatorProcess = isStoppableEmulatorProcess;
 EmulatorCommand.isReapableOrphan = isReapableOrphan;

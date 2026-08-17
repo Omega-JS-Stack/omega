@@ -131,6 +131,60 @@ test('options.user fills missing auth identity but never overrides the doc', () 
   assert.strictEqual(existing.auth.email, 'doc@example.com');
 });
 
+// ─── The applied discount ───
+
+test('an applied winback discount survives resolution, source and all', () => {
+  // The card that renders it reads the RESOLVED account, and resolution strips
+  // every key the schema does not name — so a claim the route persisted has to
+  // come back out of the engine intact ([#325]).
+  const account = resolveAccount({
+    subscription: {
+      product: { id: 'premium' },
+      status: 'active',
+      discount: {
+        valid: true,
+        code: 'WINBACK50',
+        percent: 50,
+        amount: 0,
+        duration: 'once',
+        source: 'winback',
+      },
+    },
+  });
+
+  assert.deepStrictEqual(account.subscription.discount, {
+    valid: true,
+    code: 'WINBACK50',
+    percent: 50,
+    amount: 0,
+    duration: 'once',
+    source: 'winback',
+  });
+});
+
+test('a fresh account carries no discount at all', () => {
+  const discount = resolveAccount({}).subscription.discount;
+
+  assert.strictEqual(discount.valid, false, 'absent and denied are the same thing to a reader');
+  assert.strictEqual(discount.code, null);
+  assert.strictEqual(discount.source, null, 'and nothing claims to be a winback claim');
+});
+
+test('a checkout discount keeps its OWN source — the winback claim is not the shape', () => {
+  // A code typed at checkout sets this same node, and a winback pitch suppressed
+  // by someone else's promo is an offer silently withheld. `source` is what the
+  // pitch gate reads, so the two are never the same signal.
+  const account = resolveAccount({
+    subscription: {
+      discount: { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once', source: 'checkout' },
+    },
+  });
+
+  assert.strictEqual(account.subscription.discount.source, 'checkout');
+  assert.strictEqual(account.subscription.discount.amount, 10);
+  assert.strictEqual(account.subscription.discount.percent, 0, 'the shape it is not reports zero, never undefined');
+});
+
 // ─── resolveSubscription ───
 
 test('fresh account resolves to basic/inactive/never-paid', () => {

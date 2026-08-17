@@ -130,8 +130,6 @@ export function buildBindingsState() {
         subtotal: formatCurrency(prices.subtotal),
         total: formatCurrency(prices.total),
         totalDueText: `${formatCurrency(prices.total)} due today`,
-        recurringAmount: formatCurrency(prices.recurring),
-        recurringPeriod: frequencyLabels[cycle] || cycle,
         showTerms: isSubscription,
         termsText: buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount),
       },

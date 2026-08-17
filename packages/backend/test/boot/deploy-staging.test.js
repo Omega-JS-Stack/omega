@@ -15,11 +15,14 @@
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 
 const stageLocalPackages = require('../../dist/cli/utils/stage-local-packages.js');
 const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const { loadConfig } = require('../helpers/_shared-config.js');
+
+const BACKEND_BIN = path.resolve(__dirname, '../../bin/omega-backend');
 
 function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-stage-'));
@@ -96,6 +99,162 @@ module.exports = {
         assert.deepEqual(staging.staged, []);
         assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'nothing staged');
         await staging.restore(); // harmless no-op
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      // #331: the lane packed only the framework package itself. @omega.js/client
+      // is a REAL runtime dependency of @omega.js/backend (never vendored) and is
+      // unpublished under the publish latch — so regenerating the lock against the
+      // staged shape asked the REGISTRY for it and 404'd, and no deploy ran.
+      name: 'packs-linked-omega-deps-transitively-so-the-lock-never-asks-the-registry',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        // A local @omega.js package that exists NOWHERE but this disk — the
+        // registry-404 shape (client under the publish latch)
+        const depDir = path.join(tmp, 'workspace', 'faketransitive');
+        jetpack.write(path.join(depDir, 'package.json'), JSON.stringify({
+          name: '@omega.js/faketransitive',
+          version: '0.1.0',
+          private: true,
+          main: 'index.js',
+        }, null, 2));
+        jetpack.write(path.join(depDir, 'index.js'), 'module.exports = 1;\n');
+
+        // The framework package: declares it by REGISTRY spec (that is how
+        // @omega.js/backend spells @omega.js/client) and resolves it through a
+        // node_modules SYMLINK — the local-era shape npm workspaces / `mgr i local` make
+        const pkgDir = path.join(tmp, 'fakeframework');
+        jetpack.write(path.join(pkgDir, 'package.json'), JSON.stringify({
+          name: '@omega.js/fakeframework',
+          version: '1.0.0',
+          private: true,
+          main: 'index.js',
+          dependencies: { '@omega.js/faketransitive': '^0.1.0' },
+        }, null, 2));
+        jetpack.write(path.join(pkgDir, 'index.js'), 'module.exports = 2;\n');
+        jetpack.dir(path.join(pkgDir, 'node_modules', '@omega.js'));
+        fs.symlinkSync(depDir, path.join(pkgDir, 'node_modules', '@omega.js', 'faketransitive'), 'dir');
+
+        const functionsPath = path.join(tmp, 'functions');
+        jetpack.write(path.join(functionsPath, 'package.json'), `${JSON.stringify({
+          name: 'test-functions',
+          version: '0.0.1',
+          private: true,
+          dependencies: { '@omega.js/fakeframework': 'file:../fakeframework' },
+        }, null, 2)}\n`);
+
+        const staging = await stageLocalPackages({ functionsPath });
+
+        // BOTH packages ride the upload — the linked one too
+        assert.deepEqual(staging.staged, ['@omega.js/fakeframework', '@omega.js/faketransitive']);
+        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules', 'omega.js-fakeframework-1.0.0.tgz')), 'file');
+        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules', 'omega.js-faketransitive-0.1.0.tgz')), 'file');
+
+        // The framework tarball still declares `^0.1.0` internally — only an
+        // override redirects that NESTED resolution to the packed artifact
+        const stagedPkg = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
+        assert.equal(stagedPkg.dependencies['@omega.js/fakeframework'], 'file:omega_modules/omega.js-fakeframework-1.0.0.tgz');
+        assert.equal(stagedPkg.overrides['@omega.js/faketransitive'], 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
+
+        // The lock npm ci will read: resolved from the tarball, never the registry
+        const lock = jetpack.read(path.join(functionsPath, 'package-lock.json'), 'json');
+        const locked = lock.packages['node_modules/@omega.js/faketransitive'];
+        assert.ok(locked, 'the linked dependency is in the lockfile');
+        assert.equal(locked.resolved, 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
+
+        // Restore: the override is staging-only, gone with everything else
+        await staging.restore();
+        const restored = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
+        assert.equal(restored.dependencies['@omega.js/fakeframework'], 'file:../fakeframework');
+        assert.equal(restored.overrides, undefined, 'staging overrides never survive the restore');
+        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'staging dir removed');
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      // #331's second half: a failed staging must stop the deploy loudly — throw
+      // (never a swallowed ✗), and leave the functions folder exactly as found.
+      name: 'staging-failure-throws-and-restores-the-functions-folder',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        const pkgDir = path.join(tmp, 'fakepkg');
+        jetpack.write(path.join(pkgDir, 'package.json'), JSON.stringify({
+          name: '@omega.js/fakepkg',
+          version: '1.0.0',
+          private: true,
+          main: 'index.js',
+        }, null, 2));
+        jetpack.write(path.join(pkgDir, 'index.js'), 'module.exports = 1;\n');
+
+        // The pack succeeds, then the LOCK REGEN fails (a file: spec pointing at
+        // a tarball that does not exist) — the failure lands AFTER the manifest
+        // was respelled on disk, which is exactly where the 404 landed
+        const functionsPath = path.join(tmp, 'functions');
+        const original = `${JSON.stringify({
+          name: 'test-functions',
+          version: '0.0.1',
+          private: true,
+          dependencies: {
+            '@omega.js/fakepkg': 'file:../fakepkg',
+            'never-here': 'file:missing-tarball.tgz',
+          },
+        }, null, 2)}\n`;
+        jetpack.write(path.join(functionsPath, 'package.json'), original);
+
+        let message = '';
+        try {
+          await stageLocalPackages({ functionsPath });
+        } catch (e) {
+          message = e.message;
+        }
+
+        assert.ok(message, 'a failing staging step throws — the deploy stops');
+        assert.ok(/staging failed/i.test(message), `the error names the staging lane: ${message}`);
+        assert.equal(jetpack.read(path.join(functionsPath, 'package.json')), original, 'manifest restored verbatim');
+        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'no half-staged tarballs left behind');
+        assert.equal(jetpack.exists(path.join(functionsPath, 'package-lock.json')), false, 'no half-written lockfile left behind');
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      // The exit code IS the contract: the observed #331 run printed the ✗ and
+      // read as a success. Spawn the real bin — nothing else pins an exit code.
+      name: 'deploy-exits-nonzero-when-staging-fails',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        const appRoot = path.join(tmp, 'app');
+        jetpack.write(path.join(appRoot, 'package.json'), JSON.stringify({
+          name: 'exit-code-backend',
+          version: '0.0.1',
+          private: true,
+          engines: { node: '22' },
+          // A local dep whose directory carries no package.json — staging fails
+          // before npm is ever reached, so the exit code is all this measures
+          dependencies: { '@omega.js/brokenpkg': 'file:../brokenpkg' },
+        }, null, 2));
+        jetpack.write(path.join(appRoot, 'src', 'index.js'), 'module.exports = 1;\n');
+        jetpack.write(path.join(appRoot, 'config', 'omega.json5'), '{ brand: { id: \'exit-code\', name: \'Exit Code\' }, targets: { backend: {} } }');
+        jetpack.write(path.join(appRoot, 'firebase.json'), JSON.stringify({ functions: { source: 'dist' } }, null, 2));
+        jetpack.dir(path.join(tmp, 'brokenpkg'));
+
+        const run = spawnSync(process.execPath, [BACKEND_BIN, 'deploy'], {
+          cwd: appRoot,
+          encoding: 'utf8',
+          env: { ...process.env, OMEGA_SKIP_FRESHNESS: '1' },
+        });
+
+        assert.notEqual(run.status, 0, `a failed staging exits nonzero (got ${run.status})`);
+        assert.ok(/brokenpkg/.test(run.stdout + run.stderr), 'the failure names the package it could not stage');
 
         jetpack.remove(tmp);
       },

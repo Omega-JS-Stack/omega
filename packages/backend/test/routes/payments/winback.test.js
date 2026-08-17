@@ -92,6 +92,13 @@ async function acceptOfferReadingProperties(Manager, user, settings) {
   const req = { method: 'POST', headers: { 'content-type': 'application/json' }, query: {}, body: {} };
   const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-winback' });
 
+  // The REAL analytics library, attached the way the middleware attaches it —
+  // every refusal returns before the route's accept event, but the success path
+  // records one, and a ctx built without it would fail on a line the wire never
+  // reaches this way. Not a stand-in: in a test environment the library itself
+  // skips the send.
+  ctx.analytics = Manager.Analytics({ ctx: ctx, uuid: user.auth.uid });
+
   await handler({ ctx, Manager, user, settings: { confirmed: true, ...(settings || {}) }, libraries: Manager.libraries });
 
   return {
@@ -403,6 +410,79 @@ module.exports = {
       },
     },
 
+    // ─── the claim on the account ───
+
+    {
+      name: 'records-the-applied-discount-on-the-account',
+      async run({ Manager, assert, config, firestore, skip }) {
+        // The order doc is the offer's MEMORY — what a second claim is refused
+        // against — but the billing card reads the ACCOUNT, and a saving that
+        // vanishes on reload was never announced at all ([#325]). So the claim
+        // lands on both, and the account's copy has to survive the SAME resolver
+        // the client reads it through (which strips every key the schema does
+        // not name).
+        const product = paidProduct(config, skip);
+        const uid = '_test-winback-account';
+        const orderId = '_test-winback-account-order';
+        const user = subscriber(Manager, { uid, product, orderId });
+        const processor = processorModule('test');
+        const realApplyOffer = processor.applyOffer;
+        const applied = [];
+
+        processor.applyOffer = async (options) => applied.push(options);
+
+        try {
+          const { sent } = await acceptOfferReadingProperties(Manager, user);
+
+          assert.equal(sent.code, 200, 'Should apply the save offer');
+          assert.equal(applied.length, 1, 'and the processor discounted the live subscription once');
+
+          const userDoc = await firestore.get(`users/${uid}`);
+          const discount = userDoc?.subscription?.discount;
+
+          assert.equal(discount?.valid, true, 'The account carries the discount that was applied');
+          assert.equal(discount.code, sent.body.discount.code, 'the same one the route answered with');
+          assert.equal(discount.duration, sent.body.discount.duration, 'for the same duration');
+          assert.equal(
+            discount.percent > 0 || discount.amount > 0,
+            true,
+            'and it is worth something — both shapes are written, so a merge can never leave half of an older discount behind',
+          );
+
+          // The source is the whole reason this is safe to read as a CLAIM: a
+          // checkout code sets the same node, and a winback pitch suppressed by
+          // someone else's promo is an offer silently withheld.
+          assert.equal(discount.source, 'winback', 'and it says which system applied it');
+
+          // Through the resolver, exactly as the client reads it
+          const resolved = Manager.User(userDoc).properties.subscription.discount;
+
+          assert.equal(resolved.valid, true, 'The discount survives account resolution');
+          assert.equal(resolved.source, 'winback', 'source and all');
+
+          // The claim is still recorded where the refusal reads it
+          const orderDoc = await firestore.get(`payments-orders/${orderId}`);
+          assert.equal(orderDoc.requests.winback.discount.code, discount.code, 'The order doc keeps the offer memory');
+
+          // A second accept changes NOTHING: it is refused before dispatch, and
+          // the account's discount is not doubled, re-stamped or cleared.
+          const { sent: second, properties } = await acceptOfferReadingProperties(Manager, user);
+
+          assert.equal(second.code, 400, 'Should refuse a second claim');
+          assert.equal(properties?.additional?.code, 'offer-already-claimed', 'with the branchable code');
+          assert.equal(applied.length, 1, 'the processor is never asked twice');
+
+          const after = (await firestore.get(`users/${uid}`))?.subscription?.discount;
+
+          assert.deepEqual(after, discount, 'and the account carries exactly the one discount it already had');
+        } finally {
+          processor.applyOffer = realApplyOffer;
+          await firestore.delete(`payments-orders/${orderId}`);
+          await firestore.delete(`users/${uid}`);
+        }
+      },
+    },
+
     // ─── the processor capability gate ───
 
     {
@@ -485,6 +565,10 @@ module.exports = {
 
         assert.equal(orderDoc.requests.winback.discount.code, response.data.discount.code, 'The claim records the discount applied');
         assert.ok(orderDoc.requests.winback.date.timestampUNIX > 0, 'and when it was claimed');
+
+        // …and on the ACCOUNT, which is what the billing card reads ([#325])
+        assert.equal(userDoc.subscription.discount.code, response.data.discount.code, 'The account carries the applied discount');
+        assert.equal(userDoc.subscription.discount.source, 'winback', 'stamped with the system that applied it');
 
         // Step 6: it is claimed ONCE — an offer takeable on every cancel dialog
         // is a permanent discount nobody agreed to

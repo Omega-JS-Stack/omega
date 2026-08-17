@@ -94,6 +94,18 @@ function paymentConfig(winback) {
   return { ...payment, winback: resolveWinbackOffer(payment) };
 }
 
+/** The offer as the discount the apply route records and hands back. */
+function appliedDiscount(offer) {
+  const isAmount = offer.amount > 0;
+
+  return {
+    valid: true,
+    code: isAmount ? `WINBACK${offer.amount}OFF` : `WINBACK${offer.percent}`,
+    ...(isAmount ? { amount: offer.amount } : { percent: offer.percent }),
+    duration: offer.duration,
+  };
+}
+
 const WEEK_FROM_NOW = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
 const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
@@ -137,7 +149,7 @@ function trialingAccount() {
  * here. Everything else — the gate, the state, the dialog choreography — is the
  * real module.
  */
-async function wireCancelFlow(account, { winback, requestFails } = {}) {
+async function wireCancelFlow(account, { winback, requestFails, without = [] } = {}) {
   await bundleOnce();
 
   const opened = [];
@@ -183,6 +195,10 @@ async function wireCancelFlow(account, { winback, requestFails } = {}) {
     'cancel-winback-decline-btn',
     'cancel-subscription-accordion',
   ]) {
+    if (without.includes(id)) {
+      continue;
+    }
+
     elements.set(id, makeEl(id));
   }
 
@@ -256,7 +272,11 @@ async function wireCancelFlow(account, { winback, requestFails } = {}) {
         throw requestFails;
       }
 
-      return { success: true };
+      // What the apply route answers with: the offer as the discount it
+      // applied, in the discount-codes validate shape the payment stack speaks
+      // (`libraries/payment/winback.js` toDiscount). The card reads it back
+      // onto the account so the saving shows the moment it is earned ([#325]).
+      return { success: true, discount: appliedDiscount(paymentConfig(winback).winback) };
     },
   };
 
@@ -374,21 +394,105 @@ test('#268: declining continues to the questionnaire, unchanged', async () => {
   assert.strictEqual(isAccordionOpen(), true, 'the cancel flow carries on exactly as before');
 });
 
-test('#268: a declined offer is not pitched again in the same session', async () => {
-  const { opened, clickTrigger, clickById, attributesOf } = await wireCancelFlow(paidAccount());
+test('#324: a fresh cancel attempt after a decline is pitched again', async () => {
+  // Ian's QA: decline the offer, close the questionnaire, click cancel again —
+  // and nothing was pitched. A decline is an answer to THIS attempt, not a
+  // one-shot switch for the session: the subscription is still live, the offer
+  // is still unclaimed, so the next attempt to cancel meets it again.
+  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount());
 
   clickTrigger();
   await clickById('cancel-winback-decline-btn');
 
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger is a plain Bootstrap toggle again');
+  assert.strictEqual(isAccordionOpen(), true, 'declining carries on to the questionnaire');
 
+  // Half of a toggle is closing — this click ends the attempt.
+  clickTrigger();
+
+  assert.strictEqual(isAccordionOpen(), false, 'the questionnaire is shut again');
+
+  // A NEW cancel attempt, on an eligible and unclaimed subscription.
+  clickTrigger();
+
+  assert.strictEqual(
+    opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
+    2,
+    'the offer is re-pitched',
+  );
+  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire waits behind it, exactly as the first time');
+});
+
+test('#324: every step of the reopened flow leaves a way forward', async () => {
+  // The whole point of the rewire: no click may leave the customer with neither
+  // the dialog nor the questionnaire. The second pitch answers the same two
+  // ways the first one does, so both are walked end to end.
+  const declined = await wireCancelFlow(paidAccount());
+
+  declined.clickTrigger();
+  await declined.clickById('cancel-winback-decline-btn');
+  declined.clickTrigger();
+  declined.clickTrigger();
+  await declined.clickById('cancel-winback-decline-btn');
+
+  assert.strictEqual(declined.isAccordionOpen(), true, 'declining the second pitch opens the questionnaire again');
+
+  const accepted = await wireCancelFlow(paidAccount());
+
+  accepted.clickTrigger();
+  await accepted.clickById('cancel-winback-decline-btn');
+  accepted.clickTrigger();
+  accepted.clickTrigger();
+  await accepted.clickById('cancel-winback-accept-btn');
+
+  assert.strictEqual(accepted.isAccordionOpen(), false, 'accepting the second pitch calls the cancel off');
+  assert.deepStrictEqual(accepted.requests.map((r) => r.url), ['/omega/payments/winback'], 'and applies the discount once');
+
+  accepted.clickTrigger();
+
+  assert.strictEqual(
+    accepted.opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
+    2,
+    'a CLAIMED offer is never pitched again',
+  );
+  assert.strictEqual(accepted.isAccordionOpen(), true, 'and the cancel goes straight to the questionnaire');
+});
+
+test('#324: a refusal the account cannot answer stays refused across attempts', async () => {
+  // `winbackSupported` is the other end of the state: the backend has said this
+  // account can never take the offer, so a fresh attempt is not a fresh chance.
+  const refusal = Object.assign(new Error('You have already claimed this offer'), {
+    properties: { additional: { code: 'offer-already-claimed' } },
+  });
+  const { opened, clickTrigger, clickById, isAccordionOpen } = await wireCancelFlow(paidAccount(), { requestFails: refusal });
+
+  clickTrigger();
+  await clickById('cancel-winback-accept-btn');
+
+  assert.strictEqual(isAccordionOpen(), true, 'the refusal opens the questionnaire');
+
+  clickTrigger();
   clickTrigger();
 
   assert.strictEqual(
     opened.filter((entry) => entry === 'modal:cancel-winback-modal').length,
     1,
-    'answering once is answering',
+    'and no later attempt pitches it again',
   );
+  assert.strictEqual(isAccordionOpen(), true, 'every later attempt goes straight to the questionnaire');
+});
+
+test('#324: a page missing a dialog falls back to the questionnaire, never to a dead button', async () => {
+  // The gate works by taking the trigger's declarative toggle away, so the
+  // dialog it opens instead had better exist. A layout that dropped one (a
+  // consumer override, a trimmed template) must still be able to cancel.
+  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), { without: ['cancel-winback-modal'] });
+
+  const event = clickTrigger();
+
+  assert.deepStrictEqual(opened, [], 'no dialog opened — there is none to open');
+  assert.strictEqual(event.propagationStopped, false, 'so the declarative collapse keeps the click');
+  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger stays a Bootstrap toggle');
+  assert.strictEqual(isAccordionOpen(), true, 'and the questionnaire opens on the first click');
 });
 
 test('#268: a brand that disabled the offer never sees the step', async () => {
@@ -416,20 +520,77 @@ test('#268: a trial cancel is warned, never offered a discount', async () => {
 });
 
 test('#268: the offer names the brand\'s own number and the cycle it applies to', async () => {
+  // The headline IS the dialog now (#323): short, forward, the whole pitch in
+  // one line — and every number in it the brand's own.
   const fifty = await wireCancelFlow(paidAccount());
-  assert.strictEqual(fifty.state().billing.winbackOffer.headline, 'Stay and get 50% off your next month', 'the framework default is 50% off the next cycle');
+  assert.strictEqual(fifty.state().billing.winbackOffer.headline, 'Take 50% off your next month', 'the framework default is 50% off the next cycle');
 
   const quarter = await wireCancelFlow(paidAccount(), { winback: { percent: 25 } });
-  assert.strictEqual(quarter.state().billing.winbackOffer.headline, 'Stay and get 25% off your next month');
+  assert.strictEqual(quarter.state().billing.winbackOffer.headline, 'Take 25% off your next month');
 
   const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, processor: 'stripe', resourceId: 'sub_live_premium' } }));
-  assert.strictEqual(annual.state().billing.winbackOffer.headline, 'Stay and get 50% off your next year', 'the cycle word follows the subscription, not the copy');
+  assert.strictEqual(annual.state().billing.winbackOffer.headline, 'Take 50% off your next year', 'the cycle word follows the subscription, not the copy');
 
   const amount = await wireCancelFlow(paidAccount(), { winback: { amount: 10 } });
-  assert.strictEqual(amount.state().billing.winbackOffer.headline, 'Stay and get $10.00 off your next month', 'an amount offer reads in the brand currency');
+  assert.strictEqual(amount.state().billing.winbackOffer.headline, 'Take $10.00 off your next month', 'an amount offer reads in the brand currency');
 
   const forever = await wireCancelFlow(paidAccount(), { winback: { duration: 'forever' } });
-  assert.strictEqual(forever.state().billing.winbackOffer.headline, 'Stay and get 50% off for as long as you stay', 'a permanent cut does not promise one cycle');
+  assert.strictEqual(forever.state().billing.winbackOffer.headline, 'Take 50% off for as long as you stay', 'a permanent cut does not promise one cycle');
+});
+
+test('#325: accepting the offer puts the discount on the card', async () => {
+  // Ian's QA: the discount applied server-side and the dashboard showed
+  // nothing. The route answers with the discount it applied, so the card can
+  // say what was just earned without waiting for a webhook to land.
+  const account = paidAccount();
+  const { clickTrigger, clickById, state } = await wireCancelFlow(account);
+
+  assert.strictEqual(state().billing.discount.show, false, 'nothing is applied before the offer is taken');
+
+  clickTrigger();
+  await clickById('cancel-winback-accept-btn');
+
+  assert.deepStrictEqual(
+    state().billing.discount,
+    { show: true, label: '50% off', when: 'Applied to your next month' },
+    'the saving is on the card, in words',
+  );
+
+  // The in-session patch carries the same source the backend persisted, so the
+  // gate reads one truth whether the discount arrived by patch or by reload.
+  assert.strictEqual(account.subscription.discount.source, 'winback', 'the patched discount is stamped as the claim');
+});
+
+test('#325: a declined offer leaves the card with no discount to announce', async () => {
+  const { clickTrigger, clickById, state } = await wireCancelFlow(paidAccount());
+
+  clickTrigger();
+  await clickById('cancel-winback-decline-btn');
+
+  assert.strictEqual(state().billing.discount.show, false, 'nothing was applied, so nothing is claimed on screen');
+});
+
+test('#325: a persisted winback claim suppresses the pitch, a checkout code does not', async () => {
+  // The backend stamps the discount it applies with `source: 'winback'`
+  // (payments/winback/post.js), so a claimant who reloads is never re-pitched a
+  // discount they already hold. The SOURCE is the signal, not the node itself:
+  // a checkout code rides the same `subscription.discount` shape, and holding
+  // one must never cost a customer the save offer.
+  const claimed = await wireCancelFlow(paidAccount({
+    discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback' },
+  }));
+
+  assert.strictEqual(claimed.state().billing.winbackOffer.show, false, 'a persisted claim never re-pitches');
+  assert.strictEqual(claimed.state().billing.discount.show, true, 'the discount it earned still shows on the card');
+
+  claimed.clickTrigger();
+  assert.strictEqual(claimed.isAccordionOpen(), true, 'and the cancel proceeds straight to the questionnaire');
+
+  const checkout = await wireCancelFlow(paidAccount({
+    discount: { valid: true, code: 'WELCOME15', percent: 15, duration: 'once', source: 'checkout' },
+  }));
+
+  assert.strictEqual(checkout.state().billing.winbackOffer.show, true, 'a checkout code leaves the offer open');
 });
 
 test('#311: a subscription with no processor payment details is never pitched the offer', async () => {
@@ -465,8 +626,9 @@ test('#268: a refusal the account cannot answer retires the offer and lets the c
   // whether this account can take the offer at all, and a refusal must never
   // leave the customer stuck in a dialog with no way to cancel. Every dead-end
   // code is one branch, so each is proven through it — including the one a
-  // PAST CLAIMANT hits, who is pitched again because the client reads the
-  // account and the claim lives on the order doc ([#310]).
+  // PAST CLAIMANT hits when their account predates the persisted claim node
+  // ([#325]): with nothing on the account, the client re-pitches and the order
+  // doc's refusal is the catch ([#310]).
   //
   // The route now names EVERY refusal ([#311]), and all but the unconfirmed
   // request are dead ends for this account — the brand turned the offer off,

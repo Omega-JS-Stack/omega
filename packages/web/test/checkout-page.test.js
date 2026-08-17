@@ -165,6 +165,68 @@ test('#233: the billing cadence line is centered under the plan tiles', async ()
   assert.ok(cadence[1].includes('text-center'), 'it centers under the pair of plan cards, in every theme');
 });
 
+test('#326: the summary reads like every other card, and the recurring row is gone', async () => {
+  const pages = await build();
+  const checkout = pages.get('/payment/checkout');
+  const scss = fs.readFileSync(
+    path.join(PKG, 'themes', 'classy', 'css', 'pages', 'payment', 'checkout', 'index.scss'), 'utf8',
+  );
+
+  // The recurring cost is already stated in the terms paragraph under the
+  // numbers, so the row under Total said it twice.
+  assert.ok(!checkout.includes('checkout.pricing.recurringAmount'), 'no recurring amount row');
+  assert.ok(!checkout.includes('checkout.pricing.recurringPeriod'), 'no recurring period row');
+  assert.ok(!checkout.includes('omega-checkout__recurring'), 'and its markup hook went with it');
+  assert.ok(!scss.includes('.omega-checkout__recurring'), 'and so did its style');
+  assert.ok(checkout.includes('omega-checkout__fineprint'), 'the terms paragraph — the one place recurring cost is stated — stays');
+
+  // The summary head was the page's odd one out: a logo on the right and a
+  // rule under it, where every other card leads with an icon chip and a title.
+  const title = checkout.match(/<h2 class="omega-checkout__panel-title[^"]*"[^>]*>\s*<span class="omega-icon-chip omega-icon-chip--neutral">([^]*?)<\/span>\s*Order summary/);
+  assert.ok(title, 'the Order summary title is built exactly like the other card titles: icon chip on the LEFT, then the words');
+  assert.match(title[1], /data-icon="receipt"/, 'and the glyph rides the one icon mechanism, inlined at build');
+
+  const heads = checkout.match(/omega-panel-head omega-checkout__panel-head/g) || [];
+  assert.equal(heads.length, 4, 'billing, account, payment and order summary all wear the same head');
+
+  for (const gone of ['omega-checkout__summary-head', 'omega-checkout__mark']) {
+    assert.ok(!checkout.includes(gone), `the odd-one-out head is gone: ${gone}`);
+    assert.ok(!scss.includes(`.${gone}`), `and its rule with it: ${gone}`);
+  }
+});
+
+test('#326: the trust foot reveals in with the rest of the page', async () => {
+  // Ian's QA: the header, the panels and the summary all animate in and then
+  // the last two lines were just THERE — the only static block on the page.
+  const pages = await build();
+  const checkout = pages.get('/payment/checkout');
+
+  for (const block of ['omega-checkout__trust', 'checkout-help-button']) {
+    const at = checkout.indexOf(block);
+    assert.ok(at !== -1, `${block} still renders`);
+    // The block's own wrapper tag — the reveal rides the container, so the
+    // whole line animates as one, exactly like the panels above it.
+    const open = checkout.lastIndexOf('<div', at);
+    const tag = checkout.slice(open, checkout.indexOf('>', open) + 1);
+    assert.match(tag, /data-omega-reveal/, `${block} rides the shared reveal, like every other zone (${tag})`);
+  }
+
+  // It is the ATTRIBUTE that carries it, never a page-local animation: the
+  // reduced-motion final state and the no-JS visible state live in the motion
+  // library's gating, and only apply to markup that uses the idiom.
+  const motion = fs.readFileSync(path.join(PKG, 'core', 'css', 'motion', '_index.scss'), 'utf8');
+  assert.match(
+    motion,
+    /@media \(prefers-reduced-motion: no-preference\) \{\s*html\[data-omega-motion\] \[data-omega-reveal\] \{/,
+    'a reveal hides only when motion is welcome AND the boot stamp says JS is running — reduced motion and no-JS both render the final state',
+  );
+
+  const scss = fs.readFileSync(
+    path.join(PKG, 'themes', 'classy', 'css', 'pages', 'payment', 'checkout', 'index.scss'), 'utf8',
+  );
+  assert.ok(!/\.omega-checkout__trust[^{]*\{[^}]*animation:/.test(scss), 'the trust foot animates through the library, not a page-local keyframe');
+});
+
 test('#234: the page carries no dev chrome of its own — the palette owns it', async () => {
   const pages = await build();
   const checkout = pages.get('/payment/checkout');

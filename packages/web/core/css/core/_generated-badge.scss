@@ -16,21 +16,18 @@
 //
 // It costs a production build nothing: samples never inject there, so no
 // markup carries the class and PurgeCSS's content scan trims the rule.
+//
+// SHAPE is the shared chip's (#322): every site writes `omega-chip
+// omega-generated-badge`, so the micro-pill's box has ONE home
+// (components/_index.scss) and this rule carries only what makes it a WARNING
+// — the same deal as `.omega-chip--accent`. It is emitted after the components
+// sheet AND after the theme, so the paint below always lands.
 
 .omega-generated-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-  padding: 0.15em 0.55em;
-  border: 1px solid rgba(var(--omega-warn-rgb), 0.45);
-  border-radius: 999px;
+  // A card body is a flex COLUMN: a plain item stretches the cross axis and
+  // eats a whole row under the title, which is exactly what it did.
+  align-self: flex-start;
+  border-color: rgba(var(--omega-warn-rgb), 0.45);
   background: rgba(var(--omega-warn-rgb), 0.14);
   color: var(--omega-warn);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1.6;
-  white-space: nowrap;
-  vertical-align: middle;
 }

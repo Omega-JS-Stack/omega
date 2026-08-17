@@ -1018,6 +1018,20 @@ badges:
               </div>
             </div>
 
+            <!-- Active discount (#325) — the saving already on the
+                 subscription, which the card used to say nothing about at all:
+                 a winback accept applied a real discount and the customer had
+                 no way to see it. Both halves are real TEXT (what comes off,
+                 and which bills it comes off), never a colored pill alone, and
+                 the whole row is hidden when there is no discount. -->
+            <div id="billing-discount" class="d-flex flex-wrap align-items-center gap-2 mb-3" data-omega-bind="@show billing.discount.show" hidden>
+              <span class="omega-chip omega-chip--accent">
+                {% omega_icon "tag", "fa-xs" %}
+                <span data-omega-bind="@text billing.discount.label"></span>
+              </span>
+              <span class="small text-muted" data-omega-bind="@text billing.discount.when"></span>
+            </div>
+
             <!-- State-specific alerts -->
             <div class="mb-3">
               <!-- Suspended (payment issue) alert -->
@@ -1179,40 +1193,43 @@ badges:
           </div>
         </div>
 
-        <!-- Change Plan Modal -->
         <!-- Winback offer — shown BEFORE the questionnaire, and only for a PAID
              cancel (#268). The customer is pitched a discount on the next cycle
              while they are still here to keep; accepting applies it and calls
-             the cancel off, declining opens the questionnaire unchanged. The
-             offer is the BRAND's (payment.winback in omega.json5), so the number
-             is bound from state and never spelled out here. -->
+             the cancel off, declining opens the questionnaire unchanged and the
+             NEXT cancel attempt is pitched again (#324). The offer is the
+             BRAND's (payment.winback in omega.json5), so the number is bound
+             from state and never spelled out here.
+             It wears the exit popup's treatment (#323): centered, one mark, one
+             headline, one line under it. A pitch reads like a pitch and gets
+             out of the way. -->
         <div class="modal fade" id="cancel-winback-modal" tabindex="-1" aria-labelledby="cancel-winback-title" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="cancel-winback-title">
-                  {% omega_icon "gift", "fa-lg me-2" %}
-                  <span data-omega-bind="@text billing.winbackOffer.headline">Stay and save on your next bill</span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <p class="mb-3">
-                  Before you go, we would rather keep you than lose you. Take the discount and your plan carries on with everything you have now.
-                </p>
-                <p class="mb-0">
-                  Nothing else changes, and you can still cancel any time.
-                </p>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-adaptive" id="cancel-winback-accept-btn">
-                  {% omega_icon "circle-check", "fa-sm me-2" %}
-                  <span class="button-text">Keep my plan and save</span>
-                </button>
-                <button type="button" class="btn btn-outline-adaptive" id="cancel-winback-decline-btn">
-                  {% omega_icon "ban", "fa-sm me-2" %}
-                  No thanks, cancel
-                </button>
+            <div class="modal-content overflow-hidden">
+              <div class="position-relative">
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                <div class="p-4 p-md-5 text-center">
+                  <div class="mb-4">
+                    <span class="omega-dialog-mark">{% omega_icon "gift", "fa-2xl" %}</span>
+                  </div>
+
+                  <h5 class="fw-bold fs-4 mb-2" id="cancel-winback-title" data-omega-bind="@text billing.winbackOffer.headline">Your discount is waiting</h5>
+
+                  <p class="text-muted mb-4">
+                    Give {{ site.brand.name }} another shot. Same plan, same features, better price.
+                  </p>
+
+                  <div class="d-flex flex-column align-items-center">
+                    <button type="button" class="btn btn-adaptive btn-lg px-5 mb-1" id="cancel-winback-accept-btn">
+                      <span class="button-text">Claim my discount</span>
+                      {% omega_icon "arrow-right", "fa-sm ms-2" %}
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="cancel-winback-decline-btn">
+                      No thanks, cancel my plan
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1223,34 +1240,35 @@ badges:
              opposite of the accordion's own "until the end of your billing
              period" copy, so the consequence is stated while the choice is
              still open. "Keep my trial" is the dismiss; confirming opens the
-             questionnaire the paid flow goes straight to. -->
+             questionnaire the paid flow goes straight to. Same treatment as the
+             offer beside it (#323): one mark, one headline, one line. -->
         <div class="modal fade" id="cancel-trial-warning-modal" tabindex="-1" aria-labelledby="cancel-trial-warning-title" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title text-danger" id="cancel-trial-warning-title">
-                  {% omega_icon "triangle-exclamation", "fa-lg me-2" %}
-                  This ends your trial now
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <p class="mb-3">
-                  Cancelling during a free trial ends your access <strong>immediately</strong>, not at the end of the trial.
-                </p>
-                <p class="mb-0" data-omega-bind="@show billing.cancelWarning.hasTrialEndDate" hidden>
-                  Keep it and you stay on your current plan free until <strong data-omega-bind="@text billing.cancelWarning.trialEndDate">your trial ends</strong>. You will not be charged before then, and you can cancel any time.
-                </p>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal" id="cancel-trial-keep-btn">
-                  {% omega_icon "circle-check", "fa-sm me-2" %}
-                  Keep my trial
-                </button>
-                <button type="button" class="btn btn-outline-adaptive" id="cancel-trial-continue-btn">
-                  {% omega_icon "ban", "fa-sm me-2" %}
-                  Cancel anyway
-                </button>
+            <div class="modal-content overflow-hidden">
+              <div class="position-relative">
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                <div class="p-4 p-md-5 text-center">
+                  <div class="mb-4">
+                    <span class="omega-dialog-mark omega-dialog-mark--danger">{% omega_icon "hourglass-half", "fa-2xl" %}</span>
+                  </div>
+
+                  <h5 class="fw-bold fs-4 mb-2" id="cancel-trial-warning-title">Cancel now and your trial ends immediately</h5>
+
+                  <p class="text-muted mb-4" data-omega-bind="@show billing.cancelWarning.hasTrialEndDate" hidden>
+                    Keep it and you stay free until <strong data-omega-bind="@text billing.cancelWarning.trialEndDate">your trial ends</strong>. Nothing is charged before then.
+                  </p>
+
+                  <div class="d-flex flex-column align-items-center">
+                    <button type="button" class="btn btn-adaptive btn-lg px-5 mb-1" data-bs-dismiss="modal" id="cancel-trial-keep-btn">
+                      <span class="button-text">Keep my trial</span>
+                      {% omega_icon "arrow-right", "fa-sm ms-2" %}
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="cancel-trial-continue-btn">
+                      Cancel anyway
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

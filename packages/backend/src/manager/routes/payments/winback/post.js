@@ -14,8 +14,9 @@ const isTrialing = require('../cancel/_is-trialing.js');
  * cycle by default) and it reaches the processor as a discount, through the same
  * coupon plumbing a checkout discount code rides. The subscription itself does
  * not change: the customer keeps the plan, the cadence and the renewal date they
- * already had, and the next invoice is the only thing that moves — so this route
- * writes no subscription state, exactly like cancel and uncancel.
+ * already had, and the next invoice is the only thing that moves — so the only
+ * thing this route writes onto the account is the discount itself
+ * (`subscription.discount`, [#325]), never the plan, the cadence or the renewal.
  *
  * Claimed ONCE per subscription: the claim is recorded on
  * payments-orders/{orderId}.requests.winback, which is also what a second call
@@ -218,6 +219,32 @@ module.exports = async ({ ctx, user, settings }) => {
   }, { merge: true });
 
   ctx.log(`Stored winback claim on payments-orders/${orderId}: code=${discount.code}`);
+
+  // The ACCOUNT's half of the same claim ([#325]). The order doc is the offer's
+  // memory — what a second claim is refused against — but the billing card reads
+  // the account, and a saving that disappears on the next page load was never
+  // announced at all. The subscription itself still does not change: this is the
+  // discount riding it, not a new plan, a new cadence or a new renewal date.
+  //
+  // EVERY field is written, never the validate() result's own half-shape: the
+  // node can already carry a checkout code's discount, and a percent claim
+  // merging onto a stored amount would be read as the older, wrong number. And
+  // `source` is what makes the node safe to read as a claim at all — a checkout
+  // code sets the same shape, so only 'winback' is the cancel flow's signal.
+  await admin.firestore().doc(`users/${uid}`).set({
+    subscription: {
+      discount: {
+        valid: true,
+        code: discount.code,
+        percent: discount.percent || 0,
+        amount: discount.amount || 0,
+        duration: discount.duration,
+        source: 'winback',
+      },
+    },
+  }, { merge: true });
+
+  ctx.log(`Stored the applied discount on users/${uid}: code=${discount.code}`);
 
   // The experiment's server-side half. The offer is measured against the
   // existing `subscription-winback` baseline (a returning subscriber the webhook

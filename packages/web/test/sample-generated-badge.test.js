@@ -10,6 +10,8 @@
  *     reason no environment check is needed in the templates
  *  4. the dates stay RECENT: the rolling anchor keeps a virgin blog looking
  *     alive, never months stale
+ *  5. the SHAPE (#322): a chip-sized pill above the row's title, never a
+ *     full-width row of its own
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -24,6 +26,7 @@ const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), '
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BADGE = 'omega-generated-badge';
+const SHEET = path.join(__dirname, '..', 'core', 'css', 'core', '_generated-badge.scss');
 
 /**
  * The post page's ARTICLE header — the block holding the `<h1>`, not the site
@@ -42,6 +45,40 @@ function postHeader(html) {
     if (block.includes('<h1')) return block;
   }
   throw new assert.AssertionError({ message: 'the post page renders no <header> carrying the headline' });
+}
+
+/**
+ * The first listing ROW unit whose markup carries the badge — the block the
+ * #322 placement claim is about (the badge above the row's title), scoped so
+ * "somewhere on the page" cannot pass for it.
+ * @param {string} html - a rendered listing page
+ * @param {RegExp} open - matches the row unit's opening tag (global)
+ * @param {string} end - the row unit's closing tag
+ * @returns {string}
+ */
+function badgedRow(html, open, end) {
+  for (const match of html.matchAll(open)) {
+    const close = html.indexOf(end, match.index);
+    if (close === -1) break;
+    const block = html.slice(match.index, close);
+    if (block.includes(BADGE)) return block;
+  }
+  throw new assert.AssertionError({ message: `no ${open} row carries the badge` });
+}
+
+/**
+ * Every badge the page rendered must compose the shared chip: sizing has ONE
+ * home (core/css/components), so a site that writes the badge class alone
+ * would render an unsized pill.
+ * @param {string} html - a rendered page
+ * @param {string} label - what page this is, for the failure message
+ */
+function assertChipComposed(html, label) {
+  const found = [...html.matchAll(new RegExp(`class="([^"]*\\b${BADGE}\\b[^"]*)"`, 'g'))];
+  assert.ok(found.length, `${label} renders at least one badge`);
+  for (const [, classes] of found) {
+    assert.ok(classes.split(/\s+/).includes('omega-chip'), `${label}: the badge composes the chip ("${classes}")`);
+  }
 }
 
 test('every generated sample document carries the generated marker', () => {
@@ -76,7 +113,7 @@ test('a development build badges the sample post page and every listing row', as
   // The post page
   const post = pages.get('/blog/welcome-to-the-blog');
   assert.ok(post, 'the sample post renders');
-  assert.match(postHeader(post), new RegExp(`class="${BADGE}[^"]*">TEST<`), 'the post headline wears the badge, and the pill reads TEST');
+  assert.match(postHeader(post), new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`), 'the post headline wears the badge, and the pill reads TEST');
 
   // The listing: the featured lead AND the grid cards are separate markup, so
   // both are pinned — the featured slot is the one row that does not go
@@ -98,6 +135,35 @@ test('a development build badges the sample post page and every listing row', as
   assert.doesNotMatch(declarations, /#[0-9a-fA-F]{3,8}\b/, 'no raw hex in the badge declarations — status tokens only');
 });
 
+test('#322: the badge is a chip-sized pill ABOVE the row title, never a full-width row', async () => {
+  // Ian's QA: on a playground blog card the pill spanned the whole card under
+  // the title. `.omega-post-card__body` is a flex COLUMN, so a badge dropped in
+  // as a plain item stretches across the cross axis and eats a row — and it sat
+  // under the title besides. The fix is structural, so it is pinned twice:
+  // the sheet may never let a flex parent stretch it, and the row markup puts
+  // it above the title.
+  const sheet = fs.readFileSync(SHEET, 'utf8');
+  const rule = sheet.match(/\.omega-generated-badge \{[^}]*\}/);
+  assert.ok(rule, 'the badge rule still lives in core');
+  assert.match(rule[0], /align-self: flex-start/, 'a flex column can never stretch the pill into a row');
+  assert.doesNotMatch(rule[0], /font-size:|padding:|border-radius:/, 'sizing is the chip\'s — never a second copy that drifts');
+
+  const pages = await buildSite(BARE, bareData, { environment: 'development' }, 'generated-badge-shape');
+
+  // The shared card (blog grid, category and tag pages all render it).
+  const categoryUrl = [...pages.keys()].find((url) => url.startsWith('/blog/categories/') && url !== '/blog/categories');
+  const card = badgedRow(pages.get(categoryUrl), /<article class="omega-post-card"/g, '</article>');
+  assert.ok(card.indexOf(BADGE) < card.indexOf('omega-post-card__title'), 'the card wears the pill ABOVE its title');
+  assertChipComposed(card, 'the post card');
+
+  // The featured lead is its own markup and gets the same treatment.
+  const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
+  const blog = pages.get(blogUrl);
+  const featured = badgedRow(blog, /<article class="omega-featured-post/g, '</article>');
+  assert.ok(featured.indexOf(BADGE) < featured.indexOf('omega-featured-post__title'), 'the featured lead wears it above its title too');
+  assertChipComposed(blog, 'the blog listing');
+});
+
 test('the newsflash fork renders the badge too — post page, lead splash, story rows', async () => {
   // The theme that forks blog/index.html + blog/post.html and renders rows
   // through its own story-card component: a real render, not just the static
@@ -109,12 +175,18 @@ test('the newsflash fork renders the badge too — post page, lead splash, story
 
   const post = pages.get('/blog/welcome-to-the-blog');
   assert.ok(post, 'the sample post renders under newsflash');
-  assert.match(postHeader(post), new RegExp(`class="${BADGE}[^"]*">TEST<`), 'the newsflash post headline wears the badge');
+  assert.match(postHeader(post), new RegExp(`class="[^"]*${BADGE}[^"]*">TEST<`), 'the newsflash post headline wears the badge');
 
   const blogUrl = [...pages.keys()].find((url) => url === '/blog/' || url === '/blog');
   const blog = pages.get(blogUrl);
   const badges = blog.split(BADGE).length - 1;
   assert.ok(badges >= 2, `the lead splash and the story rows are badged (found ${badges})`);
+
+  // #322: the same chip shape and above-the-title placement as the base rows —
+  // this theme's story tile is a separate component, so it is pinned separately.
+  assertChipComposed(blog, 'the newsflash listing');
+  const story = badgedRow(blog, /<a href="[^"]*" class="newsflash-story-card"/g, '</a>');
+  assert.ok(story.indexOf(BADGE) < story.indexOf('<h3'), 'the newsflash story row wears the pill above its headline');
 });
 
 test('every packaged theme that forks the blog markup carries the badge conditional', () => {

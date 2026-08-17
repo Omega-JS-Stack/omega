@@ -55,6 +55,32 @@ const USER_SCHEMA = {
         date: '$timestamp',
       },
     },
+    // The discount riding the subscription right now
+    // ([#325](https://github.com/Omega-JS-Stack/omega/issues/325)). Shaped as a
+    // discount-codes validate() RESULT — the one shape the whole payment stack
+    // already speaks — so the billing card reads exactly what the apply route
+    // wrote, and neither side learns a second spelling. `valid: false` (the
+    // default) IS "no discount": absent and denied read the same everywhere.
+    //
+    // Both shapes are always present and default to 0, unlike a fresh validate()
+    // result which omits the one it is not: this node is MERGED onto a document
+    // that may already carry a discount, and a percent claim landing on a stored
+    // amount would otherwise be read as the older, wrong number.
+    //
+    // `source` is what makes it safe to read as a CLAIM. Today only the winback
+    // claim writes this node; a code typed at checkout will set the same node
+    // when checkout starts writing it, and a winback pitch suppressed by someone
+    // else's promo is an offer silently withheld — so the node says which system
+    // applied it ('winback' | 'checkout'), and only 'winback' is the claimed
+    // signal the cancel flow gates on.
+    discount: {
+      valid: { type: 'boolean', default: false },
+      code: { type: 'string', default: null, nullable: true },
+      percent: { type: 'number', default: 0 },
+      amount: { type: 'number', default: 0 },
+      duration: { type: 'string', default: null, nullable: true },
+      source: { type: 'string', default: null, nullable: true },
+    },
   },
   roles: {
     $passthrough: true,

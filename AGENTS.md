@@ -59,7 +59,7 @@ The in-repo brands and the playground project are test-only forever; nothing in 
 ## Getting started (the dev loop)
 
 - Root `npm start` watches every dist-building package concurrently (single-instance lock).
-- In a brand's website app, `omega dev --local` links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Linking is ONE-TIME and durable — never re-run per change; a linked brand just restarts `npm start`. Full contract: [docs/shared/local-dev.md](docs/shared/local-dev.md).
+- In a brand's website app, `omega dev --local` links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Linking is ONE-TIME and durable — never re-run per change; a linked brand just restarts `npm start`. A brand ROOT's `npm start` runs `omega dev`: the whole stack (website + backend) in ONE terminal — never boot the apps separately. Full contract: [docs/shared/local-dev.md](docs/shared/local-dev.md).
 - **Upstream-first**: consumer work on a locally linked brand that reveals a framework-level hole fixes it HERE, in the framework — never as a consumer-side patch to repeat in the next project — and a consumer session asks first: it surfaces the proposed framework change and waits for Ian's go (or files an issue), never editing the monorepo unprompted. The rule (and its "within reason" line) lives in [docs/shared/local-dev.md](docs/shared/local-dev.md) and ships to brand sessions via the brand guide.
 - Tests run in lanes: `npm run test:packages` (unit), then corpus/e2e/verts/auth/journey — the full pipeline and when each lane gates is in [docs/shared/testing.md](docs/shared/testing.md).
 

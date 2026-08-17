@@ -147,7 +147,10 @@ function resolveSeededSubscription(subscription, config) {
   };
 
   // Only a term that is still running gets re-dated: a lapsed persona's expired
-  // term is the state it exists to represent.
+  // term is the state it exists to represent. A cancellation that is still
+  // PENDING takes effect when that term ends — the processors date it at the
+  // period end (stripe.js resolveCancellation) — so it follows the term here
+  // rather than being typed onto a persona and drifting away from it.
   const nowUNIX = Math.floor(Date.now() / 1000);
   if (resolved.trial?.claimed && resolved.expires?.timestampUNIX > nowUNIX) {
     // A term still INSIDE its free trial ends when the TRIAL does, not when a
@@ -163,6 +166,21 @@ function resolveSeededSubscription(subscription, config) {
     resolved.expires = getCycleExpires(resolved.payment.frequency);
   }
 
+  if (resolved.cancellation?.pending && resolved.expires) {
+    resolved.cancellation.date = { ...resolved.expires };
+  }
+
+  // The event that last wrote this subscription. Only a record that names a
+  // processor gets one — a record with no processor was never written by one —
+  // and the persona's own state says which event it was (getLastWrite). Stamped
+  // HERE, after the re-dating above, so the date derivation reads the FINAL
+  // term and frequency — stamping earlier read the seeded expires and a payment
+  // with no frequency yet, which dated a project persona's write off the wrong
+  // cycle entirely.
+  if (resolved.payment.processor && !resolved.payment.updatedBy) {
+    resolved.payment.updatedBy = getLastWrite(resolved);
+  }
+
   return resolved;
 }
 
@@ -176,6 +194,263 @@ function getPastExpires(years = 1) {
     timestamp: pastDate.toISOString(),
     timestampUNIX: Math.floor(pastDate.getTime() / 1000),
   };
+}
+
+/**
+ * A moment in the { timestamp, timestampUNIX } shape every date on a user doc wears.
+ * @param {Date} [date] - The moment (defaults to now)
+ */
+function getStamp(date) {
+  const at = date || new Date();
+  return {
+    timestamp: at.toISOString(),
+    timestampUNIX: Math.floor(at.getTime() / 1000),
+  };
+}
+
+/**
+ * A moment N days back — for the recent history a persona carries (when its
+ * subscription started, when it was last billed) at a resolution `getPastExpires`
+ * (whole years) cannot express.
+ * @param {number} days - How many days ago
+ */
+function getDaysAgo(days) {
+  return getStamp(new Date(Date.now() - (days * 86400 * 1000)));
+}
+
+/**
+ * The processor record a REAL subscription leaves on the user doc, for a persona
+ * bought through the TEST processor — the shape the unified transform writes
+ * (libraries/payment/processors/stripe.js toUnifiedSubscription, stamped `test`).
+ *
+ * `frequency` and `price` are deliberately absent: they are the CATALOG's answer,
+ * and resolveSeededSubscription fills them from the brand's own prices. A figure
+ * typed here would drift the moment a brand repriced.
+ *
+ * `updatedBy` is absent for the same reason — the event that last wrote a
+ * subscription follows from the STATE it is in, which resolveSeededSubscription
+ * reads off the persona itself (getLastWrite).
+ *
+ * @param {string} key - The persona key; names the processor resource and its order
+ * @param {object} [options]
+ * @param {object} [options.startDate] - When the subscription began (default: a year ago)
+ * @param {boolean} [options.order] - Whether a purchase record stands behind it (default: true)
+ * @returns {object} The subscription's `payment` block
+ */
+function getTestPayment(key, options) {
+  options = options || {};
+
+  return {
+    processor: 'test',
+    ...(options.order === false ? {} : { orderId: `_test-order-${key}` }),
+    resourceId: `sub_test_${key.replace(/-/g, '_')}`,
+    startDate: options.startDate || getPastExpires(1),
+  };
+}
+
+/**
+ * The webhook event that last wrote a subscription in this state — a real
+ * subscription is always stamped with one (`payment.updatedBy`, which the email
+ * library reads as the customer's last payment date: libraries/email/constants.js
+ * `user_subscription_payment_last_date`). The state IS the answer, so it is
+ * derived rather than typed onto every persona.
+ *
+ * @param {object} subscription - The persona's resolved subscription
+ * @returns {object} The `payment.updatedBy` block
+ */
+function getLastWrite(subscription) {
+  let name = 'invoice.payment_succeeded';
+
+  if (subscription.status === 'suspended') {
+    name = 'invoice.payment_failed';
+  } else if (subscription.status === 'cancelled') {
+    name = 'customer.subscription.deleted';
+  } else if (subscription.cancellation?.pending) {
+    name = 'customer.subscription.updated';
+  } else if (subscription.trial?.claimed) {
+    name = 'customer.subscription.created';
+  }
+
+  // The DATE follows the state like the event name does: a dead term's last
+  // write landed when that term ended, a running trial's when the trial began,
+  // a live term's when its current cycle opened. Stamping "now" would record a
+  // webhook landing today for a term that may have died a year ago — and the
+  // email layer prints this stamp as the last payment date
+  // (libraries/email/constants.js).
+  const nowUNIX = Math.floor(Date.now() / 1000);
+  const expires = subscription.expires;
+  let date;
+  if (!expires?.timestampUNIX) {
+    date = getStamp();
+  } else if (expires.timestampUNIX <= nowUNIX) {
+    date = { timestamp: expires.timestamp, timestampUNIX: expires.timestampUNIX };
+  } else if (subscription.trial?.claimed) {
+    date = getStamp(new Date((expires.timestampUNIX - (DEFAULT_TRIAL_DAYS * 86400)) * 1000));
+  } else {
+    const days = CYCLE_DAYS[subscription.payment?.frequency] || CYCLE_DAYS.monthly;
+    date = getStamp(new Date((expires.timestampUNIX - (days * 86400)) * 1000));
+  }
+
+  return {
+    event: { name, id: `evt_test_${name.replace(/[.]/g, '_')}` },
+    date,
+  };
+}
+
+/**
+ * Realistic identities the personas wear (Ian 2026-08-17,
+ * [#327](https://github.com/Omega-JS-Stack/omega/issues/327)).
+ *
+ * Demo-safe by construction: every IP is an IANA documentation block (RFC 5737 —
+ * routable nowhere), every telephone number is in the 555-01xx fictional range,
+ * and the companies are invented. Nothing here can reach, or name, a real person.
+ *
+ * A locale bundles everything that must AGREE about where a persona lives — the
+ * geolocation the request carried, the location on their profile, their phone's
+ * country code and the language their browser asked for — so a persona can never
+ * be seeded in Munich reading Japanese from a Brazilian IP.
+ *
+ * `areaCode` carries no trunk zero: `personal.telephone.national` is a NUMBER on
+ * the schema, and a leading zero cannot survive one.
+ */
+const PROFILE_LOCALES = [
+  { continent: 'NA', country: 'US', region: 'California', city: 'San Diego', latitude: 32.7157, longitude: -117.1611, language: 'en-US', callingCode: 1, areaCode: '619', ipBlock: '192.0.2' },
+  { continent: 'NA', country: 'US', region: 'New York', city: 'Brooklyn', latitude: 40.6782, longitude: -73.9442, language: 'en-US', callingCode: 1, areaCode: '212', ipBlock: '192.0.2' },
+  { continent: 'NA', country: 'CA', region: 'Ontario', city: 'Toronto', latitude: 43.6532, longitude: -79.3832, language: 'en-CA', callingCode: 1, areaCode: '416', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'GB', region: 'England', city: 'Manchester', latitude: 53.4808, longitude: -2.2426, language: 'en-GB', callingCode: 44, areaCode: '161', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'DE', region: 'Bavaria', city: 'Munich', latitude: 48.1351, longitude: 11.5820, language: 'de-DE', callingCode: 49, areaCode: '89', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'ES', region: 'Catalonia', city: 'Barcelona', latitude: 41.3874, longitude: 2.1686, language: 'es-ES', callingCode: 34, areaCode: '933', ipBlock: '203.0.113' },
+  { continent: 'OC', country: 'AU', region: 'Victoria', city: 'Melbourne', latitude: -37.8136, longitude: 144.9631, language: 'en-AU', callingCode: 61, areaCode: '3', ipBlock: '203.0.113' },
+  { continent: 'SA', country: 'BR', region: 'Sao Paulo', city: 'Campinas', latitude: -22.9099, longitude: -47.0626, language: 'pt-BR', callingCode: 55, areaCode: '19', ipBlock: '203.0.113' },
+];
+
+/**
+ * The devices personas browse on — the exact vocabulary @omega.js/client reports
+ * (packages/client/src/modules/utilities.js getContext: lowercase platform and
+ * browser, a `desktop|tablet|mobile` device, `web` runtime), paired with the user
+ * agent that would actually produce it.
+ */
+const PROFILE_CLIENTS = [
+  { mobile: false, device: 'desktop', platform: 'mac', browser: 'chrome', vendor: 'Google Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' },
+  { mobile: false, device: 'desktop', platform: 'mac', browser: 'safari', vendor: 'Apple Computer, Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15' },
+  { mobile: false, device: 'desktop', platform: 'windows', browser: 'edge', vendor: 'Google Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0' },
+  { mobile: false, device: 'desktop', platform: 'windows', browser: 'firefox', vendor: '', runtime: 'web', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0' },
+  { mobile: true, device: 'mobile', platform: 'ios', browser: 'safari', vendor: 'Apple Computer, Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' },
+  { mobile: true, device: 'mobile', platform: 'android', browser: 'chrome', vendor: 'Google Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36' },
+  { mobile: false, device: 'tablet', platform: 'ios', browser: 'safari', vendor: 'Apple Computer, Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/604.1' },
+  { mobile: false, device: 'desktop', platform: 'linux', browser: 'chrome', vendor: 'Google Inc.', runtime: 'web', userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' },
+];
+
+const PROFILE_FIRST_NAMES = ['Adrian', 'Beatriz', 'Camille', 'Desmond', 'Elena', 'Felix', 'Greta', 'Hugo', 'Imani', 'Julien', 'Klara', 'Lucas', 'Mira', 'Nadia', 'Omar', 'Priya', 'Rafael', 'Sofia', 'Theo', 'Ursula', 'Viktor', 'Wren', 'Yara', 'Zane'];
+const PROFILE_LAST_NAMES = ['Alvarez', 'Bennett', 'Castellanos', 'Dubois', 'Espinoza', 'Fairbanks', 'Gallagher', 'Haddad', 'Ishikawa', 'Jensen', 'Kowalski', 'Laurent', 'Moreau', 'Nakamura', 'Okafor', 'Petrov', 'Quintero', 'Rossi', 'Sandoval', 'Thorne', 'Ueda', 'Vasquez', 'Whitfield', 'Ziegler'];
+const PROFILE_COMPANIES = ['Northgate Labs', 'Harbourline Studio', 'Meridian Works', 'Copperleaf Media', 'Foxglove Analytics', 'Ridgeway Supply', 'Lanternhouse Co', 'Saltmarsh Digital'];
+const PROFILE_POSITIONS = ['Product Designer', 'Operations Lead', 'Staff Engineer', 'Marketing Manager', 'Founder', 'Data Analyst', 'Content Editor', 'Support Lead'];
+const PROFILE_GENDERS = ['female', 'male', 'non-binary'];
+
+/**
+ * A stable index derived from a seed string (djb2) — the same persona draws the
+ * same profile on every boot, so a screenshot QA took last week still matches the
+ * account in front of them, and no dependency or stored fixture is needed.
+ * @param {string} seed - The string to hash
+ * @param {number} size - Pool size to index into
+ */
+function hashIndex(seed, size) {
+  let hash = 5381;
+
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash * 33) ^ seed.charCodeAt(i)) >>> 0;
+  }
+
+  return hash % size;
+}
+
+/**
+ * Draw one entry from a pool for a persona, salted so the same key can draw
+ * independently from several pools.
+ */
+function pick(pool, key, salt) {
+  return pool[hashIndex(`${key}#${salt}`, pool.length)];
+}
+
+/**
+ * The identity a persona would have if it had signed up like a real user: who
+ * they are, where they signed up from, and on what device — the sections
+ * `routes/user/signup` fills from the request and the user fills from the account
+ * page, and which account creation alone leaves as a wall of nulls.
+ *
+ * @param {string} key - The persona key (its profile is derived from it)
+ * @param {string} domain - The brand's domain (the page they signed up on)
+ * @returns {object} The `personal` and `activity` sections of a user doc
+ */
+function seededProfile(key, domain) {
+  const locale = pick(PROFILE_LOCALES, key, 'locale');
+  const client = pick(PROFILE_CLIENTS, key, 'client');
+  const birthday = new Date(Date.UTC(
+    1975 + hashIndex(`${key}#year`, 25),
+    hashIndex(`${key}#month`, 12),
+    1 + hashIndex(`${key}#day`, 28),
+  ));
+
+  return {
+    personal: {
+      birthday: getStamp(birthday),
+      gender: pick(PROFILE_GENDERS, key, 'gender'),
+      location: {
+        country: locale.country,
+        region: locale.region,
+        city: locale.city,
+      },
+      name: {
+        first: pick(PROFILE_FIRST_NAMES, key, 'first'),
+        last: pick(PROFILE_LAST_NAMES, key, 'last'),
+      },
+      company: {
+        name: pick(PROFILE_COMPANIES, key, 'company'),
+        position: pick(PROFILE_POSITIONS, key, 'position'),
+      },
+      telephone: {
+        countryCode: locale.callingCode,
+        // The 555-01xx fictional block, behind the locale's own area code
+        national: Number(`${locale.areaCode}5550${100 + hashIndex(`${key}#phone`, 100)}`),
+      },
+    },
+    activity: {
+      geolocation: {
+        ip: `${locale.ipBlock}.${1 + hashIndex(`${key}#ip`, 250)}`,
+        continent: locale.continent,
+        country: locale.country,
+        region: locale.region,
+        city: locale.city,
+        latitude: locale.latitude,
+        longitude: locale.longitude,
+      },
+      client: {
+        ...client,
+        language: locale.language,
+        url: `https://${domain}/signup`,
+      },
+    },
+  };
+}
+
+/**
+ * Fill in every key `source` carries that `target` does not, recursively — so a
+ * persona that names only its own `personal.name` keeps that name and gains
+ * everything around it. `target` is mutated.
+ */
+function fillMissing(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (!target[key] || typeof target[key] !== 'object') {
+        target[key] = {};
+      }
+      fillMissing(target[key], value);
+    } else if (target[key] === undefined) {
+      target[key] = value;
+    }
+  }
+
+  return target;
 }
 
 /**
@@ -213,13 +488,21 @@ const STATIC_ACCOUNTS = {
       personal: { name: { first: 'Alex', last: 'Basic' } },
     },
   },
+  // The steady-state PAYING subscriber — the persona QA signs in as to see what a
+  // customer sees ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)). It
+  // carries the whole processor record a real purchase leaves, because the
+  // payment-gated surfaces read exactly that: the billing panel's winback pitch is
+  // offered only where the discount can actually be applied (a processor and the
+  // resource it holds the subscription under — core/js/pages/dashboard/account/
+  // sections/billing.js), and a hollow seed skipped it while QA expected the offer.
+  // Subscribed a year ago, billed on the cycle it is in now.
   'premium-active': {
     id: 'premium-active',
     uid: '_test-premium-active',
     email: '_test.premium-active@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-active') },
     },
   },
   // Mid-trial ([#301](https://github.com/Omega-JS-Stack/omega/issues/301)): a
@@ -236,47 +519,58 @@ const STATIC_ACCOUNTS = {
     email: '_test.premium-trialing@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getTrialExpires(), cancellation: { pending: false }, trial: { claimed: true, expires: getTrialExpires(), outcome: null }, payment: { processor: 'test', resourceId: 'sub_test_premium_trialing', orderId: '_test-order-premium-trialing', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getTrialExpires(), cancellation: { pending: false }, trial: { claimed: true, expires: getTrialExpires(), outcome: null }, payment: getTestPayment('premium-trialing', { startDate: getStamp() }) },
     },
   },
+  // A former subscriber: bought two years ago, the term ran out a year ago. The
+  // purchase record stays behind it — that is what makes it a WINBACK candidate
+  // rather than a stranger, and what a real lapsed account looks like.
   'premium-expired': {
     id: 'premium-expired',
     uid: '_test-premium-expired',
     email: '_test.premium-expired@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires() },
+      subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-expired', { startDate: getPastExpires(2) }) },
     },
   },
+  // A subscriber whose renewal card failed: the processor suspended the term it
+  // had already dated, and the last thing to write the subscription was the
+  // failed invoice (getLastWrite).
   'premium-suspended': {
     id: 'premium-suspended',
     uid: '_test-premium-suspended',
     email: '_test.premium-suspended@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'suspended', expires: getCycleExpires() },
+      subscription: { product: { id: 'premium' }, status: 'suspended', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-suspended') },
     },
   },
+  // Cancellation scheduled: still paid, still served, ending when the term does
+  // (resolveSeededSubscription dates `cancellation.date` off that term).
   'premium-cancelling': {
     id: 'premium-cancelling',
     uid: '_test-premium-cancelling',
     email: '_test.premium-cancelling@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true } },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: getTestPayment('premium-cancelling') },
     },
   },
   // Post-refund end state (N6 persona): the refund webhook cancels the subscription —
   // the refund itself lives on the ORDER doc, not the user doc — so what remains is a
   // cancelled sub on the test processor with no remaining term. "Unauthed" needs no
   // persona: that's http.as('none') / a signed-out browser.
+  // It deliberately names NO order: buildOrderFixture writes a purchase record whose
+  // `requests.refund` is null, and an order claiming nothing was refunded would
+  // contradict the one fact this persona exists to carry.
   refunded: {
     id: 'refunded',
     uid: '_test-refunded',
     email: '_test.refunded@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_refunded' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getDaysAgo(4), cancellation: { pending: false }, payment: getTestPayment('refunded', { order: false, startDate: getDaysAgo(5) }) },
     },
   },
   delete: {
@@ -285,7 +579,8 @@ const STATIC_ACCOUNTS = {
     email: '_test.delete@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() }, // Active subscription - deletion should be blocked initially
+      // Active subscription - deletion should be blocked initially
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('delete') },
     },
   },
   'delete-by-admin': {
@@ -655,7 +950,10 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.refund-active-no-cancel@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake' } },
+      // A RECENT purchase: this fixture must be refused for having no cancellation,
+      // so its payment stays well inside the refund window the guard behind that
+      // one would apply.
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: getDaysAgo(3) } },
     },
   },
   'refund-no-processor': {
@@ -753,7 +1051,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.resolve-premium-active@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires() },
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('resolve-premium-active') },
     },
   },
   'resolve-premium-expired': {
@@ -762,7 +1060,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.resolve-premium-expired@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires() },
+      subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: getTestPayment('resolve-premium-expired', { startDate: getPastExpires(2) }) },
     },
   },
   // Journey: marketing webhook revocation (test/routes/marketing/webhook.js). The
@@ -979,6 +1277,15 @@ function getAccountDefinitions(domain, config, extraAccounts) {
     if (properties.subscription) {
       properties.subscription = resolveSeededSubscription(properties.subscription, config);
     }
+
+    // Every persona is a FULL account, journey ones included (Ian 2026-08-17,
+    // [#327](https://github.com/Omega-JS-Stack/omega/issues/327)) — QA signs in as
+    // one and must see exactly what a real user sees. Account creation fills the
+    // schema's SHAPE and nothing else, so a persona that stopped there rendered as
+    // a nameless account from nowhere on every surface that shows a person. The
+    // profile is DERIVED from the persona key, so it is the same on every boot and
+    // a new persona is born complete; anything a persona names for itself wins.
+    fillMissing(properties, seededProfile(key, domain));
 
     // STATIC personas are ESTABLISHED users: born signup-processed with
     // granted legal consent (source 'seed'), so the frontend consent guard —

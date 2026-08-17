@@ -28,17 +28,19 @@
         <span>·</span>
       {% endif %}
       <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
+
+      {% comment %} Generated-content tell (#208): sample content renders on the
+        real posts lane, so every listing row of a `generated` document says so.
+        Keyed off the frontmatter flag ALONE — no environment check, because
+        samples never inject into a production build. It rides the meta line
+        (#322): a chip beside the date, above the title, never a row of its
+        own. {% endcomment %}
+      {% if _p.generated %}<span class="omega-chip omega-generated-badge">TEST</span>{% endif %}
     </div>
 
     <h3 class="omega-post-card__title">
       <a href="{{ _p.url }}">{{ _p.post.title }}</a>
     </h3>
-
-    {% comment %} Generated-content tell (#208): sample content renders on the
-      real posts lane, so every listing row of a `generated` document says so.
-      Keyed off the frontmatter flag ALONE — no environment check, because
-      samples never inject into a production build. {% endcomment %}
-    {% if _p.generated %}<span class="omega-generated-badge">TEST</span>{% endif %}
 
     {%- capture _excerpt -%}{{ _p.post.description }}{%- endcapture -%}
     {%- assign _excerpt = _excerpt | strip -%}

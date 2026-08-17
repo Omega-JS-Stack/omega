@@ -94,7 +94,7 @@ A brand linked to the local monorepo (`file:` specs) can ship the LOCAL framewor
 
 | Target | Lane | How the local framework reaches production |
 |---|---|---|
-| backend | `omega deploy` (always direct) | `stage-local-packages`: every `file:` @omega.js dep is `npm pack`ed — the package's REAL prepare runs, so vendoring makes the tarball self-contained — into `functions/omega_modules/*.tgz`; the staged manifest respells to the tarball and the lockfile regenerates, so Cloud Build installs the LOCAL framework verbatim; everything restores after the upload |
+| backend | `omega deploy` (always direct) | `stage-local-packages`: every `file:` @omega.js dep — and, transitively, every @omega.js runtime dep of those that resolves through a node_modules SYMLINK — is `npm pack`ed — the package's REAL prepare runs, so vendoring makes the tarball self-contained — into `functions/omega_modules/*.tgz`; the staged manifest respells to the tarball and the lockfile regenerates, so Cloud Build installs the LOCAL framework verbatim; everything restores after the upload |
 | web | `omega deploy --direct` | the site builds HERE with the linked framework; only built output pushes to gh-pages (the CNAME + purge ride along) |
 | desktop | `npm run package` / `npm run release:local` | webpack bundles the linked framework into the artifact at build time; `release:local` signs + publishes that locally-built artifact |
 | extension | `npm run build` → `packaged/<browser>/` | same — the bundles carry the linked framework; upload the zip (or `OMEGA_IS_PUBLISH=true npm run build`) |
@@ -119,6 +119,25 @@ removed. Published (registry) deps are untouched; a functions dir with no
 outside `file:` deps stages nothing. The Artifact Registry cleanup policy is
 ensured before deploying because firebase-tools otherwise exits 1 AFTER a
 successful functions deploy, which would skip the public-invoker fix.
+
+**"Local" is transitive ([#331](https://github.com/Omega-JS-Stack/omega/issues/331)).** A packed framework still declares its own
+dependencies by registry spec, and `@omega.js/client` is a real runtime
+dependency of `@omega.js/backend` that is never vendored — unpublished under
+the publish latch, so regenerating the lock 404'd on it and no deploy ran. The
+lane therefore packs the CLOSURE: after each target, its `@omega.js` runtime
+deps that resolve through a node_modules **symlink** (the local-era shape npm
+workspaces and `mgr i local` produce — the registry may have no copy of what
+the link points at) are packed too, and the staged manifest gets an npm
+`overrides` entry per packed transitive dep, since only an override redirects a
+NESTED requirement to the artifact beside it. A dep resolving to a real
+directory is a registry install and is left to Cloud Build. Result: lock
+regeneration never asks the registry for a local package.
+
+**A failing stage is loud and clean.** Any failure inside the lane restores the
+functions folder first (manifest, lockfile, `omega_modules/` — no half-staged
+tree) and then throws with the lane named, so the CLI's error path prints it
+and exits nonzero: nothing deploys, and the next run starts from the original
+shape.
 
 ### Backend: resolved-config staging (#31)
 

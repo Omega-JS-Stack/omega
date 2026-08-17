@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#325](../../issues/325) — The billing card announces an applied discount (what comes off, which bills it comes off) and it survives a reload: the claim lands on the account, stamped with its source, so a checkout code never reads as a claimed save offer.
+
+### Changed
+- [#323](../../issues/323) — The cancel flow's save offer and trial warning open like the exit popup: centered, one accent mark, one headline, one supporting line, one obvious way forward and a quiet way out. The offer's headline is the brand's own number, and the brand's name comes from config.
+- [#327](../../issues/327) — Every seeded persona is a full account: a name, a place, a phone, a company and the device it signed up on, stable across reseeds. The paid personas carry the processor record a real purchase leaves, so the Premium persona now sees the billing card's save offer.
+
+### Removed
+- [#329](../../issues/329) — The dev-only `window._billing.test()` / `.restore()` preview helper is gone. Dev-palette persona switching over seeded accounts is the one way to preview a billing state.
+
+### Fixed
+- [#332](../../issues/332) — The emulator ready deadline is env-tunable (`OMEGA_EMULATOR_READY_TIMEOUT`, default three minutes), so a boot whose port sweep stalls on a network mount no longer fails every self-booting test lane at sixty seconds. The preflight port report stays open on the issue.
+- [#331](../../issues/331) — A backend deploy from a locally linked brand packs every local `@omega.js` package it needs: the framework's own linked runtime deps (`@omega.js/client`) ride the upload too, so the staged lockfile never asks the registry for an unpublished package. A failing stage restores the functions folder and stops the deploy.
+- [#324](../../issues/324) — Every fresh cancel attempt re-evaluates the save offer: declining, closing the questionnaire and clicking cancel again pitches it again, while a claimed or refused offer goes straight to the questionnaire. A dialog the page does not carry can no longer leave the cancel button opening nothing.
+- [#322](../../issues/322) — The sample-content TEST badge rides a blog row's meta line above the title as a chip-sized pill, instead of a full-width band under it. It composes the shared `omega-chip` for its box, and no flex column can stretch it into a row. Both packaged themes.
+- [#326](../../issues/326) — Checkout's Order summary is titled like every other card on the page: icon chip on the left, no right-side logo, no rule under it. The duplicated recurring row under Total is gone, and the trust foot and help line reveal in with the rest of the page.
 
 ## [0.33.0] 2026-08-16
 ### Added

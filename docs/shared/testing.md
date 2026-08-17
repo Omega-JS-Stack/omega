@@ -48,6 +48,8 @@ Layer names inside a suite are platform-native on purpose: desktop's `main`/`ren
 
 **Skip knobs** (all documented in their script headers too): `OMEGA_SKIP_E2E=1` (sandbox e2e, verts, auth-token, extension auth, desktop auth, user flows), `OMEGA_SKIP_JOURNEY=1` (journey), `OMEGA_JOURNEY_STRICT=1` (unmet journey preconditions fail instead of skip), `OMEGA_JOURNEY_KEEP=1` (keep the temp brand after a green run).
 
+**The emulator ready deadline scales the same way** ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)): a boot's port sweep can stall on a network mount (lsof against a Time Machine volume), so every self-booting backend lane waits `OMEGA_EMULATOR_READY_TIMEOUT` ms (default 180000) for "All emulators ready" before declaring the boot dead. A junk value throws. The planned preflight port report lives on the same issue.
+
 **Publish rehearsal — `npm run release:check`** (scripts/release-check.js): packs every publishable (real prepare + vendoring), scratch-installs each tarball with local-tarball overrides for the published @omega.js runtime deps, `require.resolve`s it, and scans the installed tree for raw private @omega.js references. The laptop mirror of CI's pack-smoke; the mechanical gate for the publish-proving checkpoint. `--only=web,manager` iterates a subset; `--keep` preserves the scratch dir.
 
 ## The brand-shape corpus (cp197)

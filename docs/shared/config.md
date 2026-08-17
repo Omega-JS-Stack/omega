@@ -296,8 +296,24 @@ passes, and `demo-*` (emulator-only) projects are exempt.
 
 When a customer starts cancelling a PAID subscription, the billing card pitches a
 discount on the next cycle before it asks them why they are leaving. Accepting applies
-the discount through the processor's own coupon plumbing and calls the cancel off;
+the discount through the processor's own coupon plumbing, calls the cancel off, and
+leaves the saving on the card (what comes off, and which bills it comes off — #325);
 declining opens the cancellation questionnaire unchanged.
+
+The pitch is made per cancel ATTEMPT, never once per session (#324): a customer who
+declines, closes the questionnaire and comes back to cancel meets the offer again,
+because nothing about their subscription changed. Only a CLAIM (the discount is applied,
+and the backend refuses a second one) or a refusal no retry fixes ends it.
+
+An accepted offer is recorded in TWO places, on purpose (#325). `payments-orders/{orderId}`
+`.requests.winback` is the offer's MEMORY — what a second accept is refused against — and
+the account carries the discount ITSELF at `subscription.discount`, shaped like every other
+discount in the payment stack (`{ valid, code, percent | amount, duration }`) plus a
+`source`. That is what the billing card renders on a later visit; without it the saving
+disappeared on the next page load. `source` is the whole reason it is safe to read as a
+claim: today only the winback claim writes this node, and `source` is what keeps the
+read safe when checkout discounts start writing it too, because only
+`source: 'winback'` says this customer already took the save offer.
 
 The offer is the brand's, and **a brand that writes nothing gets one anyway**: 50% off
 the next cycle, that cycle only.

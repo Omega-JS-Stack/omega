@@ -196,13 +196,12 @@ test('discount: a once code discounts today and leaves the renewal at list price
 
   assert.strictEqual(percent.state.discountDuration, 'once', 'the server\'s duration reaches the state');
   assert.strictEqual(percent.bindings.pricing.total, '$85.00', 'the discount comes off today');
-  assert.strictEqual(percent.bindings.pricing.recurringAmount, '$100.00', 'the renewal is the price we will actually charge');
-  assert.match(percent.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'and the terms line quotes the same renewal');
+  assert.match(percent.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'the terms line quotes the list-price renewal we will actually charge');
 
   const amount = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
 
   assert.strictEqual(amount.bindings.pricing.total, '$90.00', 'the flat shape comes off today the same way');
-  assert.strictEqual(amount.bindings.pricing.recurringAmount, '$100.00', 'and leaves the renewal at list price too');
+  assert.match(amount.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'and its terms line leaves the renewal at list price too');
 });
 
 test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)', async () => {

@@ -24,11 +24,19 @@ let uncancelSupported = true;
 let planSwitchSupported = true;
 let winbackSupported = true;
 
-// The save offer (#268) is made ONCE per session. Accepting it applies a real
-// discount to a live subscription and declining it is an answer, so a customer
-// who reopens the cancel flow goes straight to the questionnaire — the offer is
-// a pitch, not a toll gate on the cancel button.
-let winbackOfferAnswered = false;
+// The save offer (#268) is pitched per CANCEL ATTEMPT, never once per session
+// ([#324]): every fresh click on "Cancel subscription" re-evaluates
+// eligibility, so a customer who declined, shut the questionnaire and came back
+// to cancel is pitched again — the subscription is still live and the offer is
+// still unclaimed, which is exactly the moment the pitch is for. A one-shot
+// flag made the SECOND attempt the silent one, which is the state Ian's QA
+// found.
+//
+// Only two things end the pitch, and both are facts about the account rather
+// than about the click: the offer has been CLAIMED (the discount is on the
+// subscription, and the backend refuses a second claim), or the backend has
+// refused it in a way no retry fixes (`winbackSupported`).
+let winbackClaimed = false;
 
 // Cancellation reasons (will be shuffled on each render)
 const CANCEL_REASONS = [
@@ -112,53 +120,31 @@ export function onShow() {
 
 // ─── UI Update ──────────────────────────────────────────────
 
-/* @dev-only:start */
-{
-  // The console helper renders a made-up account into the card. It has to set
-  // `currentAccount` too, because the render is only half of the card's
-  // behavior: the trial-cancel gate re-reads the account on every click, and a
-  // synthetic trialing render that left the real account in place stripped the
-  // trigger's declarative toggle while the gate said no warning was owed — a
-  // dead cancel button ([#309]). The real account is STASHED, once, so
-  // `restore()` always has it back; a bare assignment would lose it to the
-  // previous synthetic one.
-  let realAccount = null;
-  let testing = false;
-
-  window._billing = {
-    test: (account) => {
-      if (!testing) {
-        realAccount = currentAccount;
-        testing = true;
-      }
-
-      currentAccount = account;
-      updateUI(account);
-    },
-    state: () => buildBillingState(currentAccount),
-    restore: () => {
-      if (testing) {
-        currentAccount = realAccount;
-        realAccount = null;
-        testing = false;
-      }
-
-      if (currentAccount) updateUI(currentAccount);
-    },
-  };
-}
-/* @dev-only:end */
+// Previewing a billing state is the dev palette's job and only its job (Ian's
+// ruling, [#329]): a seeded persona shows this card a real account, so there is
+// no synthetic preview path beside it to keep honest.
 
 function updateUI(account) {
   const state = buildBillingState(account);
 
   omega.bindings().update(state);
-  // BOTH pre-questionnaire steps ride the same switch: the trial warning (#267)
-  // and the save offer (#268) each need the declarative collapse toggle off the
-  // trigger, and they are mutually exclusive by state, so the toggle is off
-  // whenever either is owed.
-  syncCancelTriggerToggle(state.billing.cancelWarning.show || state.billing.winbackOffer.show);
+  syncCancelTriggerToggle(dialogOwed(state));
   updateUsageInfo(account);
+}
+
+// Does a dialog stand in front of the questionnaire right now? BOTH
+// pre-questionnaire steps ride the same switch: the trial warning (#267) and
+// the save offer (#268) each need the declarative collapse toggle off the
+// trigger, and they are mutually exclusive by state.
+//
+// A step only counts if the DIALOG IT OPENS is on the page. The gate works by
+// taking the trigger's toggle away, so a layout that dropped a dialog (a
+// consumer override, a trimmed template) would otherwise be left with a cancel
+// button that opens nothing at all — the one path in this flow that cannot be
+// clicked out of ([#324]).
+function dialogOwed(state) {
+  return (state.billing.cancelWarning.show && !!document.getElementById('cancel-trial-warning-modal'))
+    || (state.billing.winbackOffer.show && !!document.getElementById('cancel-winback-modal'));
 }
 
 function buildBillingState(account) {
@@ -248,7 +234,23 @@ function buildBillingState(account) {
     && reachable
     && offer?.enabled === true
     && winbackSupported
-    && !winbackOfferAnswered;
+    && !winbackClaimed
+    // A claim persisted on the account ([#325]): the backend stamps the discount
+    // it applied with source 'winback', so a past claimant is not re-pitched in
+    // a fresh session. Only that source suppresses the pitch — a checkout code's
+    // discount rides the same node with its own source and keeps the offer open.
+    && subscription.discount?.source !== 'winback';
+
+  // The discount riding the subscription right now ([#325]). Accepting the save
+  // offer applies a real discount at the processor and the card said nothing
+  // about it at all, so the saving a customer had just been given was invisible
+  // on the one page that exists to explain their billing.
+  //
+  // The shape is the one the whole payment stack already speaks — a
+  // discount-codes validate result (`{ valid, percent | amount, duration }`),
+  // the same object the apply route records and hands back — so nothing here
+  // learns a second shape, and an invalid one is no discount at all.
+  const discount = subscription.discount?.valid === true ? subscription.discount : null;
 
   return {
     billing: {
@@ -299,6 +301,14 @@ function buildBillingState(account) {
       // is never asked to attest to access it will not get.
       cancelForm: {
         trial: trialCancel,
+      },
+      // The saving already on the subscription (#325): how much comes off, and
+      // which bills it comes off. Both are TEXT — a discount announced by a
+      // colored pill alone is not announced at all.
+      discount: {
+        show: !!discount,
+        label: discount ? `${discountOffText(discount)} off` : '',
+        when: discount ? discountWhenText(discount, subscription.payment?.frequency) : '',
       },
       // The save offer the customer reads before the questionnaire (#268). Its
       // wording is built here, from the brand's own numbers and the cadence the
@@ -1086,9 +1096,10 @@ function setupWinbackOffer() {
     trackBilling('winback_offer_shown');
   }, true);
 
+  // Declining answers THIS attempt: the questionnaire opens behind the dialog
+  // and nothing is retired ([#324]). The trigger keeps its gate, so shutting the
+  // questionnaire and coming back to cancel meets the offer again.
   document.getElementById('cancel-winback-decline-btn')?.addEventListener('click', () => {
-    retireWinbackOffer();
-
     bootstrap.Modal.getInstance($modal)?.hide();
 
     if ($accordion) {
@@ -1104,9 +1115,10 @@ function setupWinbackOffer() {
 }
 
 // Apply the discount to the live subscription and call the cancel off. The
-// route talks to the processor; the webhook pipeline writes whatever state
-// changes, so nothing is patched locally here — the subscription the customer
-// keeps is the one they already had.
+// route talks to the processor and the webhook pipeline writes whatever state
+// changes — the subscription the customer keeps is the one they already had, so
+// the only thing patched locally is the discount the route hands back, which is
+// what the billing card's indicator reads ([#325]).
 async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
   const $btnText = $acceptBtn.querySelector('.button-text');
   const originalText = $btnText?.textContent;
@@ -1116,7 +1128,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
     $acceptBtn.disabled = true;
     if ($btnText) $btnText.textContent = 'Applying...';
 
-    await omega.request(`/omega/payments/winback`, {
+    const response = await omega.request(`/omega/payments/winback`, {
       method: 'POST',
       timeout: 30000,
       body: {
@@ -1126,7 +1138,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
 
     logger.log('Winback offer accepted:', { productId: currentAccount?.subscription?.product?.id });
 
-    retireWinbackOffer();
+    claimWinbackOffer(response?.discount);
 
     bootstrap.Modal.getInstance($modal)?.hide();
 
@@ -1165,7 +1177,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
     ];
     if (deadEndCodes.includes(error.properties?.additional?.code)) {
       winbackSupported = false;
-      retireWinbackOffer();
+      updateUI(currentAccount);
 
       bootstrap.Modal.getInstance($modal)?.hide();
 
@@ -1185,10 +1197,26 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
   }
 }
 
-// The offer has been answered — re-render so the trigger gets its declarative
-// collapse toggle back and the next click opens the questionnaire directly.
-function retireWinbackOffer() {
-  winbackOfferAnswered = true;
+// The offer has been CLAIMED. The discount is on the live subscription now and
+// the backend refuses a second claim, so no later cancel attempt is pitched it
+// again ([#324]) — and the trigger gets its declarative collapse toggle back,
+// so the next click opens the questionnaire directly.
+//
+// The claim's durable home is the backend's (the order doc, and whatever the
+// webhook pipeline writes onto the account). The discount the route hands back
+// is patched onto the account this page holds so the card's indicator ([#325])
+// shows the saving in the same breath the customer earned it, exactly as the
+// cancel and plan-switch paths patch what they just changed.
+function claimWinbackOffer(discount) {
+  winbackClaimed = true;
+
+  const currentSub = currentAccount?.subscription;
+  if (currentSub && discount?.valid === true) {
+    // The route's response is the discount shape without its source; the
+    // persisted doc carries source 'winback' (payments/winback/post.js), so the
+    // in-session patch stamps the same, keeping both reads identical ([#325]).
+    currentSub.discount = { ...discount, source: 'winback' };
+  }
 
   updateUI(currentAccount);
 }
@@ -1199,19 +1227,37 @@ function offersWinback() {
   return buildBillingState(currentAccount).billing.winbackOffer.show === true;
 }
 
-// What the offer SAYS, in the brand's own numbers: a percentage or a flat
-// amount off, and the cadence the subscription is actually billed at. A
-// permanent cut does not promise a single cycle.
-function winbackHeadline(offer, frequency) {
-  const off = offer.amount > 0
-    ? formatCurrency(offer.amount, paymentConfig?.currency || 'USD')
-    : `${offer.percent}%`;
+// What a discount is WORTH, in the brand's own numbers: a flat amount off in
+// the brand's currency, or a percentage. ONE home, read by the offer being
+// pitched (#268) and by the discount already applied (#325) — two spellings of
+// the same number read as two different discounts.
+function discountOffText(discount) {
+  return discount.amount > 0
+    ? formatCurrency(discount.amount, paymentConfig?.currency || 'USD')
+    : `${discount.percent}%`;
+}
 
-  if (offer.duration === 'forever') {
-    return `Stay and get ${off} off for as long as you stay`;
+// Which bills an applied discount comes off, in the cadence the subscription is
+// actually billed at. A permanent cut does not promise a single cycle.
+function discountWhenText(discount, frequency) {
+  if (discount.duration === 'forever') {
+    return 'Applied to every bill for as long as you stay';
   }
 
-  return `Stay and get ${off} off your next ${FREQUENCY_LABELS[frequency] || 'cycle'}`;
+  return `Applied to your next ${FREQUENCY_LABELS[frequency] || 'bill'}`;
+}
+
+// What the offer SAYS: the brand's own number and the cadence the subscription
+// is billed at, in the dialog's promotional voice (#323) — short, forward, and
+// the whole pitch in one line.
+function winbackHeadline(offer, frequency) {
+  const off = discountOffText(offer);
+
+  if (offer.duration === 'forever') {
+    return `Take ${off} off for as long as you stay`;
+  }
+
+  return `Take ${off} off your next ${FREQUENCY_LABELS[frequency] || 'cycle'}`;
 }
 
 // ─── Cancellation Form ──────────────────────────────────────

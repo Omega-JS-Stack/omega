@@ -299,3 +299,52 @@ test('billing details: every paid state shows all three slots — price, cadence
     }
   }
 });
+
+test('#325: an applied discount is announced on the card, in words', async () => {
+  // Accepting the save offer applies a real discount at the processor, and the
+  // card said nothing about it at all (Ian's QA) — a customer had no way to see
+  // what they had just been given. Both halves are TEXT: what comes off, and
+  // which bills it comes off, in the cadence the subscription is billed at.
+  const cases = [
+    {
+      what: 'a percentage off the next cycle',
+      account: paidAccount({ status: 'active', discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once' } }),
+      discount: { show: true, label: '50% off', when: 'Applied to your next month' },
+    },
+    {
+      what: 'a flat amount reads in the brand currency',
+      account: paidAccount({ status: 'active', discount: { valid: true, code: 'WINBACK10OFF', amount: 10, duration: 'once' } }),
+      discount: { show: true, label: '$10.00 off', when: 'Applied to your next month' },
+    },
+    {
+      what: 'an annual subscription is told about its next YEAR',
+      account: paidAccount({ status: 'active', payment: { frequency: 'annually', price: 100, processor: 'stripe' }, discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once' } }),
+      discount: { show: true, label: '50% off', when: 'Applied to your next year' },
+    },
+    {
+      what: 'a permanent cut never promises a single cycle',
+      account: paidAccount({ status: 'active', discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'forever' } }),
+      discount: { show: true, label: '50% off', when: 'Applied to every bill for as long as you stay' },
+    },
+    {
+      what: 'a subscription with no discount announces nothing',
+      account: paidAccount({ status: 'active' }),
+      discount: { show: false, label: '', when: '' },
+    },
+    {
+      // The shape is a discount-codes VALIDATE result, so a discount that did
+      // not validate is not a saving — it is a refusal, and the card says
+      // nothing rather than promising a number nobody honours.
+      what: 'an invalid discount is no discount',
+      account: paidAccount({ status: 'active', discount: { valid: false, code: 'EXPIRED', percent: 50, duration: 'once' } }),
+      discount: { show: false, label: '', when: '' },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const state = await billingStateFor(testCase.account);
+
+    assert.deepStrictEqual(state.discount, testCase.discount, testCase.what);
+    assert.ok(!/undefined|NaN/.test(`${state.discount.label}${state.discount.when}`), `${testCase.what}: never an internal blank`);
+  }
+});

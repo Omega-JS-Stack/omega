@@ -121,3 +121,26 @@
     border-radius: var(--omega-radius-xs);
   }
 }
+
+// ============================================
+// Dialog mark — the icon medallion a promotional dialog opens on (the cancel
+// flow's save offer and its trial warning, [#323]): ONE accent disc carrying a
+// single glyph, so the dialog leads with a mark instead of a title bar. The
+// danger modifier is the same disc in the status hue, for a dialog that warns
+// rather than offers.
+// ============================================
+.omega-dialog-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  color: var(--omega-accent);
+  background: var(--omega-accent-subtle);
+  border-radius: 50%;
+}
+
+.omega-dialog-mark--danger {
+  color: var(--omega-danger);
+  background: color-mix(in srgb, var(--omega-danger) 12%, transparent);
+}

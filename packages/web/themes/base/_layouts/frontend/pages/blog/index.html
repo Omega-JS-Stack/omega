@@ -116,16 +116,16 @@ newsletter_cta:
             <time datetime="{{ _featured.date | date_to_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
             <span>·</span>
             <span>{% omega_readtime _featured.content %} min read</span>
+
+            {% comment %} The featured slot is the listing's first row and does not
+              go through post-card.html, so it carries the #208 badge itself —
+              otherwise the most prominent sample post is the one row with no
+              tell. Same meta-line placement as the card (#322). {% endcomment %}
+            {% if _featured.generated %}<span class="omega-chip omega-generated-badge">TEST</span>{% endif %}
           </div>
           <h2 class="omega-featured-post__title">
             <a href="{{ _featured.url }}">{{ _featured.post.title }}</a>
           </h2>
-
-          {% comment %} The featured slot is the listing's first row and does not
-            go through post-card.html, so it carries the #208 badge itself —
-            otherwise the most prominent sample post is the one row with no
-            tell. {% endcomment %}
-          {% if _featured.generated %}<span class="omega-generated-badge">TEST</span>{% endif %}
           {% iftruthy _featured.post.description %}
             <p class="omega-featured-post__desc">{{ _featured.post.description }}</p>
           {% endiftruthy %}
