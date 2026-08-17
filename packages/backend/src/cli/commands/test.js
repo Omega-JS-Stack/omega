@@ -234,7 +234,7 @@ class TestCommand extends BaseCommand {
     // Adopt the running emulator only when it PROVES it is ours — a listener on
     // the functions port is not evidence of ownership
     // ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
-    const portInUse = this.isEmulatorRunning(emulatorPorts);
+    const portInUse = await this.isEmulatorRunning(emulatorPorts);
     const adoption = decideEmulatorAdoption({
       portInUse: portInUse,
       ownsPortsFile: !!publishedPorts && publishedPorts.functions === emulatorPorts.functions,
@@ -520,6 +520,8 @@ class TestCommand extends BaseCommand {
 
   /**
    * Check if emulator is already running
+   * @param {object} emulatorPorts - The port map this run expects.
+   * @returns {Promise<boolean>}
    */
   isEmulatorRunning(emulatorPorts) {
     // Check if functions emulator port is in use

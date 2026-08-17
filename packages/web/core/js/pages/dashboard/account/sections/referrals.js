@@ -41,14 +41,21 @@ function updateReferralsList(referrals) {
   // Initialize referrals array
   let referralData = referrals || [];
 
-  // Add fake data if _dev_prefill=true is in query string
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('_dev_prefill') === 'true') {
-    console.log('Adding fake referral data for testing');
-    const fakeReferrals = generateFakeReferrals();
-    // Add fake referrals to existing data
-    referralData = [...referralData, ...fakeReferrals];
+  /* @dev-only:start */
+  // The palette's "Prefill fake data" toggle (#342) applies `_dev_prefill=true`
+  // — a URL param because the read happens once, while the section loads. The
+  // read lives inside the block, so production never looks and the fixtures
+  // never reach a real bundle.
+  if (omega.isDevelopment()) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('_dev_prefill') === 'true') {
+      console.log('Adding fake referral data for testing');
+      const fakeReferrals = generateFakeReferrals();
+      // Add fake referrals to existing data
+      referralData = [...referralData, ...fakeReferrals];
+    }
   }
+  /* @dev-only:end */
 
   // Handle empty state
   if (!referralData || !Array.isArray(referralData) || referralData.length === 0) {
@@ -226,6 +233,7 @@ async function handleCopyReferralCode() {
   }
 }
 
+/* @dev-only:start */
 // Generate fake referrals for demo
 function generateFakeReferrals() {
   const now = Date.now();
@@ -294,4 +302,5 @@ function generateFakeReferrals() {
     }
   ];
 }
+/* @dev-only:end */
 

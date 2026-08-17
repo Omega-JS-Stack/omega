@@ -454,11 +454,24 @@ module.exports = {
           // someone else's promo is an offer silently withheld.
           assert.equal(discount.source, 'winback', 'and it says which system applied it');
 
+          // And WHICH subscription it was applied to ([#333]). Nothing cleared
+          // this node, so a customer who churned and resubscribed carried the
+          // old claim into the new subscription and was never pitched the save
+          // again. The stamp is what the webhook pipeline compares the incoming
+          // subscription against, so the claim can end with the subscription it
+          // was made on.
+          assert.equal(
+            discount.resourceId,
+            user.subscription.payment.resourceId,
+            'stamped with the subscription it discounted',
+          );
+
           // Through the resolver, exactly as the client reads it
           const resolved = Manager.User(userDoc).properties.subscription.discount;
 
           assert.equal(resolved.valid, true, 'The discount survives account resolution');
           assert.equal(resolved.source, 'winback', 'source and all');
+          assert.equal(resolved.resourceId, user.subscription.payment.resourceId, 'stamp and all');
 
           // The claim is still recorded where the refusal reads it
           const orderDoc = await firestore.get(`payments-orders/${orderId}`);

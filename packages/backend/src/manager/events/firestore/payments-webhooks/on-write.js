@@ -3,6 +3,7 @@ const powertools = require('node-powertools');
 const transitions = require('./transitions/index.js');
 const { trackPayment } = require('./analytics.js');
 const loadProcessor = require('../../../libraries/load-processor.js');
+const User = require('../../../helpers/user.js');
 
 /**
  * Firestore trigger: payments-webhooks/{eventId} onWrite
@@ -402,6 +403,38 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx });
   }
 
+  // A persisted discount belongs to the subscription it was applied to, and to
+  // that one only ([#333]). The unified object carries no discount key at all,
+  // so the merge below would preserve the node forever: a customer who churned
+  // and resubscribed kept a spent claim on the new subscription, where the
+  // billing card reads `source: 'winback'` as "already claimed" and silently
+  // never pitches the save offer again, one the backend would grant.
+  //
+  // So the claim's stamp is compared against the subscription THIS event is
+  // about, and a mismatch clears the node: a new subscription is a clean slate.
+  // A node with no stamp was written before the stamp existed and nothing can
+  // prove it belongs to an older subscription, so it is read as riding the one
+  // it is found on (no live discount is ever taken away on a guess) and stamped
+  // there, so it clears on the next resubscribe like any other.
+  //
+  // The gate needs the RESOURCE to be a subscription, not just the category: a
+  // subscription-category event can ride an invoice or sale resource (Stripe
+  // charge.refunded, PayPal raw-payload fallback), whose id would never match
+  // the stamp and would wrongly clear a live discount.
+  const claimedDiscount = isSubscription && resourceType === 'subscription' && before?.discount?.valid === true ? before.discount : null;
+  const liveResourceId = unified.payment?.resourceId || null;
+  let discountWrite = null;
+
+  if (claimedDiscount && liveResourceId) {
+    if (!claimedDiscount.resourceId) {
+      discountWrite = { resourceId: liveResourceId };
+      ctx.log(`Adopting users/${uid}.subscription.discount onto ${liveResourceId}: the claim carries no subscription stamp, so it is the one it is riding`);
+    } else if (claimedDiscount.resourceId !== liveResourceId) {
+      discountWrite = User.EMPTY_DISCOUNT;
+      ctx.log(`Clearing users/${uid}.subscription.discount: claimed on ${claimedDiscount.resourceId}, this event is for ${liveResourceId}, so the discount ended with the subscription it was applied to`);
+    }
+  }
+
   // The three writes this event produces — the user's subscription, the order and
   // the intent — land TOGETHER. As separate awaits, anything that threw between
   // them left the state split: a user paid with no order behind it, or an order
@@ -410,7 +443,9 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
 
   // Write unified subscription to user doc (subscriptions only)
   if (isSubscription) {
-    batch.set(admin.firestore().doc(`users/${uid}`), { subscription: unified }, { merge: true });
+    batch.set(admin.firestore().doc(`users/${uid}`), {
+      subscription: discountWrite ? { ...unified, discount: discountWrite } : unified,
+    }, { merge: true });
   }
 
   if (orderId) {

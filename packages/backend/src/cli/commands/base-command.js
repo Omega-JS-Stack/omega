@@ -293,22 +293,21 @@ class BaseCommand {
   }
 
   /**
-   * Get info about a process using a specific port (returns first process only for backwards compatibility)
+   * Check if a port is in use.
+   *
+   * A bind probe, not an lsof read: lsof stats every mounted filesystem before
+   * it answers, so on a machine with a network mount this one question cost
+   * seconds at the head of every `omega test`
+   * ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)). The probe is
+   * the same primitive the port allocator resolves with, so the answer here and
+   * the answer boot acts on can no longer disagree.
    * @param {number} port - Port number to check
-   * @returns {object|null} - Process info if port is in use, null otherwise
+   * @returns {Promise<boolean>} - true if port is in use
    */
-  getProcessOnPort(port) {
-    const processes = this.getProcessesOnPort(port);
-    return processes ? processes[0] : null;
-  }
+  async isPortInUse(port) {
+    const { isPortFree } = require('@omega.js/config');
 
-  /**
-   * Check if a port is in use
-   * @param {number} port - Port number to check
-   * @returns {boolean} - true if port is in use
-   */
-  isPortInUse(port) {
-    return this.getProcessOnPort(port) !== null;
+    return !(await isPortFree(port));
   }
 
   /**

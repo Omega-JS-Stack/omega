@@ -10,6 +10,7 @@
 // them — each is consumed ONCE at page init, before any of these controls
 // exist:
 //   product, frequency        → ../index.js (initializeCheckout)
+//   _dev_preDelay             → ../index.js (artificial pre-delay)
 //   _dev_trialEligible        → ../index.js (trial override)
 //   _dev_cardProcessor        → ./state.js  (resolveProcessor)
 //   _dev_recaptcha            → ../../../../libs/recaptcha.js
@@ -33,6 +34,14 @@ const CONTROLS = [
     param: 'frequency',
     label: 'Frequency',
     options: [['annually', 'Annually'], ['monthly', 'Monthly'], ['weekly', 'Weekly'], ['daily', 'Daily']],
+  },
+  {
+    // The slow-boot rehearsal (#342): the page sleeps this long before it
+    // resolves the frequency, so the loading state is something you can look at
+    // rather than a frame that flashes past.
+    param: '_dev_preDelay',
+    label: 'Pre-delay',
+    options: [['', '(none)'], ['3000', '3s'], ['5000', '5s'], ['10000', '10s']],
   },
   {
     param: '_dev_trialEligible',

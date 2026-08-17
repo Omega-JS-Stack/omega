@@ -8,6 +8,10 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('test:appearance');
 
+// The debug panel's refresh, handed over by initDebugPanel so the controls
+// below can call it. A no-op until the panel exists.
+let refreshDebugPanel = () => {};
+
 // Module
 export default () => {
   return new Promise(async function (resolve) {
@@ -100,8 +104,10 @@ function initDebugPanel() {
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   mediaQuery.addEventListener('change', updateDebug);
 
-  // Export for console access
-  window.updateAppearanceDebug = updateDebug;
+  // The Clear control refreshes the panel by hand (clearing fires no attribute
+  // change when the resolved theme does not move), so the panel hands its
+  // refresh to the module rather than to window (#342).
+  refreshDebugPanel = updateDebug;
 }
 
 /**
@@ -127,7 +133,7 @@ function initControls() {
     logger.log('Clear clicked');
     appearance.clear();
     // Trigger debug update
-    window.updateAppearanceDebug?.();
+    refreshDebugPanel();
   });
 
   // Quick set buttons

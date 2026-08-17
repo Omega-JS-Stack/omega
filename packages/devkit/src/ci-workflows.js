@@ -355,11 +355,8 @@ function scopeRunStep(step, keyIndent, appPath) {
   return [...step.slice(0, runIndex), `${pad}${declared}`, ...step.slice(runIndex)];
 }
 
-// Delete the app-level copy of a workflow when it is byte-identical to what the
-// app-level scaffold would have written RIGHT NOW (framework-owned); keep and
-// report one that differs. The compare is against the current template only, so
-// a copy from an older framework version differs too — the report says exactly
-// that and names both files, rather than crediting edits it cannot prove.
+// Delete the app-level copy of a workflow when the framework wrote every line
+// of it (framework-owned); keep and report one carrying anything else.
 function sweepAppCopy(context) {
   const { appDir, appPath, name, composedName, rendered, logger, result } = context;
   const appCopy = path.join(appDir, '.github', 'workflows', name);
@@ -368,7 +365,7 @@ function sweepAppCopy(context) {
     return;
   }
 
-  if (jetpack.read(appCopy) === rendered) {
+  if (isFrameworkGeneration(jetpack.read(appCopy), rendered)) {
     jetpack.remove(appCopy);
     pruneEmptyDirs(path.dirname(appCopy), appDir);
     result.removed.push(`.github/workflows/${name}`);
@@ -377,6 +374,31 @@ function sweepAppCopy(context) {
   }
 
   logger.warn(`Kept ${appPath}/.github/workflows/${name} — it differs from the current framework template (your edits, or an older framework version), and GitHub NEVER runs a workflow from an app dir. Compare it against ${composedName}, move anything it still needs, then delete ${appPath}/.github/workflows/${name}`);
+}
+
+// Is every line of the app's copy a line the current template still ships, in
+// the template's own order? Then the framework wrote all of it and the copy is
+// safe to delete. An exact match is the trivial case, and a copy a SUPERSEDED
+// template wrote passes too, because templates evolve by GAINING lines (#189
+// added the generated secrets block; every copy scaffolded before it is that
+// same file minus those lines, #334). A line the consumer ADDED or CHANGED is a
+// line no template of this framework ever shipped, so it fails here and the
+// copy is kept. Accepted blind spot: an edit that ONLY deletes lines is still a
+// subsequence and gets swept — bounded, because an app-dir workflow never runs
+// and the composed root file is regenerated from the current template.
+function isFrameworkGeneration(existing, rendered) {
+  const template = rendered.split('\n');
+  let cursor = 0;
+
+  for (const line of existing.split('\n')) {
+    cursor = template.indexOf(line, cursor);
+    if (cursor === -1) {
+      return false;
+    }
+    cursor++;
+  }
+
+  return true;
 }
 
 // Remove now-empty ancestor dirs of a swept file, stopping at (never removing) rootDir.

@@ -72,8 +72,8 @@ function readGraph(outDir, manifestUrl) {
   return [...seen.values()].join('\n');
 }
 
-// The real checkout page's bundle graph, built the way a brand builds it.
-async function buildCheckoutGraph(dev, name) {
+// A real page's bundle graph, built the way a brand builds it.
+async function buildPageGraph(dev, name, page) {
   const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
   const outDir = path.join(PKG, '.omega', `${name}-${process.pid}`);
   fs.rmSync(outDir, { recursive: true, force: true });
@@ -88,7 +88,7 @@ async function buildCheckoutGraph(dev, name) {
     dev,
     only: 'js',
   });
-  const graph = readGraph(outDir, manifest.js.pages['payment/checkout/index']);
+  const graph = readGraph(outDir, manifest.js.pages[page]);
   fs.rmSync(outDir, { recursive: true, force: true });
   return graph;
 }
@@ -99,11 +99,11 @@ test('the checkout page ships no `_dev_decline` to production (#226)', async () 
   // around the section import (index.js). #235 is the standing proof that a
   // dev param read OUTSIDE a block survives the strip, so this asserts on the
   // real production build rather than on the source.
-  const devGraph = await buildCheckoutGraph(true, 'strip-checkout-dev-out');
+  const devGraph = await buildPageGraph(true, 'strip-checkout-dev-out', 'payment/checkout/index');
   assert.ok(devGraph.includes('_dev_decline'), 'the dev build carries the param — otherwise this proves nothing');
   assert.ok(devGraph.includes('Decline next checkout'), 'and the palette control that applies it');
 
-  const prodGraph = await buildCheckoutGraph(false, 'strip-checkout-prod-out');
+  const prodGraph = await buildPageGraph(false, 'strip-checkout-prod-out', 'payment/checkout/index');
   assert.ok(!prodGraph.includes('_dev_decline'), 'production never reads the decline param');
   assert.ok(!prodGraph.includes('Decline next checkout'), 'and carries none of the control that sets it');
 });
@@ -113,10 +113,10 @@ test('the checkout page ships no `_dev_cardProcessor` to production (#235)', asy
   // checkout let a visitor point their own payment at another processor. The
   // read belongs behind the same triple gate as the decline arm — this asserts
   // on the real production build, not on the source.
-  const devGraph = await buildCheckoutGraph(true, 'strip-processor-dev-out');
+  const devGraph = await buildPageGraph(true, 'strip-processor-dev-out', 'payment/checkout/index');
   assert.ok(devGraph.includes('_dev_cardProcessor'), 'the dev build carries the param — otherwise this proves nothing');
 
-  const prodGraph = await buildCheckoutGraph(false, 'strip-processor-prod-out');
+  const prodGraph = await buildPageGraph(false, 'strip-processor-prod-out', 'payment/checkout/index');
   assert.ok(!prodGraph.includes('_dev_cardProcessor'), 'production never reads the card-processor override');
 });
 
@@ -125,9 +125,36 @@ test('the checkout page ships no `_dev_trialEligible` to production (#245)', asy
   // into the production graph while every other checkout dev param stayed out.
   // Never exploitable — the apply site was always behind omega.isDevelopment()
   // — but the read belongs behind the same triple gate as the rest (#235/#226).
-  const devGraph = await buildCheckoutGraph(true, 'strip-trial-dev-out');
+  const devGraph = await buildPageGraph(true, 'strip-trial-dev-out', 'payment/checkout/index');
   assert.ok(devGraph.includes('_dev_trialEligible'), 'the dev build carries the param — otherwise this proves nothing');
 
-  const prodGraph = await buildCheckoutGraph(false, 'strip-trial-prod-out');
+  const prodGraph = await buildPageGraph(false, 'strip-trial-prod-out', 'payment/checkout/index');
   assert.ok(!prodGraph.includes('_dev_trialEligible'), 'production never reads the trial-eligibility override');
+});
+
+test('the auth pages ship no `_dev_simulateRedirect` to production (#342)', async () => {
+  // The sweep moved the OAuth returning-redirect rehearsal onto a palette
+  // section (libs/auth/index.js). dev-hooks-guard.test.js proves the read sits
+  // inside a block; only a real production build proves the strip actually
+  // took, which is the gap #226/#235/#245 each fell through.
+  const devGraph = await buildPageGraph(true, 'strip-auth-dev-out', 'signin/index');
+  assert.ok(devGraph.includes('_dev_simulateRedirect'), 'the dev build carries the param, otherwise this proves nothing');
+  assert.ok(devGraph.includes('Simulate an OAuth redirect'), 'and the palette control that applies it');
+
+  const prodGraph = await buildPageGraph(false, 'strip-auth-prod-out', 'signin/index');
+  assert.ok(!prodGraph.includes('_dev_simulateRedirect'), 'production never reads the redirect-simulation param');
+  assert.ok(!prodGraph.includes('Simulate an OAuth redirect'), 'and carries none of the control that sets it');
+});
+
+test('the account page ships no `_dev_prefill` to production (#342)', async () => {
+  // Same shape for the account page's fixtures toggle: the referrals and
+  // sessions lists both read the param as they load, so the block has to hold
+  // on the real build, not just in the source.
+  const devGraph = await buildPageGraph(true, 'strip-prefill-dev-out', 'dashboard/account/index');
+  assert.ok(devGraph.includes('_dev_prefill'), 'the dev build carries the param, otherwise this proves nothing');
+  assert.ok(devGraph.includes('Prefill referrals & sessions'), 'and the palette control that applies it');
+
+  const prodGraph = await buildPageGraph(false, 'strip-prefill-prod-out', 'dashboard/account/index');
+  assert.ok(!prodGraph.includes('_dev_prefill'), 'production never reads the fixtures-prefill param');
+  assert.ok(!prodGraph.includes('Prefill referrals & sessions'), 'and carries none of the control that sets it');
 });

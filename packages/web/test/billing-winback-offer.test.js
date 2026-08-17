@@ -193,6 +193,9 @@ async function wireCancelFlow(account, { winback, requestFails, without = [] } =
     'cancel-winback-modal',
     'cancel-winback-accept-btn',
     'cancel-winback-decline-btn',
+    'cancel-retention-modal',
+    'cancel-retention-keep-btn',
+    'cancel-retention-continue-btn',
     'cancel-subscription-accordion',
   ]) {
     if (without.includes(id)) {
@@ -365,12 +368,16 @@ test('#268: accepting applies the discount and ABORTS the cancel', async () => {
 test('#268: an accepted offer is not pitched a second time', async () => {
   // The discount is applied to a live subscription; re-opening the flow must
   // not offer another one, and the backend refuses a second claim anyway.
+  //
+  // A claimed offer is exactly the state the retention warning was built for
+  // ([#341]): nothing left to pitch, so the trigger keeps its gate and the next
+  // cancel click meets the fallback dialog instead of the questionnaire.
   const { opened, clickTrigger, clickById, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount());
 
   clickTrigger();
   await clickById('cancel-winback-accept-btn');
 
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger is a plain Bootstrap toggle again');
+  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'the trigger stays gated, because a dialog still stands in front of the questionnaire');
 
   clickTrigger();
 
@@ -379,7 +386,8 @@ test('#268: an accepted offer is not pitched a second time', async () => {
     1,
     'the offer opened exactly once',
   );
-  assert.strictEqual(isAccordionOpen(), true, 'and the next cancel click goes straight to the questionnaire');
+  assert.ok(opened.includes('modal:cancel-retention-modal'), 'and the next cancel click meets the retention warning');
+  assert.strictEqual(isAccordionOpen(), false, 'the questionnaire waits behind it');
 });
 
 test('#268: declining continues to the questionnaire, unchanged', async () => {
@@ -426,6 +434,10 @@ test('#324: every step of the reopened flow leaves a way forward', async () => {
   // The whole point of the rewire: no click may leave the customer with neither
   // the dialog nor the questionnaire. The second pitch answers the same two
   // ways the first one does, so both are walked end to end.
+  //
+  // Past the accepted end of it the retention warning takes over ([#341]): the
+  // way forward is its "Cancel anyway" button rather than a bare click, and it
+  // is walked here too, because a way forward is the whole claim of this test.
   const declined = await wireCancelFlow(paidAccount());
 
   declined.clickTrigger();
@@ -454,12 +466,22 @@ test('#324: every step of the reopened flow leaves a way forward', async () => {
     2,
     'a CLAIMED offer is never pitched again',
   );
-  assert.strictEqual(accepted.isAccordionOpen(), true, 'and the cancel goes straight to the questionnaire');
+  assert.ok(accepted.opened.includes('modal:cancel-retention-modal'), 'the claimed state meets the retention warning instead ([#341])');
+  assert.strictEqual(accepted.isAccordionOpen(), false, 'which holds the questionnaire behind it');
+
+  await accepted.clickById('cancel-retention-continue-btn');
+
+  assert.strictEqual(accepted.isAccordionOpen(), true, 'and carrying on through it still reaches the questionnaire');
 });
 
 test('#324: a refusal the account cannot answer stays refused across attempts', async () => {
   // `winbackSupported` is the other end of the state: the backend has said this
   // account can never take the offer, so a fresh attempt is not a fresh chance.
+  //
+  // A refused offer is a cancel with nothing left to pitch, so the retention
+  // warning owns every later attempt ([#341]). The refusal itself opened the
+  // questionnaire, so the click after it is the toggle-close half and only shuts
+  // it; the one after THAT is the fresh attempt the fallback dialog meets.
   const refusal = Object.assign(new Error('You have already claimed this offer'), {
     properties: { additional: { code: 'offer-already-claimed' } },
   });
@@ -471,6 +493,9 @@ test('#324: a refusal the account cannot answer stays refused across attempts', 
   assert.strictEqual(isAccordionOpen(), true, 'the refusal opens the questionnaire');
 
   clickTrigger();
+
+  assert.strictEqual(isAccordionOpen(), false, 'the next click is the toggle-close half, and only shuts it');
+
   clickTrigger();
 
   assert.strictEqual(
@@ -478,7 +503,12 @@ test('#324: a refusal the account cannot answer stays refused across attempts', 
     1,
     'and no later attempt pitches it again',
   );
-  assert.strictEqual(isAccordionOpen(), true, 'every later attempt goes straight to the questionnaire');
+  assert.ok(opened.includes('modal:cancel-retention-modal'), 'the fresh attempt meets the retention warning instead');
+  assert.strictEqual(isAccordionOpen(), false, 'which holds the questionnaire behind it');
+
+  await clickById('cancel-retention-continue-btn');
+
+  assert.strictEqual(isAccordionOpen(), true, 'and the cancel they came to make is still one click away');
 });
 
 test('#324: a page missing a dialog falls back to the questionnaire, never to a dead button', async () => {
@@ -496,14 +526,19 @@ test('#324: a page missing a dialog falls back to the questionnaire, never to a 
 });
 
 test('#268: a brand that disabled the offer never sees the step', async () => {
-  const { opened, clickTrigger, isAccordionOpen, attributesOf } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
+  // The offer step is off for this brand, and the click it would have taken now
+  // belongs to the retention warning ([#341]): the state the fallback dialog was
+  // added for. So the pin is that NO discount is ever pitched here, not that the
+  // click reaches the questionnaire untouched.
+  const { opened, clickTrigger, isAccordionOpen, attributesOf, state } = await wireCancelFlow(paidAccount(), { winback: { enabled: false } });
 
   const event = clickTrigger();
 
-  assert.deepStrictEqual(opened, [], 'no dialog opened');
-  assert.strictEqual(event.propagationStopped, false, 'the declarative collapse handles the click, exactly as before');
-  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', 'the trigger keeps its Bootstrap toggle');
-  assert.strictEqual(isAccordionOpen(), true, 'and Bootstrap opened the questionnaire on its own');
+  assert.strictEqual(state().billing.winbackOffer.show, false, 'the offer is off the table entirely');
+  assert.deepStrictEqual(opened, ['modal:cancel-retention-modal'], 'and the retention warning is the one dialog that opened');
+  assert.strictEqual(event.propagationStopped, true, 'the declarative collapse never gets the click');
+  assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, 'a gated trigger is not a Bootstrap toggle at all');
+  assert.strictEqual(isAccordionOpen(), false, 'and the questionnaire waits behind the dialog');
 });
 
 test('#268: a trial cancel is warned, never offered a discount', async () => {
@@ -584,7 +619,8 @@ test('#325: a persisted winback claim suppresses the pitch, a checkout code does
   assert.strictEqual(claimed.state().billing.discount.show, true, 'the discount it earned still shows on the card');
 
   claimed.clickTrigger();
-  assert.strictEqual(claimed.isAccordionOpen(), true, 'and the cancel proceeds straight to the questionnaire');
+  assert.deepStrictEqual(claimed.opened, ['modal:cancel-retention-modal'], 'and the cancel meets the retention warning, never a second pitch ([#341])');
+  assert.strictEqual(claimed.isAccordionOpen(), false, 'with the questionnaire behind it');
 
   const checkout = await wireCancelFlow(paidAccount({
     discount: { valid: true, code: 'WELCOME15', percent: 15, duration: 'once', source: 'checkout' },
@@ -598,7 +634,11 @@ test('#311: a subscription with no processor payment details is never pitched th
   // carries no `payment.processor` / `payment.resourceId`, so the apply route
   // has nothing to send a discount to and can only refuse. Pitching it anyway
   // put the customer in a dialog whose only button 400s, so the gate reads the
-  // fields the accept path needs — and the cancel they came for is one click.
+  // fields the accept path needs.
+  //
+  // What this cancel meets instead is the retention warning ([#341]), the
+  // fallback for exactly this state. No discount is pitched and no route is
+  // called, which is the whole of what #311 asks of it.
   const cases = [
     { what: 'no processor details at all', payment: { frequency: 'monthly', price: 10 } },
     { what: 'a processor but no resource', payment: { frequency: 'monthly', price: 10, processor: 'stripe' } },
@@ -613,10 +653,10 @@ test('#311: a subscription with no processor payment details is never pitched th
 
     const event = clickTrigger();
 
-    assert.deepStrictEqual(opened, [], `${what}: no dialog opened`);
-    assert.strictEqual(event.propagationStopped, false, `${what}: the declarative collapse handles the click`);
-    assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], 'collapse', `${what}: the trigger keeps its Bootstrap toggle`);
-    assert.strictEqual(isAccordionOpen(), true, `${what}: and the questionnaire opens on the first click`);
+    assert.deepStrictEqual(opened, ['modal:cancel-retention-modal'], `${what}: the retention warning is the one dialog that opened`);
+    assert.strictEqual(event.propagationStopped, true, `${what}: the declarative collapse never gets the click`);
+    assert.strictEqual(attributesOf('cancel-subscription-trigger-btn')['data-bs-toggle'], undefined, `${what}: a gated trigger is not a Bootstrap toggle at all`);
+    assert.strictEqual(isAccordionOpen(), false, `${what}: and the questionnaire waits behind the dialog`);
     assert.deepStrictEqual(requests, [], `${what}: nothing called the apply route`);
   }
 });

@@ -2,6 +2,15 @@
  * Development-only utilities and features
  * This file contains code that should only run in development mode
  */
+
+/* @dev-only:start */
+// The palette is the ONE home for dev affordances (#342). These helpers used to
+// be `window.logOpeningTags()` / `window.changeTheme()`, invocable only if you
+// already knew the name to type. The import rides inside the block so a
+// production build strips it with the registration.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+/* @dev-only:end */
+
 export default function () {
   // Main log
   console.log('⚠️ Enabling development mode features!');
@@ -27,46 +36,70 @@ function setupHandlers() {
 }
 
 function setupHelpers() {
-  // Add development helper functions
+  // Hand the palette a button per helper — the panel is where you FIND them,
+  // instead of having to already know the name (#342).
+  /* @dev-only:start */
+  registerDevSection('tools', {
+    title: 'Tools',
+    buildNode: (doc) => {
+      const wrap = doc.createElement('div');
+      wrap.className = 'omega-devbar__grid';
 
-  // Log opening tags of common HTML elements
-  window.logOpeningTags = function (detail) {
-    const tags = ['html', 'body', 'nav', 'main', 'footer'];
+      [
+        ['Log opening tags', () => logOpeningTags()],
+        ['Toggle theme', () => changeTheme()],
+      ].forEach(([label, run]) => {
+        const button = doc.createElement('button');
+        button.type = 'button';
+        button.className = 'omega-devbar__btn';
+        button.textContent = label;
+        button.addEventListener('click', run);
+        wrap.appendChild(button);
+      });
 
-    // Convert detail to array if provided
-    const detailTags = detail ? (Array.isArray(detail) ? detail : [detail]) : [];
+      return wrap;
+    },
+  });
+  /* @dev-only:end */
+}
 
-    // Log opening tags and add innerHTML for matching detail tags
-    const result = tags.map(tag => {
-      const el = document.querySelector(tag);
-      if (!el) return `<!-- ${tag} not found -->`;
+// Log opening tags of common HTML elements
+function logOpeningTags(detail) {
+  const tags = ['html', 'body', 'nav', 'main', 'footer'];
 
-      const openingTag = getOpeningTag(tag);
+  // Convert detail to array if provided
+  const detailTags = detail ? (Array.isArray(detail) ? detail : [detail]) : [];
 
-      // If this tag matches detail, include innerHTML
-      if (detailTags.includes(tag)) {
-        const innerHTML = el.innerHTML.trim();
-        return `${openingTag}\n${innerHTML}\n</${el.tagName.toLowerCase()}>`;
-      }
+  // Log opening tags and add innerHTML for matching detail tags
+  const result = tags.map(tag => {
+    const el = document.querySelector(tag);
+    if (!el) return `<!-- ${tag} not found -->`;
 
-      return openingTag;
-    }).join('\n\n');
+    const openingTag = getOpeningTag(tag);
 
-    // Log the result
-    console.log('Opening tags:\n', result);
-  };
-
-  // Change theme to the argument or flip it
-  window.changeTheme = function (theme) {
-    const currentTheme = document.documentElement.getAttribute('data-bs-theme');
-    if (theme) {
-      document.documentElement.setAttribute('data-bs-theme', theme);
-    } else {
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-bs-theme', newTheme);
+    // If this tag matches detail, include innerHTML
+    if (detailTags.includes(tag)) {
+      const innerHTML = el.innerHTML.trim();
+      return `${openingTag}\n${innerHTML}\n</${el.tagName.toLowerCase()}>`;
     }
-    console.log(`Theme changed to: ${document.documentElement.getAttribute('data-bs-theme')}`);
-  };
+
+    return openingTag;
+  }).join('\n\n');
+
+  // Log the result
+  console.log('Opening tags:\n', result);
+}
+
+// Change theme to the argument or flip it
+function changeTheme(theme) {
+  const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+  if (theme) {
+    document.documentElement.setAttribute('data-bs-theme', theme);
+  } else {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-bs-theme', newTheme);
+  }
+  console.log(`Theme changed to: ${document.documentElement.getAttribute('data-bs-theme')}`);
 }
 
 function getOpeningTag(tagName) {

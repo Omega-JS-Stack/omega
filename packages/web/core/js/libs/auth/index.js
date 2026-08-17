@@ -19,6 +19,12 @@ import { handleRedirectResult, shouldUseAuthPopup } from '__main_assets__/js/lib
 import { handleAuthSignout, handleCustomTokenSignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
+/* @dev-only:start */
+// The auth pages' dev control lives in the dev palette (#234, #342). The import
+// is inside the block, so production strips it with the section.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+/* @dev-only:end */
+
 const logger = createLogger('auth:pages');
 
 // Module
@@ -35,6 +41,19 @@ export default function () {
   .then(async () => {
     // Log
     logger.log('Initialized. useAuthPopup:', ctx.useAuthPopup);
+
+    /* @dev-only:start */
+    // Registered FIRST: every path below can return early, and the palette must
+    // still offer the simulation on a page that bailed out.
+    if (omega.isDevelopment()) {
+      // Its own id, not the palette's built-in `auth` — that section is the
+      // "Signed in as" readout, and a redirect simulator does not belong under it.
+      registerDevSection('oauth', {
+        title: 'OAuth',
+        buildNode: buildOauthDevSection,
+      });
+    }
+    /* @dev-only:end */
 
     // Check for authSignout parameter first
     await handleAuthSignout();
@@ -81,6 +100,55 @@ export default function () {
     // Update auth return URL in all auth-related links
     updateAuthReturnUrl();
   });
+
+  /* @dev-only:start */
+  /**
+   * The palette's OAuth section: rehearse a returning provider redirect without
+   * leaving for a provider. A URL param and a navigation to apply it, because
+   * handleRedirectResult reads it once, on page init — the same reason the
+   * checkout's controls navigate.
+   */
+  function buildOauthDevSection(doc) {
+    const SIMULATE_PARAM = '_dev_simulateRedirect';
+
+    const wrap = doc.createElement('div');
+    wrap.className = 'omega-devbar__fields';
+
+    const select = doc.createElement('select');
+    select.className = 'omega-devbar__select';
+    select.setAttribute('aria-label', 'Simulate an OAuth redirect');
+    [
+      ['', '(no simulation)'],
+      ['signin', 'Returning user'],
+      ['signup', 'New user'],
+      ['error', 'Credential conflict'],
+    ].forEach(([value, label]) => {
+      const option = doc.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    });
+    select.value = new URLSearchParams(window.location.search).get(SIMULATE_PARAM) || '';
+
+    const apply = doc.createElement('button');
+    apply.type = 'button';
+    apply.className = 'omega-devbar__btn';
+    apply.textContent = 'Apply & reload';
+    apply.addEventListener('click', () => {
+      const next = new URLSearchParams(window.location.search);
+      if (select.value) {
+        next.set(SIMULATE_PARAM, select.value);
+      } else {
+        next.delete(SIMULATE_PARAM);
+      }
+      window.location.search = next.toString();
+    });
+
+    wrap.append(select, apply);
+
+    return wrap;
+  }
+  /* @dev-only:end */
 
   // Initialize the form based on current page
   function initializePageForm() {

@@ -6,6 +6,12 @@
 import omega from '@omega.js/client';
 import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
+/* @dev-only:start */
+// The page's dev control lives in the dev palette, not on window (#234, #342).
+// The import is inside the block, so production strips it with the section.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+/* @dev-only:end */
+
 // Module
 export default () => {
   return new Promise(async function (resolve) {
@@ -15,19 +21,54 @@ export default () => {
     setupBrowserDetection();
     setupInstallTracking();
 
-    // Expose test function globally
-    window.triggerExtensionInstall = triggerInstall;
-
     /* @dev-only:start */
-    // {
-    //   window.triggerExtensionInstall('chrome');
-    // }
+    // The install trigger was `window.triggerExtensionInstall(browser)`, a
+    // console helper that also shipped to production. The palette is the one
+    // home for it now, and it only exists in a dev build.
+    if (omega.isDevelopment()) {
+      registerDevSection('extension', {
+        title: 'Extension',
+        buildNode: buildExtensionDevSection,
+      });
+    }
     /* @dev-only:end */
 
     // Resolve after initialization
     return resolve();
   });
 };
+
+/* @dev-only:start */
+/**
+ * The palette's Extension section: pick one of the browsers the page lists and
+ * fire its install click, tracking and all — the same path the real button
+ * takes, without hunting for the card.
+ */
+function buildExtensionDevSection(doc) {
+  const wrap = doc.createElement('div');
+  wrap.className = 'omega-devbar__fields';
+
+  const select = doc.createElement('select');
+  select.className = 'omega-devbar__select';
+  select.setAttribute('aria-label', 'Install browser');
+  document.querySelectorAll(config.selectors.browserCards).forEach(($card) => {
+    const option = doc.createElement('option');
+    option.value = $card.dataset.browser;
+    option.textContent = $card.dataset.browser;
+    select.appendChild(option);
+  });
+
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.className = 'omega-devbar__btn';
+  button.textContent = 'Trigger install';
+  button.addEventListener('click', () => triggerInstall(select.value));
+
+  wrap.append(select, button);
+
+  return wrap;
+}
+/* @dev-only:end */
 
 // Configuration
 const config = {

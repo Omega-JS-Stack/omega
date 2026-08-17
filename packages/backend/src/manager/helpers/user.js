@@ -46,4 +46,12 @@ function User(Manager, settings) {
 
 User.resolveSubscription = account.resolveSubscription;
 
+// The schema's own EMPTY discount node, which is what a CLEARED discount is
+// ([#333](https://github.com/Omega-JS-Stack/omega/issues/333)). The webhook
+// pipeline clears the node with a MERGE write, so every field has to be named or
+// half of the old claim survives it. Read off the resolver rather than spelled
+// out again: the node's shape keeps its one home in the schema, and a field
+// added there is cleared without anyone remembering a second list.
+User.EMPTY_DISCOUNT = account.resolveAccount({}).subscription.discount;
+
 module.exports = User;

@@ -102,6 +102,134 @@ function resolveReadyTimeout(raw) {
 }
 
 /**
+ * The subset of `ports` something is actually listening on.
+ *
+ * The sweeps below need a port to name a pid, and `lsof` is the only tool that
+ * maps one. It stats every mounted filesystem before it answers, so a machine
+ * with a network mount (an smbfs Time Machine volume) pays seconds per call,
+ * and a boot ran one call per port whether or not anything was there: ~96s of
+ * pure waste on a run with every port free, which pushed boot past the ready
+ * deadline ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)).
+ *
+ * A port nothing holds cannot have a holder to name, so its lookup could only
+ * ever come back empty. Probe first with the same bind primitive the allocator
+ * uses (in-process, no shell, no filesystem walk) and look up only the ports
+ * that answer. Same ports considered, same decisions, minus the empty calls.
+ * @param {number[]} ports - The ports a sweep is about to consider.
+ * @param {(port: number) => Promise<boolean>} [isFree] - The probe (injectable).
+ * @returns {Promise<number[]>} The held subset, deduped.
+ */
+async function heldPorts(ports, isFree = isPortFree) {
+  const unique = [...new Set(ports || [])].filter((port) => Number.isInteger(port));
+  const free = await Promise.all(unique.map((port) => isFree(port)));
+
+  return unique.filter((port, index) => !free[index]);
+}
+
+/**
+ * The pids LISTENING on a port.
+ *
+ * The one step with no Node primitive: only lsof maps a port to a process. It
+ * is reached solely for a port heldPorts() already proved is held, so a normal
+ * boot never shells here at all.
+ * @param {number} port - A port something is known to hold.
+ * @returns {string[]} The listening pids, or [] when the read fails.
+ */
+function listListeningPids(port) {
+  const { execSync } = require('child_process');
+
+  try {
+    return execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
+      .trim().split('\n').filter(Boolean);
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Every port the firebase config tells the emulator child to bind.
+ *
+ * Read from the config, never hard-coded: a brand may declare emulators this
+ * CLI's allocator knows nothing about (eventarc, tasks), and those are exactly
+ * the ones a boot cannot relocate.
+ * @param {object} firebaseConfig - The parsed firebase config the child reads.
+ * @returns {object} name to port, for every emulator that names a port.
+ */
+function declaredEmulatorPorts(firebaseConfig) {
+  const declared = {};
+
+  for (const [name, entry] of Object.entries(firebaseConfig?.emulators || {})) {
+    if (Number.isInteger(entry?.port)) {
+      declared[name] = entry.port;
+    }
+  }
+
+  return declared;
+}
+
+/**
+ * The boot's port plan: what the emulator child is about to bind.
+ *
+ * The resolved map wins over the declared value, because a bumped port is what
+ * the child actually receives (via firebase.resolved.json). `https` is left
+ * out: that is THIS process's TLS proxy, not the child's listener.
+ * @param {object} declared - name to port, from the firebase config.
+ * @param {object} resolved - This run's allocated map (already bumped).
+ * @returns {Array<{name: string, port: number}>}
+ */
+function plannedEmulatorPorts(declared, resolved) {
+  const plan = [];
+
+  for (const [name, port] of Object.entries({ ...declared, ...resolved })) {
+    if (name === 'https') {
+      continue;
+    }
+
+    plan.push({ name: name, port: port });
+  }
+
+  return plan;
+}
+
+/**
+ * The fail-fast report for a boot whose plan cannot work.
+ * @param {Array<{name: string, port: number}>} blocked - The held planned ports.
+ * @returns {string}
+ */
+function formatPortPreflightFailure(blocked) {
+  const named = blocked.map(({ name, port }) => `port ${port} (${name})`).join(', ');
+  const numbers = blocked.map(({ port }) => port).join(', ');
+
+  return [
+    `Port preflight failed: this emulator must bind ${named}, and something already holds ${blocked.length > 1 ? 'them' : 'it'}.`,
+    'Another dev stack is in the way: a tower app on that port, another brand\'s `omega dev`, or an emulator a crashed run left behind.',
+    `Stop whatever holds ${numbers} and run this again. Nothing was spawned, so there is no partial stack to clean up.`,
+  ].join('\n  ');
+}
+
+/**
+ * Stop the boot BEFORE firebase is spawned when the plan cannot work.
+ *
+ * The allocator already relocates around a busy port (N7 bump-if-taken), so a
+ * plan that still names a held port names one this run cannot move off. Left
+ * to firebase, that boot never prints its ready marker and the run burns the
+ * whole ready deadline before anything says why
+ * ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)).
+ * @param {Array<{name: string, port: number}>} planned - What the child will bind.
+ * @param {(port: number) => Promise<boolean>} [isFree] - The probe (injectable).
+ * @returns {Promise<void>} Rejects with the report when a planned port is held.
+ */
+async function assertPlannedPortsFree(planned, isFree = isPortFree) {
+  const held = await heldPorts(planned.map(({ port }) => port), isFree);
+
+  if (held.length === 0) {
+    return;
+  }
+
+  throw new Error(formatPortPreflightFailure(planned.filter(({ port }) => held.includes(port))));
+}
+
+/**
  * Can this process be PROVEN to be an emulator process of THIS project?
  *
  * The sweep used to signal whatever was listening on its ports, which
@@ -541,7 +669,7 @@ class EmulatorCommand extends BaseCommand {
     // ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)). Live
     // listeners and other projects' leftovers stay untouched and bump as before.
     const recorded = this.readEmulatorOwnership();
-    this.reapOrphanedEmulators(Object.values(wanted), {
+    await this.reapOrphanedEmulators(Object.values(wanted), {
       pids: recorded.pids,
       projectId: this.loadProjectId(projectDir) || recorded.projectId,
     });
@@ -550,6 +678,20 @@ class EmulatorCommand extends BaseCommand {
       wanted,
       pins: this.loadPortPins(projectDir),
     });
+
+    // Preflight: the allocator has relocated around every busy port it owns,
+    // so anything still held is a port this run cannot move off. Report it now,
+    // by name, instead of spawning a stack that never comes up and burning the
+    // whole ready deadline first
+    // ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)).
+    try {
+      await this.preflightEmulatorPorts(projectDir, emulatorPorts);
+    } catch (error) {
+      // Nothing is spawned yet, but the stage watcher is: it is normally torn
+      // down with the emulator child, and this boot will never have one.
+      stageWatch.close();
+      throw error;
+    }
 
     // Bumped ports can't ride the committed firebase.json — materialize a
     // patched copy NEXT TO it (same dir, so relative paths keep resolving)
@@ -864,6 +1006,33 @@ class EmulatorCommand extends BaseCommand {
   }
 
   /**
+   * Sweep the ports this boot is about to bind and fail fast when one is held.
+   *
+   * The set is read from the firebase config, never hard-coded: the resolved
+   * map covers everything the allocator owns, and the config's own `emulators`
+   * block covers anything it does not (an eventarc or tasks port a brand
+   * declared), which is the half that cannot bump. A lenient read matches
+   * loadPortPins(): an unreadable config means no extra ports, never a boot
+   * failure on its own.
+   * @param {string} projectDir - The firebase project directory.
+   * @param {object} emulatorPorts - This run's resolved port map.
+   * @param {Function} [isFree] - Port probe (injectable).
+   * @returns {Promise<Array<{name: string, port: number}>>} The plan that cleared.
+   */
+  async preflightEmulatorPorts(projectDir, emulatorPorts, isFree = isPortFree) {
+    let declared = {};
+
+    try {
+      declared = declaredEmulatorPorts(JSON5.parse(jetpack.read(path.join(projectDir, 'firebase.json'))));
+    } catch (error) { /* no readable config, so the resolved map is the whole plan */ }
+
+    const planned = plannedEmulatorPorts(declared, emulatorPorts);
+    await assertPlannedPortsFree(planned, isFree);
+
+    return planned;
+  }
+
+  /**
    * Read explicit port pins from the brand config's `ports` section (N7).
    * Lenient — a missing/broken config means no pins, never a boot failure.
    */
@@ -999,7 +1168,7 @@ class EmulatorCommand extends BaseCommand {
 
     // Anything of ours the record could not name is the sweep's to take, and
     // it runs while the ports still matter — before the verdict below.
-    this.terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared: sweepShared });
+    await this.terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared: sweepShared });
 
     // The ports are the only proof that matters to the NEXT boot.
     const { https: _httpsPort, ...checkable } = emulatorPorts || {};
@@ -1033,12 +1202,12 @@ class EmulatorCommand extends BaseCommand {
    * @param {number[]} ports - The ports this run resolved.
    * @returns {Promise<number[]>} The ports still held when the window closed.
    */
-  async waitForPortsReleased(ports) {
+  async waitForPortsReleased(ports, { isFree = isPortFree } = {}) {
     const deadline = Date.now() + PORT_RELEASE_TIMEOUT_MS;
     let held = [...new Set(ports)];
 
     while (held.length > 0 && Date.now() < deadline) {
-      const free = await Promise.all(held.map((port) => isPortFree(port)));
+      const free = await Promise.all(held.map((port) => isFree(port)));
       held = held.filter((port, index) => !free[index]);
 
       if (held.length > 0) {
@@ -1065,8 +1234,13 @@ class EmulatorCommand extends BaseCommand {
    * N7: the sweep takes the RESOLVED port map — no map → no sweep. The shared
    * hub (4400) + storage (9199) ports are looked at only on a defaults run
    * (`sweepShared`); on a bumped run they belong to the incumbent.
+   * @param {object} emulatorPorts - This run's resolved port map.
+   * @param {object} [options]
+   * @param {boolean} [options.sweepShared] - Include the shared hub/storage ports.
+   * @param {Function} [options.isFree] - Port probe (injectable).
+   * @param {Function} [options.listPids] - Port to pid lookup (injectable).
    */
-  terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared = true } = {}) {
+  async terminateOrphanedEmulatorProcesses(emulatorPorts, { sweepShared = true, isFree = isPortFree, listPids = listListeningPids } = {}) {
     if (!emulatorPorts) {
       return;
     }
@@ -1082,29 +1256,27 @@ class EmulatorCommand extends BaseCommand {
 
     const ownership = this.readEmulatorOwnership();
 
-    // Synchronous sweep — no async delays that Ctrl+C spam can interrupt.
+    // The probe is the only await, and it runs before a single signal is sent.
+    // The kill loop itself stays synchronous, so Ctrl+C spam cannot land
+    // between two signals of the same sweep.
     const { execSync } = require('child_process');
     let terminated = 0;
     let spared = 0;
 
-    for (const port of ports) {
-      try {
-        const pids = execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
-          .trim().split('\n').filter(Boolean);
-        for (const pid of pids) {
-          try {
-            const command = execSync(`ps -o command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
+    for (const port of await heldPorts(ports, isFree)) {
+      for (const pid of listPids(port)) {
+        try {
+          const command = execSync(`ps -o command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
 
-            if (!isOwnedEmulatorProcess({ pid: pid, command: command }, ownership)) {
-              spared++;
-              continue;
-            }
+          if (!isOwnedEmulatorProcess({ pid: pid, command: command }, ownership)) {
+            spared++;
+            continue;
+          }
 
-            process.kill(Number(pid), 'SIGKILL');
-            terminated++;
-          } catch (e) { /* vanished mid-check, or already gone */ }
-        }
-      } catch (e) { /* no process on this port */ }
+          process.kill(Number(pid), 'SIGKILL');
+          terminated++;
+        } catch (e) { /* vanished mid-check, or already gone */ }
+      }
     }
 
     if (terminated > 0) {
@@ -1130,36 +1302,46 @@ class EmulatorCommand extends BaseCommand {
    * the allocator bumps around both exactly as before.
    * @param {number[]} ports - The wanted port map's values.
    * @param {{pids: number[], projectId: string|null}} ownership - This project's evidence.
+   * @param {object} [probes]
+   * @param {Function} [probes.isFree] - Port probe (injectable).
+   * @param {Function} [probes.listPids] - Port to pid lookup (injectable).
    */
-  reapOrphanedEmulators(ports, ownership) {
+  async reapOrphanedEmulators(ports, ownership, { isFree = isPortFree, listPids = listListeningPids } = {}) {
     const { execSync } = require('child_process');
+    const killedPorts = new Set();
     let reaped = 0;
     let spared = 0;
 
-    for (const port of [...new Set([...(ports || []), 4400, 9199])]) {
-      try {
-        const pids = execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
-          .trim().split('\n').filter(Boolean);
-        for (const pid of pids) {
-          try {
-            const info = execSync(`ps -o ppid=,command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
-            const match = info.match(/^\s*(\d+)\s+(.*)$/s);
-            if (!match) continue;
+    for (const port of await heldPorts([...(ports || []), 4400, 9199], isFree)) {
+      for (const pid of listPids(port)) {
+        try {
+          const info = execSync(`ps -o ppid=,command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
+          const match = info.match(/^\s*(\d+)\s+(.*)$/s);
+          if (!match) continue;
 
-            if (!isReapableOrphan({ pid: pid, ppid: match[1], command: match[2] }, ownership)) {
-              spared++;
-              continue;
-            }
+          if (!isReapableOrphan({ pid: pid, ppid: match[1], command: match[2] }, ownership)) {
+            spared++;
+            continue;
+          }
 
-            process.kill(Number(pid), 'SIGKILL');
-            reaped++;
-          } catch (e) { /* vanished mid-check */ }
-        }
-      } catch (e) { /* port free */ }
+          process.kill(Number(pid), 'SIGKILL');
+          reaped++;
+          killedPorts.add(port);
+        } catch (e) { /* vanished mid-check */ }
+      }
     }
 
     if (reaped > 0) {
       this.log(chalk.gray(`  Reaped ${reaped} orphaned emulator process${reaped > 1 ? 'es' : ''} left by a previous crashed run.`));
+
+      // A SIGKILLed JVM does not release its socket the instant kill() returns,
+      // and the allocator probes these same ports right after this method. The
+      // sweep used to be slow enough to hide that race; now it is milliseconds,
+      // so wait like shutdown does or the run bumps around a corpse.
+      const held = await this.waitForPortsReleased([...killedPorts], { isFree });
+      if (held.length > 0) {
+        this.log(chalk.gray(`  Port${held.length > 1 ? 's' : ''} ${held.join(', ')} still closing after the reap; the allocator will bump around ${held.length > 1 ? 'them' : 'it'}.`));
+      }
     }
 
     if (spared > 0) {
@@ -1171,6 +1353,9 @@ class EmulatorCommand extends BaseCommand {
 // Static, alongside Middleware's precedent — the ownership decision is pure,
 // so tests exercise it directly with real `ps` rows instead of live processes.
 EmulatorCommand.resolveReadyTimeout = resolveReadyTimeout;
+EmulatorCommand.heldPorts = heldPorts;
+EmulatorCommand.plannedEmulatorPorts = plannedEmulatorPorts;
+EmulatorCommand.assertPlannedPortsFree = assertPlannedPortsFree;
 EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;
 EmulatorCommand.isStoppableEmulatorProcess = isStoppableEmulatorProcess;
 EmulatorCommand.isReapableOrphan = isReapableOrphan;

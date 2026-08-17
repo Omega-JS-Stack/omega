@@ -85,7 +85,7 @@ test('#323: the save offer opens like the exit popup, not like a form letter', a
 
 test('#323: the trial warning wears the same treatment', async () => {
   const page = await accountPage();
-  const modal = dialogAt(page, 'cancel-trial-warning-modal', 'change-plan-modal');
+  const modal = dialogAt(page, 'cancel-trial-warning-modal', 'cancel-retention-modal');
 
   assert.match(modal, /modal-dialog modal-dialog-centered/, 'centered on screen');
   assert.ok(!modal.includes('modal-header'), 'no title bar');
@@ -93,10 +93,10 @@ test('#323: the trial warning wears the same treatment', async () => {
 
   assert.match(modal, /class="omega-dialog-mark omega-dialog-mark--danger"/, 'the mark warns rather than offers');
 
-  // The consequence IS the headline now: one line, and the date line under it.
+  // The headline asks; the line under it states the consequence by the bound date.
   const headline = modal.match(/<h5[^>]*id="cancel-trial-warning-title"[^>]*>([\s\S]*?)<\/h5>/);
   assert.ok(headline, 'the dialog has a headline');
-  assert.match(headline[1], /immediately/i, 'which states the consequence');
+  assert.match(modal, /immediately/i, 'the consequence is stated in the dialog');
 
   assert.ok(
     modal.includes('data-omega-bind="@text billing.cancelWarning.trialEndDate"'),
@@ -107,11 +107,35 @@ test('#323: the trial warning wears the same treatment', async () => {
   assert.match(modal.slice(modal.indexOf('id="cancel-trial-continue-btn"') - 200), /btn btn-link/, 'cancelling anyway is the quiet one');
 });
 
+test('#341: the retention warning is the third of the family, not a fourth treatment', async () => {
+  const page = await accountPage();
+  const modal = dialogAt(page, 'cancel-retention-modal', 'change-plan-modal');
+
+  assert.match(modal, /modal-dialog modal-dialog-centered/, 'centered on screen');
+  assert.ok(!modal.includes('modal-header'), 'no title bar');
+  assert.ok(!modal.includes('modal-footer'), 'no footer rail');
+
+  assert.match(modal, /class="omega-dialog-mark omega-dialog-mark--danger"/, 'the mark warns, exactly as the trial warning\'s does');
+
+  // What leaving MIGHT cost, and never a promise the brand has not made: the
+  // copy says data may be removed, never that it will be.
+  const headline = modal.match(/<h5[^>]*id="cancel-retention-title"[^>]*>([\s\S]*?)<\/h5>/);
+  assert.ok(headline, 'the dialog has a headline');
+  assert.match(headline[1], /cancel/i, 'which names the choice being made');
+  assert.match(modal, /may be removed/, 'and the body states the consequence as a possibility');
+  assert.ok(!/will be (?:removed|deleted)/i.test(modal), 'no promise of deletion the retention policy has not made');
+
+  assert.match(modal, /id="cancel-retention-keep-btn"/, 'keeping the account is the loud button');
+  assert.match(modal.slice(0, modal.indexOf('id="cancel-retention-continue-btn"')), /btn btn-adaptive btn-lg/, 'and it comes first');
+  assert.match(modal.slice(modal.indexOf('id="cancel-retention-continue-btn"') - 200), /btn btn-link/, 'cancelling anyway is the quiet one');
+});
+
 test('#323: both dialogs hold the copy rules', async () => {
   const page = await accountPage();
   const dialogs = {
     'the save offer': dialogAt(page, 'cancel-winback-modal', 'cancel-trial-warning-modal'),
-    'the trial warning': dialogAt(page, 'cancel-trial-warning-modal', 'change-plan-modal'),
+    'the trial warning': dialogAt(page, 'cancel-trial-warning-modal', 'cancel-retention-modal'),
+    'the retention warning': dialogAt(page, 'cancel-retention-modal', 'change-plan-modal'),
   };
 
   for (const [what, modal] of Object.entries(dialogs)) {
@@ -123,6 +147,7 @@ test('#323: both dialogs hold the copy rules', async () => {
   // A brand name is NEVER written into framework copy: the offer's supporting
   // line reads the config, so every brand's dialog says its own name.
   assert.match(dialogs['the save offer'], /Give MiniCo another shot/, 'the offer names the brand from config');
+  assert.match(dialogs['the retention warning'], /MiniCo/, 'and so does the fallback warning');
 });
 
 test('#325: the card carries the applied-discount indicator, bound and hidden by default', async () => {

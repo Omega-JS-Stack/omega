@@ -11,7 +11,7 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 const logger = createLogger('account:security');
 
 let firebaseAuth = null;
-let signinMethodForms = new Map(); // Store FormManager instances for signin methods
+const signinMethodForms = new Map(); // Store FormManager instances for signin methods
 let signoutAllFormManager = null; // FormManager instance for sign out all sessions
 
 // Check query string for popup parameter
@@ -211,14 +211,21 @@ async function updateActiveSessions(account) {
     // Process sessions from server response
     let sessionData = data || {};
 
-    // Add fake data if _dev_prefill=true is in query string
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('_dev_prefill') === 'true') {
-      console.log('Adding fake session data for testing');
-      const fakeSessions = generateFakeSessions();
-      // Merge fake sessions with existing data (fake sessions don't override real ones)
-      sessionData = { ...fakeSessions, ...sessionData };
+    /* @dev-only:start */
+    // The palette's "Prefill fake data" toggle (#342) applies `_dev_prefill=true`
+    // — a URL param because the read happens once, while the sessions load. The
+    // read lives inside the block, so production never looks and the fixtures
+    // never reach a real bundle.
+    if (omega.isDevelopment()) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('_dev_prefill') === 'true') {
+        console.log('Adding fake session data for testing');
+        const fakeSessions = generateFakeSessions();
+        // Merge fake sessions with existing data (fake sessions don't override real ones)
+        sessionData = { ...fakeSessions, ...sessionData };
+      }
     }
+    /* @dev-only:end */
 
     if (sessionData && typeof sessionData === 'object') {
       // Convert sessions object to array and process each session
@@ -710,6 +717,7 @@ function formatSessionLocation(session) {
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
+/* @dev-only:start */
 // Generate fake sessions for development mode
 function generateFakeSessions() {
   const now = Date.now();
@@ -754,6 +762,7 @@ function generateFakeSessions() {
     },
   };
 }
+/* @dev-only:end */
 
 // Format date helper
 function formatDate(timestamp) {
@@ -789,5 +798,5 @@ function formatDate(timestamp) {
   }
 
   // More than 7 days - show full date
-  return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }

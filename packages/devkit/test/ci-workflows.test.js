@@ -351,12 +351,51 @@ test('sweeps the dead per-app copy, keeps one the consumer edited', () => {
   assert.deepEqual(website.removed, []);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /apps\/website\/\.github\/workflows\/build\.yml/);
-  // The comparison is against the CURRENT template only — a stale framework
-  // copy differs too, so the warning never claims edits it cannot prove, and
-  // it names the composed file to compare against
+  // A kept copy carries lines the current template does not ship, which is all
+  // the compare can prove, so the warning never claims edits by name; it does
+  // name the composed file to compare against
   assert.doesNotMatch(warnings[0], /your own edits/);
   assert.match(warnings[0], /differs from the current .*template/);
   assert.match(warnings[0], /\.github\/workflows\/website-build\.yml/);
+});
+
+test('sweeps a copy left by a superseded template, keeps one that changed a line', () => {
+  // What #189 did to the shipped web template: it GAINED a generated block, so
+  // every copy a prior setup wrote is now a strict subset of what the template
+  // renders today ([#334](https://github.com/Omega-JS-Stack/omega/issues/334)).
+  const current = TEMPLATE.replace(
+    `  NODE_VERSION: '22'\n`,
+    `  NODE_VERSION: '22'\n  # Generated from the brand's .env cascade by \`omega setup\`.\n  API_KEY: \${{ secrets.API_KEY }}\n`,
+  );
+
+  const { brandRoot, apps } = stageBrand({
+    extension: { 'publish.yml': current },
+    website: { 'build.yml': current },
+  });
+
+  // One copy is the superseded generation verbatim; the other CHANGED a line
+  // the framework wrote, which no template of this framework ever shipped
+  const supersededCopy = path.join(apps.extension.appDir, '.github', 'workflows', 'publish.yml');
+  const editedCopy = path.join(apps.website.appDir, '.github', 'workflows', 'build.yml');
+  jetpack.write(supersededCopy, TEMPLATE);
+  jetpack.write(editedCopy, current.replace('ubuntu-latest', 'ubuntu-24.04'));
+
+  const warnings = [];
+  const logger = { ...quiet, warn: (message) => warnings.push(message) };
+
+  const extension = composeAppWorkflows({ sourceDir: apps.extension.sourceDir, appDir: apps.extension.appDir, brandRoot, logger });
+  const website = composeAppWorkflows({ sourceDir: apps.website.sourceDir, appDir: apps.website.appDir, brandRoot, logger });
+
+  // The superseded copy is framework-owned: swept, empty .github/ pruned with it
+  assert.equal(jetpack.exists(supersededCopy), false);
+  assert.equal(jetpack.exists(path.join(apps.extension.appDir, '.github')), false);
+  assert.deepEqual(extension.removed, ['.github/workflows/publish.yml']);
+
+  // The changed line is content no framework template wrote: kept and warned
+  assert.equal(jetpack.exists(editedCopy), 'file');
+  assert.deepEqual(website.removed, []);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /apps\/website\/\.github\/workflows\/build\.yml/);
 });
 
 test('composedWorkflowName: the root name in a monorepo, the plain name standalone', () => {

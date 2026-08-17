@@ -148,6 +148,7 @@ test('an applied winback discount survives resolution, source and all', () => {
         amount: 0,
         duration: 'once',
         source: 'winback',
+        resourceId: 'sub_live',
       },
     },
   });
@@ -159,7 +160,23 @@ test('an applied winback discount survives resolution, source and all', () => {
     amount: 0,
     duration: 'once',
     source: 'winback',
+    resourceId: 'sub_live',
   });
+});
+
+test('the discount names the subscription it was applied to', () => {
+  // The stamp is what makes the node clearable ([#333]): the webhook pipeline
+  // compares it against the subscription the event is about, and a mismatch is a
+  // NEW subscription that never claimed this discount. Resolution strips every
+  // key the schema does not name, so a stamp the engine drops is a discount that
+  // rides a resubscribe forever and silently retires the save offer.
+  const account = resolveAccount({
+    subscription: {
+      discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once', source: 'winback', resourceId: 'sub_old' },
+    },
+  });
+
+  assert.strictEqual(account.subscription.discount.resourceId, 'sub_old');
 });
 
 test('a fresh account carries no discount at all', () => {
@@ -168,6 +185,7 @@ test('a fresh account carries no discount at all', () => {
   assert.strictEqual(discount.valid, false, 'absent and denied are the same thing to a reader');
   assert.strictEqual(discount.code, null);
   assert.strictEqual(discount.source, null, 'and nothing claims to be a winback claim');
+  assert.strictEqual(discount.resourceId, null, 'and none names a subscription');
 });
 
 test('a checkout discount keeps its OWN source — the winback claim is not the shape', () => {

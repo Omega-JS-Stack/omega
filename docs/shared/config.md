@@ -315,12 +315,27 @@ claim: today only the winback claim writes this node, and `source` is what keeps
 read safe when checkout discounts start writing it too, because only
 `source: 'winback'` says this customer already took the save offer.
 
+**The claim ends with the subscription it was made on (#333).** The account's node also
+carries `resourceId`, the subscription the discount was applied to, stamped at claim
+time. The unified webhook write carries no discount key, so a merge would otherwise keep
+the node forever: a customer who churned and resubscribed carried a spent claim into the
+NEW subscription, where `source: 'winback'` reads as "already claimed" and the save offer
+is silently never pitched again. Every subscription-resource webhook compares the stamp against
+the subscription the event is about and CLEARS the node on a mismatch (a new subscription
+is a clean slate), while same-subscription traffic (renewals, cancellations, plan
+changes) leaves the saving exactly as claimed. A node with no stamp predates it and
+nothing can prove it belongs to an older subscription, so it is read as riding the one it
+is found on and stamped there: no live discount is taken away on a guess, and it clears
+on the next resubscribe like any other. CONSUMPTION is not cleared: a spent `once` coupon
+still reads as applied until the subscription changes, because no processor's unified
+shape reports whether the coupon is still attached (#333).
+
 The offer is the brand's, and **a brand that writes nothing gets one anyway**: 50% off
 the next cycle, that cycle only.
 
 | Key | Type | Default | What it does |
 |-----|------|---------|--------------|
-| `payment.winback.enabled` | boolean | `true` | The whole off switch. `false` skips the step and the cancel flow goes straight to the questionnaire |
+| `payment.winback.enabled` | boolean | `true` | The whole off switch. `false` skips the pitch, and the cancel meets the data-retention warning instead (#341) |
 | `payment.winback.percent` | integer 1-100 | `50` | Whole percentage off. Mutually exclusive with `amount` |
 | `payment.winback.amount` | number > 0 | — | Flat amount off in `payment.currency`'s major unit (`10` = $10). Mutually exclusive with `percent` |
 | `payment.winback.duration` | `'once'` \| `'forever'` | `'once'` | `once` discounts the next cycle only; `forever` is a permanent price cut |

@@ -146,7 +146,7 @@
   payment: {
     processors: {
       stripe: { publishableKey: "pk_test_51T32RbReHWMUiO2TIWCU72ATxikGDMo1a3Byl7ZiEOdDHSKsiW9v6JwRyC7BCBK8AvhTJxWpsn3dpppwdZv73lIp00oBCyjnfg" },
-      paypal: { clientId: null },
+      paypal: { clientId: "BAAjk48TKd_AqC0VqD4dzqif8PfxWULRx6VqwoGd8PV4mJMK_OxBUXYiPhMl1kIPqzVpDgk80nAoaW73Z0" },
       chargebee: { site: null },
       coinbase: { enabled: false },
     },
@@ -182,7 +182,7 @@
           { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real person first." },
         ],
         stripe: { productId: "prod_UscSf6XFplJRS1" },
-        paypal: { productId: null },
+        paypal: { productId: "PROD-3SG37836K78792621" },
         chargebee: { itemId: null, legacyPlanIds: [] },
       },
       {
@@ -203,7 +203,7 @@
           { id: "review", name: "Draft review & approvals", icon: "pen-nib", value: true, definition: "Send a draft for review, collect comments, publish once it's approved." },
         ],
         stripe: { productId: "prod_UzOGM0st0zRSbc" },
-        paypal: { productId: null },
+        paypal: { productId: "PROD-1VY66504XX977983J" },
         chargebee: { itemId: null, legacyPlanIds: [] },
       },
       {
@@ -217,6 +217,9 @@
         ],
         stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },
+        paypal: {
+          productId: "PROD-6PE73746WK711780N",
+        },
       },
       {
         // enterprise: true leaves the card grid and renders as its own

@@ -14,6 +14,12 @@ import omega from '@omega.js/client';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
 import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
+/* @dev-only:start */
+// The page's dev control lives in the dev palette (#234, #342). The import is
+// inside the block, so production strips it with the section.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+/* @dev-only:end */
+
 // Module
 export default () => {
   return new Promise(async function (resolve) {
@@ -83,6 +89,17 @@ async function initializeAccount() {
     }
   });
 
+  /* @dev-only:start */
+  // The account page's dev control, in the palette rather than in a param you
+  // had to already know (#342).
+  if (omega.isDevelopment()) {
+    registerDevSection('account', {
+      title: 'Account',
+      buildNode: buildAccountDevSection,
+    });
+  }
+  /* @dev-only:end */
+
   // Setup auth listener. Dev-testing subscription states = sign in as a
   // seeded emulator persona (email + TEST_ACCOUNT_PASSWORD) — the old
   // ?_dev_subscription= mock fixtures are gone (N6).
@@ -98,6 +115,46 @@ async function initializeAccount() {
     handleHashChange();
   });
 }
+
+/* @dev-only:start */
+/**
+ * The palette's Account section: prefill the referrals and the sessions lists
+ * with fixtures. A URL param, and a navigation to apply it, because both
+ * sections read it ONCE while they load — the same reason the checkout's
+ * controls navigate. The seeded personas carry neither referrals nor sessions
+ * yet, so this is still the only way to see either list populated.
+ */
+function buildAccountDevSection(doc) {
+  const PREFILL_PARAM = '_dev_prefill';
+
+  const wrap = doc.createElement('label');
+  wrap.className = 'omega-devbar__toggle';
+  wrap.setAttribute('for', 'omega-devbar-prefill');
+
+  const input = doc.createElement('input');
+  input.type = 'checkbox';
+  input.id = 'omega-devbar-prefill';
+  input.checked = new URLSearchParams(window.location.search).get(PREFILL_PARAM) === 'true';
+  input.addEventListener('change', () => {
+    const next = new URLSearchParams(window.location.search);
+    if (input.checked) {
+      next.set(PREFILL_PARAM, 'true');
+    } else {
+      // REMOVE the param rather than writing `=false`: both readers test for
+      // the literal 'true', so a false would read as armed-off by accident.
+      next.delete(PREFILL_PARAM);
+    }
+    window.location.search = next.toString();
+  });
+
+  const text = doc.createElement('span');
+  text.textContent = 'Prefill referrals & sessions';
+
+  wrap.append(input, text);
+
+  return wrap;
+}
+/* @dev-only:end */
 
 // Load data for all sections
 function loadAllSectionData(authState) {

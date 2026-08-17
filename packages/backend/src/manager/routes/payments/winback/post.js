@@ -231,6 +231,14 @@ module.exports = async ({ ctx, user, settings }) => {
   // merging onto a stored amount would be read as the older, wrong number. And
   // `source` is what makes the node safe to read as a claim at all — a checkout
   // code sets the same shape, so only 'winback' is the cancel flow's signal.
+  //
+  // `resourceId` is the subscription it was applied TO, and it is what lets the
+  // claim ever END ([#333]). The unified webhook write carries no discount key,
+  // so the merge preserves this node forever: without the stamp, a customer who
+  // churned and resubscribed carried a spent claim into the new subscription,
+  // where `source: 'winback'` reads as "already claimed" and the save offer is
+  // silently never pitched again. Stamped, the webhook pipeline clears the node
+  // the moment the account's subscription is a different one.
   await admin.firestore().doc(`users/${uid}`).set({
     subscription: {
       discount: {
@@ -240,11 +248,12 @@ module.exports = async ({ ctx, user, settings }) => {
         amount: discount.amount || 0,
         duration: discount.duration,
         source: 'winback',
+        resourceId: resourceId,
       },
     },
   }, { merge: true });
 
-  ctx.log(`Stored the applied discount on users/${uid}: code=${discount.code}`);
+  ctx.log(`Stored the applied discount on users/${uid}: code=${discount.code}, sub=${resourceId}`);
 
   // The experiment's server-side half. The offer is measured against the
   // existing `subscription-winback` baseline (a returning subscriber the webhook

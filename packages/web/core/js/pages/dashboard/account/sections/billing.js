@@ -95,6 +95,7 @@ export async function init() {
   setupActionButtons();
   setupTrialCancelWarning();
   setupWinbackOffer();
+  setupRetentionWarning();
   setupCancellationForm();
   setupUncancelConfirm();
   setupPlanSwitcher();
@@ -132,10 +133,11 @@ function updateUI(account) {
   updateUsageInfo(account);
 }
 
-// Does a dialog stand in front of the questionnaire right now? BOTH
-// pre-questionnaire steps ride the same switch: the trial warning (#267) and
-// the save offer (#268) each need the declarative collapse toggle off the
-// trigger, and they are mutually exclusive by state.
+// Does a dialog stand in front of the questionnaire right now? ALL THREE
+// pre-questionnaire steps ride the same switch: the trial warning (#267), the
+// save offer (#268) and the retention warning ([#341]) each need the
+// declarative collapse toggle off the trigger, and they are mutually exclusive
+// by state.
 //
 // A step only counts if the DIALOG IT OPENS is on the page. The gate works by
 // taking the trigger's toggle away, so a layout that dropped a dialog (a
@@ -144,7 +146,8 @@ function updateUI(account) {
 // clicked out of ([#324]).
 function dialogOwed(state) {
   return (state.billing.cancelWarning.show && !!document.getElementById('cancel-trial-warning-modal'))
-    || (state.billing.winbackOffer.show && !!document.getElementById('cancel-winback-modal'));
+    || (state.billing.winbackOffer.show && !!document.getElementById('cancel-winback-modal'))
+    || (state.billing.cancelRetention.show && !!document.getElementById('cancel-retention-modal'));
 }
 
 function buildBillingState(account) {
@@ -241,6 +244,17 @@ function buildBillingState(account) {
     // discount rides the same node with its own source and keeps the offer open.
     && subscription.discount?.source !== 'winback';
 
+  // The fallback dialog ([#341]): a cancel the other two steps have nothing to
+  // say to still gets a word before the questionnaire. Ian's QA found the hole
+  // in three states, and every one of them is a real cancel walking into
+  // silence: a brand that turned the offer off, a subscription the apply route
+  // cannot reach, a customer who already claimed the discount.
+  //
+  // It is the LAST gate by construction: it reads the other two rather than
+  // restating their rules, so exactly one dialog is ever owed and adding a
+  // condition to either of them can never leave the click with two.
+  const retentionCancel = canCancel && !offerable && !trialCancel;
+
   // The discount riding the subscription right now ([#325]). Accepting the save
   // offer applies a real discount at the processor and the card said nothing
   // about it at all, so the saving a customer had just been given was invisible
@@ -295,6 +309,12 @@ function buildBillingState(account) {
         show: trialCancel,
         trialEndDate: trialEndDate,
         hasTrialEndDate: !!trialEndDate,
+      },
+      // What leaving MIGHT cost, for the cancel neither the offer nor the trial
+      // warning speaks to ([#341]). The dialog's copy is a retention-policy
+      // statement, not a threat, so all this carries is whether it is owed.
+      cancelRetention: {
+        show: retentionCancel,
       },
       // The questionnaire the warning hands the customer to: its explanation and
       // the checkbox they must tick both state what THIS cancel does, so a trial
@@ -1199,8 +1219,8 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
 
 // The offer has been CLAIMED. The discount is on the live subscription now and
 // the backend refuses a second claim, so no later cancel attempt is pitched it
-// again ([#324]) — and the trigger gets its declarative collapse toggle back,
-// so the next click opens the questionnaire directly.
+// again ([#324]). With nothing left to pitch, the trigger keeps its gate: the
+// next click meets the retention warning ([#341]) instead of the offer.
 //
 // The claim's durable home is the backend's (the order doc, and whatever the
 // webhook pipeline writes onto the account). The discount the route hands back
@@ -1214,7 +1234,9 @@ function claimWinbackOffer(discount) {
   if (currentSub && discount?.valid === true) {
     // The route's response is the discount shape without its source; the
     // persisted doc carries source 'winback' (payments/winback/post.js), so the
-    // in-session patch stamps the same, keeping both reads identical ([#325]).
+    // in-session patch stamps the same ([#325]). The persisted node also
+    // carries a resourceId stamp ([#333]) this patch skips: nothing on the
+    // client reads it, and the next account read carries it.
     currentSub.discount = { ...discount, source: 'winback' };
   }
 
@@ -1225,6 +1247,71 @@ function claimWinbackOffer(discount) {
 // bindings render, so the gate and the dialog can never disagree.
 function offersWinback() {
   return buildBillingState(currentAccount).billing.winbackOffer.show === true;
+}
+
+// ─── Retention Warning ──────────────────────────────────────
+
+// The cancel flow's LAST word ([#341]): a cancel that gets neither the save
+// offer (#268) nor the trial warning (#267) used to reach the questionnaire
+// with nothing said at all. This dialog is what it owes them: what leaving
+// might cost, stated as the retention policy states it.
+//
+// The gate is #267's and #268's, mechanism for mechanism: Bootstrap's collapse
+// data-api is a CAPTURE-phase delegate on `document`, so the only thing that
+// stops it is taking `data-bs-toggle` off the trigger (syncCancelTriggerToggle),
+// and this listener then owns that button's clicks. The three never contend:
+// `needsRetentionWarning()` reads the same state the other two do, and that
+// state only owes this dialog when neither of theirs is owed.
+function setupRetentionWarning() {
+  const $trigger = document.getElementById('cancel-subscription-trigger-btn');
+  const $modal = document.getElementById('cancel-retention-modal');
+
+  if (!$trigger || !$modal) {
+    return;
+  }
+
+  const $accordion = document.getElementById('cancel-subscription-accordion');
+
+  $trigger.addEventListener('click', (event) => {
+    if (!needsRetentionWarning()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Half of a toggle is closing: with the questionnaire already open this
+    // click only shuts it, exactly as the other two gates handle their own.
+    if ($accordion?.classList.contains('show')) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).hide();
+      return;
+    }
+
+    // Open FIRST, count second: a blocked analytics snippet must never be able
+    // to leave this button doing nothing ([#283], [#306]).
+    bootstrap.Modal.getOrCreateInstance($modal).show();
+    trackBilling('cancel_retention_warning_shown');
+  }, true);
+
+  document.getElementById('cancel-retention-continue-btn')?.addEventListener('click', () => {
+    bootstrap.Modal.getInstance($modal)?.hide();
+
+    if ($accordion) {
+      bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).show();
+    }
+
+    trackBilling('cancel_retention_warning_continue');
+  });
+
+  document.getElementById('cancel-retention-keep-btn')?.addEventListener('click', () => {
+    trackBilling('cancel_retention_warning_keep');
+  });
+}
+
+// Is the retention warning owed before the questionnaire? Read off the SAME
+// state the bindings render, so the gate and the dialog can never disagree.
+function needsRetentionWarning() {
+  return buildBillingState(currentAccount).billing.cancelRetention.show === true;
 }
 
 // What a discount is WORTH, in the brand's own numbers: a flat amount off in

@@ -1253,10 +1253,10 @@ badges:
                     <span class="omega-dialog-mark omega-dialog-mark--danger">{% omega_icon "hourglass-half", "fa-2xl" %}</span>
                   </div>
 
-                  <h5 class="fw-bold fs-4 mb-2" id="cancel-trial-warning-title">Cancel now and your trial ends immediately</h5>
+                  <h5 class="fw-bold fs-4 mb-2" id="cancel-trial-warning-title">Want to end your free trial?</h5>
 
                   <p class="text-muted mb-4" data-omega-bind="@show billing.cancelWarning.hasTrialEndDate" hidden>
-                    Keep it and you stay free until <strong data-omega-bind="@text billing.cancelWarning.trialEndDate">your trial ends</strong>. Nothing is charged before then.
+                    You have free access until <strong data-omega-bind="@text billing.cancelWarning.trialEndDate">your trial ends</strong>. Cancelling now will end your trial immediately.
                   </p>
 
                   <div class="d-flex flex-column align-items-center">
@@ -1265,6 +1265,46 @@ badges:
                       {% omega_icon "arrow-right", "fa-sm ms-2" %}
                     </button>
                     <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="cancel-trial-continue-btn">
+                      Cancel anyway
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retention warning: shown BEFORE the questionnaire, and only for a
+             cancel the other two dialogs have nothing to say to ([#341]), with
+             no save offer on the table and no trial to end. What leaving might
+             cost is stated the way the retention policy states it: data MAY be
+             removed, never a promise that it will be. "Keep my account" is the
+             dismiss; "Cancel anyway" opens the questionnaire the flow used to
+             go straight to. Same treatment as the two above it (#323): one
+             mark, one headline, one line. -->
+        <div class="modal fade" id="cancel-retention-modal" tabindex="-1" aria-labelledby="cancel-retention-title" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content overflow-hidden">
+              <div class="position-relative">
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                <div class="p-4 p-md-5 text-center">
+                  <div class="mb-4">
+                    <span class="omega-dialog-mark omega-dialog-mark--danger">{% omega_icon "triangle-exclamation", "fa-2xl" %}</span>
+                  </div>
+
+                  <h5 class="fw-bold fs-4 mb-2" id="cancel-retention-title">Cancel your subscription?</h5>
+
+                  <p class="text-muted mb-4">
+                    Your {{ site.brand.name }} data, settings, and progress may be removed after your subscription ends.
+                  </p>
+
+                  <div class="d-flex flex-column align-items-center">
+                    <button type="button" class="btn btn-adaptive btn-lg px-5 mb-1" data-bs-dismiss="modal" id="cancel-retention-keep-btn">
+                      <span class="button-text">Keep my account</span>
+                      {% omega_icon "arrow-right", "fa-sm ms-2" %}
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="cancel-retention-continue-btn">
                       Cancel anyway
                     </button>
                   </div>

@@ -8,6 +8,12 @@ import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
 import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
 
+/* @dev-only:start */
+// The page's dev control lives in the dev palette, not on window (#234, #342).
+// The import is inside the block, so production strips it with the section.
+import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
+/* @dev-only:end */
+
 // Module
 export default () => {
   return new Promise(async function (resolve) {
@@ -20,19 +26,54 @@ export default () => {
     setupMobileEmailForms();
     setupAutoDownload();
 
-    // Expose modal function globally for testing
-    window.showDownloadModal = showOnboardingModal;
-
     /* @dev-only:start */
-    // {
-    //   window.showDownloadModal('mac');
-    // }
+    // The onboarding walkthrough was `window.showDownloadModal(platform)`, a
+    // console helper that also shipped to production. The palette is the one
+    // home for it now, and it only exists in a dev build.
+    if (omega.isDevelopment()) {
+      registerDevSection('download', {
+        title: 'Download',
+        buildNode: buildDownloadDevSection,
+      });
+    }
     /* @dev-only:end */
 
     // Resolve after initialization
     return resolve();
   });
 };
+
+/* @dev-only:start */
+/**
+ * The palette's Download section: pick a platform the modal actually carries
+ * instructions for, and open its walkthrough. The options come from the modal
+ * in the page, so the list is whatever this brand ships.
+ */
+function buildDownloadDevSection(doc) {
+  const wrap = doc.createElement('div');
+  wrap.className = 'omega-devbar__fields';
+
+  const select = doc.createElement('select');
+  select.className = 'omega-devbar__select';
+  select.setAttribute('aria-label', 'Onboarding platform');
+  document.querySelectorAll('#onboardingModal .platform-instructions[data-platform]').forEach(($pane) => {
+    const option = doc.createElement('option');
+    option.value = $pane.dataset.platform;
+    option.textContent = $pane.dataset.platform;
+    select.appendChild(option);
+  });
+
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.className = 'omega-devbar__btn';
+  button.textContent = 'Show onboarding modal';
+  button.addEventListener('click', () => showOnboardingModal(select.value));
+
+  wrap.append(select, button);
+
+  return wrap;
+}
+/* @dev-only:end */
 
 // Configuration
 const config = {

@@ -114,9 +114,9 @@ export async function reverseAccidentalSignup(ctx, newUser) {
 }
 
 /**
- * Process a returning OAuth redirect (or a `_dev_simulateRedirect`
- * simulation). Returns true when a redirect result was handled — the caller
- * leaves the form disabled because navigation is imminent.
+ * Process a returning OAuth redirect (or, in development only, the palette's
+ * simulation of one). Returns true when a redirect result was handled — the
+ * caller leaves the form disabled because navigation is imminent.
  */
 export async function handleRedirectResult(ctx) {
   const url = new URL(window.location.href);
@@ -127,7 +127,16 @@ export async function handleRedirectResult(ctx) {
 
   // Resolve the redirect result — either from Firebase or a dev simulation
   let result, additionalUserInfo;
-  const simulateRedirect = url.searchParams.get('_dev_simulateRedirect');
+  let simulateRedirect = null;
+
+  /* @dev-only:start */
+  // The dev palette's OAuth-redirect simulation (#342). The read AND the fake
+  // result live inside the block, so a production build carries neither — it
+  // used to carry both, which let a visitor drive the post-redirect path on the
+  // live site. Stays null in production, so every branch below is dead there.
+  if (omega.isDevelopment()) {
+    simulateRedirect = url.searchParams.get('_dev_simulateRedirect');
+  }
 
   if (simulateRedirect) {
     logger.log('Simulating OAuth redirect result:', simulateRedirect);
@@ -140,7 +149,10 @@ export async function handleRedirectResult(ctx) {
       };
       additionalUserInfo = { isNewUser: simulateRedirect === 'signup' };
     }
-  } else {
+  }
+  /* @dev-only:end */
+
+  if (!simulateRedirect) {
     const { getAuth, getRedirectResult, getAdditionalUserInfo } = await import('@firebase/auth');
     const auth = getAuth();
     result = await getRedirectResult(auth);
@@ -150,11 +162,13 @@ export async function handleRedirectResult(ctx) {
   }
 
   try {
+    /* @dev-only:start */
     if (simulateRedirect === 'error') {
       const fakeError = new Error('Simulated: An account already exists with different credentials');
       fakeError.code = 'auth/account-exists-with-different-credential';
       throw fakeError;
     }
+    /* @dev-only:end */
 
     // Log results for debugging
     logger.log('Redirect result:', result);
@@ -199,6 +213,7 @@ export async function handleRedirectResult(ctx) {
       ctx.formManager.showSuccess('Successfully signed in!');
     }
 
+    /* @dev-only:start */
     // In simulation mode, handle the redirect ourselves since the auth
     // state listener won't fire (no real Firebase login happened).
     if (simulateRedirect) {
@@ -210,6 +225,7 @@ export async function handleRedirectResult(ctx) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       window.location.href = redirectTo;
     }
+    /* @dev-only:end */
 
     // Return true to indicate redirect was successfully processed
     return true;
