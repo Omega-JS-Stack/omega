@@ -18,6 +18,18 @@ class BaseTest {
   }
 
   /**
+   * `--offline` mode: the run may still READ live cloud state, but nothing may
+   * MUTATE it. A check whose fix (or whose check itself) deploys/writes to the
+   * brand's live project downgrades to a reported 'warn' instead of spawning
+   * `firebase`/`gsutil` — scaffolding a fresh app must never rewrite production
+   * infrastructure as a side effect ([#284](https://github.com/Omega-JS-Stack/omega/issues/284)).
+   * @returns {boolean}
+   */
+  get isOffline() {
+    return !!(this.self.argv || {}).offline;
+  }
+
+  /**
    * Re-stage functions/ from the authored tree. Fixes that write STAGED
    * INPUTS (the app manifest, .env, .nvmrc, service-account.json, config)
    * call this so the already-staged tree reflects the fix within the same

@@ -4,9 +4,11 @@
  *
  *   1. Config: _config.yml + ultimate-jekyll-manager.json → config/omega.json5
  *      (validated through the real @omega.js/config loader after writing).
- *   2. Codemod: the rule table over src/** templates (rules.js).
+ *   2. Codemod: the rule tables over src/** templates and consumer JS
+ *      (rules.js), plus the consumer asset layer (consumer-assets.js).
  *   3. Lint: the liquid-lint scanner over the (rewritten) templates.
  *   4. Hygiene: legacy files removed (Gemfile, lockfile, the old configs).
+ *   5. Tests: the legacy UJM harness, reported (never rewritten).
  *
  * `check: true` runs everything IN MEMORY — full report, zero writes.
  */
@@ -27,6 +29,60 @@ const LEGACY_FILES = [
   '.ruby-version',
 ];
 
+// The legacy UJM harness. Its runner discovered ALL of `test/**/*.js`
+// (excluding `_`-prefixed files and any `_`-prefixed directory — helpers,
+// fixtures, `_init.js`) and read the layer from the module's own export, never
+// from the path; `omega test` runs `node --test 'test/**/*.test.js'`, which
+// matches almost none of them and reports a green `pass 0` — a migrated
+// brand's whole regression suite goes dark without a word
+// ([#248](https://github.com/Omega-JS-Stack/omega/issues/248)).
+//
+// Detection is by SHAPE, not by name: a harness module named `config.test.js`
+// IS discovered by node:test, loads, registers no tests, and counts as a pass —
+// the loudest false green there is. So a file that exports a module and never
+// touches node:test is legacy whatever it is called, and a file that requires
+// node:test is ported whatever it is called. Cheap enough to read: no execution.
+const NODE_TEST_IMPORT = /(?:require\(\s*|from\s+)['"]node:test['"]/;
+const MODULE_EXPORT = /(?:^|\n)\s*(?:module\.exports\s*=|exports\.[\w$]+\s*=|export\s+default\b)/;
+
+/**
+ * Whether a test-dir file is a legacy-harness module rather than a node:test
+ * file, judged by its content.
+ * @param {string} text - the file's source
+ * @returns {boolean}
+ */
+function isLegacyHarnessFile(text) {
+  if (NODE_TEST_IMPORT.test(text)) return false;
+  return MODULE_EXPORT.test(text);
+}
+
+/**
+ * Collect the legacy-harness test files `omega test` cannot discover (or
+ * discovers and silently counts as an empty pass).
+ * @param {string} root - consumer project root
+ * @returns {string[]} paths relative to the root
+ */
+function collectLegacyTests(root) {
+  const testDir = path.join(root, 'test');
+  if (!fs.existsSync(testDir)) return [];
+
+  const files = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (entry.name.startsWith('_')) continue;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.isFile() || path.extname(entry.name) !== '.js') continue;
+      if (isLegacyHarnessFile(fs.readFileSync(full, 'utf8'))) files.push(path.relative(root, full));
+    }
+  };
+  walk(testDir);
+  return files.sort();
+}
+
 /**
  * Migrate a UJM consumer in place (or preview with `check`).
  * @param {string} root - consumer project root
@@ -36,7 +92,7 @@ const LEGACY_FILES = [
  */
 function runMigration(root, options = {}) {
   const write = !options.check;
-  const report = { root, check: !write, config: null, codemod: null, lint: [], removed: [], errors: [] };
+  const report = { root, check: !write, config: null, codemod: null, lint: [], removed: [], legacyTests: [], errors: [] };
 
   // ---- 1. Config conversion
   const { jekyll, ujm, files: legacySources } = readLegacyConfigs(root);
@@ -110,6 +166,10 @@ function runMigration(root, options = {}) {
     if (write) fs.rmSync(full);
     report.removed.push(rel);
   }
+
+  // ---- 5. Legacy test harness (reported, never rewritten — porting a suite
+  // to node:test is by hand)
+  report.legacyTests = collectLegacyTests(root);
 
   return report;
 }

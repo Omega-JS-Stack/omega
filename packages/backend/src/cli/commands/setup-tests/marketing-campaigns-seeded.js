@@ -9,6 +9,14 @@ class MarketingCampaignsSeededTest extends BaseTest {
   }
 
   getWarning() {
+    // Under --offline the opt-in is overridden, so "pass the flag" would be
+    // the wrong remedy — name the flag that suppressed the write instead.
+    if (this.isOffline) {
+      return [
+        'live campaign seeding skipped (--offline) — re-run `npx omega setup --seed-campaigns` without --offline to seed/enforce',
+      ];
+    }
+
     return [
       'live campaign seeding is opt-in — run `npx omega setup --seed-campaigns` to seed/enforce',
     ];
@@ -134,9 +142,17 @@ class MarketingCampaignsSeededTest extends BaseTest {
     return this._seedingRequested() ? false : 'warn';
   }
 
-  /** True when the run opted into live seeding with `--seed-campaigns`. */
+  /**
+   * True when the run opted into live seeding with `--seed-campaigns`.
+   * `--offline` overrides the opt-in: it promises NO live mutations for the
+   * whole run, and fix() writes real Firestore docs (#284).
+   */
   _seedingRequested() {
     const argv = this.self.argv || {};
+
+    if (this.isOffline) {
+      return false;
+    }
 
     return !!(argv.seedCampaigns || argv['seed-campaigns']);
   }

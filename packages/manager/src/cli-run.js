@@ -3,8 +3,10 @@
  * dispatch ('@omega.js/manager/cli'): at a brand root, every framework's
  * `omega` bin hands over here so brand-level commands (`omega test`,
  * `omega manage`) fan out over apps/* instead of guessing one framework.
- * The company orchestrator spawns this file directly as its per-brand
- * child entry (there is no separate bin).
+ * The manager ships that bin itself too (bin/omega → src/omega-bin.js, #276),
+ * so a fresh clone with no framework installed still lands here — that is
+ * where `npx omega onboard` runs. The company orchestrator spawns this file
+ * directly as its per-brand child entry.
  */
 // Value-less flags must be declared boolean — otherwise yargs treats the next
 // positional as the flag's VALUE (mirrors the framework bins).

@@ -4,8 +4,14 @@
   "description": "The OMEGA orchestration engine — walks every service in dependency order and reconciles each to the brand's omega.json5, idempotently, against a brand monorepo. omega-manager's brains, ported service by service. Private until first publish.",
   "private": true,
   "main": "./dist/index.js",
+  "bin": {
+    "omega": "./bin/omega",
+    "omg": "./bin/omg",
+    "mgr": "./bin/omega"
+  },
   "files": [
     ".claude-plugin/",
+    "bin/",
     "claude-plugin/",
     "dist/",
     "docs/"

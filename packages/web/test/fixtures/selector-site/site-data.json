@@ -1,0 +1,6 @@
+{
+  "url": "https://selector.example.com",
+  "brand": { "id": "selector", "name": "SelectorCo", "description": "Sidebar project-selector test brand" },
+  "meta": { "title": "SelectorCo", "description": "Selector meta description" },
+  "theme": { "id": "classy" }
+}

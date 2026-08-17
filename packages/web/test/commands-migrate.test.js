@@ -90,6 +90,23 @@ test('a pre-converted app exits ZERO so scripted pipelines survive (#297)', (t) 
   assert.match(fs.readFileSync(path.join(root, 'src', 'pages', 'index.html'), 'utf8'), /\{\{ resolved\.meta\.title \}\}/, 'the codemods still ran');
 });
 
+test('--check names the legacy test files `omega test` will never discover (#248)', (t) => {
+  const root = legacyConsumer(t);
+  fs.mkdirSync(path.join(root, 'test', 'build'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'test', 'build', 'xp-curve.js'), 'module.exports = {};\n');
+  fs.writeFileSync(path.join(root, 'test', 'build', 'quiz-grading.js'), 'module.exports = {};\n');
+
+  const result = spawnSync(process.execPath, [
+    '-e',
+    `require(${JSON.stringify(COMMAND)})({ check: true })`,
+  ], { cwd: root, encoding: 'utf8' });
+  const output = result.stdout + result.stderr;
+
+  assert.strictEqual(result.status, 0, 'an undiscoverable suite is a warning, not a failed check');
+  assert.match(output, /2 legacy test files will not be discovered/);
+  assert.match(output, /test\/build\/xp-curve\.js/, 'the files are named, like every other per-file report line');
+});
+
 test('a report carrying errors exits non-zero and skips the next-steps block', (t) => {
   // A tree with no legacy configs at all — runMigration reports the error.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-empty-'));

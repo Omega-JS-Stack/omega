@@ -120,6 +120,19 @@ which lists the missing `config/omega.json5` keys.
 
 `--continue` records the failure but keeps going instead of halting.
 
+`--offline` makes the run READ-ONLY against the brand's cloud project
+([#284](https://github.com/Omega-JS-Stack/omega/issues/284)): no mutation runs,
+but live READS still do (it is a no-mutation flag, not a no-network flag — an
+actually-offline machine still fails on the reads). The mutating checks
+downgrade to a `'warn'` naming the flag, so a scaffold run in CI, a sandbox, or
+a migration never rewrites production as a side effect: `firestore-indexes-synced`
+still fetches and prints the drift but skips `firebase deploy --only
+firestore:indexes` (its `fix()` is inert too, for direct callers),
+`storage-lifecycle-policy` — whose check *is* the mutation — returns before any
+`gsutil lifecycle set`, and `--seed-campaigns` is ignored (seeding writes real
+Firestore docs, so the opt-in loses to `--offline`). Read-only checks are
+unaffected. `BaseTest.isOffline` is the one reader of the flag.
+
 > **No more `UnhandledPromiseRejection`.** Hard failures exit cleanly via
 > `haltSetup()` / `process.exit(1)`, and `bin/omega-backend` wraps the run in a
 > `try/catch` that prints a one-line `✗ <message>` instead of Node's raw rejection

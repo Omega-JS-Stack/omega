@@ -8,7 +8,10 @@
 //
 //   <div class="omega-shell" data-omega-shell>
 //     <aside class="omega-shell__sidebar" id="…">
-//       …nav; text that hides in the rail wears .omega-shell__label…
+//       …pinned head: brand, and any popover-owning module (the selector)…
+//       <div class="omega-shell__sidebar-scroll">
+//         …nav; text that hides in the rail wears .omega-shell__label…
+//       </div>
 //     </aside>
 //     <header class="omega-shell__topbar">
 //       <div class="omega-shell__topbar-start">
@@ -46,15 +49,41 @@ $shell-breakpoint: 1200px;
   color: var(--omega-ink);
 }
 
+// The rail clips NOTHING (#319): a module that opens a popover — the project
+// selector — has to paint outside the 264px box, so the scroll lives one level
+// down on __sidebar-scroll and the rail is merely positioned. Its z-index is
+// the explicit stacking order for those popovers: above sticky page chrome
+// inside the content column (bootstrap's 1020 band), below the drawer/modal
+// layers.
 .omega-shell__sidebar {
   display: flex;
   flex-direction: column;
   grid-row: 1 / -1;
+  position: relative;
+  z-index: 1030;
   width: var(--omega-shell-sidebar-w);
-  overflow-y: auto;
   background: var(--omega-surface);
   border-inline-end: 1px solid var(--omega-line);
   transition: width var(--omega-speed) var(--omega-ease), transform var(--omega-speed) var(--omega-ease);
+}
+
+// Everything under the pinned head scrolls here — nav plus the bottom slot,
+// which keeps its `mt-auto` push because this region is the flex column now.
+.omega-shell__sidebar-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+// A rail popover can now outgrow the viewport (nothing clips it), and the
+// shell page itself never scrolls (100dvh grid) — so a long selector menu
+// caps itself and scrolls internally, keeping the tail reachable on short
+// viewports (#319).
+.omega-shell__sidebar .dropdown-menu {
+  max-height: calc(100dvh - 8rem);
+  overflow-y: auto;
 }
 
 .omega-shell__topbar {

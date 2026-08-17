@@ -168,7 +168,14 @@ async function run({ hostName, hostRun }) {
     // back to the host framework rather than dead-ending (#194). A real brand
     // root still dispatches to the manager the moment it exists.
     if (!cliPath) {
-      console.error(`omega: brand-shaped directory at ${target.dir} but ${MANAGER} is not installed — running ${hostName} instead (install ${MANAGER} at the brand root, or \`mgr i local\` for a monorepo link, if this really is a brand)`);
+      // When the HOST is the manager itself (its own bin in a fresh template
+      // clone), "install the manager" would name the thing about to run —
+      // that message is for framework hosts only.
+      if (hostName === MANAGER) {
+        console.error(`omega: brand-shaped directory at ${target.dir} with no installed ${MANAGER} — running the bundled ${hostName} (run npm install to use the pinned version)`);
+      } else {
+        console.error(`omega: brand-shaped directory at ${target.dir} but ${MANAGER} is not installed — running ${hostName} instead (install ${MANAGER} at the brand root, or \`mgr i local\` for a monorepo link, if this really is a brand)`);
+      }
       return hostRun();
     }
     return require(cliPath).run();

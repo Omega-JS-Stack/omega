@@ -63,6 +63,10 @@ $font-family-monospace: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas
 $classy-font-marketing: 'Newsreader', ui-serif, Georgia, 'Times New Roman', Times, serif !default;
 
 $font-size-base: 0.9375rem !default; // 15px — denser, app-grade base
+// The heading face is a runtime token by default (data-omega-type presets and
+// plain-CSS re-points keep working); a brand with its own display face sets
+// this slot and classy's own heading rule follows it.
+$headings-font-family: var(--omega-font-display) !default;
 $headings-font-weight: 650 !default;
 $headings-line-height: 1.15 !default;
 
@@ -82,6 +86,20 @@ $border-radius-lg: 0.875rem !default; // 14px — cards, panels, dropdowns
 $border-radius-xl: 1.25rem !default; // 20px — hero frames, the app content card
 $border-radius-2xl: 1.5rem !default;
 $border-radius-pill: 50rem !default;
+
+// Per-component shape. Each defaults to the family above through Bootstrap's
+// own CSS-variable indirection (so the runtime --bs-* ramp still flows), and
+// each is a slot a brand can move ALONE — re-shaping buttons or fields without
+// dragging cards, panels and the app content card along.
+$btn-border-radius: var(--bs-border-radius) !default;
+$btn-border-radius-sm: var(--bs-border-radius-sm) !default;
+$btn-border-radius-lg: var(--bs-border-radius-lg) !default;
+$input-border-radius: var(--bs-border-radius) !default;
+$input-border-radius-sm: var(--bs-border-radius-sm) !default;
+$input-border-radius-lg: var(--bs-border-radius-lg) !default;
+$modal-content-border-radius: var(--bs-border-radius-lg) !default;
+$toast-border-radius: var(--bs-border-radius) !default;
+$badge-border-radius: var(--bs-border-radius) !default;
 
 // ============================================
 // Components
@@ -167,6 +185,7 @@ $avatar-sizes: (
   $font-family-sans-serif: $font-family-sans-serif,
   $font-family-monospace: $font-family-monospace,
   $font-size-base: $font-size-base,
+  $headings-font-family: $headings-font-family,
   $headings-font-weight: $headings-font-weight,
   $headings-line-height: $headings-line-height,
   $h1-font-size: $h1-font-size,
@@ -180,6 +199,15 @@ $avatar-sizes: (
   $border-radius-lg: $border-radius-lg,
   $border-radius-xl: $border-radius-xl,
   $border-radius-2xl: $border-radius-2xl,
+  $btn-border-radius: $btn-border-radius,
+  $btn-border-radius-sm: $btn-border-radius-sm,
+  $btn-border-radius-lg: $btn-border-radius-lg,
+  $input-border-radius: $input-border-radius,
+  $input-border-radius-sm: $input-border-radius-sm,
+  $input-border-radius-lg: $input-border-radius-lg,
+  $modal-content-border-radius: $modal-content-border-radius,
+  $toast-border-radius: $toast-border-radius,
+  $badge-border-radius: $badge-border-radius,
   $box-shadow: $box-shadow,
   $box-shadow-sm: $box-shadow-sm,
   $box-shadow-lg: $box-shadow-lg,

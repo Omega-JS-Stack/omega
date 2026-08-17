@@ -70,7 +70,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 
 | Command | Description |
 |---|---|
-| `setup` | Bootstrap new projects (scaffolds config files + doc defaults), validate config, provision Firestore indexes |
+| `setup` | Bootstrap new projects (scaffolds config files + doc defaults), validate config, provision Firestore indexes. `--offline` blocks every live mutation (deploys, bucket policy, seeding) and downgrades those checks to reported warnings — reads still run ([#284](https://github.com/Omega-JS-Stack/omega/issues/284)) |
 | `emulator` | Start Firebase emulators (auth/firestore/functions/database/storage); fronts the public hosting port with the mkcert HTTPS proxy (`--no-https` for plain http). A stop takes the whole family: firebase-tools puts each java emulator in its OWN process group, so the stop path signals the pids it recorded at boot, sweeps whatever orphaned outside that record, and only then verifies the ports came back free. A boot that never comes up takes the same path before it reports ([#304](https://github.com/Omega-JS-Stack/omega/issues/304)) |
 | `serve` | Local Firebase serve (with auto Stripe webhook forwarding if keys set) |
 | `watch` | Auto-reload functions on file change |

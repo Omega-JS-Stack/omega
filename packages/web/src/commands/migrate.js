@@ -1,7 +1,8 @@
 /**
  * `omega migrate` — convert a UJM (Jekyll) consumer to @omega.js/web in place:
- * legacy configs → config/omega.json5, the codemod rule table over src/**
- * templates, the liquid-lint scan, and legacy-file removal (Gemfile & co).
+ * legacy configs → config/omega.json5, the codemod rule tables over src/**
+ * templates and consumer JS, the liquid-lint scan, legacy-file removal
+ * (Gemfile & co), and the legacy test-harness report.
  *
  * `omega migrate --check` runs the full pipeline in memory and prints the
  * report without writing anything — the pre-flight for Phase-4 site waves.
@@ -47,6 +48,13 @@ module.exports = async function (options) {
     for (const finding of warnings) logger.warn(`  ${finding.file}:${finding.line} — ${finding.message}`);
   } else {
     logger.log('Lint: clean');
+  }
+
+  // ---- legacy test harness (a silent `pass 0` otherwise)
+  if (report.legacyTests.length > 0) {
+    const count = report.legacyTests.length;
+    logger.warn(`Tests: ${count} legacy test file${count === 1 ? '' : 's'} will not be discovered — \`omega test\` runs \`node --test 'test/**/*.test.js'\`, which matches no \`test/<layer>/<name>.js\` and reports a green pass 0. Rename to \`*.test.js\` and port to node:test.`);
+    for (const rel of report.legacyTests) logger.warn(`  ${rel}`);
   }
 
   // ---- removed files + fatal problems

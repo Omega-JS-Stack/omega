@@ -8,8 +8,30 @@ class StorageLifecyclePolicyTest extends BaseTest {
     return 'set storage lifecycle policy';
   }
 
+  getWarning() {
+    return [
+      'storage lifecycle policy not applied (--offline) — no `gsutil lifecycle set` ran; re-run `npx omega setup` without --offline to apply it',
+    ];
+  }
+
   async run() {
     const self = this.self;
+
+    // demo-* projects are emulator-only — the buckets can never exist, so there
+    // is nothing to set and nothing to warn about (gates before --offline so a
+    // demo scaffold does not warn about a policy that can never apply).
+    if (this.isDemoProject) {
+      console.log(chalk.dim(`  demo-* project (${self.projectId}) — storage lifecycle skipped (emulator-only)`));
+      return true;
+    }
+
+    // This check IS the mutation — it writes the lifecycle policy onto live GCS
+    // buckets. Under --offline it downgrades to a non-blocking warning before
+    // any gsutil spawns, so a scaffold run never rewrites live infra (#284).
+    if (this.isOffline) {
+      return 'warn';
+    }
+
     const result = await this.cmd_setStorageLifecycle(self).catch(e => e);
     return !(result instanceof Error);
   }

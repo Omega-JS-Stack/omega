@@ -1,0 +1,41 @@
+{
+  // Consumer override of the packaged sidebar data — the #319 repro shape: the
+  // selector module on, and a menu of 14 `owner/name` slugs whose text runs
+  // wider than the 264px rail and whose height passes half a viewport (the
+  // workkit tower's real menu).
+  logo: {
+    href: '/dashboard/account',
+  },
+  selector: {
+    enabled: true,
+    name: 'itw-creative-works/workkit',
+    env: 'production',
+    dropdown: [
+      { label: 'itw-creative-works/itw-creative-works', href: '/p/1' },
+      { label: 'itw-creative-works/backend-manager', href: '/p/2' },
+      { label: 'itw-creative-works/ultimate-jekyll-manager', href: '/p/3' },
+      { label: 'itw-creative-works/browser-extension-manager', href: '/p/4' },
+      { label: 'itw-creative-works/electron-manager', href: '/p/5' },
+      { label: 'itw-creative-works/mobile-app-manager', href: '/p/6' },
+      { label: 'itw-creative-works/jekyll-uj-powertools', href: '/p/7' },
+      { label: 'itw-creative-works/web-manager', href: '/p/8' },
+      { label: 'itw-creative-works/workkit', href: '/p/9' },
+      { label: 'omega-js-stack/omega', href: '/p/10' },
+      { label: 'omega-js-stack/omega-brand', href: '/p/11' },
+      { label: 'omega-js-stack/omega-playground', href: '/p/12' },
+      { divider: true },
+      { label: 'Create a new project', href: '/p/new', icon: 'plus' },
+    ],
+  },
+  links: [
+    {
+      header: true,
+      label: 'General'
+    },
+    {
+      label: 'Account',
+      href: '/dashboard/account',
+      icon: 'user-gear'
+    },
+  ],
+}

@@ -3,14 +3,17 @@
  *
  * The 8 rule classes extracted from the A2 real-file ports (DECISION.md
  * "consumer conversion plan"), plus the analytics-spelling normalization
- * (rule 9, from the omega.json5 flip). Every rule is a pure text → text
- * transform over ONE file: `apply(text, ctx)` returns `{ text, edits,
- * findings }` where `edits` are applied rewrites and `findings` are
- * lint-level observations the rule could NOT safely fix (surfaced by both
- * `omega migrate` and `omega migrate --check`).
+ * (rule 9, from the omega.json5 flip) and the WM → @omega.js/client rename
+ * surface (rules 10–15, #248). Every rule is a pure text → text transform over
+ * ONE file: `apply(text, ctx)` returns `{ text, edits, findings }` where
+ * `edits` are applied rewrites and `findings` are lint-level observations the
+ * rule could NOT safely fix (surfaced by both `omega migrate` and
+ * `omega migrate --check`).
  *
- * Rules run in ORDER (the RULES export): page.resolved must collapse before
- * the generic page.<key> rewrite, and page.canonical.url before both.
+ * TWO tables, by file surface: RULES over the src/** templates, JS_RULES over
+ * the consumer JS. Rules run in ORDER within each: page.resolved must collapse
+ * before the generic page.<key> rewrite, page.canonical.url before both, and
+ * the theme-prefixed include after the leading slash is gone.
  */
 
 // Tags whose quoted args template-kit resolves as variables — the rule-3
@@ -418,6 +421,182 @@ const analyticsShape = {
 // Rule 8 (Jekyll defaults/collections → targets.web) lives in config-convert.js
 // — it moves config, not template text.
 
+// ---------------------------------------------------------------------------
+// Rules 10–15 — the WM → @omega.js/client rename surface
+// ([#248](https://github.com/Omega-JS-Stack/omega/issues/248))
+//
+// Every UJM consumer carries it (~40 sites in one brand). The markup pair is
+// the dangerous half: nothing fails at BUILD time, the bindings and the
+// sign-out button simply go dead at runtime. The markup rule therefore runs
+// over templates AND consumer JS (a querySelector spells the same class); the
+// import rules are JS-only (JS_RULES) and the frontmatter/include rules
+// template-only.
+// ---------------------------------------------------------------------------
+
+// Rule 10 — the client-runtime markup hooks, renamed with the runtime (#16)
+const CLIENT_MARKUP = {
+  'data-wm-bind': 'data-omega-bind',
+  'auth-signout-btn': 'omega-signout',
+};
+
+const clientMarkup = {
+  id: 'client-markup',
+  title: '`data-wm-bind` → `data-omega-bind`; `auth-signout-btn` → `omega-signout`',
+  apply(text) {
+    // Both ends are guarded against `-` and word chars: a class list and an
+    // attribute name are hyphenated namespaces, so a bare alternation would
+    // eat `js-auth-signout-btn` and `auth-signout-btn-large` — consumer names
+    // that are DIFFERENT hooks and must survive untouched.
+    const pattern = new RegExp(`(?<![\\w-])(?:${Object.keys(CLIENT_MARKUP).join('|')})(?![\\w-])`, 'g');
+    const { text: out, edits } = replacePerLine('client-markup', text, pattern, (whole) => CLIENT_MARKUP[whole]);
+    return { text: out, edits, findings: [] };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 11 — frontmatter `web_manager:` → `client:` (#1: it configures
+// @omega.js/client, and there is no dual-read)
+// ---------------------------------------------------------------------------
+const clientFrontmatter = {
+  id: 'client-frontmatter',
+  title: 'frontmatter `web_manager:` → `client:`',
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    // Scoped to the leading `---` fence: a `web_manager:` in the body is prose
+    // or data, never the client-config key.
+    const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+    if (fenceEnd < 0) return { text, edits: [], findings: [] };
+
+    const edits = [];
+    const out = lines.map((line, index) => {
+      if (index === 0 || index >= fenceEnd) return line;
+      const replaced = line.replace(/^web_manager:/, 'client:');
+      if (replaced !== line) edits.push({ rule: 'client-frontmatter', line: index + 1, before: line.trim(), after: replaced.trim() });
+      return replaced;
+    });
+    return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 12 — theme-prefixed include paths → the plain layered path
+// (runs AFTER include-slash, which owns the leading `/`)
+// ---------------------------------------------------------------------------
+const includeThemePath = {
+  id: 'include-theme-path',
+  title: '`{% include themes/<id>/… %}` → the layered include path',
+  apply(text) {
+    const pattern = new RegExp(
+      `(\\{%-?\\s*include(?:_cached)?\\s+)themes/(?:\\[\\s*site\\.theme\\.id\\s*\\]|${PACKAGED_THEMES.join('|')})/`,
+      'g'
+    );
+    const { text: out, edits } = replacePerLine('include-theme-path', text, pattern, '$1');
+    return { text: out, edits, findings: [] };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 13 — the web-manager package + its singleton identifier
+// (WebManager is not an OMEGA concept: the package is @omega.js/client and the
+// singleton is `omega`, subpath modules included)
+// ---------------------------------------------------------------------------
+const clientImport = {
+  id: 'client-import',
+  title: "`'web-manager'` → `'@omega.js/client'`; the `webManager` singleton → `omega`",
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    const edits = [];
+    const out = lines.map((line, index) => {
+      const replaced = line
+        .replace(/(["'])web-manager(\/[^"']*)?\1/g, (whole, quote, subpath) => `${quote}@omega.js/client${subpath || ''}${quote}`)
+        .replace(/\bwebManager\b/g, 'omega');
+      if (replaced !== line) edits.push({ rule: 'client-import', line: index + 1, before: line.trim(), after: replaced.trim() });
+      return replaced;
+    });
+    return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 14 — the `__main_assets__/js/libs/*` runtime libs
+//
+// form-manager MOVED (same class, new home). authorized-fetch did not: its
+// successor is the singleton's own `omega.request()`, so the import line goes
+// and the calls are renamed — but the OPTIONS are the client's, not
+// wonderful-fetch's, so every rewritten call is reported for review.
+// ---------------------------------------------------------------------------
+const FORM_MANAGER_SPECIFIER = /(["'])__main_assets__\/js\/libs\/form-manager\.js\1/g;
+const AUTHORIZED_FETCH_IMPORT = /^\s*import\s+[\w{},\s*]+\s+from\s+["']__main_assets__\/js\/libs\/authorized-fetch\.js["'];?\s*$/;
+const CLIENT_DEFAULT_IMPORT = /import\s+omega\s+from\s+["']@omega\.js\/client["']/;
+
+const clientLibs = {
+  id: 'client-libs',
+  title: '`__main_assets__/js/libs/form-manager.js` → the client module; `authorizedFetch()` → `omega.request()`',
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    const edits = [];
+    const findings = [];
+    const out = [];
+    let rewroteCall = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (AUTHORIZED_FETCH_IMPORT.test(line)) {
+        edits.push({ rule: 'client-libs', line: i + 1, before: line.trim(), after: '(removed — omega.request() replaces it)' });
+        continue;
+      }
+
+      const replaced = line
+        .replace(FORM_MANAGER_SPECIFIER, '$1@omega.js/client/modules/form-manager.js$1')
+        .replace(/\bauthorizedFetch\(/g, 'omega.request(');
+      if (replaced !== line) {
+        edits.push({ rule: 'client-libs', line: i + 1, before: line.trim(), after: replaced.trim() });
+        if (/\bauthorizedFetch\(/.test(line)) {
+          rewroteCall = true;
+          findings.push({
+            check: 'client-libs', line: i + 1, severity: 'warning',
+            message: '`authorizedFetch(…)` → `omega.request(…)`: same (url, options) shape and the same Bearer attach, but the options are @omega.js/client\'s — verify `response`/`output` and the route segment (`/backend-manager/` is now `/omega/`)',
+          });
+        }
+      }
+      out.push(replaced);
+    }
+
+    // `omega.request()` needs the singleton in scope. Every real consumer that
+    // called authorizedFetch also imported web-manager (rule 13 renames that
+    // import ahead of this one), so a miss here is a genuinely odd file — say
+    // so rather than emit a module that throws on first call.
+    const result = fromLines(out, trailingNewline);
+    if (rewroteCall && !CLIENT_DEFAULT_IMPORT.test(result)) {
+      findings.push({
+        check: 'client-libs', line: 1, severity: 'error',
+        message: 'rewrote `authorizedFetch()` to `omega.request()` but the file has no client singleton — add `import omega from \'@omega.js/client\';`',
+      });
+    }
+
+    return { text: result, edits, findings };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 15 — the service-worker entry's framework import
+// (only the /service-worker subpath: the bare `ultimate-jekyll-manager` import
+// is the asset layer's main.js, owned by consumer-assets.js)
+// ---------------------------------------------------------------------------
+const serviceWorkerImport = {
+  id: 'service-worker-import',
+  title: "`'ultimate-jekyll-manager/service-worker'` → `'@omega.js/web/service-worker'`",
+  apply(text) {
+    const { text: out, edits } = replacePerLine(
+      'service-worker-import', text,
+      /(["'])ultimate-jekyll-manager\/service-worker\1/g,
+      '$1@omega.js/web/service-worker$1'
+    );
+    return { text: out, edits, findings: [] };
+  },
+};
+
 const RULES = [
   legacyPrefix,        // 0 — must precede every rule that matches tag names
   pageResolved,        // 1
@@ -428,6 +607,27 @@ const RULES = [
   canonicalUrl,        // 7 — must precede page-props
   pageProps,           // 6
   analyticsShape,      // 9
+  clientMarkup,        // 10
+  clientFrontmatter,   // 11
+  includeThemePath,    // 12 — must follow include-slash
 ];
 
-module.exports = { RULES, VALID_PAGE_PROPS, MANUAL_PAGE_PROPS, PACKAGED_THEMES };
+// The consumer-JS table (src/**/*.js — the tree the template walk skips).
+// Template rules never run over JS: `page.title` in a script is an object
+// property, not a Jekyll frontmatter read.
+const JS_RULES = [
+  clientMarkup,        // 10 — the same class/attribute names, spelled in JS
+  clientImport,        // 13 — must precede client-libs (it puts `omega` in scope)
+  clientLibs,          // 14
+  serviceWorkerImport, // 15
+];
+
+// The section-descriptor table (src/**/*.json — bindings and classes declared
+// as DATA, not markup). Only the markup rename belongs here: the page-props,
+// include and frontmatter rules answer to template text, and a `page.`-looking
+// string in a descriptor is a JSON value, not a Jekyll read.
+const JSON_RULES = [
+  clientMarkup,        // 10 — the same class/attribute names, spelled in a descriptor
+];
+
+module.exports = { RULES, JS_RULES, JSON_RULES, VALID_PAGE_PROPS, MANUAL_PAGE_PROPS, PACKAGED_THEMES };

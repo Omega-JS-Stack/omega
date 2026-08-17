@@ -288,6 +288,40 @@ test('run(): a brand-SHAPED dir with no manager installed falls back to the HOST
   assert.ok(note.includes(appDir), `note names the brand-shaped dir: ${note}`);
 });
 
+test('run(): the MANAGER host in a brand-shaped dir never says to install what it is running (#276)', async () => {
+  // The fresh brand-template clone: brand-shaped, nothing installed, and the
+  // host IS the manager. "Install @omega.js/manager" would name the thing
+  // about to run — that wording is for framework hosts only.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-mgrhost-'));
+  const cloneDir = path.join(scratch, 'clone');
+  fs.mkdirSync(path.join(cloneDir, 'config'), { recursive: true });
+  fs.mkdirSync(path.join(cloneDir, '.git'), { recursive: true }); // bound the walk inside the scratch
+  fs.writeFileSync(
+    path.join(cloneDir, 'package.json'),
+    JSON.stringify({ name: 'clone', dependencies: {} })
+  );
+  fs.writeFileSync(path.join(cloneDir, 'config', 'omega.json5'), '{ brand: { id: "clone" } }\n');
+
+  const cwd0 = process.cwd();
+  const error0 = console.error;
+  const notes = [];
+  let ran = 0;
+  console.error = (...args) => { notes.push(args.join(' ')); };
+  process.chdir(cloneDir);
+  try {
+    await run({ hostName: '@omega.js/manager', hostRun: () => { ran += 1; } });
+  } finally {
+    process.chdir(cwd0);
+    console.error = error0;
+  }
+
+  assert.equal(ran, 1);
+  const note = notes.join('\n');
+  assert.doesNotMatch(note, /is not installed/, `the self-contradicting wording must not fire for the manager host: ${note}`);
+  assert.match(note, /running the bundled @omega\.js\/manager/);
+  assert.ok(note.includes(cloneDir), `note names the brand-shaped dir: ${note}`);
+});
+
 test('run(): an unresolvable CROSS-FRAMEWORK app still hard-fails (never falls back to the wrong CLI)', () => {
   // The brand fallback (#194) must not soften this branch: the app names a
   // DIFFERENT framework, so running the host's CLI would run the wrong tool.

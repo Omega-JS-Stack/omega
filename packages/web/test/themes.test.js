@@ -131,6 +131,87 @@ test('inheritance hatch: a partial theme @forwards omega:theme and inherits the 
   );
 });
 
+// ─── Per-component knobs (#253): the hatch's `with (…)` re-shapes classy ────
+
+test('hatch knobs: a partial theme re-values classy\'s per-component type + shape through `with (…)` (#253)', () => {
+  // A brand with its own shape/type identity configures classy ONLY through
+  // the hatch. Two of the surfaces below are what #253 actually unlocked:
+  // classy's OWN css HARDCODED them (`_typography.scss` heading font,
+  // `_forms.scss` input-group radii), so no `with (…)` value could reach them
+  // until they became !default slots those rules read. The other seven already
+  // flowed through Bootstrap's own !defaults before #253 and stay as
+  // REGRESSION PINS — classy declaring + forwarding its own slots must not
+  // sever the path they were already riding.
+  const knobsRoot = path.join(THEMING, 'knobs-theme');
+  const layers = [knobsRoot, path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')];
+
+  const css = sass.compile(path.join(knobsRoot, '_theme.scss'), {
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
+    loadPaths: layers,
+    quietDeps: true,
+    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  // THE FIX (1/2) — type: classy's OWN heading rule (the one that lands after
+  // Bootstrap's) reads the knob, so the brand face survives to the compiled
+  // output. Before #253 this rule said `var(--omega-font-display)` outright.
+  const headings = css.match(/\nh1, \.h1,[\s\S]*?\{([\s\S]*?)\}/);
+  assert.ok(headings, 'classy\'s heading rule is present');
+  assert.match(headings[1], /font-family: "Knobtest Display";/, '$headings-font-family reached classy\'s heading rule');
+
+  // THE FIX (2/2) — shape: the input-group composition reads
+  // $input-border-radius, so a re-shaped field stays consistent with the
+  // standalone .form-control. Before #253 it read the global $border-radius.
+  const inputGroup = css.match(/\n\.input-group > \.form-control,\n\.input-group > \.form-control\.is-invalid,[\s\S]*?\{([\s\S]*?)\}/);
+  assert.ok(inputGroup, 'classy\'s input-group rule is present');
+  assert.match(inputGroup[1], /border-radius: 4\.0404px;/, '$input-border-radius reached classy\'s input-group rule');
+
+  // PINS — the seven that already worked: each reaches a Bootstrap component
+  // variable, one surface each, none of them moving the global $border-radius
+  // family.
+  for (const [property, value] of [
+    ['--bs-btn-border-radius', '3.0404px'],
+    ['--bs-badge-border-radius', '7.0707px'],
+    ['--bs-toast-border-radius', '6.0606px'],
+    ['--bs-modal-border-radius', '5.0505px'],
+  ]) {
+    assert.ok(css.includes(`${property}: ${value};`), `${property} carries the override`);
+  }
+  assert.ok(css.includes('border-radius: 3.0202px'), '$btn-border-radius-sm reached the small button');
+  assert.ok(css.includes('border-radius: 4.0606px'), '$input-border-radius-lg reached the large field');
+
+  // Untouched knobs keep classy's shape (10px buttons/inputs are the default).
+  assert.ok(css.includes('--bs-border-radius: 0.625rem'), 'the global radius family is unmoved');
+});
+
+test('stock classy: the two surfaces #253 re-slotted still emit classy\'s own look unconfigured', () => {
+  // The knobs fixture can only prove an override ARRIVES. Nobody configures
+  // stock classy, so the same two rules are where a #253-style re-slot silently
+  // changes what every unconfigured brand ships — pin their stock output.
+  const layers = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base'), path.join(PKG, 'core')];
+  const css = sass.compile(path.join(PKG, 'themes', 'classy', '_theme.scss'), {
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
+    loadPaths: layers,
+    quietDeps: true,
+    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  // Type: the heading face is still the runtime token, so data-omega-type
+  // presets and a plain-CSS re-point keep steering headings with no recompile.
+  const headings = css.match(/\nh1, \.h1,[\s\S]*?\{([\s\S]*?)\}/);
+  assert.ok(headings, 'classy\'s heading rule is present');
+  assert.match(headings[1], /font-family: var\(--omega-font-display\);/, 'stock headings still ride --omega-font-display');
+
+  // Shape: the input-group still rides the --bs- radius ramp, which classy
+  // values at 10px — the standalone .form-control's radius, unchanged.
+  const inputGroup = css.match(/\n\.input-group > \.form-control,\n\.input-group > \.form-control\.is-invalid,[\s\S]*?\{([\s\S]*?)\}/);
+  assert.ok(inputGroup, 'classy\'s input-group rule is present');
+  assert.match(inputGroup[1], /border-radius: var\(--bs-border-radius\);/, 'stock input-group rides the --bs- radius ramp');
+  assert.ok(css.includes('--bs-border-radius: 0.625rem'), 'and that ramp still computes to classy\'s 10px');
+});
+
 // ─── The fall-through guard (#98): a theme that reached NEITHER lane warns ───
 
 // The compiled main bundle for a theme root of any provenance (fixture dirs

@@ -387,7 +387,8 @@ Legacy `themes/<id>/…` layout spellings alias for consumer ids too.
 [core/css/shell/_index.scss](core/css/shell/_index.scss) is the
 skin-independent structure for backend/admin surfaces: regions
 (`.omega-shell__sidebar/topbar/main/scrim`, with `__topbar-start/-end`
-slots) and states — desktop rail collapse (`data-shell-collapsed`,
+slots and the `__sidebar-scroll` region that carries the nav's scrolling —
+the rail itself clips nothing, so its popovers can escape) and states — desktop rail collapse (`data-shell-collapsed`,
 persisted under `shell.collapsed`; `.omega-shell__label` text hides in the
 rail), mobile drawer below 1200px (`data-shell-open` + scrim, matching
 classy's xl cutover), and a `.omega-shell--locked` variant whose main never

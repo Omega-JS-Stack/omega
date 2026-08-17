@@ -12,6 +12,8 @@
 //   5. The firefox artifact is a real firefox artifact: chrome-only panel keys
 //      translate to sidebar_action, and a missing gecko id derives from the
 //      brand config — failing loudly only when there is nothing to derive (#264).
+//   6. The store description assets ship RENDERED brand tokens — a `{{ brand.name }}`
+//      that reaches the live listing is the bug (#289).
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
@@ -578,6 +580,41 @@ module.exports = {
         } finally {
           fs.rmSync(withUrl, { recursive: true, force: true });
           fs.rmSync(idOnly, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'store description assets ship RENDERED brand tokens — English and translated (#289)',
+      run: async (ctx) => {
+        // The scaffolded config/description.md is written with `{{ brand.name }}`
+        // tokens; copied verbatim they reach the live store listing unrendered.
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged Brand', url: 'https://staged.example.com' } }`,
+          files: {
+            'config/description.md': `{{ brand.name }} makes browsing better.\nGet it at {{ brand.url }}.\n`,
+            // A translated variant carries the same tokens through the translator
+            'translations/es/description.md': `<!-- omega:source abc123abc123 -->\n{{ brand.name }} mejora tu navegación.\n`,
+          },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            await task.deployStoreAssets();
+
+            const descDir = path.join(tmp, 'packaged', 'assets', 'description');
+
+            const en = fs.readFileSync(path.join(descDir, 'en.md'), 'utf8');
+            ctx.expect(en).toContain('Staged Brand makes browsing better.');
+            ctx.expect(en).toContain('Get it at https://staged.example.com.');
+            ctx.expect(en).not.toContain('{{');
+
+            const es = fs.readFileSync(path.join(descDir, 'es.md'), 'utf8');
+            ctx.expect(es).toContain('Staged Brand mejora tu navegación.');
+            ctx.expect(es).not.toContain('{{');
+            // the source marker is still stripped
+            ctx.expect(es).not.toContain('omega:source');
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
         }
       },
     },

@@ -332,8 +332,10 @@ function ensureGitRepo(brandRoot, brandName) {
 /** Run manage in the new brand exactly as a user would — a real child process. */
 function spawnManage(brandRoot) {
   return new Promise((resolve) => {
-    // cli-run.js self-executes when spawned as main (no separate bin). The
-    // verb is explicit (#229): a bare invocation prints help and walks nothing.
+    // cli-run.js self-executes when spawned as main — spawning it directly
+    // deliberately bypasses the bin's dispatcher (#276): this child must run
+    // THIS manager, never re-dispatch on the child's cwd. The verb is
+    // explicit (#229): a bare invocation prints help and walks nothing.
     const entry = path.join(__dirname, 'cli-run.js');
     const child = spawn(process.execPath, [entry, 'manage'], { cwd: brandRoot, stdio: 'inherit' });
     child.on('close', (code) => resolve(code ?? 1));

@@ -65,7 +65,7 @@ The in-repo brands and the playground project are test-only forever; nothing in 
 
 ## CLI bins
 
-Every framework ships `omega` + `omg` + `mgr` — all three are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct. No app context (fresh dir) → falls back to the HOST framework's CLI with a stderr note, which keeps `omega setup` bootstrap working. `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
+Every framework AND `@omega.js/manager` ship `omega` + `omg` + `mgr` — all are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct. No app context (fresh dir) → falls back to the HOST package's CLI with a stderr note, which keeps `omega setup` bootstrap working — and with the manager as host, keeps `npx omega onboard` working in a fresh brand-template clone ([#276](https://github.com/Omega-JS-Stack/omega/issues/276)). `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 
 ## Config: omega.json5
 

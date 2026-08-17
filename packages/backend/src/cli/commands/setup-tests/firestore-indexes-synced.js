@@ -9,6 +9,12 @@ class FirestoreIndexesSyncedTest extends BaseTest {
     return 'firestore indexes synced';
   }
 
+  getWarning() {
+    return [
+      'live index deploy skipped (--offline) — the drift above is reported only; re-run `npx omega setup` without --offline to deploy',
+    ];
+  }
+
   async run() {
     const self = this.self;
     const tempPath = '_firestore.indexes.json';
@@ -88,6 +94,14 @@ class FirestoreIndexesSyncedTest extends BaseTest {
       }
     }
 
+    // The read-only comparison above already printed what is out of sync. Under
+    // --offline the only remedy (fix() → `firebase deploy`) is off the table, so
+    // the verdict downgrades to a non-blocking warning: the runner reports the
+    // drift in the summary and never reaches the mutating fix (#284).
+    if (!equal && localIndexes_exists && this.isOffline) {
+      return 'warn';
+    }
+
     return !localIndexes_exists || equal;
   }
 
@@ -97,6 +111,14 @@ class FirestoreIndexesSyncedTest extends BaseTest {
 
     if (this.isDemoProject) {
       return; // run() never fails demo projects; never touch the live API here
+    }
+
+    // Belt for a direct caller: run() already downgrades drift to a warning
+    // under --offline, so the runner can never land here. Nothing below may
+    // spawn — the deploy at the end rewrites the live project's indexes.
+    if (this.isOffline) {
+      console.log(chalk.yellow(`  ⚠ Skipping the live index sync (--offline) — indexes are out of sync and were NOT deployed`));
+      return;
     }
 
     // Fetch live indexes

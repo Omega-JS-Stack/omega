@@ -72,7 +72,12 @@ Emit this markup in the view's HTML:
 ```html
 <div class="omega-shell" data-omega-shell>
   <aside class="omega-shell__sidebar" id="app-sidebar">
-    <!-- nav; text that should hide in the collapsed rail wears .omega-shell__label -->
+    <!-- pinned head (brand, selector) sits here, outside the scroll region -->
+    <div class="omega-shell__sidebar-scroll">
+      <!-- nav scrolls HERE (the rail itself clips nothing, so popovers can
+           escape); text that should hide in the collapsed rail wears
+           .omega-shell__label -->
+    </div>
   </aside>
 
   <header class="omega-shell__topbar">

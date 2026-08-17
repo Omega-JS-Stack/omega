@@ -1,0 +1,16 @@
+// A PARTIAL consumer theme with its own TYPE and SHAPE identity: it inherits
+// the packaged chain through the hatch and re-values classy's per-component
+// knobs in the same breath (#253). Everything it doesn't name keeps classy's
+// value — the point of the knobs is re-shaping ONE surface at a time.
+@forward 'omega:theme' with (
+  $headings-font-family: 'Knobtest Display',
+  $btn-border-radius: 3.0404px,
+  $btn-border-radius-sm: 3.0202px,
+  $btn-border-radius-lg: 3.0606px,
+  $input-border-radius: 4.0404px,
+  $input-border-radius-sm: 4.0202px,
+  $input-border-radius-lg: 4.0606px,
+  $modal-content-border-radius: 5.0505px,
+  $toast-border-radius: 6.0606px,
+  $badge-border-radius: 7.0707px
+);

@@ -108,6 +108,8 @@ Safari (Apple) uses a different extension model and requires Xcode-based packagi
 
 `config/description.md` is the Chrome Web Store listing description. When writing or rewriting it, first read `config/omega.json5` (brand), `config/messages.json` (extension name + short description), `src/manifest.json` (permissions/features), and the component JS under `src/assets/js/components/` to understand what the extension actually does — be specific about real features, not generic copy.
 
+The package task renders `{{ brand.* }}` tokens against `config/omega.json5` before writing `packaged/assets/description/<lang>.md` — the English source and every translated variant — so the store listing carries the resolved brand, never a literal token.
+
 **Format:**
 
 ```
@@ -162,7 +164,7 @@ When you buy through links on our extension, we may earn an affiliate commission
 **Rules:**
 
 - **Keep the Bonus section and Privacy section EXACTLY as shown** — do not modify these
-- Use the extension's actual name from `config/messages.json` — do NOT use `{{ brand.name }}` template variables
+- Name the extension with `{{ brand.name }}` (or its literal name from `config/messages.json`) — the token resolves at package time
 - Be specific about features — reference what the code actually does
 - Tone: enthusiastic, conversational, persuasive; emojis for section headers and feature bullets
 - Feature headlines short and punchy (under 50 characters)

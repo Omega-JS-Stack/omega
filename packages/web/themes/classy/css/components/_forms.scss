@@ -66,7 +66,7 @@
   > .form-control.is-invalid,
   > .btn,
   > .input-group-text {
-    border-radius: $border-radius;
+    border-radius: $input-border-radius;
 
     &:not(:last-child) {
       border-top-right-radius: 0;
@@ -93,8 +93,8 @@
     > .btn:nth-last-child(2),
     > .input-group-text:nth-last-child(2),
     > .form-control:nth-last-child(2) {
-      border-top-right-radius: $border-radius;
-      border-bottom-right-radius: $border-radius;
+      border-top-right-radius: $input-border-radius;
+      border-bottom-right-radius: $input-border-radius;
     }
   }
 }

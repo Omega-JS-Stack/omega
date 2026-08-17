@@ -195,7 +195,9 @@ module.exports = async (argv = {}) => {
   console.log(`  Core:    ${[...CORE_SERVICES, ...requireExtra].join(', ')}\n`);
 
   const started = Date.now();
-  // cli-run.js self-executes when spawned as main (no separate bin).
+  // cli-run.js self-executes when spawned as main — spawning it directly
+  // deliberately bypasses the bin's dispatcher (#276): this child must run
+  // THIS manager, never re-dispatch on the child's cwd.
   const bin = path.join(__dirname, '..', 'cli-run.js');
 
   // Non-interactive by construction: stdin detached AND the explicit env

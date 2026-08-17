@@ -6,7 +6,7 @@ const operaLogger = Manager.logger('package:opera');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
-const { execute, getKeys } = require('node-powertools');
+const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
 const { readSiblingPorts, envPorts } = require('@omega.js/config');
 
@@ -690,16 +690,35 @@ async function deployStoreAssets() {
     logger.log('Store asset: icon-128x.png');
   }
 
-  // Copy English description
+  // Render brand tokens the same way the html task templates a view — a store
+  // listing ships the resolved brand, never a literal `{{ brand.name }}` (#289)
+  const renderDescription = (contents, label) => {
+    const rendered = template(contents, {
+      brand: config.brand || {},
+    }, {
+      brackets: ['{{', '}}'],
+    });
+
+    // An unresolvable token (typo, missing config key) passes through literally
+    // and would ship to the live store listing — say so instead of shipping quiet
+    const leftover = rendered.match(/\{\{[^}]*\}\}/g);
+    if (leftover) {
+      logger.warn(`Store description ${label}: unresolved token(s) ship literally: ${[...new Set(leftover)].join(', ')} — check config/omega.json5`);
+    }
+
+    return rendered;
+  };
+
+  // Write English description (brand tokens rendered)
   const enDescSrc = path.join(process.cwd(), 'config', 'description.md');
   if (jetpack.exists(enDescSrc)) {
     const descDir = path.join(assetsDir, 'description');
     jetpack.dir(descDir);
-    jetpack.copy(enDescSrc, path.join(descDir, 'en.md'), { overwrite: true });
+    jetpack.write(path.join(descDir, 'en.md'), renderDescription(jetpack.read(enDescSrc), 'en'));
     logger.log('Store asset: description/en.md');
   }
 
-  // Copy translated descriptions (committed translations/, source marker stripped)
+  // Write translated descriptions (committed translations/, source marker stripped)
   const translationsDir = path.join(process.cwd(), 'translations');
   if (jetpack.exists(translationsDir)) {
     const { readTranslatedDescription } = require('./translate.js');
@@ -712,7 +731,7 @@ async function deployStoreAssets() {
 
       if (content) {
         jetpack.dir(descDir);
-        jetpack.write(path.join(descDir, `${lang}.md`), content);
+        jetpack.write(path.join(descDir, `${lang}.md`), renderDescription(content, lang));
         count++;
       }
     }
@@ -791,6 +810,7 @@ module.exports.packageFn = packageFn;
 module.exports.compileManifest = compileManifest;
 module.exports.generateBuildJs = generateBuildJs;
 module.exports.compileLocales = compileLocales;
+module.exports.deployStoreAssets = deployStoreAssets;
 // The browser targets the package lane builds — the one list the CI workflow's
 // artifact upload is checked against (it ships packaged/<target>/extension.zip).
 module.exports.TARGETS = TARGETS;

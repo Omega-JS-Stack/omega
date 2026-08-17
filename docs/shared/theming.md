@@ -25,7 +25,9 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    (core/js/core/appearance.js) beats it in both directions. **Names are the
    stable API; values are the skin.**
 2. **Mechanics** — `core/css/shell/_index.scss` (the `.omega-shell` app
-   chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px),
+   chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px; the
+   rail clips nothing — its nav scrolls inside the `__sidebar-scroll` region
+   so rail popovers can escape, [#319](https://github.com/Omega-JS-Stack/omega/issues/319)),
    `core/css/motion/_index.scss` (below), and `core/css/components/_index.scss`
    (the shared component vocabulary: `omega-chip` and its `--accent`/`--ink`
    modifiers, plus the app-chrome pair the base topbar/sidebar renders —
@@ -388,7 +390,9 @@ the ⌘K search pill (`search:`), custom actions, and the account dropdown.
 
 ## Stable-API line (don't churn once consumers exist)
 
-Token NAMES · `_config.scss` variable names · `.omega-shell` markup contract ·
-`_includes` section names + their JSON data shapes · the motion attribute
-contract. Everything behind that line — values, partial internals, page
+Token NAMES · `_config.scss` variable names · `.omega-shell` markup contract
+(which since [#319](https://github.com/Omega-JS-Stack/omega/issues/319) includes
+the `__sidebar-scroll` region — hand-rolled shell markup without it gets a rail
+that no longer scrolls its nav) · `_includes` section names + their JSON data
+shapes · the motion attribute contract. Everything behind that line — values, partial internals, page
 markup — iterates freely with the skin arc.
