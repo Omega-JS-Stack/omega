@@ -5,20 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.35.0] 2026-08-17
 ### Added
-- [#341](../../issues/341) — A cancel that gets neither the save offer nor the trial warning now meets a data-retention warning first: data, settings and progress may be removed after the subscription ends. Keeping the account is the loud button; cancelling anyway carries on to the questionnaire.
+- [#341](../../issues/341) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — A cancel that gets neither the save offer nor the trial warning now meets a data-retention warning first: data, settings and progress may be removed after the subscription ends. Keeping the account is the loud button; cancelling anyway carries on to the questionnaire.
 
 ### Changed
-- [#342](../../issues/342) — The dev palette is the ONE dev-testing surface: no helper hung on `window`, no dev switch you reach only by knowing its name. The panel gains Tools, Icons, Account, Download, Extension and OAuth sections, and Checkout gains its pre-delay control. A guard fails on any new hidden hook.
+- [#342](../../issues/342) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — The dev palette is the ONE dev-testing surface: no helper hung on `window`, no dev switch you reach only by knowing its name. The panel gains Tools, Icons, Account, Download, Extension and OAuth sections, and Checkout gains its pre-delay control. A guard fails on any new hidden hook.
 
 ### Removed
-- [#342](../../issues/342) — `window.showDownloadModal`, `window.triggerExtensionInstall`, `window.logOpeningTags`, `window.changeTheme` and `window.updateAppearanceDebug` are gone. Every capability they carried is a palette control.
+- [#342](../../issues/342) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — `window.showDownloadModal`, `window.triggerExtensionInstall`, `window.logOpeningTags`, `window.changeTheme` and `window.updateAppearanceDebug` are gone. Every capability they carried is a palette control.
 
 ### Fixed
-- [#342](../../issues/342) — Four dev affordances that shipped to production are development-only again: the download page's onboarding-modal helper, the extension page's install trigger, the account page's hardcoded referral and session fixtures, and the OAuth redirect simulation a visitor could drive with a query param.
-- [#332](../../issues/332) — Backend boot stops shelling out to `lsof`: port checks are bind probes, a preflight names every blocked emulator port before anything spawns, and the reaper waits for terminated processes to release their sockets. A sandbox boot that hit the sixty-second wall now lands in the twenties.
-- [#333](../../issues/333) — A claimed winback discount finally clears: the claim is stamped with its subscription, a webhook for a DIFFERENT subscription resets the node to a fully-named empty shape, same-subscription traffic preserves it, and unstamped legacy nodes are adopted and stamped rather than guessed at.
-- [#334](../../issues/334) — Setup sweeps stale per-app workflow files that an app's framework once generated and can never fire, keeping consumer-edited copies with a warning; the three dead per-app `.github` trees in the test brands are deleted outright.
+- [#342](../../issues/342) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — Four dev affordances that shipped to production are development-only again: the download page's onboarding-modal helper, the extension page's install trigger, the account page's hardcoded referral and session fixtures, and the OAuth redirect simulation a visitor could drive with a query param.
+- [#332](../../issues/332) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — Backend boot stops shelling out to `lsof`: port checks are bind probes, a preflight names every blocked emulator port before anything spawns, and the reaper waits for terminated processes to release their sockets. A sandbox boot that hit the sixty-second wall now lands in the twenties.
+- [#333](../../issues/333) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — A claimed winback discount finally clears: the claim is stamped with its subscription, a webhook for a DIFFERENT subscription resets the node to a fully-named empty shape, same-subscription traffic preserves it, and unstamped legacy nodes are adopted and stamped rather than guessed at.
+- [#334](../../issues/334) [`a3627f40`](../../commit/a3627f40) Thanks [@ianwieds]! — Setup sweeps stale per-app workflow files that an app's framework once generated and can never fire, keeping consumer-edited copies with a warning; the three dead per-app `.github` trees in the test brands are deleted outright.
 
 ## [0.34.0] 2026-08-17
 ### Added
