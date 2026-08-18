@@ -26,7 +26,7 @@ const fs    = require('fs');
 const { waitForTarget } = require('./helpers.js');
 const chalk = require('chalk').default;
 
-async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
+async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTimeout }) {
   if (tests.length === 0) return { passed: 0, failed: 0, skipped: 0 };
 
   let puppeteer;
@@ -167,7 +167,11 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
       try {
         await Promise.race([
           t.inspect({ extension, page, expect, projectRoot: effectiveRoot }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout || 20000)),
+          // The runner resolves every test's timeout before it gets here
+          // (its bootDefaultTimeout); `defaultTimeout` is the same number for a
+          // caller driving this runner directly, so the number lives in ONE
+          // place — test/runner.js's BOOT_DEFAULT_TIMEOUT (#262).
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout || defaultTimeout)),
         ]);
         const duration = Date.now() - start;
         console.log(chalk.green(`      ✓ ${t.description}`) + chalk.gray(` (${duration}ms)`));

@@ -44,13 +44,26 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   theme:          { id, appearance },            // project-owned; seeded at onboarding
   translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/shared/translation.md
 
+  // MANAGER-read brand-level sections (#277). Schema-known at the TOP level: the
+  // manager loads the brand config unfolded, and a website-only brand has no
+  // `targets.backend` to hold them (presence there would enable the target). A
+  // `targets.backend.<same key>` block still overrides any of them.
+  parent:         'self' | 'https://parent.example.com' | false,   // webhook parent topology; false = shared webhook account owned elsewhere
+  github:         { user, website },             // GitHub identity for the brand (content identity; repo.providers.github is the source-hosting home)
+  reviews:        { enabled, sites: [] },
+  marketing:      { campaigns: {…}, newsletter: {…}, prune: {…} },   // campaigns/newsletter/prune, the manager's marketing automation
+  blog:           { /* AI blog-content settings (Ghostii pipeline) */ },
+  dataRequest:    { /* GDPR/CCPA data-request query definitions */ },
+  directory:      { enabled },                   // opt in to the manager's directory PUSH — this brand's entry into `parent`'s brands collection (#246); default off, public facts only. docs/manager/directory.md
+  sponsorships:   { acceptable: [], unacceptable: [], prices: { 'guest-post': 70, 'link-insertion': 50 } },   // sponsorship terms — the first directory BLOCK; `prices` is an open placement→USD map, not an enum
+
   // TARGET-scoped config. KEY PRESENCE = "this brand enables this target"
   // (replaces the legacy brand-config targets ARRAY). `extension: {}` means
   // enabled-with-defaults. Unknown keys are validation errors. A value may
   // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
     web:       { imagemin, collections, dev: { limitCollections } },   // collections: the brand's OWN content collections — name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
-    backend:   { parent, github, auth: { signup: { maxPerIpPerDay } }, reviews, marketing, blog, dataRequest },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
+    backend:   { auth: { signup: { maxPerIpPerDay } } },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, remoteScripts, restartManager },
     extension: { /* near-empty at launch */ },
@@ -221,14 +234,17 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   playground's https proxy holds IPv6 `*:5002`; a 127.0.0.1-only probe handed 5002
   to the second brand's functions emulator — and again at #345: a foreign `0.0.0.0`
   squatter read free to the `::` probe and the auth emulator died with no bump).
-- **Ports file** — `writePortsFile/readPortsFile/clearPortsFile(projectDir)`:
-  `<projectDir>/.temp/ports.json` (pid-stamped; readers ignore dead-pid leftovers). The
-  allocator (the backend emulator boot) writes it; siblings of the same brand
-  (`omega test` against a running emulator, the e2e harness) read it; cleared on clean
-  shutdown.
+- **Ports file** — `writePortsFile(projectDir, ports, facts)` /
+  `readPortsFile/clearPortsFile(projectDir)`: `<projectDir>/.temp/ports.json`
+  (pid-stamped; readers ignore dead-pid leftovers). The allocator (the backend emulator
+  boot) writes it; siblings of the same brand (`omega test` against a running emulator,
+  the e2e harness) read it; cleared on clean shutdown. `facts` publishes the resolved
+  NON-port facts beside the map — today `origin`, the website's dev origin
+  ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
 - **Sibling map** — `readSiblingPorts(appDir)` merges every OTHER app's live ports file
-  in the same brand (a running backend's emulator map) for the app that asks. Read at
-  USE time, never cached: the file appears when the backend boots and changes when it
+  in the same brand (a running backend's emulator map) for the app that asks;
+  `readSiblingOrigin(appDir)` reads the published dev website origin the same way. Read
+  at USE time, never cached: the file appears when the backend boots and changes when it
   restarts.
 - **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
   children; `envPort(name)` reads one, `envPorts(env)` reads the whole map back out.
@@ -237,14 +253,28 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   browser code can read neither env nor files, so a surface BAKES the map into its
   client config: `omega dev` writes `dev: { ports }` into the Configuration chrome
   PER RENDER (its resolved website port with the sibling backend's map merged over it),
-  and its auth-emulator proxy resolves the target port per REQUEST — so a backend that
-  boots after the dev server, or an emulator that restarts onto bumped numbers, lands
-  in the next render instead of never. Desktop (`OMEGA_BUILD_JSON.config.dev`) and
+  and its auth-emulator proxy resolves the target port per REQUEST. The render-time
+  bake is ADVISORY ([#346](https://github.com/Omega-JS-Stack/omega/issues/346)): the
+  dev server REWRITES that chrome in every HTML response as it serves it, resolving the
+  sibling maps per request, because the normal boot order builds the whole page fleet in
+  under a second while the emulator suite seeds for minutes — nothing under `src/`
+  changes when it lands, so no page would ever re-render onto it. Mid-session emulator
+  restarts onto bumped numbers ride the same lane. Built `dist/` output is untouched on
+  disk. Desktop (`OMEGA_BUILD_JSON.config.dev`) and
   extension (`build.js` + the page config blob) bake the same map at build time, from
   the sibling file plus the env channel; production builds bake none. Drivers serving a
   STATIC build set `window.__OMEGA_DEV_PORTS__` (the devkit e2e harness — the site
   builds before the emulator boots), which is a FALLBACK: it fills only what a page's
   chrome omits, so a side channel no real browser has can never hide a broken real one.
+  The dev WEBSITE ORIGIN rides the same map as one more resolved fact
+  ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)): `omega dev` publishes
+  `dev.origin` (protocol AND port — the mkcert proxy fronts the public port by default,
+  so a port number alone cannot say the scheme) into the chrome and into its ports file,
+  and desktop/extension bake it from that file on their existing lanes. The extension
+  manifest's `externally_connectable` dev entry resolves from it at package time —
+  nothing hardcodes a dev origin any more. `@omega.js/client`'s `getDevWebsiteOrigin()`
+  is the one getter that answers it, falling back to the classic `https://localhost:4000`
+  with the same out-loud warning the ports take.
   `@omega.js/client` resolves chrome `dev.ports` → runtime global → classic defaults,
   and warns loudly (dev only) naming every port it had to assume; its dev `getApiUrl`
   speaks plain http to a mapped `hosting` (the emulator serves http), https to a mapped
@@ -267,11 +297,13 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   requested (`OMEGA_CDP_PORT` set); desktop URL getters mirror the backend's
   env-channel reads (`https` → mkcert, `hosting` → plain http, classic otherwise).
   The manager's Google-OAuth loopback binds an EPHEMERAL port (`listen(0)`, RFC 8252)
-  instead of pinning 9876. `getWebsiteUrl` (backend + desktop) now returns
-  `http://localhost:4000` — the https form was a browsersync-era assumption no current
-  dev server speaks. Packaged extension/desktop artifacts keep BUILD-TIME-BAKED ports
-  by design (a shipped extension can't probe); the extension manifest's dev-website
-  origin documents that inline.
+  instead of pinning 9876. `getWebsiteUrl` (backend + desktop, both Node-side) still
+  returns `http://localhost:4000` — plain http on the public port 307s to https, so the
+  link lands either way; the BROWSER-side answer is `getDevWebsiteOrigin()`, which needs
+  the exact origin and takes it from the resolved map (#262). Packaged
+  extension/desktop artifacts keep BUILD-TIME-BAKED ports by design (a shipped
+  extension can't probe); the extension manifest's dev-website origin documents that
+  inline.
 - **Config `ports` section** (schema, optional object) — explicit pins for any port name;
   unset = auto-allocate.
 - When a boot bumps emulator ports, the backend CLI materializes
@@ -423,6 +455,17 @@ extension: `require('@omega.js/extension/config')` → `{ loadConfig, validateCo
 Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolution
 always applies.
 
+**Derived values reach brands as VALUES, never as a recipe to re-run**
+([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand app cannot require
+this private package at runtime, so a framework that owns a derivation publishes its
+ANSWER on the runtime config object the app already holds, under `resolved.*`: the
+backend's `Manager.config.resolved.github` carries `{ owner, name, repo }` — the brand
+repo derivation (`repo.providers.github` overlaid by `targets.backend.github`, slug or
+bare name) as one finished value, `repo` being the `owner/name` slug. The derivations
+themselves stay here (`brandRepo()` in `src/repo.js`): one implementation, called by the
+framework, so no brand re-implements the merge rules and drifts from them. New derived
+values join a framework's `resolved` group as real brand needs surface.
+
 ## Writeback (comment-preserving edits)
 
 omega.json5 is hand-edited — comments, key order, and quote style carry meaning — so
@@ -484,7 +527,7 @@ entry matches ONE exact path from the root:
 | `gcp` | **`cloud`** (`cloud.organizationId`, `cloud.billingAccount`) |
 | `firebase` | **`cloud`** (`cloud.shared`, `cloud.supportEmail`, `cloud.apiSubdomain`; projectId only at `cloud.config.projectId`) |
 | `advertising.providers.google-adsense` | **`advertising.providers.adsense`** + camelCase slots |
-| `github` | **`repo.providers.github`** — the ONE row with no guard: rules run against the RESOLVED config, where `targets.backend.github` (content identity, unchanged) is overlaid at the top level and would false-positive. This table is its only guide |
+| `github` | **`repo.providers.github`** — the ONE row with no guard: the brand's own `github` (content identity, unchanged; a shared key since [#277](https://github.com/Omega-JS-Stack/omega/issues/277)) lives at the top level, so a name test would false-positive. This table is its only guide |
 
 The
 `omega migrate` converter is unaffected: it READS legacy files as input and emits the new
@@ -513,7 +556,7 @@ names, and only its output is validated.
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
 | `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
 | custom keys (`omega`, `mcp`, …) | top level, unchanged |
-| `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
+| `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | top level, unchanged ([#277](https://github.com/Omega-JS-Stack/omega/issues/277)): shared keys the manager reads brand-level, so a website-only brand has a home for them; `targets.backend.<same key>` still overrides |
 
 Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
 the same loader and passed as `options.defaults`; `Manager.init()`'s

@@ -161,3 +161,7 @@ Each subsystem has its own API reference under [`docs/`](docs/):
 ## Status
 
 Active development on `v1`. See [`PROGRESS.md`](PROGRESS.md) for pass-by-pass progress.
+
+## License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer `@omega.js/desktop` to third parties as a hosted or managed service.

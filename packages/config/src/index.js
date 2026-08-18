@@ -33,9 +33,9 @@ const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
-const { parseRepoSlug, brandRepoName, brandRepoOwner } = require('./repo.js');
+const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
-const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, readSiblingOrigin, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
 const { APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceAppDir, appInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
 
 module.exports = {
@@ -92,6 +92,9 @@ module.exports = {
   isDemoProject,
   brandRepoName,
   brandRepoOwner,
+  // The finished form a framework hands to consumer code (#290) — owner, name,
+  // and the "owner/name" slug — so brands never re-derive the rule
+  brandRepo,
 
   // Validation
   validateConfig,
@@ -108,12 +111,14 @@ module.exports = {
 
   // Port auto-allocation (N7 — dev/emulator only)
   CLASSIC_PORTS,
+  CLASSIC_DEV_ORIGIN,
   isPortFree,
   resolvePorts,
   writePortsFile,
   readPortsFile,
   clearPortsFile,
   readSiblingPorts,
+  readSiblingOrigin,
   envName,
   portsToEnv,
   envPort,

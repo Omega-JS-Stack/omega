@@ -1,117 +1,55 @@
+// ============================================================================
+// YOUR Firestore rules. This file is the SOURCE and it is yours — @omega.js/backend
+// never rewrites it (it only appends a framework hook back if one goes missing).
+//
+// `omega build` COMPILES this file together with the framework half into
+// dist/firestore.rules, and firebase.json points the emulator AND
+// `firebase deploy` at that compiled artifact. Never edit the compiled file.
+//
+//   Framework half : node_modules/@omega.js/backend/templates/firestore.framework.rules
+//   Compiled output: dist/firestore.rules  (GENERATED — do not edit)
+//
+// Both halves land in the SAME `match /databases/{database}/documents` scope,
+// so your rules may call ANY framework helper — declaration order does not
+// matter:
+//
+//   isAuthenticated()   authUid()            authEmail()
+//   belongsTo(id)       isAdmin()            emailVerified()
+//   existingData()      incomingData()
+//   isCreatingField(f)  isUpdatingField(f)   isWritingField(f)
+//
+// See the framework half for the full list and what each one reads.
+// ============================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Custom rules
-    // ...
-
-    // ========== OMEGA Rules (v0.0.0) ==========
-    // Lock by default
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-
-    // Protect user account data
-    match /users/{uid} {
-      allow read: if belongsTo(uid);
-      allow write: if belongsTo(uid) && !isWritingProtectedUserField();
-    }
-
-    // Protect notification data — the doc id IS the push token, a high-entropy
-    // capability: knowing it proves possession of the device. Point reads/updates ride
-    // that capability; list is denied so tokens can never be harvested by query; owner
-    // may only be null (anonymous subscribe) or the caller's own uid.
-    match /notifications/{token} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if incomingData().token == token
-        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
-      allow update: if incomingData().token == existingData().token
-        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
-    }
-
-    // Protect abandoned cart data
-    match /payments-carts/{uid} {
-      allow create, update: if belongsTo(uid)
-        && incomingData().owner == uid
-        && incomingData().status == 'pending';
-      allow read: if belongsTo(uid);
-    }
-
-    // Auth functions
-    function authEmail() {
-      return request.auth.token.email;
-    }
-    function authUid() {
-      return request.auth.uid;
-    }
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    function belongsTo(identity) {
-      return isAuthenticated() && (authUid() == identity || authEmail() == identity);
-      // eventually include a check for (existingData().owner == identity)...(in case its a doc owned by a user that's not actually user doc)
-    }
-
-    function getRoles() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
-    }
-    function getVerifications() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verifications;
-    }
-    function isAdmin() {
-      return getRoles().admin == true;
-    }
-    function emailVerified() {
-      return getVerifications().email == true;
-    }
-
-    function isWritingProtectedUserField() {
-      return isWritingField('auth')
-        || isWritingField('roles')
-        || isWritingField('flags')
-        || isWritingField('plan') // TODO: REMOVE THIS WHEN ALL PROJECTS UPDATED
-        || isWritingField('subscription')
-        || isWritingField('affiliate')
-        || isWritingField('api')
-        || isWritingField('metadata')
-        || isWritingField('usage')
-        || isWritingField('consent');
-    }
-
-    function isCreatingField(field) {
-      return !(field in resource.data) && field in request.resource.data;
-    }
-
-    function isUpdatingField(field) {
-      return field in resource.data && field in request.resource.data && resource.data[field] != request.resource.data[field];
-    }
-
-    function isWritingField(field) {
-      return isCreatingField(field) || isUpdatingField(field);
-    }
-
-    // function userEmail(userId) {
-    //   return get(/databases/$(database)/documents/users/$(userId)).data.email;
-    // }
-    // Helper functions
-    // [READ] Data that exists on the Firestore document
-    function existingData() {
-      return resource.data;
-    }
-    // [WRITE] Data that is sent to a Firestore document
-    function incomingData() {
-      return request.resource.data;
-    }
-    // ========== Tests ==========
-    // match /test-cases/write/admin {
+    // ─── Your rules ──────────────────────────────────────────────────────────
+    // match /posts/{id} {
+    //   allow read: if true;
     //   allow write: if isAdmin();
     // }
-    // ========== Resources ==========
-    // https://fireship.io/snippets/firestore-rules-recipes/
-    // https://github.com/jaysquared/atom-firestore-grammar
-    // https://fireship.io/courses/firestore-data-modeling/models-roles/
-    // https://firebase.google.com/docs/firestore/security/test-rules-emulator
-    // ========== End OMEGA Rules ==========
 
+    // ─── Framework hooks ─────────────────────────────────────────────────────
+    // Both are REQUIRED. The compiler lints for them; a missing hook is
+    // re-seeded with the default below and reported loudly.
+
+    // Top-level `users/{uid}` keys ONLY your backend may write. Firestore ORs
+    // `allow` across sibling match blocks, so a custom `match /users/{uid}`
+    // can never TIGHTEN the framework's — this hook is how you do it: the
+    // framework ANDs `!isWritingProtectedUserField()` into the user write rule
+    // and folds this list in.
+    //
+    // Keys are TOP-LEVEL: protecting `xp.total` means listing `'xp'`.
+    //   e.g. return ['xp', 'credits'];
+    function protectedFields() {
+      return [];
+    }
+
+    // Extra condition ANDed into the framework's `users/{uid}` write rule.
+    // Return `true` to keep the framework default.
+    //   e.g. return emailVerified();
+    function canWriteUser() {
+      return true;
+    }
   }
 }

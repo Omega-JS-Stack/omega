@@ -28,6 +28,12 @@ const DEV_PORT_FALLBACKS = {
   hosting: 5002,
 };
 
+// The classic dev WEBSITE ORIGIN (#262) — the same lockstep-with-@omega.js/config
+// deal as the ports above (its CLASSIC_DEV_ORIGIN). Protocol included, because a
+// port alone cannot say it: `omega dev` fronts the public port with the mkcert
+// proxy by default, so the assumption is https.
+const DEV_ORIGIN_FALLBACK = 'https://localhost:4000';
+
 class Manager {
   constructor() {
     // Configuration from init()
@@ -634,6 +640,35 @@ class Manager {
       `No resolved dev port for ${assumed.join(', ')}; assuming the classic ${assumed.map((name) => `${name} :${DEV_PORT_FALLBACKS[name]}`).join(', ')}. `
       + 'If another project\'s emulator holds those ports, this page is talking to IT, not your stack. '
       + 'Boot the backend with `omega dev` (or `omega emulator`) so the resolved map reaches the page.',
+    );
+  }
+
+  // Where the dev WEBSITE answers — the one shared answer for every surface
+  // that links to it in dev (#262). A resolved fact when the stack published
+  // one: `omega dev` puts its origin in the same `dev` map as the ports, and
+  // web reads it from the page chrome while desktop/extension read it from
+  // their build-time bake of that same map. Protocol is part of the fact —
+  // the dev server fronts its public port with the mkcert proxy by default,
+  // so a port alone would still be a guess about the scheme.
+  getDevWebsiteOrigin() {
+    const provided = this.config.dev?.origin;
+
+    if (provided) {
+      return provided;
+    }
+
+    this._warnClassicOriginAssumption();
+    return DEV_ORIGIN_FALLBACK;
+  }
+
+  // The origin's half of the classic-assumption warning (#300's pattern, #262):
+  // one loud line when the answer is a guess rather than a published fact,
+  // because a wrong dev origin fails as a silent connection refusal.
+  _warnClassicOriginAssumption() {
+    firebaseLogger.warn(
+      `No resolved dev website origin; assuming the classic ${DEV_ORIGIN_FALLBACK}. `
+      + 'If your `omega dev` bumped its port (or runs without mkcert), this is the wrong origin. '
+      + 'Boot the website with `omega dev` so the resolved origin reaches this surface.',
     );
   }
 

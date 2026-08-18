@@ -49,6 +49,14 @@ so a tarball can never build missing its vendored internals. Contract:
 3. npm auth sanity: `npm whoami` (expected `itwcw2000`). Known parked mystery: `npm org ls omega.js`
    403s on the empty org — the first real publish is the definitive test. If IT 403s,
    the org-owning account must grant publish rights for the `@omega.js` scope.
+4. **License check** ([#349](https://github.com/Omega-JS-Stack/omega/issues/349)): every
+   `packages/*/package.json` reads `"license": "Elastic-2.0"`, every publishable carries a
+   root `LICENSE` naming the Elastic License 2.0 (npm ships it into the tarball regardless
+   of `files`), and no MIT text survives anywhere:
+   `grep -rL "Elastic License 2.0" packages/*/LICENSE` must print nothing and
+   `grep -ril "MIT License" packages/ --include=LICENSE*` must be empty. A tarball that
+   publishes under the wrong license cannot be recalled from the registry, so this runs
+   before the unlatch, not after.
 
 ## Publish day (Ian's GO)
 

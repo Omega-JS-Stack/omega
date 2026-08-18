@@ -17,7 +17,7 @@ module.exports = async function writeFavicons(context) {
   const { brandConfig, brandmarkPath, outDir, options } = context;
   const dryRun = options?.dryRun || false;
 
-  const outputDir = join(outDir, 'favicon');
+  const outputDir = join(outDir, FAVICON_CONFIG.outputDir);
 
   const staleImages = [
     ...FAVICON_CONFIG.files.map((file) => file.name),

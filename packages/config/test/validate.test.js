@@ -72,14 +72,13 @@ test('email identity keys are optional but typed when present', () => {
   assert.ok(errors.some((e) => e.includes('config.brand.contact.carbonCopy has wrong type')));
 });
 
-test("parent accepts 'self', a URL string, or the deliberate false opt-out — union types (backend rule)", () => {
-  const opts = { target: 'backend' };
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'self' }, opts).errors, []);
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'https://api.example.com' }, opts).errors, []);
+test("parent accepts 'self', a URL string, or the deliberate false opt-out: union types (shared rule, #277)", () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'self' }).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'https://api.example.com' }).errors, []);
   // false = "shared webhook account owned elsewhere" (the playground's shape)
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: false }, opts).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: false }).errors, []);
 
-  const { errors } = validateConfig({ ...VALID, parent: 42 }, opts);
+  const { errors } = validateConfig({ ...VALID, parent: 42 });
   assert.ok(errors.some((e) => e.includes('config.parent has wrong type') && e.includes('string|boolean')));
 });
 
@@ -139,6 +138,85 @@ test('devlog + seo are schema-known optional objects (manager-read sections)', (
   const { errors } = validateConfig({ ...VALID, devlog: 'yes', seo: [1] });
   assert.ok(errors.some((e) => e.includes('config.devlog has wrong type')));
   assert.ok(errors.some((e) => e.includes('config.seo has wrong type')));
+});
+
+test('the six manager-level sections are shared keys: a website-only brand carries them at the top level (#277)', () => {
+  // The manager reads these at brand level UNFOLDED (manage.js loads the brand
+  // config with no target), so a brand whose only target is web still needs a
+  // home for them, and adding targets.backend just to hold them would falsely
+  // enable the target.
+  const websiteOnly = {
+    ...VALID,
+    targets: { web: {} },
+    parent: 'https://itwcreativeworks.com',
+    github: { user: 'itw-creative-works', website: 'https://github.com/itw-creative-works/clockii' },
+    reviews: { enabled: true, sites: ['trustpilot.com'] },
+    marketing: { campaigns: { enabled: true, platform: 'sendgrid' }, prune: { enabled: true } },
+    blog: { enabled: false },
+    dataRequest: { queries: [] },
+  };
+
+  assert.deepStrictEqual(validateConfig(websiteOnly).errors, []);
+  assert.deepStrictEqual(validateConfig(websiteOnly, { target: 'web' }).errors, []);
+
+  // Shared keys are TYPED shared too: no backend target needed to catch a shape mistake.
+  const { errors } = validateConfig({ ...VALID, parent: 42, github: 'itw', reviews: 'yes', marketing: [1], blog: 'on', dataRequest: 3 });
+  assert.ok(errors.some((e) => e.includes('config.parent has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.github has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.reviews has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.marketing has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.blog has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.dataRequest has wrong type')));
+});
+
+test('directory + sponsorships are shared keys, typed shared, and secret-free (#246)', () => {
+  // The manager's directory service reads both at brand level, unfolded, the
+  // same way as the #277 six.
+  const participating = {
+    ...VALID,
+    targets: { web: {} },
+    parent: 'https://itwcreativeworks.com',
+    directory: { enabled: true },
+    sponsorships: {
+      acceptable: ['tech'],
+      unacceptable: ['gambling'],
+      prices: { 'guest-post': 70, 'link-insertion': 50 },
+    },
+  };
+
+  assert.deepStrictEqual(validateConfig(participating).errors, []);
+  assert.deepStrictEqual(validateConfig(participating, { target: 'web' }).errors, []);
+
+  const { errors } = validateConfig({
+    ...VALID,
+    directory: { enabled: 'yes' },
+    sponsorships: { acceptable: 'tech', unacceptable: 'gambling', prices: [70] },
+  });
+  assert.ok(errors.some((e) => e.includes('config.directory.enabled has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.sponsorships.acceptable has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.sponsorships.unacceptable has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.sponsorships.prices has wrong type')));
+
+  // The entry is pushed into a world-readable collection: the secret-shape
+  // guard is the hard floor on what a brand can put in these sections.
+  const secret = validateConfig({ ...VALID, sponsorships: { apiSecret: 'sk_live_x' } });
+  assert.ok(secret.errors.some((e) => e.includes('config.sponsorships.apiSecret looks like a secret')));
+});
+
+test('an unrecognized top-level key stays unvalidated: the move admits six NAMED keys, not a permissiveness change (#277)', () => {
+  // No unknown-top-level-key rejection exists anywhere in the validator: only
+  // unknown TARGET names, retired keys, and secret-shaped keys are errors.
+  // This guards the move against changing that either way.
+  assert.deepStrictEqual(validateConfig({ ...VALID, bogusSection: { a: 1 } }).errors, []);
+
+  // Retired + secret-shaped keys still bounce alongside a bogus one.
+  const { errors } = validateConfig({
+    ...VALID,
+    bogusSection: { a: 1 },
+    payment: { processors: { stripe: { apiSecret: 'x' } } },
+  });
+  assert.strictEqual(errors.length, 1);
+  assert.ok(errors[0].includes('config.payment.processors.stripe.apiSecret looks like a secret'));
 });
 
 // ─── validateConfig: targets sanity ───

@@ -122,7 +122,7 @@
     "webpack"
   ],
   "author": "ITW Creative Works",
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "peerDependencies": {
     "electron": ">=42",
     "electron-builder": ">=26",

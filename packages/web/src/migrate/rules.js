@@ -3,8 +3,9 @@
  *
  * The 8 rule classes extracted from the A2 real-file ports (DECISION.md
  * "consumer conversion plan"), plus the analytics-spelling normalization
- * (rule 9, from the omega.json5 flip) and the WM → @omega.js/client rename
- * surface (rules 10–15, #248). Every rule is a pure text → text transform over
+ * (rule 9, from the omega.json5 flip), the WM → @omega.js/client rename
+ * surface (rules 10–15, #248) and the classy gradient utilities classy v2
+ * dropped (rule 16, #296). Every rule is a pure text → text transform over
  * ONE file: `apply(text, ctx)` returns `{ text, edits, findings }` where
  * `edits` are applied rewrites and `findings` are lint-level observations the
  * rule could NOT safely fix (surfaced by both `omega migrate` and
@@ -597,6 +598,72 @@ const serviceWorkerImport = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Rule 16 — the legacy classy gradient utilities → the v2 dotgrid hero
+// ([#296](https://github.com/Omega-JS-Stack/omega/issues/296))
+//
+// UJM-era heroes wear `.gradient-animated` (a 5s shimmer over the gradient
+// background) and `.gradient-grain` (a ::before noise overlay). Classy v2
+// ships NEITHER — its binding constraint is zero gradients (classy-v2
+// DIRECTION.md) — so those classes silently do nothing on a ported page.
+// The conversion is once, here: v2's Marketing DNA puts a "subtle dotted grid
+// (masked)" behind every hero, and that is `.omega-dotgrid`
+// (themes/classy/css/base/_utilities.scss) — the same shape the grain had, a
+// masked ::before backdrop with the content lifted above it. The animated
+// half becomes the dotgrid's LIVE canvas, opted in per element with
+// `data-omega-dotfield` exactly as every packaged hero authors the pair. Both
+// classes on one element collapse to ONE `omega-dotgrid`.
+//
+// `.bg-gradient-*` is NOT in scope: v2 deliberately keeps those names,
+// neutralized to flat token paint for straggler markup.
+// ---------------------------------------------------------------------------
+const LEGACY_GRADIENT_CLASSES = /(?<![\w-])gradient-(?:animated|grain)(?![\w-])/g;
+const GRADIENT_ANIMATED = /(?<![\w-])gradient-animated(?![\w-])/;
+const DOTGRID_CLASS = /(?<![\w-])omega-dotgrid(?![\w-])/;
+// Each occurrence with the whitespace ahead of it — dropping a duplicate takes
+// its separator along instead of leaving a double space in the class list.
+const DOTGRID_OCCURRENCE = /\s*(?<![\w-])omega-dotgrid(?![\w-])/g;
+const CLASS_ATTRIBUTE = /class\s*=\s*(["'])([^"']*)\1/g;
+const LIQUID_VALUE = /\{[{%]/;
+
+const gradientUtilities = {
+  id: 'gradient-utilities',
+  title: '`gradient-animated`/`gradient-grain` → `omega-dotgrid` (+ `data-omega-dotfield` for the motion)',
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    const edits = [];
+    const out = lines.map((line, index) => {
+      let replaced = line.replace(LEGACY_GRADIENT_CLASSES, 'omega-dotgrid');
+      if (replaced === line) return line;
+
+      replaced = replaced.replace(CLASS_ATTRIBUTE, (whole, quote, value) => {
+        // A class list Liquid assembles may emit its dotgrid conditionally —
+        // there a "duplicate" is the only class the other branch has, so the
+        // literal duplicate (harmless in a class attribute) stays.
+        if (LIQUID_VALUE.test(value)) return whole;
+        let kept = false;
+        const collapsed = value.replace(DOTGRID_OCCURRENCE, (occurrence) => {
+          if (kept) return '';
+          kept = true;
+          return occurrence;
+        });
+        return `class=${quote}${collapsed}${quote}`;
+      });
+
+      // The live canvas rides the element that carries the class — and only
+      // when the page asked for motion in the first place.
+      if (GRADIENT_ANIMATED.test(line) && !/data-omega-dotfield/.test(replaced)) {
+        replaced = replaced.replace(CLASS_ATTRIBUTE, (whole, quote, value) =>
+          (DOTGRID_CLASS.test(value) ? `${whole} data-omega-dotfield` : whole));
+      }
+
+      edits.push({ rule: 'gradient-utilities', line: index + 1, before: line.trim(), after: replaced.trim() });
+      return replaced;
+    });
+    return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
+
 const RULES = [
   legacyPrefix,        // 0 — must precede every rule that matches tag names
   pageResolved,        // 1
@@ -610,6 +677,7 @@ const RULES = [
   clientMarkup,        // 10
   clientFrontmatter,   // 11
   includeThemePath,    // 12 — must follow include-slash
+  gradientUtilities,   // 16
 ];
 
 // The consumer-JS table (src/**/*.js — the tree the template walk skips).

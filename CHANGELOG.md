@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#246](../../issues/246) — A brand keeps its own listing current in the project above it: the manager's opt-in `directory` service pushes brand identity, repo slugs and the blocks it declares (`sponsorships` first — a price per placement) into the parent's `brands` collection. Off unless `directory.enabled: true`, and it writes only on drift.
+- [#214](../../issues/214) — A wrong derived asset stops being a hand-delete: `omega manage --reset-assets` clears the brand's derived assets cache so the same walk regenerates it, naming what it cleared. `=logos` takes the logo variants, app icons, social icons and favicons; `=templates` the PSD exports.
+- [#290](../../issues/290) — A backend app reads config-DERIVED values straight off the config object it already receives: `config.resolved.github.repo` is the brand's GitHub repo as an `owner/name` slug, resolved with the real merge rules (the `targets.backend.github.repo` override included), alongside `.owner` and `.name`. Brands stop re-implementing derivations they cannot import.
+
+### Changed
+- [#277](../../issues/277) — `parent`, `github`, `reviews`, `marketing`, `blog` and `dataRequest` are shared config keys, typed at the top level of a brand's omega.json5. A website-only brand no longer needs a `targets.backend` block (which would falsely enable a backend it has no app for) to hold them; that block still works as an override.
+- [#281](../../issues/281) — A monorepo-linked `@omega.js/*` package is read-only to consumer builds: `omega build` no longer prepares that checkout in place (no dist purge, no cache refetch). The monorepo watch owns dist freshness, and a missing, unbuilt or stale linked dist stops the build loudly instead.
+- [#349](../../issues/349) — Every package is licensed under the Elastic License 2.0 instead of MIT: the root and all seven publishables carry an ELv2 `LICENSE`, all eleven `packages/*/package.json` declare `Elastic-2.0`, and every README states the terms (free to use, a key unlocks payments and removes attribution, no managed service).
+- [#255](../../issues/255) — A backend app's `firestore.rules` is the brand's own source again: its rules plus `protectedFields()` and `canWriteUser()` hooks. The framework half compiles in from the package to `dist/firestore.rules`, so a brand can finally TIGHTEN what a signed-in client may write. Setup converts legacy marker-block files once.
+
+### Fixed
+- [#269](../../issues/269) — A page can finally REPLACE a shell layout's default list: the page's sidecar data file (`<page>.11tydata.json`) is re-applied with the engine's own merge, so a sidecar array wins outright instead of concatenating onto the theme's defaults. Object and string keys merge as before.
+- [#296](../../issues/296) — `omega migrate` converts the classy utilities v2 dropped: a hero's `.gradient-animated` and `.gradient-grain` become `omega-dotgrid` plus `data-omega-dotfield`, collapsing to one class per element. A ported UJM page stops losing its hero treatment silently; classy stays gradient-free.
+- [#288](../../issues/288) — A malformed notification doc (its stored `token` never matched its doc id) is client-read-only again: the framework's update rule requires the incoming token to equal the doc id, restoring the guard legacy BEM had. Reads by token still work.
+- [#346](../../issues/346) — Dev pages stop talking to stale emulator ports: the dev server rewrites the baked dev-port map into every HTML response as it serves it, so a late-booting backend or a restarted emulator lands on the next request. Built `dist/` output is unchanged on disk.
+- [#262](../../issues/262) — The dev website origin is a resolved fact: `omega dev` publishes it, protocol included, in the dev map every client reads, and `getDevWebsiteOrigin()` answers it — warning when it must assume. The extension bakes that origin into `externally_connectable` instead of a literal; the boot-test timeout default rises to 45s.
+- [#352](../../issues/352) — Back-to-back backend test runs stop bouncing off the freshness gate: the runtime state self-tests seed under `dist/test/fixtures/` is no longer read as a deleted source, so the next command in a linked consumer boots without a manual prepare. Leftovers elsewhere in dist still stop it.
+- [#314](../../issues/314) — `Manager.AI()` collapses every prompt form to one internal shape at the top of `ai.request()`, where prompt files load and the universal rules inject once for every provider. `prompt: { path }` carries the rules again, `message: { path }` loads on Claude too, and ambiguous input throws naming both inputs.
 
 ## [0.35.1] 2026-08-17
 ### Added

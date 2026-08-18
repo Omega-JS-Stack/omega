@@ -188,6 +188,14 @@ test('the dev-server options are ONE object for the session', () => {
     devServerOptions('/tmp/site-out-live', () => 9200) === live,
     'a getter keys as `live`, so its identity can never restart the server',
   );
+
+  // The dev-chrome getter the serve-time ports injection rides (#346) is the
+  // second one `omega dev` passes, and it keys exactly the same way
+  const injecting = devServerOptions('/tmp/site-out-inject', () => 9099, () => ({ ports: { auth: 9099 } }));
+  assert.ok(
+    devServerOptions('/tmp/site-out-inject', () => 9200, () => ({ ports: { auth: 9200 } })) === injecting,
+    'the injecting server is one object for the session too',
+  );
 });
 
 test('a config reset does not restart the dev server', async (t) => {

@@ -6,7 +6,9 @@
  * (converged rerun = zero writes), staleness regeneration, the dry-run
  * zero-write guarantee, wordmark/combomark generation from a
  * programmatically-built font (missing-only — never overwritten), the
- * de-ITW'd no-packaged-font behavior, and the svg-to-black conversion.
+ * de-ITW'd no-packaged-font behavior, the svg-to-black conversion, and the
+ * `--reset-assets` force refresh that clears the cache so a converged brand
+ * rebuilds anyway (#214).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -96,8 +98,8 @@ function stageFont(root) {
 
 // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('assets: registered after server with the six operations in dependency order', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('server') + 1], 'assets');
+test('assets: registered after directory with the six operations in dependency order', () => {
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('directory') + 1], 'assets');
   // templates before icons — icons prefers the composited icon.png it makes
   assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons']);
 });
@@ -660,6 +662,102 @@ test('brandmark: MRLOGO_API_KEY rides the same Bearer transport (BEM resolves no
     delete process.env.MRLOGO_API_KEY;
     api.server.close();
   }
+});
+
+// ─── Force refresh (#214) ────────────────────────────────────────────────────
+
+const { resolveResetKinds, resetAssetsCache } = require('../src/services/assets/lib/reset.js');
+
+test('reset: the flag resolves to kinds: bare = both, a value = that kind, unknown throws', () => {
+  assert.deepEqual(resolveResetKinds(undefined), []);
+  assert.deepEqual(resolveResetKinds(true), ['logos', 'templates']);
+  assert.deepEqual(resolveResetKinds('templates'), ['templates']);
+  assert.deepEqual(resolveResetKinds('templates,logos'), ['logos', 'templates']);
+  assert.throws(() => resolveResetKinds('logo'), /Unknown --reset-assets kind\(s\): logo/);
+});
+
+test('reset: clearing one kind leaves the other kind and the brand sources alone', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+  await runService(root, brandConfig());
+  const outDir = path.join(root, '.omega', 'assets');
+
+  const logos = resetAssetsCache({ outDir, kinds: ['logos'] });
+
+  assert.ok(logos.removed.includes('logo/brandmark'));
+  assert.ok(logos.removed.includes('social/brandmark'));
+  assert.ok(logos.removed.includes('favicon'));
+  assert.ok(logos.removed.includes(path.join('app', 'macos', 'icon.icns')));
+  // The templates kind's export survives; only it is left
+  assert.deepEqual(derivedFiles(root), ['app/macos/icon.png']);
+
+  const templates = resetAssetsCache({ outDir, kinds: ['templates'] });
+
+  assert.ok(templates.removed.includes(path.join('app', 'macos', 'icon.png')));
+  assert.deepEqual(derivedFiles(root), []);
+
+  // Only .omega/assets/ is cache: the brand's committed sources are never touched
+  assert.ok(fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg')));
+  assert.ok(fs.existsSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd')));
+});
+
+test('assets: --reset-assets regenerates the derived set a converged rerun skips', async () => {
+  const root = stageBrand();
+  await runService(root, brandConfig());
+
+  const files = derivedFiles(root);
+  const before = mtimes(root, files);
+
+  // Timestamps alone: the rerun has nothing to do
+  const converged = await runService(root, brandConfig());
+  assert.equal(converged.output.process.synced, true);
+  assert.deepEqual(mtimes(root, files), before);
+
+  // Forced: the cache is cleared, so the same walk rebuilds every file
+  const forced = await runService(root, brandConfig(), { options: { resetAssets: true } });
+
+  assert.equal(forced.status, 'success');
+  assert.deepEqual(derivedFiles(root), files);
+  assert.equal(forced.output.process.generated, 20);
+  assert.equal(forced.output.icons.generated, 2);
+  assert.equal(forced.output.socialIcons.generated, 4);
+  assert.equal(forced.output.favicons.generated, 7);
+  const after = mtimes(root, files);
+  assert.equal(files.filter((_, index) => after[index] === before[index]).length, 0);
+});
+
+test('assets: --reset-assets=templates re-exports the PSD and leaves the logo variants fresh', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+  await runService(root, brandConfig());
+
+  const logoSvg = path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg');
+  const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+  const before = { logo: fs.statSync(logoSvg).mtimeMs, icon: fs.statSync(iconPng).mtimeMs };
+
+  const result = await runService(root, brandConfig(), { options: { resetAssets: 'templates' } });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.templates.processed, 1);
+  // The PSD is brand collateral, not cache: it is re-processed, never re-seeded
+  assert.equal(result.output.templates.seeded, 0);
+  assert.equal(result.output.process.synced, true);
+  assert.equal(fs.statSync(logoSvg).mtimeMs, before.logo);
+  assert.ok(fs.statSync(iconPng).mtimeMs > before.icon);
+});
+
+test('assets: a dry run reports the reset and deletes nothing', async () => {
+  const root = stageBrand();
+  await runService(root, brandConfig());
+
+  const files = derivedFiles(root);
+  const before = mtimes(root, files);
+
+  const result = await runService(root, brandConfig(), { options: { resetAssets: true, dryRun: true } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(derivedFiles(root), files);
+  assert.deepEqual(mtimes(root, files), before);
 });
 
 test('brandmark: operator SA ensures the brand\'s own product user and generates with ITS api key', async () => {

@@ -1,0 +1,137 @@
+// ============================================================================
+// @omega.js/backend — the FRAMEWORK half of the Firestore rules.
+//
+// This file ships INSIDE @omega.js/backend and never exists in a brand repo.
+// `omega build` compiles it together with the brand's own firestore.rules into
+// dist/firestore.rules — the artifact firebase.json points the emulator AND
+// `firebase deploy` at (src/cli/utils/compile-rules.js).
+//
+// Both halves land in the SAME `match /databases/{database}/documents` scope,
+// so every helper below is callable from a brand's rules, and the two BRAND
+// HOOKS below are callable from here:
+//
+//   protectedFields()  → list of top-level user-doc keys the brand protects
+//   canWriteUser()     → extra condition ANDed into the user-doc write rule
+//
+// Firestore ORs `allow` across sibling match blocks, so a brand's own
+// `match /users/{uid}` can only ever WIDEN access. The hooks are how a brand
+// TIGHTENS it ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)).
+// ============================================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Lock by default
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Protect user account data. The two brand hooks ride the write rule:
+    // `protectedFields()` (folded in by isWritingProtectedUserField) and
+    // `canWriteUser()`.
+    match /users/{uid} {
+      allow read: if belongsTo(uid);
+      allow write: if belongsTo(uid) && !isWritingProtectedUserField() && canWriteUser();
+    }
+
+    // Protect notification data — the doc id IS the push token, a high-entropy
+    // capability: knowing it proves possession of the device. Point reads/updates ride
+    // that capability; list is denied so tokens can never be harvested by query; owner
+    // may only be null (anonymous subscribe) or the caller's own uid.
+    match /notifications/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if incomingData().token == token
+        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
+      // `incomingData().token == token` is the malformed-doc guard: a legacy-era
+      // doc whose stored token never matched its id is client-read-only, never
+      // updatable ([#288](https://github.com/Omega-JS-Stack/omega/issues/288)).
+      // The `== existingData().token` clause keeps the field immutable.
+      allow update: if incomingData().token == token
+        && incomingData().token == existingData().token
+        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
+    }
+
+    // Protect abandoned cart data
+    match /payments-carts/{uid} {
+      allow create, update: if belongsTo(uid)
+        && incomingData().owner == uid
+        && incomingData().status == 'pending';
+      allow read: if belongsTo(uid);
+    }
+
+    // Auth functions
+    function authEmail() {
+      return request.auth.token.email;
+    }
+    function authUid() {
+      return request.auth.uid;
+    }
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function belongsTo(identity) {
+      return isAuthenticated() && (authUid() == identity || authEmail() == identity);
+      // eventually include a check for (existingData().owner == identity)...(in case its a doc owned by a user that's not actually user doc)
+    }
+
+    function getRoles() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+    }
+    function getVerifications() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verifications;
+    }
+    function isAdmin() {
+      return getRoles().admin == true;
+    }
+    function emailVerified() {
+      return getVerifications().email == true;
+    }
+
+    // The framework's own protected user-doc fields, plus the brand's list
+    // folded in through the `protectedFields()` hook. affectedKeys() is
+    // TOP-LEVEL, so a brand protecting `xp.total` lists `'xp'`.
+    function isWritingProtectedUserField() {
+      return isWritingField('auth')
+        || isWritingField('roles')
+        || isWritingField('flags')
+        || isWritingField('plan') // TODO: REMOVE THIS WHEN ALL PROJECTS UPDATED
+        || isWritingField('subscription')
+        || isWritingField('affiliate')
+        || isWritingField('api')
+        || isWritingField('metadata')
+        || isWritingField('usage')
+        || isWritingField('consent')
+        || incomingData().diff(existingData()).affectedKeys().hasAny(protectedFields());
+    }
+
+    function isCreatingField(field) {
+      return !(field in resource.data) && field in request.resource.data;
+    }
+
+    function isUpdatingField(field) {
+      return field in resource.data && field in request.resource.data && resource.data[field] != request.resource.data[field];
+    }
+
+    function isWritingField(field) {
+      return isCreatingField(field) || isUpdatingField(field);
+    }
+
+    // function userEmail(userId) {
+    //   return get(/databases/$(database)/documents/users/$(userId)).data.email;
+    // }
+    // Helper functions
+    // [READ] Data that exists on the Firestore document
+    function existingData() {
+      return resource.data;
+    }
+    // [WRITE] Data that is sent to a Firestore document
+    function incomingData() {
+      return request.resource.data;
+    }
+    // ========== Resources ==========
+    // https://fireship.io/snippets/firestore-rules-recipes/
+    // https://github.com/jaysquared/atom-firestore-grammar
+    // https://fireship.io/courses/firestore-data-modeling/models-roles/
+    // https://firebase.google.com/docs/firestore/security/test-rules-emulator
+  }
+}

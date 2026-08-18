@@ -3,6 +3,7 @@ const path = require('path');
 const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
 const { hasOmegaConfig, loadConfig, loadEnv, formatErrors } = require('@omega.js/config');
+const { resolvedConfigValues } = require('./helpers/resolved-config.js');
 const EventEmitter = require('events');
 // const EventEmitter = require('events').EventEmitter;
 const util = require('util');
@@ -172,6 +173,13 @@ Manager.prototype.init = function (exporter, options) {
   } else {
     self.config = configDefaults;
   }
+
+  // Config-DERIVED values, on the config object consumer code already reads
+  // (#290): `config.resolved.github.repo` and whatever joins it. The recipes
+  // live in @omega.js/config — private, so a brand app cannot call them and
+  // used to re-implement them — and the framework runs them once, here, on the
+  // composed config.
+  self.config.resolved = resolvedConfigValues(self.config);
 
   // Expose config on the constructor for static access by internal libraries.
   // Since Node.js caches require(), any `require('./index.js')` returns this same

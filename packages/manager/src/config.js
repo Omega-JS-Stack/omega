@@ -338,6 +338,16 @@ const DEFAULTS = {
     enabled: true,
   },
 
+  // Parent-project brand directory (#246) — pushes this brand's own entry
+  // into the PARENT project's brands collection, so whatever the parent runs
+  // on top of it (ITW's guest-post sponsorship marketplace is the first) reads
+  // a current directory. OFF by default: participation is opt-in, never
+  // implicit, because the entry is world-readable by design. Needs `parent` to
+  // name the relationship and DIRECTORY_SERVICE_ACCOUNT in the brand .env.
+  directory: {
+    enabled: false,
+  },
+
   // Derived visual collateral generated locally from the brand's logo
   // sources (assets/logo/*.svg in the brand repo → .omega/assets/):
   // wordmark/combomark from brand.font (omega-manager packaged the
@@ -602,6 +612,7 @@ const SERVICE_ORDER = [
   'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
   'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
+  'directory',       // brand's own entry pushed into the PARENT project's brands collection (opt-in; no cross-service deps)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
   'disperse',        // signing artifacts + composed app .env files land in the apps (after certificates, before update builds)
@@ -753,6 +764,10 @@ const OPERATIONS = {
 
   server: [
     { name: 'brands', ensure: true }, // Registry entry replace-synced against the company server's Firestore
+  ],
+
+  directory: [
+    { name: 'entry', ensure: true }, // Directory entry (identity + declared blocks) merge-synced into the parent project's brands collection
   ],
 
   assets: [

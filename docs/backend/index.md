@@ -52,7 +52,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 ## Architecture
 
-@omega.js/backend exposes a single `Manager` class that orchestrates everything: it initializes Firebase Admin, wires built-in functions (`omega_api`, auth events, cron), and hands out helper instances via factory methods. Supports **two deployment modes** — Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](../../packages/backend/docs/architecture.md) for the full overview of the Manager class, dual-mode support, and helper factory pattern.
+@omega.js/backend exposes a single `Manager` class that orchestrates everything: it initializes Firebase Admin, wires built-in functions (`omega_api`, auth events, cron), and hands out helper instances via factory methods. Supports **two deployment modes** — Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](../../packages/backend/docs/architecture.md) for the full overview of the Manager class, dual-mode support, the derived `config.resolved.*` values consumer code reads (`config.resolved.github.repo` — the brand repo slug), and helper factory pattern.
 
 For the directory layout of both the @omega.js/backend library and consumer projects, see [docs/directory-structure.md](../../packages/backend/docs/directory-structure.md).
 
@@ -88,7 +88,30 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `version` | Print @omega.js/backend version |
 | `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1. The listing is GENERATED from the same command table the dispatcher reads (`src/cli/command-table.js`) — it cannot drift from what actually dispatches |
 
-`setup` also regenerates the OMEGA-managed block in `firestore.rules` and `database.rules.json`; the `(vX.Y.Z)` stamp in that block's header marker is `RULES_VERSION` in `src/cli/commands/setup.js`, a rules SCHEMA version that bumps only when generated rule semantics change (never the package version).
+`setup` also regenerates the OMEGA-managed block in `database.rules.json` and seeds/repairs the brand's `firestore.rules` source (see [Firestore rules: compiled, not managed](#firestore-rules-compiled-not-managed)); the `(vX.Y.Z)` stamp in the marker header — and in the compiled firestore artifact's header — is `RULES_VERSION`, a rules SCHEMA version that bumps only when generated rule semantics change (never the package version). Its one home is `src/cli/utils/compile-rules.js`.
+
+## Firestore rules: compiled, not managed
+
+A brand's `firestore.rules` is **source**, not a file the framework rewrites ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)). Firestore ORs `allow` across sibling match blocks, so a brand's own `match /users/{uid}` can only ever WIDEN access — under the old managed-marker-block model a brand had no way to protect a field of its own, and hand-edits to the managed block were wiped on the next setup.
+
+```
+firestore.rules                                  ← the brand's, pure rules language
++ @omega.js/backend/templates/firestore.framework.rules   ← ships inside the package
+= dist/firestore.rules                           ← GENERATED, what firebase.json points at
+```
+
+- **Where it happens**: `stageFunctions()` (`src/cli/utils/stage-functions.js`) compiles on every stage, so `omega build`, `omega setup`, emulator/serve boot, `omega test` and `omega deploy` all read a current artifact — and the stage watch treats `firestore.rules` as a stage input, so editing it hot-reloads the running emulator. The compiled artifact opens with a header naming BOTH sources and forbidding edits.
+- **`firebase.json`** points `firestore.rules` at `dist/firestore.rules` for the emulator AND `firebase deploy`. A build that finds a stale target reports it loudly.
+- **The hooks** are how a brand TIGHTENS. Both halves land in one `match /databases/{database}/documents` scope, so functions resolve across the seam in both directions: brand rules call framework helpers (`belongsTo`, `isAdmin`, `existingData`, `isWritingField`, …), and the framework's user write rule calls the brand's:
+
+  ```
+  allow write: if belongsTo(uid) && !isWritingProtectedUserField() && canWriteUser();
+  ```
+
+  `protectedFields()` (default `[]`) folds into `isWritingProtectedUserField()` via `incomingData().diff(existingData()).affectedKeys().hasAny(protectedFields())` — `affectedKeys()` is TOP-LEVEL, so protecting `xp.total` means listing `'xp'`. `canWriteUser()` (default `true`) ANDs a brand condition into the same rule.
+- **The compiler lints both hooks.** A missing one is re-seeded into the artifact (loudly) so the ruleset stays valid, and setup writes the stub back into the brand's source. New framework versions needing new hooks extend the lint list; consumers get stubs on next setup.
+- **Migration**: setup detects a legacy `// ========== OMEGA Rules (vX.Y.Z) ==========` block, extracts the non-managed region into the new source ONCE, and retargets `firebase.json`.
+- **`database.rules.json` keeps the marker model** and `storage.rules` stays a copy-if-missing deny-all scaffold: neither has a framework half a brand needs to tighten, and RTDB rules are a JSON tree with no function language to splice ([#351](https://github.com/Omega-JS-Stack/omega/issues/351) covers revisiting them).
 
 See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.md) and [docs/cli-logs.md](../../packages/backend/docs/cli-logs.md) for full flag references.
 

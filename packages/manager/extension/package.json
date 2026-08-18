@@ -15,7 +15,7 @@
     "email": "hello@itwcreativeworks.com",
     "url": "https://itwcreativeworks.com"
   },
-  "license": "ISC",
+  "license": "Elastic-2.0",
   "devDependencies": {
     "gulp": "^5.0.1",
     "@omega.js/extension": "file:../../extension"

@@ -181,6 +181,27 @@ Manager.getLiveReloadPort = function () {
 }
 Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
 
+// getDevWebsiteOrigin: where the brand's dev website answers (protocol + port),
+// as the live sibling website app published it beside its port map. An extension
+// has no way to probe at runtime, so every dev-origin surface — the build.js
+// blob, the page config blob, the manifest's externally_connectable — BAKES this
+// one answer ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
+//
+// null when nothing published one: presence is a RESOLVED FACT, absence means
+// "assume the classics" and say so (the N7 dev-map contract). A packaged build
+// never probes at all — its artifact must not depend on whether a dev server
+// happened to be running on the build machine.
+Manager.getDevWebsiteOrigin = function () {
+  const { readSiblingOrigin } = require('@omega.js/config');
+
+  if (Manager.getEnvironment() === 'production') {
+    return null;
+  }
+
+  return readSiblingOrigin(Manager.getRootPath('project'));
+}
+Manager.prototype.getDevWebsiteOrigin = Manager.getDevWebsiteOrigin;
+
 // Create dummy file in project dist to force jekyll to build
 Manager.triggerRebuild = function (files, logger) {
   // Ensure logger is defined

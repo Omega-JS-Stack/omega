@@ -15,6 +15,7 @@ const Anthropic = require('./providers/anthropic.js');
 const ClaudeCode = require('./providers/claude-code.js');
 const TestProvider = require('./providers/test.js');
 const { emptyTokens, addTokens } = require('./tokens.js');
+const { normalizePrompt, loadContent } = require('./prompt.js');
 
 const DEFAULT_PROVIDER = 'openai';
 
@@ -48,8 +49,8 @@ function AI(ctx, key) {
  * @param {string} [options.model]
  * @param {string} [options.apiKey] - override provider-specific key
  * @param {Array<{role,content}>} [options.messages]
- * @param {object} [options.prompt] - { content: 'system prompt' }
- * @param {object} [options.message] - { content: 'user message' }
+ * @param {object|Array} [options.prompt] - { path|content, settings } or [{ role, path|content, settings }, ...]
+ * @param {object} [options.message] - { path|content, settings }
  * @param {'json'|'text'} [options.response]
  * @param {object} [options.schema] - JSON schema for structured output
  * @param {number} [options.maxTokens]
@@ -128,93 +129,142 @@ AI.prototype._getProvider = function (provider, apiKey) {
 };
 
 /**
- * Translate a unified options object into the shape each provider expects.
+ * Translate a unified options object into the ONE internal shape every provider
+ * format reads.
  *
  * Accepts:
  *   - messages: [{ role: 'system'|'user'|'assistant', content: string }]
- *   - OR prompt (object or multi-role array) + message.content (user)
+ *   - OR prompt (object or multi-role array) + message (user)
  *
- * Returns options with BOTH styles populated, so OpenAI's `prompt`/`message`
- * fields and Anthropic's `messages` array both work. The array prompt form and
- * a non-empty messages[] are mutually exclusive — combining them throws.
+ * Both prompt forms collapse HERE into canonical segments
+ * ([{ role, content }, ...] with the universal rules as the leading system
+ * segment) and the message collapses into resolved `message.content`. Every
+ * `{ path }` is read and templated at this one point, so the openai, anthropic
+ * and claude-code formatters all receive the same already-resolved text and
+ * neither the rules nor a prompt file can go missing on one of them.
+ *
+ * Ambiguous input is an error, never a silent winner: `path` and `content` on
+ * the same input throw, and a prompt combined with a messages[] conversation
+ * throws.
  */
 function normalizeOptions(opts) {
   const out = { ...opts };
   const rules = SYSTEM_PROMPT_INJECTIONS.join('\n');
+  const hasMessages = Array.isArray(opts.messages) && opts.messages.length > 0;
+  const segments = normalizePrompt(opts.prompt);
 
-  // The array prompt form cannot combine with a messages[] conversation: every
-  // provider treats a non-empty messages[] as the WHOLE conversation and ignores
-  // the prompt segments, and the segments only resolve (prompt files included)
-  // inside the provider, so there is nowhere to merge them. Silently dropping a
-  // caller's segments is worse than refusing the call.
-  if (Array.isArray(opts.prompt) && Array.isArray(opts.messages) && opts.messages.length) {
-    throw new Error('AI request: an array prompt cannot be combined with messages[]. messages[] is the whole conversation, so move the segments into it as system turns, or drop messages[].');
+  // Two texts, one slot: whichever the loader happened to prefer would silently
+  // discard the other, so refuse the call and name both.
+  segments.forEach((segment, i) => {
+    assertOneSource(segment, Array.isArray(opts.prompt) ? `options.prompt[${i}]` : 'options.prompt');
+  });
+
+  assertOneSource(opts.message || {}, 'options.message');
+
+  // A prompt and a messages[] conversation both claim the system prompt, and
+  // every provider treats a non-empty messages[] as the WHOLE conversation, so
+  // the prompt would be dropped without a word.
+  if (segments.length && hasMessages) {
+    if (opts.messages.some((m) => m.role === 'system')) {
+      throw new Error('AI request: options.prompt and the system-role turn in options.messages both set the system prompt. Pass the prompt or the system turn, not both.');
+    }
+
+    throw new Error('AI request: options.prompt cannot be combined with options.messages. messages[] is the whole conversation on every provider, so move the prompt into it as a system turn, or drop messages[].');
   }
 
-  // Structured conversations (tool-call turns, tool results, raw content
-  // blocks) must NOT be flattened into prompt/message — the provider consumes
-  // messages[] directly. Only the system turn gets the universal rules.
-  if (isStructuredMessages(opts.messages)) {
-    const systemIdx = opts.messages.findIndex((m) => m.role === 'system');
+  if (hasMessages) {
+    out.messages = injectRules(opts.messages, rules);
 
-    if (systemIdx >= 0 && typeof opts.messages[systemIdx].content === 'string') {
-      const existing = opts.messages[systemIdx].content;
-      out.messages = opts.messages.map((m, i) => i === systemIdx
-        ? { ...m, content: existing ? `${rules}\n\n${existing}` : rules }
-        : m);
-    } else if (systemIdx >= 0) {
-      // Content is an array of content blocks — prepend rules as a text block
-      out.messages = opts.messages.map((m, i) => i === systemIdx
-        ? { ...m, content: [{ type: 'text', text: rules }, ...(Array.isArray(m.content) ? m.content : [])] }
-        : m);
-    } else {
-      out.messages = [{ role: 'system', content: rules }, ...opts.messages];
+    // Structured conversations (tool-call turns, tool results, raw content
+    // blocks) must NOT be flattened into prompt/message — the provider consumes
+    // messages[] directly.
+    if (!isStructuredMessages(opts.messages)) {
+      const system = opts.messages.find((m) => m.role === 'system');
+      const userTurns = opts.messages.filter((m) => m.role !== 'system');
+      const lastUser = userTurns[userTurns.length - 1];
+      const systemText = system ? stringifyContent(system.content) : '';
+
+      // Legacy echo of the conversation into the prompt/message pair, for
+      // callers that read those off the normalized options. Every provider
+      // reads messages[] itself when it is non-empty.
+      out.prompt = { content: systemText ? `${rules}\n\n${systemText}` : rules };
+
+      if (lastUser && !out.message?.content) {
+        out.message = { ...(out.message || {}), content: stringifyContent(lastUser.content) };
+      }
     }
 
     return out;
   }
 
-  // The array prompt form (multi-role segments, each with its own path/content/
-  // settings) is the provider's own input shape — it must survive normalization
-  // as an array. Spreading it collapses the segments into { 0: ..., 1: ... },
-  // which the provider then reads as a single content-only segment and every
-  // prompt-file path is silently dropped.
-  const hasPromptSegments = Array.isArray(opts.prompt);
+  // The one load point. Segments come back resolved (prompt files read and
+  // templated), so a `path` and the universal rules can no longer compete for
+  // the same slot inside a provider.
+  out.prompt = [
+    { role: 'system', content: rules },
+    ...segments.map((segment, i) => ({
+      role: segment.role,
+      content: resolveContent(segment, Array.isArray(opts.prompt) ? `options.prompt[${i}]` : 'options.prompt'),
+    })),
+  ];
 
-  if (Array.isArray(opts.messages) && opts.messages.length) {
-    const system = opts.messages.find((m) => m.role === 'system');
-    const userTurns = opts.messages.filter((m) => m.role !== 'system');
-    const lastUser = userTurns[userTurns.length - 1];
-
-    if (system && !out.prompt?.content) {
-      out.prompt = { ...(out.prompt || {}), content: stringifyContent(system.content) };
-    }
-
-    if (lastUser && !out.message?.content) {
-      out.message = { ...(out.message || {}), content: stringifyContent(lastUser.content) };
-    }
-  }
-
-  // Prepend universal rules to the system prompt. Patches both representations
-  // (prompt.content and messages[]) since providers read from one or the other.
-  // On the array form the rules ride in as their own leading system segment, so
-  // every caller segment reaches the provider untouched.
-  const existing = hasPromptSegments ? '' : stringifyContent(out.prompt?.content || '');
-  const merged = existing ? `${rules}\n\n${existing}` : rules;
-
-  out.prompt = hasPromptSegments
-    ? [{ role: 'system', content: rules }, ...opts.prompt]
-    : { ...(out.prompt || {}), content: merged };
-
-  if (Array.isArray(out.messages) && out.messages.length) {
-    const systemIdx = out.messages.findIndex((m) => m.role === 'system');
-    out.messages = systemIdx >= 0
-      ? out.messages.map((m, i) => i === systemIdx ? { ...m, content: merged } : m)
-      : [{ role: 'system', content: rules }, ...out.messages];
-  }
+  out.message = {
+    ...(opts.message || {}),
+    path: '',
+    content: resolveContent(opts.message || {}, 'options.message'),
+  };
 
   return out;
 }
+
+// Read a `{ path|content, settings }` input into its final text. Content blocks
+// flatten first, because loadContent templates strings.
+function resolveContent(input, label) {
+  const source = input.path ? input : { ...input, content: stringifyContent(input.content) };
+  const content = loadContent(source, noopLog);
+
+  if (content instanceof Error) {
+    throw new Error(`AI request: error loading ${label}: ${content.message}`);
+  }
+
+  return content;
+}
+
+function assertOneSource(input, label) {
+  if (input.path && input.content) {
+    throw new Error(`AI request: ${label} sets both a path and a content, and only one of them can be the text. Pass the file path or the inline content, not both.`);
+  }
+}
+
+// The universal rules ride into the system turn of a messages[] conversation:
+// prepended to its text, or as a leading text block when the turn carries raw
+// content blocks (images, tool results). No system turn means the rules become
+// one.
+function injectRules(messages, rules) {
+  const systemIdx = messages.findIndex((m) => m.role === 'system');
+
+  if (systemIdx < 0) {
+    return [{ role: 'system', content: rules }, ...messages];
+  }
+
+  return messages.map((m, i) => {
+    if (i !== systemIdx) {
+      return m;
+    }
+
+    if (Array.isArray(m.content)) {
+      return { ...m, content: [{ type: 'text', text: rules }, ...m.content] };
+    }
+
+    const existing = stringifyContent(m.content);
+
+    return { ...m, content: existing ? `${rules}\n\n${existing}` : rules };
+  });
+}
+
+// loadContent logs each prompt-file read through the caller's logger; the
+// normalize hop runs before a provider's logger exists
+function noopLog() {}
 
 // A messages[] array is "structured" when it carries turns that cannot survive
 // string-flattening: tool results, ctx tool-call turns, or raw

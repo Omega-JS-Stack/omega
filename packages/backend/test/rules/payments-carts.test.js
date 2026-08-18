@@ -12,7 +12,7 @@
  * - Anonymous cannot create/read/update cart docs
  * - Admin can read/write any cart doc
  *
- * @see templates/firestore.rules
+ * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
 module.exports = {
   description: 'Firestore security rules for payments-carts documents',

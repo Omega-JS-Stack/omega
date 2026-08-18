@@ -514,3 +514,9 @@ bundles, full icon set (B-phase pipeline) · engine consumption of
 `targets.web.collections`/`defaults`/`generators` (migrate carries the config;
 custom collections land with the sweet-saucy wave) · dev-loop re-render
 narrowing + browser live-reload on asset rebuilds.
+
+## License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a
+license key unlocks payments and removes the attribution; and you may not
+offer `@omega.js/web` to third parties as a hosted or managed service.

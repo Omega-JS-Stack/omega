@@ -16,10 +16,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const JSON5 = require('json5');
+const sass = require('sass');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
 const { loadConfig } = require('@omega.js/config');
-const { applyRules, applyJsRules, applyJsonRules } = require('../src/migrate/codemod.js');
+const { applyRules, applyJsRules, applyJsonRules, runCodemod } = require('../src/migrate/codemod.js');
 const { convertConfig, serializeOmega } = require('../src/migrate/config-convert.js');
 const { lintText } = require('../src/migrate/lint.js');
 const { runMigration } = require('../src/migrate/index.js');
@@ -234,6 +235,57 @@ test('rules: the service-worker entry imports @omega.js/web; the bare package im
 
   const seed = applyJsRules("import Manager from 'ultimate-jekyll-manager';", 'src/assets/js/main.js');
   assert.strictEqual(seed.text, "import Manager from 'ultimate-jekyll-manager';", 'the bare import stays for the asset-layer step to own');
+});
+
+// ---------------------------------------------------------------------------
+// Rule units — the legacy classy gradient utilities (#296)
+// ---------------------------------------------------------------------------
+
+test('rules: the legacy gradient utilities become the v2 dotgrid hero (#296)', () => {
+  const input = [
+    '<section class="bg-gradient-rainbow gradient-animated gradient-grain text-light min-vh-80">',
+    '<div class="gradient-grain p-4">',
+    '<section class="gradient-animated" data-omega-dotfield>',
+    '<div class="gradient-animated-slow gradient-grainy x-gradient-grain">',
+    '<section class="{% if a %}gradient-grain{% else %}gradient-animated{% endif %}">',
+  ].join('\n');
+  const { text, edits } = applyRules(input, 'unit.html');
+  const lines = text.split('\n');
+  assert.strictEqual(
+    lines[0],
+    '<section class="bg-gradient-rainbow omega-dotgrid text-light min-vh-80" data-omega-dotfield>',
+    'both utilities on one element collapse to ONE dotgrid, and the animated half opts into the live dotfield',
+  );
+  assert.strictEqual(lines[1], '<div class="omega-dotgrid p-4">', 'the static half is the dot grid alone — no motion it never had');
+  assert.strictEqual(lines[2], '<section class="omega-dotgrid" data-omega-dotfield>', 'an element already opted in keeps ONE attribute');
+  assert.strictEqual(lines[3], '<div class="gradient-animated-slow gradient-grainy x-gradient-grain">', 'longer and prefixed names are DIFFERENT classes');
+  assert.strictEqual(
+    lines[4],
+    '<section class="{% if a %}omega-dotgrid{% else %}omega-dotgrid{% endif %}" data-omega-dotfield>',
+    'a Liquid-built class list keeps every branch — a "duplicate" there is the ONLY class one branch emits',
+  );
+  assert.strictEqual(edits.length, 4, 'one edit recorded per changed line');
+});
+
+test('rules: a real UJM hero converts to a treatment classy v2 actually ships (#296)', () => {
+  const fixture = fs.readFileSync(path.join(__dirname, 'fixtures', 'ports-site', 'pages', 'index.html'), 'utf8');
+  assert.match(fixture, /gradient-animated/, 'the fixture hero carries the legacy pair');
+  assert.match(fixture, /gradient-grain/, 'both of them');
+
+  const { text } = applyRules(fixture, 'src/pages/index.html');
+  assert.ok(!/gradient-animated|gradient-grain/.test(text), 'no legacy gradient utility survives the page');
+  const hero = text.split('\n').find((line) => line.includes('omega-dotgrid'));
+  assert.match(hero, /class="bg-gradient-rainbow omega-dotgrid /, 'the hero wears the dotgrid; bg-gradient-rainbow stays (v2 still neutralizes that name)');
+  assert.match(hero, /" data-omega-dotfield>/, 'and the live dotfield the animation became');
+  assert.strictEqual((text.match(/omega-dotgrid/g) || []).length, 1, 'the pair collapsed, it did not double');
+
+  // The other half of "renders with the v2 treatment": classy v2 paints the
+  // class the codemod writes, and paints neither class it rewrote.
+  const css = sass.compile(path.join(PKG, 'themes', 'classy', 'css', 'base', '_utilities.scss'), {
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+  assert.match(css, /\.omega-dotgrid::before/, 'classy v2 ships the masked dot backdrop the hero now wears');
+  assert.ok(!/gradient-animated|gradient-grain/.test(css), 'and ships neither legacy utility — the reason they convert (#296)');
 });
 
 // ---------------------------------------------------------------------------
@@ -711,6 +763,34 @@ test('e2e: a legacy test harness is reported as undiscoverable, not silently dar
       'every harness-shaped file under test/ — any layer dir, any name — and no real node:test file, no `_`-prefixed helper',
     );
     assert.deepStrictEqual(report.errors, [], 'an undiscoverable suite is a warning, never a failed migration');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: no legacy gradient utility survives a codemod run (#296)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-gradients-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'index.html'), [
+      '---',
+      'layout: frontend/core/base',
+      '---',
+      '<section class="bg-gradient-rainbow gradient-animated gradient-grain text-light">',
+      '  <h1>Hero</h1>',
+      '</section>',
+      '<div class="gradient-grain rounded-4">Grain only</div>',
+    ].join('\n'));
+
+    const report = runCodemod(root, { write: true });
+    const page = fs.readFileSync(path.join(root, 'src', 'pages', 'index.html'), 'utf8');
+    assert.ok(!/gradient-animated|gradient-grain/.test(page), 'the walk reaches the rule — nothing legacy left on disk');
+    assert.ok(page.includes('<section class="bg-gradient-rainbow omega-dotgrid text-light" data-omega-dotfield>'), 'the hero wears the v2 treatment');
+    assert.ok(page.includes('<div class="omega-dotgrid rounded-4">Grain only</div>'), 'the static half converts without the motion attribute');
+    assert.ok(report.files.some((file) => file.edits.some((edit) => edit.rule === 'gradient-utilities')), 'the edits are reported under the rule');
+
+    const again = runCodemod(root, { write: true });
+    assert.strictEqual(again.totalEdits, 0, 'converting is a ONE-time move — a rerun changes nothing');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

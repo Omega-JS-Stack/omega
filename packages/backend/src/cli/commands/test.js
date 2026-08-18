@@ -10,8 +10,6 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
-// The rules SCHEMA version — setup.js owns it, this is the second generator.
-const { RULES_VERSION } = require('./setup');
 
 // The Firebase emulator hub — fixed, not part of the N7-allocated map.
 const HUB_PORT = 4400;
@@ -429,16 +427,17 @@ class TestCommand extends BaseCommand {
   }
 
   /**
-   * Stage the framework's canonical firestore.rules into the fixture — the
-   * SAME template `omega setup` ships to consumers (templates/firestore.rules,
-   * marker version stamped), so the rules suite exercises the real ruleset.
-   * Runtime-derived and gitignored like the service account: the fixture
-   * commits no rules copy that could drift from the template. A running
-   * emulator hot-reloads the file, so re-writing it every run is safe.
+   * Seed the fixture's BRAND rules source — the same seed `omega setup` ships
+   * to a consumer, hooks at their defaults. The framework half is no longer
+   * copied anywhere: the stage below compiles it in
+   * ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)), so the rules
+   * suite exercises the real compiled artifact, exactly what a consumer
+   * deploys. Runtime-derived and gitignored like the service account, and
+   * never clobbered — a fixture edit survives the run that reads it.
    */
   ensureFixtureRules(fixture) {
-    const template = jetpack.read(path.resolve(__dirname, '..', '..', '..', 'templates', 'firestore.rules'));
-    jetpack.write(path.join(fixture, 'firestore.rules'), template.replace('(v0.0.0)', `(v${RULES_VERSION})`));
+    const { ensureBrandRulesSource } = require('../utils/compile-rules');
+    ensureBrandRulesSource({ projectDir: fixture });
   }
 
   /**

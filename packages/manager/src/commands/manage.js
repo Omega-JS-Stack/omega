@@ -41,6 +41,7 @@ module.exports = async (options) => {
       migration: options.migration,
       limit: options.limit,
       ids: options.ids,
+      resetAssets: options.resetAssets,
     });
   }
 

@@ -390,6 +390,37 @@ function buildConfig(eleventyConfig, options) {
     pageOwnData.set(inputPath, own);
     return own;
   };
+
+  // The template's own SIDECAR data file (`<template>.11tydata.json`), re-read
+  // for the same reason (#269): page frontmatter is meta-only, so the sidecar
+  // is the page-level lane for a SHELL layout's band data — and Eleventy's
+  // cascade CONCATS a sidecar array onto the layout default, so a page could
+  // only append to a band, never replace it. `resolved` re-applies the sidecar
+  // with OUR deepMerge, the arrays-replace rule every other override lane
+  // obeys; object/string keys land exactly where the cascade already put them.
+  // JSON is the sidecar form Eleventy reads without a data-extension of ours
+  // (a module sidecar keeps pure cascade behavior), and a missing file — the
+  // common case — degrades the same way any read/parse failure does.
+  const pageSidecarData = new Map();
+  const sidecarPath = (inputPath) => {
+    const file = path.resolve(inputPath);
+    return path.join(path.dirname(file), `${path.basename(file, path.extname(file))}.11tydata.json`);
+  };
+  const readSidecarData = (inputPath) => {
+    if (pageSidecarData.has(inputPath)) return pageSidecarData.get(inputPath);
+    let sidecar = null;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(sidecarPath(inputPath), 'utf8'));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        sidecar = {};
+        for (const key of Object.keys(parsed)) {
+          if (!RESOLVED_OMIT.has(key)) sidecar[key] = parsed[key];
+        }
+      }
+    } catch { /* no sidecar, or malformed JSON — cascade behavior stands */ }
+    pageSidecarData.set(inputPath, sidecar);
+    return sidecar;
+  };
   eleventyConfig.addPreprocessor('omega-frontmatter', 'md,html,liquid', (data) => {
     const inputPath = data.page.inputPath;
     // Directory → collection tag, the Jekyll convention: a document under
@@ -515,6 +546,17 @@ function buildConfig(eleventyConfig, options) {
       }
       for (const key of Object.keys(data)) {
         if (!RESOLVED_OMIT.has(key)) out[key] = deepMerge(out[key], data[key]);
+      }
+
+      // Parity repair — sidecar lane (#269): the page's own data file is the
+      // sanctioned page-level lane for shell-layout band data, so its keys are
+      // re-applied here with the arrays-replace rule. It sits BELOW the
+      // template's own frontmatter, exactly where the cascade puts it.
+      const sidecar = readSidecarData(data.page.inputPath);
+      if (sidecar) {
+        for (const key of Object.keys(sidecar)) {
+          out[key] = deepMerge(out[key], sidecar[key]);
+        }
       }
 
       // Parity repair — collections lane: Eleventy's cascade merge concats

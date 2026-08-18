@@ -50,7 +50,7 @@
     "cli"
   ],
   "author": "ITW Creative Works",
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "preparePackage": {
     "input": "./src",
     "output": "./dist",

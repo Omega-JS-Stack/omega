@@ -68,12 +68,14 @@
 
   // Web accessible resources
   // The dev-website origin is BUILD-TIME-BAKED by design (N7 non-goal: a
-  // shipped extension can't probe ports). 4000 is the website convention —
-  // if your `omega dev` bumped, rebuild while it's running or pin
-  // `ports.website` in the brand config so both sides agree.
+  // shipped extension can't probe ports). The token resolves at package time to
+  // the origin the LIVE sibling website published — protocol and port both —
+  // and to the classic https://localhost:4000 when nothing is running. If your
+  // `omega dev` bumped, rebuild while it's running (or pin `ports.website` in
+  // the brand config) so both sides agree.
   externally_connectable: {
     matches: [
-      'http://localhost:4000/*',
+      '%%%devWebsiteOrigin%%%/*',
     ],
   },
 

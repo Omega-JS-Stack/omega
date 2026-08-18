@@ -11,9 +11,10 @@
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
  * - startVendorPropagation() — re-prepare dist-building frameworks when a
  *   vendored shared package (devkit, config, account) changes
- * - ensureFreshLocalDist() / freshnessBoot() — rebuild a locally-linked
- *   framework's stale dist (and its @omega.js/* runtime deps') at CLI boot
- *   (and re-exec once after a rebuild)
+ * - ensureFreshLocalDist() / freshnessBoot() — check a locally-linked
+ *   framework's dist (and its @omega.js/* runtime deps') at CLI boot: a link
+ *   into the monorepo is read-only and stops the boot loudly, any other local
+ *   checkout is rebuilt and the invocation re-execs once
  *
  * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
  * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
@@ -674,6 +675,13 @@ const FRESHNESS_SKIP_DIRS = new Set(['node_modules', '.temp', 'dist']);
 // desktop/extension end up with a dist/assets tree the web package owns.
 const DIST_EXTRAS = ['vendor'];
 
+// The one dist subtree the orphan scan skips entirely: a package's self-tests
+// SEED runtime state into dist/test/fixtures/ (backend writes its fixture
+// project's firestore.rules and service-account.json there). Nothing in it can
+// shadow a consumer require, and the exemption survives a crashed run where a
+// teardown would not (#352). Files there WITH a src counterpart still age.
+const DIST_FIXTURE_STATE = 'test/fixtures/';
+
 // The per-package heal mutex (mkdir-as-mutex, owner pid inside) — .omega/ is
 // gitignored monorepo-wide, so the lock never dirties a package.
 const HEAL_LOCK = path.join('.omega', 'heal.lock');
@@ -864,7 +872,7 @@ function distStaleReason(options) {
 
   const extras = allowedDistExtras(pkg);
   for (const relative of distFiles.keys()) {
-    if (srcFiles.has(relative)) {
+    if (srcFiles.has(relative) || relative.startsWith(DIST_FIXTURE_STATE)) {
       continue;
     }
     if (!extras.some((extra) => relative === extra || relative.startsWith(`${extra}/`))) {
@@ -1148,25 +1156,52 @@ function warnWatchDown(monorepoRoot) {
     return;
   }
   warnedWatchDown = true;
-  console.warn(`omega: the monorepo src→dist watch is not running — edits reach linked apps only at CLI boot; run \`npm start\` in ${monorepoRoot} for live rebuilds`);
+  console.warn(`omega: the monorepo src→dist watch is not running: nothing rebuilds a linked package's dist, so run \`npm start\` in ${monorepoRoot} before building against it`);
 }
 
 /**
- * Ensure a locally-linked framework's dist is at least as new as its src —
- * rebuilding it (`npm run prepare`) when a src edit landed without a prepare,
- * so consumers never run stale dist code just because nobody remembered to
+ * The loud stop for a monorepo-linked package whose dist is missing or stale
+ * (#281). A consumer build does not fix it: the package belongs to the monorepo
+ * and its watch, so the build says what is unbuilt, where, and what to start.
+ * @param {object} result - A 'stale-linked' ensureFreshLocalDist result.
+ * @returns {string} The multi-line message, stderr-bound.
+ */
+function staleLinkedMessage(result) {
+  return [
+    '',
+    `omega: ${result.packageName} is linked into the omega monorepo and its dist is not built (${result.reason}).`,
+    `omega: linked packages are read-only to consumer builds, so this build will not rebuild ${result.dir}.`,
+    result.watching
+      ? `omega: the monorepo watch (\`npm start\` in ${result.monorepoRoot}) is running but has not landed that build yet: give it a moment, then re-run this command.`
+      : `omega: the monorepo watch owns that dist: run \`npm start\` in ${result.monorepoRoot} (one-off: \`npm run prepare -w ${result.packageName}\`), then re-run this command.`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Check that a locally-linked framework's dist is at least as new as its src —
+ * reporting or rebuilding it when a src edit landed without a prepare, so
+ * consumers never run stale dist code just because nobody remembered to
  * rebuild (Ian's ask, 2026-07-20).
  *
  * Only acts on SOURCE CHECKOUTS: a registry install (real path still inside
  * node_modules) is untouched. Staleness is PER-FILE evidence (distStaleReason),
  * never a whole-tree mtime compare. A live monorepo watch buys a bounded grace
- * for its in-flight copy — then the boot heals anyway, because a watcher that
- * silently died is exactly what let a stale dist serve for a day (#195). Heals
- * take the package's cross-process lock, so N booting CLIs produce one build.
+ * for its in-flight copy — then the check reports anyway, because a watcher that
+ * silently died is exactly what let a stale dist serve for a day (#195).
+ *
+ * A link into the OMEGA MONOREPO is read-only here (#281): that checkout is
+ * shared (a fleet of agents, several brands, the monorepo's own processes), so
+ * a consumer build never prepares it in place — a prepare purges the dist a
+ * sibling process is mid-require on, and refetches network caches, all of it
+ * invisible to git. Those come back 'stale-linked' and freshnessBoot stops the
+ * invocation loudly. Any other local checkout (a link with no watch behind it)
+ * still heals, under the package's cross-process lock so N booting CLIs produce
+ * one build.
  * @param {object} options
  * @param {string} options.packageName - The package to check (e.g. '@omega.js/web').
  * @param {string} [options.fromDir] - Resolution origin (default process.cwd()).
- * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'rebuilt'|'rebuild-failed', by?: 'self'|'watch'|'peer', packageName: string, dir?: string}}
+ * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'rebuilt'|'stale-linked'|'rebuild-failed', by?: 'self'|'watch'|'peer', packageName: string, dir?: string, reason?: string, monorepoRoot?: string, watching?: boolean}}
  *   Every HEALED outcome is 'rebuilt' — `by` only says who built it — because
  *   whoever built it, this process booted from the pre-heal dist and must
  *   re-exec.
@@ -1225,6 +1260,12 @@ function ensureFreshLocalDist(options) {
         return { status: 'rebuilt', by: 'watch', packageName, dir: realDir };
       }
     }
+  }
+
+  // Linked into the monorepo: the watch owns this dist, and a consumer build
+  // owns nothing here (#281). Report it and let the boot stop the invocation.
+  if (inMonorepo) {
+    return { status: 'stale-linked', packageName, dir: realDir, reason, monorepoRoot, watching: Boolean(watchPid) };
   }
 
   return withHealLock(realDir, () => {
@@ -1311,8 +1352,13 @@ let freshnessBootRan = false;
  * dist — so the same invocation re-execs ONCE (OMEGA_FRESH_REEXEC guards the
  * loop) and this process exits with the child's status. That is EVERY heal,
  * whoever built it (`by: self|watch|peer`): a dist the watch or a peer CLI
- * rebuilt leaves this process just as stale as one it rebuilt itself. Every
- * other outcome returns the HOST's result and the boot continues.
+ * rebuilt leaves this process just as stale as one it rebuilt itself.
+ *
+ * A 'stale-linked' entry is the LOUD STOP (#281): the package lives in the
+ * shared monorepo, nothing here may build it, and running on a dist nobody
+ * built is the silent fallback the ruling forbids — so the boot prints what is
+ * unbuilt and exits 1 before the verb runs. Every other outcome returns the
+ * HOST's result and the boot continues.
  * @param {object} options - Same as ensureFreshLocalDist (packageName = the host).
  * @returns {{status: string, by?: string, packageName: string, dir?: string}}
  */
@@ -1328,6 +1374,10 @@ function freshnessBoot(options) {
   let healed = false;
   for (const entry of freshnessCheckList(options)) {
     const entryResult = ensureFreshLocalDist(entry);
+    if (entryResult.status === 'stale-linked') {
+      console.error(staleLinkedMessage(entryResult));
+      process.exit(1);
+    }
     healed = healed || entryResult.status === 'rebuilt';
     if (entry.packageName === options.packageName) {
       result = entryResult; // The host is last — its result is the boot's

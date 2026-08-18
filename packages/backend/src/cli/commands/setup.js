@@ -17,11 +17,11 @@ const { omegaAllRulesRegex } = require('./setup-tests/helpers.js');
 // is Firebase's to provide, the laptop only has to meet the floor.
 const frameworkPackage = require('../../../package.json');
 
-// The version stamped into every generated rules block's open marker. This is
-// the rules SCHEMA version and bumps ONLY when the generated rule semantics
-// change, never with the package version. Tying it to the package version made
-// every release rewrite every consumer's rules files and dirty their tree.
-const RULES_VERSION = '1.0.0';
+// The rules SCHEMA version — the stamp in `database.rules.json`'s open marker
+// and in the compiled firestore artifact's header. Owned by the rules compiler
+// (src/cli/utils/compile-rules.js) and re-exported here, the address every
+// caller already knows.
+const { RULES_VERSION } = require('../utils/compile-rules');
 
 class SetupCommand extends BaseCommand {
   async execute() {
@@ -111,7 +111,7 @@ class SetupCommand extends BaseCommand {
 
     // Load the rules files (reads from @omega.js/backend's own templates/, not consumer files)
     this.getRulesFile();
-    // The rules SCHEMA version rides in the block's open marker: `// ========== OMEGA Rules (v1.0.0) ==========`
+    // The rules SCHEMA version rides in the block's open marker: `// ========== OMEGA Rules (v2.0.0) ==========`
     self.default.rulesVersionRegex = new RegExp(`========== OMEGA Rules \\(v${RULES_VERSION.replace(/\./g, '\\.')}\\) ==========`);
 
     // Resolve project info — safe now, scaffoldConfigs guarantees these exist.
@@ -161,9 +161,9 @@ class SetupCommand extends BaseCommand {
 
   getRulesFile() {
     const self = this.main;
-    self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('(v0.0.0)', `(v${RULES_VERSION})`);
-    self.default.firestoreRulesCore = self.default.firestoreRulesWhole.match(omegaAllRulesRegex)[0];
-
+    // firestore.rules is COMPILED now (#255), not marker-managed: the brand's
+    // file is pure source and the framework half ships in templates/, so
+    // nothing here generates it. database.rules.json keeps the marker model.
     self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('(v0.0.0)', `(v${RULES_VERSION})`);
     self.default.databaseRulesCore = self.default.databaseRulesWhole.match(omegaAllRulesRegex)[0];
   }
@@ -313,6 +313,17 @@ class SetupCommand extends BaseCommand {
       const templatePath = path.join(templatesDir, 'index.js');
       jetpack.copy(templatePath, indexPath);
       ui.status('add', `Created ${chalk.cyan('src/index.js')}`, { level: 2 });
+      touched++;
+    }
+
+    // firestore.rules — the brand's SOURCE half (#255). Seeded HERE, before
+    // the stage below compiles it, so a virgin app's first stage already has a
+    // real source to splice the framework half into. Migration off a legacy
+    // marker block + the hook lint belong to the firestore-rules-file check.
+    const firestoreRulesPath = `${self.firebaseProjectPath}/firestore.rules`;
+    if (!jetpack.exists(firestoreRulesPath)) {
+      jetpack.copy(path.join(templatesDir, 'firestore.rules'), firestoreRulesPath);
+      ui.status('add', `Created ${chalk.cyan('firestore.rules')}`, { level: 2 });
       touched++;
     }
 

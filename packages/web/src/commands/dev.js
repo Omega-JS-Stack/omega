@@ -15,10 +15,14 @@
  * --port=4001` (or a config `ports.website` entry) PINS the port instead:
  * busy = hard error, never a silent bump. The
  * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
- * website port are injected into the page chrome as `dev.ports` so
+ * website port and its resolved ORIGIN (protocol included,
+ * [#262](https://github.com/Omega-JS-Stack/omega/issues/262)) are injected into
+ * the page chrome as `dev` so
  * @omega.js/client connects to the stack that is ACTUALLY running — read PER
- * RENDER, and per request for the auth-emulator proxy, because a backend that
- * boots after this server (or restarts onto bumped ports) is the normal case
+ * RESPONSE (the render-time bake is advisory, rewritten as the page is served,
+ * [#346](https://github.com/Omega-JS-Stack/omega/issues/346)) and per request
+ * for the auth-emulator proxy, because a backend that boots after this server
+ * (or restarts onto bumped ports) is the normal case
  * ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
  *
  * `omega dev --local` first links every @omega.js framework the brand uses to
@@ -71,10 +75,6 @@ module.exports = async function (options) {
   const siteData = loadSiteData(paths.root);
   const clientEntry = resolveClientEntry();
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
-  // LIVE, never a snapshot: both the baked page chrome and the auth-emulator
-  // proxy resolve the sibling backend's map at use time (#300).
-  const devPorts = devPortsOption(paths.root, port);
-  const authPort = () => devPorts().ports.auth;
 
   // HTTPS (same contract as the backend's serve/emulator): the PUBLIC website
   // port speaks TLS through the shared mkcert proxy; eleventy sits on an
@@ -96,7 +96,17 @@ module.exports = async function (options) {
     }
   }
 
-  applyDevSiteUrl(siteData, port, httpsCerts !== null);
+  // The resolved website ORIGIN — protocol and port together, since only this
+  // point in the boot knows whether the public port speaks TLS. Everything that
+  // needs "where the dev website answers" reads THIS: site.url, the page chrome,
+  // and the ports file siblings read (#262).
+  const origin = devWebsiteOrigin(port, httpsCerts !== null);
+  applyDevSiteUrl(siteData, origin);
+
+  // LIVE, never a snapshot: both the baked page chrome and the auth-emulator
+  // proxy resolve the sibling backend's map at use time (#300).
+  const devPorts = devPortsOption(paths.root, port, origin);
+  const authPort = () => devPorts().ports.auth;
 
   // ---- Sample content on disk (spec §8): mirror the injected filler under
   // the gitignored .omega/sample-content/ so it can be read and copied —
@@ -248,7 +258,7 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort));
+      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts));
       // Arms the watch registration for the config build below — the engine's
       // captured reads are what fill it in (#200). The reset union goes to
       // Eleventy, the rescan union to the light content watcher; a config
@@ -287,8 +297,10 @@ module.exports = async function (options) {
 
   // Publish the resolved website port for sibling tools (same contract as the
   // backend emulator's ports file) and retract it on shutdown. The PUBLIC
-  // port is the published one — the internal eleventy port is plumbing.
-  writePortsFile(paths.root, { website: port });
+  // port is the published one — the internal eleventy port is plumbing. The
+  // ORIGIN rides along, because a sibling reading `website: 4000` cannot know
+  // whether this run speaks TLS (#262).
+  writePortsFile(paths.root, { website: port }, { origin });
   process.on('exit', () => clearPortsFile(paths.root));
   process.on('SIGINT', () => process.exit(0));
 
@@ -350,14 +362,23 @@ const SERVER_OPTIONS = new Map();
  *   GETTER resolving it per request (the live map, #300); a getter keys as
  *   `live`, since a session runs exactly one dev server and the getter's
  *   identity would otherwise change on every config reset
+ * @param {function} [devChrome] - the live dev-chrome getter (devPortsOption);
+ *   given, every HTML response is rewritten to carry it (#346)
  * @returns {object} setServerOptions() payload
  */
-function devServerOptions(outDir, authPort) {
-  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort}`;
+function devServerOptions(outDir, authPort, devChrome) {
+  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort} ${devChrome ? 'inject' : 'plain'}`;
 
   if (!SERVER_OPTIONS.has(key)) {
     SERVER_OPTIONS.set(key, {
-      middleware: [devAuthEmulator(authPort), devCleanUrls(outDir), devImageFallback(outDir)],
+      middleware: [
+        devAuthEmulator(authPort),
+        // After the proxy, which answers its own prefixes and returns: the
+        // emulator's pages are not this site's pages, and nothing rewrites them
+        ...(devChrome ? [devInjectDevPorts(devChrome)] : []),
+        devCleanUrls(outDir),
+        devImageFallback(outDir),
+      ],
       watch: [
         path.join(outDir, 'assets', 'css'),
         path.join(outDir, 'assets', 'js'),
@@ -581,6 +602,57 @@ function devAuthEmulator(authPort) {
 }
 
 /**
+ * The `dev:` value of the Configuration chrome, as `core/_includes/core/foot.html`
+ * renders it (`dev: {{ jekyll.dev | jsonify }},`) — one compact JSON line, or
+ * `null` on a build that bakes no dev chrome. The lookahead is what makes the
+ * non-greedy body stop at the object's OWN close brace rather than the nested
+ * ports one. The coupling to that template is pinned by the served-page test,
+ * which rewrites a REAL rendered page.
+ */
+const DEV_CHROME = /(\n\s*dev: )(?:\{.*?\}|null)(?=,\n)/s;
+
+/**
+ * Serve-time dev-ports injection (#346): every HTML response leaves this server
+ * carrying the map of the stack running RIGHT NOW, whatever its page baked.
+ *
+ * The render-time bake is a snapshot of the moment a page was built, and the
+ * normal boot order builds every page before the backend publishes anything:
+ * the website build finishes in under a second while the emulator suite seeds
+ * for minutes, so the whole initial fleet bakes `{ website }` alone and nothing
+ * re-renders it — no source file changed. Same hole for a mid-session emulator
+ * restart onto bumped numbers. Rewriting the chrome as the page goes out covers
+ * both by construction; the bake stays as it is on disk, advisory, and the
+ * built output is byte-for-byte what the build wrote.
+ *
+ * The rewrite wraps `res.end` rather than the response object: eleventy wrapped
+ * `res` before the middleware chain ran (its live-reload injection), so ours is
+ * the OUTER end — it rewrites the string the static handler hands over, and
+ * eleventy's transform then runs on the rewritten html and sizes the body from
+ * it. HTML only, and only a response whose body arrives as a string, which is
+ * how eleventy serves a page. A response with no chrome (a redirect stub, an
+ * error page) matches nothing and passes through untouched.
+ * @param {function} devChrome - the live dev-chrome getter (devPortsOption)
+ * @returns {function} connect-style middleware
+ */
+function devInjectDevPorts(devChrome) {
+  return (req, res, next) => {
+    const end = res.end;
+
+    res.end = (data, ...rest) => {
+      const contentType = String(res.getHeader('content-type') || '');
+
+      if (typeof data === 'string' && contentType.startsWith('text/html')) {
+        return end.call(res, data.replace(DEV_CHROME, (match, open) => `${open}${JSON.stringify(devChrome())}`), ...rest);
+      }
+
+      return end.call(res, data, ...rest);
+    };
+
+    return next();
+  };
+}
+
+/**
  * Clean-URL resolution, the legacy serve.js contract: pages are flat `.html`
  * files with slash-free URLs, so `/signin` (and a stray `/signin/`) serves
  * `signin.html`. Mirrors production GitHub Pages, which resolves extensionless
@@ -627,16 +699,27 @@ function devCleanUrls(outDir) {
 }
 
 /**
+ * The dev website ORIGIN this run answers on — the ONE place protocol and port
+ * are put together (#262). Every consumer of "where the dev website is" derives
+ * from this: site.url, the published ports file, and the page chrome.
+ * @param {number} port - the resolved dev-server (public) port
+ * @param {boolean} [https] - whether the public port speaks TLS (mkcert proxy)
+ * @returns {string} the origin, protocol included
+ */
+function devWebsiteOrigin(port, https) {
+  return `${https ? 'https' : 'http'}://localhost:${port}`;
+}
+
+/**
  * Dev builds link to THIS server, never the live site (legacy _config_dev.yml
  * url-override parity): site.url is the one root every absolute-URL surface
  * derives from — canonicals/og tags, omega_external, absolute_url, redirect
  * pages, nav — so pointing it at the local origin keeps every click in dev.
  * @param {object} siteData - the loaded site global (mutated)
- * @param {number} port - the resolved dev-server port
- * @param {boolean} [https] - whether the public port speaks TLS (mkcert proxy)
+ * @param {string} origin - the resolved dev website origin (devWebsiteOrigin)
  */
-function applyDevSiteUrl(siteData, port, https) {
-  siteData.url = `${https ? 'https' : 'http'}://localhost:${port}`;
+function applyDevSiteUrl(siteData, origin) {
+  siteData.url = origin;
 }
 
 /**
@@ -709,13 +792,19 @@ function loadPortPins(root) {
  * connects to the stack that is actually running: a backend that booted after
  * this server, or an emulator that restarted onto bumped numbers, lands in
  * the very next render instead of never.
+ *
+ * The website ORIGIN rides the same map (#262): a page knows its own origin,
+ * but a desktop/extension surface reading this chrome does not, and protocol is
+ * not derivable from a port number.
  * @param {string} root - this app's root (its own ports file is skipped)
  * @param {number} port - the resolved website port
+ * @param {string} origin - the resolved website origin (devWebsiteOrigin)
  * @returns {function} () => the dev chrome object
  */
-function devPortsOption(root, port) {
+function devPortsOption(root, port, origin) {
   return () => ({
     ports: { ...readSiblingPorts(root), website: port },
+    origin,
     authEmulatorProxy: true,
   });
 }
@@ -734,6 +823,7 @@ module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
 module.exports.watchRescanTargets = watchRescanTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
+module.exports.devWebsiteOrigin = devWebsiteOrigin;
 
 async function linkBrandToMonorepo() {
   const local = require('@omega.js/devkit/local');

@@ -13,7 +13,9 @@
  * operation is mtime-diffed — only missing or stale outputs regenerate —
  * which replaces omega-manager's `--onboarding` gate on the write
  * operations (it regenerated blindly, so running every time was too
- * expensive; it also had no dry-run guard).
+ * expensive; it also had no dry-run guard). `--reset-assets` forces a
+ * rebuild the timestamps would skip by clearing the cache first
+ * (lib/reset.js).
  *
  * The brandmark is the root of every derived asset. When it's missing
  * and MrLogo credentials are present (MRLOGO_SERVICE_ACCOUNT /
@@ -33,6 +35,7 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 const { input } = require('@omega.js/devkit/prompt');
 const { withSpinner } = require('@omega.js/devkit/flows');
 const { resolveLogoAuth, generateBrandmark, MRLOGO_URL } = require('./lib/brandmark-api.js');
+const { resolveResetKinds, resetAssetsCache } = require('./lib/reset.js');
 const { canPrompt } = require('../../lib/run-gates.js');
 
 module.exports.run = createServiceRunner({
@@ -80,10 +83,27 @@ module.exports.run = createServiceRunner({
       }
     }
 
+    const outDir = join(context.brandRoot, '.omega', 'assets');
+
+    // The force refresh (#214): clear the asked kinds before the operations
+    // run, so the mtime gate below sees them missing and rebuilds them. Loud
+    // by design, because this is the one thing the service destroys and an
+    // operator who typed the flag by accident has to see what went.
+    const resetKinds = resolveResetKinds(context.options?.resetAssets);
+    if (resetKinds.length > 0) {
+      const dryRun = context.options?.dryRun || false;
+      const { removed } = resetAssetsCache({ outDir, kinds: resetKinds, dryRun });
+      const what = `${chalk.bold(resetKinds.join(' + '))} ${chalk.dim(`(${removed.length} path${removed.length === 1 ? '' : 's'} under .omega/assets/)`)}`;
+
+      console.log(dryRun
+        ? `    ${chalk.yellow('[DRY RUN]')} Would reset ${what}`
+        : `    ${chalk.yellow('↺')} Reset ${what}; regenerating below`);
+    }
+
     return {
       logoDir,
       brandmarkPath,
-      outDir: join(context.brandRoot, '.omega', 'assets'),
+      outDir,
     };
   },
 });

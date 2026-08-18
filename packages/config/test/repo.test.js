@@ -10,7 +10,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseRepoSlug, brandRepoName, brandRepoOwner, loadConfig } = require('../src/index.js');
+const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, loadConfig } = require('../src/index.js');
 
 test('brandRepoName: explicit owner/name slug names the repo', () => {
   assert.equal(
@@ -59,6 +59,25 @@ test('backend load: the target-overlaid github.repo drives the derivation (CMS c
   const { config } = loadConfig(root, 'backend');
   assert.equal(brandRepoOwner(config), 'itw-creative-works');
   assert.equal(brandRepoName(config), 'acme-brand');
+});
+
+test('brandRepo: the finished value frameworks hand to consumer code (#290)', () => {
+  assert.deepEqual(
+    brandRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } }),
+    { owner: 'Acme-Org', name: 'acme', repo: 'Acme-Org/acme' },
+  );
+
+  // The target overlay wins, exactly as the two halves resolve it.
+  assert.deepEqual(
+    brandRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-brand' } } }, github: { repo: 'itw-creative-works/acme-content' } }),
+    { owner: 'itw-creative-works', name: 'acme-content', repo: 'itw-creative-works/acme-content' },
+  );
+});
+
+test('brandRepo: half an address addresses nothing — the slug stays empty', () => {
+  assert.deepEqual(brandRepo({ brand: { id: 'acme' } }), { owner: '', name: 'acme', repo: '' });
+  assert.deepEqual(brandRepo({ repo: { providers: { github: { org: 'Acme-Org' } } } }), { owner: 'Acme-Org', name: '', repo: '' });
+  assert.deepEqual(brandRepo({}), { owner: '', name: '', repo: '' });
 });
 
 test('parseRepoSlug: shapes', () => {

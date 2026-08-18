@@ -320,11 +320,13 @@ module.exports = {
       },
     },
 
-    // ─── normalizeOptions: every prompt form survives the ai.request() hop ───
+    // ─── normalizeOptions: every prompt form collapses to the one shape ───
 
     {
-      name: 'normalize-options-array-prompt-stays-an-array',
+      name: 'normalize-options-array-prompt-becomes-resolved-segments',
       async run({ assert }) {
+        ensureFixtures();
+
         const out = normalizeOptions({
           prompt: [
             { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
@@ -333,12 +335,12 @@ module.exports = {
           message: { content: 'hello' },
         });
 
-        assert.equal(Array.isArray(out.prompt), true, 'array prompt stays an array');
+        assert.equal(Array.isArray(out.prompt), true, 'the internal shape is a segment array');
         assert.equal(out.prompt.length, 3, 'rules segment + the two caller segments');
         assert.equal(out.prompt[0].role, 'system', 'rules ride as a leading system segment');
         assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules content');
-        assert.equal(out.prompt[1].path, HOUSE_STYLE_PATH, 'caller segment path preserved');
-        assert.deepEqual(out.prompt[1].settings, { brand: 'Paperloom' }, 'caller segment settings preserved');
+        assert.equal(out.prompt[1].content, 'House style for Paperloom.', 'caller segment file read and templated here');
+        assert.equal(out.prompt[1].path, undefined, 'the path is consumed at the one load point');
         assert.equal(out.prompt[2].role, 'developer', 'caller segment role preserved');
         assert.equal(out.prompt[2].content, 'operator config', 'caller segment content preserved');
         assert.equal(out.prompt.content, undefined, 'segments NOT collapsed into a content-only object');
@@ -410,17 +412,20 @@ module.exports = {
     },
 
     {
-      name: 'normalize-options-object-prompt-keeps-object-form',
+      name: 'normalize-options-object-prompt-becomes-resolved-segments',
       async run({ assert }) {
+        ensureFixtures();
+
         const out = normalizeOptions({
           prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
           message: { content: 'hello' },
         });
 
-        assert.equal(Array.isArray(out.prompt), false, 'object form stays an object');
-        assert.equal(out.prompt.path, HOUSE_STYLE_PATH, 'path preserved');
-        assert.deepEqual(out.prompt.settings, { brand: 'Paperloom' }, 'settings preserved');
-        assert.equal(out.prompt.content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules injected as content');
+        assert.equal(Array.isArray(out.prompt), true, 'the object form collapses into the same segment array');
+        assert.equal(out.prompt.length, 2, 'rules segment + the caller segment');
+        assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules lead');
+        assert.equal(out.prompt[1].role, 'system', 'the object form is one implicit system segment');
+        assert.equal(out.prompt[1].content, 'House style for Paperloom.', 'prompt file read and templated here');
       },
     },
 
@@ -432,8 +437,97 @@ module.exports = {
           message: { content: 'hello' },
         });
 
-        assert.equal(out.prompt.content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules prepended');
-        assert.equal(out.prompt.content.includes('You are a helpful assistant.'), true, 'caller text preserved');
+        assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules prepended');
+        assert.equal(out.prompt[1].content, 'You are a helpful assistant.', 'caller text preserved');
+      },
+    },
+
+    {
+      name: 'normalize-options-path-and-content-together-throws',
+      async run({ assert }) {
+        ensureFixtures();
+
+        const cases = [
+          {
+            label: 'options.prompt',
+            options: { prompt: { path: HOUSE_STYLE_PATH, content: 'inline system text' } },
+          },
+          {
+            label: 'options.message',
+            options: { message: { path: OPERATOR_PATH, content: 'inline user text' } },
+          },
+        ];
+
+        for (const testCase of cases) {
+          let threw = false;
+
+          try {
+            normalizeOptions(testCase.options);
+          } catch (e) {
+            threw = true;
+            assert.equal(String(e.message).includes(testCase.label), true, `error names ${testCase.label}`);
+            assert.equal(String(e.message).includes('path'), true, 'error names the path');
+            assert.equal(String(e.message).includes('content'), true, 'error names the content');
+          }
+
+          assert.equal(threw, true, `${testCase.label} with both a path and a content fails loudly`);
+        }
+      },
+    },
+
+    {
+      name: 'normalize-options-object-prompt-with-messages-system-turn-throws',
+      async run({ assert }) {
+        let threw = false;
+
+        try {
+          normalizeOptions({
+            prompt: { content: 'prompt system text' },
+            messages: [
+              { role: 'system', content: 'caller system turn' },
+              { role: 'user',   content: 'hello' },
+            ],
+          });
+        } catch (e) {
+          threw = true;
+          assert.equal(String(e.message).includes('options.prompt'), true, 'error names the prompt');
+          assert.equal(String(e.message).includes('system-role turn'), true, 'error names the competing system turn');
+        }
+
+        assert.equal(threw, true, 'two system prompts in one call fail loudly');
+      },
+    },
+
+    {
+      name: 'normalize-options-message-path-loads-once-for-every-format',
+      async run({ assert }) {
+        ensureFixtures();
+
+        const out = normalizeOptions({
+          prompt: { content: 'You are terse.' },
+          message: { path: OPERATOR_PATH },
+        });
+
+        // OpenAI reads the message through its own loader (a no-op second pass
+        // now the path is consumed); the Claude formatters read message.content
+        const promptSegments = normalizePrompt(out.prompt).map((segment) => ({
+          role: segment.role,
+          content: loadContent(segment, noopLog),
+        }));
+        const openaiPayload = formatHistory(
+          baseOptions({ message: { ...out.message, attachments: [] } }),
+          promptSegments,
+          loadContent(out.message, noopLog),
+          noopLog,
+        );
+        const openaiUserText = openaiPayload[openaiPayload.length - 1].content[0].text;
+
+        // Both Claude providers (anthropic, claude-code) share buildMessages
+        const { messages } = format.buildMessages(out);
+        const claudeUserText = messages[messages.length - 1].content;
+
+        assert.equal(openaiUserText, 'Operator config.', 'the message file reaches the OpenAI payload');
+        assert.equal(claudeUserText, openaiUserText, 'the Claude formats carry the same file text');
       },
     },
 
@@ -472,11 +566,12 @@ module.exports = {
         });
         const { system } = format.buildMessages(out);
 
-        // Claude reads the object form exactly as OpenAI does: a `path` wins over
-        // `content`, so the system prompt is the loaded file (the rules that
-        // normalizeOptions writes into `content` are dropped by that precedence
-        // on EVERY provider — pre-existing, not this path's doing)
-        assert.equal(system, 'House style for Paperloom.', 'object-form prompt file loaded and templated');
+        // The object form is loaded at the ONE normalize point, so the file text
+        // and the universal rules both reach Claude: nothing competes for the
+        // `content` slot inside a provider any more
+        assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'first universal rule survives the object form');
+        assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[1]), true, 'second universal rule survives the object form');
+        assert.equal(system.includes('House style for Paperloom.'), true, 'object-form prompt file loaded and templated');
       },
     },
 

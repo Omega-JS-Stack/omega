@@ -1,54 +1,68 @@
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
-const { omegaAllRulesRegex } = require('./helpers.js');
+const {
+  BRAND_RULES_FILE,
+  COMPILED_RULES_FILE,
+  compileFirestoreRules,
+  ensureBrandRulesSource,
+  isLegacyMarkerFile,
+  missingBrandHooks,
+} = require('../../utils/compile-rules');
 
+/**
+ * The brand's `firestore.rules` is SOURCE now, not a managed block
+ * ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)): setup seeds it
+ * once, converts a legacy marker-block file ONCE, and lints that both framework
+ * hooks are present — re-seeding a missing one loudly. The deployed artifact is
+ * `dist/firestore.rules`, compiled by every stage.
+ */
 class FirestoreRulesFileTest extends BaseTest {
   getName() {
-    return 'update firestore rules file';
+    return 'compile firestore rules';
   }
 
   async run() {
     const self = this.self;
-    const exists = jetpack.exists(`${self.firebaseProjectPath}/firestore.rules`);
-    const contents = jetpack.read(`${self.firebaseProjectPath}/firestore.rules`) || '';
-    const containsCore = contents.match(omegaAllRulesRegex);
-    const matchesVersion = contents.match(self.default.rulesVersionRegex);
+    const contents = jetpack.read(`${self.firebaseProjectPath}/${BRAND_RULES_FILE}`) || '';
 
-    // Always run fix() to ensure rules are synced, even if version matches
-    // This ensures the rules content is always up to date
-    await this.fix();
+    if (!contents.trim() || isLegacyMarkerFile(contents)) {
+      return false;
+    }
 
-    return (exists && !!containsCore && !!matchesVersion);
+    // An unparseable file fails the check and lets fix() throw with the
+    // compiler's precise message — setup must never quietly rewrite rules it
+    // could not read.
+    try {
+      if (missingBrandHooks(contents).length) {
+        return false;
+      }
+    } catch (error) {
+      return false;
+    }
+
+    // The artifact is stage output — a source-only pass still has to leave a
+    // current compile behind (setup's own stage ran before this check).
+    compileFirestoreRules({ projectDir: self.firebaseProjectPath });
+
+    return jetpack.exists(`${self.firebaseProjectPath}/${COMPILED_RULES_FILE}`) === 'file';
   }
 
   async fix() {
     const self = this.self;
-    const name = 'firestore.rules';
-    const path = `${self.firebaseProjectPath}/${name}`;
-    const exists = jetpack.exists(path);
-    let contents = jetpack.read(path) || '';
+    const result = ensureBrandRulesSource({ projectDir: self.firebaseProjectPath });
 
-    if (!exists || !contents) {
-      console.log(chalk.yellow(`Writing new ${name} file...`));
-      jetpack.write(path, self.default.firestoreRulesWhole);
-      contents = jetpack.read(path) || '';
+    if (result.created) {
+      console.log(chalk.yellow(`Seeded ${BRAND_RULES_FILE} — your rules plus the framework hooks. It is yours to edit.`));
+    }
+    if (result.migrated) {
+      console.log(chalk.yellow(`Converted ${BRAND_RULES_FILE} off the legacy OMEGA Rules marker block — your custom rules were kept, the managed block now compiles in from @omega.js/backend.`));
+    }
+    for (const hook of result.reseeded) {
+      console.log(chalk.red(`${BRAND_RULES_FILE} was missing the required \`${hook}()\` hook — re-seeded with its default. Review it: the framework's user-doc write rule calls it.`));
     }
 
-    const hasTemplate = contents.match(omegaAllRulesRegex);
-    if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} and add the '// ========== OMEGA Rules (v0.0.0) ==========' ... '// ========== End OMEGA Rules ==========' marker block to it.`));
-      return;
-    }
-
-    // Always replace rules to ensure they're in sync with @omega.js/backend template
-    const originalContents = contents;
-    contents = contents.replace(omegaAllRulesRegex, self.default.firestoreRulesCore);
-
-    if (contents !== originalContents) {
-      jetpack.write(path, contents);
-      console.log(chalk.yellow(`Updated @omega.js/backend rules in ${name} file`));
-    }
+    compileFirestoreRules({ projectDir: self.firebaseProjectPath });
   }
 }
 

@@ -161,6 +161,47 @@ test('any shared key inside a target entry overrides the shared value for that s
   assert.strictEqual(loadConfig(root, 'web').config.monitoring.dsn, 'https://brand-shared.example.com');
 });
 
+test('the six manager-level sections resolve shared, and a targets.backend block still overrides them (#277)', (t) => {
+  const root = makeFixture('manager-sections-shared', {
+    'config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme' },
+      parent: 'https://itwcreativeworks.com',
+      github: { user: 'acme-org' },
+      reviews: { enabled: true, sites: ['trustpilot.com'] },
+      marketing: { campaigns: { enabled: true, platform: 'sendgrid' } },
+      blog: { enabled: false },
+      dataRequest: { queries: [] },
+      targets: {
+        web: {},
+        backend: { parent: 'self', marketing: { campaigns: { platform: 'beehiiv' } } },
+      },
+    }`,
+  });
+  cleanup(t, root);
+
+  // The manager reads the brand config UNFOLDED (no target), so the shared level is its home
+  const brandView = loadConfig(root);
+  assert.deepStrictEqual(brandView.errors, []);
+  assert.strictEqual(brandView.config.parent, 'https://itwcreativeworks.com');
+  assert.strictEqual(brandView.config.marketing.campaigns.platform, 'sendgrid');
+  assert.strictEqual(brandView.config.reviews.sites[0], 'trustpilot.com');
+
+  // A website-only surface sees the shared values, and they validate there
+  const webView = loadConfig(root, 'web');
+  assert.deepStrictEqual(webView.errors, []);
+  assert.strictEqual(webView.config.parent, 'https://itwcreativeworks.com');
+  assert.strictEqual(webView.config.blog.enabled, false);
+
+  // targets.backend stays a valid OVERRIDE via the existing merge chain, with no schema of its own
+  const backendView = loadConfig(root, 'backend');
+  assert.deepStrictEqual(backendView.errors, []);
+  assert.strictEqual(backendView.config.parent, 'self');
+  assert.strictEqual(backendView.config.marketing.campaigns.platform, 'beehiiv');
+  // ...and the shared keys the override did not touch survive it
+  assert.strictEqual(backendView.config.marketing.campaigns.enabled, true);
+  assert.strictEqual(backendView.config.github.user, 'acme-org');
+});
+
 test('resolved config keeps the merged targets map — enablement survives resolution', (t) => {
   const root = makeFixture('targets-map', BRAND_MONOREPO);
   cleanup(t, root);

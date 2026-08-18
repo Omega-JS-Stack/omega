@@ -1,5 +1,7 @@
 // Unit tests for src/local.js ensureFreshLocalDist/freshnessBoot — the
-// local-dist freshness guard (auto-rebuild stale dists at CLI boot).
+// local-dist freshness guard: detect a stale linked dist at CLI boot, heal a
+// plain local checkout, and STOP on a monorepo link, which is read-only to
+// consumer builds (#281).
 //
 // Real-execution only (no mocks): every scenario runs against a scratch
 // package on disk, and the rebuild path spawns the fixture's REAL
@@ -235,7 +237,7 @@ test('a missing dist is stale and rebuilds', (t) => {
   assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
 });
 
-test('a stale vendored copy (monorepo package) triggers a rebuild even with a fresh own-src dist', (t) => {
+test('a stale vendored copy (monorepo package) is stale even with a fresh own-src dist', (t) => {
   const scratch = makeScratch(t);
   const root = path.join(scratch, 'monorepo');
   const pkgDir = path.join(root, 'packages', 'pkg');
@@ -250,9 +252,11 @@ test('a stale vendored copy (monorepo package) triggers a rebuild even with a fr
   setTreeTimes(path.join(pkgDir, 'dist', 'vendor', 'devkit'), 1500);
   setTreeTimes(path.join(root, 'packages', 'devkit', 'src'), 2500); // devkit edited after the vendor copy
 
+  // A monorepo link: detected, reported, and left alone (#281)
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'rebuilt');
-  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(result.status, 'stale-linked');
+  assert.equal(result.reason, 'dist/vendor/devkit is older than packages/devkit/src');
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
 // ---- per-file evidence (#195: the whole-tree mtime compare could be fooled)
@@ -307,6 +311,42 @@ test('a dist leftover from a deleted src file is stale', (t) => {
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
   assert.equal(result.status, 'rebuilt');
   assert.equal(fs.existsSync(path.join(pkgDir, 'dist', 'removed.js')), false);
+});
+
+test('runtime-mutable state under dist/test/fixtures/ is never an orphan (#352)', (t) => {
+  const scratch = makeScratch(t);
+  const pkgDir = path.join(scratch, 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makePkg(pkgDir);
+  makeConsumer(consumer, pkgDir);
+  // What a backend self-test run seeds into its fixture project: gitignored
+  // files with no src counterpart, still there after a crashed run.
+  const seeded = path.join(pkgDir, 'dist', 'test', 'fixtures', 'firebase-project', 'firestore.rules');
+  fs.mkdirSync(path.dirname(seeded), { recursive: true });
+  fs.writeFileSync(seeded, "rules_version = '2';\n");
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 2000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'fresh');
+  assert.equal(fs.existsSync(seeded), true);
+});
+
+test('the fixture-state exemption is narrow — an extra dist/test/ file outside fixtures is stale', (t) => {
+  const scratch = makeScratch(t);
+  const pkgDir = path.join(scratch, 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makePkg(pkgDir);
+  makeConsumer(consumer, pkgDir);
+  const leftover = path.join(pkgDir, 'dist', 'test', 'runner.js');
+  fs.mkdirSync(path.dirname(leftover), { recursive: true });
+  fs.writeFileSync(leftover, 'module.exports = 5;\n'); // src copy deleted
+  setTreeTimes(path.join(pkgDir, 'src'), 1000);
+  setTreeTimes(path.join(pkgDir, 'dist'), 2000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+  assert.equal(result.status, 'rebuilt');
+  assert.equal(fs.existsSync(leftover), false);
 });
 
 test('the extras prepare generates (vendor, declared assets) stay fresh', (t) => {
@@ -395,8 +435,9 @@ test('a vendorAssets source newer than its vendored dist copy is stale', (t) => 
   setTreeTimes(sourcePkgDir(root), 3000); // the theme edited after the copy
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'rebuilt');
-  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(result.status, 'stale-linked'); // a monorepo link: reported, never built here (#281)
+  assert.equal(result.reason, `dist/assets/themes is older than ${ASSET_SOURCE}'s themes`);
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
 test('a vendorAssets source older than its vendored dist copy is fresh', (t) => {
@@ -441,8 +482,9 @@ test('a single-FILE vendorAssets entry compares that file, not a tree', (t) => {
   setTreeTimes(sourcePkgDir(root), 3000); // the one file edited after the copy
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'rebuilt');
-  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(result.status, 'stale-linked');
+  assert.equal(result.reason, `dist/assets/js/app-shell.js is older than ${ASSET_SOURCE}'s core/js/core/app-shell.js`);
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
 test('a vendorAssets destination that was never vendored is stale', (t) => {
@@ -461,8 +503,9 @@ test('a vendorAssets destination that was never vendored is stale', (t) => {
   setTreeTimes(sourcePkgDir(root), 2000);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'rebuilt');
-  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(result.status, 'stale-linked');
+  assert.equal(result.reason, `dist/assets/themes was never vendored from ${ASSET_SOURCE}'s themes`);
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
 test('a foreign-scope vendorAssets entry is skipped, not mismapped', (t) => {
@@ -486,9 +529,9 @@ test('a foreign-scope vendorAssets entry is skipped, not mismapped', (t) => {
   assert.equal(result.status, 'fresh');
 });
 
-// ---- the live watch: bounded grace, then heal anyway
+// ---- the live watch: bounded grace, then the verdict
 
-test('stale under a live watch lock heals here once the bounded recheck expires', (t) => {
+test('stale under a live watch lock is reported once the bounded recheck expires', (t) => {
   const scratch = makeScratch(t);
   const root = path.join(scratch, 'monorepo');
   const pkgDir = path.join(root, 'packages', 'pkg');
@@ -501,8 +544,9 @@ test('stale under a live watch lock heals here once the bounded recheck expires'
   writeWatchLock(root);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'rebuilt');
-  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(result.status, 'stale-linked'); // the grace expired, and a monorepo link is still read-only
+  assert.equal(result.watching, true); // which the message says: wait for the watch, do not start it
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
 test('a watcher copy landing inside the grace window is a heal by the watch (rebuilt/watch)', (t) => {
@@ -837,4 +881,52 @@ test('the walk is transitive through dependencies and never through devDependenc
   const list = local.freshnessCheckList({ packageName: HOST_NAME, fromDir: consumer });
   assert.deepEqual(list.map((entry) => entry.packageName), [GRANDDEP_NAME, DEP_NAME, HOST_NAME]);
   assert.equal(list[0].fromDir, depDir); // the granddep resolved from ITS depender
+});
+
+// ---- linked into the monorepo is READ-ONLY to consumer builds (#281)
+
+test('a stale monorepo-linked package is reported, never rebuilt in place (#281)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir);
+  makeConsumer(consumer, pkgDir);
+  setTreeTimes(path.join(pkgDir, 'dist'), 1000);
+  setTreeTimes(path.join(pkgDir, 'src'), 2000); // a src edit the watch has not landed yet
+  const distMtime = fs.statSync(path.join(pkgDir, 'dist', 'index.js')).mtimeMs;
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+
+  assert.equal(result.status, 'stale-linked');
+  assert.equal(result.reason, 'dist/index.js is older than src/index.js');
+  assert.equal(result.monorepoRoot, root);
+  // The whole point: no prepare ran, so no dist purge and no cache refetch, and
+  // the package dir is byte-for-byte what the watch left there.
+  assert.equal(buildCount(pkgDir), 0);
+  assert.equal(fs.statSync(path.join(pkgDir, 'dist', 'index.js')).mtimeMs, distMtime);
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
+  assert.equal(fs.existsSync(path.join(pkgDir, '.omega')), false); // not even a lock is written
+});
+
+test('a monorepo-linked dep with no dist fails the build loudly, naming the watch (#281)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, { withDist: false }); // never built here, and never built by us
+  makeConsumer(consumer, pkgDir);
+
+  const run = runWiredCli(consumer, PKG_NAME);
+
+  assert.equal(run.status, 1, run.stdout);
+  assert.match(run.stderr, /read-only to consumer builds/);
+  assert.match(run.stderr, /dist\/ is missing/);
+  assert.match(run.stderr, /npm start/);
+  assert.equal(run.stderr.includes(root), true, run.stderr); // the monorepo to start it in
+  assert.equal(buildCount(pkgDir), 0);
+  assert.equal(fs.existsSync(path.join(pkgDir, 'dist')), false);
+  assert.equal(run.stdout.includes('CLI_RAN'), false); // the command never ran
 });

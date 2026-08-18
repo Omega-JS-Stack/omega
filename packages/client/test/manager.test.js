@@ -206,6 +206,37 @@ describe('Dev ports (N7)', () => {
     }
   });
 
+  it('should answer the dev website origin from the resolved map, and say so when it has to assume (#262)', async () => {
+    const Manager = getManager();
+    const realWarn = console.warn;
+    let warnings = [];
+    console.warn = (...args) => warnings.push(args.join(' '));
+    const originLines = () => warnings.filter((line) => line.includes('No resolved dev website origin'));
+
+    try {
+      // The stack published its origin — protocol and port both, and a bumped
+      // https run is exactly the case a port-only map could never express
+      await Manager.initialize({
+        ...TEST_CONFIG,
+        environment: 'development',
+        dev: { ports: { website: 4001 }, origin: 'https://localhost:4001' },
+      });
+      assert.strictEqual(Manager.getDevWebsiteOrigin(), 'https://localhost:4001');
+      assert.strictEqual(originLines().length, 0, 'a resolved fact says nothing');
+
+      // Nothing published one: the classic assumption, out loud
+      warnings = [];
+      await Manager.initialize({ ...TEST_CONFIG, environment: 'development' });
+      assert.strictEqual(Manager.getDevWebsiteOrigin(), 'https://localhost:4000');
+      assert.strictEqual(originLines().length, 1, 'ONE line');
+      assert.match(originLines()[0], /^\[@omega\.js\/client:firebase\]/, 'through the client logger (the tag contract)');
+      assert.match(originLines()[0], /assuming the classic https:\/\/localhost:4000/);
+      assert.match(originLines()[0], /Boot the website with `omega dev`/);
+    } finally {
+      console.warn = realWarn;
+    }
+  });
+
   it('should prefer an https (mkcert proxy) entry over plain-http hosting', async () => {
     const Manager = getManager();
     await Manager.initialize({

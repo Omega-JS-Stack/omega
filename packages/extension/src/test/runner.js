@@ -20,6 +20,14 @@ const chalk = require('chalk').default;
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
 const { FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 
+// Per-test default for the boot layer's inspect(). Sized for the FIRST run after
+// a fresh build, where the extension's Firebase service worker initializes from
+// cold — observed at 20-30s, which sat right on top of the old 20000 and made a
+// consumer's boot test flake until it passed its own timeout
+// ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)). A boot test that
+// is genuinely stuck still fails, just later; a slow first boot passes.
+const BOOT_DEFAULT_TIMEOUT = 45000;
+
 const runner = createRunner({
   title: 'OMEGA Extension Tests',
   packageName: '@omega.js/extension',
@@ -27,7 +35,7 @@ const runner = createRunner({
   frameworkAliases: FRAMEWORK_IDS['@omega.js/extension'],
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
-  bootDefaultTimeout: 20000,
+  bootDefaultTimeout: BOOT_DEFAULT_TIMEOUT,
 
   middleLayers: [
     {
@@ -79,6 +87,7 @@ const runner = createRunner({
         tests,
         projectRoot,
         frameworkDistRoot: path.resolve(__dirname, '..'),
+        defaultTimeout: BOOT_DEFAULT_TIMEOUT,
       });
       results.passed  += counts.passed;
       results.failed  += counts.failed;
@@ -87,4 +96,4 @@ const runner = createRunner({
   },
 });
 
-module.exports = { run: runner.run, SkipError, DISCOVERY_IGNORE };
+module.exports = { run: runner.run, SkipError, DISCOVERY_IGNORE, BOOT_DEFAULT_TIMEOUT };

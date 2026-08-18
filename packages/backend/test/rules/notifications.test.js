@@ -7,10 +7,11 @@
  * - list: DENIED for non-admins — tokens can never be harvested by query
  * - create: token field must equal the doc id; owner must be null (anonymous
  *   subscribe) or the caller's own uid — never someone else's
- * - update: token immutable; owner may only become null or the caller's own uid
+ * - update: token must equal the doc id AND stay immutable; owner may only
+ *   become null or the caller's own uid
  * - delete: admin only
  *
- * @see templates/firestore.rules
+ * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
 module.exports = {
   description: 'Firestore security rules for notification documents',
@@ -375,6 +376,53 @@ module.exports = {
           db.doc(`notifications/${token}`).update({
             token: 'rewritten-token',
             owner: uid,
+          })
+        );
+      },
+    },
+
+    // Test 14b: A MALFORMED doc (stored token ≠ doc id) is client-read-only
+    // ([#288](https://github.com/Omega-JS-Stack/omega/issues/288)). The
+    // framework's own create rule cannot produce one, but legacy-era docs
+    // exist, and the managed block used to let their owner keep updating them
+    // — legacy BEM denied it. Only an admin write can seed one here.
+    {
+      name: 'cannot-update-a-malformed-notification',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+        const adminDb = rules.asAccount('admin');
+        const malformed = 'test-token-malformed-doc';
+        const wellFormed = 'test-token-well-formed-doc';
+
+        // Legacy-era shape: the stored token never matched the doc id
+        await rules.expectSuccess(
+          adminDb.doc(`notifications/${malformed}`).set({
+            token: 'a-token-that-is-not-the-doc-id',
+            owner: uid,
+          })
+        );
+
+        // Every OTHER clause holds — token unchanged, owner is the caller — so
+        // this update is denied by the doc-id guard alone
+        await rules.expectFailure(
+          db.doc(`notifications/${malformed}`).update({
+            preferences: { sound: true },
+          })
+        );
+
+        // …and the same update on a well-formed doc still passes
+        await rules.expectSuccess(
+          adminDb.doc(`notifications/${wellFormed}`).set({
+            token: wellFormed,
+            owner: uid,
+          })
+        );
+        await rules.expectSuccess(
+          db.doc(`notifications/${wellFormed}`).update({
+            preferences: { sound: true },
           })
         );
       },

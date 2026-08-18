@@ -868,3 +868,7 @@ Web Manager is transpiled to ES5 for broad browser support:
 If you're having issues or have questions:
 - [Open an issue](https://github.com/itw-creative-works/web-manager/issues) on GitHub
 - Include code samples and relevant files to help us help you faster
+
+## License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer `@omega.js/client` to third parties as a hosted or managed service.

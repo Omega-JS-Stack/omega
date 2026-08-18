@@ -10,7 +10,7 @@
  * - Authenticated non-admin cannot read/write verts docs
  * - Admin can read/write verts docs (default catch-all)
  *
- * @see templates/firestore.rules
+ * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
 module.exports = {
   description: 'Firestore security rules for verts documents',

@@ -30,6 +30,7 @@ const CONFIG_TIME_MODULES = [
     // calls them per template, on the incremental lane the reset must not own.
     snippets: [
       'fs.readFileSync(path.resolve(inputPath)', // render time: a page's own frontmatter, re-parsed per template
+      'fs.readFileSync(sidecarPath(inputPath)', // render time: a page's own sidecar data file, re-read per template (#269)
       'fileExists: (file) => fs.existsSync', // template time: the file_exists Liquid filter
     ],
   },

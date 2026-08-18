@@ -8,7 +8,7 @@
  * - Users cannot read/write other users' documents
  * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent) cannot be written by users
  *
- * @see templates/firestore.rules
+ * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
 module.exports = {
   description: 'Firestore security rules for user documents',

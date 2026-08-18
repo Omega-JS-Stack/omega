@@ -191,3 +191,7 @@ In-depth docs for every subsystem live in [docs/](docs/); the architecture overv
 - [@omega.js/desktop](../desktop/) — same patterns, but for Electron desktop apps
 - [Ultimate Jekyll Manager (UJM)](https://github.com/itw-creative-works/ultimate-jekyll-manager) — Jekyll static-site framework
 - [Backend Manager (@omega.js/backend)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework
+
+## 📜 License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer `@omega.js/extension` to third parties as a hosted or managed service.

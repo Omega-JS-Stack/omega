@@ -143,6 +143,13 @@ module.exports = {
           ports: { auth: 9100, firestore: 8081, hosting: 5003 }, pid: process.pid, startedAt: 'x',
         }));
 
+        // …and a live WEBSITE publishing its resolved origin beside its port —
+        // bumped AND https, the pair a port number alone can never express (#262)
+        fs.mkdirSync(path.join(brand, 'apps', 'website', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'apps', 'website', '.temp', 'ports.json'), JSON.stringify({
+          ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
+        }));
+
         const app = path.join(brand, 'apps', 'extension');
         fs.mkdirSync(app, { recursive: true });
         fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
@@ -173,10 +180,44 @@ module.exports = {
           ctx.expect(dev.dev.ports.auth).toBe(9100);
           ctx.expect(dev.dev.ports.firestore).toBe(8081);
           ctx.expect(dev.dev.ports.hosting).toBe(5003);
+          // The website's origin is a resolved fact in the same map (#262)
+          ctx.expect(dev.dev.origin).toBe('https://localhost:4001');
 
           // A packaged build has no local stack to reach — no map ships
           const production = await bake('production');
           ctx.expect(production.dev).toBe(undefined);
+        } finally {
+          fs.rmSync(brand, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the manifest\'s dev origin is the RESOLVED website origin, never a baked literal (#262)',
+      run: async (ctx) => {
+        // Same staging as the dev.ports test: a brand with a live website app
+        // that published a bumped, https origin beside its port.
+        const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-origin-brand-'));
+        fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
+        fs.mkdirSync(path.join(brand, 'apps', 'website', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'apps', 'website', '.temp', 'ports.json'), JSON.stringify({
+          ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
+        }));
+
+        const app = path.join(brand, 'apps', 'extension');
+        fs.mkdirSync(path.join(app, 'dist'), { recursive: true });
+        fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
+        fs.writeFileSync(path.join(app, 'dist', 'manifest.json'), MANIFEST(`description: 'no externally_connectable anywhere'`));
+
+        try {
+          await inProject(app, async (task) => {
+            const outputDir = path.join(app, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            // Protocol AND port both follow the live dev server — the old bake
+            // said http://localhost:4000 while `omega dev` served https
+            ctx.expect(m.externally_connectable.matches).toEqual(['https://localhost:4001/*']);
+          });
         } finally {
           fs.rmSync(brand, { recursive: true, force: true });
         }
@@ -367,7 +408,9 @@ module.exports = {
             const outputDir = path.join(absent, 'out');
             await task.compileManifest(outputDir, 'chromium');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
-            ctx.expect(m.externally_connectable.matches).toEqual(['http://localhost:4000/*']);
+            // No live website published an origin — the classic assumption, over
+            // the protocol `omega dev` speaks by default (#262)
+            ctx.expect(m.externally_connectable.matches).toEqual(['https://localhost:4000/*']);
           });
         } finally {
           fs.rmSync(declared, { recursive: true, force: true });

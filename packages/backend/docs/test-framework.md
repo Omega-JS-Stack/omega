@@ -381,7 +381,9 @@ Extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_test-e
 
 ## Rules Tests
 
-Security-rules tests use the `rules` client (`src/test/utils/firestore-rules-client.js`). Canonical pattern: **seed as admin (bypasses rules), then test operations as different users**:
+Security-rules tests run against the **compiled artifact** the emulator booted with (`dist/firestore.rules` — the brand's `firestore.rules` plus the framework half, see [build-system.md](build-system.md)), so they exercise exactly what a consumer deploys.
+
+They use the `rules` client (`src/test/utils/firestore-rules-client.js`). Canonical pattern: **seed as admin (bypasses rules), then test operations as different users**:
 
 ```javascript
 {
@@ -414,6 +416,11 @@ Security-rules tests use the `rules` client (`src/test/utils/firestore-rules-cli
   },
 },
 ```
+
+A suite that needs a DIFFERENT ruleset (proving a hook a brand sets, for
+instance) compiles one and loads it into its own emulator project with
+`initializeTestEnvironment` — `test/rules/user-protected-fields.test.js` is the
+worked example.
 
 ## Test Account Isolation (CRITICAL)
 

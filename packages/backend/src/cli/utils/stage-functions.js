@@ -15,6 +15,9 @@
  *                           brand's .omega/secrets/ — the key's ONE home)
  *   src/public/** OR      → dist/public/**          (consumer overrides win;
  *   templates/public/**                               defaults fill the gaps)
+ *   firestore.rules +     → dist/firestore.rules    (COMPILED: the brand's rules
+ *   the framework half                                + hooks spliced with the
+ *                                                     framework's — compile-rules.js)
  *
  * firebase.json references `dist` as both `functions.source` and
  * `hosting.public` (as `dist/public`), so one staged tree feeds every
@@ -35,6 +38,7 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { composeTargetConfig, findBrandRoot } = require('@omega.js/config');
+const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
 
 // The framework's pinned Cloud Functions runtime — the engines fallback when
 // an app manifest carries none (never the ambient node: staging must produce
@@ -167,6 +171,17 @@ function stageFunctions(options) {
     staged.push(file);
   }
 
+  // ─── Firestore rules: the brand's source + the framework half, compiled ───
+  //     Rebuilt HERE (not just at setup) because the wipe above takes the
+  //     previous artifact with it, and firebase.json points the emulator and
+  //     `firebase deploy` at it — a stage that skipped this would leave both
+  //     reading nothing. The AUTHORED file is never touched; setup owns that.
+  //     An unmigrated (marker-block) source is refused there and reported —
+  //     the step is then not claimed here either.
+  if (!compileFirestoreRules({ projectDir }).refused) {
+    staged.push(`${COMPILED_RULES_FILE.replace('dist/', '')} (compiled)`);
+  }
+
   // ─── Service account: the authored chain (see resolveServiceAccountPath) ──
   const saSource = resolveServiceAccountPath(projectDir);
   if (saSource) {
@@ -180,10 +195,11 @@ function stageFunctions(options) {
 
 /**
  * Watch every STAGE INPUT and re-stage on change — src/, the app manifest,
- * .env/.nvmrc/SA, and the config layers (app + brand omega.json5, brand
- * secrets). The Firebase emulator watches dist/ natively, so a re-stage IS
- * the hot reload: a brand-config edit reaches the running emulator without
- * a restart. The app-root watch filters to named files so dist/ churn (our
+ * .env/.nvmrc/SA, firestore.rules, and the config layers (app + brand
+ * omega.json5, brand secrets). The Firebase emulator watches dist/ natively,
+ * so a re-stage IS the hot reload: a brand-config edit reaches the running
+ * emulator without a restart, and so does a brand rules edit (the re-stage
+ * recompiles dist/firestore.rules, which the firestore emulator reloads). The app-root watch filters to named files so dist/ churn (our
  * own output) can never feed back into a re-stage loop.
  * @param {object} options
  * @param {string} options.projectDir
@@ -219,7 +235,7 @@ function watchAndStage(options) {
   watch(path.join(projectDir, 'src'), restage('src'), { recursive: true });
 
   // App-root stage inputs by NAME (never react to dist/ or log churn)
-  const APP_ROOT_INPUTS = new Set(['package.json', '.env', '.nvmrc', 'service-account.json']);
+  const APP_ROOT_INPUTS = new Set(['package.json', '.env', '.nvmrc', 'service-account.json', BRAND_RULES_FILE]);
   watch(projectDir, (event, filename) => {
     if (APP_ROOT_INPUTS.has(filename)) restage(filename)();
   });

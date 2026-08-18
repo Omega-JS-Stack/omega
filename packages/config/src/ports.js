@@ -14,6 +14,12 @@
  * getters. Browser code receives `dev.ports` via the injected dev config —
  * it can read neither env nor files.
  *
+ * A port is not always the whole fact: the website's dev ORIGIN carries a
+ * protocol too (mkcert HTTPS by default), and a sibling reading `website:
+ * 4000` cannot guess it. The publisher writes the resolved origin string
+ * beside the map in the same file, and `readSiblingOrigin` reads it back
+ * ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
+ *
  * Explicit pins (config `ports` section) never bump: a pinned port that is
  * busy is a hard error naming the pin, because the user asked for exactly
  * that port.
@@ -41,6 +47,11 @@ const CLASSIC_PORTS = {
 };
 
 const PORTS_FILE = 'ports.json';
+
+// The dev website origin every surface assumes when no live website published
+// one — the classic port, over the protocol `omega dev` speaks by default (the
+// mkcert proxy). An assumption, and every fallback says so out loud (#262).
+const CLASSIC_DEV_ORIGIN = `https://localhost:${CLASSIC_PORTS.website}`;
 
 /**
  * Attempt one bind (the probe primitive). On macOS/BSD, wildcard and
@@ -137,23 +148,26 @@ async function resolvePorts({ wanted, pins = {}, claimed = new Set() }) {
  * Publish the resolved map for sibling processes of the same brand.
  * @param {string} projectDir - The project directory (owns `.temp/`).
  * @param {object} ports - Resolved name → port map.
+ * @param {object} [facts] - Resolved non-port facts published beside the map
+ *   ({ origin }, the website's resolved dev origin — protocol included).
  * @returns {string} The file path written.
  */
-function writePortsFile(projectDir, ports) {
+function writePortsFile(projectDir, ports, facts = {}) {
   const dir = path.join(projectDir, '.temp');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, PORTS_FILE);
-  fs.writeFileSync(file, JSON.stringify({ ports, pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
+  fs.writeFileSync(file, JSON.stringify({ ports, ...facts, pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
   return file;
 }
 
 /**
- * Read a live ports file. Returns null when absent, unparseable, or stale
- * (the writing process is no longer running).
+ * Read a live ports file's WHOLE payload (the map plus the facts published
+ * beside it). Returns null when absent, unparseable, or stale (the writing
+ * process is no longer running).
  * @param {string} projectDir - The project directory.
- * @returns {object|null} The resolved name → port map, or null.
+ * @returns {object|null} The parsed payload, or null.
  */
-function readPortsFile(projectDir) {
+function readPortsData(projectDir) {
   const file = path.join(projectDir, '.temp', PORTS_FILE);
 
   let parsed;
@@ -177,7 +191,18 @@ function readPortsFile(projectDir) {
     }
   }
 
-  return parsed.ports;
+  return parsed;
+}
+
+/**
+ * Read a live ports file. Returns null when absent, unparseable, or stale
+ * (the writing process is no longer running).
+ * @param {string} projectDir - The project directory.
+ * @returns {object|null} The resolved name → port map, or null.
+ */
+function readPortsFile(projectDir) {
+  const data = readPortsData(projectDir);
+  return data ? data.ports : null;
 }
 
 /**
@@ -209,13 +234,52 @@ function clearPortsFile(projectDir) {
  * @returns {object} Merged name → port map.
  */
 function readSiblingPorts(appDir) {
+  const merged = {};
+
+  for (const dir of siblingAppDirs(appDir)) {
+    Object.assign(merged, readPortsFile(dir) || {});
+  }
+
+  return merged;
+}
+
+/**
+ * The resolved dev WEBSITE ORIGIN a sibling app of the same brand published —
+ * protocol and port together, because a port alone cannot say whether the dev
+ * server speaks TLS (mkcert is the default) and every client that links to the
+ * website in dev needs the whole origin
+ * ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
+ *
+ * Read at USE time like readSiblingPorts, and null when no sibling is live —
+ * the caller falls back to the classic assumption and says so.
+ * @param {string} appDir - The reading app's root (its own file is skipped).
+ * @returns {string|null} The published origin, or null.
+ */
+function readSiblingOrigin(appDir) {
+  for (const dir of siblingAppDirs(appDir)) {
+    const origin = readPortsData(dir)?.origin;
+    if (origin) {
+      return origin;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The sibling app dirs of the app that asks: every `apps/<name>` of the same
+ * brand except its own. No brand root (standalone consumer) → none.
+ * @param {string} appDir - The reading app's root.
+ * @returns {string[]} Absolute sibling app dirs.
+ */
+function siblingAppDirs(appDir) {
   const brandRoot = findBrandRoot(appDir);
   if (!brandRoot) {
-    return {};
+    return [];
   }
 
   const appsDir = path.join(brandRoot, 'apps');
-  const merged = {};
+  const dirs = [];
 
   for (const entry of fs.existsSync(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }) : []) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) {
@@ -225,10 +289,10 @@ function readSiblingPorts(appDir) {
     if (path.resolve(dir) === path.resolve(appDir)) {
       continue;
     }
-    Object.assign(merged, readPortsFile(dir) || {});
+    dirs.push(dir);
   }
 
-  return merged;
+  return dirs;
 }
 
 /**
@@ -290,12 +354,14 @@ function envPorts(env = process.env) {
 
 module.exports = {
   CLASSIC_PORTS,
+  CLASSIC_DEV_ORIGIN,
   isPortFree,
   resolvePorts,
   writePortsFile,
   readPortsFile,
   clearPortsFile,
   readSiblingPorts,
+  readSiblingOrigin,
   envName,
   portsToEnv,
   envPort,

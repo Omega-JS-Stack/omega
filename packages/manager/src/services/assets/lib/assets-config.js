@@ -155,6 +155,7 @@ const ICON_PLATFORMS = {
  * Web favicon set.
  */
 const FAVICON_CONFIG = {
+  outputDir: 'favicon',
   files: [
     { name: 'favicon-16x16.png', size: 16 },
     { name: 'favicon-32x32.png', size: 32 },

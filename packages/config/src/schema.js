@@ -568,6 +568,103 @@ const SHARED_SCHEMA = [
     description: "Managed Firebase Auth accounts (@omega.js/manager account service): enabled + admins ([{ email, account, marketing }]; '{domain}' templates to the brand domain). Owner-defined — typically set once in the COMPANY omega.json5 (arrays replace, so the company list wins whole). Passwords NEVER live here: per-account OMEGA_ACCOUNT_PASSWORD__* env vars, the config/hooks/account/password.js hook, or the ACCOUNT_PASSWORD_SEED derivation.",
   },
 
+  // ── parent ───────────────────────────────────────────────────────────────
+  // parent … dataRequest are brand-level sections the manager reads UNFOLDED
+  // (#277): a website-only brand has no targets.backend to hold them, and
+  // adding one purely as a config home would falsely enable the target. A
+  // targets.backend block still overrides any of them: that comes free from
+  // the merge chain.
+  {
+    path:        'parent',
+    type:        'string|boolean',
+    required:    false,
+    description: "Webhook parent topology: 'self' when this brand IS the parent, a parent URL otherwise, or false to deliberately opt out (shared webhook account owned elsewhere).",
+  },
+
+  // ── github ───────────────────────────────────────────────────────────────
+  {
+    path:        'github',
+    type:        'object',
+    required:    false,
+    description: 'GitHub identity for the brand (user, website repo URL).',
+  },
+
+  // ── reviews ──────────────────────────────────────────────────────────────
+  {
+    path:        'reviews',
+    type:        'object',
+    required:    false,
+    description: 'Review-collection settings (enabled, sites).',
+  },
+
+  // ── marketing ────────────────────────────────────────────────────────────
+  {
+    path:        'marketing',
+    type:        'object',
+    required:    false,
+    description: 'Marketing automation: campaigns, newsletter (Beehiiv), prune.',
+  },
+
+  // ── blog ─────────────────────────────────────────────────────────────────
+  {
+    path:        'blog',
+    type:        'object',
+    required:    false,
+    description: 'AI blog-content settings (Ghostii pipeline).',
+  },
+
+  // ── dataRequest ──────────────────────────────────────────────────────────
+  {
+    path:        'dataRequest',
+    type:        'object',
+    required:    false,
+    description: 'GDPR/CCPA data-request query definitions.',
+  },
+
+  // ── directory ────────────────────────────────────────────────────────────
+  // The same brand-level family (#277): the manager's directory service reads
+  // these unfolded. PUBLIC FACTS ONLY — the entry is pushed into the parent
+  // project's world-readable `brands` collection, so the validator's
+  // secret-shape guard is the hard floor here (#246).
+  {
+    path:        'directory',
+    type:        'object',
+    required:    false,
+    description: "Directory participation (@omega.js/manager directory service): { enabled } — opt in to push this brand's entry into the parent project's `brands` collection. Absent or false never pushes. Needs `parent` to name the relationship and DIRECTORY_SERVICE_ACCOUNT in the brand .env.",
+  },
+  {
+    path:        'directory.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'true opts the brand into the directory push. Default false — participation is never implicit.',
+  },
+
+  // ── sponsorships ─────────────────────────────────────────────────────────
+  {
+    path:        'sponsorships',
+    type:        'object',
+    required:    false,
+    description: "The brand's sponsorship terms — the first directory BLOCK (#246), and the section the server service also publishes. Public terms only: { acceptable, unacceptable, prices }.",
+  },
+  {
+    path:        'sponsorships.acceptable',
+    type:        'array',
+    required:    false,
+    description: 'Topics the brand accepts sponsored content about (strings).',
+  },
+  {
+    path:        'sponsorships.unacceptable',
+    type:        'array',
+    required:    false,
+    description: 'Topics the brand refuses sponsored content about (strings).',
+  },
+  {
+    path:        'sponsorships.prices',
+    type:        'object',
+    required:    false,
+    description: "Price in USD per placement type — placement key to number ({ 'guest-post': 70, 'link-insertion': 50 }). A placement with no price is not for sale.",
+  },
+
   // ── ports (dev-only) ─────────────────────────────────────────────────────
   {
     path:        'ports',
@@ -703,42 +800,9 @@ const TARGET_SCHEMAS = {
 
   // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).
   backend: [
-    {
-      path:        'parent',
-      type:        'string|boolean',
-      required:    false,
-      description: "Webhook parent topology: 'self' when this brand IS the parent, a parent URL otherwise, or false to deliberately opt out (shared webhook account owned elsewhere).",
-    },
-    {
-      path:        'github',
-      type:        'object',
-      required:    false,
-      description: 'GitHub identity for the brand (user, website repo URL).',
-    },
-    {
-      path:        'reviews',
-      type:        'object',
-      required:    false,
-      description: 'Review-collection settings (enabled, sites).',
-    },
-    {
-      path:        'marketing',
-      type:        'object',
-      required:    false,
-      description: 'Marketing automation: campaigns, newsletter (Beehiiv), prune.',
-    },
-    {
-      path:        'blog',
-      type:        'object',
-      required:    false,
-      description: 'AI blog-content settings (Ghostii pipeline).',
-    },
-    {
-      path:        'dataRequest',
-      type:        'object',
-      required:    false,
-      description: 'GDPR/CCPA data-request query definitions.',
-    },
+    // parent, github, reviews, marketing, blog, dataRequest moved to
+    // SHARED_SCHEMA (#277); a targets.backend block still overrides them
+    // through the merge chain.
     {
       path:        'auth.signup.maxPerIpPerDay',
       type:        'integer',

@@ -70,4 +70,21 @@ function brandRepoOwner(config) {
   return parseRepoSlug(github.repo).owner || github.org || '';
 }
 
-module.exports = { parseRepoSlug, brandRepoName, brandRepoOwner };
+/**
+ * The brand repo as ONE finished value: owner, name, and the "owner/name" slug
+ * the GitHub API takes. This is the form a FRAMEWORK hands to consumer code —
+ * @omega.js/backend exposes it as `config.resolved.github` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)),
+ * because a brand app cannot require this private package and must never
+ * re-derive the merge rules for itself.
+ *
+ * @param {object} config - Composed omega config (brand + app layers).
+ * @returns {{ owner: string, name: string, repo: string }} `repo` is the slug, '' unless BOTH halves resolve (half an address addresses nothing).
+ */
+function brandRepo(config) {
+  const owner = brandRepoOwner(config);
+  const name = brandRepoName(config);
+
+  return { owner, name, repo: owner && name ? `${owner}/${name}` : '' };
+}
+
+module.exports = { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo };

@@ -89,3 +89,7 @@ One name is reserved: **`${MCP_ROUTER_ROOT}`** always resolves to this package's
 ## Docs
 
 The full guide — architecture, the launchers, the plugin wiring, the noted gaps — is [docs/mcp-router/index.md](../../docs/mcp-router/index.md) in the OMEGA monorepo.
+
+## License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer `@omega.js/mcp-router` to third parties as a hosted or managed service.

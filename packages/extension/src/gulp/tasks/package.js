@@ -8,7 +8,7 @@ const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
 const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
-const { readSiblingPorts, envPorts } = require('@omega.js/config');
+const { readSiblingPorts, envPorts, CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -55,6 +55,9 @@ async function generateBuildJs(outputDir) {
     const sentryConfig = { ...(config.monitoring || {}) };
     delete sentryConfig.provider;
 
+    // The live sibling website's published origin, or null when none is up (#262)
+    const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
+
     // Build config object matching @omega.js/client's expected structure
     const buildConfig = {
       timestamp: new Date().toISOString(),
@@ -74,15 +77,22 @@ async function generateBuildJs(outputDir) {
         // Brand configuration (from config/omega.json5 or manifest)
         brand: config.brand || {},
 
-        // The local stack's resolved ports (N7). An extension context has no
+        // The local stack's resolved facts (N7). An extension context has no
         // env and no filesystem, so this bake is its ONLY channel: the sibling
         // backend's published map plus anything a parent injected on the env
-        // channel, resolved per build so a rebuild follows a restarted
-        // emulator ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+        // channel, and the sibling WEBSITE's published origin
+        // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)) —
+        // resolved per build so a rebuild follows a restarted emulator
+        // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
         // Production packages carry none — there is no local stack to reach.
+        // A key present is a resolved fact; absent, @omega.js/client assumes the
+        // classic and warns — so an unpublished origin ships no origin at all.
         ...(Manager.getEnvironment() === 'production'
           ? {}
-          : { dev: { ports: { ...readSiblingPorts(rootPathProject), ...envPorts() } } }),
+          : { dev: {
+            ports: { ...readSiblingPorts(rootPathProject), ...envPorts() },
+            ...(devWebsiteOrigin ? { origin: devWebsiteOrigin } : {}),
+          } }),
 
         // Cloud (firebase) config in the CANONICAL `cloud.config` shape —
         // what @omega.js/client prefers and the only shape background.js
@@ -340,9 +350,15 @@ async function compileManifest(outputDir, target) {
     const outputPath = path.join(outputDir, 'manifest.json');
     const configPath = path.join(rootPathPackage, 'dist', 'config', 'manifest.json');
 
-    // Read and parse using JSON5
+    // Read and parse using JSON5. The framework defaults carry build-time
+    // tokens (the same `%%%name%%%` idiom the webpack replace plugin speaks) —
+    // the dev-website origin is a resolved fact now, never a literal (#262).
     let manifest = JSON5.parse(jetpack.read(manifestPath));
-    const defaultConfig = JSON5.parse(jetpack.read(configPath));
+    const defaultConfig = JSON5.parse(template(jetpack.read(configPath), {
+      devWebsiteOrigin: Manager.getDevWebsiteOrigin() || CLASSIC_DEV_ORIGIN,
+    }, {
+      brackets: ['%%%', '%%%'],
+    }));
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP 1: Apply defaults (shared across all targets)

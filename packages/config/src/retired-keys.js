@@ -19,10 +19,10 @@
  * one level down, and `firebase` lives on as `client.firebase` — so these
  * match one EXACT path from the root.
  *
- * `github` is deliberately NOT here: rules run against the RESOLVED config,
- * where a target section's keys are overlaid at the top level, so the
- * legitimate `targets.backend.github` (content identity, unchanged) arrives
- * as top-level `github` and would false-positive. Its rename to
+ * `github` is deliberately NOT here: the brand's own `github` (content
+ * identity, unchanged; a shared key since #277) lives at the top level, and
+ * a `targets.backend.github` override is overlaid there too by the resolved
+ * view, so a name test would false-positive. Its rename to
  * `repo.providers.github` is carried by the mapping tables in
  * docs/shared/config.md instead.
  */

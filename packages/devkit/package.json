@@ -48,7 +48,7 @@
     "node": ">=22"
   },
   "author": "ITW Creative Works",
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
     "@omega.js/client": "*",

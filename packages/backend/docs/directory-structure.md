@@ -131,6 +131,8 @@ src/
   public/                             # OPTIONAL: hosting boilerplate overrides
 test/                                 # Project tests
 firebase.json  .firebaserc           # Firebase project config
-firestore.rules  database.rules.json  # Security rules
+firestore.rules  database.rules.json  # Security rules (firestore.rules is YOUR
+                                      # source — compiled into dist/, see
+                                      # build-system.md)
 dist/                                 # GENERATED — never edit (staged by omega build)
 ```

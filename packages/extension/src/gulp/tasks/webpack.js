@@ -470,15 +470,22 @@ function getTemplateReplaceOptions() {
   // Compose the @omega.js/client runtime blob by hand (the web build gets it
   // free from the site-global spread; the extension has no such pass).
   const clientConfig = options.omega || {};
+  const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
   options.webManagerConfiguration = JSON.stringify({
     environment: options.environment || 'production',
     buildTime: now,
-    // The local stack's resolved ports (N7) — same bake, same reason as
+    // The local stack's resolved facts (N7) — same bake, same reason as
     // build.js's blob: an extension page has no other way to learn a bumped
-    // emulator port ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
+    // emulator port ([#300](https://github.com/Omega-JS-Stack/omega/issues/300))
+    // or the website's dev origin
+    // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)). A key
+    // present is a resolved fact; absent, the client assumes and warns.
     ...(options.environment === 'production'
       ? {}
-      : { dev: { ports: { ...readSiblingPorts(rootPathProject), ...envPorts() } } }),
+      : { dev: {
+        ports: { ...readSiblingPorts(rootPathProject), ...envPorts() },
+        ...(devWebsiteOrigin ? { origin: devWebsiteOrigin } : {}),
+      } }),
     brand: {
       id: options.brand?.id || 'extension',
       name: options.brand?.name || 'Extension',

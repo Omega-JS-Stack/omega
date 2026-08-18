@@ -340,7 +340,15 @@ never render) and deleting the file returns the URL to the packaged default.
   yet a pure composition, or shadowed by a theme's own hand-crafted layout,
   e.g. newsflash's home). The materialized file is a verbatim copy of the
   thin default page (layout pointer + permalink): customization happens
-  through frontmatter args over `resolved.*`, and everything keeps flowing.
+  through the page's SIDECAR data file over `resolved.*`, and everything
+  keeps flowing. Page frontmatter is meta-only (the guard strips content
+  keys), so `<page>.11tydata.json` beside the page IS the page-level lane
+  for a shell layout's band data — and it obeys the same arrays-replace rule
+  every other override lane does ([#269](https://github.com/Omega-JS-Stack/omega/issues/269)):
+  a sidecar array REPLACES the layout's default array outright (Eleventy's
+  cascade concats it; `resolved` re-applies the sidecar with the engine's
+  deepMerge), while object and string keys merge over the defaults as they
+  always did. Pinned by `test/sidecar-data.test.js`.
 
 The `{% composition %}` wrap is tri-state, byte-parity with the
 `{{ content | omega_content_format }}` line it replaces in the layout:

@@ -14,16 +14,34 @@ Return shape (same for all providers): `{ content, output, tokens, raw }` — pl
 
 API keys: `OMEGA_OPENAI_API_KEY`, `OMEGA_ANTHROPIC_API_KEY` (process.env or config).
 
-## Prompt forms
+## Prompt forms: one internal shape
 
-`options.prompt` takes either form, and both survive `normalizeOptions()` unchanged:
+`normalizeOptions()` runs once at the top of `ai.request()` and collapses every prompt/message form into ONE internal shape before any provider sees it:
 
-- **Object** — `{ path|content, settings }`, one implicit `system` segment. The universal prompt injections are prepended to `content`.
-- **Array** — `[{ role, path|content, settings }, ...]`, one segment per role (`system` | `developer` | `user` | `assistant`, defaulting to `system`), order preserved. The injections ride in as their own leading `system` segment so caller segments (prompt-file `path` included) reach the provider. One OpenAI caveat: a trailing `user` segment followed by a `message` is popped by the consecutive-role dedupe there, while the Claude providers merge the two turns.
+- `options.prompt` becomes `[{ role, content }, ...]`: canonical segments, the universal prompt injections as the leading `system` segment, every caller segment already resolved.
+- `options.message` becomes `{ content }`: already resolved, with its `path` consumed.
 
-Both forms resolve through the same segment loader on every provider — on the Claude providers (`anthropic`, `claude-code`) `system` + `developer` segments join into the `system` string and `user` + `assistant` segments become leading turns.
+**Every `{ path }` is read and templated at that one point**, so the openai, anthropic and claude-code formatters all receive the same text. Neither the injections nor a prompt file can go missing on one provider and not another.
 
-An array prompt and a non-empty `messages[]` **cannot combine** and throw: `messages[]` is the whole conversation on every provider, so the segments would be silently dropped. Pass the segments as `system` turns inside `messages[]` instead.
+The two accepted prompt forms:
+
+- **Object** — `{ path|content, settings }`, one implicit `system` segment.
+- **Array** — `[{ role, path|content, settings }, ...]`, one segment per role (`system` | `developer` | `user` | `assistant`, defaulting to `system`), order preserved. One OpenAI caveat: a trailing `user` segment followed by a `message` is popped by the consecutive-role dedupe there, while the Claude providers merge the two turns.
+
+On the Claude providers (`anthropic`, `claude-code`) `system` + `developer` segments join into the `system` string and `user` + `assistant` segments become leading turns; OpenAI emits one Responses item per segment.
+
+### Ambiguity is an error
+
+There are no silent winners. A call that gives the same slot two texts is refused, and the error names both:
+
+| Input | Why it throws |
+|---|---|
+| `prompt: { path, content }` (or any array segment with both) | Two candidate texts for one segment. Pass the file path or the inline content. |
+| `message: { path, content }` | Same, for the user message. |
+| `prompt` + a `system`-role turn in `messages[]` | Two system prompts in one call. Pass the prompt or the system turn. |
+| `prompt` + any non-empty `messages[]` | `messages[]` is the whole conversation on every provider, so the prompt would be dropped. Move it in as a system turn, or drop `messages[]`. |
+
+A prompt file that is missing, unreadable, or a directory throws from the same one point, naming the input (`options.prompt[1]`, `options.message`, …).
 
 ## Token accounting
 
@@ -142,8 +160,8 @@ The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that r
 
 | File | Purpose |
 |---|---|
-| `src/manager/libraries/ai/index.js` | Unified `AI` class (dispatches by provider; structured-messages detection) |
-| `src/manager/libraries/ai/prompt.js` | Shared prompt-segment normalization + content/prompt-file loading (both prompt forms, every provider) |
+| `src/manager/libraries/ai/index.js` | Unified `AI` class (dispatches by provider; the one normalize point: prompt/message forms, prompt-file loading, universal injections, ambiguity guards; structured-messages detection) |
+| `src/manager/libraries/ai/prompt.js` | Shared prompt-segment normalization + content/prompt-file loading, called by the normalize point (and again, idempotently, by a directly constructed provider) |
 | `src/manager/libraries/ai/tokens.js` | Token accounting helpers (per-call report, running counters) |
 | `src/manager/libraries/ai/providers/openai.js` | OpenAI provider (Responses API; direct-messages mode + tool envelopes) |
 | `src/manager/libraries/ai/providers/anthropic.js` | Anthropic provider (Claude Messages API, x-api-key, API credits, native tool_use) |

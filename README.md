@@ -20,3 +20,7 @@ Published packages live under the `@omega.js` npm scope. Private shared internal
 ## Status
 
 Live work is tracked as [GitHub issues](https://github.com/Omega-JS-Stack/omega/issues) (the queue is a query: `gh issue list`); standing rulings live in [docs/shared/rulings.md](docs/shared/rulings.md).
+
+## License
+
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer these packages to third parties as a hosted or managed service.

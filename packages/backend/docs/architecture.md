@@ -8,6 +8,31 @@ The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and or
 - Provides factory methods for helper classes
 - Manages configuration from multiple sources
 
+## Derived config values (`config.resolved.*`)
+
+The composed config a consumer reads (`Manager.config`, and the same object every
+route/hook/cron receives) carries a `resolved` group of values the FRAMEWORK derives at
+boot ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand app cannot
+require `@omega.js/config` — it is a private package, vendored into the framework's dist
+— so a brand that needed a derived value used to re-implement the derivation and drift
+from the real merge rules. The framework runs the recipe once; brands read the answer.
+
+| Path | What it is |
+|---|---|
+| `config.resolved.github.repo` | The brand repo as an `owner/name` slug (`''` unless both halves resolve) |
+| `config.resolved.github.owner` | The same answer's owner (GitHub org or user) |
+| `config.resolved.github.name` | The same answer's bare repo name |
+
+The GitHub values resolve `repo.providers.github` (`org`, `repo`) overlaid by the backend
+target's own `github` block, which wins — the CMS/content-repo override — with `repo`
+taking either an `owner/name` slug or a bare name, name falling back to `brand.id` and
+owner to `repo.providers.github.org`.
+
+Every derivation lives in `@omega.js/config` (`brandRepo()` here) — never a second copy.
+`src/manager/helpers/resolved-config.js` only names the group and the values in it; new
+derived values join there as real brand needs surface, each with a test pinning it to the
+config package's own function.
+
 ## Dual-Mode Support
 
 @omega.js/backend supports two deployment modes:
