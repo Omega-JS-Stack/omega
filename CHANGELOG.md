@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.35.1] 2026-08-17
 ### Added
-- [#240](../../issues/240) — PayPal sandbox QA is a written recipe: a standing trial-free "Proof Press" tier in the playground catalog (manager-owned processor objects), a saved sandbox buyer, and a runbook (`packages/backend/docs/paypal-sandbox-qa.md`) covering the live sale-and-refund drive, the checkout-first lane rule, and every gotcha the first drive hit.
+- [#240](../../issues/240) [`b7589cfc`](../../commit/b7589cfc) Thanks [@ianwieds]! — PayPal sandbox QA is a written recipe: a standing trial-free "Proof Press" tier in the playground catalog (manager-owned processor objects), a saved sandbox buyer, and a runbook (`packages/backend/docs/paypal-sandbox-qa.md`) covering the live sale-and-refund drive, the checkout-first lane rule, and every gotcha the first drive hit.
 
 ### Fixed
-- [#345](../../issues/345) — The port allocator now sees a port held on the IPv4 wildcard `0.0.0.0` (Docker forwards, non-loopback dev servers): a fourth bind probe closes the macOS wildcard-coexistence gap, so the emulator's port bumps instead of the boot dying on a squatted port.
+- [#345](../../issues/345) [`76330b94`](../../commit/76330b94) Thanks [@ianwieds]! — The port allocator now sees a port held on the IPv4 wildcard `0.0.0.0` (Docker forwards, non-loopback dev servers): a fourth bind probe closes the macOS wildcard-coexistence gap, so the emulator's port bumps instead of the boot dying on a squatted port.
 
 ## [0.35.0] 2026-08-17
 ### Added
