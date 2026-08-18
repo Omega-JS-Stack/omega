@@ -38,6 +38,19 @@ function block(port, host = '127.0.0.1') {
   });
 }
 
+/** Pick a real free port from the OS (bind 0, read it back, release) — for
+ * cases that must not collide with the fixed 42xxx numbers above. */
+function ephemeralPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen({ port: 0, host: '0.0.0.0' }, () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
 function makeTempProject() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'ports-test-'));
 }
@@ -91,6 +104,23 @@ test('isPortFree sees listeners on EVERY bind surface (macOS coexistence)', asyn
   assert.equal(await isPortFree(42802), true, 'all listeners closed → free again');
 });
 
+test('isPortFree: an IPv4-wildcard (0.0.0.0) holder reads busy', async () => {
+  // The shape Docker port forwards and most non-loopback dev servers bind.
+  // On macOS/BSD an IPv6-wildcard bind COEXISTS with it, so the ::/::1/
+  // 127.0.0.1 probes all succeed and the port false-reads free — the
+  // allocator then hands firebase a port it cannot take
+  // ([#345](https://github.com/Omega-JS-Stack/omega/issues/345)).
+  const port = await ephemeralPort();
+  const close = await block(port, '0.0.0.0');
+  try {
+    assert.equal(await isPortFree(port), false, 'v4-wildcard listener must read busy');
+  } finally {
+    await close();
+  }
+
+  assert.equal(await isPortFree(port), true, 'listener closed → free again');
+});
+
 // ---- resolvePorts
 
 test('resolvePorts: all free → classic values untouched, nothing bumped', async () => {
@@ -104,6 +134,18 @@ test('resolvePorts: taken port bumps +1 until free', async () => {
   try {
     const { ports, bumped } = await resolvePorts({ wanted: { a: 42820 } });
     assert.equal(ports.a, 42821);
+    assert.deepEqual(bumped, ['a']);
+  } finally {
+    await close();
+  }
+});
+
+test('resolvePorts: a wanted port held on 0.0.0.0 bumps, never resolves in place', async () => {
+  const port = await ephemeralPort();
+  const close = await block(port, '0.0.0.0');
+  try {
+    const { ports, bumped } = await resolvePorts({ wanted: { a: port } });
+    assert.equal(ports.a, port + 1);
     assert.deepEqual(bumped, ['a']);
   } finally {
     await close();

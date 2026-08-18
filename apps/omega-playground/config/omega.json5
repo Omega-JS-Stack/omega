@@ -222,6 +222,32 @@
         },
       },
       {
+        // QA tier (Ian 2026-08-17): NO trial by design, so a sandbox
+        // subscription charges the moment it activates — the payments QA
+        // drives need a real PAYMENT.SALE.* sequence, and every public tier
+        // carries a 14-day trial that defers the first sale two weeks. A
+        // proof press is the machine printers pull test prints on — the QA
+        // tier in Paperloom's own voice. Recipe:
+        // packages/backend/docs/paypal-sandbox-qa.md. Visible on the pricing page
+        // because products have no hidden flag yet (#348 tracks one).
+        id: "proof-press",
+        name: "Proof Press",
+        type: "subscription",
+        tagline: "test prints, pulled immediately",
+        limits: { requests: 1 },
+        prices: { monthly: 5.00 },
+        features: [
+          { id: "requests", name: "Saves", icon: "feather" },
+        ],
+        chargebee: { itemId: null, legacyPlanIds: [] },
+        paypal: {
+          productId: "PROD-1VE952820H061592K",
+        },
+        stripe: {
+          productId: "prod_V5odp6Jww1qPyg",
+        },
+      },
+      {
         // enterprise: true leaves the card grid and renders as its own
         // full-width row under the cards — priced by conversation
         id: "enterprise",

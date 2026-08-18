@@ -213,12 +213,14 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
 - **`resolvePorts({ wanted, pins, claimed })`** — each wanted port keeps its value when
   free, bumps +1 until free when taken (shared `claimed` set prevents two names landing
   on one port). `pins` (the config `ports` section) never bump — a busy pin throws.
-  The free-check is a TRIPLE bind-probe (127.0.0.1, ::1 when the host has IPv6, and
-  the wildcard) — on macOS/BSD, wildcard and specific-address listeners COEXIST on one
-  port, so any single-surface probe false-positives against a sibling brand's stack
-  and the real bind crashes later (found live at cp186: the playground's https proxy
-  holds IPv6 `*:5002`; a 127.0.0.1-only probe handed 5002 to the second brand's
-  functions emulator).
+  The free-check is a QUADRUPLE bind-probe (127.0.0.1, ::1 when the host has IPv6,
+  the IPv4 wildcard 0.0.0.0, and the `::` wildcard) — on macOS/BSD, wildcard and
+  specific-address listeners COEXIST on one port, and the two wildcard FAMILIES
+  coexist with each other, so any single-surface probe false-positives against a
+  sibling brand's stack and the real bind crashes later (found live at cp186: the
+  playground's https proxy holds IPv6 `*:5002`; a 127.0.0.1-only probe handed 5002
+  to the second brand's functions emulator — and again at #345: a foreign `0.0.0.0`
+  squatter read free to the `::` probe and the auth emulator died with no bump).
 - **Ports file** — `writePortsFile/readPortsFile/clearPortsFile(projectDir)`:
   `<projectDir>/.temp/ports.json` (pid-stamped; readers ignore dead-pid leftovers). The
   allocator (the backend emulator boot) writes it; siblings of the same brand

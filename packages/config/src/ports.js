@@ -45,7 +45,7 @@ const PORTS_FILE = 'ports.json';
 /**
  * Attempt one bind (the probe primitive). On macOS/BSD, wildcard and
  * specific-address listeners COEXIST on the same port — so no single bind
- * can see every listener; isPortFree composes three.
+ * can see every listener; isPortFree composes four.
  * @param {object} listenOptions - net listen options ({ port } = wildcard).
  * @param {boolean} [ignoreMissingFamily] - Treat address-family-unavailable
  *   errors (no IPv6 on this host) as free rather than busy.
@@ -68,18 +68,22 @@ function bindProbe(listenOptions, ignoreMissingFamily = false) {
 
 /**
  * Is this port free for a dev server to take? Bind-probe, not connect-probe
- * — and THREE binds, because on macOS/BSD specific-address and wildcard
- * listeners coexist per port: a 127.0.0.1 probe misses an IPv6-wildcard
- * listener (`*:port`), a wildcard probe misses a 127.0.0.1-specific one,
- * and a `localhost` server can sit on ::1 alone. Free means all of
- * 127.0.0.1, ::1 (when the host has IPv6), and the wildcard bind succeed —
- * matching what firebase-tools' own connect-probe will conclude at boot.
+ * — and FOUR binds, because on macOS/BSD specific-address and wildcard
+ * listeners coexist per port, and so do the two wildcard families: a
+ * 127.0.0.1 probe misses an IPv6-wildcard listener (`*:port`), a wildcard
+ * probe misses a 127.0.0.1-specific one, a `localhost` server can sit on ::1
+ * alone, and the bare-`{ port }` bind lands on the IPv6 wildcard `::`, which
+ * coexists with a foreign `0.0.0.0` holder (Docker, `nc -l`, any
+ * non-loopback dev server). Free means all of 127.0.0.1, ::1 (when the host
+ * has IPv6), 0.0.0.0, and the `::` wildcard bind succeed — matching what
+ * firebase-tools' own connect-probe will conclude at boot.
  * @param {number} port - Port to probe.
  * @returns {Promise<boolean>} True when the port is free.
  */
 async function isPortFree(port) {
   return (await bindProbe({ port, host: '127.0.0.1' }))
     && (await bindProbe({ port, host: '::1' }, true))
+    && (await bindProbe({ port, host: '0.0.0.0' }))
     && (await bindProbe({ port }));
 }
 
