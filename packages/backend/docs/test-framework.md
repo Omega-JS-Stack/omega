@@ -417,10 +417,10 @@ They use the `rules` client (`src/test/utils/firestore-rules-client.js`). Canoni
 },
 ```
 
-A suite that needs a DIFFERENT ruleset (proving a hook a brand sets, for
-instance) compiles one and loads it into its own emulator project with
-`initializeTestEnvironment` — `test/rules/user-protected-fields.test.js` is the
-worked example.
+A suite that needs a DIFFERENT ruleset (proving what a brand's own rules do to
+the framework's, for instance) compiles one and loads it into its own emulator
+project with `initializeTestEnvironment` — `test/rules/_environment.js` is the
+shared plumbing, and `test/rules/brand-merge.test.js` the worked example.
 
 ## Test Account Isolation (CRITICAL)
 

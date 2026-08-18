@@ -1,6 +1,6 @@
 // ============================================================================
 // YOUR Firestore rules. This file is the SOURCE and it is yours — @omega.js/backend
-// never rewrites it (it only appends a framework hook back if one goes missing).
+// never rewrites the rules you write here.
 //
 // `omega build` COMPILES this file together with the framework half into
 // dist/firestore.rules, and firebase.json points the emulator AND
@@ -9,16 +9,43 @@
 //   Framework half : node_modules/@omega.js/backend/templates/firestore.framework.rules
 //   Compiled output: dist/firestore.rules  (GENERATED — do not edit)
 //
+// MERGE-BY-MATCH — how you TIGHTEN a framework rule. Firestore ORs `allow`
+// across sibling match blocks, so a second `match /users/{uid}` could only ever
+// widen access. Instead, a match block here whose PATH matches a framework
+// block's (wildcard names do not have to agree) is MERGED into it: for an op
+// both blocks declare, your condition is ANDed onto the framework's.
+//
+//   you write here          match /users/{userId} {
+//                             allow create, update: if !isWritingAny(['xp']) && isEmailVerified();
+//                           }
+//   the framework ships     match /users/{uid} {
+//                             allow create, update: if isUser(uid) && !isWritingFrameworkField();
+//                           }
+//   dist/firestore.rules    match /users/{uid} {
+//                             allow create, update: if isUser(uid) && !isWritingFrameworkField() && (!isWritingAny(['xp']) && isEmailVerified());
+//                           }
+//
+// Ops pair by NAME, so name the same ones the framework does (`allow write`
+// beside its `allow create, update` would WIDEN, not tighten — the compiler
+// says so out loud). An op ONLY you declare is appended as written (that op
+// widens, as sibling blocks always did); a nested match of yours splices in; a
+// path the framework does not define is yours alone and passes through
+// untouched.
+//
 // Both halves land in the SAME `match /databases/{database}/documents` scope,
 // so your rules may call ANY framework helper — declaration order does not
-// matter:
+// matter. `is*` asks a question, `get*` hands back a value:
 //
-//   isAuthenticated()   authUid()            authEmail()
-//   belongsTo(id)       isAdmin()            emailVerified()
-//   existingData()      incomingData()
-//   isCreatingField(f)  isUpdatingField(f)   isWritingField(f)
+//   isAuthenticated()   isUser(id)          isOwner()
+//   isAdmin()           isEmailVerified()
+//   isWritingAny(list)  isWritingField(f)   isCreatingField(f) isUpdatingField(f)
+//   getAuthUid()        getAuthEmail()      getRoles()
+//   getExistingData()   getIncomingData()
 //
-// See the framework half for the full list and what each one reads.
+// Fields are TOP-LEVEL: protecting `xp.total` means listing `'xp'`.
+// See the framework half for the full list and what each one reads (`getRoles()`
+// bills a document read per call, and so does every `isAdmin()`; the rest are
+// free).
 // ============================================================================
 rules_version = '2';
 service cloud.firestore {
@@ -26,28 +53,5 @@ service cloud.firestore {
     // ─── Your rules ──────────────────────────────────────────────────────────
     // Custom rules
     // ...
-
-    // ─── Framework hooks ─────────────────────────────────────────────────────
-    // Both are REQUIRED. The compiler lints for them; a missing hook is
-    // re-seeded with the default below and reported loudly.
-
-    // Top-level `users/{uid}` keys ONLY your backend may write. Firestore ORs
-    // `allow` across sibling match blocks, so a custom `match /users/{uid}`
-    // can never TIGHTEN the framework's — this hook is how you do it: the
-    // framework ANDs `!isWritingProtectedUserField()` into the user write rule
-    // and folds this list in.
-    //
-    // Keys are TOP-LEVEL: protecting `xp.total` means listing `'xp'`.
-    //   e.g. return ['xp', 'credits'];
-    function protectedFields() {
-      return [];
-    }
-
-    // Extra condition ANDed into the framework's `users/{uid}` write rule.
-    // Return `true` to keep the framework default.
-    //   e.g. return emailVerified();
-    function canWriteUser() {
-      return true;
-    }
   }
 }

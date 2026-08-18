@@ -6,6 +6,7 @@
  * - Authenticated user can create their own cart doc with status: 'pending'
  * - Authenticated user can update their own cart doc with status: 'pending'
  * - User cannot write to another user's cart doc
+ * - User cannot rewrite `owner` on an update — the cart stays theirs
  * - User cannot set status to anything other than 'pending'
  * - User can read their own cart doc
  * - User cannot read another user's cart doc
@@ -364,6 +365,38 @@ module.exports = {
           adminDb.doc(`payments-carts/${uid}`).update({
             status: 'completed',
           })
+        );
+      },
+    },
+
+    // Test 13: An owner cannot hand their own cart to somebody else.
+    // This pins the rationale written above the rule: the clause is
+    // deliberately NOT `isOwner()`, which asks whether the STORED owner names
+    // the caller and would let this rewrite through on the update path.
+    {
+      name: 'user-cannot-rewrite-owner-on-update',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const otherUid = accounts.admin.uid;
+        const db = rules.asAccount('basic');
+        const adminDb = rules.asAccount('admin');
+
+        // Seed a cart the caller genuinely owns
+        await rules.expectSuccess(
+          adminDb.doc(`payments-carts/${uid}`).set({
+            id: uid,
+            owner: uid,
+            status: 'pending',
+            productId: 'premium',
+            type: 'subscription',
+          })
+        );
+
+        // The owner rewrites `owner` to a third party — denied
+        await rules.expectFailure(
+          db.doc(`payments-carts/${uid}`).set({ owner: otherUid }, { merge: true })
         );
       },
     },

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- [#353](../../issues/353) — A brand tightens a framework Firestore rule with an ORDINARY match block: one whose path names a framework block's is MERGED into it, ANDing your condition onto every op both declare. The `protectedFields()`/`canWriteUser()` hooks retire — setup strips a default-bodied hook and keeps a customized one, loudly.
+- [#353](../../issues/353) — The rules helpers settle on one convention: `is*` asks a question, `get*` hands back a value. `belongsTo` → `isUser`, `authUid`/`authEmail`/`existingData`/`incomingData` → `getAuthUid`/`getAuthEmail`/`getExistingData`/`getIncomingData`, `emailVerified` → `isEmailVerified`, `isWritingProtectedUserField` → `isWritingFrameworkField`, plus new `isWritingAny(fields)` and `isOwner()`. Setup renames every call in your rules file.
+- [#353](../../issues/353) — Field helpers are correct on CREATE, the framework's protected list drops `plan` and gains `verifications`, and the rules schema is v3.0.0. `isEmailVerified()` reads the auth token instead of a stored field nothing ever wrote; `getVerifications()` is removed.
+- [#353](../../issues/353) — `isUser()` holds its EMAIL arm to a verified token, so an unverified signup claiming an address stops matching email-keyed docs. `isOwner()` reads the stored owner, or the incoming one on a create, so it is right on every op.
+- [#353](../../issues/353) — The framework's `match /users/{uid}` declares `create, update` instead of `write`: an owner's delete is denied by the rule through the admin catch-all, not by an evaluation error. Tighten it from your own rules with the same op names.
 
 ## [0.36.0] 2026-08-18
 ### Added

@@ -4,9 +4,9 @@
  *
  * Rules being tested:
  * - Users can read their own document
- * - Users can write to their own document (non-protected fields only)
+ * - Users can create/update their own document (non-protected fields only)
  * - Users cannot read/write other users' documents
- * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent) cannot be written by users
+ * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent, verifications) cannot be written by users
  *
  * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
@@ -390,7 +390,12 @@ module.exports = {
       },
     },
 
-    // Note: User create/delete tests are omitted because users don't create or delete
-    // their own documents - that's handled by system auth triggers (on-create/on-delete)
+    // Note: the framework's users rule declares `create, update` and no delete
+    // — users don't delete their own documents, that's the on-delete auth
+    // trigger's job — so an owner delete falls to the admin catch-all and is
+    // denied by the RULE. Both of the owner's own paths are covered in
+    // rules/field-helpers.test.js: the CREATE (a signed-in client may create
+    // its own users/{uid} doc as long as it writes no framework-owned key) and
+    // that denied DELETE
   ],
 };

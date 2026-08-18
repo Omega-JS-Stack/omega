@@ -62,7 +62,8 @@ npx omega install live      # restore the published @omega.js/backend from npm
 - `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
 - `.firebaserc`: Firebase project ID alias.
 - `firestore.rules`: YOUR security rules — the whole file, no managed block. `omega build` compiles it with @omega.js/backend's framework half into `dist/firestore.rules`, which the emulator and `firebase deploy` read (never edit that).
-  - Your rules may call any framework helper (`belongsTo`, `isAdmin`, `existingData`, …); the seeded `protectedFields()` / `canWriteUser()` hooks are how you TIGHTEN the framework's `users/{uid}` write rule.
+  - Your rules may call any framework helper: `is*` asks a question (`isUser`, `isOwner`, `isAdmin`, `isWritingAny`), `get*` hands back a value (`getAuthUid`, `getExistingData`).
+  - A match block of yours whose path names a framework block's MERGES into it (your condition ANDs onto the framework's) — that is how you TIGHTEN. Ops pair by NAME: `match /users/{uid} { allow create, update: if !isWritingAny(['xp']); }`.
 - `database.rules.json`: Realtime Database security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside it; everything outside is yours.
 - `dist/`: GENERATED staged output (`omega build`) carrying the src copy, derived manifest, composed config, and hosting boilerplate. Never edit; gitignored.
 

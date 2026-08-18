@@ -16,8 +16,9 @@
  *   src/public/** OR      → dist/public/**          (consumer overrides win;
  *   templates/public/**                               defaults fill the gaps)
  *   firestore.rules +     → dist/firestore.rules    (COMPILED: the brand's rules
- *   the framework half                                + hooks spliced with the
- *                                                     framework's — compile-rules.js)
+ *   the framework half                                spliced with the framework's,
+ *                                                     a matching brand match block
+ *                                                     MERGED in — compile-rules.js)
  *
  * firebase.json references `dist` as both `functions.source` and
  * `hosting.public` (as `dist/public`), so one staged tree feeds every

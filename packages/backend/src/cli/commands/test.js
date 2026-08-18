@@ -428,7 +428,7 @@ class TestCommand extends BaseCommand {
 
   /**
    * Seed the fixture's BRAND rules source — the same seed `omega setup` ships
-   * to a consumer, hooks at their defaults. The framework half is no longer
+   * to a consumer. The framework half is no longer
    * copied anywhere: the stage below compiles it in
    * ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)), so the rules
    * suite exercises the real compiled artifact, exactly what a consumer

@@ -6,16 +6,24 @@
 // dist/firestore.rules — the artifact firebase.json points the emulator AND
 // `firebase deploy` at (src/cli/utils/compile-rules.js).
 //
-// Both halves land in the SAME `match /databases/{database}/documents` scope,
-// so every helper below is callable from a brand's rules, and the two BRAND
-// HOOKS below are callable from here:
-//
-//   protectedFields()  → list of top-level user-doc keys the brand protects
-//   canWriteUser()     → extra condition ANDed into the user-doc write rule
-//
+// MERGE-BY-MATCH ([#353](https://github.com/Omega-JS-Stack/omega/issues/353)):
 // Firestore ORs `allow` across sibling match blocks, so a brand's own
-// `match /users/{uid}` can only ever WIDEN access. The hooks are how a brand
-// TIGHTENS it ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)).
+// `match /users/{uid}` could only ever WIDEN what this file allows. So the
+// compiler MERGES it instead — a brand block whose path matches one below
+// (wildcard names normalized) folds in, and for an op both blocks declare the
+// brand's condition is ANDed onto the framework's. A brand writes ordinary
+// rules; there are no hook functions any more (they retired in rules v3).
+//
+// Both halves land in the SAME `match /databases/{database}/documents` scope,
+// so every helper below is callable from a brand's rules, in either direction.
+//
+// NAMING: `is*` is a PREDICATE about the caller or about this write, and reads
+// as a sentence in a rule (`isUser(uid)`, `isWritingField('xp')`); `get*` hands
+// back a VALUE to compare against (`getAuthUid()`, `getIncomingData()`).
+//
+// COST: every helper here is free except getRoles(), which bills ONE document
+// read per call — and `isAdmin()` is built on it, so the lock-by-default block
+// below means even a denied request pays for one read.
 // ============================================================================
 rules_version = '2';
 service cloud.firestore {
@@ -25,12 +33,16 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // Protect user account data. The two brand hooks ride the write rule:
-    // `protectedFields()` (folded in by isWritingProtectedUserField) and
-    // `canWriteUser()`.
+    // Protect user account data. A brand TIGHTENS this by writing its own
+    // `match /users/{uid}` block — the compiler ANDs its condition onto the
+    // ops below. DELETE is deliberately not declared: a user document is
+    // removed by the auth trigger, never by its owner, and naming the two ops
+    // this rule MEANS keeps a client delete denied by the admin catch-all
+    // above instead of by an evaluation error (a delete carries no incoming
+    // data for the field guard to read).
     match /users/{uid} {
-      allow read: if belongsTo(uid);
-      allow write: if belongsTo(uid) && !isWritingProtectedUserField() && canWriteUser();
+      allow read: if isUser(uid);
+      allow create, update: if isUser(uid) && !isWritingFrameworkField();
     }
 
     // Protect notification data — the doc id IS the push token, a high-entropy
@@ -40,94 +52,118 @@ service cloud.firestore {
     match /notifications/{token} {
       allow get: if true;
       allow list: if false;
-      allow create: if incomingData().token == token
-        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
-      // `incomingData().token == token` is the malformed-doc guard: a legacy-era
+      allow create: if getIncomingData().token == token
+        && (getIncomingData().owner == null || (isAuthenticated() && getIncomingData().owner == getAuthUid()));
+      // `getIncomingData().token == token` is the malformed-doc guard: a legacy-era
       // doc whose stored token never matched its id is client-read-only, never
       // updatable ([#288](https://github.com/Omega-JS-Stack/omega/issues/288)).
-      // The `== existingData().token` clause keeps the field immutable.
-      allow update: if incomingData().token == token
-        && incomingData().token == existingData().token
-        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
+      // The `== getExistingData().token` clause keeps the field immutable.
+      allow update: if getIncomingData().token == token
+        && getIncomingData().token == getExistingData().token
+        && (getIncomingData().owner == null || (isAuthenticated() && getIncomingData().owner == getAuthUid()));
     }
 
-    // Protect abandoned cart data
+    // Protect abandoned cart data. NOT `isOwner()`: this rule pins the owner
+    // the write CARRIES to the doc id, on the update as well as the create, so
+    // an owner cannot hand their own cart to somebody else. `isOwner()` asks
+    // the other question (does the STORED owner name the caller), which an
+    // owner rewriting the field would still satisfy.
     match /payments-carts/{uid} {
-      allow create, update: if belongsTo(uid)
-        && incomingData().owner == uid
-        && incomingData().status == 'pending';
-      allow read: if belongsTo(uid);
+      allow create, update: if isUser(uid)
+        && getIncomingData().owner == uid
+        && getIncomingData().status == 'pending';
+      allow read: if isUser(uid);
     }
 
-    // Auth functions
-    function authEmail() {
+    // ========== Auth ==========
+    function getAuthEmail() {
       return request.auth.token.email;
     }
-    function authUid() {
+    function getAuthUid() {
       return request.auth.uid;
     }
     function isAuthenticated() {
       return request.auth != null;
     }
-    function belongsTo(identity) {
-      return isAuthenticated() && (authUid() == identity || authEmail() == identity);
-      // eventually include a check for (existingData().owner == identity)...(in case its a doc owned by a user that's not actually user doc)
+    // The caller IS `identity` — a uid or an email, since a doc id is one or
+    // the other across the framework's collections. The EMAIL arm requires a
+    // VERIFIED token: Firebase Auth lets anyone sign up claiming any address,
+    // so an unproven claim must never match an email-keyed document. The uid
+    // arm needs no such gate — a uid is Firebase Auth's own value.
+    function isUser(identity) {
+      return isAuthenticated() && (getAuthUid() == identity || (isEmailVerified() && getAuthEmail() == identity));
+    }
+    // The caller owns THIS doc: its `owner` field names them. The STORED owner
+    // once the document exists — so an update can never hand ownership to
+    // whoever is writing — and the INCOMING one on a create, where there is no
+    // stored document to own yet. That is what makes the answer mean the same
+    // thing on every op. `.get()` (not `.owner`) because reading a key a map
+    // does not carry is an error, and an error denies the whole rule.
+    function isOwner() {
+      return isUser(resource == null
+        ? getIncomingData().get('owner', null)
+        : getExistingData().get('owner', null));
     }
 
+    // ========== Account ==========
+    // The get() below bills ONE document read, every time it is called.
     function getRoles() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
-    }
-    function getVerifications() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verifications;
     }
     function isAdmin() {
       return getRoles().admin == true;
     }
-    function emailVerified() {
-      return getVerifications().email == true;
+    // The AUTH TOKEN, never a stored field: `users/{uid}.verifications` is
+    // written by nothing server-side, so reading it would only ever trust a
+    // value the client planted. The token claim is Firebase Auth's, it cannot
+    // be forged, it costs no read, and it is right on the first request. Read
+    // through `.get()` because a token without an email (phone or anonymous
+    // sign-in) carries no such claim at all, and reading a key a map does not
+    // carry is an error that would deny the whole rule.
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.get('email_verified', false) == true;
     }
 
-    // The framework's own protected user-doc fields, plus the brand's list
-    // folded in through the `protectedFields()` hook. affectedKeys() is
-    // TOP-LEVEL, so a brand protecting `xp.total` lists `'xp'`.
-    function isWritingProtectedUserField() {
-      return isWritingField('auth')
-        || isWritingField('roles')
-        || isWritingField('flags')
-        || isWritingField('plan') // TODO: REMOVE THIS WHEN ALL PROJECTS UPDATED
-        || isWritingField('subscription')
-        || isWritingField('affiliate')
-        || isWritingField('api')
-        || isWritingField('metadata')
-        || isWritingField('usage')
-        || isWritingField('consent')
-        || incomingData().diff(existingData()).affectedKeys().hasAny(protectedFields());
-    }
-
-    function isCreatingField(field) {
-      return !(field in resource.data) && field in request.resource.data;
-    }
-
-    function isUpdatingField(field) {
-      return field in resource.data && field in request.resource.data && resource.data[field] != request.resource.data[field];
-    }
-
-    function isWritingField(field) {
-      return isCreatingField(field) || isUpdatingField(field);
-    }
-
-    // function userEmail(userId) {
-    //   return get(/databases/$(database)/documents/users/$(userId)).data.email;
-    // }
-    // Helper functions
-    // [READ] Data that exists on the Firestore document
-    function existingData() {
-      return resource.data;
+    // ========== Document data ==========
+    // [READ] Data that exists on the Firestore document. `resource` is null on
+    // a CREATE, and reading through a null errors (which denies the rule), so
+    // an absent document reads as the empty map — that is what makes every
+    // field helper below correct on create as well as update.
+    function getExistingData() {
+      return resource == null ? {} : resource.data;
     }
     // [WRITE] Data that is sent to a Firestore document
-    function incomingData() {
+    function getIncomingData() {
       return request.resource.data;
     }
+
+    // ========== Field writes ==========
+    // Is this write touching any of `fields`? TOP-LEVEL keys: protecting
+    // `xp.total` means listing `'xp'`. Counts creations, value changes and
+    // removals; writing a key back with the SAME value is not a write.
+    function isWritingAny(fields) {
+      return getIncomingData().diff(getExistingData()).affectedKeys().hasAny(fields);
+    }
+    function isWritingField(field) {
+      return isWritingAny([field]);
+    }
+    // The two halves of a write, when a rule needs to tell them apart.
+    function isCreatingField(field) {
+      return !(field in getExistingData()) && field in getIncomingData();
+    }
+    function isUpdatingField(field) {
+      return field in getExistingData() && field in getIncomingData() && getExistingData()[field] != getIncomingData()[field];
+    }
+
+    // The user-doc keys the FRAMEWORK owns: server-written, never a client's.
+    // A brand protects keys of its own by tightening `match /users/{uid}` in
+    // its own firestore.rules — e.g. `allow create, update: if !isWritingAny(['xp']);`.
+    // `verifications` is on the list as a RESERVED name: nothing writes it
+    // today, and a client planting one must never look like server truth.
+    function isWritingFrameworkField() {
+      return isWritingAny(['auth', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'usage', 'consent', 'verifications']);
+    }
+
     // ========== Resources ==========
     // https://fireship.io/snippets/firestore-rules-recipes/
     // https://github.com/jaysquared/atom-firestore-grammar

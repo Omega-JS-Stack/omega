@@ -6,16 +6,16 @@ const {
   COMPILED_RULES_FILE,
   compileFirestoreRules,
   ensureBrandRulesSource,
-  isLegacyMarkerFile,
-  missingBrandHooks,
+  needsRulesMigration,
 } = require('../../utils/compile-rules');
 
 /**
- * The brand's `firestore.rules` is SOURCE now, not a managed block
+ * The brand's `firestore.rules` is SOURCE, not a managed block
  * ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)): setup seeds it
- * once, converts a legacy marker-block file ONCE, and lints that both framework
- * hooks are present — re-seeding a missing one loudly. The deployed artifact is
- * `dist/firestore.rules`, compiled by every stage.
+ * once and migrates an older one ONCE — a legacy marker-block file, or a v2
+ * hook-era file whose retired hooks merge-by-match replaced
+ * ([#353](https://github.com/Omega-JS-Stack/omega/issues/353)). The deployed
+ * artifact is `dist/firestore.rules`, compiled by every stage.
  */
 class FirestoreRulesFileTest extends BaseTest {
   getName() {
@@ -26,15 +26,11 @@ class FirestoreRulesFileTest extends BaseTest {
     const self = this.self;
     const contents = jetpack.read(`${self.firebaseProjectPath}/${BRAND_RULES_FILE}`) || '';
 
-    if (!contents.trim() || isLegacyMarkerFile(contents)) {
-      return false;
-    }
-
     // An unparseable file fails the check and lets fix() throw with the
     // compiler's precise message — setup must never quietly rewrite rules it
     // could not read.
     try {
-      if (missingBrandHooks(contents).length) {
+      if (needsRulesMigration(contents)) {
         return false;
       }
     } catch (error) {
@@ -53,13 +49,16 @@ class FirestoreRulesFileTest extends BaseTest {
     const result = ensureBrandRulesSource({ projectDir: self.firebaseProjectPath });
 
     if (result.created) {
-      console.log(chalk.yellow(`Seeded ${BRAND_RULES_FILE} — your rules plus the framework hooks. It is yours to edit.`));
+      console.log(chalk.yellow(`Seeded ${BRAND_RULES_FILE} — your rules, compiled with the framework half. It is yours to edit.`));
     }
     if (result.migrated) {
-      console.log(chalk.yellow(`Converted ${BRAND_RULES_FILE} off the legacy OMEGA Rules marker block — your custom rules were kept, the managed block now compiles in from @omega.js/backend.`));
+      console.log(chalk.yellow(`Migrated ${BRAND_RULES_FILE} to rules v3 (merge-by-match) — your own rules were kept, and a match block of yours that names a framework path now MERGES into it instead of sitting beside it.`));
     }
-    for (const hook of result.reseeded) {
-      console.log(chalk.red(`${BRAND_RULES_FILE} was missing the required \`${hook}()\` hook — re-seeded with its default. Review it: the framework's user-doc write rule calls it.`));
+    for (const hook of result.strippedHooks) {
+      console.log(chalk.yellow(`Removed the retired \`${hook}()\` hook from ${BRAND_RULES_FILE} — it still carried the default body, and nothing calls it any more.`));
+    }
+    for (const hook of result.keptHooks) {
+      console.log(chalk.red(`${BRAND_RULES_FILE}: the retired \`${hook}()\` hook carried YOUR code, so it was kept as an ordinary function — but NOTHING CALLS IT NOW. Move what it enforced into a \`match\` block of your own (it merges into the framework's), then delete it.`));
     }
 
     compileFirestoreRules({ projectDir: self.firebaseProjectPath });
