@@ -5,16 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.39.0] 2026-08-18
 ### Added
-- [#358](../../issues/358) — `omega deploy` now fills the base path itself, so a gh-pages brand never sees an env var: a custom domain deploys at the domain root, a project site under `/<repo>/`. The direct lane and the CI workflow derive it from one function; an explicit `OMEGA_PATH_PREFIX` still wins.
-- [#357](../../issues/357) — A new backend rules suite proves the shipped `database.rules.json` against the real emulator: a user's own-uid session query passes, while a cross-uid query, an unfiltered list read, a point read of another user's session and a client write to it are all denied.
+- [#358](../../issues/358) [`c322e437`](../../commit/c322e437) Thanks [@ianwieds]! — `omega deploy` now fills the base path itself, so a gh-pages brand never sees an env var: a custom domain deploys at the domain root, a project site under `/<repo>/`. The direct lane and the CI workflow derive it from one function; an explicit `OMEGA_PATH_PREFIX` still wins.
+- [#357](../../issues/357) [`c322e437`](../../commit/c322e437) Thanks [@ianwieds]! — A new backend rules suite proves the shipped `database.rules.json` against the real emulator: a user's own-uid session query passes, while a cross-uid query, an unfiltered list read, a point read of another user's session and a client write to it are all denied.
 
 ### Changed
-- [#356](../../issues/356) — The stdout guard that kept the manager's suite off node's report pipe now ships from `@omega.js/devkit`, and every node test-runner suite preloads it: account, config, template-kit, mcp-router, client, web, manager, devkit's runner, the root scripts lane. A wiring pin fails a suite that skips it.
+- [#356](../../issues/356) [`c322e437`](../../commit/c322e437) Thanks [@ianwieds]! — The stdout guard that kept the manager's suite off node's report pipe now ships from `@omega.js/devkit`, and every node test-runner suite preloads it: account, config, template-kit, mcp-router, client, web, manager, devkit's runner, the root scripts lane. A wiring pin fails a suite that skips it.
 
 ### Fixed
-- [#354](../../issues/354) — A require path quoted inside a COMMENT is no longer chased as a real dependency: the vendor closure walk strips line and block comments (JSDoc included) before scanning, string- and template-literal aware. An illustrative `require('../dist/…')` in a doc block stops killing every dependent package's prepare.
-- [#355](../../issues/355) — A site served under a URL path — a GitHub Pages project site — no longer 404s on every asset. The publisher exports `OMEGA_PATH_PREFIX` around `omega build`, and every emitted URL is mounted under it: stylesheets, bundles, favicons, images, internal links, font sources, runtime fetches. Unset means the domain root.
+- [#354](../../issues/354) [`c322e437`](../../commit/c322e437) Thanks [@ianwieds]! — A require path quoted inside a COMMENT is no longer chased as a real dependency: the vendor closure walk strips line and block comments (JSDoc included) before scanning, string- and template-literal aware. An illustrative `require('../dist/…')` in a doc block stops killing every dependent package's prepare.
+- [#355](../../issues/355) [`c322e437`](../../commit/c322e437) Thanks [@ianwieds]! — A site served under a URL path (a GitHub Pages project site) no longer 404s on every asset. The publisher exports `OMEGA_PATH_PREFIX` around `omega build`, and every emitted URL is mounted under it: stylesheets, bundles, favicons, images, internal links, font sources, runtime fetches. Unset means the domain root.
 
 ## [0.38.0] 2026-08-18
 ### Added
