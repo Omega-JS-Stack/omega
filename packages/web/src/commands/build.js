@@ -19,8 +19,28 @@ const { resolveStaticDirs } = require('../static-assets.js');
 const { resolveClientEntry } = require('../paths.js');
 const { translateSite } = require('../translate/index.js');
 const { fetchFirebaseAuthHelpers } = require('../firebase-auth-helpers.js');
+const { visibleProducts } = require('../pricing.js');
 
 const logger = new Logger('omega:build');
+
+/**
+ * C2: payment.products is the only pricing source — surface the honest empty
+ * state loudly so a bare catalog is a choice, not a surprise. The page composes
+ * from the VISIBLE catalog (#348), so an all-hidden catalog renders the same
+ * empty state and earns the same warning, named for what it actually is.
+ * @param {object} payment - resolved config `payment` section
+ * @returns {string|null} The warning to print, or null when /pricing has cards.
+ */
+function catalogWarning(payment) {
+  if (visibleProducts(payment).length > 0) return null;
+
+  const total = payment && Array.isArray(payment.products) ? payment.products.length : 0;
+  const state = total > 0
+    ? `payment.products lists ${total} product${total === 1 ? '' : 's'}, every one marked hidden`
+    : 'payment.products is empty';
+
+  return `${state} — /pricing renders the "no published pricing" empty state`;
+}
 
 module.exports = async function (options) {
   options = options || {};
@@ -36,10 +56,9 @@ module.exports = async function (options) {
   const siteData = loadSiteData(paths.root);
   const brandRoot = findBrandRoot(paths.root);
 
-  // C2: payment.products is the only pricing source — surface the honest
-  // empty state loudly so a bare catalog is a choice, not a surprise
-  if (!siteData.payment || !Array.isArray(siteData.payment.products) || siteData.payment.products.length === 0) {
-    logger.warn('payment.products is empty — /pricing renders the "no published pricing" empty state');
+  const emptyCatalog = catalogWarning(siteData.payment);
+  if (emptyCatalog) {
+    logger.warn(emptyCatalog);
   }
 
   const result = await buildSite({
@@ -123,3 +142,5 @@ module.exports = async function (options) {
 
   return result;
 };
+
+module.exports.catalogWarning = catalogWarning;

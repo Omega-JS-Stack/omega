@@ -413,10 +413,12 @@ billing-toggle availability (both cadences must exist), an HONEST savings
 badge (computed from real prices), and the feature-comparison matrix (tiers
 inherit earlier plans' features) — and it surfaces as `resolved.pricing` in
 every theme's pricing layout. Optional presentation fields per product:
-`tagline`, `popular`, `url`, `features [{ id, name, icon, definition,
-value }]` (value falls back to `limits[id]`; `-1` renders Unlimited). Free
-plan = no prices → anchors to `/signup`. Empty catalog → an explicit
-`#pricing-empty` state + an `omega build` warning — never fictional plans.
+`tagline`, `popular`, `url`, `hidden` (drops the product from every pricing
+lane while checkout still resolves it by id), `features [{ id, name, icon,
+definition, value }]` (value falls back to `limits[id]`; `-1` renders
+Unlimited). Free plan = no prices → anchors to `/signup`. Empty catalog —
+bare, or every product `hidden` — → an explicit `#pricing-empty` state + an
+`omega build` warning — never fictional plans.
 Consumer page frontmatter still overrides presentation per-page (hero copy,
 `faqs`, `social_proof`, `pricing.enterprise`, `pricing.promo`,
 `pricing.guarantee`, `pricing.price_per_unit`); the framework ships NO
@@ -518,5 +520,6 @@ narrowing + browser live-reload on asset rebuilds.
 ## License
 
 [Elastic License 2.0](LICENSE). The source is free to use and modify; a
-license key unlocks payments and removes the attribution; and you may not
+license key unlocks payments in production deploys and removes the
+attribution (local dev and test payments are always free); and you may not
 offer `@omega.js/web` to third parties as a hosted or managed service.

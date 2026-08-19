@@ -57,8 +57,6 @@ const DEV_HOOKS = {
   _dev_cardProcessor: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   _dev_recaptcha: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   _dev_decline: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
-  // The account page's fixtures toggle: referrals + sessions in one control.
-  _dev_prefill: { offeredBy: 'core/js/pages/dashboard/account/index.js' },
   // The auth pages' returning-redirect rehearsal.
   _dev_simulateRedirect: { offeredBy: 'core/js/libs/auth/index.js' },
   // NOT a test hook: the per-request API-base escape (`?_dev_apiEnvironment=

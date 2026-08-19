@@ -3,8 +3,10 @@
 The repeatable recipe for driving a REAL PayPal sandbox payment through the deployed
 playground backend, proven 2026-08-17 on the [#240](https://github.com/Omega-JS-Stack/omega/issues/240)
 v1 sale fixture drive. Use it whenever a webhook change needs a live delivery instead
-of a fixture replay. [#348](https://github.com/Omega-JS-Stack/omega/issues/348) tracks
-precreating more of this (hidden products, API-minted buyer accounts).
+of a fixture replay. [#348](https://github.com/Omega-JS-Stack/omega/issues/348) precreated
+what it could: the QA product is `hidden: true` (created on every processor, never on the
+pricing page). The BUYER stays hand-made — PayPal retired the sandbox-accounts API (see
+below).
 
 ## The standing fixtures
 
@@ -19,17 +21,25 @@ precreating more of this (hidden products, API-minted buyer accounts).
   playground backend (`api.playground.omegajs.dev/omega/payments/webhook`).
   Deliveries arrive with real signature headers; the deployed backend is the
   verification surface (a local emulator receives nothing — no forwarding path).
-- **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial) in
-  `apps/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
+- **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial, `hidden: true`)
+  in `apps/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
   tier carries a 14-day trial, which defers a subscription's first sale two weeks.
-  The manager payment walk owns its processor objects
+  `hidden: true` (#348) is presentation-only — the pricing page never renders it,
+  while checkout still resolves it by id and the walk still creates its processor
+  objects. The manager payment walk owns those objects
   (`npx mgr manage --service=payment` at the playground root); read the current
   ids from the config write-backs (`stripe.productId`, `paypal.productId`) and
   list plans via `GET /v1/billing/plans?product_id=<paypal.productId>`.
 - **Sandbox buyer** — `qa-fixture-buyer@playground.omegajs.dev`, created by hand
   through PayPal's guest checkout during the 2026-08-17 drive. Its wallet holds a
-  working generator-BIN Visa. If the login is lost, recreate through the guest
-  flow below or wait for #348's API precreation.
+  working generator-BIN Visa. It is DURABLE — the hoops are one-time, not per
+  drive. If the login is lost, recreate it through the guest flow below, or from
+  the Developer Dashboard (Sandbox → Accounts → Create Account).
+  **There is no API for this** (probed 2026-08-18, #348): the app-credential token
+  carries no sandbox-account scope (asking for one downgrades the token to
+  `openid`), the legacy `/v1/customer/partners/{merchant_id}/accounts` route 404s
+  even with our real merchant id, and every `developer.paypal.com` account path
+  redirects to an interactive login. Don't spend time re-probing it.
 
 ## Two lanes — pick deliberately (Ian's ruling, 2026-08-17)
 

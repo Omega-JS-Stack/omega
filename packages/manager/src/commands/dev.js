@@ -14,9 +14,10 @@
  *   omega dev --all                 every target with a dev leg
  *   omega dev --full                boot on the WHOLE manage walk, not the lane
  *
- * Boot order: a manage cycle first — the boot lane (workspace, assets,
- * disperse: the local redistribution the legs consume), then the legs. See
- * docs/shared/local-dev.md for what refreshes when.
+ * Boot order: the freshness sweep first (one dist check for every lane), then
+ * a manage cycle — the boot lane (workspace, assets, disperse: the local
+ * redistribution the legs consume), then the legs. See docs/shared/local-dev.md
+ * for what refreshes when.
  *
  * Port coordination is already solved (N7): the backend leg publishes its
  * emulator ports; the web leg reads them and bakes dev.ports into pages —
@@ -28,6 +29,8 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { findTarget } = require('@omega.js/devkit/omega-bin');
+const { freshnessSweep } = require('@omega.js/devkit/local');
 
 // Local
 const { runManage } = require('../manage.js');
@@ -152,6 +155,31 @@ module.exports = async (options = {}) => {
   console.log(chalk.bold(`🚀 omega dev — booting ${selected.join(' + ')} ${chalk.dim(`(${brandRoot})`)}`));
   if (!options.only && !options.all) {
     console.log(chalk.dim('   default set is web + backend — `--only`, `--except`, `--all` filter it'));
+  }
+
+  // Dist freshness is checked ONCE, here, for every lane at once (#340). Each
+  // lane's CLI boot checks itself too — but a heal runs `npm run prepare`,
+  // which PURGES dist before recopying, and a framework bin opens by requiring
+  // its own `../dist/` entry. Unsynchronized, one lane's purge window is the
+  // sibling lane's require: the backend leg died MODULE_NOT_FOUND dispatching
+  // through the web package the web leg was mid-rebuild on. Swept first, every
+  // lane's own check is a no-op.
+  const hosts = [];
+  for (const target of selected) {
+    const app = apps.find((entry) => entry.target === target);
+    const found = findTarget(app.path);
+    if (found && found.kind === 'framework') {
+      hosts.push({ packageName: found.name, fromDir: found.dir });
+    }
+  }
+  const sweep = freshnessSweep({ hosts });
+  if (sweep.healed.length > 0) {
+    console.log(chalk.dim(`   ✔ rebuilt ${sweep.healed.join(', ')} before booting — the legs start on a complete dist`));
+  }
+  if (sweep.staleLinked.length > 0) {
+    // The monorepo watch owns those dists (#281) — the sweep printed what is
+    // unbuilt and what to start; nothing boots on top of it.
+    throw new Error(`omega dev: ${sweep.staleLinked.map((entry) => entry.packageName).join(', ')} — see above; nothing booted`);
   }
 
   // Boot opens with a full manage cycle (#44): the app watchers see only

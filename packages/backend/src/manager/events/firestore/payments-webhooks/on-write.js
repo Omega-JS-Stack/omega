@@ -5,6 +5,11 @@ const { trackPayment } = require('./analytics.js');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const User = require('../../../helpers/user.js');
 
+// Where an event the pipeline REFUSES to act on is parked for a human. Keyed by the
+// processor's event id, so a redelivery re-records the same document rather than
+// piling up duplicates. Server-only, like every other payments-* collection.
+const ANOMALIES_COLLECTION = 'payments-anomalies';
+
 /**
  * Firestore trigger: payments-webhooks/{eventId} onWrite
  *
@@ -74,7 +79,13 @@ module.exports = async ({ ctx, change, context }) => {
 
     // A flagged resource is the webhook's own payload, not the API's answer — say which
     const source = resource._stale ? 'stale-fallback (webhook payload, processor API unreachable)' : 'processor API';
-    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resource.status || 'unknown'}, source=${source}`);
+
+    // v2 resources spell the field `status`, v1 sale resources spell it `state` —
+    // reading only the first reported `status=unknown` on a fetch that plainly
+    // succeeded, which is exactly the confusion this line exists to prevent
+    // ([#347](https://github.com/Omega-JS-Stack/omega/issues/347)).
+    const resourceStatus = resource.status ?? resource.state ?? 'unknown';
+    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resourceStatus}, source=${source}`);
 
     // Resolve UID from the fetched resource if not available from webhook parse
     // This handles events like PAYMENT.SALE where the Sale object doesn't carry custom_id
@@ -282,6 +293,30 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     ctx.warn(`Webhook ${eventId} has no orderId (processor=${processor}, ${resourceType} ${resourceId}) — the staleness guard cannot run, so an out-of-order delivery for this resource would be applied as-is`);
   }
 
+  // Unified refund details from the processor library (keeps the order record and
+  // the transition handlers processor-agnostic). Every refund path needs them: the
+  // subscription email's amount, the one-time refund's record on the order, and
+  // the anomaly record below.
+  const isRefund = transitions.REFUND_EVENTS.includes(eventType);
+  const refundDetails = (isRefund && library.getRefundDetails) ? library.getRefundDetails(raw) : null;
+
+  // A refund UPDATES a purchase — it can never DEFINE one. With no order record
+  // behind it, the refund event used to be read as a fresh purchase definition:
+  // payments-orders/{orderId} was minted with `unified.status: 'completed'` and the
+  // REFUND's id as the resource, so a reversal was booked as revenue while the
+  // trail said one-time/purchase-refunded. Reachable whenever the purchase write is
+  // missing — a lost or failed purchase webhook, a webhook registered after the
+  // sale, or PayPal delivering REFUNDED before the capture.
+  //
+  // So the pipeline refuses, loudly, and writes nothing else: the event is recorded
+  // as an anomaly a human reconciles from, which surfaces the lost purchase webhook
+  // instead of letting it masquerade as revenue
+  // ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
+  if (!isSubscription && isRefund && !existingOrder?.unified) {
+    await recordRefundAnomaly({ admin, ctx, resource, raw, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId, now, nowUNIX });
+    return null;
+  }
+
   // Read current user doc (needed for transition detection + handler context)
   const userDoc = await admin.firestore().doc(`users/${uid}`).get();
   const userData = userDoc.exists ? userDoc.data() : {};
@@ -316,12 +351,6 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     unified.status = 'suspended';
   }
 
-  // Unified refund details from the processor library (keeps the order record and
-  // the transition handlers processor-agnostic). Both refund paths need them: the
-  // subscription email's amount, and the one-time refund's record on the order.
-  const isRefund = transitions.REFUND_EVENTS.includes(eventType);
-  const refundDetails = (isRefund && library.getRefundDetails) ? library.getRefundDetails(raw) : null;
-
   // A refund UPDATES a purchase record — it does not redefine the purchase.
   //
   // A one-time refund's resource is the bare charge that moved the money back: it
@@ -329,8 +358,9 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // completed purchase to product=unknown and price=0, and replaced the checkout
   // resourceId with the charge id. Merge instead — the purchase stays exactly what
   // it was, and only the refund outcome is written
-  // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
-  const isOneTimeRefund = !isSubscription && isRefund && !!existingOrder?.unified;
+  // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)). A one-time refund
+  // with no purchase to merge onto never reaches here — the guard above refused it.
+  const isOneTimeRefund = !isSubscription && isRefund;
 
   if (isOneTimeRefund) {
     unified = applyRefundToPurchase(existingOrder.unified, unified, { refundDetails, now, nowUNIX });
@@ -553,6 +583,86 @@ function applyRefundToPurchase(purchase, derived, { refundDetails, now, nowUNIX 
       updatedBy: derived.payment?.updatedBy || purchase.payment?.updatedBy || null,
     },
   };
+}
+
+/**
+ * Park a refund that has no purchase behind it, loudly and durably
+ *
+ * The books are the point: nothing is written to payments-orders or
+ * payments-intents, so no revenue is invented. What the reconciler needs instead
+ * lands in ONE document — the refund payload as delivered, the money, and the id of
+ * the capture the refund reversed, which is the only pointer back to the purchase
+ * whose webhook never landed ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
+ *
+ * @param {object} options
+ * @param {object} options.admin - firebase-admin
+ * @param {object} options.ctx - Assistant instance
+ * @param {object} options.resource - The refund resource fetched from the processor
+ * @param {object} options.raw - The raw webhook payload the processor sent
+ * @param {object|null} options.refundDetails - The library's { amount, currency, reason }
+ * @param {string} options.eventId - The webhook doc id (the processor's event id)
+ * @param {string} options.eventType - The processor's event name
+ * @param {string} options.processor - The processor that sent it
+ * @param {string} options.resourceType - The parsed event's resource type
+ * @param {string} options.resourceId - The refund's own id
+ * @param {string} options.uid - The owner the event resolved to
+ * @param {string|null} options.orderId - The order the refund named, which does not exist
+ * @param {string} options.now - Timestamp string
+ * @param {number} options.nowUNIX - Timestamp seconds
+ * @returns {Promise<void>}
+ */
+async function recordRefundAnomaly({ admin, ctx, resource, raw, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId, now, nowUNIX }) {
+  const captureId = extractParentResourceId(resource);
+
+  ctx.error(`REFUND WITHOUT ORDER: ${eventType} (${processor}) reversed ${resourceType} ${resourceId} but payments-orders/${orderId || 'null'} does not exist — refusing to mint an order from a refund (owner=${uid}, capture=${captureId || 'unknown'}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}). Recorded at ${ANOMALIES_COLLECTION}/${eventId}: the purchase behind this refund never wrote an order and needs manual reconciliation`);
+
+  await admin.firestore().doc(`${ANOMALIES_COLLECTION}/${eventId}`).set({
+    id: eventId,
+    type: 'refund-without-order',
+    processor: processor,
+    owner: uid,
+    orderId: orderId || null,
+    event: {
+      type: eventType || null,
+      id: eventId,
+    },
+    resource: {
+      type: resourceType || null,
+      id: resourceId || null,
+      captureId: captureId,
+    },
+    refund: refundDetails || null,
+    raw: raw || null,
+    metadata: {
+      created: {
+        timestamp: now,
+        timestampUNIX: nowUNIX,
+      },
+    },
+  }, { merge: true });
+
+  ctx.log(`Recorded ${ANOMALIES_COLLECTION}/${eventId}: type=refund-without-order, owner=${uid}, orderId=${orderId || 'null'}`);
+}
+
+/**
+ * The id of the resource a refund reversed, read off the payload's `up` link
+ *
+ * PayPal points a refund at the capture it reversed with a HATEOAS link whose
+ * `rel` is `up`, and the id is that URL's last segment. Processors that ship no
+ * such links answer null, which the anomaly record carries honestly rather than
+ * guessing at a capture.
+ *
+ * @param {object} resource - The refund resource fetched from the processor
+ * @returns {string|null}
+ */
+function extractParentResourceId(resource) {
+  const up = (resource?.links || []).find((link) => link?.rel === 'up');
+
+  if (!up?.href) {
+    return null;
+  }
+
+  return up.href.split('/').filter(Boolean).pop() || null;
 }
 
 /**

@@ -1,4 +1,5 @@
 const uuid = require('uuid');
+const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
 
 // Deterministic password for EVERY seeded persona (N6) — makes manual dev signin
 // possible: boot the emulators, open an emulator-connected dev site, and sign in
@@ -216,6 +217,16 @@ function getStamp(date) {
  */
 function getDaysAgo(days) {
   return getStamp(new Date(Date.now() - (days * 86400 * 1000)));
+}
+
+/**
+ * A moment N hours back — a device's last check-in is measured in hours, not
+ * days: a session dated to the nearest day reads as stale on a list whose whole
+ * subject is who is signed in RIGHT NOW.
+ * @param {number} hours - How many hours ago
+ */
+function getHoursAgo(hours) {
+  return getStamp(new Date(Date.now() - (hours * 3600 * 1000)));
 }
 
 /**
@@ -451,6 +462,137 @@ function fillMissing(target, source) {
   }
 
   return target;
+}
+
+/**
+ * Who each persona referred, by persona key → the personas that signed up
+ * through its affiliate link (Ian 2026-08-18,
+ * [#343](https://github.com/Omega-JS-Stack/omega/issues/343)).
+ *
+ * The referrals name REAL personas rather than invented uids, and that is what
+ * makes a mixed list possible at all: the record a signup appends to a referrer
+ * carries a uid and nothing else (routes/user/signup/post.js processAffiliate),
+ * so whether a referral CONVERTED is a fact about the referred ACCOUNT — one
+ * holding a paid plan converted, one still on basic has not. Inventing a status
+ * field here would invent a shape no referral has ever had.
+ */
+const PERSONA_REFERRALS = {
+  // The steady-state subscriber QA signs in as (#327): friends invited over a
+  // few months, two of whom subscribed and one who never has.
+  'premium-active': ['premium-trialing', 'basic', 'premium-cancelling'],
+  // The affiliate owner the signup lane credits — an established referrer, so
+  // the list a new referral lands on is never an empty one.
+  referrer: ['premium-active', 'basic', 'premium-expired', 'refunded'],
+};
+
+/**
+ * How long ago each referral in a persona's list signed up — a spread, so the
+ * list reads as a history rather than a batch, and the newest is recent enough
+ * to count towards the account page's "this month" stat.
+ */
+const REFERRAL_DAYS_AGO = [2, 9, 24, 51, 88];
+
+/**
+ * The devices a persona is signed in on besides the browser in front of you, by
+ * persona key → how many (#343). Two personas carry them: the ones the palette
+ * offers as an ordinary customer, which is who QA opens the security panel as.
+ */
+const PERSONA_SESSIONS = {
+  'premium-active': 3,
+  basic: 2,
+};
+
+/** How long ago each of those devices last checked in. */
+const SESSION_HOURS_AGO = [1, 20, 73];
+
+/**
+ * The Realtime Database path a signed-in app records itself at. `app` is the
+ * session id both sessions routes default to (schemas/user/sessions/get.js), so
+ * it is the one the account page's security panel reads.
+ */
+const SESSION_PATH = 'sessions/app';
+
+/**
+ * The referral records a persona's affiliate link earned — the exact shape a
+ * signup appends to the referrer's doc: `{ uid, timestamp }`, the timestamp an
+ * ISO string (processAffiliate writes `ctx.meta.startTime.timestamp`). No
+ * `timestampUNIX`: the writer records one field, and a seed carrying two would
+ * wear a shape no real referral has.
+ *
+ * @param {string} key - The persona key
+ * @param {object} accounts - Every account definition, keyed (referrals name real personas)
+ * @returns {Array|null} The persona's `affiliate.referrals`, or null when it referred nobody
+ */
+function buildReferralFixtures(key, accounts) {
+  const referred = PERSONA_REFERRALS[key];
+
+  if (!referred) {
+    return null;
+  }
+
+  return referred.map((referredKey, index) => {
+    const account = accounts[referredKey];
+
+    // A referral pointing at nobody is a uid the emulator cannot resolve — the
+    // one thing seeding real personas exists to prevent, so it fails loudly.
+    if (!account) {
+      throw new Error(`Persona '${key}' is seeded as having referred '${referredKey}', which no persona defines`);
+    }
+
+    return {
+      uid: account.uid,
+      timestamp: getDaysAgo(REFERRAL_DAYS_AGO[index % REFERRAL_DAYS_AGO.length]).timestamp,
+    };
+  });
+}
+
+/**
+ * The active-session records a persona's other devices leave in the Realtime
+ * Database — the shape `routes/user/sessions` queries (`uid`, which the
+ * `orderByChild('uid')` filter reads) and the account page's security panel
+ * renders (`platform`, `ip`, and the check-in stamp).
+ *
+ * The devices are drawn from the same client pool the persona's own signup
+ * context comes from, starting AFTER the one it signed up on, so the list is
+ * three different machines rather than the same one three times. The IPs sit in
+ * the persona's own locale block: the same person, at home, on their other
+ * devices.
+ *
+ * @param {string} key - The persona key
+ * @param {object} accounts - Every account definition, keyed
+ * @returns {object|null} Session id → record, or null for a persona signed in nowhere else
+ */
+function buildSessionFixtures(key, accounts) {
+  const count = PERSONA_SESSIONS[key];
+
+  if (!count) {
+    return null;
+  }
+
+  const account = accounts[key];
+
+  if (!account) {
+    throw new Error(`No seeded persona named ${key} — there are no session fixtures to seed`);
+  }
+
+  const locale = pick(PROFILE_LOCALES, key, 'locale');
+  const signupClient = PROFILE_CLIENTS.indexOf(pick(PROFILE_CLIENTS, key, 'client'));
+  const sessions = {};
+
+  for (let index = 0; index < count; index++) {
+    const client = PROFILE_CLIENTS[(signupClient + 1 + index) % PROFILE_CLIENTS.length];
+    const at = getHoursAgo(SESSION_HOURS_AGO[index % SESSION_HOURS_AGO.length]);
+
+    sessions[`_test-session-${key}-${index + 1}`] = {
+      uid: account.uid,
+      platform: client.platform,
+      ip: `${locale.ipBlock}.${1 + hashIndex(`${key}#session${index}`, 250)}`,
+      timestamp: at.timestamp,
+      timestampUNIX: at.timestampUNIX,
+    };
+  }
+
+  return sessions;
 }
 
 /**
@@ -1287,6 +1429,15 @@ function getAccountDefinitions(domain, config, extraAccounts) {
     // a new persona is born complete; anything a persona names for itself wins.
     fillMissing(properties, seededProfile(key, domain));
 
+    // The people this persona referred (#343). Resolved HERE rather than typed
+    // into the definition because a referral records the referred account's
+    // UID, and only the assembled table knows what those are.
+    const referrals = buildReferralFixtures(key, all);
+
+    if (referrals) {
+      properties.affiliate = { ...(properties.affiliate || {}), referrals };
+    }
+
     // STATIC personas are ESTABLISHED users: born signup-processed with
     // granted legal consent (source 'seed'), so the frontend consent guard —
     // which signs out processed-but-unconsented docs as signup orphans —
@@ -1899,6 +2050,110 @@ async function seedOrderFixtures(admin, config, extraAccounts) {
 }
 
 /**
+ * The emulator's Realtime Database, reached the way the Functions runtime
+ * reaches it. The seeder is an ordinary Node process: its admin app is built
+ * from a project id alone (run-tests.js, cli/commands/emulator.js), so it
+ * carries no database URL at all and `admin.database()` throws. The runtime
+ * inside the emulator is handed one by firebase-tools, and it is that exact URL
+ * — `http://<database emulator>/?ns=<namespace>` — this rebuilds, because a
+ * write to any OTHER namespace is invisible to the route that reads it.
+ *
+ * The namespace is firebase-tools' own: a demo project's default Admin SDK
+ * config names the project itself, every other project its default instance
+ * (firebase-tools emulator/adminSdkConfig.js + functionsEmulator.js
+ * getFirebaseConfig, which takes the first label of that URL's hostname).
+ *
+ * @param {object} admin - Firebase admin instance (pointed at the emulator)
+ * @returns {object|null} The database, or null when nothing names an emulator to write to
+ */
+function sessionsDatabase(admin) {
+  // Emulator-only, the same fence flushEmulatorFirestore stands behind: seeded
+  // sessions are test data and never touch a real database.
+  if (!process.env.FIRESTORE_EMULATOR_HOST) {
+    return null;
+  }
+
+  let options = {};
+  try {
+    options = admin.app().options || {};
+  } catch (e) {
+    options = {}; // No admin, or no default app.
+  }
+
+  // A process firebase-tools configured itself (the Functions runtime the reset
+  // route runs in) already holds the right URL — take it rather than rebuild it.
+  if (options.databaseURL) {
+    return admin.database();
+  }
+
+  const projectId = options.projectId || process.env.GCLOUD_PROJECT || null;
+
+  if (!projectId) {
+    return null;
+  }
+
+  const port = envPort('database') || CLASSIC_PORTS.database;
+  const namespace = projectId.startsWith('demo-') ? projectId : `${projectId}-default-rtdb`;
+
+  return admin.app().database(`http://127.0.0.1:${port}/?ns=${namespace}`);
+}
+
+/**
+ * Seed one persona's active sessions — the other devices it is signed in on,
+ * which live in the Realtime Database rather than on the user doc and which
+ * account creation therefore never writes
+ * ([#343](https://github.com/Omega-JS-Stack/omega/issues/343)). Without them
+ * the account page's security panel shows the browser in front of you and
+ * nothing else, which is not what a real customer's panel looks like.
+ *
+ * The ids are derived from the persona key, so re-seeding REPLACES the same
+ * records rather than piling up a new set on every boot.
+ *
+ * @param {object} admin - Firebase admin instance (pointed at the emulator)
+ * @param {string} key - Account key in TEST_ACCOUNTS (e.g. 'premium-active')
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
+ * @returns {Promise<string[]|null>} The session ids seeded, or null when the persona has none
+ */
+async function seedSessionFixture(admin, key, extraAccounts) {
+  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const sessions = buildSessionFixtures(key, all);
+
+  if (!sessions) {
+    return null;
+  }
+
+  const database = sessionsDatabase(admin);
+
+  if (!database) {
+    return null;
+  }
+
+  await Promise.all(
+    Object.entries(sessions).map(([id, session]) => database.ref(`${SESSION_PATH}/${id}`).set(session)),
+  );
+
+  return Object.keys(sessions);
+}
+
+/**
+ * Seed EVERY persona's active sessions — the boot-seed counterpart of the
+ * per-persona reset (routes/test/reset-account), exactly like the order
+ * fixtures beside it.
+ *
+ * @param {object} admin - Firebase admin instance (pointed at the emulator)
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
+ * @returns {Promise<string[]>} The session ids seeded
+ */
+async function seedSessionFixtures(admin, extraAccounts) {
+  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const seeded = await Promise.all(
+    Object.keys(all).map((key) => seedSessionFixture(admin, key, extraAccounts)),
+  );
+
+  return seeded.filter(Boolean).flat();
+}
+
+/**
  * Test data constants - SSOT for test values
  */
 const TEST_DATA = {
@@ -1926,4 +2181,9 @@ module.exports = {
   buildOrderFixture,
   seedOrderFixture,
   seedOrderFixtures,
+  buildReferralFixtures,
+  buildSessionFixtures,
+  seedSessionFixture,
+  seedSessionFixtures,
+  SESSION_PATH,
 };

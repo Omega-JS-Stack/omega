@@ -23,13 +23,13 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { resolvePorts } = require('@omega.js/config');
 
-const { configureOmega } = require('../src/index.js');
-const { registerTemplateWatchTargets, devServerOptions } = require('../src/commands/dev.js');
+const { configureOmega } = require('../../src/index.js');
+const { registerTemplateWatchTargets, devServerOptions } = require('../../src/commands/dev.js');
 
 // A rebuild is chokidar's write-settle window plus one build of this (tiny)
 // fixture; the deadline is the point at which "the edit never landed" is the
 // only remaining explanation. It scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('./lib/deadlines.js').rebuildDeadlineMs();
+const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
 const POLL_MS = 50;
 // Consecutive quiet polls (no build running) that mean the watch loop is done
 // — the restart, if one is coming, rides the END of the rebuild (Eleventy
@@ -209,12 +209,23 @@ test('a config reset does not restart the dev server', async (t) => {
 
   assert.equal((await fetch(`http://localhost:${dev.port}/`)).status, 200, 'the server answers before the reset');
 
-  // ONE reset: the consumer layout is a config-time capture, so an edit here
-  // rides the reset lane (dev-watch.test.js proves the reset itself).
+  // The consumer layout is a config-time capture, so an edit here rides the
+  // reset lane (dev-watch.test.js proves the reset itself).
+  const runsBeforeEdit = dev.configRuns.count;
   fixture.write('_layouts/toy.html', '<main data-layout="AFTER">{{ content }}</main>');
   await dev.settleAfter(/data-layout="AFTER"/);
 
-  assert.equal(dev.configRuns.count, 2, 'the edit did trigger exactly one config reset');
+  // EVENT-keyed, not count-keyed (#344). This asserts the edit rode the RESET
+  // lane, which is what makes every assertion below mean anything — but never
+  // how MANY resets it took. One save legitimately reaches chokidar once per
+  // registered path form (src/commands/dev.js registers two for a cwd-
+  // contained dir, on purpose and measured), and whether those events land in
+  // one throttle window or two is the machine's load, not the product: 3 !== 2
+  // was this suite's most frequent lane-only failure. The product promise is
+  // the four assertions below, and they hold PER reset — with two resets,
+  // `closes === 0` is a stronger statement, not a weaker one.
+  assert.ok(dev.configRuns.count > runsBeforeEdit,
+    `the edit rode the config-reset lane — the config callback re-ran (was ${runsBeforeEdit}, now ${dev.configRuns.count})`);
   // assert.ok again: the instances differ by their whole socket state, and the
   // diff of two dev servers buries the one fact that matters.
   assert.ok(dev.serve._server === devServer, 'the SAME dev server survived the reset — a restart builds a new instance');

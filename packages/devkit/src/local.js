@@ -1395,6 +1395,83 @@ function freshnessBoot(options) {
   process.exit(child.status === null ? 1 : child.status);
 }
 
+/**
+ * ONE freshness pass for a FAN-OUT, run BEFORE it (#340): the brand-root
+ * `omega dev` sweeps every lane's host closure in this process, then spawns the
+ * lanes — each lane's own freshnessBoot then finds nothing to do.
+ *
+ * Why it must be hoisted: a heal runs `npm run prepare`, which PURGES dist
+ * before recopying, and a lane's framework bin opens by loading its own built
+ * dist entry. Two lanes checking themselves in parallel means one lane's purge
+ * window is the other lane's require — the backend lane died MODULE_NOT_FOUND
+ * dispatching through the web package the web lane was mid-rebuild on. The heal lock does
+ * not help: it serializes BUILDS, and the casualty is a bystander require.
+ *
+ * The lanes' closures overlap almost entirely (they share the brand's
+ * node_modules), so entries are deduped by the package DIRECTORY they resolve
+ * to — one check per real package, deps-first per host (freshnessCheckList).
+ *
+ * Nothing here re-execs, unlike freshnessBoot: what this pass heals is the
+ * LANES' code, which no lane has loaded yet — this process's own closure was
+ * settled by its CLI-boot freshnessBoot. That is also why the re-exec loop
+ * guard is lifted for the pass: a dev boot that re-execed after healing its own
+ * host must still hoist the lanes' check, or the fan-out races exactly as before.
+ *
+ * A 'stale-linked' entry (a monorepo link, read-only here — #281) is REPORTED,
+ * message and all, and returned: the caller stops the boot before any lane
+ * spawns, instead of each lane discovering it separately, half-booted.
+ * @param {object} options
+ * @param {Array<{packageName: string, fromDir: string}>} options.hosts - One entry
+ *   per lane: the framework package that lane runs, and the app dir it resolves from.
+ * @returns {{checked: object[], healed: string[], staleLinked: object[], failed: string[]}}
+ *   checked = every ensureFreshLocalDist result, in check order.
+ */
+function freshnessSweep(options) {
+  const { hosts = [] } = options;
+
+  const entries = [];
+  const seen = new Set();
+  for (const host of hosts) {
+    for (const entry of freshnessCheckList(host)) {
+      // The resolved dir is the identity — the same package reached from two
+      // apps is ONE dist. Unresolvable entries keep their own key so
+      // ensureFreshLocalDist still gets to classify them.
+      const key = resolvePackageRealDir(entry.packageName, entry.fromDir) || `${entry.packageName}\u0000${entry.fromDir}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      entries.push(entry);
+    }
+  }
+
+  const priorReexec = process.env.OMEGA_FRESH_REEXEC;
+  delete process.env.OMEGA_FRESH_REEXEC;
+
+  const checked = [];
+  try {
+    for (const entry of entries) {
+      checked.push(ensureFreshLocalDist(entry));
+    }
+  } finally {
+    if (priorReexec !== undefined) {
+      process.env.OMEGA_FRESH_REEXEC = priorReexec;
+    }
+  }
+
+  const staleLinked = checked.filter((result) => result.status === 'stale-linked');
+  for (const result of staleLinked) {
+    console.error(staleLinkedMessage(result));
+  }
+
+  return {
+    checked,
+    healed: checked.filter((result) => result.status === 'rebuilt').map((result) => result.packageName),
+    staleLinked,
+    failed: checked.filter((result) => result.status === 'rebuild-failed').map((result) => result.packageName),
+  };
+}
+
 // Exports
 module.exports = {
   DEFAULT_MONOREPO,
@@ -1417,4 +1494,5 @@ module.exports = {
   ensureFreshLocalDist,
   freshnessCheckList,
   freshnessBoot,
+  freshnessSweep,
 };

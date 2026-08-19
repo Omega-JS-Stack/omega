@@ -85,7 +85,37 @@ module.exports = {
       },
     },
 
-    // Test 5: Admin can get sessions
+    // Test 5: The seeded persona's own devices come back (#343)
+    {
+      name: 'get-returns-the-personas-seeded-sessions',
+      auth: 'premium-active',
+      timeout: 15000,
+
+      async run({ http, assert, accounts }) {
+        const response = await http.get('backend-manager/user/sessions', {});
+
+        assert.isSuccess(response, 'Get active sessions should succeed');
+
+        // The boot seed writes these into the Realtime Database from OUTSIDE the
+        // functions runtime, so this is also the proof it wrote the namespace
+        // this route reads (src/test/test-accounts.js sessionsDatabase).
+        const sessions = response.data || {};
+        const ids = Object.keys(sessions).filter((id) => id.startsWith('_test-session-premium-active-'));
+
+        assert.ok(
+          ids.length >= 2,
+          `The Premium persona is seeded as signed in on several devices, so its sessions must come back (got ${Object.keys(sessions).length} session(s))`
+        );
+
+        for (const id of ids) {
+          assert.equal(sessions[id].uid, accounts['premium-active'].uid, `Session ${id} should belong to the persona`);
+          assert.ok(sessions[id].platform, `Session ${id} should name its platform`);
+          assert.ok(sessions[id].timestampUNIX > 0, `Session ${id} should record its last check-in`);
+        }
+      },
+    },
+
+    // Test 6: Admin can get sessions
     {
       name: 'get-admin-succeeds',
       auth: 'admin',
@@ -98,7 +128,7 @@ module.exports = {
       },
     },
 
-    // Test 6: Unauthenticated GET request fails
+    // Test 7: Unauthenticated GET request fails
     {
       name: 'get-unauthenticated-rejected',
       auth: 'none',
@@ -113,7 +143,7 @@ module.exports = {
 
     // --- DELETE /user/sessions tests ---
 
-    // Test 7: Authenticated user can sign out all sessions
+    // Test 8: Authenticated user can sign out all sessions
     {
       name: 'delete-authenticated-user-succeeds',
       auth: 'basic',
@@ -136,7 +166,7 @@ module.exports = {
       },
     },
 
-    // Test 8: Custom session id for delete
+    // Test 9: Custom session id for delete
     {
       name: 'delete-custom-session-id',
       auth: 'basic',
@@ -152,7 +182,7 @@ module.exports = {
       },
     },
 
-    // Test 9: Premium user can sign out all sessions
+    // Test 10: Premium user can sign out all sessions
     // Note: admin key admin doesn't have auth.uid, so we test with premium user instead
     {
       name: 'delete-premium-user-succeeds',
@@ -167,7 +197,7 @@ module.exports = {
       },
     },
 
-    // Test 10: Multiple calls are idempotent
+    // Test 11: Multiple calls are idempotent
     {
       name: 'delete-idempotent-operation',
       auth: 'basic',
@@ -183,7 +213,7 @@ module.exports = {
       },
     },
 
-    // Test 11: Unauthenticated DELETE request fails
+    // Test 12: Unauthenticated DELETE request fails
     {
       name: 'delete-unauthenticated-rejected',
       auth: 'none',

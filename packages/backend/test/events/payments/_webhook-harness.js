@@ -135,19 +135,22 @@ function subscriptionPayload({ uid, orderId, resourceId }) {
  * @param {string} options.eventId - The webhook doc id
  * @param {string} options.eventType - The processor's event name
  * @param {string} options.resourceType - The parsed event's resource type (a subscription-category event can ride an invoice or sale resource)
+ * @param {string} options.category - The parsed event's category ('subscription' | 'one-time')
+ * @param {object|null} options.payload - The resource the webhook envelope carries (defaults to an active subscription)
  * @param {object} options.seed - Extra documents the run starts from
  * @param {string|null} options.failPath - The document path whose write rejects
  * @returns {Promise<{ store: Map, logs: string[] }>}
  */
-async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'customer.subscription.updated', resourceType = 'subscription', seed = {}, failPath = null } = {}) {
-  const raw = { id: eventId, type: eventType, data: { object: subscriptionPayload({ uid, orderId, resourceId }) } };
+async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'customer.subscription.updated', resourceType = 'subscription', category = 'subscription', payload = null, seed = {}, failPath = null } = {}) {
+  const resource = payload || subscriptionPayload({ uid, orderId, resourceId });
+  const raw = { id: eventId, type: eventType, data: { object: resource } };
   const webhookDoc = {
     id: eventId,
     processor: 'test',
     status: 'pending',
     raw: raw,
     owner: uid,
-    event: { type: raw.type, category: 'subscription', resourceType: resourceType, resourceId: resourceId },
+    event: { type: raw.type, category: category, resourceType: resourceType, resourceId: resourceId },
     metadata: { created: { timestampUNIX: Math.floor(Date.now() / 1000) } },
   };
 

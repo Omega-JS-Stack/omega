@@ -31,6 +31,23 @@ function updateReferralCode(code) {
   }
 }
 
+// When a referral happened, in milliseconds.
+//
+// A signup appends `{ uid, timestamp }` with an ISO STRING (@omega.js/backend
+// routes/user/signup/post.js processAffiliate), so every read below has to go
+// through a parse: comparing or subtracting that string produced NaN, and the
+// whole list rendered as "NaN years ago" against real data (#343). Read once,
+// here, and `timestampUNIX` still answers for a record that carries one.
+function getReferralTime(referral) {
+  const parsed = referral.timestamp ? new Date(referral.timestamp).getTime() : NaN;
+
+  if (!Number.isNaN(parsed)) {
+    return parsed;
+  }
+
+  return referral.timestampUNIX ? referral.timestampUNIX * 1000 : 0;
+}
+
 // Update referrals list
 function updateReferralsList(referrals) {
   const $totalReferrals = document.getElementById('total-referrals');
@@ -39,23 +56,7 @@ function updateReferralsList(referrals) {
   const $referralsList = document.getElementById('referrals-list');
 
   // Initialize referrals array
-  let referralData = referrals || [];
-
-  /* @dev-only:start */
-  // The palette's "Prefill fake data" toggle (#342) applies `_dev_prefill=true`
-  // — a URL param because the read happens once, while the section loads. The
-  // read lives inside the block, so production never looks and the fixtures
-  // never reach a real bundle.
-  if (omega.isDevelopment()) {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('_dev_prefill') === 'true') {
-      console.log('Adding fake referral data for testing');
-      const fakeReferrals = generateFakeReferrals();
-      // Add fake referrals to existing data
-      referralData = [...referralData, ...fakeReferrals];
-    }
-  }
-  /* @dev-only:end */
+  const referralData = referrals || [];
 
   // Handle empty state
   if (!referralData || !Array.isArray(referralData) || referralData.length === 0) {
@@ -77,10 +78,7 @@ function updateReferralsList(referrals) {
   const totalCount = referralData.length;
   const now = new Date();
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const recentCount = referralData.filter(ref => {
-    const timestamp = ref.timestamp || ref.timestampUNIX * 1000;
-    return timestamp >= thisMonth;
-  }).length;
+  const recentCount = referralData.filter(ref => getReferralTime(ref) >= thisMonth).length;
 
   // Update stats
   if ($totalReferrals) $totalReferrals.textContent = totalCount.toString();
@@ -88,11 +86,7 @@ function updateReferralsList(referrals) {
   if ($referralsBadge) $referralsBadge.textContent = totalCount.toString();
 
   // Sort referrals by timestamp in reverse order (newest first)
-  const sortedReferrals = [...referralData].sort((a, b) => {
-    const timeA = a.timestamp || (a.timestampUNIX * 1000) || 0;
-    const timeB = b.timestamp || (b.timestampUNIX * 1000) || 0;
-    return timeB - timeA; // Reverse order
-  });
+  const sortedReferrals = [...referralData].sort((a, b) => getReferralTime(b) - getReferralTime(a));
 
   // Generate referral list HTML
   if ($referralsList) {
@@ -104,7 +98,7 @@ function updateReferralsList(referrals) {
       `;
     } else {
       const referralHTML = sortedReferrals.map((referral, index) => {
-        const timestamp = referral.timestamp || (referral.timestampUNIX * 1000);
+        const timestamp = getReferralTime(referral);
         const date = timestamp ? new Date(timestamp) : null;
         const dateStr = date ? formatDate(date) : 'Unknown date';
         const timeStr = date ? formatTime(date) : '';
@@ -232,75 +226,3 @@ async function handleCopyReferralCode() {
     omega.utilities().showNotification('Failed to copy referral link', 'danger');
   }
 }
-
-/* @dev-only:start */
-// Generate fake referrals for demo
-function generateFakeReferrals() {
-  const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000;
-
-  return [
-    {
-      uid: 'user_k9m2n8p4q1r7',
-      timestamp: now - (2 * 60 * 60 * 1000), // 2 hours ago
-      timestampUNIX: Math.floor((now - (2 * 60 * 60 * 1000)) / 1000)
-    },
-    {
-      uid: 'user_x3y7z2a5b9c6',
-      timestamp: now - (8 * 60 * 60 * 1000), // 8 hours ago
-      timestampUNIX: Math.floor((now - (8 * 60 * 60 * 1000)) / 1000)
-    },
-    {
-      uid: 'user_t4u8i2o6p1a5',
-      timestamp: now - (oneDay), // 1 day ago
-      timestampUNIX: Math.floor((now - oneDay) / 1000)
-    },
-    {
-      uid: 'user_f7g1h5j9k3l8',
-      timestamp: now - (3 * oneDay), // 3 days ago
-      timestampUNIX: Math.floor((now - (3 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_q2w6e1r5t9y4',
-      timestamp: now - (7 * oneDay), // 1 week ago
-      timestampUNIX: Math.floor((now - (7 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_m8n2b6v1c5x9',
-      timestamp: now - (14 * oneDay), // 2 weeks ago
-      timestampUNIX: Math.floor((now - (14 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_a3s7d1f5g9h4',
-      timestamp: now - (25 * oneDay), // 25 days ago
-      timestampUNIX: Math.floor((now - (25 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_z9x5c1v7b3n8',
-      timestamp: now - (35 * oneDay), // 35 days ago
-      timestampUNIX: Math.floor((now - (35 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_p6o2i8u4y1t5',
-      timestamp: now - (45 * oneDay), // 45 days ago
-      timestampUNIX: Math.floor((now - (45 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_l1k9j7h5g3f2',
-      timestamp: now - (60 * oneDay), // 2 months ago
-      timestampUNIX: Math.floor((now - (60 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_e4r8t2y6u1i5',
-      timestamp: now - (90 * oneDay), // 3 months ago
-      timestampUNIX: Math.floor((now - (90 * oneDay)) / 1000)
-    },
-    {
-      uid: 'user_w7q1a5s9d3f6',
-      timestamp: now - (120 * oneDay), // 4 months ago
-      timestampUNIX: Math.floor((now - (120 * oneDay)) / 1000)
-    }
-  ];
-}
-/* @dev-only:end */
-

@@ -773,6 +773,61 @@ test('paypal-products: legacy product plans are deactivated', async () => {
   assert.deepEqual(paypal.callsTo('deactivatePlan').map((c) => c.args), [['P-LEGACY']]);
 });
 
+// #348 — `hidden: true` is a PRESENTATION flag the web pricing composer
+// honors; the walk must keep reconciling the product, or the QA tier the
+// payments drives buy by id would have no processor objects to buy.
+test('payment: a hidden product is presentation-only — the walk still ensures its processor objects (#348)', async () => {
+  const products = [
+    { id: 'proof-press', name: 'Proof Press', type: 'subscription', hidden: true, prices: { monthly: 5 } },
+  ];
+
+  const paypalResponses = paypalConverged();
+  paypalResponses.listProducts = [];
+  paypalResponses.createProduct = { id: 'PROD-QA' };
+  paypalResponses.listPlansForProduct = [];
+  paypalResponses.createPlan = { id: 'P-QA' };
+  const paypal = fakePaypal(paypalResponses);
+  const paypalConfig = brandConfig({ products });
+  const paypalRoot = makeBrandRoot(writebackSource(paypalConfig));
+  const paypalResult = await runService(paypalConfig, { paypal, options: { processor: 'paypal' }, brandRoot: paypalRoot });
+
+  assert.deepEqual(paypal.callsTo('createProduct').map((c) => c.args), [[{
+    name: `${BRAND_NAME} - Proof Press`,
+    description: BRAND_DESC,
+    type: 'SERVICE',
+    imageUrl: BRANDMARK,
+    homeUrl: BRAND_URL,
+  }]]);
+  assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
+    [{ productId: 'PROD-QA', name: `${BRAND_NAME} - Proof Press (Monthly)`, interval: 'monthly', amount: 5, trialDays: 0 }],
+  ]);
+  assert.deepEqual(paypalResult.state.paypalProducts, { 'proof-press': 'PROD-QA' });
+  assert.ok(readConfigSource(paypalRoot).includes(`{ id: 'proof-press', paypal: { productId: "PROD-QA" } }, // Proof Press`));
+
+  const stripeResponses = stripeConverged();
+  stripeResponses.listAllProducts = [];
+  stripeResponses.createProduct = { id: 'prod_qa' };
+  stripeResponses.listPricesForProduct = [];
+  stripeResponses.createRecurringPrice = { id: 'price_qa' };
+  const stripe = fakeStripe(stripeResponses);
+  const stripeConfig = brandConfig({ products });
+  const stripeRoot = makeBrandRoot(writebackSource(stripeConfig));
+  const stripeResult = await runService(stripeConfig, {
+    stripe, options: { processor: 'stripe' }, serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot: stripeRoot,
+  });
+
+  assert.deepEqual(stripe.callsTo('createProduct').map((c) => c.args), [[{
+    name: `${BRAND_NAME} - Proof Press`,
+    brandId: BRAND_ID,
+    productId: 'proof-press',
+    description: BRAND_DESC,
+    images: [BRANDMARK],
+    url: BRAND_URL,
+  }]]);
+  assert.deepEqual(stripe.callsTo('createRecurringPrice').map((c) => c.args), [['prod_qa', 5, 'monthly']]);
+  assert.deepEqual(stripeResult.state.stripeProducts, { 'proof-press': 'prod_qa' });
+});
+
 test('paypal-webhook: missing → created with exact URL + events', async () => {
   const responses = paypalConverged();
   responses.listWebhooks = { webhooks: [] };

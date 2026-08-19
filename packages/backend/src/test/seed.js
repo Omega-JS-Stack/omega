@@ -138,12 +138,21 @@ async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) 
   const orderIds = await testAccounts.seedOrderFixtures(admin, config, initHooks.accounts);
   logLn(chalk.green(`✓ (${orderIds.length} orders)`));
 
-  // 5. Fetch private keys
+  // 5. Stand up the personas' active sessions. A session is the one part of an
+  // account that does not live on its user doc — it is a Realtime Database
+  // record an app writes while it is signed in — so account creation leaves
+  // even a full persona signed in nowhere, and the account page's security
+  // panel shows a customer with a single device forever (#343).
+  log(chalk.gray('  Seeding persona session fixtures... '));
+  const sessionIds = await testAccounts.seedSessionFixtures(admin, initHooks.accounts);
+  logLn(chalk.green(`✓ (${sessionIds.length} sessions)`));
+
+  // 6. Fetch private keys
   const accounts = await testAccounts.fetchPrivateKeys(
     admin, domain, config, initHooks.accounts,
   );
 
-  // 6. Run setup hooks (_init.js setup functions)
+  // 7. Run setup hooks (_init.js setup functions)
   for (const setup of initHooks.setups) {
     log(chalk.gray('  Running test/_init.js setup... '));
     try {

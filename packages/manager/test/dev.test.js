@@ -1,5 +1,5 @@
 // `omega dev` (brand root) — target-selection rules plus the boot SEQUENCE
-// (manage cycle, then the app legs). The spawn plumbing is composition of
+// (freshness sweep, manage cycle, then the app legs). The spawn plumbing is composition of
 // tested pieces (discoverApps, resolveAppNode, watch-all's forwarding
 // pattern); the SELECTION is the behavior with rules worth pinning: default
 // set, --only/--except/--all, unknowns, missing apps, backend-first ordering.
@@ -12,9 +12,9 @@ const { EventEmitter } = require('node:events');
 const childProcess = require('node:child_process');
 
 // ─── Boot-sequence instrumentation ───────────────────────────────────────────
-// Both boundaries dev.js binds at load time (child_process.spawn, manage's
-// runManage) are replaced BEFORE it is required, so the order of the two is
-// observable in-process without booting anything real.
+// Every boundary dev.js binds at load time (child_process.spawn, manage's
+// runManage, devkit's freshnessSweep) is replaced BEFORE it is required, so
+// their order is observable in-process without booting anything real.
 
 const boot = [];
 let manageReport = { hasErrors: false, results: {}, brand: {} };
@@ -39,6 +39,26 @@ childProcess.spawn = (command, args, options) => {
   child.kill = () => {};
   spawned.push(child);
   return child;
+};
+
+// The hoisted freshness sweep (#340): stubbed at its module boundary so its
+// ORDER in the boot and the lane hosts it is handed are observable without a
+// real linked dist on disk.
+let sweepResult = { checked: [], healed: [], staleLinked: [], failed: [] };
+const sweepHosts = [];
+const localPath = require.resolve('@omega.js/devkit/local');
+require.cache[localPath] = {
+  id: localPath,
+  filename: localPath,
+  path: path.dirname(localPath),
+  loaded: true,
+  exports: {
+    freshnessSweep: ({ hosts }) => {
+      boot.push(`sweep:${hosts.map((host) => host.packageName).join(',') || 'none'}`);
+      sweepHosts.push(hosts);
+      return sweepResult;
+    },
+  },
 };
 
 const managePath = require.resolve('../src/manage.js');
@@ -75,7 +95,11 @@ function stageBrand() {
 
   const website = path.join(root, 'apps', 'website');
   fs.mkdirSync(website, { recursive: true });
-  fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({ name: 'fixture-website', private: true }));
+  fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({
+    name: 'fixture-website',
+    private: true,
+    dependencies: { '@omega.js/web': '*' }, // the app declares its framework, as every real one does
+  }));
 
   return root;
 }
@@ -153,7 +177,7 @@ test('boot opens with the manage cycle, THEN spawns the app legs — brand asset
   const outcome = await bootDev(root, { only: 'web' });
 
   assert.strictEqual(outcome, 'running', 'the orchestrator stays alive after booting');
-  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'],
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
     'the full service walk runs against the brand root before any app leg starts');
 });
 
@@ -163,7 +187,7 @@ test('a manage cycle with errors stops dev boot loudly — no app leg spawns', a
   const root = stageBrand();
 
   await assert.rejects(() => bootDev(root, { only: 'web' }), /manage/i);
-  assert.deepStrictEqual(boot, [`manage:${root}`], 'nothing booted on top of a broken brand');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`], 'nothing booted on top of a broken brand');
 });
 
 // ─── Quiet boot (#228) ───────────────────────────────────────────────────────
@@ -206,7 +230,7 @@ test('the non-interactive switch is restored before any leg spawns — the dev s
 
   await bootDev(root, { only: 'web' });
 
-  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'], 'the boot still runs manage, then the leg');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'], 'the boot still runs manage, then the leg');
   assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
   assert.deepStrictEqual(nonInteractiveAt.spawnEnv, [undefined], "the leg's inherited env carries no switch");
   assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, undefined, 'and nothing leaks past the boot');
@@ -229,7 +253,7 @@ test('a clean report with pending human gates still boots the legs — pending i
   const outcome = await bootDev(root, { only: 'web' });
 
   assert.strictEqual(outcome, 'running');
-  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'],
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
     "the summary's ⚑ pending list is the report — the stack boots regardless");
 });
 
@@ -262,7 +286,7 @@ test('the boot walks the LOCAL lane only, and says where the full setup lives', 
   assert.deepStrictEqual(manageOptions, [{ lane: 'boot' }],
     'the dev legs consume the local slice — the slow services must not hold the boot');
   assert.match(log, /npm run manage/, 'and the boot names the one command that runs the rest');
-  assert.deepStrictEqual(boot, [`manage:${root}`, 'spawn:website'], 'still manage, then the legs');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'], 'still manage, then the legs');
 });
 
 test('omega dev --full boots on the whole manage walk instead of the lane', async () => {
@@ -280,6 +304,109 @@ test('omega dev --full boots on the whole manage walk instead of the lane', asyn
 test('omega dev --full is declared boolean (yargs would otherwise eat the next positional)', () => {
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
   assert.ok(BOOLEAN_FLAGS.includes('full'), '--full takes no value — it must be declared boolean');
+});
+
+// ─── Hoisted freshness sweep (#340) ──────────────────────────────────────────
+
+/** Stage a brand with a website AND a backend app, each declaring its framework. */
+function stageFanOutBrand() {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
+
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  targets: { web: {}, backend: {} },
+}
+`);
+
+  for (const [dir, framework] of [['website', '@omega.js/web'], ['backend', '@omega.js/backend']]) {
+    const appPath = path.join(root, 'apps', dir);
+    fs.mkdirSync(appPath, { recursive: true });
+    fs.writeFileSync(path.join(appPath, 'package.json'), JSON.stringify({
+      name: `fixture-${dir}`,
+      private: true,
+      dependencies: { [framework]: '*' },
+    }));
+  }
+
+  return root;
+}
+
+/** Clear the sweep recorders and put the result back to an all-fresh brand. */
+function resetSweep() {
+  sweepHosts.length = 0;
+  sweepResult = { checked: [], healed: [], staleLinked: [], failed: [] };
+}
+
+test('the freshness sweep runs ONCE, before the manage cycle and before any leg spawns (#340)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+
+  await bootDev(root);
+
+  assert.deepStrictEqual(boot, [
+    'sweep:@omega.js/backend,@omega.js/web',
+    `manage:${root}`,
+    'spawn:backend',
+    'spawn:website',
+  ], 'one check pass covers every lane — a lane that rebuilds after the fan-out purges a sibling\'s dispatcher');
+  assert.strictEqual(sweepHosts.length, 1, 'ONE sweep, not one per lane');
+});
+
+test('the sweep is handed each selected lane\'s framework host, resolved from its app (#340)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+
+  await bootDev(root);
+
+  assert.deepStrictEqual(sweepHosts[0], [
+    { packageName: '@omega.js/backend', fromDir: path.join(root, 'apps', 'backend') },
+    { packageName: '@omega.js/web', fromDir: path.join(root, 'apps', 'website') },
+  ], 'each host resolves from the app that declares it — the same chain the lane itself would walk');
+});
+
+test('a lane whose framework is unfiltered out is not swept — --only narrows the pass too (#340)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+
+  await bootDev(root, { only: 'web' });
+
+  assert.deepStrictEqual(sweepHosts[0].map((host) => host.packageName), ['@omega.js/web']);
+});
+
+test('a stale monorepo-linked dist stops the boot before the manage cycle — nothing spawns (#340)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  sweepResult = {
+    checked: [],
+    healed: [],
+    staleLinked: [{ packageName: '@omega.js/web', reason: 'dist/ is missing' }],
+    failed: [],
+  };
+  const root = stageFanOutBrand();
+
+  await assert.rejects(() => bootDev(root, { only: 'web' }), /@omega\.js\/web/);
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web'],
+    'the watch owns that dist — half-booting the stack on it is what the loud stop prevents');
+});
+
+test('a heal before the fan-out is announced, so the boot pause has a reason (#340)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  sweepResult = { checked: [], healed: ['@omega.js/web'], staleLinked: [], failed: [] };
+  const root = stageFanOutBrand();
+
+  const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
+
+  assert.match(log, /@omega\.js\/web/);
 });
 
 // ─── Leg output dedup (#230) ─────────────────────────────────────────────────

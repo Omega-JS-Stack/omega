@@ -250,6 +250,10 @@ test('in-cwd targets register both path forms, out-of-cwd targets absolute only'
 
   const inCwd = path.join(fixture.consumerDir, '_layouts');
   assert.ok(registered.has(inCwd), 'the absolute form carries the reset today');
+  // Not dead insurance, measured (#344): registering the absolute form ALONE
+  // starved the packaged-layer reset in 5 of 8 interleaved A/B runs, against
+  // 0 of 8 with both. The duplicate event is the cost of an FSEvents stream
+  // arrangement that actually delivers.
   assert.ok(registered.has(path.relative(process.cwd(), inCwd)), 'the relative form is the insurance form');
 
   const outOfCwd = path.join(fs.realpathSync(fixture.coreDir), '_layouts');

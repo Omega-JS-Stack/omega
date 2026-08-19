@@ -40,9 +40,9 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('prepare-package')()\"",
+    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js && node --test --test-concurrency=1 test/watch/*.test.js"
   },
   "preparePackage": {
     "input": "./src",
@@ -50,7 +50,10 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "after": [
+        "node -e \"require('@omega.js/devkit/vendor')()\"",
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\""
+      ],
       "afterBlocking": true
     }
   },

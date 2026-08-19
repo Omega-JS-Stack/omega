@@ -303,7 +303,7 @@ const SHARED_SCHEMA = [
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), url, features [{ id, name, icon, definition, value }].',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every processor and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features [{ id, name, icon, definition, value }].',
   },
   {
     path:        'payment.winback.enabled',

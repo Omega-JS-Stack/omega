@@ -164,4 +164,4 @@ Active development on `v1`. See [`PROGRESS.md`](PROGRESS.md) for pass-by-pass pr
 
 ## License
 
-[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments and removes the attribution; and you may not offer `@omega.js/desktop` to third parties as a hosted or managed service.
+[Elastic License 2.0](LICENSE). The source is free to use and modify; a license key unlocks payments in production deploys and removes the attribution (local dev and test payments are always free); and you may not offer `@omega.js/desktop` to third parties as a hosted or managed service.

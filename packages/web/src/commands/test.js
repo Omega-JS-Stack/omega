@@ -38,11 +38,10 @@ module.exports = async function (options) {
   // ---- Framework suite (framework:/omega:/web:/full:)
   if (scope.sources.includes('framework')) {
     const frameworkRoot = path.resolve(__dirname, '../..');
-    const frameworkTests = scope.filters.framework.length
-      ? scope.filters.framework.map((f) => `test/${f.replace(/\.js$/, '')}*.test.js`).join(' ')
-      : 'test/*.test.js';
-    logger.log(`Running @omega.js/web framework tests (node --test ${frameworkTests})`);
-    execSync(`node --test ${frameworkTests}`, { stdio: 'inherit', cwd: frameworkRoot });
+    for (const { flags, target } of frameworkTestRuns(scope.filters.framework)) {
+      logger.log(`Running @omega.js/web framework tests (node --test ${flags}${target})`);
+      execSync(`node --test ${flags}${target}`, { stdio: 'inherit', cwd: frameworkRoot });
+    }
   }
 
   if (!scope.sources.includes('project')) {
@@ -84,6 +83,28 @@ module.exports = async function (options) {
     execSync(`node --test ${projectTests}`, { stdio: 'inherit' });
   }
 };
+
+/**
+ * The framework suite's two phases — the SAME split the package's own
+ * `npm test` runs (#344). `test/watch/` holds the rebuild-watching suites and
+ * runs alone, one file at a time: nine sibling test processes churning temp
+ * trees starve a watcher's FSEvents stream, and a starved watcher reads as a
+ * rebuild that never landed. A filter is applied to both phases — a glob that
+ * matches nothing is a no-op run, so naming a suite in either dir works.
+ * @param {string[]} filters - `web:<filter>` scope filters (empty = the lot)
+ * @returns {Array<{flags: string, target: string}>} the runs, in order
+ */
+function frameworkTestRuns(filters) {
+  const target = (dir) => (filters.length
+    ? filters.map((f) => `${dir}/${f.replace(/\.js$/, '')}*.test.js`).join(' ')
+    : `${dir}/*.test.js`);
+
+  return [
+    { flags: '', target: target('test') },
+    { flags: '--test-concurrency=1 ', target: target('test/watch') },
+  ];
+}
+module.exports.frameworkTestRuns = frameworkTestRuns;
 
 // The default is a QUOTED glob node expands itself: a bare `test/` positional
 // is treated as a module on Node >= 22 (our engines floor), and macOS /bin/sh

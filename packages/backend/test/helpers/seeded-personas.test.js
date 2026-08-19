@@ -1,4 +1,4 @@
-const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture } = require('../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture, buildSessionFixtures } = require('../../src/test/test-accounts.js');
 const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialing.js');
 
 /**
@@ -14,7 +14,10 @@ const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialin
  * And every persona is a FULL account ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)),
  * journey ones included: identical in shape AND in substance to a real user, so QA
  * signed in as one sees exactly what a customer sees. The completeness cases below
- * are what stops a persona added tomorrow from arriving half-built.
+ * are what stops a persona added tomorrow from arriving half-built — the referrals
+ * and the active sessions an established account carries included
+ * ([#343](https://github.com/Omega-JS-Stack/omega/issues/343)), because those two
+ * lists were the last ones a persona could not fill.
  *
  * PURE: reads the seeder's own definitions against the brand catalog — no emulator,
  * no Firestore. What it pins is the SEED, which is what every payment suite and the
@@ -413,6 +416,117 @@ module.exports = {
         assert.ok(fixture, 'The Premium persona names an order, so it must have one');
         assert.equal(fixture.doc.owner, '_test-premium-active', 'The order belongs to the Premium persona');
         assert.equal(fixture.doc.unified.status, 'active', 'The order records the live subscription it bought');
+      },
+    },
+
+    // The referrals an established account has earned (#343). They were the last
+    // list on the account page still coming from client-side fixtures, which is
+    // exactly why they were wrong: the shape those fixtures invented is not the
+    // shape a signup writes, and nobody could tell while no persona carried one.
+    {
+      name: 'referrers-carry-the-referrals-a-signup-writes',
+      async run({ assert, config }) {
+        const definitions = getAccountDefinitions('example.com', config);
+        const byUid = new Map(Object.values(definitions).map((definition) => [definition.uid, definition]));
+        const referrers = Object.entries(definitions).filter(([, definition]) => (definition.properties.affiliate?.referrals || []).length > 0);
+        const nowUNIX = Math.floor(Date.now() / 1000);
+
+        assert.ok(referrers.length > 0, 'The seeder must define personas that referred somebody');
+
+        for (const [key, definition] of referrers) {
+          const referrals = definition.properties.affiliate.referrals;
+          const converted = [];
+          const pending = [];
+
+          assert.ok(referrals.length > 1, `Persona '${key}' should carry a few referrals, not one`);
+
+          for (const referral of referrals) {
+            // The record processAffiliate appends (routes/user/signup/post.js):
+            // a uid and an ISO timestamp, and nothing else. A seed with extra
+            // fields would let a reader lean on data no real referral has.
+            assert.deepEqual(
+              Object.keys(referral).sort(),
+              ['timestamp', 'uid'],
+              `Persona '${key}' must record referrals exactly as a signup writes them`,
+            );
+
+            const at = Math.floor(new Date(referral.timestamp).getTime() / 1000);
+
+            assert.ok(at > 0, `Persona '${key}' has a referral with an unreadable timestamp (${referral.timestamp})`);
+            assert.ok(at < nowUNIX, `Persona '${key}' has a referral dated in the future`);
+
+            // The referred account exists: the panel prints the uid, and a
+            // referral pointing at nobody is a uid the emulator cannot resolve.
+            const referred = byUid.get(referral.uid);
+
+            assert.ok(referred, `Persona '${key}' referred ${referral.uid}, which is no seeded persona`);
+
+            const isConverted = referred.properties.subscription?.product?.id !== 'basic'
+              || Boolean(referred.properties.subscription?.payment?.orderId);
+
+            (isConverted ? converted : pending).push(referral.uid);
+          }
+
+          // A real referral list is mixed: some of the people who signed up went
+          // on to subscribe and some never did. Conversion is a fact about the
+          // REFERRED account (the referral record itself carries no status), so
+          // the mix only exists when the referrals name real personas.
+          assert.ok(converted.length > 0, `Persona '${key}' referred nobody who ever subscribed`);
+          assert.ok(pending.length > 0, `Persona '${key}' referred nobody who is still on the free tier`);
+        }
+      },
+    },
+
+    // The devices an account is signed in on (#343). Sessions are the one part
+    // of an account that lives OUTSIDE the user doc — a Realtime Database record
+    // an app writes while it is signed in — so account creation alone leaves the
+    // security panel showing the browser in front of you and nothing else.
+    {
+      name: 'personas-are-signed-in-on-their-other-devices',
+      async run({ assert }) {
+        const withSessions = Object.keys(TEST_ACCOUNTS)
+          .map((key) => [key, buildSessionFixtures(key, TEST_ACCOUNTS)])
+          .filter(([, sessions]) => sessions);
+        const nowUNIX = Math.floor(Date.now() / 1000);
+
+        assert.ok(withSessions.length > 0, 'The seeder must define personas that are signed in somewhere');
+
+        for (const [key, sessions] of withSessions) {
+          const ids = Object.keys(sessions);
+          const platforms = new Set();
+
+          assert.ok(ids.length >= 2 && ids.length <= 3, `Persona '${key}' should carry 2-3 devices (got ${ids.length})`);
+
+          for (const id of ids) {
+            const session = sessions[id];
+
+            // The route finds a user's sessions with `orderByChild('uid')`
+            // (routes/user/sessions/get.js), so a record whose uid is not the
+            // persona's is a session nothing will ever return.
+            assert.equal(session.uid, TEST_ACCOUNTS[key].uid, `Session ${id} must belong to persona '${key}'`);
+
+            assert.ok(session.platform, `Session ${id} must name the platform it runs on — the panel renders the device from it`);
+            assert.ok(session.ip, `Session ${id} must record where it connected from`);
+            assert.ok(session.timestampUNIX > 0, `Session ${id} must record when it last checked in`);
+            assert.ok(session.timestampUNIX < nowUNIX, `Session ${id} checked in from the future`);
+
+            // ACTIVE sessions: a device that last checked in a month ago is not
+            // somebody who is signed in right now.
+            assert.ok(session.timestampUNIX > nowUNIX - (7 * 86400), `Session ${id} is too stale to read as an active session`);
+
+            platforms.add(session.platform);
+          }
+
+          assert.equal(platforms.size, ids.length, `Persona '${key}' should be signed in on ${ids.length} DIFFERENT devices`);
+
+          // The ids are derived from the persona, so a re-seed replaces the same
+          // records instead of piling a second set on top of them.
+          assert.deepEqual(
+            Object.keys(buildSessionFixtures(key, TEST_ACCOUNTS)),
+            ids,
+            `Persona '${key}' must seed the same session ids on every boot`,
+          );
+        }
       },
     },
   ],

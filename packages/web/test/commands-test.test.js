@@ -12,7 +12,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { projectTestArgs } = require('../src/commands/test.js');
+const { projectTestArgs, frameworkTestRuns } = require('../src/commands/test.js');
 
 const stageApp = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-test-'));
@@ -51,4 +51,21 @@ test('the old bare test/ positional fails on this Node — the defect stays pinn
 test('a project filter still maps to test/<path>* patterns', () => {
   assert.equal(projectTestArgs(['pages.js']), 'test/pages*');
   assert.equal(projectTestArgs(['a', 'b']), 'test/a* test/b*');
+});
+
+test('#344: `omega test web:` runs the watcher lane too, serially, and never in parallel', () => {
+  // The framework suite is TWO phases here for the same reason the package's
+  // own `npm test` is: a watcher suite left in the parallel glob starves.
+  // `omega test web:` losing test/watch/ would silently stop running them.
+  assert.deepEqual(frameworkTestRuns([]), [
+    { flags: '', target: 'test/*.test.js' },
+    { flags: '--test-concurrency=1 ', target: 'test/watch/*.test.js' },
+  ]);
+
+  // A filter reaches both dirs — a non-matching glob is a no-op run, so
+  // `web:dev-watch` resolves in test/watch/ and `web:pricing` in test/.
+  assert.deepEqual(frameworkTestRuns(['dev-watch']), [
+    { flags: '', target: 'test/dev-watch*.test.js' },
+    { flags: '--test-concurrency=1 ', target: 'test/watch/dev-watch*.test.js' },
+  ]);
 });

@@ -19,6 +19,11 @@
  *                checkout button instead)
  *   features   - display list [{ id, name, icon, definition, value }];
  *                value falls back to limits[id], -1 renders as Unlimited
+ *   hidden     - presentation-only exclusion (#348): the product is still
+ *                created on every processor and purchasable by id (QA tiers,
+ *                grandfathered plans), but the composer drops it before any
+ *                lane reads the catalog — no card, no comparison row, no vote
+ *                on the page's universal numbers
  */
 
 const Logger = require('@omega.js/devkit/logger');
@@ -179,12 +184,26 @@ function composeComparison(plans) {
 }
 
 /**
+ * The catalog a page may show: `hidden: true` is presentation-only (#348), so
+ * it drops here ONCE and every reader — the composer below, the `omega build`
+ * empty-catalog warning — asks this one question.
+ * @param {object} payment - resolved config `payment` section
+ * @returns {Array<object>} the non-hidden products, in catalog order
+ */
+function visibleProducts(payment) {
+  const catalog = payment && Array.isArray(payment.products) ? payment.products : [];
+  return catalog.filter((product) => product.hidden !== true);
+}
+
+/**
  * Compose the pricing view-model from the shared payment section.
  * @param {object} payment - resolved config `payment` section
  * @returns {object|null} { plans, oneTime, enterprise, billing, savingsPercent, comparison } or null when the catalog is empty
  */
 function composePricing(payment) {
-  const products = payment && Array.isArray(payment.products) ? payment.products : [];
+  // Every lane below composes from what the page may show (a catalog of
+  // nothing else renders the empty state)
+  const products = visibleProducts(payment);
   if (products.length === 0) return null;
 
   // The enterprise tier is a product like any other, marked `enterprise: true`
@@ -266,4 +285,4 @@ function composePricing(payment) {
   };
 }
 
-module.exports = { composePricing };
+module.exports = { composePricing, visibleProducts };

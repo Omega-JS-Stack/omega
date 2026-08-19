@@ -145,6 +145,10 @@ function toPx(value) {
  * @param {string} [options.targetOrigin] - origin every postMessage targets ('*' when unknown)
  * @returns {string} a complete html document
  */
+// The generated script reports the CARD's box as the height, never the root
+// element's: the frame arrives at the slot preset, so documentElement
+// .scrollHeight can never measure shorter than the frame and the host would
+// never shrink. (Kept out of the template literal — srcdoc ships verbatim.)
 export function renderVertDocument(options) {
   options = options || {};
 
@@ -329,9 +333,6 @@ export function renderVertDocument(options) {
         window.parent.postMessage(message, TARGET_ORIGIN);
       }
 
-      // The CARD's box is the reported height, never the root element's: the
-      // frame arrives at the slot preset, so documentElement.scrollHeight can
-      // never measure shorter than the frame and the host would never shrink.
       function reportDimensions() {
         var doc = document.documentElement;
         post({ type: ${JSON.stringify(MESSAGE_DIMENSIONS)}, id: VERT_ID, width: doc.scrollWidth, height: Math.ceil(card.getBoundingClientRect().height) });

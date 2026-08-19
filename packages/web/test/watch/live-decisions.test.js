@@ -18,11 +18,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { configureOmega } = require('../src/index.js');
-const { registerTemplateWatchTargets, watchRescanTargets } = require('../src/commands/dev.js');
+const { configureOmega } = require('../../src/index.js');
+const { registerTemplateWatchTargets, watchRescanTargets } = require('../../src/commands/dev.js');
 
 // The rebuild deadline scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('./lib/deadlines.js').rebuildDeadlineMs();
+const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
 const POLL_MS = 50;
 const DRAIN_QUIET_POLLS = 20;
 

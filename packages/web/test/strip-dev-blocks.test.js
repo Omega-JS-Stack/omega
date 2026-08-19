@@ -145,16 +145,3 @@ test('the auth pages ship no `_dev_simulateRedirect` to production (#342)', asyn
   assert.ok(!prodGraph.includes('_dev_simulateRedirect'), 'production never reads the redirect-simulation param');
   assert.ok(!prodGraph.includes('Simulate an OAuth redirect'), 'and carries none of the control that sets it');
 });
-
-test('the account page ships no `_dev_prefill` to production (#342)', async () => {
-  // Same shape for the account page's fixtures toggle: the referrals and
-  // sessions lists both read the param as they load, so the block has to hold
-  // on the real build, not just in the source.
-  const devGraph = await buildPageGraph(true, 'strip-prefill-dev-out', 'dashboard/account/index');
-  assert.ok(devGraph.includes('_dev_prefill'), 'the dev build carries the param, otherwise this proves nothing');
-  assert.ok(devGraph.includes('Prefill referrals & sessions'), 'and the palette control that applies it');
-
-  const prodGraph = await buildPageGraph(false, 'strip-prefill-prod-out', 'dashboard/account/index');
-  assert.ok(!prodGraph.includes('_dev_prefill'), 'production never reads the fixtures-prefill param');
-  assert.ok(!prodGraph.includes('Prefill referrals & sessions'), 'and carries none of the control that sets it');
-});

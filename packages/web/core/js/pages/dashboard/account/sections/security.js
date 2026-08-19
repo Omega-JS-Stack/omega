@@ -209,23 +209,7 @@ async function updateActiveSessions(account) {
     });
 
     // Process sessions from server response
-    let sessionData = data || {};
-
-    /* @dev-only:start */
-    // The palette's "Prefill fake data" toggle (#342) applies `_dev_prefill=true`
-    // — a URL param because the read happens once, while the sessions load. The
-    // read lives inside the block, so production never looks and the fixtures
-    // never reach a real bundle.
-    if (omega.isDevelopment()) {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('_dev_prefill') === 'true') {
-        console.log('Adding fake session data for testing');
-        const fakeSessions = generateFakeSessions();
-        // Merge fake sessions with existing data (fake sessions don't override real ones)
-        sessionData = { ...fakeSessions, ...sessionData };
-      }
-    }
-    /* @dev-only:end */
+    const sessionData = data || {};
 
     if (sessionData && typeof sessionData === 'object') {
       // Convert sessions object to array and process each session
@@ -716,53 +700,6 @@ function formatSessionLocation(session) {
 
   return parts.length > 0 ? parts.join(', ') : null;
 }
-
-/* @dev-only:start */
-// Generate fake sessions for development mode
-function generateFakeSessions() {
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000;
-  const oneDay = 24 * oneHour;
-
-  return {
-    'session_abc123': {
-      _current: false,
-      platform: 'Windows',
-      ip: '98.137.246.8',
-      timestamp: new Date(now - (3 * oneHour)).toISOString(),
-      timestampUNIX: Math.floor((now - (3 * oneHour)) / 1000),
-    },
-    'session_def456': {
-      _current: false,
-      platform: 'Darwin',  // macOS
-      ip: '192.168.1.42',
-      timestamp: new Date(now - (8 * oneHour)).toISOString(),
-      timestampUNIX: Math.floor((now - (8 * oneHour)) / 1000),
-    },
-    'session_ghi789': {
-      _current: false,
-      platform: 'Linux',
-      ip: '45.62.189.3',
-      timestamp: new Date(now - (oneDay)).toISOString(),
-      timestampUNIX: Math.floor((now - (oneDay)) / 1000),
-    },
-    'session_jkl012': {
-      _current: false,
-      platform: 'Win32',
-      ip: '203.0.113.45',
-      timestamp: new Date(now - (2 * oneDay)).toISOString(),
-      timestampUNIX: Math.floor((now - (2 * oneDay)) / 1000),
-    },
-    'session_mno345': {
-      _current: false,
-      platform: 'Mac',
-      ip: '172.217.16.195',
-      timestamp: new Date(now - (5 * oneDay)).toISOString(),
-      timestampUNIX: Math.floor((now - (5 * oneDay)) / 1000),
-    },
-  };
-}
-/* @dev-only:end */
 
 // Format date helper
 function formatDate(timestamp) {

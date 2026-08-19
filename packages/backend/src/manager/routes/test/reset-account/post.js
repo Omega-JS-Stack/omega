@@ -1,4 +1,4 @@
-const { getAccountDefinitions, createAccount, seedOrderFixture } = require('../../../../test/test-accounts.js');
+const { getAccountDefinitions, createAccount, seedOrderFixture, seedSessionFixture } = require('../../../../test/test-accounts.js');
 
 /**
  * POST /test/reset-account
@@ -55,11 +55,15 @@ module.exports = async ({ ctx, user }) => {
 
   // Re-run the seeder's own per-account primitive (auth delete + create, then
   // the seed properties merged over the fresh doc) and stand the persona's
-  // canonical order fixture back up.
+  // canonical order fixture back up. Its active sessions come back too: they
+  // live in the Realtime Database rather than on the doc, so recreating the
+  // account leaves them behind — and signing out of all sessions is one of the
+  // flows a browser rehearses on this persona.
   await createAccount(admin, definition);
   const order = await seedOrderFixture(admin, key, config);
+  const sessions = await seedSessionFixture(admin, key);
 
-  ctx.log(`test/reset-account: ${key} reset (${orders.size} order(s) cleared, ${order ? `order ${order.orderId} reseeded` : 'no order fixture'})`);
+  ctx.log(`test/reset-account: ${key} reset (${orders.size} order(s) cleared, ${order ? `order ${order.orderId} reseeded` : 'no order fixture'}, ${sessions ? `${sessions.length} session(s) reseeded` : 'no session fixtures'})`);
 
   return ctx.respond({
     success: true,
@@ -68,5 +72,6 @@ module.exports = async ({ ctx, user }) => {
     email: definition.email,
     ordersCleared: orders.size,
     orderId: order?.orderId || null,
+    sessions: sessions?.length || 0,
   });
 };

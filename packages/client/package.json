@@ -17,7 +17,7 @@
     "start": "npm run prepare:watch",
     "test": "npm run prepare && node --require ./test/setup.js --test-timeout=10000 --test test/*.test.js",
     "prepare_": "node -e 'require(`prepare-package`)()'",
-    "prepare": "node -e \"require('prepare-package')()\"",
+    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },
   "engines": {
@@ -35,7 +35,10 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omega.js/devkit/vendor')()\"",
+      "after": [
+        "node -e \"require('@omega.js/devkit/vendor')()\"",
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\""
+      ],
       "afterBlocking": true
     }
   },

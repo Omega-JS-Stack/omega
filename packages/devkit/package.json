@@ -39,6 +39,7 @@
     "./test/steps-log": "./src/test/steps-log.js",
     "./test/journey-harness": "./src/test/journey-harness.js",
     "./vendor": "./tools/vendor.js",
+    "./prepare-guard": "./tools/prepare-guard.js",
     "./omega-bin": "./src/omega-bin.js"
   },
   "scripts": {

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- [#348](../../issues/348) — A product marked `hidden: true` never reaches the pricing page, while every processor still gets its objects and checkout still resolves it by id — the QA tier stops advertising itself. An all-hidden catalog warns at build time, named as such. Applied to the playground's `proof-press`.
+
+### Changed
+- [#349](../../issues/349) — Every README's license paragraph now states the boundary plainly: a license key unlocks payments in PRODUCTION deploys; local dev and test payments are always free. Wording only, no behavior change.
+- [#343](../../issues/343) — Seeded personas carry the referrals their link earned and the 2-3 devices they are signed in on, so the account page's last client-side fixtures (`?_dev_prefill`) and their palette control are deleted. A real ISO referral timestamp now renders as a date instead of `NaN`.
+- [#330](../../issues/330) — Production builds ship no framework developer comments: `omega build` drops every HTML comment (IE conditionals and third-party licenses excepted) and every bundled-JS comment, while `omega dev` keeps them for debuggability. Already the pipeline's behavior; now a documented contract with its own regression pin.
+- [#351](../../issues/351) — The three rules surfaces are settled as three deliberate models: `firestore.rules` compiles (merge-by-match), `database.rules.json` keeps its managed marker block, and `storage.rules` stays a brand-owned deny-all scaffold. Documented in the backend guide; no code change.
+
+### Fixed
+- [#335](../../issues/335) — A one-time refund arriving before its order stops minting a completed-looking purchase from the reversal. With no order behind it the pipeline writes nothing, logs loudly, and parks the event at `payments-anomalies/{eventId}` with the refund payload and the capture it reversed.
+- [#340](../../issues/340) — `omega dev` checks linked-dist freshness ONCE, before any leg spawns, so a boot rebuild can no longer purge the dist a sibling leg is dispatching through (`✖ backend exited (code 1)`, MODULE_NOT_FOUND). A stale monorepo-linked dist stops the boot instead of taking a leg down.
+- [#347](../../issues/347) — The webhook's fetched-resource log reads `state` when a v1 sale resource spells it that way, so a successful fetch stops reporting `status=unknown`.
+- [#344](../../issues/344) — Web's rebuild-watching suites moved to `test/watch/` and run in their own serial phase (`npm test` and `omega test web:` alike), and the dev-server-restart suite now asserts that an edit rode the config-reset lane instead of counting resets — nine lane-only sightings, twice at a ship gate.
+- [#350](../../issues/350) — A locally linked brand stops rebuilding the monorepo package it links: npm runs a `file:` dep's prepare inside that checkout, so every framework's prepare skips when the command came from outside — `install`, `ci`, `update`, `rebuild`, `dedupe`. Pack and publish still build.
+- [#321](../../issues/321) — The manager's suite stops losing a random file to `Unable to deserialize cloned data`: a test child's console output — and any child it spawns — now rides stderr, leaving node's report pipe carrying frames alone. Node reads a frame length signed until 26.7; this repo pins 24.
 
 ## [0.37.0] 2026-08-18
 ### Changed

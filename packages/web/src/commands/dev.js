@@ -436,6 +436,15 @@ function devServerOptions(outDir, authPort, devChrome) {
  * path matches ANY registered target and every reset dies — including the
  * consumer ones (#134 verification).
  *
+ * Dropping the relative form was TRIED and reverted (#344). It is not dead
+ * insurance: with only the absolute form registered, the packaged-layer reset
+ * starves — an interleaved A/B of dev-watch.test.js, one run per arm per
+ * round, went 0/8 red on both forms and 5/8 red on absolute-only. The extra
+ * registrations change how chokidar arranges its FSEvents streams (its
+ * consolidation threshold is a count of watched paths under one parent), and
+ * the arrangement the duplicates produce is the one that reliably delivers a
+ * freshly created packaged tmp dir's events. Measure before touching this.
+ *
  * ONLY the reset union lands here. The same scope also records the RESCAN
  * union (#200 Lane B) — the content scans, whose dirs must never carry a reset
  * — and `options.onRescans` hands it to the lane that owns it

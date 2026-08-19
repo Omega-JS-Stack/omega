@@ -16,6 +16,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const { composePricing } = require('../src/pricing.js');
+const { catalogWarning } = require('../src/commands/build.js');
 const { buildSite, buildWith: sharedBuildWith, miniData, BARE } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
@@ -508,4 +509,89 @@ test('#270 follow-up: an enterprise-only catalog never skips a heading level', a
     if (i === 0) return;
     assert.ok(level <= levels[i - 1] + 1, `heading ${i} (h${level}) does not skip past h${levels[i - 1]}`);
   });
+});
+
+// #348 — the QA tier is a real product: created on every processor and
+// purchasable by id, but never a card on the pricing page. `hidden: true` is
+// presentation-only, so the composer drops it before any lane reads the
+// catalog (including the numbers the page speaks).
+const HIDDEN_QA = {
+  products: [
+    ...CATALOG.products,
+    {
+      id: 'proof-press',
+      name: 'Proof Press',
+      type: 'subscription',
+      tagline: 'test prints, pulled immediately',
+      hidden: true,
+      prices: { monthly: 5 },
+      features: [{ id: 'proofs', name: 'Proof pulls', icon: 'flask' }],
+    },
+  ],
+};
+
+test('composePricing: a hidden product leaves every rendered lane (#348)', () => {
+  const pricing = composePricing(HIDDEN_QA);
+
+  assert.deepStrictEqual(pricing.plans.map((plan) => plan.id), ['basic', 'premium'], 'not a plan card');
+  assert.ok(!pricing.comparison.features.some((feature) => feature.id === 'proofs'), 'nor a comparison row');
+  assert.strictEqual(
+    pricing.trialDays,
+    14,
+    'nor a vote on the universal trial number (a trial-free QA tier would zero it)',
+  );
+
+  const hiddenOneTime = composePricing({
+    products: [...CATALOG.products, { id: 'qa-pack', name: 'QA Pack', type: 'one-time', hidden: true, prices: { once: 5 } }],
+  });
+  assert.deepStrictEqual(hiddenOneTime.oneTime.map((product) => product.id), ['launch-kit'], 'nor a one-time card');
+
+  const hiddenEnterprise = composePricing({
+    products: [...CATALOG.products, { id: 'qa-terms', name: 'QA Terms', enterprise: true, hidden: true }],
+  });
+  assert.strictEqual(hiddenEnterprise.enterprise, null, 'nor the enterprise row');
+
+  assert.strictEqual(
+    composePricing({ products: [{ id: 'proof-press', name: 'Proof Press', hidden: true, prices: { monthly: 5 } }] }),
+    null,
+    'a catalog of nothing but hidden products renders the honest empty state',
+  );
+});
+
+test("`omega build`'s empty-catalog warning counts the VISIBLE catalog (#348)", () => {
+  assert.strictEqual(catalogWarning(CATALOG), null, 'a catalog with cards warns about nothing');
+  assert.strictEqual(catalogWarning(HIDDEN_QA), null, 'nor does one that merely CONTAINS a hidden product');
+
+  // The page renders #pricing-empty here, so the build must say so — and say
+  // WHICH config state it is, or the reader hunts a catalog that is not bare.
+  const allHidden = catalogWarning({
+    products: [
+      { id: 'proof-press', name: 'Proof Press', hidden: true, prices: { monthly: 5 } },
+      { id: 'qa-pack', name: 'QA Pack', type: 'one-time', hidden: true, prices: { once: 5 } },
+    ],
+  });
+  assert.match(allHidden, /lists 2 products, every one marked hidden/, 'an all-hidden catalog warns, named for what it is');
+  assert.match(allHidden, /empty state/, 'and says what the page renders');
+  assert.match(
+    catalogWarning({ products: [{ id: 'proof-press', name: 'Proof Press', hidden: true }] }),
+    /lists 1 product, every one marked hidden/,
+    'one hidden product is a product, not products',
+  );
+
+  assert.match(catalogWarning({ products: [] }), /payment\.products is empty/, 'a bare catalog keeps its own wording');
+  assert.match(catalogWarning(undefined), /payment\.products is empty/, 'and so does a missing payment section');
+});
+
+test('classy: a hidden product never reaches the pricing page (#348)', async () => {
+  const pages = await buildWith({ ...miniData, payment: HIDDEN_QA });
+  const html = pages.get('/pricing');
+  // The client Configuration blob keeps the WHOLE catalog (checkout resolves
+  // a hidden product by id) — the claim is about what the page RENDERS.
+  const markup = html.replace(/<script[\s\S]*?<\/script>/g, '');
+
+  assert.ok(!markup.includes('Proof Press'), 'the hidden product name is nowhere on the page');
+  assert.ok(!markup.includes('test prints, pulled immediately'), 'nor its tagline');
+  assert.ok(!markup.includes('data-plan-id="proof-press"'), 'and it has no checkout button');
+  assert.ok(markup.includes('data-plan-id="premium"'), 'the visible catalog still renders');
+  assert.ok(html.includes('"id":"proof-press"'), 'while the client still resolves it by id');
 });
