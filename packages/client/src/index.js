@@ -12,6 +12,7 @@ import Device from './modules/device.js';
 import Verts from './modules/verts.js';
 import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
 import { createLogger } from './modules/logger.js';
+import { pathPrefix } from './modules/path-prefix.js';
 
 const firebaseLogger = createLogger('firebase');
 const analyticsLogger = createLogger('analytics');
@@ -178,9 +179,10 @@ class Manager {
       }
 
       // Initialize service worker if enabled — dev included (push/caching are
-      // testable locally). Registering at scope '/' REPLACES whatever worker
-      // last claimed the origin (a different project on the same localhost
-      // port), and the worker itself evicts foreign caches on boot. When a
+      // testable locally). Registering at the page's scope ('/', or the base
+      // path the site is mounted under — #360) REPLACES whatever worker last
+      // claimed it (a different project on the same localhost port), and the
+      // worker itself evicts foreign caches on boot. When a
       // project explicitly disables the SW, sweep the origin clean instead so
       // a previous project's worker can't keep serving its stale caches.
       // Only http(s) origins are eligible: file:// (desktop) and
@@ -845,7 +847,10 @@ class Manager {
     }
 
     try {
-      const response = await fetch(`/build.json?cb=${Date.now()}`);
+      // The manifest is served from the site's own mount (#364): under a URL
+      // path (#355) a root-relative fetch lands off-site and 404s forever. No
+      // stamp means the domain root and an unchanged URL.
+      const response = await fetch(`${pathPrefix()}/build.json?cb=${Date.now()}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch build.json (${response.status})`);
       }

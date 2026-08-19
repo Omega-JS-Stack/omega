@@ -6,6 +6,8 @@
  *   /service-worker.js  - esbuild iife bundle of the consumer's
  *                         src/service-worker.js (or the packaged default
  *                         entry), registered by @omega.js/client at scope '/'
+ *                         (at scope '<prefix>/' when the site is mounted
+ *                         under a base path — #360)
  *   /build.js           - `self.OMEGA_BUILD_JSON = {…}` — the SW's config
  *                         transport (importScripts can't consume JSON)
  *   /build.json         - the same meta for page-side consumers

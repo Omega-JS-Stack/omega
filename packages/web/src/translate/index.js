@@ -30,6 +30,7 @@ const {
 } = require('@omega.js/devkit/translate');
 const { collectTextNodes } = require('./collect-text-nodes.js');
 const { updateSitemap } = require('./sitemap.js');
+const { readPathPrefixStamp, stripPathPrefix } = require('../path-prefix.js');
 
 // System routes never translated (auth flows, transactional + legal pages)
 const SYSTEM_EXCLUDED_ROUTES = [
@@ -91,12 +92,15 @@ function buildExclusionTest(config) {
 
 /**
  * Rewrite same-site links on a translated page to their /{lang}/ versions.
+ * On a MOUNTED site (#355) the hrefs already carry the base path: the route
+ * is read underneath it, and the language segment goes back on AFTER it.
  * @param {object} $ - cheerio root
  * @param {string} lang - target language
  * @param {string} baseUrl - site origin
  * @param {Function} isExcluded - route exclusion test
+ * @param {string} pathPrefix - the base path the site is served under ('' at the domain root)
  */
-function rewriteLinks($, lang, baseUrl, isExcluded) {
+function rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix) {
   $('a[href]').each((_, el) => {
     const href = $(el).attr('href');
 
@@ -111,12 +115,13 @@ function rewriteLinks($, lang, baseUrl, isExcluded) {
         return;
       }
 
-      const route = url.pathname.replace(/^\/+|\/+$/g, '');
+      const sitePath = stripPathPrefix(url.pathname, pathPrefix);
+      const route = sitePath.replace(/^\/+|\/+$/g, '');
       if (isExcluded(route)) {
         return;
       }
 
-      url.pathname = `/${lang}${url.pathname}`;
+      url.pathname = `${pathPrefix}/${lang}${sitePath}`;
 
       // Preserve relative-style hrefs as root-relative paths
       $(el).attr('href', href.startsWith('http') ? url.toString() : `${url.pathname}${url.search}${url.hash}`);
@@ -133,7 +138,8 @@ function rewriteLinks($, lang, baseUrl, isExcluded) {
  * @param {string[]} languages - translated languages for THIS page
  * @param {string} defaultLang - source language code
  * @param {string} route - the page's route
- * @param {string} baseUrl - site origin
+ * @param {string} baseUrl - site origin (on a MOUNTED site brand.url carries
+ *   the base path already — absolute URLs are never prefixed a second time)
  * @returns {boolean} whether anything was inserted
  */
 function insertAlternates($, languages, defaultLang, route, baseUrl) {
@@ -214,6 +220,12 @@ async function translateSite(options) {
   const files = options.only
     ? allFiles.filter((relPath) => relPath === options.only || routeOf(relPath) === options.only.replace(/^\/+|\/+$/g, ''))
     : allFiles;
+
+  // Base path (#355): the build stamped the mount point on every page it
+  // emitted, so the pass reads it off the site itself — no caller plumbing,
+  // and `omega translate` run on its own gets it too. dist IS the mount root,
+  // so only the URLs carry it; the copies' file paths never do (#359).
+  const pathPrefix = files.length ? readPathPrefixStamp(jetpack.read(path.join(outDir, files[0]))) : '';
 
   logger.log(`Translating ${files.length} pages into ${settings.languages.length} language(s): ${settings.languages.join(', ')} (provider: ${provider.name}${provider.model ? `/${provider.model}` : ''})`);
 
@@ -319,7 +331,7 @@ async function translateSite(options) {
       $('meta[property="og:url"]').attr('content', pageUrl);
       $('meta[property="og:locale"]').attr('content', ogLocale(lang));
 
-      rewriteLinks($, lang, baseUrl, isExcluded);
+      rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix);
 
       // Canonical URLs are extensionless (about.html ↔ /about), so the
       // language HOME must land as <lang>.html for /es to resolve as a FILE.

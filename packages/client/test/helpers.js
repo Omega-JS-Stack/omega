@@ -37,8 +37,27 @@ after(() => {
   }
 });
 
+// Stamp the #355 base path on <html>, the way the web build's HTML pass does,
+// and hand back the undo — every module that mounts under a prefix reads it
+// from that one stamp, so every suite exercising one starts here.
+function setPathPrefix(prefix) {
+  const dataset = document.documentElement.dataset;
+  const previous = dataset.omegaPathPrefix;
+
+  dataset.omegaPathPrefix = prefix;
+
+  return () => {
+    if (previous === undefined) {
+      delete dataset.omegaPathPrefix;
+    } else {
+      dataset.omegaPathPrefix = previous;
+    }
+  };
+}
+
 module.exports = {
   TEST_CONFIG,
   assert,
   getManager,
+  setPathPrefix,
 };

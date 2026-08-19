@@ -477,6 +477,46 @@ module.exports = {
       },
     },
 
+    // And they are the DEDICATED referrer's alone (Ian 2026-08-18,
+    // [#363](https://github.com/Omega-JS-Stack/omega/issues/363)). A persona
+    // demonstrates exactly its own scenario: premium-active is the steady-state
+    // subscriber QA signs in as, and an affiliate list on it is a second story
+    // told by an account that exists to tell the billing one.
+    {
+      name: 'only-the-referrer-persona-carries-referrals',
+      async run({ assert, config }) {
+        const definitions = getAccountDefinitions('example.com', config);
+        const carriers = Object.entries(definitions)
+          .filter(([, definition]) => (definition.properties.affiliate?.referrals || []).length > 0)
+          .map(([key]) => key);
+
+        assert.deepEqual(carriers, ['referrer'], 'The referrer persona is the only account seeded with referrals');
+        assert.equal(
+          (definitions['premium-active'].properties.affiliate?.referrals || []).length,
+          0,
+          'The Premium persona demonstrates a subscription, not an affiliate link',
+        );
+
+        // The one that DOES carry them stays a full realistic account (Ian
+        // 2026-08-17, #327), and its dates stay the shape a signup writes: the
+        // account page reads the timestamp as an ISO STRING, and the epoch
+        // millis the old client-side fixtures invented rendered every row as
+        // `NaN years ago` (#343).
+        const referrals = definitions.referrer.properties.affiliate.referrals;
+
+        assert.ok(referrals.length >= 3, `The referrer persona must carry a real list of referrals (got ${referrals.length})`);
+
+        for (const referral of referrals) {
+          assert.equal(
+            typeof referral.timestamp,
+            'string',
+            `Referral ${referral.uid} must be dated with the ISO string a signup writes, never epoch millis`,
+          );
+          assert.match(referral.timestamp, /^\d{4}-\d{2}-\d{2}T/, `Referral ${referral.uid} is dated '${referral.timestamp}', which no signup would write`);
+        }
+      },
+    },
+
     // The devices an account is signed in on (#343). Sessions are the one part
     // of an account that lives OUTSIDE the user doc — a Realtime Database record
     // an app writes while it is signed in — so account creation alone leaves the

@@ -47,6 +47,16 @@ test('brand.url unset → the Pages project address /<name>/, from the slug the 
   assert.equal(deployPathPrefix({ brand: { id: 'my-brand' } }, {}), '/my-brand/', 'brand.id is the slug fallback (same chain as the direct plan)');
 });
 
+// #366 — a *.github.io brand.url is the PROJECT ADDRESS, not a custom domain:
+// the path it carries is the mount, so following the deploy's advice cannot
+// move the build to the domain root.
+test('a *.github.io brand.url names its own mount — the path it carries IS the base path (#366)', () => {
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, {}), '/workkit/');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit/' }, repo: { providers: { github: { repo: 'Org/site' } } } }, {}), '/workkit/', 'the URL names the mount, not the slug');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io' }, repo: { providers: { github: { repo: 'Org/site' } } } }, {}), '/site/', 'a bare Pages host names no project — the slug does');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, { OMEGA_PATH_PREFIX: '/other' }), '/other', 'an explicit export still wins');
+});
+
 test('no config slug → GITHUB_REPOSITORY names the repo (the CI lane derives remotely)', () => {
   assert.equal(deployPathPrefix({}, { GITHUB_REPOSITORY: 'Omega-JS-Stack/omega-brand' }), '/omega-brand/');
   assert.equal(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/omega-brand' }), '/', 'a custom domain still wins over the repo address');
@@ -85,7 +95,10 @@ test('appPathPrefix: the app-dir entry point loads the composed config (the CI l
 
 test('the --direct lane sets the variable around the build it runs itself', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'deploy.js'), 'utf8');
-  assert.match(source, /OMEGA_PATH_PREFIX: deployPathPrefix\(config\)/, 'the direct build env carries the derived value');
+  // The plan carries the derived value (#361: the address it publishes to and
+  // the path the build mounts under come from the one derivation)
+  assert.match(source, /pathPrefix = deployPathPrefix\(config, env, cwd\)/, 'the plan derives it');
+  assert.match(source, /OMEGA_PATH_PREFIX: plan\.pathPrefix/, 'the direct build env carries the plan value');
   assert.match(source, /npm run build -- --cached-only[\s\S]{0,120}env[,:} ]/, 'that env reaches the build exec');
 });
 

@@ -11,12 +11,18 @@
  * omega_cachebreak or author value wins).
  */
 
+const { mapSrcset } = require('./srcset.js');
+
 const IMG_TAG_PATTERN = /<(?:img|source)\b[^>]*>/gi;
 // Lookbehind keeps data-src/data-srcset (and any *-src) out of scope
 const SRC_ATTR_PATTERN = /(?<![-\w])(src|srcset)=(?:"([^"]*)"|'([^']*)')/gi;
 
 /**
  * Whether a URL is a first-party asset this build owns.
+ *
+ * ⚠️ Mirrored by `isLocalUrl()` in `core/js/core/lazy-loading.js` (#368) — the
+ * runtime half busts the caches of the `data-lazy` URLs this pass defers.
+ *
  * @param {string} url
  * @returns {boolean}
  */
@@ -43,24 +49,6 @@ function breakUrl(url, stamp) {
 }
 
 /**
- * Stamp every candidate URL in a srcset value, keeping descriptors.
- * @param {string} value - srcset attribute value
- * @param {string} stamp
- * @returns {string}
- */
-function breakSrcset(value, stamp) {
-  return value
-    .split(',')
-    .map((candidate) => {
-      const part = candidate.trim();
-      if (!part) return part;
-      const [url, ...descriptor] = part.split(/\s+/);
-      return [breakUrl(url, stamp), ...descriptor].join(' ');
-    })
-    .join(', ');
-}
-
-/**
  * Rewrite an HTML document's <img>/<source> src + srcset attributes.
  * @param {string} html - rendered page
  * @param {string} stamp - build cache stamp (CACHE_TIMESTAMP)
@@ -71,7 +59,9 @@ function cachebreakHtml(html, stamp) {
     SRC_ATTR_PATTERN,
     (attr, name, doubleQuoted, singleQuoted) => {
       const value = doubleQuoted !== undefined ? doubleQuoted : singleQuoted;
-      const broken = name.toLowerCase() === 'srcset' ? breakSrcset(value, stamp) : breakUrl(value, stamp);
+      const broken = name.toLowerCase() === 'srcset'
+        ? mapSrcset(value, (url) => breakUrl(url, stamp))
+        : breakUrl(value, stamp);
       const quote = doubleQuoted !== undefined ? '"' : "'";
       return `${name}=${quote}${broken}${quote}`;
     },

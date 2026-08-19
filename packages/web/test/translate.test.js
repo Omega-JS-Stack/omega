@@ -15,7 +15,7 @@ const { test } = require('node:test');
 const { translateSite } = require('../src/translate/index.js');
 const { hashKey, CONTROL } = require('@omega.js/devkit/translate');
 
-const PAGE = (title, body) => `<!doctype html><html lang="en" dir="ltr"><head>
+const PAGE = (title, body, prefix = '') => `<!doctype html><html lang="en" dir="ltr"${prefix ? ` data-omega-path-prefix="${prefix}"` : ''}><head>
 <title>${title}</title>
 <meta name="description" content="A fine page"/>
 <meta property="og:url" content="https://mini.co/"/>
@@ -34,21 +34,27 @@ const SITEMAP_ENTRY = (loc, priority) => `  <url>
     <priority>${priority}</priority>
   </url>`;
 
-const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
+const SITEMAP = (base = 'https://mini.co') => `<?xml version="1.0" encoding="UTF-8"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml"
   >
 ${[
-    SITEMAP_ENTRY('https://mini.co', '1.0'),
-    SITEMAP_ENTRY('https://mini.co/about', '0.5'),
-    SITEMAP_ENTRY('https://mini.co/checkout', '0.5'),
+    SITEMAP_ENTRY(base, '1.0'),
+    SITEMAP_ENTRY(`${base}/about`, '0.5'),
+    SITEMAP_ENTRY(`${base}/checkout`, '0.5'),
   ].join('\n')}
 </urlset>
 `;
 
-/** Stage a consumer root with a built dist. */
-function stage() {
+/**
+ * Stage a consumer root with a built dist. `prefix` stages what a MOUNTED
+ * build (#355) emits: the base path stamped on <html>, every internal href
+ * already carrying it, and the sitemap written from a `brand.url` that carries
+ * it too (absolute URLs are built from brand.url — README: nothing prefixes
+ * them twice). dist itself is the mount root, so file paths never carry it.
+ */
+function stage(prefix = '') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-wtr-'));
   const dist = path.join(root, 'dist');
 
@@ -60,18 +66,18 @@ function stage() {
 
   write('index.html', PAGE('Welcome home', `
     <p>Grow faster with MiniCo</p>
-    <a href="/about">About us</a>
-    <a href="/checkout">Buy now</a>
+    <a href="${prefix}/about">About us</a>
+    <a href="${prefix}/checkout">Buy now</a>
     <a href="https://external.example/x">External</a>
     <span data-omega-no-translate>Do Not Touch</span>
     <input type="submit" value="Send it"/>
-    <input type="hidden" value="csrf-token-123"/>`));
-  write('about/index.html', PAGE('About - MiniCo', '<p>The consumer about page</p>'));
-  write('checkout/index.html', PAGE('Checkout', '<p>Card number</p>'));
-  write('admin/panel/index.html', PAGE('Admin', '<p>Secret admin copy</p>'));
-  write('skipme/index.html', PAGE('Skipped', '<p>User-excluded page</p>'));
-  write('twitter.html', PAGE('Social redirect', '<p>Social</p>'));
-  write('sitemap.xml', SITEMAP);
+    <input type="hidden" value="csrf-token-123"/>`, prefix));
+  write('about/index.html', PAGE('About - MiniCo', '<p>The consumer about page</p>', prefix));
+  write('checkout/index.html', PAGE('Checkout', '<p>Card number</p>', prefix));
+  write('admin/panel/index.html', PAGE('Admin', '<p>Secret admin copy</p>', prefix));
+  write('skipme/index.html', PAGE('Skipped', '<p>User-excluded page</p>', prefix));
+  write('twitter.html', PAGE('Social redirect', '<p>Social</p>', prefix));
+  write('sitemap.xml', SITEMAP(`https://mini.co${prefix}`));
 
   return { root, dist };
 }
@@ -81,6 +87,10 @@ const CONFIG = {
   socials: { twitter: 'minico' },
   translation: { languages: ['es', 'ar'], exclude: ['skipme'] },
 };
+
+// The same brand served as a project site under /workkit: brand.url carries
+// the mount point, exactly as the base-path contract describes it.
+const MOUNTED_CONFIG = { ...CONFIG, brand: { ...CONFIG.brand, url: 'https://mini.co/workkit' } };
 
 /** Fake provider: suffixes each string with ·<lang>, tracks calls per lang. */
 function fakeSend(calls) {
@@ -359,6 +369,66 @@ test('translateSite: an unproduced language appears nowhere in the sitemap', asy
   });
   const after = fs.readFileSync(sitemapFile, 'utf8');
   assert.ok(!after.includes('/es'), 'entries for a no-longer-produced language are removed');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('translateSite: a MOUNTED site composes prefix-then-lang in hrefs, alternates and the sitemap (#359)', async () => {
+  const { root, dist } = stage('/workkit');
+
+  await translateSite({ root, outDir: dist, config: MOUNTED_CONFIG, send: fakeSend([]) });
+
+  // 1. Page hrefs: the lang segment goes AFTER the base path, and an excluded
+  //    route is still recognized through the prefix
+  const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
+  assert.ok(es.includes('href="/workkit/es/about"'), 'a mounted link keeps its prefix and gains the lang after it');
+  assert.ok(es.includes('href="/workkit/checkout"'), 'the excluded route is recognized under the prefix, link untouched');
+  assert.ok(!es.includes('/es/workkit'), 'the lang segment never lands at the domain root');
+  assert.ok(es.includes('href="https://external.example/x"'), 'external links stay external');
+
+  // 2. Localized chrome + hreflang alternates, on the copy and stitched back
+  //    into the original
+  assert.ok(es.includes('<link rel="canonical" href="https://mini.co/workkit/es"'), 'canonical mounted');
+  assert.ok(es.includes('content="https://mini.co/workkit/es"'), 'og:url mounted');
+  assert.ok(es.includes('href="https://mini.co/workkit/ar" hreflang="ar"'), 'the copy names its sibling under the base path');
+
+  const original = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+  assert.ok(original.includes('href="https://mini.co/workkit/es" hreflang="es"'), 'the original advertises the mounted copy');
+  assert.ok(!original.includes('https://mini.co/es'), 'no alternate points at the domain root');
+  assert.ok(!/workkit\/workkit/.test(`${es}${original}`), 'an absolute URL is never prefixed twice — it comes from brand.url');
+
+  // 3. The sitemap tells the same story, and re-running does not duplicate it
+  //    (a mounted copy entry is recognized as one on the next pass)
+  const sitemapFile = path.join(dist, 'sitemap.xml');
+  const xml = fs.readFileSync(sitemapFile, 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.ok(locs.includes('https://mini.co/workkit/es/about'), 'the copy is listed under the base path');
+  assert.ok(locs.includes('https://mini.co/workkit/ar'), 'the language home too');
+  assert.ok(!locs.some((loc) => loc.includes('/es/workkit')), 'never the wrong way round');
+  assert.match(xml, /hreflang="es" href="https:\/\/mini\.co\/workkit\/es"\/>/, 'sitemap alternates mounted');
+  assert.ok(!xml.includes('workkit/workkit'), 'sitemap URLs are never prefixed twice either');
+
+  await translateSite({ root, outDir: dist, config: MOUNTED_CONFIG, send: async () => { throw new Error('warm cache'); } });
+  const second = fs.readFileSync(sitemapFile, 'utf8');
+  assert.strictEqual([...second.matchAll(/<loc>https:\/\/mini\.co\/workkit\/es<\/loc>/g)].length, 1, 'no duplicate copy entry on a second pass');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('translateSite: an UNMOUNTED site composes exactly as it always has (#359 regression pin)', async () => {
+  const { root, dist } = stage();
+
+  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+
+  const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
+  assert.ok(es.includes('href="/es/about"'), 'href: the lang segment sits at the site root');
+  assert.ok(es.includes('href="/checkout"'), 'excluded route link untouched');
+  assert.ok(es.includes('<link rel="canonical" href="https://mini.co/es"'), 'canonical unchanged');
+  assert.ok(es.includes('href="https://mini.co/ar" hreflang="ar"'), 'alternate unchanged');
+
+  const xml = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
+  assert.ok(xml.includes('<loc>https://mini.co/es/about</loc>'), 'sitemap entry unchanged');
+  assert.match(xml, /hreflang="es" href="https:\/\/mini\.co\/es"\/>/, 'sitemap alternate unchanged');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

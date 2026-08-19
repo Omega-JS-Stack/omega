@@ -19,6 +19,21 @@
  */
 const sw = self;
 
+// The base path this site is mounted under (#355/#360). A worker has no
+// document to read the `data-omega-path-prefix` stamp from, so @omega.js/client
+// hands the value over on this script's query string at registration time —
+// which also scopes the worker to `<prefix>/`. Empty means the domain root.
+const PATH_PREFIX = new URLSearchParams(sw.location.search).get('omega-path-prefix') || '';
+
+// Mount a root-relative site URL under that base path. A no-op at the domain
+// root, and anything the payload supplies (absolute URLs from FCM) is left alone.
+function sitePath(url) {
+  if (!PATH_PREFIX || typeof url !== 'string') return url;
+  if (!url.startsWith('/') || url.startsWith('//')) return url;
+
+  return `${PATH_PREFIX}${url}`;
+}
+
 // Cache warming is DISABLED (Ian 2026-07-18: page speed wins — nothing reads
 // the cache today, and no fetch handler exists to serve from it). The
 // machinery stays wired (updateCache + the update-cache message command) so
@@ -26,7 +41,7 @@ const sw = self;
 const CACHE_WARMING_ENABLED = false;
 
 // Build config — synchronous, top-level (importScripts cannot run later)
-importScripts('/build.js');
+importScripts(sitePath('/build.js'));
 
 // ⚠️ Global listeners BEFORE the Firebase imports — firebase-messaging
 // registers its own notificationclick handler, and ours must come first:
@@ -169,7 +184,7 @@ class Manager {
       const title = notification.title || 'New notification';
       const options = {
         body: notification.body || '',
-        icon: notification.icon || notification.image || '/assets/images/favicon/favicon-192x192.png',
+        icon: notification.icon || notification.image || sitePath('/assets/images/favicon/favicon-192x192.png'),
         data: payload,
       };
 
@@ -207,10 +222,12 @@ class Manager {
 
     // Set default resources to cache: the home page + the main bundles
     // (their URLs ride /build.js — hashed names in production builds)
-    const defaults = ['/', this.config.assets?.js, this.config.assets?.css].filter(Boolean);
+    const defaults = ['/', this.config.assets?.js, this.config.assets?.css].filter(Boolean).map(sitePath);
 
-    // Ensure pages is an array
-    pages = pages || [];
+    // Ensure pages is an array, mounted the same way the defaults are: the
+    // update-cache caller supplies SITE-relative pages (it knows nothing about
+    // this worker's base path), so they ride sitePath() too
+    pages = (pages || []).map(sitePath);
 
     // Merge with additional pages
     const pagesToCache = [...new Set([...defaults, ...pages])];
@@ -245,7 +262,7 @@ function setupGlobalHandlers() {
     const payload = (notification.data && notification.data.FCM_MSG ? notification.data.FCM_MSG.notification : null) || {};
 
     // Get the click action
-    const clickAction = payload.click_action || data.click_action || '/';
+    const clickAction = payload.click_action || data.click_action || sitePath('/');
 
     // Log
     console.log('[service-worker] notificationclick', clickAction, event);

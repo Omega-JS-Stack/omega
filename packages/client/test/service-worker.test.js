@@ -1,5 +1,5 @@
 const { describe, it, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getManager, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
 
 // Count the calls the real ServiceWorker module makes into the harness's inert
 // navigator.serviceWorker container — the assertions watch the actual code path.
@@ -10,9 +10,11 @@ function instrumentContainer() {
     getRegistrations: container.getRegistrations,
   };
   const calls = { register: 0, getRegistrations: 0 };
+  const registered = [];
 
   container.register = async (...args) => {
     calls.register++;
+    registered.push({ url: args[0], options: args[1] });
     return original.register(...args);
   };
   container.getRegistrations = async (...args) => {
@@ -22,6 +24,7 @@ function instrumentContainer() {
 
   return {
     calls,
+    registered,
     restore() {
       Object.assign(container, original);
     },
@@ -85,5 +88,57 @@ describe('Service Worker origin gate', () => {
 
     assert.strictEqual(container.calls.register, 0);
     assert.strictEqual(container.calls.getRegistrations, 1);
+  });
+});
+
+// #360 — a site served under a URL path (#355) hosts its worker script at
+// /<prefix>/service-worker.js, which can only claim /<prefix>/. The page reads
+// the stamp the build wrote on <html> and hands the value to the worker on the
+// script URL's query string (a worker has no document to read it from).
+describe('Service Worker under a URL-path mount', () => {
+  let container;
+  let restorePrefix;
+
+  afterEach(() => {
+    container?.restore();
+    restorePrefix?.();
+    container = null;
+    restorePrefix = null;
+  });
+
+  it('should register the mounted script at the mounted scope, carrying the prefix', async () => {
+    restorePrefix = setPathPrefix('/workkit');
+    container = instrumentContainer();
+
+    await getManager().initialize({ ...TEST_CONFIG });
+
+    assert.deepStrictEqual(container.registered, [{
+      url: '/workkit/service-worker.js?omega-path-prefix=%2Fworkkit',
+      options: { scope: '/workkit/', updateViaCache: 'none' },
+    }]);
+  });
+
+  it('should mount an explicitly configured script path too', async () => {
+    restorePrefix = setPathPrefix('/workkit');
+    container = instrumentContainer();
+
+    await getManager().initialize({
+      ...TEST_CONFIG,
+      serviceWorker: { enabled: true, config: { path: '/sw.js' } },
+    });
+
+    assert.strictEqual(container.registered[0].url, '/workkit/sw.js?omega-path-prefix=%2Fworkkit');
+    assert.strictEqual(container.registered[0].options.scope, '/workkit/');
+  });
+
+  it('should leave the unprefixed default byte-identical', async () => {
+    container = instrumentContainer();
+
+    await getManager().initialize({ ...TEST_CONFIG });
+
+    assert.deepStrictEqual(container.registered, [{
+      url: '/service-worker.js',
+      options: { scope: '/', updateViaCache: 'none' },
+    }]);
   });
 });

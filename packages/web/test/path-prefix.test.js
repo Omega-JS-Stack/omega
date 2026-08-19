@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { after, test } = require('node:test');
 
-const { resolvePathPrefix, prefixUrl, prefixHtml, prefixCss } = require('../src/path-prefix.js');
+const { resolvePathPrefix, prefixUrl, stripPathPrefix, readPathPrefixStamp, prefixHtml, prefixCss } = require('../src/path-prefix.js');
 const { pathPrefix, siteUrl } = require('../core/js/libs/path-prefix.js');
 const { buildAssets } = require('../src/assets.js');
 const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
@@ -67,6 +67,20 @@ test('prefixUrl: root-relative only — external, protocol-relative, bare-relati
   assert.equal(prefixUrl('/pricing', ''), '/pricing', 'no prefix → identity');
 });
 
+test('stripPathPrefix + readPathPrefixStamp: the route under a mount, and the mount a built page carries (#359)', () => {
+  assert.equal(stripPathPrefix('/workkit/pricing', '/workkit'), '/pricing', 'the site-relative route comes back');
+  assert.equal(stripPathPrefix('/workkit', '/workkit'), '/', 'the mount root IS the site root');
+  assert.equal(stripPathPrefix('/workkit/', '/workkit'), '/', 'trailing slash kept as the site root');
+  assert.equal(stripPathPrefix('/workkitchen/pricing', '/workkit'), '/workkitchen/pricing', 'a same-looking sibling segment is not the prefix');
+  assert.equal(stripPathPrefix('/pricing', '/workkit'), '/pricing', 'an unmounted path comes back untouched');
+  assert.equal(stripPathPrefix('/pricing', ''), '/pricing', 'no prefix → identity');
+  assert.equal(stripPathPrefix(prefixUrl('/pricing', '/workkit'), '/workkit'), '/pricing', 'the inverse of prefixUrl');
+
+  assert.equal(readPathPrefixStamp(prefixHtml('<html lang="en"></html>', '/workkit')), '/workkit', 'the stamp prefixHtml writes reads back');
+  assert.equal(readPathPrefixStamp('<html lang="en"></html>'), '', 'an unmounted page carries none');
+  assert.equal(readPathPrefixStamp('<!DOCTYPE html>\n<HTML DATA-OMEGA-PATH-PREFIX="/workkit/">'), '/workkit', 'case-insensitive, and normalized like every other read');
+});
+
 test('prefixHtml: URL attributes rewritten, data-* and page identity left alone, <html> stamped', () => {
   const html = [
     '<!DOCTYPE html>',
@@ -102,6 +116,26 @@ test('prefixHtml: URL attributes rewritten, data-* and page identity left alone,
   assert.ok(out.includes('<html data-omega-path-prefix="/workkit" lang="en"'), 'the browser half gets the stamp');
 
   assert.equal(prefixHtml(html, ''), html, 'no prefix → the document is returned untouched');
+});
+
+test('prefixHtml: a comma INSIDE a srcset candidate URL is not a candidate boundary (#362)', () => {
+  const html = [
+    '<img srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, /a-2048.png 2x"/>',
+    '<img srcset="/thumb.png?w=100,200 1x, /wide.png?w=300,400 2x"/>',
+    '<source srcset="data:image/svg+xml,%3Csvg%3E"/>',
+  ].join('\n');
+
+  const out = prefixHtml(html, '/workkit');
+
+  assert.ok(
+    out.includes('srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, /workkit/a-2048.png 2x"'),
+    'the data-URI candidate stays whole, its root-relative sibling still mounts',
+  );
+  assert.ok(
+    out.includes('srcset="/workkit/thumb.png?w=100,200 1x, /workkit/wide.png?w=300,400 2x"'),
+    'a comma in a query string is not a boundary — both candidates mount whole',
+  );
+  assert.ok(out.includes('srcset="data:image/svg+xml,%3Csvg%3E"'), 'a lone data-URI candidate is untouched');
 });
 
 test('prefixCss: url() targets rewritten, data/external/relative untouched', () => {

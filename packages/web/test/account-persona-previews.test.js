@@ -167,10 +167,15 @@ async function settle() {
 }
 
 test('#343: the referrals panel renders the referrals a persona carries', async () => {
+  // The REFERRER persona's list — the only account seeded with referrals
+  // ([#363](https://github.com/Omega-JS-Stack/omega/issues/363)): every persona
+  // demonstrates its own scenario, so the affiliate story is told by the
+  // account built for it, and this is the list it carries.
   const referrals = [
-    referral('_test-premium-trialing', 2 * DAY),
+    referral('_test-premium-active', 2 * DAY),
     referral('_test-basic', 9 * DAY),
-    referral('_test-premium-cancelling', 24 * DAY),
+    referral('_test-premium-expired', 24 * DAY),
+    referral('_test-refunded', 51 * DAY),
   ];
 
   const elements = await renderPanels(async (bundle) => {
@@ -183,15 +188,15 @@ test('#343: the referrals panel renders the referrals a persona carries', async 
     assert.ok(list.includes(entry.uid), `the panel lists ${entry.uid}`);
   }
 
-  assert.equal(elements.get('total-referrals').textContent, '3', 'every referral is counted');
-  assert.equal(elements.get('referrals-badge').textContent, '3', 'and the nav badge agrees');
+  assert.equal(elements.get('total-referrals').textContent, '4', 'every referral is counted');
+  assert.equal(elements.get('referrals-badge').textContent, '4', 'and the nav badge agrees');
   assert.equal(elements.get('referral-code-input').value, 'https://example.com?ref=TESTREF', 'the persona\'s own link');
 
   // The bug the fixtures hid: an ISO timestamp is what a signup writes, and the
   // panel did arithmetic on it — every real referral read `NaN years ago`.
   assert.ok(!/NaN/.test(list), 'no referral renders an unreadable date');
   assert.match(list, /2 days ago/, 'the newest referral is dated from its ISO timestamp');
-  assert.match(list, /3 weeks ago/, 'and so is the oldest');
+  assert.match(list, /1 month ago/, 'and so is the oldest');
 });
 
 test('#343: the referrals panel counts this month from the same timestamps', async () => {

@@ -1,4 +1,5 @@
 import omega from '@omega.js/client';
+import { mapSrcset } from '__main_assets__/js/libs/srcset.js';
 
 // Lazy Loading Module
 export default function () {
@@ -14,8 +15,25 @@ export default function () {
   // IntersectionObserver instance
   let observer = null;
 
+  // Whether a URL is a first-party asset this build owns — the ONLY kind a
+  // cache buster belongs on (#368).
+  //
+  // ⚠️ Mirrors `isLocal()` in `packages/web/src/cachebreak-html.js`, the
+  // build-time half of the same rule: a `?cb=` on a `data:` URI corrupts the
+  // payload, and one on an external URL rewrites somebody else's URL.
+  function isLocalUrl(url) {
+    const value = String(url).trim();
+    if (!value) return false;
+    if (/^(https?:)?\/\//i.test(value)) return false;
+    if (/^(data|blob|mailto|tel|javascript):/i.test(value)) return false;
+
+    return true;
+  }
+
   // Helper function to add cache buster to URLs
   function addCacheBuster(url) {
+    if (!isLocalUrl(url)) return url;
+
     const urlObj = new URL(url, window.location.href);
     urlObj.searchParams.set('cb', omega.config.buildTime);
     return urlObj.toString();
@@ -242,12 +260,11 @@ export default function () {
   function loadSrcset(element, value) {
     const tagName = element.tagName.toLowerCase();
 
-    // Add cache buster to each URL in srcset
-    value = value.split(',').map(part => {
-      const [url, descriptor] = part.trim().split(/\s+/);
-      const busteredUrl = addCacheBuster(url);
-      return descriptor ? `${busteredUrl} ${descriptor}` : busteredUrl;
-    }).join(', ');
+    // Add cache buster to each URL in srcset. The candidates are read with the
+    // srcset GRAMMAR, never `value.split(',')` (#367): a candidate URL may
+    // legally contain a comma (a `data:` payload, a `?w=100,200` query), and
+    // this is the lane the build passes defer `data-srcset` to.
+    value = mapSrcset(value, addCacheBuster);
 
     if (tagName === 'img') {
       // Test load with srcset

@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { pathPrefix } from './path-prefix.js';
 
 const logger = createLogger('service-worker');
 
@@ -38,8 +39,18 @@ class ServiceWorker {
         return null;
       }
 
-      const swPath = options.path || this.manager.config.serviceWorker?.config?.path || '/service-worker.js';
-      const scope = options.scope || '/';
+      // Mount the script and the scope under the page's base path (#360): a
+      // worker served at /<prefix>/service-worker.js can only claim
+      // /<prefix>/. The prefix rides the script URL as a query param because
+      // the worker has no document to read the stamp from — it reads it back
+      // off self.location.search. No prefix leaves both untouched.
+      const prefix = pathPrefix();
+      const configuredPath = options.path || this.manager.config.serviceWorker?.config?.path || '/service-worker.js';
+      const swPath = prefix && configuredPath.startsWith('/') && !configuredPath.startsWith('//')
+        ? `${prefix}${configuredPath}`
+        : configuredPath;
+      const swUrl = prefix ? `${swPath}?omega-path-prefix=${encodeURIComponent(prefix)}` : swPath;
+      const scope = options.scope || `${prefix}/`;
 
       // Build config object to pass to service worker
       const config = {
@@ -50,7 +61,7 @@ class ServiceWorker {
       };
 
       // Register service worker
-      const registration = await navigator.serviceWorker.register(swPath, {
+      const registration = await navigator.serviceWorker.register(swUrl, {
         scope,
         updateViaCache: 'none'
       });

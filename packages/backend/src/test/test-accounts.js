@@ -477,11 +477,12 @@ function fillMissing(target, source) {
  * field here would invent a shape no referral has ever had.
  */
 const PERSONA_REFERRALS = {
-  // The steady-state subscriber QA signs in as (#327): friends invited over a
-  // few months, two of whom subscribed and one who never has.
-  'premium-active': ['premium-trialing', 'basic', 'premium-cancelling'],
   // The affiliate owner the signup lane credits — an established referrer, so
-  // the list a new referral lands on is never an empty one.
+  // the list a new referral lands on is never an empty one. It is the ONLY
+  // persona carrying referrals (Ian 2026-08-18,
+  // [#363](https://github.com/Omega-JS-Stack/omega/issues/363)): every persona
+  // demonstrates exactly its own scenario, so the affiliate story belongs to
+  // the account built for it and nowhere else.
   referrer: ['premium-active', 'basic', 'premium-expired', 'refunded'],
 };
 

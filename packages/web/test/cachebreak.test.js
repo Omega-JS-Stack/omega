@@ -47,6 +47,27 @@ test('cachebreakHtml: existing params/cb respected; srcset per-candidate; scope 
   assert.ok(out.includes('href="/pricing"'), 'links out of scope');
 });
 
+test('cachebreakHtml: a comma INSIDE a candidate URL is not a candidate boundary (#362)', () => {
+  const out = cachebreakHtml(
+    [
+      '<img srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, /c-2048.png 2x"/>',
+      '<img srcset="/thumb.png?w=100,200 1x, /wide.png?w=300,400 2x"/>',
+      '<source srcset="data:image/svg+xml,%3Csvg%3E"/>',
+    ].join('\n'),
+    STAMP,
+  );
+
+  assert.ok(
+    out.includes(`srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, /c-2048.png?cb=${STAMP} 2x"`),
+    'the data-URI candidate survives byte-identical, its local sibling is still stamped',
+  );
+  assert.ok(
+    out.includes(`srcset="/thumb.png?w=100,200&cb=${STAMP} 1x, /wide.png?w=300,400&cb=${STAMP} 2x"`),
+    'a comma in a query string is not a boundary — both candidates keep their params',
+  );
+  assert.ok(out.includes('srcset="data:image/svg+xml,%3Csvg%3E"'), 'a lone data-URI candidate is untouched');
+});
+
 test('engine: dev AND prod builds stamp local imgs with one build value', async () => {
   const prod = await buildWith(miniData, { environment: 'production' }, 'cachebreak-prod');
   const dev = await buildWith(miniData, {}, 'cachebreak-dev');

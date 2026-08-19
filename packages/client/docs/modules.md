@@ -86,6 +86,27 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
   is what replaces a DIFFERENT project's worker left on the same localhost
   port). `enabled: false` calls `unregisterAll()` instead — the origin is
   swept clean, never left to a stale foreign worker.
+- **Under a URL-path mount** ([#360](https://github.com/Omega-JS-Stack/omega/issues/360)):
+  when the page carries the web build's `<html data-omega-path-prefix>` stamp,
+  `register()` mounts the script and the scope under it
+  (`/workkit/service-worker.js` at scope `/workkit/` — the only scope a script
+  served from there can claim) and appends the prefix to the script URL as
+  `?omega-path-prefix=…`, which is how the worker (no document, no stamp) learns
+  the mount for the URLs it builds. No stamp means the domain root and an
+  unchanged registration.
+
+## Path prefix (`path-prefix.js`)
+
+- **Exports**: `pathPrefix()`
+- The base path this page is mounted under (#355), read off the web build's
+  `<html data-omega-path-prefix>` stamp — `''` at the domain root,
+  `'/workkit'`-shaped otherwise. The client's mirror of the web package's
+  runtime helper (`core/js/libs/path-prefix.js`); nothing imports across the
+  package boundary.
+- **Read by**: the ServiceWorker registration above ([#360](https://github.com/Omega-JS-Stack/omega/issues/360))
+  and the Manager's refresh-new-version poll, which fetches the build manifest
+  at `<prefix>/build.json` ([#364](https://github.com/Omega-JS-Stack/omega/issues/364))
+  — root-relative, that poll 404s forever under a path mount.
 
 ## Sentry (`sentry.js`)
 

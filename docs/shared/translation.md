@@ -123,6 +123,17 @@ advertised, on the copies as on the originals), so hreflang never lies.
 and on the source pages the head include renders. Cache namespace:
 `pages/{route}` (`pages/home` for `/`).
 
+On a site served under a base path ([#355](https://github.com/Omega-JS-Stack/omega/issues/355)),
+link rewriting composes **prefix, then language**: the pass reads the mount
+point off the `<html data-omega-path-prefix>` stamp the build wrote (so
+`omega translate` standalone sees it too), takes the route from underneath it,
+and mounts the language segment after it — `/workkit/es/pricing`, never
+`/es/workkit/pricing` ([#359](https://github.com/Omega-JS-Stack/omega/issues/359)).
+Exclusions are matched on that same underneath-the-prefix route. ABSOLUTE URLs
+(canonical, `og:url`, hreflang alternates, the sitemap entries) are built from
+`brand.url`, which for a mounted site already carries the path — nothing
+prefixes them twice.
+
 Never translated: auth flows (`oauth2`, `authentication-*`), `checkout*`,
 `submission/confirmation`, legal (`terms`/`privacy`/`cookies`), `404`,
 socials redirects (config `socials` keys), `admin`/`test`/`team`/`updates`

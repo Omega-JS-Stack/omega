@@ -25,6 +25,8 @@
  * registered — so today's output is unchanged byte for byte.
  */
 
+const { mapSrcset } = require('./srcset.js');
+
 // The attributes a browser resolves as a URL. The lookbehind keeps `data-src`,
 // `data-srcset` and friends out of scope (same guard cachebreak-html.js uses):
 // those are runtime-consumed values, and the browser half mounts them itself.
@@ -66,21 +68,32 @@ function prefixUrl(url, prefix) {
 }
 
 /**
- * Mount every candidate URL in a srcset value, keeping descriptors.
- * @param {string} value - srcset attribute value
- * @param {string} prefix
+ * The inverse of prefixUrl: the SITE-relative path of an already mounted URL.
+ * Post-build passes that reason about routes (the translation pass composes
+ * prefix-then-lang, #359) need the route the build knows, not the mounted one.
+ * A path that does not carry the prefix is returned as it came.
+ * @param {string} pathname - a root-relative path
+ * @param {string} prefix - resolvePathPrefix output
  * @returns {string}
  */
-function prefixSrcset(value, prefix) {
-  return value
-    .split(',')
-    .map((candidate) => {
-      const part = candidate.trim();
-      if (!part) return part;
-      const [url, ...descriptor] = part.split(/\s+/);
-      return [prefixUrl(url, prefix), ...descriptor].join(' ');
-    })
-    .join(', ');
+function stripPathPrefix(pathname, prefix) {
+  const value = String(pathname);
+  if (!prefix || !(value === prefix || value.startsWith(`${prefix}/`))) return value;
+
+  return value.slice(prefix.length) || '/';
+}
+
+/**
+ * The base path a built page carries. prefixHtml stamps the mount point on
+ * <html> for the browser half, and that stamp is equally the record a
+ * post-build pass reads instead of re-plumbing the publisher's value.
+ * @param {string} html - a built page
+ * @returns {string} resolvePathPrefix output ('' when the page is unmounted)
+ */
+function readPathPrefixStamp(html) {
+  const match = /<html\b[^>]*\bdata-omega-path-prefix="([^"]*)"/i.exec(String(html));
+
+  return resolvePathPrefix(match ? match[1] : '');
 }
 
 /**
@@ -100,7 +113,7 @@ function prefixHtml(html, prefix) {
       const value = doubleQuoted !== undefined ? doubleQuoted : singleQuoted;
       const quote = doubleQuoted !== undefined ? '"' : "'";
       const next = name.toLowerCase() === 'srcset'
-        ? prefixSrcset(value, prefix)
+        ? mapSrcset(value, (url) => prefixUrl(url, prefix))
         : prefixUrl(value, prefix);
 
       return `${name}=${quote}${next}${quote}`;
@@ -134,4 +147,4 @@ function prefixCss(css, prefix) {
   );
 }
 
-module.exports = { resolvePathPrefix, prefixUrl, prefixHtml, prefixCss };
+module.exports = { resolvePathPrefix, prefixUrl, stripPathPrefix, readPathPrefixStamp, prefixHtml, prefixCss };
