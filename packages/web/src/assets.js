@@ -41,6 +41,7 @@ const { frameworkDependencyNames, frameworkDepsPattern } = require('@omega.js/de
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
+const { resolvePathPrefix, prefixCss } = require('./path-prefix.js');
 const { checkThemeVocabulary } = require('./theme-vocabulary.js');
 
 // Variables
@@ -153,6 +154,9 @@ function resolvePageAsset(map, base) {
  *   sheet via `omega:sections` (PurgeCSS self-trims unused ones) and every
  *   section.js bundles into the main bundle behind DOM-presence init
  *   (data-omega-section/-component attributes, boot.js bootSections)
+ * @param {string} [options.pathPrefix] - the base path the built site is served
+ *   under (#355): emitted stylesheets' `url()` targets are written under it.
+ *   Manifest URLs stay root-relative — the HTML pass mounts them (src/path-prefix.js)
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
  * @param {function} [options.warn] - warning sink for the theme fall-through
@@ -334,7 +338,11 @@ async function buildAssets(options) {
   // explicit scheme, which sass never resolves relatively).
   const cssDirs = options.layers.map((layer) => path.join(layer, 'css')).filter((dir) => fs.existsSync(dir));
   const importers = [layeredFileImporter(options.layers), sectionsImporter(sectionAssets)];
-  const emitCss = (css, rel) => {
+  const emitCss = (rawCss, rel) => {
+    // Base path (#355) before the hash: the digest names the bytes actually
+    // served, and a theme sheet's `url(/assets/fonts/…)` is out of reach of
+    // every HTML pass. No prefix → the sheet is untouched.
+    const css = prefixCss(rawCss, resolvePathPrefix(options.pathPrefix));
     const hash = crypto.createHash('md5').update(css).digest('hex').slice(0, 8);
     const outRel = path.join('assets', 'css', options.dev ? `${rel}.css` : rel.replace(/(\.css)?$/, `-${hash}.css`));
     fs.mkdirSync(path.dirname(path.join(options.outDir, outRel)), { recursive: true });

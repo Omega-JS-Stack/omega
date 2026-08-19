@@ -6,6 +6,7 @@
 // Relative, not the __main_assets__ alias: modules/ builds in the legacy IIFE
 // lane (src/assets.js), whose esbuild pass carries no layer-alias plugin.
 import { createLogger } from '../libs/logger.js';
+import { siteUrl } from '../libs/path-prefix.js';
 
 const logger = createLogger('redirect');
 
@@ -37,7 +38,7 @@ const performRedirect = () => {
 
   // Parse URLs
   const currentUrl = new URL(window.location.href);
-  const siteUrl = new URL(config.siteUrl);
+  const siteUrlBase = new URL(config.siteUrl);
 
   // Determine redirect delay — slow in any non-production environment (development OR
   // testing) so the redirect is observable; near-instant in production.
@@ -53,17 +54,17 @@ const performRedirect = () => {
       if (isAbsoluteUrl) {
         redirectUrl = new URL(config.url);
       } else {
-        // Construct URL from site base
+        // Construct URL from site base, under the path the site is mounted at (#355)
         const path = config.url.startsWith('/') ? config.url : `/${config.url}`;
-        redirectUrl = new URL(`${siteUrl.origin}${path}`);
+        redirectUrl = new URL(`${siteUrlBase.origin}${siteUrl(path)}`);
       }
     } else {
       // Default to site home page
-      redirectUrl = new URL(siteUrl);
+      redirectUrl = new URL(siteUrlBase);
     }
   } catch (error) {
     logger.error('Invalid redirect URL:', config.url, error);
-    redirectUrl = new URL(siteUrl);
+    redirectUrl = new URL(siteUrlBase);
   }
 
   // Handle querystring forwarding

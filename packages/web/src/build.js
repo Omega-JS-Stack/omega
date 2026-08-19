@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
+const { resolvePathPrefix } = require('./path-prefix.js');
 const { buildServiceWorker, writeBuildMeta } = require('./service-worker.js');
 const { copyStaticAssets, hasFaviconSet } = require('./static-assets.js');
 const { processImages } = require('./imagemin.js');
@@ -36,8 +37,9 @@ const { PATHS } = require('./paths.js');
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {boolean} [options.skipPurge] - skip the PurgeCSS pass
  * @param {string} [options.manifestPath] - also write the asset manifest here (the dev config reads it)
+ * @param {string} [options.pathPrefix] - the base path the site is served under (#355) — default `process.env.OMEGA_PATH_PREFIX`, then the domain root
  * @param {function} [options.onPhase] - (name, seconds) callback after each phase
- * @returns {Promise<{ timings: object, htmlCount: number, manifest: object }>}
+ * @returns {Promise<{ timings: object, htmlCount: number, manifest: object, pathPrefix: string }>}
  */
 async function buildSite(options) {
   const themesDir = options.themesDir || PATHS.themes;
@@ -45,6 +47,13 @@ async function buildSite(options) {
   const defaultsDir = options.defaultsDir || PATHS.defaults;
   const activeTheme = options.activeTheme || (options.siteData.theme && options.siteData.theme.id) || 'classy';
   const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
+  // Base path (#355), read ONCE here and handed to both emit lanes. The env var
+  // is the publisher's channel (workkit's publish derives it from the Pages
+  // API); `omega dev` never comes through here, so the dev server keeps serving
+  // at the root no matter what the environment says.
+  const pathPrefix = resolvePathPrefix(
+    options.pathPrefix === undefined ? process.env.OMEGA_PATH_PREFIX : options.pathPrefix,
+  );
 
   const timings = {};
   const started = process.hrtime.bigint();
@@ -72,6 +81,7 @@ async function buildSite(options) {
       coreDir,
       outDir: options.outDir,
       clientEntry: options.clientEntry,
+      pathPrefix,
     })
   );
   manifest.favicons = hasFaviconSet(options.staticDirs);
@@ -142,6 +152,7 @@ async function buildSite(options) {
           farmDir: options.farmDir,
           assetManifest: manifest,
           environment: options.environment,
+          pathPrefix,
         }),
     });
     await elev.write();
@@ -153,7 +164,7 @@ async function buildSite(options) {
   }
 
   timings.total = Number(process.hrtime.bigint() - started) / 1e9;
-  return { timings, htmlCount: countHtml(options.outDir), manifest, imagemin };
+  return { timings, htmlCount: countHtml(options.outDir), manifest, imagemin, pathPrefix };
 }
 
 /**

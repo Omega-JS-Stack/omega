@@ -34,6 +34,7 @@
     "./paths": "./dist/paths.js",
     "./consumer": "./dist/consumer.js",
     "./scaffold": "./dist/scaffold.js",
+    "./deploy": "./dist/commands/deploy.js",
     "./service-worker": "./sw/manager.js",
     "./migrate": "./dist/migrate/index.js",
     "./cli": "./dist/cli-run.js"
@@ -42,7 +43,7 @@
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node --test test/*.test.js && node --test --test-concurrency=1 test/watch/*.test.js"
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js && node --require @omega.js/devkit/test/stdout-guard --test --test-concurrency=1 test/watch/*.test.js"
   },
   "preparePackage": {
     "input": "./src",

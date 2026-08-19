@@ -16,11 +16,14 @@
     "./winback": "./src/winback.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
     "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@omega.js/devkit": "*"
   },
   "engines": {
     "node": ">=22"

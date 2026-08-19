@@ -29,6 +29,11 @@ const PKG = path.join(__dirname, '..');
 const TEST_DIR = path.join(PKG, 'test');
 const ISOLATED = 'e2e-harness.test.js';
 
+// The stdout guard every package's test script preloads (#356). Devkit reaches
+// its own copy by path — the runner pass is where the frame pipe exists, so the
+// direct pass below takes it as inert weight it doesn't need.
+const STDOUT_GUARD = path.join(PKG, 'src', 'test', 'stdout-guard.js');
+
 // Sweep dead-pid .temp dirs from prior runs (fixtures are per-pid, e.g.
 // defaults-engine-<pid>) so passing runs don't accumulate junk forever.
 // Files (flake-evidence logs) are kept — they're the point of .temp.
@@ -54,7 +59,7 @@ if (fs.existsSync(TEMP_DIR)) {
 const extraArgs = process.argv.slice(2);
 
 function runPass(files, { capture = false, inProcess = false } = {}) {
-  return spawnSync(process.execPath, [...(inProcess ? [] : ['--test']), ...extraArgs, ...files], {
+  return spawnSync(process.execPath, [...(inProcess ? [] : ['--require', STDOUT_GUARD, '--test']), ...extraArgs, ...files], {
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     encoding: 'utf8',
     cwd: PKG,

@@ -93,6 +93,12 @@ module.exports = async function (options) {
 
   logger.log(`Built ${result.htmlCount} pages in ${result.timings.total.toFixed(2)}s → ${path.relative(paths.root, paths.out)}/`);
 
+  // A mounted build looks identical on disk and wrong at the domain root, so
+  // say the base path out loud whenever OMEGA_PATH_PREFIX supplied one (#355).
+  if (result.pathPrefix) {
+    logger.log(`Base path: ${result.pathPrefix} — every emitted URL is mounted under it (OMEGA_PATH_PREFIX)`);
+  }
+
   // GH Pages custom domain: every production build carries dist/CNAME so
   // BOTH deploy lanes publish it — the CI workflow passes no cname to its
   // gh-pages action, and a push without the file clears the Pages domain

@@ -11,6 +11,7 @@
 import { formatTimeAgo } from '__main_assets__/js/libs/admin-helpers.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
 let posts = [];
@@ -55,7 +56,7 @@ async function loadPosts() {
   showLoading();
 
   try {
-    const response = await fetch('/feeds/posts.json', { cache: 'no-store' });
+    const response = await fetch(siteUrl('/feeds/posts.json'), { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`Feed returned ${response.status}`);
     }
@@ -162,7 +163,7 @@ function renderRow(post) {
     ? `<div class="text-muted" style="font-size: 0.7rem;">${escape(formatTimeAgo(published.getTime()))}</div>`
     : '';
 
-  const editorHref = `/admin/posts/editor?post=${encodeURIComponent(url)}`;
+  const editorHref = siteUrl(`/admin/posts/editor?post=${encodeURIComponent(url)}`);
 
   const $row = document.createElement('tr');
   $row.innerHTML = `

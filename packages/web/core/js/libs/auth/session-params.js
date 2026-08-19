@@ -5,6 +5,7 @@
 import omega from '@omega.js/client';
 import { trackLogin } from '__main_assets__/js/libs/auth/tracking.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth:session-params');
 
@@ -84,7 +85,7 @@ export async function handleCustomTokenSignin() {
     const authReturnUrl = url.searchParams.get('authReturnUrl');
     const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
       ? authReturnUrl
-      : '/dashboard/account';
+      : siteUrl('/dashboard/account');
 
     window.location.href = redirectTo;
     return true;

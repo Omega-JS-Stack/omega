@@ -28,7 +28,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 |---|---|---|
 | **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `ctx`, Firestore) |
 | **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omega.js/backend's end-to-end |
-| **Rules** | `test/rules/` suites | Firestore security rules permit/deny exactly as intended (required whenever rules change) |
+| **Rules** | `test/rules/` suites | Firestore AND Realtime Database security rules permit/deny exactly as intended (required whenever rules change) |
 
 @omega.js/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
 
@@ -421,6 +421,16 @@ A suite that needs a DIFFERENT ruleset (proving what a brand's own rules do to
 the framework's, for instance) compiles one and loads it into its own emulator
 project with `initializeTestEnvironment` — `test/rules/_environment.js` is the
 shared plumbing, and `test/rules/brand-merge.test.js` the worked example.
+
+**Realtime Database rules** ride the same emulator through the same library, but
+not through the `rules` client, which is Firestore-only. `test/rules/sessions.test.js`
+loads `templates/database.rules.json` — the very file `omega setup` ships to a
+brand, so there is no copy to drift — into its OWN emulator project, reads the
+Database emulator's port off `OMEGA_DATABASE_PORT`, and drives the tree with
+`context.database()`. The separate project id matters: the RTDB emulator keys a
+namespace by project id, so sharing the fixture's would overwrite the rules the
+fixture booted with and `clearDatabase()` would wipe the personas' seeded
+sessions.
 
 ## Test Account Isolation (CRITICAL)
 

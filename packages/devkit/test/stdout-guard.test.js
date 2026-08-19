@@ -1,14 +1,17 @@
 /**
- * The test-child stdout guard (#321): inside a `node --test` child, the pipe
- * that carries the runner's v8 frames carries NOTHING else — console output
- * goes to stderr instead. Outside a runner child the guard is inert.
+ * The test-child stdout guard (#321, shared from devkit in #356): inside a
+ * `node --test` child, the pipe that carries the runner's v8 frames carries
+ * NOTHING else — console output goes to stderr instead. Outside a runner child
+ * the guard is inert, and a second load leaves the first application alone.
+ *
+ * Run: node --test test/stdout-guard.test.js
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const GUARD = path.join(__dirname, 'lib', 'stdout-guard.js');
+const GUARD = path.join(__dirname, '..', 'src', 'test', 'stdout-guard.js');
 
 // A frame-shaped Buffer (the reporter's own writes) plus the kind of line the
 // manage walk prints — box drawing is what makes the parser's signed length
@@ -61,4 +64,24 @@ test('stdout-guard: outside a runner child it leaves stdout alone', () => {
   assert.equal(result.status, 0, result.stderr.toString());
   assert.match(result.stdout.toString(), /─── \[1\/2\] website ───/);
   assert.equal(result.stderr.toString(), '');
+});
+
+test('stdout-guard: loading it twice re-applies nothing', () => {
+  // Every wired package preloads the same file, but a suite can reach the guard
+  // a second way (its own require, a vendored copy) — the second application
+  // would wrap the ALREADY guarded stdout.write, stacking a layer per load.
+  const reload = `
+    const first = process.stdout.write;
+    delete require.cache[require.resolve(${JSON.stringify(GUARD)})];
+    require(${JSON.stringify(GUARD)});
+    process.stderr.write(String(process.stdout.write === first) + '\\n');
+    process.stdout.write(Buffer.from([0xff, 0x0f]));
+  `;
+  const result = spawnSync(process.execPath, ['--require', GUARD, '-e', reload], {
+    env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+  });
+
+  assert.equal(result.status, 0, result.stderr.toString());
+  assert.match(result.stderr.toString(), /^true$/m);
+  assert.deepEqual([...result.stdout], [0xff, 0x0f]);
 });

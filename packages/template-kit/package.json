@@ -14,7 +14,7 @@
     "./variable-resolver": "./src/variable-resolver.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
   },
   "engines": {
     "node": ">=22"
@@ -23,6 +23,7 @@
     "@omega.js/client": "*"
   },
   "devDependencies": {
+    "@omega.js/devkit": "*",
     "liquidjs": "^10.24.0"
   },
   "author": "ITW Creative Works",

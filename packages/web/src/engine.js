@@ -29,6 +29,7 @@ const { registerCollections, BUILT_IN_COLLECTIONS } = require('./collections.js'
 const { applyCollectionLimits } = require('./limit-collections.js');
 const { readCollections, collectionPages, applyDocumentData } = require('./dynamic-pages.js');
 const { resolvePageAsset } = require('./assets.js');
+const { resolvePathPrefix, prefixHtml } = require('./path-prefix.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
@@ -96,6 +97,7 @@ const { deepMerge } = require('./merge.js');
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {object} [options.assetManifest] - js/css manifest from the asset build
+ * @param {string} [options.pathPrefix] - the base path the built site is served under (#355) — default the domain root
  * @param {string} [options.sampleAnchor] - YYYY-MM-DD rolling-date anchor for sample content (default: OMEGA_SAMPLE_ANCHOR env, then today)
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
@@ -771,6 +773,22 @@ function buildConfig(eleventyConfig, options) {
     }
     return content;
   });
+
+  // ---- Base path (#355): a site mounted under a URL path (a GitHub Pages
+  // project site) gets every root-relative URL it emits moved under that path,
+  // plus the stamp the browser half reads (src/path-prefix.js). Registered ONLY
+  // when a prefix is set — a build at the domain root runs no pass at all, so
+  // its output is what it has always been, byte for byte. The dev server serves
+  // at the root and never passes one.
+  const pathPrefix = resolvePathPrefix(options.pathPrefix);
+  if (pathPrefix) {
+    eleventyConfig.addTransform('omega-path-prefix', function (content) {
+      if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {
+        return prefixHtml(content, pathPrefix);
+      }
+      return content;
+    });
+  }
 
   // ---- Production HTML minification (the UJM minifyHtml successor). Only
   // .html outputs — the meta-files (sitemap.xml, feeds, robots.txt, …) ship

@@ -135,6 +135,71 @@ test('dep-guard ignores comment prose that reads like an ESM from-clause', (t) =
   assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'config', 'edit.js')));
 });
 
+test('the closure walk ignores relative requires inside comments (#354)', (t) => {
+  // The real case: a JSDoc @example in packages/devkit/src/local.js quoted
+  // require('../dist/…'); the walk chased it as a real module and killed
+  // @omega.js/backend's prepare mid-session. The vendorable package is a
+  // stand-in resolved from the host's own node_modules, so the fixture owns
+  // exactly what the walk reads.
+  const root = makeFixture('vendor-comment-walk', {
+    packageJSON: { name: 'fixture-comment-walk', version: '1.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/a.js': `module.exports = require('@omega.js/account');`,
+      'node_modules/@omega.js/account/package.json': JSON.stringify({ name: '@omega.js/account', version: '0.0.1', main: './src/index.js' }),
+      'node_modules/@omega.js/account/src/index.js': [
+        `// require('./line-comment-only.js')`,
+        `/**`,
+        ` * @example`,
+        ` *   const dist = require('../dist/block-comment-only.js');`,
+        ` */`,
+        `module.exports = require('./real.js'); // require('./trailing-comment-only.js')`,
+      ].join('\n'),
+      'node_modules/@omega.js/account/src/real.js': `module.exports = 'real';`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // Used to throw: "'@omega.js/account' has no module '../dist/block-comment-only.js'"
+  const result = vendorDevkit({ cwd: root });
+
+  // Only the real require walks — the commented paths never become dependencies
+  assert.deepEqual(result.vendored, { account: ['index.js', 'real.js'] });
+  assert.equal(require(path.join(root, 'dist', 'a.js')), 'real');
+});
+
+test('the comment strip is string-literal aware: // and /* inside strings hide nothing (#354)', (t) => {
+  const root = makeFixture('vendor-comment-strings', {
+    packageJSON: { name: 'fixture-comment-strings', version: '1.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/a.js': `module.exports = require('@omega.js/account');`,
+      'node_modules/@omega.js/account/package.json': JSON.stringify({ name: '@omega.js/account', version: '0.0.1', main: './src/index.js' }),
+      'node_modules/@omega.js/account/src/index.js': [
+        `const sep = '//';`,
+        `const marker = 'a // b'; const inline = require('./inline.js');`,
+        `const tmpl = \`x // y\`; const templated = require('./templated.js');`,
+        // A naive block strip runs from this '/*' to the '*/' two lines down,
+        // swallowing the requires in between
+        `const open = '/*'; const opener = require('./opener.js');`,
+        `const close = '*/'; const closer = require('./closer.js');`,
+        `module.exports = { sep, marker, tmpl, open, close, inline, templated, opener, closer };`,
+      ].join('\n'),
+      'node_modules/@omega.js/account/src/inline.js': `module.exports = 'inline';`,
+      'node_modules/@omega.js/account/src/templated.js': `module.exports = 'templated';`,
+      'node_modules/@omega.js/account/src/opener.js': `module.exports = 'opener';`,
+      'node_modules/@omega.js/account/src/closer.js': `module.exports = 'closer';`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root });
+
+  assert.deepEqual(result.vendored, { account: ['closer.js', 'index.js', 'inline.js', 'opener.js', 'templated.js'] });
+  const loaded = require(path.join(root, 'dist', 'a.js'));
+  assert.equal(loaded.sep, '//');
+  assert.equal(loaded.inline, 'inline');
+  assert.equal(loaded.closer, 'closer');
+});
+
 test('is idempotent: running twice leaves dist identical', (t) => {
   const root = makeFixture('vendor-idem', {
     packageJSON: { name: 'fixture-idem', version: '1.0.0', dependencies: HOST_DEPS, preparePackage: { output: './dist' } },

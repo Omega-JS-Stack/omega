@@ -13,6 +13,7 @@ import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
 let formManager = null;
@@ -306,7 +307,7 @@ function renderRow(row) {
 
   $row.querySelector('.btn-view-firebase').addEventListener('click', (e) => {
     e.preventDefault();
-    window.location.href = `/admin/firebase?collection=users&doc=${uid}`;
+    window.location.href = siteUrl(`/admin/firebase?collection=users&doc=${uid}`);
   });
 
   $row.querySelector('.btn-signin-as').addEventListener('click', (e) => {
@@ -359,7 +360,7 @@ async function viewUser(uid, email) {
   const $firebaseBtn = document.getElementById('btn-view-in-firebase');
   if ($firebaseBtn) {
     $firebaseBtn.onclick = () => {
-      window.location.href = `/admin/firebase?collection=users&doc=${uid}`;
+      window.location.href = siteUrl(`/admin/firebase?collection=users&doc=${uid}`);
     };
   }
 
@@ -424,10 +425,10 @@ async function signInAsUser(uid, email) {
       throw new Error('No token returned from server');
     }
 
-    const signinUrl = new URL('/signin', window.location.origin);
+    const signinUrl = new URL(siteUrl('/signin'), window.location.origin);
     signinUrl.searchParams.set('authSignout', 'true');
     signinUrl.searchParams.set('authCustomToken', token);
-    signinUrl.searchParams.set('authReturnUrl', '/dashboard/account');
+    signinUrl.searchParams.set('authReturnUrl', siteUrl('/dashboard/account'));
 
     showSignInAsModalReady(email, signinUrl.toString());
   } catch (error) {

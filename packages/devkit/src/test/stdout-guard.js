@@ -1,6 +1,6 @@
 /**
  * Test-child stdout guard — keeps human output off the test runner's protocol
- * pipe (#321).
+ * pipe (#321, lifted repo-wide in #356).
  *
  * `node --test` spawns one child per file, and that child reports back over
  * its STDOUT as v8-serialized frames — the same fd every console line the code
@@ -10,16 +10,22 @@
  * walk prints them constantly) makes that SIGNED length negative, so the
  * parser deserializes the console text and the whole file dies with
  * `Unable to deserialize cloned data due to invalid or unsupported version`.
- * Upstream reads the length unsigned as of Node 26.7 (nodejs/node#64706); this
- * repo pins Node 24, and mixing two protocols on one pipe desyncs the report
- * either way.
  *
  * So the console side goes to STDERR, which the runner reads as lines and
  * folds into the report — the output still shows, the protocol pipe carries
- * frames alone. Loaded with `--require` from the package's test script, which
- * the runner forwards to every child; outside a runner child it does nothing.
+ * frames alone. Loaded with `--require @omega.js/devkit/test/stdout-guard`
+ * from a package's test script, which the runner forwards to every child;
+ * outside a runner child it does nothing, and a second load is a no-op.
+ *
+ * RETIREMENT: upstream reads the length unsigned as of Node 26.7
+ * (nodejs/node#64706). When this repo's pinned node (.nvmrc) reaches >=26.7.0,
+ * delete this file and every `--require` of it.
  */
 const childProcess = require('node:child_process');
+
+// One application per process, whatever path the preload was resolved through
+// (a package's `--require`, a vendored copy, a test's own require).
+const APPLIED = Symbol.for('@omega.js/devkit:test/stdout-guard');
 
 /**
  * Rewrite a stdio option so a spawned child never gets OUR fd 1 — an inherited
@@ -43,7 +49,9 @@ function guardStdio(options) {
   return options;
 }
 
-if (process.env.NODE_TEST_CONTEXT) {
+if (process.env.NODE_TEST_CONTEXT && !globalThis[APPLIED]) {
+  globalThis[APPLIED] = true;
+
   const writeFrame = process.stdout.write.bind(process.stdout);
 
   // The reporter writes its frames as Buffers, and nothing else writes to this
@@ -55,11 +63,12 @@ if (process.env.NODE_TEST_CONTEXT) {
       : writeFrame(chunk, ...rest);
   };
 
-  // The spawn pair is where this package hands a child its stdio (`omega
-  // deploy`/`test`/`update` fan-outs, the onboard hand-off, the pipeline legs);
-  // the exec family pipes stdout unless it is asked for otherwise. Preloading
-  // beats every `require('node:child_process')` in src and test, so destructured
-  // imports get the guarded functions too.
+  // The spawn pair is where a package hands a child its stdio (the manage
+  // walk's service legs, `omega deploy`/`test`/`update` fan-outs, every
+  // fixture build a suite shells out for); the exec family pipes stdout unless
+  // it is asked for otherwise. Preloading beats every
+  // `require('node:child_process')` in src and test, so destructured imports
+  // get the guarded functions too.
   for (const name of ['spawn', 'spawnSync']) {
     const original = childProcess[name];
 

@@ -29,6 +29,7 @@
 // directly (test/language-switcher.test.js) — same reason modules/redirect.js
 // imports the logger relatively.
 import { createLogger } from '../libs/logger.js';
+import { siteUrl } from '../libs/path-prefix.js';
 
 const logger = createLogger('language-switcher');
 
@@ -111,7 +112,7 @@ export function switcherHtml(entries) {
     const classes = `dropdown-item${current ? ' active' : ''}`;
     const marker = current ? ' aria-current="true"' : '';
     // alt is empty on purpose: the label beside it already names the language
-    const flag = `<img class="omega-language-flag" data-omega-language-flag src="${FLAG_BASE}${escapeHtml(code)}.svg" alt="" loading="lazy">`;
+    const flag = `<img class="omega-language-flag" data-omega-language-flag src="${siteUrl(FLAG_BASE)}${escapeHtml(code)}.svg" alt="" loading="lazy">`;
 
     return `<li><a lang="${escapeHtml(code)}" dir="auto" hreflang="${escapeHtml(code)}" class="${classes}" href="${escapeHtml(href)}"${marker}>${flag}${escapeHtml(label)}</a></li>`;
   }).join('');

@@ -26,12 +26,15 @@ function scratchFile(name) {
 
 // Swap in a collector for the terminal writers and hand back the restore. The spy
 // FORWARDS every chunk to the real writer — this file runs under `node --test`, whose
-// result stream is this process's stdout.
+// result stream is this process's stdout — EXCEPT a stdout string, which the spy
+// swallows: this file is the one place that asserts on stream routing, and below
+// the spy sits the stdout guard (#356), which sends a string on to STDERR and would
+// cross the two collectors. Only the runner's own frames (Buffers) need to pass.
 function spyWriters() {
   const chunks = { stdout: [], stderr: [] };
   const priorStdout = process.stdout.write;
   const priorStderr = process.stderr.write;
-  process.stdout.write = function (...args) { chunks.stdout.push(String(args[0])); return priorStdout.apply(process.stdout, args); };
+  process.stdout.write = function (...args) { chunks.stdout.push(String(args[0])); return typeof args[0] === 'string' ? true : priorStdout.apply(process.stdout, args); };
   process.stderr.write = function (...args) { chunks.stderr.push(String(args[0])); return priorStderr.apply(process.stderr, args); };
   return {
     chunks,

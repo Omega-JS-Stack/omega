@@ -1,6 +1,7 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { trackGoogle, trackMeta, identifyTikTok } from '__main_assets__/js/libs/analytics.js';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth');
 
@@ -199,7 +200,9 @@ function redirect(url, returnUrl) {
   }
 
   // Set the authReturnUrl to the current URL
-  const newURL = new URL(url, window.location.origin);
+  // The policy's routes are site-relative ('/signin'), so they resolve against
+  // the path the site is mounted under, not the domain root (#355)
+  const newURL = new URL(siteUrl(url), window.location.origin);
 
   // Attach return URL
   if (returnUrl) {
@@ -219,7 +222,9 @@ function redirect(url, returnUrl) {
 // Add authReturnUrl to all signup/signin links so users return to the current page after auth
 // Uses click handler so the return URL always reflects the *current* location (e.g. after chat ID is added)
 function updateAuthLinks() {
-  const authPaths = ['/signin', '/signup'];
+  // Mounted: a link's pathname carries the site's base path, so the routes
+  // compared against it carry it too (#355)
+  const authPaths = ['/signin', '/signup'].map(siteUrl);
 
   document.querySelectorAll('a[href]').forEach(($link) => {
     try {
@@ -367,7 +372,7 @@ function _legacyTranslateAppAuth() {
   }
 
   // Chain through /token page to generate a custom token before redirecting to the app
-  const tokenPageUrl = new URL('/token', window.location.origin);
+  const tokenPageUrl = new URL(siteUrl('/token'), window.location.origin);
   tokenPageUrl.searchParams.set('authReturnUrl', destination);
   url.searchParams.set('authReturnUrl', tokenPageUrl.toString());
 

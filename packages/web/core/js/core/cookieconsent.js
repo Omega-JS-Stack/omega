@@ -1,5 +1,6 @@
 import omega from '@omega.js/client';
 import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // Cookie Consent Module
 export default function () {
@@ -58,7 +59,7 @@ export default function () {
     // Replace {terms} (with or without spaces) with a clickable link to /terms
     messageHTML = messageHTML.replace(
       /\{\s*terms\s*\}/gi,
-      `<a href="/terms" class="cookie-consent-link" target="_blank" rel="noopener noreferrer">terms of service</a>`
+      `<a href="${siteUrl('/terms')}" class="cookie-consent-link" target="_blank" rel="noopener noreferrer">terms of service</a>`
     );
 
     message.innerHTML = messageHTML;

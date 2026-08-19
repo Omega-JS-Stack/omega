@@ -18,6 +18,7 @@ const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+const { resolvePathPrefix } = require('../path-prefix.js');
 
 const logger = new Logger('omega:deploy');
 
@@ -32,6 +33,62 @@ const logger = new Logger('omega:deploy');
  */
 function pagesHost(config) {
   return (config.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+}
+
+/**
+ * The base path this deploy publishes under ([#358](https://github.com/Omega-JS-Stack/omega/issues/358)) —
+ * the `OMEGA_PATH_PREFIX` the #355 build lanes mount every root-relative URL
+ * under, filled from facts a deploy already resolves so an ordinary gh-pages
+ * brand never sees an env var:
+ *
+ *   brand.url set   → the site serves at that domain's ROOT (the CNAME both
+ *                     lanes publish cannot carry a path) → `/`.
+ *   brand.url unset → the default project address
+ *                     `https://<owner>.github.io/<name>/` → `/<name>/`, from
+ *                     the same slug the direct plan names the repo with.
+ *
+ * An explicitly exported value WINS: publisher machinery (workkit's publish
+ * reads the mount point off the Pages API) knows better than this derivation.
+ * A blank export is an ABSENCE, not a value — an Actions secret that was never
+ * set renders as an empty string, and that must not suppress the autofill.
+ * Normalization is #355's (src/path-prefix.js), never a second copy.
+ *
+ * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} [env] - Environment to read (defaults to process.env).
+ * @returns {string} '/' (domain root) or '/<name>/' (project address).
+ */
+function deployPathPrefix(config, env) {
+  env = env || process.env;
+
+  const explicit = String(env.OMEGA_PATH_PREFIX || '').trim();
+  if (explicit) return explicit;
+
+  if (pagesHost(config)) return '/';
+
+  // CI derives the same value remotely: the checked-out config normally
+  // carries the slug, and GITHUB_REPOSITORY names the repo when it does not.
+  const { brandRepoName, parseRepoSlug } = require('@omega.js/config');
+  const name = brandRepoName(config) || parseRepoSlug(env.GITHUB_REPOSITORY).name;
+  const prefix = resolvePathPrefix(name);
+
+  return prefix ? `${prefix}/` : '/';
+}
+
+/**
+ * `deployPathPrefix` for an app dir, loading that app's composed config —
+ * the entry point for callers holding no config yet. The scaffolded CI
+ * workflow runs exactly this (`@omega.js/web/deploy`) from the app dir, so
+ * the dispatch lane and the direct lane derive through ONE function.
+ *
+ * @param {string} [dir] - The consumer app dir (defaults to cwd).
+ * @param {object} [env] - Environment to read (defaults to process.env).
+ * @returns {string} '/' or '/<name>/'.
+ */
+function appPathPrefix(dir, env) {
+  const { loadConfig } = require('@omega.js/config');
+  const { config } = loadConfig(dir || process.cwd(), 'web');
+
+  return deployPathPrefix(config || {}, env);
 }
 
 /**
@@ -88,8 +145,11 @@ function deployDirect({ dryRun }) {
   // Cached-only translation: a deploy must never hang on a live LLM pass
   // (provider limits/outages) — cold language pairs skip with the standard
   // warning, and `omega translate` owns filling the cache.
+  // The base path travels with the build (#358): this lane builds LOCALLY, so
+  // it is the lane that must hand `omega build` the mount point.
   logger.log('Building (production, cached-only translation)...');
-  execSync('npm run build -- --cached-only', { stdio: 'inherit' });
+  const env = { ...process.env, OMEGA_PATH_PREFIX: deployPathPrefix(config) };
+  execSync('npm run build -- --cached-only', { stdio: 'inherit', env });
 
   if (!fs.existsSync(path.join(dist, 'index.html')) && !fs.existsSync(path.join(dist, '404.html'))) {
     throw new Error(`Build produced no site in ${dist} — refusing to push an empty branch`);
@@ -199,3 +259,5 @@ module.exports = async function (options) {
 
 module.exports.buildDirectPlan = buildDirectPlan;
 module.exports.pagesHost = pagesHost;
+module.exports.deployPathPrefix = deployPathPrefix;
+module.exports.appPathPrefix = appPathPrefix;

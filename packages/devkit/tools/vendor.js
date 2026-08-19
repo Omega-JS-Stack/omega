@@ -97,15 +97,73 @@ const BARE_PATTERNS = [
   /import\s+(['"])([^'"./][^'"]*)\1/g,
 ];
 
-// Strip JS comments before dep-guard scanning — JSDoc prose can look exactly
-// like an ESM from-clause (config/edit.js: "('brand' from brand, 'a b' from
-// 'a b')" reported a phantom host dep named 'a b'). Conservative: block
-// comments and // line tails (the [^:'"\`] guard keeps 'http://...' in string
-// literals intact). Detection-only — never used for rewriting.
+// Strip JS comments before scanning — a require/import inside a comment is not
+// a dependency. Two live bites: JSDoc prose that reads like an ESM from-clause
+// (config/edit.js: "('brand' from brand, 'a b' from 'a b')" reported a phantom
+// host dep named 'a b'), and a JSDoc @example quoting require('../dist/…'),
+// which sent the closure walk after a module that doesn't exist and killed
+// @omega.js/backend's prepare (#354).
+//
+// Lexer-grade, not a parser: it tracks string and template literals so a `//`
+// or `/*` inside one is never a comment, and treats a backslash as escaping the
+// next character everywhere — which covers the escaped slashes of a regex
+// literal (/https?:\/\//). Regex literals themselves are not tracked; an
+// UNescaped `//` inside one (only reachable in a character class) would still
+// read as a comment. NESTED template literals are not tracked either: the
+// scanner closes a template at the first unescaped backtick, so a `${`…`}`
+// misclassifies the tail (verified inert across all vendorable sources).
+// Detection-only — never used for rewriting.
 function stripComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  let result = '';
+  let index = 0;
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (char === '/' && next === '/') {
+      while (index < source.length && source[index] !== '\n') index += 1;
+      continue;
+    }
+
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2);
+      index = end === -1 ? source.length : end + 2;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      const start = index;
+      index += 1;
+      while (index < source.length) {
+        if (source[index] === '\\') {
+          index += 2;
+          continue;
+        }
+        if (source[index] === char) {
+          index += 1;
+          break;
+        }
+        // An unterminated quote (a stray apostrophe) ends at the newline rather
+        // than swallowing the rest of the file — templates may span lines.
+        if (char !== '`' && source[index] === '\n') break;
+        index += 1;
+      }
+      result += source.slice(start, index);
+      continue;
+    }
+
+    if (char === '\\') {
+      result += source.slice(index, index + 2);
+      index += 2;
+      continue;
+    }
+
+    result += char;
+    index += 1;
+  }
+
+  return result;
 }
 
 // Map a package subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its module-root-relative file.
@@ -244,7 +302,9 @@ function resolveNeededFiles(name, packageRoot, seeds) {
     }
     needed.add(relative);
 
-    const contents = jetpack.read(abs) || '';
+    // Comments never register as dependencies (#354) — the file is COPIED
+    // verbatim, only the scan reads the stripped text.
+    const contents = stripComments(jetpack.read(abs) || '');
     for (const pattern of RELATIVE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         let dep = path.join(path.dirname(relative), match[2]).split(path.sep).join('/');
@@ -331,7 +391,10 @@ function vendorPackages(options) {
   };
 
   // 1. Scan dist for @omega.js references: which files need rewriting, which
-  // modules of which packages are used.
+  // modules of which packages are used. RAW on purpose (no stripComments):
+  // step 4's rewrite and CI's self-containment grep both read raw text, so a
+  // comment-only reference must still land in filesToRewrite or it would ship
+  // unrewritten and fail the CI gate.
   const seedsByPackage = new Map();
   const filesToRewrite = [];
   findHostJsFiles(distPath, vendorRoot).forEach((abs) => {

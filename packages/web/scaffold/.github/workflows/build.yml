@@ -79,6 +79,18 @@ jobs:
           restore-keys: |
             omega-imagemin-
 
+      # Base path (#358): a Pages PROJECT site serves under `/<repo>/`, a
+      # custom domain (brand.url → CNAME) at the domain root — and everything
+      # the build emits is root-relative, so the build has to be told. Derived
+      # by the SAME function `omega deploy --direct` uses, off the config in
+      # this checkout (GITHUB_REPOSITORY names the repo when it carries no
+      # slug); an explicitly set OMEGA_PATH_PREFIX wins and passes through.
+      - name: Resolve base path
+        run: |
+          PREFIX="$(node -p "require('@omega.js/web/deploy').appPathPrefix()")"
+          echo "Base path: $PREFIX"
+          echo "OMEGA_PATH_PREFIX=$PREFIX" >> "$GITHUB_ENV"
+
       - name: Build
         run: |
           npx omega setup && npm run build

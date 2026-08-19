@@ -1,5 +1,6 @@
 // Libraries
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // Module
 export default () => {
@@ -83,7 +84,7 @@ function showSuccess() {
 
   // Redirect to account page after delay
   setTimeout(() => {
-    window.location.href = '/dashboard/account#connections';
+    window.location.href = siteUrl('/dashboard/account#connections');
   }, 500);
 }
 
@@ -102,5 +103,5 @@ function showError(message) {
   $errorMessage.textContent = message;
 
   // Default return URL
-  $returnButton.href = '/dashboard/account#connections';
+  $returnButton.href = siteUrl('/dashboard/account#connections');
 }

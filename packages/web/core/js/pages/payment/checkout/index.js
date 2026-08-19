@@ -7,6 +7,7 @@ import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 /* @dev-only:start */
@@ -258,7 +259,7 @@ function setupForm() {
   const $switchAccountLink = document.getElementById('switch-account');
   if ($switchAccountLink) {
     const currentUrl = encodeURIComponent(window.location.href);
-    $switchAccountLink.href = `/signin?authSignout=true&authReturnUrl=${currentUrl}`;
+    $switchAccountLink.href = siteUrl(`/signin?authSignout=true&authReturnUrl=${currentUrl}`);
   }
 
   // Help button

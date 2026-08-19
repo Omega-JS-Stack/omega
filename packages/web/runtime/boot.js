@@ -20,6 +20,10 @@
 import omega from '@omega.js/client';
 import { createIconRenderer } from '@omega.js/client/modules/icon-renderer.js';
 import { Manager } from './manager.js';
+// Relative, not the __main_assets__ alias: this runtime is bundled by every
+// esbuild pass, and a package-root-relative path resolves the same in the
+// monorepo and in a published install (both ship runtime/ and core/).
+import { siteUrl } from '../core/js/libs/path-prefix.js';
 
 let context = null;
 let ready = null;
@@ -51,7 +55,7 @@ async function initialize() {
   // the brand's Pro chain + free floor). Static fa-* markup and classes
   // set or changed via JS both render; only used icons ever transfer.
   createIconRenderer({
-    resolve: (name, style) => fetch(`/assets/fa/${style}/${name}.svg`)
+    resolve: (name, style) => fetch(siteUrl(`/assets/fa/${style}/${name}.svg`))
       .then((response) => (response.ok ? response.text() : null)),
   }).start(document);
 

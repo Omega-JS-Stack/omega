@@ -38,6 +38,7 @@
     "./test/e2e-harness": "./src/test/e2e-harness.js",
     "./test/steps-log": "./src/test/steps-log.js",
     "./test/journey-harness": "./src/test/journey-harness.js",
+    "./test/stdout-guard": "./src/test/stdout-guard.js",
     "./vendor": "./tools/vendor.js",
     "./prepare-guard": "./tools/prepare-guard.js",
     "./omega-bin": "./src/omega-bin.js"

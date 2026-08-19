@@ -103,6 +103,7 @@ see the harness README for the honest before/after numbers.
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
 | [overrides.js](src/overrides.js) | The layered override map (#94): `buildOverrideMap()` — every shadowable section/include/css/page with its owning layer and the consumer's shadows, read out of the SAME layer chains the build resolves through (`collectProviders`), and `materializeOverride()` — one file copied to its shadow path with a provenance header. The css lane lists ONLY what sass layers by — `main.scss` and the page sheets (`isPageEntry`, base bucket) — never the partials a bare relative `@use` resolves against the importing file, which a consumer copy could never win |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass (content scan = `dist/**/*.html` + `dist/**/*.js`, so classes that live only in JS-built markup survive — #66) |
+| [path-prefix.js](src/path-prefix.js) | Base-path support (#355): `resolvePathPrefix()` normalizes the publisher's `OMEGA_PATH_PREFIX`, and the emit lanes mount root-relative URLs under it — `prefixHtml()` (the engine's `omega-path-prefix` transform: href/src/srcset/action plus the `<html data-omega-path-prefix>` stamp the browser half reads) and `prefixCss()` (the theme sheets' `url()` targets). Unset = no pass runs |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — the build manifest at `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`, the `/status` page shows the rest: theme, package versions, repo, commit) |
 | [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
@@ -216,6 +217,48 @@ full shape explicitly. Serving: the dev server's `devCleanUrls` middleware
 resolves `/signin` (and a stray `/signin/`) to `signin.html` — the legacy
 serve.js contract — and GitHub Pages resolves extensionless paths against
 `.html` files natively, so production behaves identically.
+
+## Serving under a URL path (`OMEGA_PATH_PREFIX`)
+
+Everything a build emits is root-relative, so a site mounted under a URL path
+instead of a domain root — a GitHub Pages **project** site at
+`https://<user>.github.io/<repo>/` — would ask the domain root for its assets
+and 404. Set `OMEGA_PATH_PREFIX` around `omega build` and every emitted URL
+moves under it:
+
+```bash
+OMEGA_PATH_PREFIX=/workkit npx omega build
+```
+
+The value is a **publisher** input, not an end-user one: whatever machinery
+publishes the site knows its mount point (workkit's publish reads it off the
+Pages API), and hosts that serve at the domain root — Netlify, Vercel, a custom
+domain — pass nothing. It is normalized defensively (leading slash added,
+trailing slash stripped); `/` and unset both mean the domain root, and then no
+pass runs at all, so the output is byte-for-byte what it has always been.
+
+**`omega deploy` fills it for you** ([#358](../../issues/358)), so an ordinary
+gh-pages brand never types the variable: `brand.url` set means the site serves
+at that domain's root (the CNAME both lanes publish cannot carry a path) → `/`;
+`brand.url` unset means the default project address
+`https://<owner>.github.io/<name>/` → `/<name>/`, from the same repo slug the
+deploy plan resolves. `--direct` sets it around the build it runs itself; the
+scaffolded CI workflow derives it remotely through the same function
+(`@omega.js/web/deploy`'s `appPathPrefix()`, with `GITHUB_REPOSITORY` naming
+the repo when the config carries no slug). An explicitly exported value always
+wins, and `omega dev` / a bare `omega build` stay at the root.
+
+Three lanes carry it ([path-prefix.js](src/path-prefix.js)): the rendered HTML
+(`href`/`src`/`srcset`/`action`, which covers asset URLs, favicons, config-sourced
+brand images and every internal link), the emitted CSS (`url()` targets — the
+theme sheets' `@font-face` sources), and the runtime, which reads the value off
+`<html data-omega-path-prefix>` through `core/js/libs/path-prefix.js` rather
+than baking it into a bundle. Page IDENTITY stays site-relative:
+`data-page-path` is the route, which is what the client's route checks compare
+against. `omega dev` serves at the root and never sets one. ABSOLUTE URLs
+(canonical, `og:url`, the sitemap) are built from `brand.url`, which for a
+project site already carries the path — nothing prefixes them twice. Pinned by
+`test/path-prefix.test.js`.
 
 ## Service worker (dev AND production)
 

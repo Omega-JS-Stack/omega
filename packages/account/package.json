@@ -11,7 +11,10 @@
     "./subscription": "./src/subscription.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@omega.js/devkit": "*"
   },
   "engines": {
     "node": ">=22"

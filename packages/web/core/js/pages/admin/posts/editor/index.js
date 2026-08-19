@@ -12,6 +12,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
 let formManager = null;
@@ -221,7 +222,7 @@ function showSuccess(response, payload) {
   }
 
   if ($view) {
-    $view.href = editUrl || `/blog/${payload.url}`;
+    $view.href = editUrl || siteUrl(`/blog/${payload.url}`);
   }
 
   if ($formCard) $formCard.classList.add('d-none');

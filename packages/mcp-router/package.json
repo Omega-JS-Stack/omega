@@ -15,11 +15,14 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@omega.js/devkit": "*"
   },
   "engines": {
     "node": ">=22"

@@ -8,6 +8,7 @@ import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { loadCharts, barChart, doughnutChart } from '__main_assets__/js/libs/charts.js';
 import omega from '@omega.js/client';
+import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // The plan doughnut paints STATUS hues, not the categorical ramp (#74, Ian's
 // triage call): the slices mean healthy/attention/trouble, and the ramp would
@@ -302,7 +303,7 @@ async function loadContent() {
   const $footer = document.getElementById('content-footer');
   const escape = omega.utilities().escapeHTML;
 
-  const response = await fetch('/feeds/posts.json', { cache: 'no-store' });
+  const response = await fetch(siteUrl('/feeds/posts.json'), { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Feed returned ${response.status}`);
   }
@@ -327,7 +328,7 @@ async function loadContent() {
       const url = item.url || item.id || '';
       const pathname = url ? new URL(url, window.location.origin).pathname : '';
       const published = item.date_published ? formatTimeAgo(new Date(item.date_published).getTime()) : '';
-      const editorHref = `/admin/posts/editor?post=${encodeURIComponent(url)}`;
+      const editorHref = siteUrl(`/admin/posts/editor?post=${encodeURIComponent(url)}`);
 
       return `
         <div class="omega-activity__row align-items-center">
