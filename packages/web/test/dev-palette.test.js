@@ -430,6 +430,19 @@ test('#234: reopening the panel does not stack a second copy of a section', asyn
   assert.strictEqual(copies.length, 1, 'rendering is idempotent — the panel opens as often as you like');
 });
 
+test('#375: the persona dropdown draws its own chevron, clear of the right edge', () => {
+  // The native select arrow hugs the control's edge — every other dropdown on
+  // the page draws its own. appearance: none suppresses the OS arrow; the
+  // inline chevron sits in from the edge, and the right padding clears it.
+  const source = fs.readFileSync(path.join(PALETTE_DIR, 'dev-palette.js'), 'utf8');
+  const rule = source.match(/\.omega-devbar__select \{[^}]*\}/)[0];
+
+  assert.match(rule, /appearance: none;/, 'the OS arrow is suppressed');
+  assert.match(rule, /background-image: url\("data:image\/svg\+xml/, 'a drawn chevron replaces it');
+  assert.match(rule, /background-position: right 0\.5rem center;/, 'sitting in from the edge');
+  assert.match(rule, /padding: 0\.3125rem 1\.75rem 0\.3125rem 0\.5rem;/, 'with right padding clearing it');
+});
+
 test('#234: a section without an id or a builder is a programmer error, loudly', async () => {
   const { register } = await boot();
 

@@ -863,7 +863,7 @@ module.exports = {
     {
       name: 'call-user-signup-with-affiliate',
       async run({ http, assert, state }) {
-        const response = await http.as('referred').command('user:sign-up', {
+        const response = await http.as('signup-referred').command('user:sign-up', {
           attribution: { affiliate: { code: 'TESTREF' } },
         });
         assert.isSuccess(response);

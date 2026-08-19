@@ -228,13 +228,13 @@
         // carries a 14-day trial that defers the first sale two weeks. A
         // proof press is the machine printers pull test prints on — the QA
         // tier in Paperloom's own voice. Recipe:
-        // packages/backend/docs/paypal-sandbox-qa.md. hidden: true keeps it
-        // off the pricing page (#348) while the walk still creates its
-        // processor objects — the drives buy it by id.
+        // packages/backend/docs/paypal-sandbox-qa.md. Deliberately VISIBLE on
+        // the pricing page (Ian 2026-08-19, #348): real checkouts run against
+        // it by hand. The hidden: true mechanism still exists for products
+        // that should stay off /pricing.
         id: "proof-press",
         name: "Proof Press",
         type: "subscription",
-        hidden: true,
         tagline: "test prints, pulled immediately",
         limits: { requests: 1 },
         prices: { monthly: 5.00 },
@@ -295,6 +295,10 @@
     chat: {
       providers: {
         chatsy: {
+          // Deliberately ON in the playground (Ian 2026-08-19): the widget must
+          // be seeable in local QA. The client boots it only when enabled AND
+          // an agentId are both set.
+          enabled: true,
           templateAgentId: "8YIsRlzAAiv03d",
           agentId: "KJT3xUjlQQVuaC",
         },

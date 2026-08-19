@@ -2,15 +2,30 @@
 layout: frontend/core/cover
 
 # ═══ Checkout — the classy redesign (round 18). The commitment moment now
-# sits on real surfaces: serif display header, the left column as three
-# hairline PANELS (plan, account, payment) each led by an icon chip, and the
-# order summary as a receipt CARD on the right (product identity, discount,
-# then the money rows in the shared receipt vocabulary). Reveals stagger the
-# zones in; every color is a token, both modes.
-# The mobile one-screen contract (cp179) is kept: Plan and Account collapse
-# to one-line rows showing the bound selection, the price rows are ALWAYS
-# visible (Ian: never fold the numbers), wallet buttons pair up two-across,
-# and the pay buttons stay above the fold.
+# sits on real surfaces: the left column as two hairline PANELS (plan,
+# account) each led by an icon chip, then the pay zone BARE beneath them, and
+# the order summary as a receipt CARD on the right (product identity,
+# discount, then the money rows in the shared receipt vocabulary). Reveals
+# stagger the zones in; every color is a token, both modes.
+# The pay buttons live OUTSIDE any card and under NO head, both viewports
+# (Ian 2026-08-19, #374): the commitment moment is the one zone with no chrome
+# around it, and a "Payment" label over a Credit/Debit button and a PayPal mark
+# names nothing the buttons do not already say. The trust chips AND the help
+# line ride the buttons' own capture, centered right under the terms line — the
+# page foot below the form is empty.
+# The HEADER is one brand lockup and nothing else (#373): the brandmark and
+# the brand name on one line, left, linking home, and it is the page's h1.
+# A checkout page is got THROUGH, not read — an eyebrow, a serif display
+# title and a second copy of the mark were three voices for a page that
+# needs one. It reads its brand facts from config; never type them here.
+# The mobile one-screen contract (cp179) is DELIBERATE and stays (Ian
+# 2026-08-19, #370): EVERY card collapses to a one-line row showing the value
+# it hides, so the pay buttons sit above the fold. Billing cycle and Account
+# start closed; the Order summary starts OPEN, and its folded row carries the
+# total due today (the old "never fold the numbers" note is retired). What the
+# phone must NOT have is its own vocabulary — the rows are labeled with
+# desktop's words ("Billing cycle", "Account", "Order summary"), and the pay
+# buttons are one width and one height on every viewport.
 # Every payment-engine hook is preserved verbatim: #checkout-form,
 # name="frequency" radios, data-payment-method/data-action buttons,
 # #discount-code, #apply-discount, #switch-account, #checkout-help-button,
@@ -28,7 +43,13 @@ client:
     enabled: false
 ---
 
-<!-- Capture payment buttons content to reuse in both desktop and mobile layouts -->
+<!-- The pay buttons captured once and rendered by both column positions (the
+     phone puts payment after the summary), so neither viewport carries its own
+     copy of this markup — and both stack them the same way: one full-width
+     column, one height per button (#370). The capture is the WHOLE commitment
+     block (#374): buttons, terms, trust chips, help line — every one of them
+     centered, so the assurance always sits directly under the buttons and the
+     two viewports can never drift apart. -->
 {% capture payment_buttons_content %}
   <!-- Credit/Debit Card Button -->
   <button type="submit" class="btn btn-adaptive payment-button d-flex align-items-center justify-content-center"
@@ -88,6 +109,31 @@ client:
   <p class="omega-checkout__terms small mb-0">
     By purchasing, you agree to our <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.
   </p>
+
+  <!-- Trust chips — centered inside the pay stack, right under the terms line,
+       both viewports (Ian 2026-08-19, #374): at the page foot they were a
+       footnote two zones away from the thing they reassure. The refund chip
+       rides the brand's `pricing.guarantee` gate (#273); the other two state
+       facts the framework owns. No "Encrypted" chip joins them — "SSL
+       encrypted" already says it, with the same lock. The gap above is the
+       sheet's, not a utility: one home for the pay stack's rhythm. -->
+  <div class="omega-checkout__trust">
+    <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
+    {% iftruthy resolved.pricing.guarantee %}
+      <span>{% omega_icon "shield-halved", "fa-xs" %} Money-back guarantee</span>
+    {% endiftruthy %}
+    <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
+  </div>
+
+  <!-- Help — the stack's last line, in the stack (Ian 2026-08-19, #374): the
+       one line a stalled buyer reaches for belongs where the stall happens, not
+       at a page foot below the form. Its rhythm is the sheet's too, so the
+       capture carries no utility margins to drift between viewports. -->
+  <div class="omega-checkout__help">
+    <a href="javascript:;" class="omega-checkout__quiet-link small" id="checkout-help-button">
+      {% omega_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
+    </a>
+  </div>
 {% endcapture %}
 
 <!-- Error Message Container (hidden by default, shown via bindings) -->
@@ -111,18 +157,17 @@ client:
 
 <!-- Checkout Section (visible by default, hidden only when error is shown) -->
 <section id="checkout-content" class="col-12 col-xl-10 omega-checkout" data-omega-bind="@hide checkout.error.show">
-  <!-- Header: the serif moment left, small brand right (cover pages carry no nav) -->
+  <!-- Header: ONE brand lockup, left, and nothing else (#373 — Shopify's
+       checkout leads with the store's mark). It is the page's h1, so it links
+       home and reads its facts from config; the right of the row stays empty.
+       Cover pages carry no nav, which is why the mark lives here at all. -->
   <header class="omega-checkout__head" data-omega-reveal="fade">
-    <div class="omega-checkout__head-title">
-      <span class="omega-micro d-block mb-1">Secure checkout</span>
-      <h1 class="omega-display omega-display--section mb-0">Complete your <em>order</em></h1>
-    </div>
-    <div class="d-flex align-items-center gap-3">
+    <h1 class="omega-checkout__head-mark mb-0">
       <a href="/" class="omega-checkout__brand">
         <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} logo" width="24" height="24">
-        <span class="fw-semibold d-none d-sm-inline">{{ site.brand.name }}</span>
+        <span class="fw-semibold">{{ site.brand.name }}</span>
       </a>
-    </div>
+    </h1>
   </header>
 
   <!-- Main Checkout Form -->
@@ -132,10 +177,13 @@ client:
       <div class="col-12 col-lg-7 order-1">
         <!-- Plan panel (subscriptions only) -->
         <div class="omega-checkout__panel" data-omega-reveal data-omega-bind="@show checkout.product.isSubscription">
-          <!-- Mobile: collapsed one-line row showing the current selection -->
+          <!-- Mobile: collapsed one-line row showing the current selection. The
+               row IS the panel's title on phones, so it is labeled with the
+               word desktop uses — "Billing cycle", never a phone-only "Plan"
+               (#370): one vocabulary, both viewports. -->
           <button class="omega-checkout__rowtoggle d-lg-none collapsed" type="button"
                   data-bs-toggle="collapse" data-bs-target="#collapse-billing" aria-expanded="false">
-            <span class="omega-micro">Plan</span>
+            <span class="omega-micro">Billing cycle</span>
             <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@show checkout">
               <span data-omega-bind="@text checkout.product.name">--</span> &middot; <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
             </span>
@@ -255,28 +303,31 @@ client:
           </button>
 
           <div id="collapse-account" class="collapse d-lg-block">
-            <div class="omega-panel-head omega-checkout__panel-head">
-              <h2 class="omega-checkout__panel-title d-none d-lg-flex mb-0">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "user", "fa-sm" %}</span>
-                Account
-              </h2>
-              <a href="#" id="switch-account" class="omega-checkout__quiet-link small ms-auto">Switch account</a>
+            <!-- The expanded content is ONE block: the head is desktop's title
+                 row, and on phones (where that title is the row above) the CSS
+                 orders the switch link under the "Paying as" line rather than
+                 leaving it floating alone over a gap (#370). -->
+            <div class="omega-checkout__account-block">
+              <div class="omega-panel-head omega-checkout__panel-head">
+                <h2 class="omega-checkout__panel-title d-none d-lg-flex mb-0">
+                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "user", "fa-sm" %}</span>
+                  Account
+                </h2>
+                <a href="#" id="switch-account" class="omega-checkout__quiet-link small">Switch account</a>
+              </div>
+              <p class="mb-0 omega-binding-skeleton omega-checkout__account" data-omega-bind="@show checkout">
+                Paying as <strong data-omega-bind="@text auth.user.email">loading@example.com</strong>
+              </p>
             </div>
-            <p class="mb-0 omega-binding-skeleton omega-checkout__account" data-omega-bind="@show checkout">
-              Paying as <strong data-omega-bind="@text auth.user.email">loading@example.com</strong>
-            </p>
           </div>
         </div>
 
-        <!-- Payment panel (Desktop only - duplicate for layout) -->
-        <div class="omega-checkout__panel d-none d-lg-block" data-omega-reveal>
-          <div class="omega-panel-head omega-checkout__panel-head">
-            <h2 class="omega-checkout__panel-title mb-0">
-              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "credit-card", "fa-sm" %}</span>
-              Payment
-            </h2>
-            <span class="omega-quiet small">{% omega_icon "lock", "fa-xs me-1" %}Encrypted</span>
-          </div>
+        <!-- Pay zone (desktop only — the phone's copy sits after the summary).
+             NOT a card and NOT headed (#374): the buttons sit in open space
+             with nothing labeling them, on this viewport exactly like the
+             phone's. The reveal rides this wrapper, so the whole stack inside
+             it — buttons, terms, chips, help — animates in as one zone (#326). -->
+        <div class="omega-checkout__pay d-none d-lg-block" data-omega-reveal>
           <div class="d-grid gap-2 omega-binding-skeleton" data-omega-bind="@show checkout.paymentMethods">
             {{ payment_buttons_content }}
           </div>
@@ -287,108 +338,107 @@ client:
       <div class="col-12 col-lg-5 order-2">
         <div class="omega-checkout__sticky">
           <div class="omega-checkout__summary" data-omega-reveal>
-            <div class="omega-panel-head omega-checkout__panel-head d-none d-lg-flex">
-              <h2 class="omega-checkout__panel-title mb-0">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "receipt", "fa-sm" %}</span>
-                Order summary
-              </h2>
+            <!-- Mobile: the summary folds like the two rows above it (#370 —
+                 parity across all cards), with one difference: it starts OPEN,
+                 so the numbers are still what the phone lands on. Folded, the
+                 row keeps the total due today on screen. -->
+            <button class="omega-checkout__rowtoggle d-lg-none" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#collapse-summary" aria-expanded="true">
+              <span class="omega-micro">Order summary</span>
+              <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text checkout.pricing.total">$--</span>
+              {% omega_icon "chevron-down", "fa-xs omega-checkout__rowtoggle-chev" %}
+            </button>
+
+            <div id="collapse-summary" class="collapse show d-lg-block">
+              <div class="omega-panel-head omega-checkout__panel-head d-none d-lg-flex">
+                <h2 class="omega-checkout__panel-title mb-0">
+                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "receipt", "fa-sm" %}</span>
+                  Order summary
+                </h2>
+              </div>
+
+              <!-- Product identity: what you get, on what cadence -->
+              <div class="omega-checkout__product omega-binding-skeleton" data-omega-bind="@show checkout">
+                <span class="omega-checkout__product-name">{{ site.brand.name }} <span data-omega-bind="@text checkout.product.name">Loading...</span></span>
+                <span class="omega-quiet small" data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
+              </div>
+
+              <!-- Discount Code -->
+              <div class="omega-checkout__discount-zone omega-binding-skeleton" data-omega-bind="@show checkout">
+                <!-- The label sits OUTSIDE the input-group on purpose: Bootstrap
+                     rounds a group by child position, so a label as first child
+                     made the input `:not(:first-child)` and squared its left
+                     corners (and pulled it -1px left). It keeps the group's show
+                     binding so the two still appear and hide together. -->
+                <label for="discount-code" class="visually-hidden" data-omega-bind="@show checkout" hidden>Discount code</label>
+                <div class="input-group omega-checkout__discount" data-omega-bind="@show checkout" hidden>
+                  <input type="text" class="form-control" id="discount-code" name="discount" placeholder="Discount code" autocomplete="off">
+                  <button class="btn btn-outline-adaptive px-3" type="button" id="apply-discount" data-action="apply-discount">Apply</button>
+                </div>
+
+                <!-- Discount Messages -->
+                <div class="mt-2 omega-quiet small" data-omega-bind="@show checkout.discount.loading" hidden>
+                  {% omega_icon "clock", "me-1" %} Checking code...
+                </div>
+                <div class="mt-2 omega-checkout__row-ok small" data-omega-bind="@show checkout.discount.success" hidden>
+                  {% omega_icon "check-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
+                </div>
+                <div class="mt-2 omega-checkout__row-bad small" data-omega-bind="@show checkout.discount.error" hidden>
+                  {% omega_icon "times-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
+                </div>
+              </div>
+
+              <!-- Price detail — the folded row states the total, so opening the
+                   summary is what reveals subtotal, discount and trial credit -->
+              <div class="omega-receipt__panel">
+                <div class="omega-receipt__row omega-binding-skeleton" data-omega-bind="@show checkout">
+                  <span class="omega-micro">Subtotal</span>
+                  <span data-omega-bind="@text checkout.pricing.subtotal">$--</span>
+                </div>
+
+                <div class="omega-receipt__row omega-checkout__row-ok"
+                     data-omega-bind="@show checkout.discount.hasDiscount"
+                     hidden>
+                  <span class="omega-micro">Discount (<span data-omega-bind="@text checkout.discount.label"></span>)</span>
+                  <span>-$<span data-omega-bind="@text checkout.discount.amount"></span></span>
+                </div>
+
+                <div class="omega-receipt__row omega-checkout__row-ok"
+                     data-omega-bind="@show checkout.trial.hasFreeTrial"
+                     hidden>
+                  <span class="omega-micro">Free trial</span>
+                  <span>-$<span data-omega-bind="@text checkout.trial.discountAmount"></span></span>
+                </div>
+
+                <div class="omega-receipt__row omega-receipt__row--total omega-binding-skeleton" data-omega-bind="@show checkout">
+                  <span class="omega-micro">Total due today</span>
+                  <span class="omega-receipt__total" data-omega-bind="@text checkout.pricing.total">$--</span>
+                </div>
+              </div>
+
+              <!-- Subscription Terms -->
+              <p class="omega-checkout__fineprint small mb-0"
+                 data-omega-bind="@show checkout.pricing.showTerms"
+                 hidden>
+                <span data-omega-bind="@text checkout.pricing.termsText"></span>
+              </p>
             </div>
-
-            <!-- Product identity: what you get, on what cadence -->
-            <div class="omega-checkout__product omega-binding-skeleton" data-omega-bind="@show checkout">
-              <span class="omega-checkout__product-name">{{ site.brand.name }} <span data-omega-bind="@text checkout.product.name">Loading...</span></span>
-              <span class="omega-quiet small" data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
-            </div>
-
-            <!-- Discount Code -->
-            <div class="omega-checkout__discount-zone omega-binding-skeleton" data-omega-bind="@show checkout">
-              <!-- The label sits OUTSIDE the input-group on purpose: Bootstrap
-                   rounds a group by child position, so a label as first child
-                   made the input `:not(:first-child)` and squared its left
-                   corners (and pulled it -1px left). It keeps the group's show
-                   binding so the two still appear and hide together. -->
-              <label for="discount-code" class="visually-hidden" data-omega-bind="@show checkout" hidden>Discount code</label>
-              <div class="input-group omega-checkout__discount" data-omega-bind="@show checkout" hidden>
-                <input type="text" class="form-control" id="discount-code" name="discount" placeholder="Discount code" autocomplete="off">
-                <button class="btn btn-outline-adaptive px-3" type="button" id="apply-discount" data-action="apply-discount">Apply</button>
-              </div>
-
-              <!-- Discount Messages -->
-              <div class="mt-2 omega-quiet small" data-omega-bind="@show checkout.discount.loading" hidden>
-                {% omega_icon "clock", "me-1" %} Checking code...
-              </div>
-              <div class="mt-2 omega-checkout__row-ok small" data-omega-bind="@show checkout.discount.success" hidden>
-                {% omega_icon "check-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
-              </div>
-              <div class="mt-2 omega-checkout__row-bad small" data-omega-bind="@show checkout.discount.error" hidden>
-                {% omega_icon "times-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
-              </div>
-            </div>
-
-            <!-- Price detail — always visible (Ian: never fold the numbers); mobile compacts it -->
-            <div class="omega-receipt__panel">
-              <div class="omega-receipt__row omega-binding-skeleton" data-omega-bind="@show checkout">
-                <span class="omega-micro">Subtotal</span>
-                <span data-omega-bind="@text checkout.pricing.subtotal">$--</span>
-              </div>
-
-              <div class="omega-receipt__row omega-checkout__row-ok"
-                   data-omega-bind="@show checkout.discount.hasDiscount"
-                   hidden>
-                <span class="omega-micro">Discount (<span data-omega-bind="@text checkout.discount.label"></span>)</span>
-                <span>-$<span data-omega-bind="@text checkout.discount.amount"></span></span>
-              </div>
-
-              <div class="omega-receipt__row omega-checkout__row-ok"
-                   data-omega-bind="@show checkout.trial.hasFreeTrial"
-                   hidden>
-                <span class="omega-micro">Free trial</span>
-                <span>-$<span data-omega-bind="@text checkout.trial.discountAmount"></span></span>
-              </div>
-
-              <div class="omega-receipt__row omega-receipt__row--total omega-binding-skeleton" data-omega-bind="@show checkout">
-                <span class="omega-micro">Total due today</span>
-                <span class="omega-receipt__total" data-omega-bind="@text checkout.pricing.total">$--</span>
-              </div>
-            </div>
-
-            <!-- Subscription Terms -->
-            <p class="omega-checkout__fineprint small mb-0"
-               data-omega-bind="@show checkout.pricing.showTerms"
-               hidden>
-              <span data-omega-bind="@text checkout.pricing.termsText"></span>
-            </p>
           </div>
         </div>
       </div>
 
-      <!-- Zone 3: Payment (Mobile only — no heading, wallets pair up two-across) -->
+      <!-- Zone 3: Payment (mobile only — headless and out of any card, exactly
+           like desktop's (#374), and the SAME full-width stack desktop
+           renders: one width, one height, every button) -->
       <div class="col-12 order-3 d-lg-none">
-        <div class="omega-checkout__panel omega-checkout__panel--mobile-pay">
-          <div class="omega-checkout__paybuttons omega-binding-skeleton" data-omega-bind="@show checkout.paymentMethods">
+        <div class="omega-checkout__pay">
+          <div class="d-grid gap-2 omega-binding-skeleton" data-omega-bind="@show checkout.paymentMethods">
             {{ payment_buttons_content }}
           </div>
         </div>
       </div>
     </div>
   </form>
-
-  <!-- Trust foot + help — one quiet line each, shared by both breakpoints.
-       The refund chip rides the brand's `pricing.guarantee` gate (#273); the
-       other two state facts the framework owns. Both reveal in like every zone
-       above them (#326) — they were the page's only static block. -->
-  <div class="omega-checkout__trust mt-3 mt-lg-4" data-omega-reveal>
-    <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
-    {% iftruthy resolved.pricing.guarantee %}
-      <span>{% omega_icon "shield-halved", "fa-xs" %} Money-back guarantee</span>
-    {% endiftruthy %}
-    <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
-  </div>
-  <div class="text-center mt-1 mt-lg-3" data-omega-reveal>
-    <a href="javascript:;" class="omega-checkout__quiet-link small" id="checkout-help-button">
-      {% omega_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
-    </a>
-  </div>
 </section>
 
 {{ content | omega_content_format }}

@@ -100,16 +100,17 @@
     font-size: 0.78125rem;
 
     a {
-      color: var(--omega-ink-muted);
+      color: var(--omega-accent);
       text-decoration: none;
 
       &:hover {
-        color: var(--omega-ink);
+        color: var(--omega-accent-hover);
       }
     }
   }
 
-  // Framework attribution — same quiet scale as the copyright beside it
+  // Framework attribution — same quiet scale as the copyright beside it,
+  // but the bolt and link carry the brand primary (#379)
   .omega-footer__powered {
     display: inline-flex;
     align-items: center;
@@ -117,14 +118,18 @@
     color: var(--omega-ink-faint);
     font-size: 0.78125rem;
 
+    .fa {
+      color: var(--omega-accent);
+    }
+
     a {
-      color: var(--omega-ink-muted);
+      color: var(--omega-accent);
       text-decoration: none;
       transition: color var(--omega-speed) var(--omega-ease);
 
       &:hover,
       &:focus-visible {
-        color: var(--omega-ink);
+        color: var(--omega-accent-hover);
       }
     }
   }

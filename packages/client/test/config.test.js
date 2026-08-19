@@ -55,6 +55,19 @@ describe('Configuration & Initialization', () => {
     assert.strictEqual(Manager.config.auth?.enabled, true);
   });
 
+  it('#377: a nulled settings blob is omitted from the Chatsy options', () => {
+    // The web build's public config filter inlines `settings: null` for brands
+    // that set no widget settings, and that null survives the merge. Forwarding
+    // it into the chatsy package crashed its constructor (reading 'button' of
+    // null), so the widget silently never booted.
+    const Manager = getManager();
+    assert.deepStrictEqual(Manager._chatsyOptions({ settings: null }), {});
+    assert.deepStrictEqual(
+      Manager._chatsyOptions({ settings: { button: { icon: 'default' } } }),
+      { settings: { button: { icon: 'default' } } },
+    );
+  });
+
   it('should skip Firebase when the nested config has only empty values (framework merge artifact)', async () => {
     const Manager = getManager();
 

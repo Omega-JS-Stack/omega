@@ -201,21 +201,34 @@ hr {
     border-top-color: color-mix(in srgb, var(--nf-panel-color) 18%, transparent);
   }
 
+  // Muted TEXT via color-mix (not span opacity) so the volt bolt/links
+  // inside stay full-strength (#379)
   .omega-footer__copyright {
-    color: var(--nf-panel-color);
-    opacity: 0.6;
-  }
-
-  .omega-footer__powered {
-    color: var(--nf-panel-color);
-    opacity: 0.6;
+    color: color-mix(in srgb, var(--nf-panel-color) 60%, transparent);
 
     a {
-      color: var(--nf-panel-color);
+      color: var(--nf-volt);
 
       &:hover,
       &:focus-visible {
-        color: var(--nf-volt);
+        color: var(--nf-panel-color);
+      }
+    }
+  }
+
+  .omega-footer__powered {
+    color: color-mix(in srgb, var(--nf-panel-color) 60%, transparent);
+
+    .fa {
+      color: var(--nf-volt);
+    }
+
+    a {
+      color: var(--nf-volt);
+
+      &:hover,
+      &:focus-visible {
+        color: var(--nf-panel-color);
       }
     }
   }

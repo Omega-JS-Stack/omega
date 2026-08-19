@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#376](../../issues/376) — The playground brand runs the Chatsy widget: the config flips `inbound.chat.providers.chatsy.enabled` beside its agent id, so local QA can see the bubble, open the panel, and drive it from the checkout help link.
+
+### Changed
+- [#369](../../issues/369) — Seeded personas are single-purpose: personas carry bare role names (`referrer`, `referred`) and lane rigs carry their lane prefix (`signup-referred`, `signup-referred-invalid`, `signup-referred-disposable`), so each account demonstrates exactly one scenario.
+- [#372](../../issues/372) — A payment event the pipeline refuses to act on is flagged as `refusal` on the event doc itself, cleared on a reprocess that succeeds. The separate `payments-anomalies` collection is gone; nothing piles up beside the event.
+- [#373](../../issues/373) — The checkout header is the brand lockup (mark plus name) linking home, matching the rest of the site's chrome instead of a bare page title.
+- [#374](../../issues/374) — Checkout's pay stack lives bare on the page, no card and no head row: buttons, then the terms line, then the trust chips, then the help link, all centered, on both viewports. The help link opens the chat widget.
+- [#379](../../issues/379) — The footer attribution carries the brand primary: the bolt, the omegajs.dev link, and the parent-company link render in the accent in both themes and both color modes.
+
+### Removed
+- [#371](../../issues/371) — The stale per-package CHANGELOG.md files are deleted; this root file is the one log, and package tarballs stopped shipping a changelog that recorded nothing real.
+
+### Fixed
+- [#370](../../issues/370) — Mobile checkout's folding layout renders cleanly again: the accordion stays (one-screen fit outranks title parity with desktop), with its layout defects fixed in place.
+- [#375](../../issues/375) — The dev palette's persona dropdown draws its own chevron clear of the right edge (`appearance: none` plus an inline svg), instead of the browser default arrow crammed against the border.
+- [#377](../../issues/377) — Chatsy boots even when a brand sets no widget settings: the client omits a nulled `settings` blob instead of forwarding it into the widget constructor, which crashed reading `button` of null and silently killed the widget.
+- [#378](../../issues/378) — A framework package rebuild now reaches a RUNNING brand site: the dev server watches the resolved `@omega.js/client` dist and survives a prepare's delete-and-recreate by re-arming onto the new directory. No more silent stale serving until a stack restart.
+
 ## [0.40.0] 2026-08-19
 
 ### Changed

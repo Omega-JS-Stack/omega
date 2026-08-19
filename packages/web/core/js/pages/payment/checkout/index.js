@@ -262,14 +262,14 @@ function setupForm() {
     $switchAccountLink.href = siteUrl(`/signin?authSignout=true&authReturnUrl=${currentUrl}`);
   }
 
-  // Help button
-  const $helpButton = document.getElementById('checkout-help-button');
-  if ($helpButton) {
+  // Help button — the pay-stack capture renders once per viewport (#374), so
+  // the id appears twice and getElementById would leave the phone copy dead.
+  document.querySelectorAll('#checkout-help-button').forEach(($helpButton) => {
     $helpButton.addEventListener('click', (e) => {
       e.preventDefault();
       omega._chatsy?.open();
     });
-  }
+  });
 
   // Set form ready
   formManager.ready();

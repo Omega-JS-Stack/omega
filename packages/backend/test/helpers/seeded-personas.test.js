@@ -497,6 +497,16 @@ module.exports = {
           'The Premium persona demonstrates a subscription, not an affiliate link',
         );
 
+        // The inbound half obeys the same rule (#369): being referred is the
+        // referred persona's ONE state, so it is the only account seeded with an
+        // affiliate attribution — a second one would be a persona telling the
+        // referral story on the side of the story it was built for.
+        const attributed = Object.entries(definitions)
+          .filter(([, definition]) => definition.properties.attribution?.affiliate?.code)
+          .map(([key]) => key);
+
+        assert.deepEqual(attributed, ['referred'], 'The referred persona is the only account seeded as having come in through a referral');
+
         // The one that DOES carry them stays a full realistic account (Ian
         // 2026-08-17, #327), and its dates stay the shape a signup writes: the
         // account page reads the timestamp as an ISO STRING, and the epoch
@@ -514,6 +524,61 @@ module.exports = {
           );
           assert.match(referral.timestamp, /^\d{4}-\d{2}-\d{2}T/, `Referral ${referral.uid} is dated '${referral.timestamp}', which no signup would write`);
         }
+      },
+    },
+
+    // The OTHER half of the referral pair (Ian 2026-08-19,
+    // [#369](https://github.com/Omega-JS-Stack/omega/issues/369)). A referral is
+    // two facts, written to two docs: the record on the referrer's list, and the
+    // attribution on the account that arrived through the link. While only the
+    // outbound half was seeded, every surface that reads the INBOUND one — "you
+    // were referred by" — had no persona to render, and no test could tell the
+    // two halves had drifted apart.
+    {
+      name: 'the-referred-persona-is-the-inbound-half-of-the-pair',
+      async run({ assert, config }) {
+        const definitions = getAccountDefinitions('example.com', config);
+        const referred = definitions.referred;
+
+        assert.ok(referred, 'The seeder must define the persona that came in through a referral');
+
+        const affiliate = referred.properties.attribution?.affiliate;
+
+        // The block routes/user/signup writes from the request, exactly as the
+        // account schema defines it (packages/account/src/schema.js): a code, a
+        // click stamp, and where it was clicked. Extra fields would let a reader
+        // lean on data no signup has ever written.
+        assert.deepEqual(
+          Object.keys(affiliate || {}).sort(),
+          ['code', 'page', 'timestamp', 'url'],
+          'The referred persona must carry attribution.affiliate exactly as a signup writes it',
+        );
+        assert.equal(
+          affiliate.code,
+          definitions.referrer.properties.affiliate.code,
+          'The referred persona came in through the REFERRER persona\'s own code',
+        );
+        assert.match(affiliate.url, new RegExp(`ref=${affiliate.code}$`), `The link it arrived on carries the code (got ${affiliate.url})`);
+        assert.ok(affiliate.page, 'The referred persona records the page it landed on');
+
+        // The two halves are ONE event: the referrer's record for this account
+        // and the account's own attribution are dated the same instant, which is
+        // the only way a pair could have come from a single signup.
+        const outbound = definitions.referrer.properties.affiliate.referrals.find((referral) => referral.uid === referred.uid);
+
+        assert.ok(outbound, 'The referrer\'s outbound list must include the account it referred');
+        assert.equal(outbound.timestamp, affiliate.timestamp, 'Both halves of the referral are dated the same signup');
+        assert.match(affiliate.timestamp, /^\d{4}-\d{2}-\d{2}T/, `The click is dated with the ISO string a signup writes (got ${affiliate.timestamp})`);
+
+        // ONE distinguishing state: it was referred. It is a full realistic
+        // account around that ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)) —
+        // the exhaustive leaf sweep is 'every-persona-is-a-full-account' above —
+        // and it tells no second story: no billing history, no referrals of its own.
+        assert.ok(referred.properties.personal.name.first, 'The referred persona is a real person, not a bare account');
+        assert.ok(referred.properties.activity.geolocation.city, 'The referred persona signed up from somewhere');
+        assert.equal(referred.properties.subscription.product.id, 'basic', 'The referred persona demonstrates a referral, not a purchase');
+        assert.equal(buildOrderFixture('referred', config), null, 'The referred persona bought nothing, so it has no order behind it');
+        assert.equal((referred.properties.affiliate?.referrals || []).length, 0, 'The referred persona is the referred one — it has referred nobody');
       },
     },
 

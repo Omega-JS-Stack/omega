@@ -5,8 +5,8 @@
  * exist, the refund event was read as a fresh purchase definition: the order was
  * created with `unified.status: 'completed'` and the REFUND's id as the resource,
  * so a reversal was booked as revenue while the transition trail said
- * one-time/purchase-refunded ([#335]). The pipeline now refuses and records the
- * event as an anomaly instead.
+ * one-time/purchase-refunded ([#335]). The pipeline now refuses and stamps the
+ * refusal on the event's own doc instead.
  *
  * The same file covers the fetched-resource log line ([#347]): the live sighting
  * was a v1 sale refund, whose resource spells its state `state`, not `status` —
@@ -20,12 +20,12 @@
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
 
-const UID = '_test-refund-anomaly-uid';
+const UID = '_test-refund-refusal-uid';
 const ORDER_ID = '2402-2402-2402';
 const REFUND_ID = '_test-refund-id';
 const CAPTURE_ID = '_test-capture-id';
 const CHECKOUT_ID = '_test-checkout-id';
-const EVENT_ID = '_test-refund-anomaly-evt';
+const EVENT_ID = '_test-refund-refusal-evt';
 
 /**
  * The refund resource the processor answers with: a bare charge that moved the
@@ -89,7 +89,7 @@ function runRefund({ seed = {}, payload = refundPayload(), eventType = 'charge.r
 }
 
 module.exports = {
-  description: 'A one-time refund with no order behind it is recorded as an anomaly, never minted as a purchase',
+  description: 'A one-time refund with no order behind it is refused on its own event doc, never minted as a purchase',
   type: 'group',
   timeout: 30000,
 
@@ -106,20 +106,18 @@ module.exports = {
     },
 
     {
-      name: 'the refund is recorded as an anomaly carrying the payload and the capture it reversed',
+      name: 'the refusal is stamped on the event doc with the capture it reversed',
 
       async run() {
         const { store } = await runRefund();
-        const anomaly = store.get(`payments-anomalies/${EVENT_ID}`);
+        const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
-        assert.ok(anomaly, 'the event is parked durably for reconciliation');
-        assert.equal(anomaly.type, 'refund-without-order', 'the record names what is wrong');
-        assert.equal(anomaly.owner, UID, 'the owner it resolved to');
-        assert.equal(anomaly.orderId, ORDER_ID, 'the order the refund named, which does not exist');
-        assert.equal(anomaly.resource.id, REFUND_ID, 'the refund itself');
-        assert.equal(anomaly.resource.captureId, CAPTURE_ID, 'the capture from links.up — the pointer back to the purchase');
-        assert.equal(anomaly.refund.amount, '9.99', 'the money that moved back');
-        assert.equal(anomaly.raw?.data?.object?.id, REFUND_ID, 'the refund payload as delivered');
+        assert.ok(event.refusal, 'the event doc carries the refusal durably');
+        assert.equal(event.refusal.reason, 'refund-without-order', 'the stamp names what is wrong');
+        assert.equal(event.refusal.captureId, CAPTURE_ID, 'the capture from links.up — the pointer back to the purchase');
+        assert.equal(event.owner, UID, 'the owner it resolved to');
+        assert.equal(event.orderId, ORDER_ID, 'the order the refund named, which does not exist');
+        assert.equal(event.raw?.data?.object?.id, REFUND_ID, 'the refund payload as delivered is already on the doc');
       },
     },
 
@@ -144,7 +142,7 @@ module.exports = {
         const { store } = await runRefund({ seed: { [`payments-orders/${ORDER_ID}`]: existingOrder() } });
         const order = store.get(`payments-orders/${ORDER_ID}`);
 
-        assert.ok(!store.get(`payments-anomalies/${EVENT_ID}`), 'a refund with a purchase behind it is no anomaly');
+        assert.ok(!store.get(`payments-webhooks/${EVENT_ID}`)?.refusal, 'a refund with a purchase behind it is refused nothing');
         assert.equal(order.unified.status, 'refunded', 'the purchase is marked refunded');
         assert.equal(order.unified.product.id, 'premium', 'the purchase keeps its product');
         assert.equal(order.resourceId, CHECKOUT_ID, 'the purchase keeps the resource it was bought through');

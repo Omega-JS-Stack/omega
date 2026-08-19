@@ -4,9 +4,8 @@ The repeatable recipe for driving a REAL PayPal sandbox payment through the depl
 playground backend, proven 2026-08-17 on the [#240](https://github.com/Omega-JS-Stack/omega/issues/240)
 v1 sale fixture drive. Use it whenever a webhook change needs a live delivery instead
 of a fixture replay. [#348](https://github.com/Omega-JS-Stack/omega/issues/348) precreated
-what it could: the QA product is `hidden: true` (created on every processor, never on the
-pricing page). The BUYER stays hand-made — PayPal retired the sandbox-accounts API (see
-below).
+what it could: the QA product's processor objects exist on every processor. The BUYER
+stays hand-made — PayPal retired the sandbox-accounts API (see below).
 
 ## The standing fixtures
 
@@ -21,12 +20,13 @@ below).
   playground backend (`api.playground.omegajs.dev/omega/payments/webhook`).
   Deliveries arrive with real signature headers; the deployed backend is the
   verification surface (a local emulator receives nothing — no forwarding path).
-- **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial, `hidden: true`)
+- **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial)
   in `apps/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
   tier carries a 14-day trial, which defers a subscription's first sale two weeks.
-  `hidden: true` (#348) is presentation-only — the pricing page never renders it,
-  while checkout still resolves it by id and the walk still creates its processor
-  objects. The manager payment walk owns those objects
+  It lists on the playground /pricing page on purpose (Ian 2026-08-19, #348) so
+  real checkouts can be run against it by hand; the `hidden: true` mechanism
+  remains available for products that should stay off /pricing.
+  The manager payment walk owns the processor objects
   (`npx mgr manage --service=payment` at the playground root); read the current
   ids from the config write-backs (`stripe.productId`, `paypal.productId`) and
   list plans via `GET /v1/billing/plans?product_id=<paypal.productId>`.
@@ -97,5 +97,6 @@ All API calls go to `https://api-m.sandbox.paypal.com` with an OAuth token from 
   `parent_payment`; the legacy one-time shape (uid via the `parent_payment`
   fold) is covered by `test/fixtures/paypal/sale-refunded.json`. Both uid paths
   stay pinned.
-- v1 resources spell status `state`; until [#347](https://github.com/Omega-JS-Stack/omega/issues/347)
-  ships, a successful v1 fetch logs `status=unknown` — ignore it.
+- v1 resources spell status `state`; the pipeline reads both
+  (`resource.status ?? resource.state`, [#347](https://github.com/Omega-JS-Stack/omega/issues/347)),
+  so a successful v1 fetch logs its real status (`status=refunded`).

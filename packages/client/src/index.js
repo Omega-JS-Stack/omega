@@ -775,14 +775,19 @@ class Manager {
     }
   }
 
+  // The web build's public config filter inlines `settings: null` when a
+  // brand sets none, and Chatsy's constructor rejects a null blob — omit the
+  // key instead so the widget applies its own defaults (#377).
+  _chatsyOptions(config) {
+    return config.settings ? { settings: config.settings } : {};
+  }
+
   async _initializeChatsy() {
     try {
       const { default: Chatsy } = await import('chatsy');
       const config = this.config.inbound.chat.providers.chatsy;
 
-      this._chatsy = new Chatsy(config.agentId, {
-        settings: config.settings,
-      });
+      this._chatsy = new Chatsy(config.agentId, this._chatsyOptions(config));
 
       chatsyLogger.log('Initialized');
     } catch (error) {

@@ -5,11 +5,6 @@ const { trackPayment } = require('./analytics.js');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const User = require('../../../helpers/user.js');
 
-// Where an event the pipeline REFUSES to act on is parked for a human. Keyed by the
-// processor's event id, so a redelivery re-records the same document rather than
-// piling up duplicates. Server-only, like every other payments-* collection.
-const ANOMALIES_COLLECTION = 'payments-anomalies';
-
 /**
  * Firestore trigger: payments-webhooks/{eventId} onWrite
  *
@@ -143,14 +138,17 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const transitionName = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
+    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
 
-    // Mark webhook as completed (include transition name for auditing/testing)
+    // Mark webhook as completed (include transition name + any refusal for auditing/testing).
+    // Both are written on EVERY pass, so a reprocess that now finds its order clears
+    // the refusal it was stamped with rather than leaving a stale flag behind.
     await webhookRef.set({
       status: 'completed',
       owner: uid,
       orderId: orderId,
-      transition: transitionName,
+      transition: transition,
+      refusal: refusal,
       metadata: {
         completed: {
           timestamp: now,
@@ -268,6 +266,10 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  * 5. Detect and dispatch transition handlers (non-blocking)
  * 6. Track analytics (non-blocking)
  * 7. Write to Firestore in ONE batch (user doc for subscriptions + payments-orders + payments-intents)
+ *
+ * @returns {Promise<{ transition: string|null, refusal: object|null }>} What the
+ *   caller stamps back on the event doc: the transition detected, and the refusal
+ *   when the pipeline declined to act on the event at all.
  */
 async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
   const Manager = ctx.Manager;
@@ -284,7 +286,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
       const existingUpdatedUNIX = existingOrder.metadata?.updated?.timestampUNIX || 0;
       if (webhookReceivedUNIX < existingUpdatedUNIX) {
         ctx.log(`Stale webhook ${eventId}: received=${webhookReceivedUNIX}, existing updated=${existingUpdatedUNIX}, skipping`);
-        return null;
+        return { transition: null, refusal: null };
       }
     }
   } else {
@@ -296,7 +298,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // Unified refund details from the processor library (keeps the order record and
   // the transition handlers processor-agnostic). Every refund path needs them: the
   // subscription email's amount, the one-time refund's record on the order, and
-  // the anomaly record below.
+  // the refusal below.
   const isRefund = transitions.REFUND_EVENTS.includes(eventType);
   const refundDetails = (isRefund && library.getRefundDetails) ? library.getRefundDetails(raw) : null;
 
@@ -308,13 +310,15 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // missing — a lost or failed purchase webhook, a webhook registered after the
   // sale, or PayPal delivering REFUNDED before the capture.
   //
-  // So the pipeline refuses, loudly, and writes nothing else: the event is recorded
-  // as an anomaly a human reconciles from, which surfaces the lost purchase webhook
-  // instead of letting it masquerade as revenue
+  // So the pipeline refuses, loudly, and writes nothing else: the refusal is stamped
+  // on the event's own doc for a human to reconcile from, which surfaces the lost
+  // purchase webhook instead of letting it masquerade as revenue
   // ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
   if (!isSubscription && isRefund && !existingOrder?.unified) {
-    await recordRefundAnomaly({ admin, ctx, resource, raw, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId, now, nowUNIX });
-    return null;
+    return {
+      transition: null,
+      refusal: refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId }),
+    };
   }
 
   // Read current user doc (needed for transition detection + handler context)
@@ -547,7 +551,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
       }
     });
 
-  return transitionName;
+  return { transition: transitionName, refusal: null };
 }
 
 /**
@@ -586,19 +590,18 @@ function applyRefundToPurchase(purchase, derived, { refundDetails, now, nowUNIX 
 }
 
 /**
- * Park a refund that has no purchase behind it, loudly and durably
+ * Refuse a refund that has no purchase behind it, loudly, and say so on the record
  *
  * The books are the point: nothing is written to payments-orders or
- * payments-intents, so no revenue is invented. What the reconciler needs instead
- * lands in ONE document — the refund payload as delivered, the money, and the id of
- * the capture the refund reversed, which is the only pointer back to the purchase
- * whose webhook never landed ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
+ * payments-intents, so no revenue is invented. What the reconciler needs is stamped
+ * on the event's OWN doc, which already carries the refund payload as delivered
+ * (`raw`), the owner and the order it named: the reason it was refused, and the id
+ * of the capture the refund reversed — the only pointer back to the purchase whose
+ * webhook never landed ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
  *
  * @param {object} options
- * @param {object} options.admin - firebase-admin
  * @param {object} options.ctx - Assistant instance
  * @param {object} options.resource - The refund resource fetched from the processor
- * @param {object} options.raw - The raw webhook payload the processor sent
  * @param {object|null} options.refundDetails - The library's { amount, currency, reason }
  * @param {string} options.eventId - The webhook doc id (the processor's event id)
  * @param {string} options.eventType - The processor's event name
@@ -607,41 +610,17 @@ function applyRefundToPurchase(purchase, derived, { refundDetails, now, nowUNIX 
  * @param {string} options.resourceId - The refund's own id
  * @param {string} options.uid - The owner the event resolved to
  * @param {string|null} options.orderId - The order the refund named, which does not exist
- * @param {string} options.now - Timestamp string
- * @param {number} options.nowUNIX - Timestamp seconds
- * @returns {Promise<void>}
+ * @returns {{ reason: string, captureId: string|null }} The refusal stamp for the event doc
  */
-async function recordRefundAnomaly({ admin, ctx, resource, raw, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId, now, nowUNIX }) {
+function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId }) {
   const captureId = extractParentResourceId(resource);
 
-  ctx.error(`REFUND WITHOUT ORDER: ${eventType} (${processor}) reversed ${resourceType} ${resourceId} but payments-orders/${orderId || 'null'} does not exist — refusing to mint an order from a refund (owner=${uid}, capture=${captureId || 'unknown'}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}). Recorded at ${ANOMALIES_COLLECTION}/${eventId}: the purchase behind this refund never wrote an order and needs manual reconciliation`);
+  ctx.error(`REFUND WITHOUT ORDER: ${eventType} (${processor}) reversed ${resourceType} ${resourceId} but payments-orders/${orderId || 'null'} does not exist — refusing to mint an order from a refund (owner=${uid}, capture=${captureId || 'unknown'}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}). Stamped on payments-webhooks/${eventId} as refusal.reason=refund-without-order: the purchase behind this refund never wrote an order and needs manual reconciliation`);
 
-  await admin.firestore().doc(`${ANOMALIES_COLLECTION}/${eventId}`).set({
-    id: eventId,
-    type: 'refund-without-order',
-    processor: processor,
-    owner: uid,
-    orderId: orderId || null,
-    event: {
-      type: eventType || null,
-      id: eventId,
-    },
-    resource: {
-      type: resourceType || null,
-      id: resourceId || null,
-      captureId: captureId,
-    },
-    refund: refundDetails || null,
-    raw: raw || null,
-    metadata: {
-      created: {
-        timestamp: now,
-        timestampUNIX: nowUNIX,
-      },
-    },
-  }, { merge: true });
-
-  ctx.log(`Recorded ${ANOMALIES_COLLECTION}/${eventId}: type=refund-without-order, owner=${uid}, orderId=${orderId || 'null'}`);
+  return {
+    reason: 'refund-without-order',
+    captureId: captureId,
+  };
 }
 
 /**
@@ -649,7 +628,7 @@ async function recordRefundAnomaly({ admin, ctx, resource, raw, refundDetails, e
  *
  * PayPal points a refund at the capture it reversed with a HATEOAS link whose
  * `rel` is `up`, and the id is that URL's last segment. Processors that ship no
- * such links answer null, which the anomaly record carries honestly rather than
+ * such links answer null, which the refusal stamp carries honestly rather than
  * guessing at a capture.
  *
  * @param {object} resource - The refund resource fetched from the processor

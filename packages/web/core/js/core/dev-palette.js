@@ -151,13 +151,19 @@ const STYLES = `
   color: var(--omega-ink-muted, #6d6d6c);
 }
 .omega-devbar__select {
-  padding: 0.3125rem 0.5rem;
+  padding: 0.3125rem 1.75rem 0.3125rem 0.5rem;
   font-size: 0.78125rem;
   color: var(--omega-ink, #1a1a19);
   background: var(--omega-surface, #fff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%236d6d6c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.625rem auto;
   border: 1px solid var(--omega-line-strong, #d8d8d5);
   border-radius: 6px;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .omega-devbar__select:focus-visible {
   outline: 2px solid var(--omega-accent, currentColor);

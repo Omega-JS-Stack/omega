@@ -483,7 +483,23 @@ const PERSONA_REFERRALS = {
   // [#363](https://github.com/Omega-JS-Stack/omega/issues/363)): every persona
   // demonstrates exactly its own scenario, so the affiliate story belongs to
   // the account built for it and nowhere else.
-  referrer: ['premium-active', 'basic', 'premium-expired', 'refunded'],
+  referrer: ['premium-active', 'basic', 'premium-expired', 'refunded', 'referred'],
+};
+
+/**
+ * Who referred each persona, by persona key → the persona whose affiliate link
+ * it came in through (Ian 2026-08-19,
+ * [#369](https://github.com/Omega-JS-Stack/omega/issues/369)).
+ *
+ * The INBOUND half of PERSONA_REFERRALS: a referral is two facts written to two
+ * docs — the record appended to the referrer's list, and the attribution the
+ * signup writes onto the account that arrived — and while only the outbound half
+ * was seeded, no persona could show what "you were referred by" renders as. The
+ * account carrying it is a persona of its own, never a state added to one that
+ * already demonstrates something else.
+ */
+const PERSONA_REFERRED_BY = {
+  referred: 'referrer',
 };
 
 /**
@@ -545,6 +561,47 @@ function buildReferralFixtures(key, accounts) {
       timestamp: getDaysAgo(REFERRAL_DAYS_AGO[index % REFERRAL_DAYS_AGO.length]).timestamp,
     };
   });
+}
+
+/**
+ * The attribution an account that arrived through an affiliate link carries —
+ * `attribution.affiliate`, the block routes/user/signup writes from the request
+ * and the account schema defines (packages/account/src/schema.js): the code it
+ * came in on, when the link was clicked, and the page it was clicked on.
+ *
+ * The stamp is READ OFF the referrer's own record for this account rather than
+ * dated here: both halves are the SAME signup, and a pair that disagrees about
+ * when it happened is a pair no signup could have produced.
+ *
+ * @param {string} key - The persona key
+ * @param {object} accounts - Every account definition, keyed
+ * @param {string} domain - The brand's domain (the link they clicked)
+ * @returns {object|null} The persona's `attribution.affiliate`, or null for one nobody referred
+ */
+function buildInboundReferral(key, accounts, domain) {
+  const referrerKey = PERSONA_REFERRED_BY[key];
+
+  if (!referrerKey) {
+    return null;
+  }
+
+  const referrer = accounts[referrerKey];
+  const record = (buildReferralFixtures(referrerKey, accounts) || []).find((referral) => referral.uid === accounts[key]?.uid);
+
+  // Half a pair: an account claiming a referrer whose list never names it. The
+  // referral panel would show a referrer nobody referred through.
+  if (!referrer || !record) {
+    throw new Error(`Persona '${key}' is seeded as referred by '${referrerKey}', which carries no referral for it`);
+  }
+
+  const code = referrer.properties?.affiliate?.code;
+
+  return {
+    code: code,
+    timestamp: record.timestamp,
+    url: `https://${domain}/?ref=${code}`,
+    page: '/',
+  };
 }
 
 /**
@@ -745,6 +802,27 @@ const STATIC_ACCOUNTS = {
       affiliate: { code: 'TESTREF', referrals: [] },
     },
   },
+  // The other side of that link (Ian 2026-08-19,
+  // [#369](https://github.com/Omega-JS-Stack/omega/issues/369)): the account that
+  // CAME IN through the referrer's code, and whose one distinguishing state is
+  // exactly that. Its `attribution.affiliate` is resolved in
+  // getAccountDefinitions (buildInboundReferral) off the referrer's own record,
+  // so the two halves can never disagree.
+  //
+  // It is deliberately NOT the journey `signup-referred` account: that one exists
+  // to EARN its referral live in the signup suite, and seeding one for it would
+  // answer the very assertion that suite is there to make. A persona is a bare
+  // ROLE, so this one is plain `referred`; the lane-scoped rig is the one
+  // carrying its lane's prefix (Ian 2026-08-19).
+  referred: {
+    id: 'referred',
+    uid: '_test-referred',
+    email: '_test.referred@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
 };
 
 /**
@@ -812,28 +890,28 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
-  referred: {
-    id: 'referred',
-    uid: '_test-referred',
-    email: '_test.referred@{domain}',
+  'signup-referred': {
+    id: 'signup-referred',
+    uid: '_test-signup-referred',
+    email: '_test.signup-referred@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
-  'referred-invalid': {
-    id: 'referred-invalid',
-    uid: '_test-referred-invalid',
-    email: '_test.referred-invalid@{domain}',
+  'signup-referred-invalid': {
+    id: 'signup-referred-invalid',
+    uid: '_test-signup-referred-invalid',
+    email: '_test.signup-referred-invalid@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
-  'referred-disposable': {
-    id: 'referred-disposable',
-    uid: '_test-referred-disposable',
-    email: '_test.referred-disposable@mailinator.com',
+  'signup-referred-disposable': {
+    id: 'signup-referred-disposable',
+    uid: '_test-signup-referred-disposable',
+    email: '_test.signup-referred-disposable@mailinator.com',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -1437,6 +1515,16 @@ function getAccountDefinitions(domain, config, extraAccounts) {
 
     if (referrals) {
       properties.affiliate = { ...(properties.affiliate || {}), referrals };
+    }
+
+    // And the other half of that referral (#369): the attribution the signup
+    // wrote onto the account that came IN through the link. Resolved here for
+    // the same reason — only the assembled table knows the referrer's code and
+    // the stamp its record for this account carries.
+    const referredBy = buildInboundReferral(key, all, domain);
+
+    if (referredBy) {
+      properties.attribution = { ...(properties.attribution || {}), affiliate: referredBy };
     }
 
     // STATIC personas are ESTABLISHED users: born signup-processed with

@@ -59,6 +59,10 @@ const WATCH_DEBOUNCE_MS = 250;
 // The rescan lane settles faster than the asset lane: a scan is a readdir, and
 // the sooner it lands the sooner a permalink collision is on screen.
 const RESCAN_DEBOUNCE_MS = 50;
+// How often a re-arming watcher probes for its directory to come back. A
+// prepare's wipe-to-rewrite gap is a build's worth of time, so a coarse probe
+// costs nothing and never busy-loops.
+const REARM_POLL_MS = 200;
 
 module.exports = async function (options) {
   options = options || {};
@@ -209,31 +213,7 @@ module.exports = async function (options) {
     path.join(paths.src, '_components'),
   ].filter((dir) => fs.existsSync(dir));
 
-  // Narrowed rebuilds: a css-only change set rebuilds just the stylesheets —
-  // no js files are rewritten, so the dev server HOT-SWAPS the css without a
-  // page reload. js changes rebuild js (full reload — scripts need one), and
-  // an unknown/mixed set rebuilds everything.
-  let timer = null;
-  let pendingKinds = new Set();
-  const kindOf = (file) => {
-    if (/\.(scss|css)$/.test(file || '')) return 'css';
-    if (/\.(js|mjs)$/.test(file || '')) return 'js';
-    return 'other';
-  };
-  for (const dir of watchDirs) {
-    fs.watch(dir, { recursive: true }, (event, file) => {
-      pendingKinds.add(kindOf(file));
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const kinds = pendingKinds;
-        pendingKinds = new Set();
-        const only = kinds.size === 1 && !kinds.has('other') ? kinds.values().next().value : undefined;
-        build(only)
-          .then(() => logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`))
-          .catch((error) => logger.error('Asset rebuild failed:', error));
-      }, WATCH_DEBOUNCE_MS);
-    });
-  }
+  watchAssetSources({ dirs: watchDirs, clientDist: path.dirname(clientEntry), build });
 
   // The consumer's service-worker entry lives OUTSIDE the asset trees
   // (src/service-worker.js) — its own watcher; the browser picks the new
@@ -464,6 +444,124 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
     }
     if (options && options.onRescans) options.onRescans(rescans);
   });
+}
+
+/**
+ * The ASSET lane's source watchers: one recursive fs.watch per asset source
+ * dir, all feeding ONE debounced rebuild.
+ *
+ * Narrowed rebuilds: a css-only change set rebuilds just the stylesheets — no
+ * js files are rewritten, so the dev server HOT-SWAPS the css without a page
+ * reload. js changes rebuild js (full reload — scripts need one), and an
+ * unknown/mixed set rebuilds everything.
+ *
+ * @omega.js/client's dist rides the same lane (#378). It reaches the bundle
+ * through the `@omega.js/client` alias, resolved once at boot — so without it
+ * here a client edit rebuilt the client's dist and stopped, and the site served
+ * its boot-time bytes until an unrelated asset edit or a stack restart.
+ * @param {object} options
+ * @param {string[]} options.dirs - the asset source dirs (existing ones only)
+ * @param {string} [options.clientDist] - the resolved @omega.js/client dist dir
+ * @param {function} options.build - (only) => Promise, the dev asset rebuild
+ * @returns {{ close: function }} the live watchers (the dev loop keeps them for
+ *   the life of the process; tests close them)
+ */
+function watchAssetSources(options) {
+  let timer = null;
+  let pendingKinds = new Set();
+  const kindOf = (file) => {
+    if (/\.(scss|css)$/.test(file || '')) return 'css';
+    if (/\.(js|mjs)$/.test(file || '')) return 'js';
+    return 'other';
+  };
+  const schedule = (file) => {
+    pendingKinds.add(kindOf(file));
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const kinds = pendingKinds;
+      pendingKinds = new Set();
+      const only = kinds.size === 1 && !kinds.has('other') ? kinds.values().next().value : undefined;
+      options.build(only)
+        .then(() => logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`))
+        .catch((error) => logger.error('Asset rebuild failed:', error));
+    }, WATCH_DEBOUNCE_MS);
+  };
+
+  const watchers = options.dirs.map((dir) => fs.watch(dir, { recursive: true }, (event, file) => schedule(file)));
+
+  // The client dist is the one watched root that gets REPLACED rather than
+  // written into (its own `npm run prepare` deletes dist/ and writes it again),
+  // so it registers replace-safe. Absent at boot (no client installed) → not
+  // watched, the same existence rule the dirs above are filtered by.
+  if (options.clientDist && fs.existsSync(options.clientDist)) {
+    watchers.push(watchReplaceable(options.clientDist, schedule));
+  }
+
+  return {
+    close: () => {
+      clearTimeout(timer);
+      watchers.forEach((watcher) => watcher.close());
+    },
+  };
+}
+
+/**
+ * A recursive fs.watch over a directory that may be REPLACED under it. A
+ * handle is bound to the directory it was opened on: once that directory is
+ * deleted, the handle is watching something the filesystem no longer resolves
+ * — on some platforms it errors or closes, on others it stays quietly useless.
+ * So: whenever the root is gone (an event that finds it missing, an `error`, a
+ * `close` nobody asked for), drop the handle, probe until the directory is back,
+ * watch the NEW one, and report the replacement as one change.
+ * @param {string} dir - the directory to watch
+ * @param {function} onChange - (file) => void, the same sink the plain watchers use
+ * @returns {{ close: function }}
+ */
+function watchReplaceable(dir, onChange) {
+  let watcher = null;
+  let poll = null;
+  let closed = false;
+
+  const arm = () => {
+    watcher = fs.watch(dir, { recursive: true }, (event, file) => {
+      if (!fs.existsSync(dir)) return rearm();
+      return onChange(file);
+    });
+    watcher.on('error', rearm);
+    watcher.on('close', rearm);
+  };
+
+  // Arming the probe FIRST makes every re-entrant call (closing the handle
+  // emits its own 'close') a no-op instead of a second interval.
+  const rearm = () => {
+    if (closed || poll) return;
+
+    poll = setInterval(() => {
+      if (!fs.existsSync(dir)) return;
+      try {
+        arm();
+      } catch (error) {
+        return; // replaced again between the probe and the watch — keep probing
+      }
+      clearInterval(poll);
+      poll = null;
+      onChange(dir);
+    }, REARM_POLL_MS);
+
+    const dead = watcher;
+    watcher = null;
+    if (dead) dead.close();
+  };
+
+  arm();
+
+  return {
+    close: () => {
+      closed = true;
+      clearInterval(poll);
+      if (watcher) watcher.close();
+    },
+  };
 }
 
 /**
@@ -830,6 +928,7 @@ module.exports.devPortsOption = devPortsOption;
 module.exports.devServerOptions = devServerOptions;
 module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
+module.exports.watchAssetSources = watchAssetSources;
 module.exports.watchRescanTargets = watchRescanTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 module.exports.devWebsiteOrigin = devWebsiteOrigin;

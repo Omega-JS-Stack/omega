@@ -30,9 +30,9 @@ A refund **updates** a purchase record; it does not redefine it. A one-time refu
 
 A refund can only UPDATE a purchase — it can never DEFINE one. When the refund event named an order that did not exist, the merge above could not run and the event was read as a fresh purchase definition instead: `payments-orders/{orderId}` was created with `unified.status: 'completed'` and the REFUND's id as the resource, so a reversal was booked as revenue while the transition trail said `one-time/purchase-refunded`. Reachable whenever the purchase write is missing — a lost or failed purchase webhook, a webhook registered after the sale, or PayPal delivering `PAYMENT.CAPTURE.REFUNDED` before the capture.
 
-So the pipeline **refuses**, and writes nothing to `payments-orders` or `payments-intents`: no transition is detected, no analytics fire, and the webhook doc completes with `transition: null` — the trail agrees with the record. The event is parked instead at `payments-anomalies/{eventId}` (`type: 'refund-without-order'`) with a loud `REFUND WITHOUT ORDER` error line. The record carries the refund payload as delivered, the money from `getRefundDetails()`, and the id of the capture the refund reversed — read off the payload's HATEOAS `up` link, which PayPal points at the capture and other processors omit (`null`, never a guess). That capture id is the pointer a human reconciles the missing purchase from ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
+So the pipeline **refuses**, and writes nothing to `payments-orders` or `payments-intents`: no transition is detected, no analytics fire, and the webhook doc completes with `transition: null` — the trail agrees with the record. The refusal is stamped on the event's OWN doc, alongside that transition: `payments-webhooks/{eventId}.refusal` = `{ reason: 'refund-without-order', captureId }`, with a loud `REFUND WITHOUT ORDER` error line carrying the money from `getRefundDetails()`. The doc already holds the refund payload as delivered (`raw`), the owner and the order the refund named; what it adds is the id of the capture the refund reversed — read off the payload's HATEOAS `up` link, which PayPal points at the capture and other processors omit (`null`, never a guess). That capture id is the pointer a human reconciles the missing purchase from ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
 
-The webhook is **completed**, not failed: the event reached a terminal decision, so it must not burn the retry ladder or dead-letter. Keying the anomaly by the processor's event id makes a redelivery re-record the same document rather than pile up duplicates.
+The webhook is **completed**, not failed: the event reached a terminal decision, so it must not burn the retry ladder or dead-letter. The event doc is keyed by the processor's event id, so a redelivery re-decides the same document rather than piling up duplicates — and `refusal` is written on every completion (`null` when nothing was refused), so a reprocess that now finds its order clears the flag instead of leaving a stale one behind.
 
 ## 3-Layer Architecture
 
@@ -528,9 +528,8 @@ Key rules:
 | Collection | Key | Purpose |
 |---|---|---|
 | `payments-intents/{orderId}` | Order ID | Intent metadata (processor, product, status) |
-| `payments-webhooks/{eventId}` | Processor event ID | Webhook processing state + transition result |
+| `payments-webhooks/{eventId}` | Processor event ID | Webhook processing state + transition result + `refusal`, the flag on an event the pipeline REFUSED to act on ([above](#a-refund-with-no-purchase-behind-it-is-refused-not-minted)) |
 | `payments-orders/{orderId}` | Order ID | Unified order data (single source of truth for orders) |
-| `payments-anomalies/{eventId}` | Processor event ID | Events the pipeline REFUSED to act on, parked for manual reconciliation ([above](#a-refund-with-no-purchase-behind-it-is-refused-not-minted)) |
 | `users/{uid}.subscription` | User UID | Current subscription state (subscriptions only) |
 
 ### payments-webhooks retry state

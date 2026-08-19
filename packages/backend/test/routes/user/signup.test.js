@@ -11,7 +11,7 @@ const REFERRER_AFFILIATE_CODE = TEST_ACCOUNTS.referrer.properties.affiliate.code
  * - Verifying the referral tracking works
  * - Edge cases: unauthenticated, signing up for another user, invalid affiliate code
  *
- * Note: referrer and referred accounts are pre-created by the test runner
+ * Note: referrer and signup-referred accounts are pre-created by the test runner
  * The referrer has affiliate.code set at creation time (see test-accounts.js)
  */
 module.exports = {
@@ -26,7 +26,7 @@ module.exports = {
       async run({ http, assert }) {
         // Try to sign up with a non-existent affiliate code
         // Use dedicated account so it doesn't affect other tests
-        const signupResponse = await http.as('referred-invalid').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred-invalid').post('backend-manager/user/signup', {
           attribution: {
             affiliate: { code: 'INVALID_CODE_12345' },
           },
@@ -62,8 +62,8 @@ module.exports = {
       name: 'verify-referred-exists',
       async run({ firestore, assert, state, accounts }) {
         // Use the pre-created static referred account
-        state.referredUid = accounts.referred.uid;
-        state.referredEmail = accounts.referred.email;
+        state.referredUid = accounts['signup-referred'].uid;
+        state.referredEmail = accounts['signup-referred'].email;
 
         // Verify the referred account exists
         const referredDoc = await firestore.get(`users/${state.referredUid}`);
@@ -77,8 +77,8 @@ module.exports = {
       async run({ http, assert, state }) {
         // Call POST /user/signup as the referred user with the new attribution format
         // This triggers the referral tracking logic
-        // Use .as('referred') to authenticate as that specific user via privateKey
-        const signupResponse = await http.as('referred').post('backend-manager/user/signup', {
+        // Use .as('signup-referred') to authenticate as that specific user via privateKey
+        const signupResponse = await http.as('signup-referred').post('backend-manager/user/signup', {
           attribution: {
             affiliate: {
               code: state.referrerAffiliateCode,
@@ -116,7 +116,7 @@ module.exports = {
       async run({ http, assert, state }) {
         // Try to call POST /user/signup again for the same user
         // This should be blocked since signup has already been processed
-        const signupResponse = await http.as('referred').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred').post('backend-manager/user/signup', {
           attribution: {
             affiliate: { code: state.referrerAffiliateCode },
           },
@@ -208,7 +208,7 @@ module.exports = {
         // Sign up a disposable email account with the referrer's affiliate code
         // The signup itself should succeed (account was created via Admin SDK, bypassing beforeCreate)
         // But the referral credit should be SKIPPED because the email is disposable
-        const signupResponse = await http.as('referred-disposable').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred-disposable').post('backend-manager/user/signup', {
           attribution: {
             affiliate: { code: state.referrerAffiliateCode },
           },
@@ -229,7 +229,7 @@ module.exports = {
           `Referrer should NOT get credit for disposable email referral (before=${state.referralCountBefore}, after=${referralsAfter.length})`
         );
 
-        const disposableReferral = referralsAfter.find(r => r.uid === accounts['referred-disposable'].uid);
+        const disposableReferral = referralsAfter.find(r => r.uid === accounts['signup-referred-disposable'].uid);
         assert.ok(!disposableReferral, 'Disposable account should NOT appear in referrals');
       },
     },

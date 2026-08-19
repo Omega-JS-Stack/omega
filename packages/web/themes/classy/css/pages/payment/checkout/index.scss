@@ -1,19 +1,19 @@
 // classy checkout — the commitment moment on real surfaces. The left column
-// is three hairline PANELS (plan, account, payment) on --omega-surface, each
-// led by an icon chip; the right column is the order summary as a receipt
-// CARD composed from the shared receipt vocabulary (components/_receipt.scss)
-// so checkout and confirmation read as one story. Tokens only, both modes.
+// is two hairline PANELS (plan, account) on --omega-surface, each led by an
+// icon chip, with the pay zone BARE beneath them (#374 — the buttons are the
+// one thing on the page no card contains); the right column is the order
+// summary as a receipt CARD composed from the shared receipt vocabulary
+// (components/_receipt.scss) so checkout and confirmation read as one story.
+// Tokens only, both modes.
 
 .omega-checkout {
   max-width: 72rem;
 }
 
-// ── Header — the serif moment left, brand right ─────────────────────────────
+// ── Header — one brand lockup, left (#373) ──────────────────────────────────
 .omega-checkout__head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
+  align-items: center;
   margin-bottom: 1.25rem;
 
   @media (min-width: 992px) {
@@ -21,23 +21,30 @@
   }
 }
 
-.omega-checkout__head-title {
+// The lockup is the page's h1, so its size is STATED here — an h1 default is a
+// hero, and this is a header. It sits at the panel titles' weight, one notch up
+// in size, so the mark reads as chrome above the surfaces, never as a headline.
+.omega-checkout__head-mark {
   min-width: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
-// ── Brand (small, right of the title — cover pages have no nav) ─────────────
+// ── Brand lockup — cover pages have no nav, so the mark lives in the head ───
 .omega-checkout__brand {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--omega-ink);
-  font-size: 0.875rem;
+  font-size: inherit;
   text-decoration: none;
   transition: opacity var(--omega-speed) var(--omega-ease);
 
   img {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 2rem;
+    height: 2rem;
     object-fit: contain;
     border-radius: var(--omega-radius-s);
   }
@@ -61,14 +68,18 @@
 }
 
 // ── Panels — the hairline surfaces the left column is built from ────────────
+// The padding is the ORDER SUMMARY's, at both widths (Ian 2026-08-19, #370):
+// the panels used to sit looser than the summary beside them, and the tighter
+// values are the ones that read right. One card padding on the page — change
+// it here and in .omega-checkout__summary together, never one alone.
 .omega-checkout__panel {
-  padding: 1.375rem;
+  padding: 1rem;
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
 
   @media (min-width: 992px) {
-    padding: 1.75rem;
+    padding: 1.375rem;
   }
 
   & + & {
@@ -103,13 +114,20 @@
 .omega-checkout__account {
   color: var(--omega-ink-muted);
   font-size: 0.9375rem;
+  // An address is one unbreakable word: let it break anywhere rather than
+  // run out of a phone-width panel.
+  overflow-wrap: anywhere;
 
   strong {
     color: var(--omega-ink);
   }
 }
 
-// ── Mobile collapsed rows (Shopify-style: everything folds but the summary) ─
+// ── Mobile collapsed rows (Shopify-style: every card folds) ─────────────────
+// Deliberate, and ratified again in #370: the folded rows are what buy the
+// one-screen fit. They carry desktop's words, never a phone-only vocabulary.
+// The summary folds with them — it just starts OPEN, and its row states the
+// total, so nothing that matters is ever a tap away by default.
 .omega-checkout__rowtoggle {
   display: flex;
   align-items: center;
@@ -144,11 +162,27 @@
 }
 
 @media (max-width: 991.98px) {
-  // A folded panel IS its one-line row; expanded content pads under it
-  .omega-checkout__panel:has(> .omega-checkout__rowtoggle) {
+  // A folded card IS its one-line row; expanded content pads under it
+  .omega-checkout__panel:has(> .omega-checkout__rowtoggle),
+  .omega-checkout__summary:has(> .omega-checkout__rowtoggle) {
     > .collapse.show,
     > .collapsing {
       padding-top: 1rem;
+    }
+  }
+
+  // Expanded, the account panel is one block. Its head is desktop's title row,
+  // and the title is the row above on phones — so the head would be a lone
+  // right-floating "Switch account" over a gap. Order it UNDER the line it
+  // belongs to instead (#370).
+  .omega-checkout__account-block {
+    display: flex;
+    flex-direction: column;
+
+    .omega-checkout__panel-head {
+      order: 2;
+      margin-top: 0.375rem;
+      margin-bottom: 0;
     }
   }
 
@@ -159,19 +193,12 @@
     padding-bottom: 0.625rem !important;
   }
 
-  .omega-checkout .omega-display--section {
-    font-size: 1.5rem;
-  }
-
-  .omega-checkout__panel {
-    padding: 1rem;
-  }
-
   .omega-checkout__panel-head {
     margin-bottom: 0.75rem;
   }
 
-  // Price rows stay visible (never folded) — they just tighten up
+  // The summary opens by default, so its rows are what the phone lands on —
+  // they just tighten up
   .omega-checkout .omega-receipt__panel {
     padding: 0.125rem 1rem;
   }
@@ -198,10 +225,22 @@
   .omega-checkout__trust {
     gap: 0.375rem 1.25rem;
   }
+
+  // The phone stacks the same full-width buttons desktop does — it only rides a
+  // tighter slab, and STATES that slab so every button here matches too. It
+  // lives inside the phone query so the short-phone block below can outrank it.
+  // The zone is the same class on both viewports now (#374); at this width only
+  // the phone's copy is displayed, so scoping to it is scoping to the phone.
+  .omega-checkout__pay .payment-button {
+    --omega-payment-button-height: 2.75rem;
+
+    padding-block: 0.5625rem;
+  }
 }
 
 // Short phones (SE-class ≤700px tall): same content, tighter rhythm — nothing
-// hides; the one-screen promise holds all the way down.
+// hides. The fit holds down to an SE with the payment methods a phone actually
+// offers; a device showing all five wallets scrolls the last one into reach.
 @media (max-width: 991.98px) and (max-height: 700px) {
   main.py-5 {
     padding-top: 0.5rem !important;
@@ -212,7 +251,8 @@
     margin-bottom: 0.625rem;
   }
 
-  .omega-checkout__panel {
+  .omega-checkout__panel,
+  .omega-checkout__summary {
     padding: 0.8125rem;
   }
 
@@ -229,7 +269,9 @@
     line-height: 1.4;
   }
 
-  .omega-checkout__paybuttons .payment-button {
+  .omega-checkout__pay .payment-button {
+    --omega-payment-button-height: 2.625rem;
+
     padding-block: 0.5rem;
   }
 
@@ -239,8 +281,12 @@
 }
 
 // ── Billing cycle tiles ─────────────────────────────────────────────────────
+// The tiles are equal-height columns with the price pinned to the foot, so the
+// annual tile's SAVE chip — which wraps to a second line at phone widths — can
+// never push its price below the monthly tile's (#370).
 .omega-checkout__tile {
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   padding: 1rem 1.125rem;
@@ -297,6 +343,7 @@
 
 .omega-checkout__tile-price {
   display: block;
+  margin-top: auto;
   font-family: var(--omega-font-marketing);
   font-size: 1.5rem;
   font-weight: 550;
@@ -333,8 +380,32 @@
   }
 }
 
+// ── The pay zone — open space, never a card (Ian 2026-08-19, #374) ──────────
+// The buttons are the page's conclusion, so nothing boxes them in: this
+// wrapper is LAYOUT and nothing else — no background, no border, no card
+// padding. Only desktop states a rhythm, because only there does the zone
+// follow the account panel inside one column; the phone's copy is its own grid
+// cell and the row gutter already spaces it. The value IS the panel-to-panel
+// gap (.omega-checkout__panel + &): headless buttons are just the column's next
+// block, so they sit on the column's own rhythm — the extra quarter-rem existed
+// to stand the deleted head off the panel above it.
+.omega-checkout__pay {
+  @media (min-width: 992px) {
+    margin-top: 1rem;
+  }
+}
+
 // ── Payment buttons ─────────────────────────────────────────────────────────
+// One width, one HEIGHT, every viewport (#370). The wallet buttons carry brand
+// IMAGES and the rest carry a glyph + label, and a 24px image is a taller flex
+// item than that text line box — which is why PayPal measured 52px against
+// Credit/Debit's 49 (44 vs 41 on phones). So the slab height is STATED, not
+// inferred from content: padding only pads, and every viewport that retunes the
+// padding restates the height with it.
 .payment-button {
+  --omega-payment-button-height: 3.25rem;
+
+  min-height: var(--omega-payment-button-height);
   padding-block: 0.8125rem;
   font-weight: 600;
   border-radius: var(--omega-radius-m);
@@ -400,22 +471,6 @@
   }
 }
 
-// Mobile payment stack — card leads full-width, wallets pair up two-across
-.omega-checkout__paybuttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-
-  .payment-button {
-    padding-block: 0.5625rem;
-  }
-
-  [data-payment-method='card'],
-  .omega-checkout__terms {
-    grid-column: 1 / -1;
-  }
-}
-
 // ── Order summary — the receipt card ────────────────────────────────────────
 .omega-checkout__sticky {
   position: sticky;
@@ -428,6 +483,8 @@
   }
 }
 
+// The padding here is the page's card padding — .omega-checkout__panel states
+// the same pair (#370). The two move together or not at all.
 .omega-checkout__summary {
   padding: 1rem;
   background: var(--omega-surface);
@@ -476,12 +533,19 @@
   line-height: 1.5;
 }
 
-// ── Trust foot — green marks (the assurance moment stays green, Ian) ───────
+// ── Trust chips — green marks under the buttons (Ian 2026-08-19, #374) ─────
+// Placement: CENTERED inside the pay stack, directly under the terms line, one
+// copy per zone — the whole stack (buttons, terms, chips, help) shares one
+// center axis, so nothing under the buttons reads as a stray edge. The margin is
+// stated here rather than as mt-* on the markup, because the markup is captured
+// once and rendered twice — one rhythm, both viewports, and the phone block
+// above only retunes the gap between chips.
 .omega-checkout__trust {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.625rem 1.75rem;
+  margin-top: 0.75rem;
   font-size: 0.78125rem;
   color: var(--omega-ink-muted);
 
@@ -489,6 +553,16 @@
     color: var(--omega-ok);
     margin-right: 0.25rem;
   }
+}
+
+// ── Help line — the pay stack's last word (Ian 2026-08-19, #374) ────────────
+// It used to be the page foot's one line, centered by utilities on a wrapper
+// below the form; it rides the buttons' capture now, so its centering and its
+// gap are stated here — the captured markup renders twice and cannot carry a
+// rhythm of its own. The link itself keeps the quiet-link look above.
+.omega-checkout__help {
+  margin-top: 0.5rem;
+  text-align: center;
 }
 
 // ── Discount input — rounded ends on the group ──────────────────────────────
