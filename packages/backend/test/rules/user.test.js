@@ -6,7 +6,7 @@
  * - Users can read their own document
  * - Users can create/update their own document (non-protected fields only)
  * - Users cannot read/write other users' documents
- * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent, verifications) cannot be written by users
+ * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent, trackingConsent, attribution, verifications) cannot be written by users
  *
  * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
@@ -254,6 +254,47 @@ module.exports = {
             consent: {
               marketing: { status: 'forged' },
             },
+          }, { merge: true })
+        );
+      },
+    },
+
+    // Test 11.6: User cannot write 'trackingConsent' (protected - server-only)
+    {
+      name: 'user-cannot-write-tracking-consent-field',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        // The banner's answer reaches the user doc through /user/signup ONLY —
+        // the client SENDS the snapshot, the server is what writes it. A direct
+        // client write is a user granting themselves a consent they refused
+        // (or, worse, someone else's snapshot pasted over theirs).
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            trackingConsent: { analytics: true, marketing: true, region: 'forged', version: 1 },
+          }, { merge: true })
+        );
+      },
+    },
+
+    // Test 11.7: User cannot write 'attribution' (protected - server-only)
+    {
+      name: 'user-cannot-write-attribution-field',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        // Same route, same reason: attribution is the campaign credit for this
+        // account, and it decides who gets paid for the signup. A client that
+        // could rewrite it could assign itself an affiliate's commission.
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            attribution: { affiliate: { code: 'FORGED' } },
           }, { merge: true })
         );
       },

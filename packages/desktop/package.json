@@ -133,6 +133,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
+    "@omega.js/analytics": "*",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
     "@omega.js/web": "*",

@@ -89,18 +89,22 @@ Calls before init complete are queued (up to 200 events). On init, the queue is 
 
 In all three cases, `event()` is a silent no-op (no throws, no warns past init).
 
-## Event-name normalization
+## Event names come from the catalog
 
-GA4 enforces `[A-Za-z0-9_]` only, max 40 chars, no leading/trailing underscores. @omega.js/desktop normalizes:
+`event(name, params)` takes a CANONICAL name from `@omega.js/analytics`' shared
+catalog — the same vocabulary the web pages, the extension and the Cloud
+Functions speak ([docs/shared/analytics.md](../../../docs/shared/analytics.md)).
+The catalog's GA4 mapping decides the native name and payload; this module keeps
+only what is desktop's: the Measurement Protocol transport, the pre-init queue,
+the session/engagement enrichment, and the IPC bridge (unchanged — the preload
+API is byte-compatible).
 
-- `'Hello World!'` → `'Hello_World'`
-- `'__trim__'` → `'trim'`
-- `'a___b'` → `'a_b'`
-- `'a'.repeat(50)` → 40-char prefix
-
-Invalid (`null`, `''`) → silent drop.
+A name no catalog entry declares is a programmer error: it throws in development
+and is logged-and-skipped in a packaged app, where a throw would take the user's
+action with it. Adding an event is one catalog entry plus its test, never a
+free-typed string here.
 
 ## Tests
 
-- `src/test/suites/main/analytics.test.js` — disabled paths, uuidv5 stability, name normalization, queueing, auth-bridge wiring, IPC handlers, secret-not-leaked guard.
+- `src/test/suites/main/analytics.test.js` — disabled paths, uuidv5 stability, the catalog contract (canonical name in, GA4 descriptor out; unknown names never post), queueing, auth-bridge wiring, IPC handlers, secret-not-leaked guard.
 - `src/test/suites/renderer/analytics-bridge.test.js` — renderer-side surface shape + `getStatus` round-trip.

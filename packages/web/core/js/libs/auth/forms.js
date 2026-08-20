@@ -4,6 +4,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
+import { event } from '__main_assets__/js/libs/analytics.js';
 import { handleEmailSignin, handleEmailSignup, handlePasswordReset } from '__main_assets__/js/libs/auth/email.js';
 import { signInWithProvider } from '__main_assets__/js/libs/auth/oauth.js';
 
@@ -143,6 +144,48 @@ export function initializeSignupForm(ctx) {
   // Clear consent error styling when either checkbox is toggled
   document.getElementById('consent-legal')?.addEventListener('change', clearConsentError);
   document.getElementById('consent-marketing')?.addEventListener('change', clearConsentError);
+
+  trackSignupStarted(formManager);
+}
+
+/**
+ * The funnel ENTRY (#328 inventory gap 1: only completed signups fired, so the
+ * drop-off between reaching the form and finishing it was invisible).
+ *
+ * The honest entry is the first real ENGAGEMENT with the form — the first
+ * keystroke in a field, or the press of a provider button — not the page view
+ * (a bounce is not a started signup) and not every keystroke. One fire per page
+ * view: the flag is what makes it one, since two listeners each carrying
+ * `{ once: true }` would fire twice for a visitor who types and then clicks.
+ *
+ * @param {object} formManager - the signup form's FormManager
+ */
+function trackSignupStarted(formManager) {
+  const $form = formManager.$form;
+
+  if (!$form) {
+    return;
+  }
+
+  let started = false;
+
+  const start = (domEvent) => {
+    if (started) {
+      return;
+    }
+
+    started = true;
+
+    // The provider button carries the method; typing in the form is the email one.
+    const provider = domEvent?.target?.closest?.('[data-provider]')?.getAttribute('data-provider');
+
+    event('sign_up_started', {
+      method: provider || 'email',
+    });
+  };
+
+  $form.addEventListener('input', start);
+  $form.addEventListener('click', start);
 }
 
 export function initializeResetForm(ctx) {

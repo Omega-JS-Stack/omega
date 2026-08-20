@@ -164,63 +164,26 @@
   }
 </script>
 
-<!-- Script - Google Analytics Tracking Script -->
-{% iftruthy resolved.analytics.providers.google.id %}
-  <script type="text/javascript" src="https://www.googletagmanager.com/gtag/js?id={{ resolved.analytics.providers.google.id }}" async></script>
-  <script type="text/javascript">
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
+<!-- Analytics providers: the CONFIG rides in `Configuration.analytics` above,
+     and the loaders are injected at runtime by core/js/core/analytics-loader.js
+     once consent allows the provider's category (#383). The chrome emitting the
+     snippets directly is what made the old cookie banner decorative — every
+     pixel had already fired by the time it appeared.
 
-    gtag('config', '{{ resolved.analytics.providers.google.id }}');
-  </script>
-{% endiftruthy %}
+     The stubs below survive for the UNCONFIGURED case only: a site with no id
+     for a provider still has page code naming the global, and #306's guarded
+     wrappers read a stub as "present". A CONFIGURED provider gets no stub — its
+     global appears when (and only when) the loader injects it. -->
 {% iffalsy resolved.analytics.providers.google.id %}
   <script type="text/javascript">
     function gtag() {};
   </script>
 {% endiffalsy %}
-
-<!-- Script - Meta Pixel Tracking Script -->
-{% iftruthy resolved.analytics.providers.meta.id %}
-  <script type="text/javascript">
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-
-    fbq('init', '{{ resolved.analytics.providers.meta.id }}');
-    fbq('track', 'PageView');
-  </script>
-  <noscript>
-    <img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id={{ resolved.analytics.providers.meta.id }}&ev=PageView&noscript=1"
-    />
-  </noscript>
-{% endiftruthy %}
 {% iffalsy resolved.analytics.providers.meta.id %}
   <script type="text/javascript">
     function fbq() {};
   </script>
 {% endiffalsy %}
-
-<!-- Script - TikTok Pixel Tracking Script -->
-{% iftruthy resolved.analytics.providers.tiktok.id %}
-  <script type="text/javascript">
-    !function (w, d, t) {
-      //part1
-      w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
-
-      //part2
-      ttq.load('{{ resolved.analytics.providers.tiktok.id }}');
-      ttq.page();
-    }(window, document, 'ttq');
-  </script>
-{% endiftruthy %}
 {% iffalsy resolved.analytics.providers.tiktok.id %}
   <script type="text/javascript">
     window.ttq = {

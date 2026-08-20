@@ -6,7 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -163,37 +163,19 @@ function showReviewModal(reviewURL, data) {
 
 // Tracking functions
 function trackFeedbackSubmit(rating) {
-  trackGoogle('event', 'feedback_submitted', {
+  event('feedback_submitted', {
     feedback_rating: rating,
-  });
-  trackMeta('track', 'SubmitApplication', {
-    content_name: 'Feedback Form',
-    content_category: rating,
-  });
-  trackTikTok('SubmitForm', {
-    content_id: 'feedback-form',
-    content_type: 'product',
-    content_name: 'Feedback Form',
   });
 }
 
 function trackReviewPromptShown(url) {
-  trackGoogle('event', 'review_prompt_shown', {
+  event('review_prompt_shown', {
     review_url: url,
   });
 }
 
 function trackReviewClick(url) {
-  trackGoogle('event', 'review_click', {
+  event('review_click', {
     review_url: url,
-  });
-  trackMeta('track', 'Lead', {
-    content_name: 'Review Click',
-    content_category: 'review',
-  });
-  trackTikTok('Contact', {
-    content_id: 'review-click',
-    content_type: 'product',
-    content_name: 'Review Click',
   });
 }

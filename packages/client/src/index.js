@@ -284,28 +284,22 @@ class Manager {
           }
         }
       },
-      cookieConsent: {
+      // Consent (#383) — the region-gated banner. The palette/theme keys the
+      // old `cookieConsent` blob carried are gone: the panel paints itself from
+      // the --omega-* token sheet, which is the only way it is correct in both
+      // color modes. `type` is gone too — the visitor's timezone decides opt-in
+      // vs opt-out, never a config key.
+      consent: {
         enabled: true,
         config: {
-          // Token-aware defaults (classy v2): the banner rides the --omega-*
-          // sheet wherever it exists; fallbacks cover surfaces without it.
-          palette: {
-            popup: {
-              background: 'var(--omega-surface, #ffffff)',
-              text: 'var(--omega-ink, #1a1a19)'
-            },
-            button: {
-              background: 'var(--omega-ink, #1a1a19)',
-              text: 'var(--omega-ground, #ffffff)'
-            }
-          },
-          theme: 'classic',
           position: 'bottom-left',
-          // type: '',
-          // showLink: false,
           content: {
-            message: 'We use cookies to ensure you get the best experience on our website. By continuing to use the site, you agree to our { terms }.',
-            dismiss: 'I Understand'
+            message: 'We use cookies to improve your experience, measure traffic, and personalize marketing. See our { terms }.',
+            panelIntro: 'We and our partners use cookies and similar technologies to operate this site, measure how it is used, and personalize marketing. Necessary technologies are always active; the rest are yours to switch on or off, here or later, and a choice takes effect the moment you make it. See our { cookies } and { terms }.',
+            accept: 'Accept',
+            customize: 'Customize',
+            acceptAll: 'Accept all',
+            acceptNone: 'Accept none'
           }
         }
       },
@@ -584,8 +578,10 @@ class Manager {
       // Let auth module handle everything including DOM updates
       this._auth._handleAuthStateChange(user);
 
-      // Analytics identity follows auth (user_id = uuidv5(uid, namespace))
-      this._analytics.setUserId(user?.uid || null);
+      // Analytics follows auth: the identity on every runtime (user_id =
+      // uuidv5(uid, namespace)), plus the login/logout events on the runtimes
+      // that own them — web's auth pages fire their own (#328 gap 8)
+      this._analytics.handleAuthChange(user);
 
       // Update Chatsy with current user
       if (this._chatsy) {

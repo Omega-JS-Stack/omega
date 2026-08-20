@@ -455,12 +455,15 @@ const clientMarkup = {
 };
 
 // ---------------------------------------------------------------------------
-// Rule 11 — frontmatter `web_manager:` → `client:` (#1: it configures
-// @omega.js/client, and there is no dual-read)
+// Rule 11 — the client block's frontmatter key names: `web_manager:` →
+// `client:` (#1: it configures @omega.js/client, and there is no dual-read) and
+// its `cookieConsent:` sub-key → `consent:` (#383: the banner became a real
+// consent gate, and a page that disabled the old name would silently stop
+// disabling anything)
 // ---------------------------------------------------------------------------
 const clientFrontmatter = {
   id: 'client-frontmatter',
-  title: 'frontmatter `web_manager:` → `client:`',
+  title: 'frontmatter `web_manager:` → `client:`, `cookieConsent:` → `consent:`',
   apply(text) {
     const { lines, trailingNewline } = toLines(text);
     // Scoped to the leading `---` fence: a `web_manager:` in the body is prose
@@ -471,7 +474,11 @@ const clientFrontmatter = {
     const edits = [];
     const out = lines.map((line, index) => {
       if (index === 0 || index >= fenceEnd) return line;
-      const replaced = line.replace(/^web_manager:/, 'client:');
+      // `cookieConsent` is always INDENTED here — it only ever existed as a
+      // sub-key of the client block, never at the frontmatter's top level.
+      const replaced = line
+        .replace(/^web_manager:/, 'client:')
+        .replace(/^(\s+)cookieConsent:/, '$1consent:');
       if (replaced !== line) edits.push({ rule: 'client-frontmatter', line: index + 1, before: line.trim(), after: replaced.trim() });
       return replaced;
     });

@@ -222,7 +222,7 @@ Marketing.prototype.sync = async function (userDocOrUid) {
 
   const firstName = _.get(userDoc, 'personal.name.first');
   const lastName = _.get(userDoc, 'personal.name.last');
-  const source = _.get(userDoc, 'attribution.utm.tags.utm_source');
+  const source = _.get(userDoc, 'attribution.last.tags.utm_source');
   const results = {};
   const promises = [];
 

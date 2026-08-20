@@ -7,7 +7,7 @@ import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES, getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
 
 const logger = createLogger('account:billing');
@@ -1624,19 +1624,12 @@ function shuffleArray(arr) {
 // An ad blocker does not stub these snippets, it stops them loading, so the
 // names are simply never defined — and every caller here counts before it acts,
 // so one ReferenceError turned "Undo cancellation" into a dead button. The
-// guard this card was given first is now the framework's ONE analytics helper
-// ([#306]), which asks for each provider on its own: blockers work per list, so
-// a page with Google allowed and Meta blocked still counts what it can.
+// guard this card was given first is now the ONE canonical call ([#328]): the
+// catalog decides who hears `billing_action`, and the transport under it asks
+// for each provider on its own — blockers work per list, so a page with Google
+// allowed and Meta blocked still counts what it can.
 function trackBilling(action) {
-  trackGoogle('event', 'billing_action', {
+  event('billing_action', {
     action: action,
-  });
-  trackMeta('trackCustom', 'BillingAction', {
-    action: action,
-  });
-  trackTikTok('ViewContent', {
-    content_id: `billing-${action}`,
-    content_type: 'product',
-    content_name: `Billing ${action}`,
   });
 }

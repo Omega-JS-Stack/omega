@@ -1,4 +1,28 @@
-import core from './analytics-core.js';
+/**
+ * The client runtime's analytics — a HOST of `@omega.js/analytics`, never a
+ * second implementation of it ([#328](https://github.com/Omega-JS-Stack/omega/issues/328),
+ * stage E).
+ *
+ * `manager.analytics().event('<canonical>', params)` resolves through the shared
+ * catalog and adapters, exactly like a web page's call sites and the backend's
+ * webhook. What differs per runtime is the TRANSPORT, and this module is where
+ * each one is injected:
+ *
+ *   web                    the PAGE's transport — the guarded gtag/fbq/ttq the
+ *                          web host wired (`core/js/libs/analytics.js`), which
+ *                          also owns the consent gate and the attribution
+ *                          context. Nothing is configured here beyond the
+ *                          environment: a page's seams are the page's.
+ *   electron / extension   the Measurement Protocol, fed by the GA4 descriptor.
+ *                          Meta and TikTok resolve and then skip — no pixel
+ *                          exists in these runtimes to receive them.
+ *
+ * Identity is real here (#159 is closed): `setUserId` / `setUserProperties` SEND
+ * on web through the page's gtag instead of storing values only the Measurement
+ * Protocol payload ever read.
+ */
+import analytics from '@omega.js/analytics';
+import core from '@omega.js/analytics/core';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('analytics');
@@ -23,6 +47,7 @@ class Analytics {
     this.clientId = null;
     this.userId = null;
     this.userProperties = {};
+    this.authed = false;
   }
 
   // Check if runtime is supported
@@ -30,7 +55,7 @@ class Analytics {
     return SUPPORTED_RUNTIMES.includes(this.runtime);
   }
 
-  // Web's transport is the page's own gtag, never the Measurement Protocol
+  // Web's transport is the page's own pixels, never the Measurement Protocol
   _isWeb() {
     return this.runtime === 'web';
   }
@@ -69,18 +94,38 @@ class Analytics {
     this.secret = this._isWeb() ? null : config.secret;
 
     // Skip if no measurement ID. Web has none to require, since the gtag
-    // config is page-side (emitted by web core foot.html)
+    // config is page-side (the consent-gated loader owns it)
     if (!this.measurementId && !this._isWeb()) {
       logger.log('No measurement ID provided, skipping initialization');
       return;
     }
 
-    // Cross-surface identity — shared analytics-core (the ONE place the
+    // Cross-surface identity — @omega.js/analytics core (the ONE place the
     // uuidv5 math lives; desktop's main-process lib uses the same module)
     this.namespace = core.deriveNamespace(this.projectId);
 
     // Generate or retrieve client ID
     this.clientId = this._getClientId();
+
+    // The facade's environment seam is the brand's own `config.environment` —
+    // it decides whether an unknown event name throws and whether the fire log
+    // prints. Injected for EVERY runtime, because it is the one thing a page
+    // host cannot know before the config has loaded.
+    analytics.configure({
+      environment: this.devMode ? 'development' : 'production',
+    });
+
+    // The transport per runtime. On web it is the package's guarded browser
+    // transport — the same object the page host wires, so a client-fired event
+    // (a vert click, a permission prompt) counts on a page whose own call sites
+    // never loaded. The page keeps the seams only a page can supply: the
+    // consent gate and the attribution context.
+    analytics.configure(this._isWeb()
+      ? { transport: analytics.transports.browser }
+      : {
+        transport: { send: (descriptor) => this._sendViaMeasurementProtocol(descriptor) },
+        context: { runtime: this.runtime },
+      });
 
     // Log initialization
     logger.log(`Initializing with measurement ID: ${this.measurementId || 'page-side gtag'}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
@@ -129,21 +174,22 @@ class Analytics {
     };
   }
 
-  // Track an event
-  event(eventName, params = {}) {
+  /**
+   * Fire a canonical event.
+   *
+   * @param {string} eventName - A canonical name from the catalog — the SSOT
+   *   for what each provider is told and in which dialect.
+   * @param {object} [params] - That event's canonical params.
+   * @param {object} [options] - `{ eventId, providers }` for an event whose
+   *   other half fires server-side.
+   * @returns {void}
+   */
+  event(eventName, params = {}, options = {}) {
     if (!this._isSupported()) {
       return;
     }
 
     if (!this.initialized) {
-      return;
-    }
-
-    // Normalize to GA4's charset/length rule — same core call desktop makes,
-    // so an event name lands (or is rejected) identically on every surface
-    const name = core.normalizeEventName(eventName);
-    if (!name) {
-      logger.warn(`Dropping event with unusable name: ${eventName}`);
       return;
     }
 
@@ -153,42 +199,35 @@ class Analytics {
       ...params,
     };
 
-    // Log event
-    logger.log(`Event: ${name}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
-
-    // Transport split: web hands the event to the page's gtag; the
-    // Measurement Protocol stays exclusive to the runtimes that have no page
-    // of their own to carry a gtag config
-    if (this._isWeb()) {
-      this._sendViaGtag(name, eventParams);
-    } else {
-      this._sendViaFetch(name, eventParams);
-    }
+    // The facade walks consent → adapters → transport and never throws at a
+    // visitor; its own dev line is the per-fire trace.
+    analytics.event(eventName, eventParams, options);
   }
 
-  // Send event via the page's gtag (web). Web core foot.html emits the gtag
-  // config, and a no-op gtag stub when the brand has no analytics configured
-  _sendViaGtag(eventName, params = {}) {
-    if (typeof window.gtag !== 'function') {
-      logger.log('No gtag on the page, event not sent');
-      return;
+  /**
+   * The Measurement Protocol transport for the runtimes with no page pixels.
+   * GA4 is the only provider it can deliver: Meta's and TikTok's browser pixels
+   * do not exist in an Electron window or an extension context, so their
+   * descriptors report "blocked" and the fire log says so.
+   *
+   * @param {object} descriptor - The resolved provider descriptor.
+   * @returns {boolean} true when the descriptor was delivered.
+   */
+  _sendViaMeasurementProtocol(descriptor) {
+    if (descriptor.provider !== 'ga4') {
+      return false;
     }
 
-    window.gtag('event', eventName, params);
-  }
-
-  // Send event via Measurement Protocol (fetch)
-  _sendViaFetch(eventName, params = {}) {
     // Dev mode logs only — nothing posts
     if (this.devMode) {
       logger.log('Dev mode: event logged locally, not sent');
-      return;
+      return true;
     }
 
     // Measurement Protocol requires api_secret
     if (!this.secret) {
       logger.warn('No API secret provided, cannot send via Measurement Protocol');
-      return;
+      return false;
     }
 
     const url = core.buildCollectUrl(this.measurementId, this.secret);
@@ -197,9 +236,9 @@ class Analytics {
       clientId: this.clientId,
       userId: this.userId,
       userProperties: this.userProperties,
-      eventName,
+      eventName: descriptor.name,
       params: {
-        ...params,
+        ...descriptor.payload,
         engagement_time_msec: 100,
         session_id: this._getSessionId(),
       },
@@ -212,6 +251,8 @@ class Analytics {
     }).catch((err) => {
       logger.warn('Failed to send event:', err);
     });
+
+    return true;
   }
 
   // Get or generate session ID
@@ -255,10 +296,9 @@ class Analytics {
   }
 
   // Set user properties — GA4 wraps each value as { value } — merged into
-  // every subsequent event's user_properties block
+  // every subsequent event's user_properties block, and SENT on web through
+  // the page's own gtag (#159: they used to be stored and never sent)
   setUserProperties(properties = {}) {
-    // TODO: web stores but never sends these (only the MP payload reads them);
-    // wiring gtag("set", ...) is open — see #159
     if (!this._isSupported()) {
       return;
     }
@@ -268,13 +308,15 @@ class Analytics {
     }
 
     this.userProperties = { ...this.userProperties, ...core.wrapUserProperties(properties) };
+
+    if (this._isWeb()) {
+      this._setOnGtag({ user_properties: this.userProperties });
+    }
   }
 
   // Set user ID — raw uid in, uuidv5 out (the same value desktop/backend
   // emit for this uid). Without a namespace the raw uid is never sent.
   setUserId(userId) {
-    // TODO: web stores but never sends these (only the MP payload reads them);
-    // wiring gtag("set", ...) is open — see #159
     if (!this._isSupported()) {
       return;
     }
@@ -284,7 +326,73 @@ class Analytics {
     }
 
     this.userId = core.deriveUserId(userId, this.namespace);
+
+    // Web sends it (#159). A null userId is sent as null, which is how GA4 is
+    // told to stop attributing to the person who just signed out.
+    if (this._isWeb()) {
+      this._setOnGtag({ user_id: this.userId });
+    }
+  }
+
+  /**
+   * GA4's `set` command through the page's own gtag, guarded: an ad blocker
+   * does not stub the global, it keeps it from existing, and a bare call would
+   * throw a ReferenceError (#306).
+   * @param {object} properties - The `set` payload.
+   */
+  _setOnGtag(properties) {
+    // `typeof` against an undeclared NAME is the one check that does not throw:
+    // a blocker leaves `gtag` undefined rather than stubbed, so `window.gtag`
+    // would be a miss on any page that never made a window object of it.
+    if (typeof gtag !== 'function') {
+      return;
+    }
+
+    gtag('set', properties);
+  }
+
+  /**
+   * Auth transitions → the catalog's `login` / `logout`.
+   *
+   * The audited asymmetry (#328 inventory gap 8): desktop's main-process
+   * singleton fired these off its auth bridge while web and the extension fired
+   * nothing. The wiring belongs here, in the class every runtime shares — with
+   * ONE owner per surface:
+   *
+   *   web    the auth pages own it (`libs/auth/tracking.js` fires `login` with
+   *          the METHOD the visitor actually used, which an auth-state callback
+   *          cannot know), so this wiring stays out of web's way entirely.
+   *   other  this is the only owner. On desktop the renderer's client is
+   *          normally uninitialized (no Measurement Protocol secret reaches a
+   *          renderer), and the main-process singleton is what delivers.
+   *
+   * @param {object|null} user - The auth user, or null when signed out.
+   * @returns {void}
+   */
+  handleAuthChange(user) {
+    const uid = user?.uid || null;
+
+    // Identity follows auth on every runtime (user_id = uuidv5(uid, namespace))
+    this.setUserId(uid);
+
+    if (this._isWeb()) {
+      return;
+    }
+
+    if (uid && !this.authed) {
+      this.authed = true;
+      this.event('login', { method: user?.providerId || 'unknown', user_id: uid });
+    } else if (!uid && this.authed) {
+      this.authed = false;
+      this.event('logout');
+    }
   }
 }
 
 export default Analytics;
+
+// The facade itself, for the HOST that wires a runtime's seams — @omega.js/web's
+// page module reaches the package through here, because `@omega.js/analytics` is
+// private and exists in a consumer install only as the copy vendored into this
+// package's dist (HARD RULE 3).
+export { analytics };

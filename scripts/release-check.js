@@ -36,7 +36,7 @@ const path = require('node:path');
 // Constants
 const ROOT = path.join(__dirname, '..');
 const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web'];
-const PRIVATE_PACKAGES = ['devkit', 'config', 'account', 'template-kit'];
+const PRIVATE_PACKAGES = ['devkit', 'config', 'account', 'template-kit', 'analytics'];
 // Always packed even under --only: overrides point at these tarballs
 const OVERRIDE_PACKAGES = ['client', 'backend', 'mcp-router'];
 

@@ -84,7 +84,9 @@ module.exports = {
 
         // Attribution
         assert.equal(user.attribution.affiliate.code, null, 'attribution.affiliate.code should be null');
-        assert.deepEqual(user.attribution.utm.tags, {}, 'attribution.utm.tags should be empty object');
+        assert.deepEqual(user.attribution.first.tags, {}, 'attribution.first.tags should be empty object');
+        assert.deepEqual(user.attribution.first.clickIds, {}, 'attribution.first.clickIds should be empty object');
+        assert.equal(user.attribution.last.referrer, null, 'attribution.last.referrer should be null');
       },
     },
 
@@ -236,24 +238,37 @@ module.exports = {
       },
     },
 
-    // ─── $passthrough: utm.tags ───
+    // ─── $passthrough: touch tags + clickIds ───
 
     {
-      name: 'utm-tags-passthrough-preserves-all-tags',
+      name: 'touch-passthrough-preserves-all-tags-and-click-ids',
       async run({ assert }) {
         const user = createUser({
           attribution: {
-            utm: {
-              tags: { source: 'google', medium: 'cpc', campaign: 'summer' },
+            first: {
+              tags: { utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'summer' },
+              clickIds: { gclid: 'G1', gbraid: 'GB1' },
+              referrer: 'https://google.com/',
               timestamp: '2025-06-01T00:00:00.000Z',
+            },
+            last: {
+              tags: { utm_source: 'meta' },
+              clickIds: { fbclid: 'FB9' },
+              timestamp: '2025-08-01T00:00:00.000Z',
             },
           },
         });
 
-        assert.equal(user.attribution.utm.tags.source, 'google', 'utm source preserved');
-        assert.equal(user.attribution.utm.tags.medium, 'cpc', 'utm medium preserved');
-        assert.equal(user.attribution.utm.tags.campaign, 'summer', 'utm campaign preserved');
-        assert.equal(user.attribution.utm.timestamp, '2025-06-01T00:00:00.000Z', 'utm timestamp preserved');
+        assert.equal(user.attribution.first.tags.utm_source, 'google', 'first-touch utm source preserved');
+        assert.equal(user.attribution.first.tags.utm_medium, 'cpc', 'first-touch utm medium preserved');
+        assert.equal(user.attribution.first.tags.utm_campaign, 'summer', 'first-touch utm campaign preserved');
+        assert.equal(user.attribution.first.clickIds.gclid, 'G1', 'first-touch click id preserved');
+        assert.equal(user.attribution.first.clickIds.gbraid, 'GB1', 'every click id in the family passes through');
+        assert.equal(user.attribution.first.referrer, 'https://google.com/', 'first-touch referrer preserved');
+        assert.equal(user.attribution.first.timestamp, '2025-06-01T00:00:00.000Z', 'first-touch timestamp preserved');
+        assert.equal(user.attribution.last.tags.utm_source, 'meta', 'last-touch utm source preserved');
+        assert.equal(user.attribution.last.clickIds.fbclid, 'FB9', 'last-touch click id preserved');
+        assert.equal(user.attribution.last.timestamp, '2025-08-01T00:00:00.000Z', 'last-touch timestamp preserved');
       },
     },
 
@@ -406,7 +421,7 @@ module.exports = {
         const user = createUser({});
         const expectedKeys = [
           'auth', 'subscription', 'roles', 'flags', 'affiliate',
-          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'consent', 'metadata',
+          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent', 'metadata',
         ];
 
         for (const key of expectedKeys) {
@@ -421,7 +436,7 @@ module.exports = {
         const user = createUser({});
         const expectedKeys = [
           'auth', 'subscription', 'roles', 'flags', 'affiliate',
-          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'consent', 'metadata',
+          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent', 'metadata',
         ];
 
         for (const key of Object.keys(user)) {
@@ -730,7 +745,7 @@ module.exports = {
           },
           attribution: {
             affiliate: { code: 'PARTNER1', timestamp: '2024-06-01T00:00:00.000Z' },
-            utm: { tags: { source: 'twitter', campaign: 'launch' }, url: 'https://example.com' },
+            last: { tags: { utm_source: 'twitter', utm_campaign: 'launch' }, url: 'https://example.com' },
           },
         });
 
@@ -748,7 +763,7 @@ module.exports = {
         assert.equal(user.personal.name.first, 'Ian', 'name preserved');
         assert.equal(user.personal.company.name, 'ITW Creative Works', 'company preserved');
         assert.equal(user.personal.birthday.timestampUNIX, 642988800, 'birthday preserved');
-        assert.equal(user.attribution.utm.tags.source, 'twitter', 'utm tags preserved');
+        assert.equal(user.attribution.last.tags.utm_source, 'twitter', 'utm tags preserved');
       },
     },
   ],

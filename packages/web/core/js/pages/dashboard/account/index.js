@@ -12,7 +12,7 @@ import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
 import omega from '@omega.js/client';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -343,15 +343,7 @@ function showSection(sectionId) {
 
 // Tracking functions
 function trackAccountSectionView(sectionId) {
-  trackGoogle('event', 'account_section_view', {
+  event('account_section_view', {
     section_name: sectionId
-  });
-  trackMeta('trackCustom', 'AccountSectionView', {
-    section: sectionId
-  });
-  trackTikTok('ViewContent', {
-    content_id: `account-${sectionId}`,
-    content_type: 'product',
-    content_name: `Account ${sectionId}`
   });
 }

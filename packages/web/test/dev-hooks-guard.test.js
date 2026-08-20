@@ -72,8 +72,15 @@ const ALLOWED_GLOBALS = {
   Sentry: 'the vendor SDK\'s own documented global (client/src/modules/sentry.js)',
   bootstrap: 'the vendor UMD bundle\'s own documented global, published by every theme entry and read in production (core/js/core/exit-popup.js)',
   adsbygoogle: 'AdSense\'s own queue, pushed the way Google documents it',
-  gtag: 'the dev tracking interceptor wraps the analytics global in place',
-  fbq: 'the dev tracking interceptor wraps the analytics global in place',
+  // The consent-gated loader installs each provider's own documented globals
+  // (#383) — the queues the vendor snippets used to create inline in foot.html,
+  // moved into JS so consent decides whether they exist at all.
+  gtag: 'Google\'s own documented command queue (core/js/core/analytics-loader.js)',
+  fbq: 'the Meta pixel snippet\'s own global, verbatim from the vendor bootstrap',
+  dataLayer: 'Google\'s own documented queue (core/js/core/analytics-loader.js)',
+  _fbq: 'the Meta pixel snippet\'s own global, verbatim from the vendor bootstrap',
+  ttq: 'the TikTok pixel\'s own documented global',
+  TiktokAnalyticsObject: 'the TikTok pixel snippet\'s own name marker, verbatim from the vendor bootstrap',
   onbeforeunload: 'a standard window handler, not a helper',
   __OMEGA_SIGNOUT_IN_PROGRESS: 'auth flow coordination across modules, production behaviour',
   __OMEGA_REVERSING_SIGNUP: 'auth flow coordination across modules, production behaviour',

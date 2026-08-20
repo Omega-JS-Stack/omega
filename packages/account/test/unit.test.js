@@ -285,7 +285,7 @@ test('suspended paid plan falls back to basic', () => {
 // ─── Schema export sanity ───
 
 test('USER_SCHEMA is exported and carries the canonical branches', () => {
-  for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'consent']) {
+  for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent']) {
     assert.ok(USER_SCHEMA[branch], `missing branch: ${branch}`);
   }
 });

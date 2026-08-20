@@ -420,14 +420,14 @@ module.exports = {
         const empty = resolve(signupSchema({ user }), {});
         assert.equal(
           J(empty),
-          J({ uid: 'u1', attribution: {}, context: {}, consent: { legal: { granted: false, text: '' }, marketing: { granted: false, text: '' } } }),
+          J({ uid: 'u1', attribution: {}, trackingConsent: null, context: {}, consent: { legal: { granted: false, text: '' }, marketing: { granted: false, text: '' } } }),
           'Empty signup resolves the pinned consent structure'
         );
 
         const partial = resolve(signupSchema({ user }), { consent: { legal: { granted: 1 } }, attribution: { src: 'x' }, evil: 'strip' });
         assert.equal(
           J(partial),
-          J({ uid: 'u1', attribution: { src: 'x' }, context: {}, consent: { legal: { granted: true, text: '' }, marketing: { granted: false, text: '' } } }),
+          J({ uid: 'u1', attribution: { src: 'x' }, trackingConsent: null, context: {}, consent: { legal: { granted: true, text: '' }, marketing: { granted: false, text: '' } } }),
           'Partial consent coerces granted, defaults the rest, strips unknowns'
         );
       },

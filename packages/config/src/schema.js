@@ -727,6 +727,32 @@ const SHARED_SCHEMA = [
     description: 'Web only: extra page paths/folders to skip (system pages like checkout/legal/auth are always skipped).',
   },
 
+  // ── client (the @omega.js/client runtime blob) ───────────────────────────
+  // The blob is a settings bag the client normalizes against its own defaults,
+  // so it is deliberately NOT enumerated key by key here. `consent` is the
+  // exception (#383): it decides whether a visitor is tracked at all, which is
+  // a legal surface, not a preference — a typo that silently disabled the
+  // banner would ship a site with no consent gate and no error.
+  {
+    path:        'client.consent.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'The consent banner + the provider-script gate (default true). false ships NO banner — legal only for a site that loads no analytics/marketing provider at all.',
+  },
+  {
+    path:        'client.consent.config.position',
+    type:        'string',
+    required:    false,
+    enum:        ['bottom-left', 'bottom-right', 'bottom'],
+    description: "Where the panel sits. 'bottom' is the centered full-width form.",
+  },
+  {
+    path:        'client.consent.config.content',
+    type:        'object',
+    required:    false,
+    description: "Banner copy: message, panelIntro, accept, customize, acceptAll, acceptNone (a literal `{terms}`/`{cookies}` links the terms/cookie-policy page). Category labels are framework copy — a brand renames the buttons, not the categories.",
+  },
+
   // ── targets ──────────────────────────────────────────────────────────────
   {
     path:        'targets',

@@ -370,7 +370,7 @@ const FIELDS = {
   user_subscription_payment_last_date:   { display: 'Last Payment Date', source: 'user', path: 'subscription.payment.updatedBy.date.timestamp', type: 'date' },
 
   // Attribution
-  user_attribution_utm_source:           { display: 'UTM Source', source: 'user', path: 'attribution.utm.tags.utm_source', type: 'text', skip: ['beehiiv'] },
+  user_attribution_utm_source:           { display: 'UTM Source', source: 'user', path: 'attribution.last.tags.utm_source', type: 'text', skip: ['beehiiv'] },
 };
 
 // Master segment dictionary — SSOT for all marketing segments.

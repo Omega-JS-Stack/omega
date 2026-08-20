@@ -2,13 +2,13 @@
 
 The OMEGA monorepo — a unified full-stack framework ecosystem for launching and operating brands: website, backend, browser extension, and desktop app from one source of truth.
 
-Published packages live under the `@omega.js` npm scope. Private shared internals (`account`, `config`, `devkit`, `template-kit`) are bundled into the frameworks at build time; `@omega.js/client` publishes as a real runtime dependency of the desktop and extension frameworks.
+Published packages live under the `@omega.js` npm scope. Private shared internals (`account`, `analytics`, `config`, `devkit`, `template-kit`) are bundled into the frameworks at build time; `@omega.js/client` publishes as a real runtime dependency of the desktop and extension frameworks.
 
 ## Layout
 
 | Directory | Contents |
 |-----------|----------|
-| `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + the orchestration engine (`manager`) + shared internals (`client`, `account`, `config`, `devkit`, `template-kit`) |
+| `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + the orchestration engine (`manager`) + shared internals (`client`, `account`, `analytics`, `config`, `devkit`, `template-kit`) |
 | `apps/` | The three in-repo test brands: `sandbox-brand` (synthetic fixture for the corpus/e2e), `omega-playground` ("Paperloom", classy theme), `newsflash-brand` ("The Daily Build", newsflash theme) — the real brand lives in a sibling repo |
 | `docs/` | The knowledge home: cross-framework contracts in `docs/shared/`, each framework's guide in `docs/<framework>/` |
 | `agent-plugins/` | Knowledge shipped to coding agents — `claude/` is a Claude Code plugin (skills + hooks) that the committed `.claude/settings.json` auto-installs after one trust prompt |

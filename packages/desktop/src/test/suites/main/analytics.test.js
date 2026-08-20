@@ -164,16 +164,39 @@ module.exports = {
       },
     },
     {
-      name: 'event name normalization (GA4 contract)',
-      run: (ctx) => {
+      // The catalog owns the NAME now (#328 stage E): this module no longer
+      // normalizes free-typed strings, it fires canonical events and the shared
+      // adapters decide what GA4 is told. An uncatalogued name is a programmer
+      // error — logged and skipped rather than posted as junk.
+      name: 'the shared catalog decides the name; an unknown one never posts',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { GOOGLE_ANALYTICS_SECRET: 'fake-secret' }, {
+          enabled: true,
+          providers: { google: { id: 'G-TESTID12' } },
+        });
+
         const a = ctx.manager.analytics;
-        ctx.expect(a._normalizeName('Hello World!')).toBe('Hello_World');
-        ctx.expect(a._normalizeName('___trim___')).toBe('trim');
-        ctx.expect(a._normalizeName('multi___underscores')).toBe('multi_underscores');
-        ctx.expect(a._normalizeName('valid_name_42')).toBe('valid_name_42');
-        ctx.expect(a._normalizeName(null)).toBe(null);
-        ctx.expect(a._normalizeName('')).toBe(null);
-        ctx.expect(a._normalizeName('a'.repeat(50))).toBe('a'.repeat(40));
+        const origSend = a._send;
+        const sent = [];
+        a._send = (descriptor) => { sent.push(descriptor); return true; };
+
+        try {
+          a.event('screen_view', { screen_name: 'Settings' });
+          ctx.expect(sent.length).toBe(1);
+          ctx.expect(sent[0].provider).toBe('ga4');
+          ctx.expect(sent[0].name).toBe('screen_view');
+          ctx.expect(sent[0].payload.screen_name).toBe('Settings');
+          // The enrichment desktop still owns rides the payload
+          ctx.expect(typeof sent[0].payload.session_id).toBe('string');
+          ctx.expect(typeof sent[0].payload.engagement_time_msec).toBe('number');
+
+          sent.length = 0;
+          a.event('Hello World!', { x: 1 });
+          ctx.expect(sent.length).toBe(0);
+        } finally {
+          a._send = origSend;
+          await restore();
+        }
       },
     },
     {
@@ -194,7 +217,7 @@ module.exports = {
         const restore = await reinit(ctx, {}, { enabled: false });
         try {
           // Should not throw.
-          ctx.manager.analytics.event('test_event', { x: 1 });
+          ctx.manager.analytics.event('app_launch', { x: 1 });
           ctx.expect(true).toBe(true);
         } finally { await restore(); }
       },

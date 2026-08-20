@@ -120,7 +120,7 @@ async function generateBuildJs(outputDir) {
           appCheck: { enabled: false, config: {} },
         },
 
-        cookieConsent: { enabled: true, config: {} },
+        consent: { enabled: true, config: {} },
         inbound: (() => {
           // Curated to the leaves the client runtime reads (#23) — the provisioning-only
           // siblings (template ids, plan, update flags) never ship in the bundle

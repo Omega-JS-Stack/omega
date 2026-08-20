@@ -4,7 +4,7 @@
 
 // Libraries
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 /* @dev-only:start */
 // The page's dev control lives in the dev palette, not on window (#234, #342).
@@ -133,21 +133,9 @@ function setupInstallTracking() {
 function trackInstallClick(browser, installUrl) {
   console.log('Extension install clicked:', browser, installUrl);
 
-  trackGoogle('event', 'extension_install', {
+  event('extension_install', {
     browser: browser,
     install_url: installUrl,
-  });
-
-  trackMeta('trackCustom', 'ExtensionInstall', {
-    content_name: `${browser} extension`,
-    content_category: browser,
-    content_type: 'extension',
-  });
-
-  trackTikTok('Download', {
-    content_id: `extension-${browser}`,
-    content_type: 'product',
-    content_name: `${browser} extension`,
   });
 }
 

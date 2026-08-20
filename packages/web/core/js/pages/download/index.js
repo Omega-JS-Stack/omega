@@ -6,7 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 /* @dev-only:start */
 // The page's dev control lives in the dev palette, not on window (#234, #342).
@@ -290,22 +290,12 @@ function resetAutoAdvance($slideshow) {
 function trackDownloadClick(platform, downloadName, downloadUrl) {
   console.log('Download clicked:', platform, downloadName, downloadUrl);
 
-  trackGoogle('event', 'download', {
+  // `file_download` is GA4's standard name — the literal `download` this page
+  // used to send was a name nothing but us understood (#328 inventory gap 10).
+  event('file_download', {
     platform: platform,
     download_name: downloadName,
     download_url: downloadUrl,
-  });
-
-  trackMeta('trackCustom', 'Download', {
-    content_name: downloadName,
-    content_category: platform,
-    content_type: 'download',
-  });
-
-  trackTikTok('Download', {
-    content_id: `download-${platform}`,
-    content_type: 'product',
-    content_name: downloadName,
   });
 }
 

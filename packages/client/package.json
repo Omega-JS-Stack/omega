@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@omega.js/account": "*",
+    "@omega.js/analytics": "*",
     "@omega.js/devkit": "*",
     "prepare-package": "^2.2.0"
   }

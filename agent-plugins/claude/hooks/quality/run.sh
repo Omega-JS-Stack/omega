@@ -2,7 +2,8 @@
 # omega:quality — PostToolUse (Write|Edit) + Stop hook
 # Fires the quality skills deterministically instead of by model judgment: a
 # write to a web surface asks for the skills that own it (omega:seo,
-# omega:accessibility, omega:brandcheck), and the Stop pass refuses a sign-off
+# omega:accessibility, omega:brandcheck), a write to a flow or money surface
+# asks for omega:analytics, and the Stop pass refuses a sign-off
 # that never went through their checklists. One script for both events so the
 # surface table has ONE home; the event comes off hook_event_name.
 # Fails open on anything unexpected, and only polices projects that depend on
@@ -85,6 +86,12 @@ done <<'MAP'
 */omega.json5 omega:brandcheck
 */_includes/*.json omega:brandcheck
 */sections/*.json5 omega:brandcheck
+*/core/js/pages/* omega:analytics
+*/core/js/libs/auth/* omega:analytics
+*/routes/payments/* omega:analytics
+*/events/firestore/payments-webhooks/* omega:analytics
+*/events/auth/* omega:analytics
+*/packages/analytics/* omega:analytics
 MAP
 
 [ "${#matched[@]}" -gt 0 ] || exit 0

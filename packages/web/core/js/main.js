@@ -1,5 +1,6 @@
 // Static imports for core modules (bundled together for efficiency)
 // import initializeModule from '__main_assets__/js/core/initialize.js';
+import analyticsLoaderModule from '__main_assets__/js/core/analytics-loader.js';
 import authModule from '__main_assets__/js/core/auth.js';
 import lazyLoadingModule from '__main_assets__/js/core/lazy-loading.js';
 import queryStringsModule from '__main_assets__/js/core/query-strings.js';
@@ -10,6 +11,7 @@ import motionModule from '__main_assets__/js/core/motion.js';
 import languageSwitcherModule from '__main_assets__/js/core/language-switcher.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggle.js';
+import { configureAnalytics } from '__main_assets__/js/libs/analytics.js';
 
 import omega from '@omega.js/client';
 
@@ -33,6 +35,15 @@ export default async function ({ manager, options } = {}) {
 
   // Initialize fixed modules synchronously (already loaded via static imports)
   // initializeModule({ manager, options });
+  // FIRST (#383): the consent gate queues Google Consent Mode's default before
+  // any provider script can load, and nothing else may count an event ahead of
+  // that decision.
+  analyticsLoaderModule({ manager, options });
+  // …and the page's own analytics seams go in beside it (#386), so an event
+  // fired by shared client code — a vert click, a notification prompt — is
+  // gated on this visitor's consent and carries their attribution, on a page
+  // whose own call sites never loaded.
+  configureAnalytics();
   authModule({ manager, options });
   lazyLoadingModule({ manager, options });
   queryStringsModule({ manager, options });
@@ -65,7 +76,7 @@ export default async function ({ manager, options } = {}) {
   // template literals) — esbuild resolves and inlines each dynamic import;
   // webpack-style expression contexts don't exist here.
   const conditionalModules = [
-    { path: 'cookieconsent.js', configKey: 'cookieConsent', load: () => import('__main_assets__/js/core/cookieconsent.js') },
+    { path: 'consent.js', configKey: 'consent', load: () => import('__main_assets__/js/core/consent.js') },
     { path: 'exit-popup.js', configKey: 'exitPopup', load: () => import('__main_assets__/js/core/exit-popup.js') },
     { path: 'social-sharing.js', configKey: 'socialSharing', load: () => import('__main_assets__/js/core/social-sharing.js') }
   ];

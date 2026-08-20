@@ -109,6 +109,7 @@ module.exports = {
             trial: false,
             verification: {},
             attribution: {},
+            trackingConsent: null,
             discount: null,
             supplemental: {},
             simulate: null,

@@ -55,7 +55,7 @@ Each skill is asked for once per session (a marker file under `TMPDIR`, keyed on
 
 ## The quality hook
 
-The three quality skills do not wait to be remembered. `hooks/quality/run.sh` serves two events from one script — so the surface table has one home — and fires them off the files a session actually edits:
+The four quality skills do not wait to be remembered. `hooks/quality/run.sh` serves two events from one script — so the surface table has one home — and fires them off the files a session actually edits:
 
 | Surface written or edited | Skills asked for |
 |---|---|
@@ -64,11 +64,14 @@ The three quality skills do not wait to be remembered. `hooks/quality/run.sh` se
 | an include, section, or component partial; page/core JS | `omega:accessibility` |
 | `.scss` / `.css` | `omega:accessibility`, `omega:brandcheck` |
 | `omega.json5`, section data JSON, a section schema | `omega:brandcheck` |
+| a web flow page or auth module (`*/core/js/pages/*`, `*/core/js/libs/auth/*`) | `omega:analytics` (plus `omega:accessibility` from the core-JS row) |
+| a backend payment route, payments-webhook or auth event | `omega:analytics` |
+| the analytics package itself (`*/packages/analytics/*`) | `omega:analytics` |
 
 On `PostToolUse` (Write|Edit) a match names its skills once per session per skill and records the file. On `Stop` the recorded list comes back as a block: the surfaces edited this session, the checklists they owe, and a refusal to sign off on an unreviewed pass. The block runs once per batch of edits (the list clears, so a later edit re-arms it) and never inside its own turn (`stop_hook_active`). Same scope guard as the shape hook, literally: both source `hooks/lib/omega-scope.sh`, which walks up from the edited file to the nearest `package.json` (stopping at the git root) and answers whether that project is or depends on `@omega.js/*`. The inject hook asks a different question — a project from a cwd, with its `functions/` manifest joined in — and keeps its own walk. Fail-open throughout. Covered by the quality cases in `scripts/agent-plugins.test.js`.
 
 ## What is here, and what is not built yet
 
-Eleven skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), `browser` (driving the MCP router's Chrome upstreams), and the three quality checklists (`seo`, `accessibility`, `brandcheck`) the quality hook fires on web-surface edits. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
+Twelve skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), `browser` (driving the MCP router's Chrome upstreams), and the four quality checklists (`seo`, `accessibility`, `brandcheck`, `analytics`) the quality hook fires on the surfaces they own. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
 
 **The staleness mechanism.** This is the point of the move, not a bonus. Whatever ships needs something that fails when a skill names an export, a path, a config key, or a CLI command the code no longer has. A test in this repo is the strongest form; a generated section is next; a review trigger tied to a release is the floor. A plugin that goes stale quietly has only relocated the problem.

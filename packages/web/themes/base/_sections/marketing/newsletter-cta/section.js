@@ -15,7 +15,7 @@
 import omega from '@omega.js/client';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { initializeRecaptcha, getRecaptchaToken } from '__main_assets__/js/libs/recaptcha.js';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 export default (el) => {
   const $form = el.querySelector('form.newsletter-form');
@@ -70,18 +70,7 @@ export default (el) => {
 
 // Tracking (the guarded helper no-ops per provider when its global is absent)
 function trackNewsletterSignup() {
-  trackGoogle('event', 'newsletter_signup', {
-    event_category: 'engagement',
-    event_label: 'newsletter-cta',
-    value: 1,
-  });
-  trackMeta('track', 'Lead', {
-    content_name: 'Newsletter',
-    status: 'success',
-  });
-  trackTikTok('Subscribe', {
-    content_id: 'newsletter-cta',
-    content_type: 'product',
-    content_name: 'Newsletter',
+  event('newsletter_signup', {
+    method: 'newsletter-cta',
   });
 }

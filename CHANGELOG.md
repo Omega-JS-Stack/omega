@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#382](../../issues/382) — The `@omega.js/analytics` internal package: one typed event catalog, per-provider adapters (GA4, Meta, TikTok), a guarded browser transport, and the consent seam — vendored into every framework so all targets speak one contract.
+- [#385](../../issues/385) — Server-side conversion delivery with full match data: Meta CAPI, Google, and TikTok Events read the order's stored attribution — click ids, hashed email and phone, the raw-uid external id, IP and user agent — so money events land even when the browser is blocked or offline.
+- [#328](../../issues/328) — The browser pixels learn the signed-in user: shared per-provider hashing (`@omega.js/analytics/identity`) feeds Meta advanced matching and TikTok identify with hashed email and phone plus the raw-uid external id, linking the browser half and the server half of one person.
+- [#387](../../issues/387) — The Claude plugin ships an `omega:analytics` skill, and the quality hook surfaces analytics rows for sessions touching tracking code.
+- [#390](../../issues/390) — The dev palette carries a Storage section: a target dropdown (All, or any top-level key, listed from live storage on every open) with Log and Clear buttons acting on the selection.
+- [#391](../../issues/391) — The consent banner v2: a cookie icon, a dense configurable intro, instant-saving pill switches, and an Accept all / Accept none pair in place of Save. Opt-out regions (US) see no banner at all — just the Cookie Policy tab that reopens it.
+
+### Changed
+- [#383](../../issues/383) — Consent is region-aware and two-tier: opt-in regions see the banner before anything tracks, opt-out regions get only the reopening tab, and grants flow through Google Consent Mode and gate every pixel load.
+- [#384](../../issues/384) — Attribution capture rebuilt: click ids (fbclid, gclid, ttclid), first and last touch, and one structured shape carried from landing through checkout onto the order, where the server conversions read it.
+- [#386](../../issues/386) — Every tracking call site on every target rides the typed catalog; the dev interceptors are retired and the event gaps closed. Client events are UI and journey truth, server events are money and account truth, and the two dedupe where both fire.
+
 ## [0.41.0] 2026-08-19
 
 ### Added

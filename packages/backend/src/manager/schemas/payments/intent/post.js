@@ -11,6 +11,9 @@ module.exports = () => f.object({
   trial: f.boolean({ default: false }),
   verification: f.passthrough({ default: {} }),
   attribution: f.passthrough({ default: {} }),
+  // The client's tracking-consent snapshot, stored verbatim beside attribution and
+  // folded onto the order — never interpreted here. Absent when nothing was captured.
+  trackingConsent: f.passthrough({ default: null }),
   discount: f.string({ default: null }),
   supplemental: f.passthrough({ default: {} }),
   // Checkout simulation — honored ONLY by the test processor (itself

@@ -1,0 +1,424 @@
+// The consent banner and its reopen tab (core/js/core/consent.js, #383/#391).
+//
+// Every color here is an `--omega-*` token, so the panel is correct in both
+// `data-bs-theme` modes and carries the token sheet's tested contrast — the
+// old banner painted itself from raw config hex, which was one palette for two
+// modes and an untested pairing in each. Every control is a real button or a
+// real checkbox with a visible `:focus-visible` ring: the category switches are
+// the page's own checkboxes repainted (`appearance: none`), never a div wearing
+// a pill, so focus, keyboard and the bound label all come for free.
+
+// ============================================
+// The panel
+// ============================================
+
+.omega-consent {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  padding: 1.375rem;
+  max-width: 28rem;
+  background-color: var(--omega-surface);
+  color: var(--omega-ink);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  box-shadow: var(--omega-shadow-2);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  opacity: 0;
+  transform: translateY(1rem);
+  transition:
+    opacity var(--omega-speed-slow) var(--omega-ease),
+    transform var(--omega-speed-slow) var(--omega-ease);
+
+  &.omega-consent--show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  &.omega-consent--hide {
+    opacity: 0;
+    transform: translateY(1rem);
+    // The out-animation keeps the buttons on screen for a beat — dead to the
+    // pointer, so a late second click cannot re-answer (#391 review).
+    pointer-events: none;
+  }
+}
+
+// ============================================
+// Placement
+// ============================================
+
+.omega-consent {
+  &.omega-consent--bottom-left {
+    bottom: 1rem;
+    left: 1rem;
+  }
+
+  &.omega-consent--bottom-right {
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  &.omega-consent--bottom {
+    bottom: 1rem;
+    left: 50%;
+    max-width: 90%;
+    width: 34rem;
+    transform: translateX(-50%) translateY(1rem);
+
+    &.omega-consent--show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    &.omega-consent--hide {
+      transform: translateX(-50%) translateY(1rem);
+    }
+  }
+}
+
+// ============================================
+// Message
+// ============================================
+
+.omega-consent__message {
+  margin: 0;
+}
+
+.omega-consent__link {
+  color: var(--omega-accent);
+  text-decoration: underline;
+
+  &:hover {
+    color: var(--omega-accent-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+    border-radius: var(--omega-radius-xs);
+  }
+}
+
+// ============================================
+// Controls — the big Accept + small Customize row, and the panel's own pair
+// ============================================
+
+.omega-consent__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+
+  // Customize hides the whole row (Accept all inside the panel is the same
+  // grant), and a flex container ignores `hidden` unless it is told not to.
+  &[hidden] {
+    display: none;
+  }
+}
+
+.omega-consent__accept,
+.omega-consent__accept-all,
+.omega-consent__accept-none {
+  padding: 0.625rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--omega-radius-m);
+  background-color: var(--omega-accent);
+  color: var(--omega-accent-ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease),
+    color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    background-color: var(--omega-accent-hover);
+  }
+
+  &:active {
+    background-color: var(--omega-accent-active);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+}
+
+.omega-consent__accept {
+  width: 100%;
+}
+
+// The refusal is the SAME size and the SAME one click as the grant beside it —
+// quieter paint, never a harder path (the EU equal-ease rule).
+.omega-consent__accept-none {
+  border-color: var(--omega-accent);
+  background-color: transparent;
+  color: var(--omega-accent);
+
+  &:hover {
+    background-color: var(--omega-accent-subtle);
+    color: var(--omega-accent-hover);
+  }
+
+  &:active {
+    background-color: var(--omega-accent-subtle);
+    color: var(--omega-accent-active);
+  }
+}
+
+.omega-consent__customize {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--omega-radius-xs);
+  background: none;
+  color: var(--omega-ink-muted);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    color: var(--omega-ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+}
+
+// ============================================
+// The per-category options Customize reveals
+// ============================================
+
+// Flush with the banner body (Ian 2026-08-20) — no nested card around the
+// disclosure and switches, just the column's own spacing.
+.omega-consent__options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+// The disclosure the ask stands on: quieter than the message but the same
+// size (Ian 2026-08-20 — no shrunken legalese).
+.omega-consent__intro {
+  margin: 0;
+  color: var(--omega-ink-muted);
+  line-height: 1.5;
+}
+
+.omega-consent__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem 1.25rem;
+}
+
+.omega-consent__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+}
+
+// A real checkbox repainted as a switch — same element, same keyboard, same
+// bound label; only the box is ours.
+.omega-consent__switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  margin: 0;
+  width: 2.125rem;
+  height: 1.1875rem;
+  background-color: var(--omega-line-strong);
+  border: 1px solid var(--omega-line-strong);
+  border-radius: var(--omega-radius-pill);
+  cursor: pointer;
+  transition:
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.1875rem;
+    width: 0.8125rem;
+    height: 0.8125rem;
+    background-color: var(--omega-surface);
+    border-radius: 50%;
+    transform: translate(0, -50%);
+    transition: transform var(--omega-speed) var(--omega-ease);
+  }
+
+  &:checked {
+    background-color: var(--omega-accent);
+    border-color: var(--omega-accent);
+
+    &::after {
+      transform: translate(0.875rem, -50%);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+}
+
+.omega-consent__toggle-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.omega-consent__toggle--locked .omega-consent__toggle-label {
+  color: var(--omega-ink-muted);
+  cursor: default;
+}
+
+// The pair fills the row, half each (Ian 2026-08-20): full width and centered
+// by construction, with the refusal the same size as the grant beside it.
+.omega-consent__panel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+// ============================================
+// The reopen tab
+// ============================================
+
+.omega-consent__tab {
+  position: fixed;
+  z-index: 9998;
+  bottom: 0;
+  padding: 0.5rem 0.875rem;
+  background-color: var(--omega-surface);
+  color: var(--omega-ink-muted);
+  border: 1px solid var(--omega-line);
+  border-bottom: none;
+  border-radius: var(--omega-radius-s) var(--omega-radius-s) 0 0;
+  box-shadow: var(--omega-shadow-1);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(100%);
+  transition:
+    opacity var(--omega-speed-slow) var(--omega-ease),
+    transform var(--omega-speed) var(--omega-ease),
+    color var(--omega-speed) var(--omega-ease);
+
+  // How much of the tab peeks above the fold when it is at rest.
+  --omega-consent-tab-offset: 1.5rem;
+
+  // A forgiving halo: an invisible hit area past the visible sliver, so the
+  // tab rises (and takes the click) when the pointer is merely NEAR it.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -1.25rem -1rem 0;
+  }
+
+  .omega-consent__icon {
+    color: var(--omega-accent);
+    margin-right: 0.375rem;
+  }
+
+  &.omega-consent__tab--show {
+    opacity: 1;
+    transform: translateY(var(--omega-consent-tab-offset));
+  }
+
+  &.omega-consent__tab--show:hover,
+  &.omega-consent__tab--show:focus-visible {
+    color: var(--omega-ink);
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+
+  &.omega-consent--bottom-left {
+    left: 2rem;
+  }
+
+  &.omega-consent--bottom-right {
+    right: 2rem;
+  }
+
+  &.omega-consent--bottom {
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+
+    &.omega-consent__tab--show {
+      transform: translateX(-50%) translateY(var(--omega-consent-tab-offset));
+    }
+
+    &.omega-consent__tab--show:hover,
+    &.omega-consent__tab--show:focus-visible {
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+}
+
+// ============================================
+// Reduced motion — the panel arrives, it does not travel
+// ============================================
+
+@media (prefers-reduced-motion: reduce) {
+  .omega-consent,
+  .omega-consent__accept,
+  .omega-consent__accept-all,
+  .omega-consent__accept-none,
+  .omega-consent__customize,
+  .omega-consent__switch,
+  .omega-consent__switch::after,
+  .omega-consent__tab {
+    transition: none;
+  }
+}
+
+// ============================================
+// Small viewports
+// ============================================
+
+@media (max-width: 576px) {
+  .omega-consent {
+    max-width: calc(100% - 2rem);
+
+    // Every brand floats a chat launcher in the bottom corner on phones; the
+    // panel sits above that zone so Accept none is never under the bubble.
+    &.omega-consent--bottom-left,
+    &.omega-consent--bottom-right,
+    &.omega-consent--bottom {
+      bottom: 5.5rem;
+    }
+
+    &.omega-consent--bottom {
+      width: calc(100% - 2rem);
+    }
+  }
+
+  // Full-width stacked pair: big tap targets, and neither button lives in the
+  // corner the chat launcher owns.
+  .omega-consent__panel-actions {
+    grid-template-columns: 1fr;
+  }
+}

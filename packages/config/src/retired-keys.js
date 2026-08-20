@@ -37,6 +37,10 @@ const RETIRED_KEYS = {
     replacement: 'cloud',
     why: "the provider-discriminated role key: cloud: { provider: 'firebase', config: {…} }",
   },
+  cookieConsent: {
+    replacement: 'client.consent',
+    why: 'the banner became a real consent gate (#383) — the block names the DECISION, not the cookie, and its palette/theme/type keys are gone (tokens paint it, the visitor\'s region picks opt-in vs opt-out)',
+  },
 };
 
 // exact dotted path → { replacement, why } (docs/shared/config.md carries the rows)

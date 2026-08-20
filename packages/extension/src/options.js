@@ -35,6 +35,11 @@ class Manager {
     // Initialize
     await this.omega.initialize(configuration);
 
+    // No app_launch here: opening SETTINGS is not launching the extension, and
+    // counting it would inflate the launch count with a maintenance visit
+    // (Ian's ruling). The popup, the injected page and the side panel are the
+    // surfaces that count as a launch.
+
     // Set up auth state listener (updates bindings with user/account state)
     this.omega.auth().listen((state) => {
       this.logger.log('Auth state changed:', state);

@@ -372,7 +372,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
 
   ctx.log(`Unified ${category}: product=${unified.product.id}, status=${unified.status}`, unified);
 
-  // Read checkout context from payments-intents (attribution, discount, supplemental)
+  // Read checkout context from payments-intents (attribution, trackingConsent, request, discount, supplemental)
   let intentData = {};
   if (orderId) {
     const intentDoc = await admin.firestore().doc(`payments-intents/${orderId}`).get();
@@ -391,6 +391,13 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     resourceId: isOneTimeRefund ? (existingOrder.resourceId || resourceId) : resourceId,
     unified: unified,
     attribution: intentData.attribution || {},
+    trackingConsent: intentData.trackingConsent || null,
+    // The requester's IP + user agent, captured when the intent was created —
+    // what Meta and TikTok match a server conversion to the browsing session on
+    // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)). A webhook's
+    // own request is the PROCESSOR's, never the customer's, so this can only
+    // come from the intent.
+    request: intentData.request || null,
     discount: intentData.discount || null,
     supplemental: intentData.supplemental || {},
     metadata: {
@@ -434,7 +441,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // Track payment analytics (non-blocking)
   // Fires independently of transitions — renewals have no transition but still need tracking
   if (shouldRunHandlers) {
-    trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx });
+    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, uid, processor, ctx });
   }
 
   // A persisted discount belongs to the subscription it was applied to, and to

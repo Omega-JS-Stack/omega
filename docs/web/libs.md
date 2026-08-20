@@ -58,9 +58,9 @@ diagram, and do not add chart.js or mermaid to an app's dependencies.
 | Module | What it is | Key exports |
 |---|---|---|
 | `admin-helpers.js` | Formatting and stat-cell helpers for the admin pages: relative timestamps, capitalization, and writing a settled Firestore count-aggregation result (or an inline error) into a stat element | `formatTimeAgo`, `capitalize`, `setStatValue`, `setStatSubValue` |
-| `analytics.js` | The ONE way core code reaches the pixel globals ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)). Detail below | `trackGoogle`, `trackMeta`, `trackTikTok`, `identifyTikTok` |
+| `analytics.js` | The web HOST of the analytics facade ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)): it wires the page's three seams into `@omega.js/analytics` and is the ONE way core code counts anything. Detail below | `event`, `identify`, `reset`, `configureAnalytics`, `readPlatformCookies`, `PLATFORM_COOKIES` |
 | `charts.js` | Chart.js behind framework helpers: lazy load, token colors, a slot to draw into, four chart builders. Detail below | `loadCharts`, `chartsReady`, `chartColors`, `resolveColor`, `chartSlot`, `barChart`, `stackedBarChart`, `doughnutChart`, `lineChart` |
-| `dev.js` | Development-only helpers, imported by `runtime/boot.js` only when `manager.isDevelopment()`: a click logger, a breakpoint logger on resize, logging interceptors installed over `gtag` / `fbq` / `ttq`, and the palette's **Tools** section — "Log opening tags" and "Toggle theme", which were `window.logOpeningTags()` / `window.changeTheme()` until [#342](https://github.com/Omega-JS-Stack/omega/issues/342) made the palette the one home | default export: a function that installs all of it |
+| `dev.js` | Development-only helpers, imported by `runtime/boot.js` only when `manager.isDevelopment()`: a click logger, a breakpoint logger on resize, and the palette's **Tools** section — "Log opening tags" and "Toggle theme", which were `window.logOpeningTags()` / `window.changeTheme()` until [#342](https://github.com/Omega-JS-Stack/omega/issues/342) made the palette the one home | default export: a function that installs all of it |
 | `graph.js` | mermaid behind framework helpers, on the charts contract: a definition in, an SVG out. Detail below | `loadGraph`, `graphReady`, `graphTheme`, `graphSlot`, `drawGraph` |
 | `initialize-tooltips.js` | Initializes every `[data-bs-toggle="tooltip"]` element as a Bootstrap tooltip, and exits early when the page has none. The ONE home for the behavior ([#99](https://github.com/Omega-JS-Stack/omega/issues/99)): each theme's `_theme.js` calls it from its DOM-ready handler instead of shipping its own copy | default export: `initializeTooltips()` |
 | `logger.js` | The web runtime's tagged console, `[@omega.js/web:<module>]` with no timestamp ([#12](https://github.com/Omega-JS-Stack/omega/issues/12)). The methods are getters returning a bound `console` method, so devtools attributes each line to the real call site and a swapped `console` method is still seen | `createLogger(module)`, also the default export |
@@ -73,37 +73,65 @@ diagram, and do not add chart.js or mermaid to an app's dependencies.
 
 ### analytics.js
 
-`gtag`, `fbq` and `ttq` are page-level snippets (`core/_includes/core/foot.html`),
-and an ad blocker does not stub them: it keeps them from ever being defined, so a
-BARE call throws a ReferenceError. Every one of these calls sits in front of the
-thing the customer just pressed, so the throw takes the action with it. That was
-the billing card's dead "Undo cancellation" button
-([#283](https://github.com/Omega-JS-Stack/omega/issues/283)), found again in 19
-other files ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)).
-
-`typeof` against an undeclared name is the one check that does not throw, and
-every provider is checked on its own, because blockers work per list: a page that
-lost Meta still counts Google. Each export is a pass-through of the provider's
-own call, so a call site reads the way it always did:
+The ONE call, and nothing about a provider at the call site:
 
 ```js
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
-trackGoogle('event', 'refund_action', { action: 'submit' });
-trackMeta('trackCustom', 'RefundAction', { action: 'submit' });
-trackTikTok('ViewContent', { content_id: 'refund-submit', content_type: 'product' });
+event('refund_action', { action: 'submit' });
 ```
 
-`trackGoogle` and `trackMeta` are variadic, because gtag and fbq are single
-command functions and take more than events (`set`, `init`). `ttq` is an object
-of methods, so each method the framework uses gets its own export:
-`trackTikTok(event, properties)` and `identifyTikTok(properties)`.
+The name is a CANONICAL event from `@omega.js/analytics`' catalog, which decides
+which providers hear it, under which native name, in which dialect — the whole
+contract is [docs/shared/analytics.md](../shared/analytics.md). This module is
+the web HOST of that facade: it injects the three seams only a page can supply,
+once, and exports the call sites' entry points.
 
-The module is the SSOT, and `test/analytics-blocked.test.js` keeps it one: a
-guard test greps every file under `core/js` for a bare `gtag(` / `fbq(` / `ttq.`,
-so the pattern cannot regrow a page module at a time. Two files may name the
-globals — this module, which IS the guard, and `dev.js`, which wraps whatever the
-page loaded rather than reaching for a name that may not be there.
+| Seam | What web supplies |
+|---|---|
+| `transport` | the package's guarded browser transport — `gtag` / `fbq` / `ttq`, each checked with `typeof` before it is called |
+| `consent` | a gate over `libs/tracking-consent.js`, read LIVE, so a visitor who accepts mid-session is counted from that moment ([#383](https://github.com/Omega-JS-Stack/omega/issues/383)) |
+| `context` | `runtime: 'web'` plus the captured attribution, flattened into what the adapters read ([#384](https://github.com/Omega-JS-Stack/omega/issues/384)) |
+
+`environment` is NOT web's: @omega.js/client injects it from the brand's own
+`config.environment`, which is what decides whether an unknown event name throws.
+
+The package is reached THROUGH @omega.js/client (`@omega.js/client/modules/analytics.js`),
+never as a bare `@omega.js/analytics`: the analytics package is private and never
+publishes, so in a consumer install it exists only as the copy vendored into the
+client's dist — and the client is a real runtime dependency of every framework.
+
+**Identity is not an event.** `identify(user)` and `reset()` set what the events
+after them inherit — GA4's user properties, the Meta Pixel's advanced-matching
+`init`, TikTok's `identify` — so they have no catalog entry, and they live here,
+guarded the same way. `core/js/core/auth.js` calls them off the auth state. GA4's
+`user_id` is deliberately NOT among them: @omega.js/client's `setUserId` owns
+that one key on every runtime and sends the derived `uuidv5(uid, namespace)`
+value, so a raw uid written here would only clobber it.
+
+**`readPlatformCookies()`** is exported for the same SSOT reason: the checkout's
+intent payload needs the `_fbc`/`_fbp`/`_ttp` read at conversion time
+(`pages/payment/checkout/modules/api.js`), and one reader means a separator quirk
+cannot be fixed on one path and left on the other.
+
+**Why guarded at all**: `gtag`, `fbq` and `ttq` are page-level snippets, and an
+ad blocker does not stub them — it keeps them from ever being defined, so a BARE
+call throws a ReferenceError. Every one of these calls sits in front of the thing
+the customer just pressed, so the throw takes the action with it. That was the
+billing card's dead "Undo cancellation" button
+([#283](https://github.com/Omega-JS-Stack/omega/issues/283)), found again in 19
+other files ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)). Each
+provider is checked on its own, because blockers work per list: a page that lost
+Meta still counts Google. The same reasoning covers this module's own storage
+reads (consent, attribution): a read that fails is a denial or an absence, never
+a raise.
+
+`test/analytics-blocked.test.js` keeps it the SSOT with two static sweeps: no
+file under `core/js` or the theme layer calls a provider global bare, and none
+names a provider at all — the retired `trackGoogle` / `trackMeta` / `trackTikTok`
+wrappers cannot regrow one page module at a time. Two files may name the globals:
+this module (the guard itself, plus the identity calls) and
+`core/js/core/analytics-loader.js`, which DEFINES them.
 
 ### charts.js
 

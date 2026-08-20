@@ -86,14 +86,32 @@ module.exports = {
               url: `https://example.com/?ref=${REFERRER_AFFILIATE_CODE}`,
               page: '/',
             },
-            utm: {
+            // The touch model: the affiliate block stays top level (processAffiliate
+            // reads attribution.affiliate.code straight off it), and the campaign
+            // context now arrives as first/last touches.
+            first: {
               tags: {
                 utm_source: 'test',
                 utm_medium: 'referral',
                 utm_campaign: 'signup-test',
               },
+              referrer: 'https://google.com',
               timestamp: new Date().toISOString(),
               url: 'https://example.com/?utm_source=test',
+              page: '/',
+            },
+            last: {
+              tags: {
+                utm_source: 'test',
+                utm_medium: 'referral',
+                utm_campaign: 'signup-test',
+              },
+              clickIds: {
+                gclid: 'G-SIGNUP-1',
+              },
+              referrer: 'https://google.com',
+              timestamp: new Date().toISOString(),
+              url: 'https://example.com/?utm_source=test&gclid=G-SIGNUP-1',
               page: '/',
             },
           },
@@ -182,8 +200,10 @@ module.exports = {
         const attribution = referredDoc?.attribution;
         assert.ok(attribution, 'Attribution object should exist');
         assert.ok(attribution?.affiliate?.code === state.referrerAffiliateCode, 'Attribution should have affiliate code');
-        assert.ok(attribution?.utm?.tags?.utm_source === 'test', 'Attribution should have UTM source');
-        assert.ok(attribution?.utm?.tags?.utm_campaign === 'signup-test', 'Attribution should have UTM campaign');
+        assert.ok(attribution?.first?.tags?.utm_source === 'test', 'Attribution should have first-touch UTM source');
+        assert.ok(attribution?.first?.tags?.utm_campaign === 'signup-test', 'Attribution should have first-touch UTM campaign');
+        assert.ok(attribution?.first?.referrer === 'https://google.com', 'Attribution should have the first-touch referrer');
+        assert.ok(attribution?.last?.clickIds?.gclid === 'G-SIGNUP-1', 'Attribution should have the last-touch click id');
 
         // Check activity context was merged
         const activity = referredDoc?.activity;
@@ -468,7 +488,11 @@ module.exports = {
 
         const signupResponse = await http.as('signup-merge').post('backend-manager/user/signup', {
           consent: { legal: { granted: true, text: 'I agree.' }, marketing: { granted: true, text: 'Updates please.' } },
-          attribution: { utm: { tags: { utm_source: 'newsletter' } } },
+          attribution: {
+            first: { tags: { utm_source: 'newsletter' }, referrer: 'https://news.ycombinator.com/', page: '/' },
+            last: { tags: { utm_source: 'meta' }, clickIds: { fbclid: 'FB1' }, page: '/pricing' },
+          },
+          trackingConsent: { analytics: true, marketing: false, region: 'opt-in', timestamp: '2026-08-01T00:00:00.000Z', version: 1 },
         });
         assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
 
@@ -489,17 +513,29 @@ module.exports = {
         assert.hasProperty(doc, 'attribution.affiliate.url', 'attribution.affiliate.url must exist (filled)');
         assert.hasProperty(doc, 'attribution.affiliate.page', 'attribution.affiliate.page must exist (filled)');
         assert.hasProperty(doc, 'attribution.affiliate.timestamp', 'attribution.affiliate.timestamp must exist (filled)');
-        assert.hasProperty(doc, 'attribution.utm.url', 'attribution.utm.url must exist (filled)');
-        assert.hasProperty(doc, 'attribution.utm.page', 'attribution.utm.page must exist (filled)');
-        assert.hasProperty(doc, 'attribution.utm.timestamp', 'attribution.utm.timestamp must exist (filled)');
+        assert.hasProperty(doc, 'attribution.first.url', 'attribution.first.url must exist (filled)');
+        assert.hasProperty(doc, 'attribution.first.timestamp', 'attribution.first.timestamp must exist (filled)');
+        assert.hasProperty(doc, 'attribution.first.clickIds', 'attribution.first.clickIds must exist (filled)');
+        assert.hasProperty(doc, 'attribution.last.url', 'attribution.last.url must exist (filled)');
+        assert.hasProperty(doc, 'attribution.last.referrer', 'attribution.last.referrer must exist (filled)');
         // filled leaves should be null, not undefined/missing
         assert.equal(doc?.attribution?.affiliate?.url, null, 'unset attribution leaf should be null');
 
         // (c) Signup data applied on top.
         assert.equal(doc?.attribution?.affiliate?.code, 'PARTIALONLY', 'pre-existing affiliate.code preserved (signup did not send one)');
-        assert.equal(doc?.attribution?.utm?.tags?.utm_source, 'newsletter', 'signup utm tag applied');
+        assert.equal(doc?.attribution?.first?.tags?.utm_source, 'newsletter', 'signup first-touch utm tag applied');
+        assert.equal(doc?.attribution?.first?.referrer, 'https://news.ycombinator.com/', 'signup first-touch referrer applied');
+        assert.equal(doc?.attribution?.last?.tags?.utm_source, 'meta', 'signup last-touch utm tag applied');
+        assert.equal(doc?.attribution?.last?.clickIds?.fbclid, 'FB1', 'signup last-touch click id applied');
         assert.equal(doc?.flags?.signupProcessed, true, 'flags.signupProcessed set true');
         assert.equal(doc?.consent?.legal?.status, 'granted', 'consent applied');
+        // The tracking-consent snapshot is stored VERBATIM beside attribution — its own
+        // top-level field, never folded into the legal/marketing consent record.
+        assert.deepEqual(
+          doc?.trackingConsent,
+          { analytics: true, marketing: false, region: 'opt-in', timestamp: '2026-08-01T00:00:00.000Z', version: 1 },
+          'trackingConsent stored verbatim beside attribution'
+        );
       },
     },
     {
@@ -512,7 +548,7 @@ module.exports = {
         const uid = accounts['signup-merge'].uid;
         const doc = await firestore.get(`users/${uid}`);
 
-        for (const section of ['auth', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'personal', 'attribution', 'consent', 'subscription']) {
+        for (const section of ['auth', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'personal', 'attribution', 'trackingConsent', 'consent', 'subscription']) {
           assert.hasProperty(doc, section, `doc must have top-level '${section}' section after signup`);
         }
         // Nested completeness spot-checks across the sections signup writes.

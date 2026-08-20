@@ -31,7 +31,7 @@
 // Import libraries
 // Important to do these BEFORE defaults so the animations, etc can be overridden
 // @use 'core/_chatsy' as *;
-@use 'core/_cookieconsent' as *;
+@use 'core/_consent' as *;
 @use 'core/_lazy-loading' as *;
 @use 'core/_bindings' as *;
 @use 'core/_social-sharing' as *;

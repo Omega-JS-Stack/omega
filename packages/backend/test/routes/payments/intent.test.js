@@ -253,27 +253,83 @@ module.exports = {
     },
 
     {
-      name: 'saves-attribution-and-supplemental-to-intent-doc',
-      async run({ http, assert, config, firestore, skip }) {
+      // The checkout context the client sends rides through UNTOUCHED: the
+      // first/last touch model of [#384](https://github.com/Omega-JS-Stack/omega/issues/384)
+      // and the tracking-consent snapshot beside it are stored verbatim on the intent,
+      // then folded onto the order by the payments-webhooks on-write. The one piece
+      // the client CANNOT send is captured here: the requester's IP and user agent,
+      // which is what Meta and TikTok match a server conversion on
+      // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)) — the completing
+      // webhook arrives from the processor, so this is the only moment we hear from
+      // the customer's own browser.
+      name: 'saves-attribution-tracking-consent-and-supplemental-to-intent-doc',
+      async run({ http, assert, config, firestore, waitFor, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
           skip('No paid product configured in this brand');
         }
         const frequency = Object.keys(paidProduct.prices)[0];
 
+        const attribution = {
+          first: {
+            tags: { utm_source: 'newsletter', utm_medium: 'email' },
+            referrer: 'https://news.ycombinator.com/',
+            url: 'https://brand.test/',
+            page: '/',
+            timestamp: '2025-06-01T00:00:00.000Z',
+          },
+          last: {
+            tags: { utm_source: 'meta', utm_campaign: 'launch' },
+            clickIds: { fbclid: 'FB1', gclid: 'G1' },
+            referrer: 'https://facebook.com/',
+            url: 'https://brand.test/pricing?utm_source=meta',
+            page: '/pricing',
+            timestamp: '2025-08-01T00:00:00.000Z',
+          },
+          affiliate: { code: 'IAN7', timestamp: '2025-08-01T00:00:00.000Z', url: 'https://brand.test/', page: '/' },
+          // The platform cookies the checkout reads off document.cookie at send
+          // time (#385) — just another key on a passthrough field, so proving the
+          // whole object survives proves these do.
+          cookies: { fbc: 'fb.1.1754006400000.FB1', fbp: 'fb.1.1754006400000.987654321', ttp: 'TTP1' },
+        };
+        // The snapshot the web consent module writes under storage.trackingConsent.
+        const trackingConsent = {
+          analytics: true,
+          marketing: false,
+          region: 'opt-in',
+          timestamp: '2026-08-01T00:00:00.000Z',
+          version: 1,
+        };
+
         const response = await http.as('journey-payments-intent-attribution').post('backend-manager/payments/intent', {
           processor: 'test',
           productId: paidProduct.id,
           frequency,
-          attribution: { utm_source: 'test', utm_medium: 'unit-test' },
+          attribution,
+          trackingConsent,
           supplemental: { referral: 'friend' },
         });
 
-        assert.isSuccess(response, 'Should succeed with attribution and supplemental');
+        assert.isSuccess(response, 'Should succeed with attribution, trackingConsent and supplemental');
 
         const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
-        assert.equal(intentDoc.attribution.utm_source, 'test', 'Attribution utm_source should be saved');
+        assert.deepEqual(intentDoc.attribution, attribution, 'Attribution should be stored verbatim on the intent');
+        assert.deepEqual(intentDoc.trackingConsent, trackingConsent, 'Tracking consent should be stored verbatim on the intent');
         assert.equal(intentDoc.supplemental.referral, 'friend', 'Supplemental should be saved');
+        assert.equal(typeof intentDoc.request, 'object', 'The requester context should be captured on the intent');
+        assert.equal(Object.hasOwn(intentDoc.request, 'ip'), true, 'The client IP slot is always written — null when no header carries one');
+        assert.equal(Object.hasOwn(intentDoc.request, 'userAgent'), true, 'The user agent slot is always written');
+
+        // The auto-webhook folds the intent's checkout context onto the order.
+        await waitFor(async () => {
+          const orderDoc = await firestore.get(`payments-orders/${response.data.orderId}`);
+          return !!orderDoc;
+        }, 15000, 500);
+
+        const orderDoc = await firestore.get(`payments-orders/${response.data.orderId}`);
+        assert.deepEqual(orderDoc.attribution, attribution, 'The order fold copies attribution unchanged');
+        assert.deepEqual(orderDoc.trackingConsent, trackingConsent, 'The order fold copies trackingConsent unchanged');
+        assert.deepEqual(orderDoc.request, intentDoc.request, 'The order fold copies the captured request context — the conversion match data reads it from the order');
       },
     },
 

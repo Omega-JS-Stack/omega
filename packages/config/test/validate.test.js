@@ -395,9 +395,21 @@ test('the retired firebaseConfig key is an error; its replacement passes', () =>
 });
 
 test('the current client key is untouched by the retired-key guard', () => {
-  const config = { ...VALID, targets: { web: { client: { auth: {}, chatsy: {}, cookieConsent: {} } } } };
+  const config = { ...VALID, targets: { web: { client: { auth: {}, chatsy: {}, consent: {} } } } };
 
   assert.deepStrictEqual(validateConfig(config).errors, []);
+});
+
+test('the retired cookieConsent key is an error and names client.consent (#383)', () => {
+  // It sat INSIDE the client blob, which is exactly where a name test has to
+  // reach: the block was renamed, so a config still carrying it would lose its
+  // banner settings silently.
+  const { errors } = validateConfig({ ...VALID, targets: { web: { client: { cookieConsent: { enabled: false } } } } });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.client.cookieConsent') && e.includes('client.consent')),
+    'the old block bounces and names its replacement',
+  );
 });
 
 // ─── validateConfig: retired PATHS — the de-branding rekey (#23) ───

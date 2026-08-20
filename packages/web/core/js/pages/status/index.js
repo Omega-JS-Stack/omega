@@ -6,7 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -637,17 +637,8 @@ function updateIncidents(incidents) {
 
 // Tracking functions
 function trackStatusSubscribe() {
-  trackGoogle('event', 'status_subscribe', {
+  event('status_subscribe', {
     method: 'email'
-  });
-  trackMeta('track', 'Lead', {
-    content_name: 'Status Updates',
-    content_category: 'subscription'
-  });
-  trackTikTok('SubmitForm', {
-    content_id: 'status-subscribe',
-    content_type: 'product',
-    content_name: 'Status Subscription'
   });
 }
 

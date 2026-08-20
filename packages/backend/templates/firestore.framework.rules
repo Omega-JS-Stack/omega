@@ -160,8 +160,13 @@ service cloud.firestore {
     // its own firestore.rules — e.g. `allow create, update: if !isWritingAny(['xp']);`.
     // `verifications` is on the list as a RESERVED name: nothing writes it
     // today, and a client planting one must never look like server truth.
+    // `trackingConsent` and `attribution` sit beside `consent` for the same
+    // reason it does: both reach the user doc through the signup route ONLY
+    // (the client SENDS them in the payload; the server is what writes them),
+    // so a direct client write could only ever be a forged consent answer or a
+    // rewritten campaign credit — the two records nobody may edit after the fact.
     function isWritingFrameworkField() {
-      return isWritingAny(['auth', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'usage', 'consent', 'verifications']);
+      return isWritingAny(['auth', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'usage', 'consent', 'trackingConsent', 'attribution', 'verifications']);
     }
 
     // ========== Resources ==========

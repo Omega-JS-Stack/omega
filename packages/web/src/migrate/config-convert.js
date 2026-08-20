@@ -181,6 +181,28 @@ function convertConfig({ jekyll, ujm }) {
     }
   }
 
+  // ---- cookieConsent → consent (#383). The banner became a real gate, so the
+  // block was renamed and most of its settings stopped existing: `palette` and
+  // `theme` (the panel paints from the --omega-* tokens, which is the only way
+  // it is right in both color modes), `type` (the visitor's region picks opt-in
+  // vs opt-out — never a config key), and the copy, whose buttons no longer
+  // mean what they meant ("I Understand" is not an Accept). `enabled` and
+  // `position` are the two that survive unchanged. Carrying the old name would
+  // emit a config that fails validation on the retired-key guard.
+  if (!isEmpty(legacyWebManager.cookieConsent)) {
+    const legacyConsent = legacyWebManager.cookieConsent;
+    delete legacyWebManager.cookieConsent;
+
+    const consent = {};
+    if (typeof legacyConsent.enabled === 'boolean') consent.enabled = legacyConsent.enabled;
+
+    const position = legacyConsent.config && legacyConsent.config.position;
+    if (!isEmpty(position)) consent.config = { position };
+
+    if (!isEmpty(consent)) legacyWebManager.consent = consent;
+    notes.push('`web_manager.cookieConsent` → `client.consent` (#383); palette/theme/type and the banner copy are gone — the panel paints from tokens and the visitor\'s region picks opt-in vs opt-out');
+  }
+
   const oauth2 = take('oauth2');
   if (!isEmpty(oauth2)) omega.oauth2 = oauth2;
 

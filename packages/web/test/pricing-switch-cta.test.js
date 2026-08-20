@@ -159,12 +159,21 @@ async function loadPricingPage(account) {
   };
 
   globalThis.__omegaClient = {
+    config: { analytics: { providers: {} } },
     dom: () => ({ ready: async () => {} }),
     auth: () => ({
       listen: (options, handler) => handler({ account: account }),
       resolveSubscription: (candidate) => resolveSubscription(candidate),
     }),
     sentry: () => ({ captureException: () => {} }),
+    // A visitor who consented: what this suite is about is WHICH clicks count,
+    // not whether the visitor allowed counting (#383's gate is its own suite).
+    storage: () => ({
+      get: (key, fallback) => (key === 'trackingConsent'
+        ? { analytics: true, marketing: true, region: 'opt-out', version: 1 }
+        : fallback),
+      set: () => {},
+    }),
   };
 
   // Every analytics call the page makes, as `<network>:<event>` — a switch is

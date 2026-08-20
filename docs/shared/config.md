@@ -62,7 +62,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // enabled-with-defaults. Unknown keys are validation errors. A value may
   // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
-    web:       { imagemin, collections, dev: { limitCollections } },   // collections: the brand's OWN content collections — name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
+    web:       { imagemin, collections, client: { consent, … }, dev: { limitCollections } },   // client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …) — a settings bag the client normalizes; only `consent` is schema-known, see "Consent" below. collections: the brand's OWN content collections — name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
     backend:   { auth: { signup: { maxPerIpPerDay } } },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, remoteScripts, restartManager },
@@ -391,6 +391,51 @@ plumbing. Those two refuse with `not-supported-by-processor`, and the billing ca
 retires the offer for the session and opens the questionnaire — a subscriber can always
 still cancel.
 
+## Consent (`client.consent`) — #383
+
+The consent banner is a real GATE, so its config is schema-known even though the rest of
+the `client` blob is not: a typo that silently disabled it would ship a site with no
+consent surface and no error.
+
+```json5
+targets: {
+  web: {
+    client: {
+      consent: {
+        enabled: true,                    // default true; false ships NO banner
+        config: {
+          position: 'bottom-left',        // bottom-left | bottom-right | bottom
+          content: {
+            message: 'We use cookies … See our { terms }.',       // the banner face
+            panelIntro: 'We and our partners … See our { cookies } and { terms }.',
+            accept: 'Accept',                                     // the big grant
+            customize: 'Customize',                               // opens the panel
+            acceptAll: 'Accept all',                              // the panel's pair
+            acceptNone: 'Accept none',
+          },
+          // `{terms}` and `{cookies}` link the terms and cookie-policy pages.
+          // `save` retired with the Save button (#391) — a config still setting
+          // it is ignored, not an error.
+        },
+      },
+    },
+  },
+}
+```
+
+Two things are deliberately NOT config:
+
+- **The regime.** The visitor's browser timezone picks it — EEA/UK (plus an unplaceable
+  timezone) gets opt-in, where no provider script loads until they accept; everywhere
+  else gets opt-out, where the scripts load and a first visit sees only the Cookies Settings
+  tab ([#391](https://github.com/Omega-JS-Stack/omega/issues/391)). There is no key that
+  forces one, because the answer is legal, not stylistic.
+- **The colors.** The panel paints itself from the `--omega-*` token sheet, which is the
+  only way it is correct in both color modes. The old `palette`/`theme` keys are gone.
+
+`enabled: false` is legal only for a site that loads no analytics or marketing provider
+at all — the gate and the banner are the same switch.
+
 ## Tri-state provisioning values (#33)
 
 Provisioning-flow keys (org, billing account, service/agent ids — anything a manage
@@ -505,8 +550,8 @@ keys); everything framework-specific moves under `targets.<type>`.
 **Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142)):
 a name that was renamed OUTRIGHT is a validation error wherever it sits — shared level,
 inside a `targets.<type>` entry, inside an instance array — naming its replacement and
-pointing back here. Today that is `web_manager` → `client` and `firebaseConfig` → `cloud`
-(`src/retired-keys.js` is the list). Without the guard the old key validated clean and
+pointing back here. Today that is `web_manager` → `client`, `firebaseConfig` → `cloud`, and
+`cookieConsent` → `client.consent` (`src/retired-keys.js` is the list). Without the guard the old key validated clean and
 everything under it vanished, since nothing dual-reads it. Names that live on as legitimate
 keys elsewhere (`sentry`, which survives as `client.sentry`; `google`/`meta` under
 `analytics.providers`) stay out of the list — the rows below are their only guide.
@@ -596,7 +641,8 @@ before the report prints.
 | `analytics.{google,meta,tiktok}` (flat scalars) | `analytics.providers.<p>.id` — the unified spelling; the web chrome emits the client's flat shape from it |
 | `web_manager.firebase.app.config` | **`cloud: { provider: 'firebase', config: {…} }`** (top level); the engine composes `cloud.config` back into `client.firebase.app.config` at build |
 | `web_manager.payment` | **`payment`** (top level); composed back into `client.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
-| `web_manager` (rest: auth, sentry, cookieConsent, exitPopup, …) | **`targets.web.client`** — the client-runtime settings blob, whole, under its new name (#1: `web_manager` → `client`, since it configures `@omega.js/client`; WebManager is not an OMEGA concept). No dual-read: the old key name is not honored anywhere |
+| `web_manager` (rest: auth, sentry, exitPopup, …) | **`targets.web.client`** — the client-runtime settings blob, whole, under its new name (#1: `web_manager` → `client`, since it configures `@omega.js/client`; WebManager is not an OMEGA concept). No dual-read: the old key name is not honored anywhere |
+| `web_manager.cookieConsent` (incl. `palette`, `theme`, `type`, `content.dismiss`) | **`targets.web.client.consent`** — the block that became a real gate (#383). `palette`/`theme` are gone (the panel paints from the `--omega-*` tokens); `type` is gone (the visitor's region picks opt-in vs opt-out); `content.dismiss` is now `content.accept`, beside `content.customize`, `content.panelIntro`, `content.acceptAll` and `content.acceptNone` (#391 retired `content.save` with the Save button) |
 | `web_manager.chatsy` (agentId + widget settings) | **`inbound.chat.providers.chatsy`** — the chat widget left the client blob for the one chat home the manager also provisions (#23) |
 | `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |
 | `recaptcha` (incl. `site-key`) | **`captcha.providers.recaptcha`** (`siteKey` — every key is camelCase, #23) |

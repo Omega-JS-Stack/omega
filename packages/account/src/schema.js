@@ -14,6 +14,24 @@
  *   '$uuid', '$randomId', '$apiKey', '$oldDate' — resolved at runtime (generators
  *   are injected by the host — see engine.js; absent generators resolve to null)
  */
+
+/**
+ * One attribution TOUCH — a single visit's campaign context, shared by
+ * `attribution.first` and `attribution.last`
+ * ([#384](https://github.com/Omega-JS-Stack/omega/issues/384)). `tags` holds the
+ * utm set and `clickIds` the ad-platform click ids (fbclid/gclid/…), both
+ * passthrough because the platforms keep adding params. The schema is read-only
+ * to the engine, so one object serves both slots.
+ */
+const ATTRIBUTION_TOUCH = {
+  tags: { $passthrough: true },
+  clickIds: { $passthrough: true },
+  referrer: { type: 'string', default: null, nullable: true },
+  url: { type: 'string', default: null, nullable: true },
+  page: { type: 'string', default: null, nullable: true },
+  timestamp: { type: 'string', default: null, nullable: true },
+};
+
 const USER_SCHEMA = {
   auth: {
     uid: { type: 'string', default: null, nullable: true },
@@ -186,12 +204,18 @@ const USER_SCHEMA = {
       url: { type: 'string', default: null, nullable: true },
       page: { type: 'string', default: null, nullable: true },
     },
-    utm: {
-      tags: { $passthrough: true },
-      timestamp: { type: 'string', default: null, nullable: true },
-      url: { type: 'string', default: null, nullable: true },
-      page: { type: 'string', default: null, nullable: true },
-    },
+    // The touch model: `first` is the visit that first brought the user here,
+    // written once and never overwritten; `last` is the newest TAGGED visit. No
+    // expiry — the timestamps carry any read-time lookback window. Replaces the
+    // single `utm` blob outright (no dual-read).
+    first: ATTRIBUTION_TOUCH,
+    last: ATTRIBUTION_TOUCH,
+  },
+  // The tracking-consent snapshot the client captured, stored verbatim: passthrough
+  // because this layer never interprets it — the consent module owns its shape. NOT
+  // the same thing as `consent` below, which is the legal/marketing decision.
+  trackingConsent: {
+    $passthrough: true,
   },
   consent: {
     legal: {

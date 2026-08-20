@@ -661,7 +661,7 @@ function startVendorPropagation(options) {
 // The vendorable private packages folded into framework dists. Hardcoded here
 // because this module must stay stdlib-only — tools/vendor.js
 // VENDORABLE_PACKAGES is the SSOT (a devkit test pins the two lists equal).
-const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit'];
+const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit', 'analytics'];
 
 // Directory names the freshness scan never descends into.
 const FRESHNESS_SKIP_DIRS = new Set(['node_modules', '.temp', 'dist']);

@@ -1,0 +1,227 @@
+/**
+ * The provider loaders — gated on consent, at RUNTIME
+ * ([#383](https://github.com/Omega-JS-Stack/omega/issues/383)).
+ *
+ * foot.html used to emit the GA4, Meta and TikTok snippets straight into the
+ * page whenever an id was configured, which meant every visitor was counted
+ * before the banner had even finished animating in. The chrome still emits the
+ * IDS (`window.Configuration.analytics`); the scripts themselves are injected
+ * from here, and only for a category the visitor's consent allows:
+ *
+ *   ga4    → `analytics`
+ *   meta   → `marketing`
+ *   tiktok → `marketing`
+ *
+ * Google Consent Mode is wired for the GA4 half: the `consent default` command
+ * is queued into dataLayer BEFORE gtag.js can load (denied-by-default in an
+ * opt-in region, granted in an opt-out one), and every later change pushes a
+ * `consent update`. That is what makes a denied GA4 behave — the tag itself
+ * honors the flags, on top of us not loading it at all.
+ *
+ * Granting a category injects its loader immediately, no reload. REVOKING one
+ * cannot unload a script that is already running — there is no such thing — so
+ * it takes effect on the next page load, while Consent Mode updates now.
+ */
+import omega from '@omega.js/client';
+
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { getTrackingConsent, onTrackingConsentChange } from '__main_assets__/js/libs/tracking-consent.js';
+
+const logger = createLogger('analytics-loader');
+
+// Which consent category each provider needs.
+const PROVIDER_CATEGORY = {
+  google: 'analytics',
+  meta: 'marketing',
+  tiktok: 'marketing',
+};
+
+const GTAG_SRC = 'https://www.googletagmanager.com/gtag/js';
+const META_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
+const TIKTOK_SRC = 'https://analytics.tiktok.com/i18n/pixel/events.js';
+
+// The TikTok pixel's own deferred-method list (vendor snippet).
+const TIKTOK_METHODS = [
+  'page', 'track', 'identify', 'instances', 'debug', 'on', 'off', 'once',
+  'ready', 'alias', 'group', 'enableCookie', 'disableCookie',
+];
+
+export default function () {
+  const providers = (omega.config.analytics && omega.config.analytics.providers) || {};
+  const ids = {
+    google: idOf(providers.google),
+    meta: idOf(providers.meta),
+    tiktok: idOf(providers.tiktok),
+  };
+
+  // Nothing configured: no queues, no flags, no listener.
+  if (!ids.google && !ids.meta && !ids.tiktok) {
+    logger.log('No analytics provider is configured — nothing to gate');
+    return;
+  }
+
+  const loaded = { google: false, meta: false, tiktok: false };
+
+  // Inject every provider the consent allows and that is not already running.
+  const load = (consent) => {
+    Object.keys(PROVIDER_CATEGORY).forEach((provider) => {
+      if (!ids[provider] || loaded[provider] || !consent[PROVIDER_CATEGORY[provider]]) {
+        return;
+      }
+
+      loaded[provider] = true;
+      LOADERS[provider](ids[provider]);
+    });
+  };
+
+  const consent = getTrackingConsent();
+
+  // Consent Mode's default MUST be queued before gtag.js can read dataLayer,
+  // so it happens here, ahead of any injection. The boot state IS the default —
+  // there is nothing to update yet.
+  if (ids.google) {
+    installGtagQueue();
+    window.gtag('consent', 'default', consentModeFlags(consent));
+    window.gtag('js', new Date());
+  }
+
+  load(consent);
+
+  onTrackingConsentChange((next) => {
+    if (ids.google) {
+      window.gtag('consent', 'update', consentModeFlags(next));
+    }
+
+    load(next);
+  });
+}
+
+/** A provider's configured id, or '' — an empty id is not configured. */
+function idOf(provider) {
+  const id = provider && provider.id;
+  return typeof id === 'string' && id.trim() ? id.trim() : '';
+}
+
+/**
+ * Google Consent Mode flags for one consent record. The ad_* trio rides
+ * `marketing`, analytics_storage rides `analytics`.
+ * @param {object} consent - a consent record (libs/tracking-consent.js)
+ * @returns {object} the gtag consent payload
+ */
+function consentModeFlags(consent) {
+  const ads = consent.marketing ? 'granted' : 'denied';
+
+  return {
+    ad_storage: ads,
+    ad_user_data: ads,
+    ad_personalization: ads,
+    analytics_storage: consent.analytics ? 'granted' : 'denied',
+  };
+}
+
+/**
+ * The dataLayer queue gtag.js drains when (if) it loads. Ours is the standard
+ * snippet's function — a real `arguments` push, not a rest spread, because
+ * Google's tag reads the pushed object's `length`/index shape.
+ */
+function installGtagQueue() {
+  window.dataLayer = window.dataLayer || [];
+
+  if (window.gtag && window.gtag.__omega) {
+    return;
+  }
+
+  function gtag() {
+    window.dataLayer.push(arguments);
+  }
+
+  gtag.__omega = true;
+  window.gtag = gtag;
+}
+
+/** The Meta pixel's queue (vendor snippet), without its script injection. */
+function installMetaQueue() {
+  if (window.fbq && window.fbq.queue) {
+    return;
+  }
+
+  const fbq = function () {
+    fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments);
+  };
+
+  fbq.push = fbq;
+  fbq.loaded = true;
+  fbq.version = '2.0';
+  fbq.queue = [];
+
+  window.fbq = fbq;
+  window._fbq = window._fbq || fbq;
+}
+
+/**
+ * The TikTok pixel's queue (vendor snippet), without its script injection —
+ * `ttq.load` in the vendor blob both registers the instance AND appends the
+ * script tag; only the registration survives here, so every provider script on
+ * the page goes through the ONE seam (omega.dom().loadScript).
+ */
+function installTikTokQueue() {
+  if (window.ttq && window.ttq.methods) {
+    return;
+  }
+
+  window.TiktokAnalyticsObject = 'ttq';
+  const ttq = window.ttq = [];
+
+  ttq.methods = TIKTOK_METHODS;
+  ttq.setAndDefer = function (target, method) {
+    target[method] = function () {
+      target.push([method].concat(Array.prototype.slice.call(arguments, 0)));
+    };
+  };
+  ttq.methods.forEach((method) => ttq.setAndDefer(ttq, method));
+
+  ttq.instance = function (id) {
+    const instance = (ttq._i && ttq._i[id]) || [];
+    ttq.methods.forEach((method) => ttq.setAndDefer(instance, method));
+    return instance;
+  };
+
+  ttq.load = function (id, options) {
+    ttq._i = ttq._i || {};
+    ttq._i[id] = [];
+    ttq._i[id]._u = TIKTOK_SRC;
+    ttq._t = ttq._t || {};
+    ttq._t[id] = +new Date();
+    ttq._o = ttq._o || {};
+    ttq._o[id] = options || {};
+  };
+}
+
+/** Inject one provider script; a blocked or failed load is never fatal. */
+function inject(provider, src) {
+  omega.dom().loadScript({ src: src })
+    .catch((error) => logger.log(`${provider} did not load (blocked or offline):`, error.message));
+}
+
+const LOADERS = {
+  google: (id) => {
+    // `config` is queued, not called on a loaded library: dataLayer holds it
+    // until gtag.js drains the queue, exactly as the inline snippet did.
+    window.gtag('config', id);
+    inject('google', `${GTAG_SRC}?id=${encodeURIComponent(id)}`);
+  },
+
+  meta: (id) => {
+    installMetaQueue();
+    window.fbq('init', id);
+    window.fbq('track', 'PageView');
+    inject('meta', META_SRC);
+  },
+
+  tiktok: (id) => {
+    installTikTokQueue();
+    window.ttq.load(id);
+    window.ttq.page();
+    inject('tiktok', `${TIKTOK_SRC}?sdkid=${encodeURIComponent(id)}&lib=ttq`);
+  },
+};

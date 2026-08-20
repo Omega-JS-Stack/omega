@@ -92,6 +92,9 @@ async function createIntent({ development, search = '' }) {
   const client = makeClient({ development, storage: {} });
 
   globalThis.window = { location: { search } };
+  // The intent payload also reads the ad platforms' cookies (#385) — an empty
+  // jar is what a decline rehearsal has.
+  globalThis.document = { cookie: '' };
   globalThis.__omegaClient = client;
 
   // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and

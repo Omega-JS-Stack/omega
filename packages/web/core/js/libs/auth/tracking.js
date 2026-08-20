@@ -1,74 +1,41 @@
-// Auth analytics — GA4 + Facebook Pixel + TikTok Pixel events for the three
-// auth outcomes. The pixel globals (gtag/fbq/ttq) are page-level stubs the
-// analytics loader replaces when consented, and a blocker leaves them
-// undefined — so every provider is reached through the guarded helper (#306).
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+// Auth analytics — the three auth outcomes, fired as canonical events (#328).
+// The catalog decides what each provider is told; the transport under it is
+// guarded per provider, so a blocked pixel never takes the sign-in with it (#306).
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 export function trackLogin(method, user) {
-  const userId = user.uid;
-  const methodName = method.charAt(0).toUpperCase() + method.slice(1);
-
-  // Google Analytics 4
-  trackGoogle('event', 'login', {
+  event('login', {
     method: method,
-    user_id: userId,
-  });
-
-  // Facebook Pixel
-  trackMeta('trackCustom', 'Login', {
-    content_name: `Account Login ${methodName}`,
-    method: method,
-  });
-
-  // TikTok Pixel
-  trackTikTok('Login', {
-    content_id: `account-login-${method}`,
-    content_type: 'product',
-    content_name: `Account Login ${methodName}`,
+    user_id: user.uid,
   });
 }
 
+/**
+ * The BROWSER half of `sign_up` — the catalog's one `placement: 'both'` event.
+ *
+ * The server half fires from the backend's auth trigger the moment Auth creates
+ * the account (`events/auth/on-create.js`), and the two MUST deduplicate or
+ * every registration is counted twice. The shared key is the uid:
+ *
+ *   THE DEDUPE ID IS `sign_up.<uid>`.
+ *
+ * Meta deduplicates on the (event_name, event_id) pair and TikTok on `event_id`,
+ * so both halves name the same string — computed from the one thing both sides
+ * hold before either fires. GA4 has NO cross-source deduplication, which is why
+ * the server half is Meta + TikTok only: this half owns GA4 outright.
+ */
 export function trackSignup(method, user) {
-  const userId = user.uid;
-  const methodName = method.charAt(0).toUpperCase() + method.slice(1);
-
-  // Google Analytics 4
-  trackGoogle('event', 'sign_up', {
+  event('sign_up', {
     method: method,
-    user_id: userId,
-  });
-
-  // Facebook Pixel
-  trackMeta('track', 'CompleteRegistration', {
-    content_name: `Account Registration ${methodName}`,
-    method: method,
-  });
-
-  // TikTok Pixel
-  trackTikTok('CompleteRegistration', {
-    content_id: `account-registration-${method}`,
-    content_type: 'product',
-    content_name: `Account Registration ${methodName}`,
+    user_id: user.uid,
+  }, {
+    eventId: `sign_up.${user.uid}`,
   });
 }
 
 export function trackPasswordReset() {
-  // Google Analytics 4
-  trackGoogle('event', 'password_reset', {
+  event('password_reset', {
     method: 'email',
     status: 'success',
-  });
-
-  // Facebook Pixel
-  trackMeta('trackCustom', 'PasswordReset', {
-    method: 'email',
-    status: 'success',
-  });
-
-  // TikTok Pixel
-  trackTikTok('SubmitForm', {
-    content_id: 'password-reset',
-    content_type: 'product',
-    content_name: 'Password Reset',
   });
 }

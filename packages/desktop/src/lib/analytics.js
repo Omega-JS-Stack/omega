@@ -43,10 +43,16 @@
 const crypto     = require('crypto');
 const LoggerLite = require('./logger-lite.js');
 const fetch      = require('wonderful-fetch');
-// The MP semantics live in ONE place — @omega.js/client's analytics-core
-// (C4 cp106b): identity math, event-name rules, payload + URL shape are
-// shared with the browser engine and can never drift again.
-const core = require('@omega.js/client/modules/analytics-core.js');
+// The MP semantics live in ONE place — @omega.js/analytics' core
+// (C4 cp106b): identity math, payload + URL shape are shared with the browser
+// engine and can never drift again.
+const core = require('@omega.js/analytics/core');
+// And so does WHAT an event is called: the shared catalog and its adapters
+// decide the native name and payload for every surface
+// ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)). This module
+// keeps only what is genuinely desktop's — the Measurement Protocol transport,
+// the pre-init queue, and the IPC bridge.
+const analytics_ = require('@omega.js/analytics');
 
 const logger = new LoggerLite('analytics');
 
@@ -114,6 +120,18 @@ const analytics = {
     const deviceId = manager.context.session.deviceId || crypto.randomUUID();
     analytics._clientId = core.deriveClientId(deviceId, analytics._namespace);
 
+    // The facade's seams for THIS process. The transport is the Measurement
+    // Protocol below — Meta's and TikTok's pixels do not exist in a main
+    // process, so their descriptors report blocked and the fire log says so.
+    // Environment mirrors the app's own dev flag: an unknown event name throws
+    // in development, where a typo is a bug, and is logged-and-skipped in a
+    // packaged app, where throwing would take the user's action with it.
+    analytics_.configure({
+      transport: { send: (descriptor) => analytics._send(descriptor) },
+      context: { runtime: 'electron' },
+      environment: manager.isDevelopment?.() ? 'development' : 'production',
+    });
+
     // Wire auth subscription so user_id flips automatically on login/logout.
     analytics._authUnsub = manager.omega.onAuthChange((snap) => {
       analytics._handleAuthChange(snap);
@@ -161,7 +179,7 @@ const analytics = {
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 
-  // Send an event. Queues if not initialized yet.
+  // Fire a CANONICAL event (a catalog name). Queues if not initialized yet.
   event(name, params) {
     if (!analytics._enabled || !analytics._measurementId) {
       // Queue while we're still booting (init may flip _enabled later).
@@ -173,17 +191,23 @@ const analytics = {
       return;
     }
 
-    const cleanName = analytics._normalizeName(name);
-    if (!cleanName) return;
+    // The catalog resolves the name and the payload; the transport below is
+    // handed the result. Nothing about a provider's dialect lives here.
+    analytics_.event(name, analytics._enrichParams(params || {}));
+  },
 
-    const enrichedParams = analytics._enrichParams(params || {});
+  // The Measurement Protocol transport: one resolved descriptor → one POST.
+  _send(descriptor) {
+    if (descriptor.provider !== 'ga4') {
+      return false;
+    }
 
     const payload = core.buildPayload({
       clientId:       analytics._clientId,
       userId:         analytics._userId,
       userProperties: analytics._userProperties,
-      eventName:      cleanName,
-      params:         enrichedParams,
+      eventName:      descriptor.name,
+      params:         descriptor.payload,
     });
 
     const url = core.buildCollectUrl(analytics._measurementId, analytics._apiSecret);
@@ -195,8 +219,10 @@ const analytics = {
       timeout:  FETCH_TIMEOUT_MS,
       body:     payload,
     }).catch((e) => {
-      logger.warn(`event "${cleanName}" failed: ${e.message}`);
+      logger.warn(`event "${descriptor.name}" failed: ${e.message}`);
     });
+
+    return true;
   },
 
   pageview(path) {
@@ -227,12 +253,6 @@ const analytics = {
 
   _isMain() {
     return process.type === 'browser' || process.type === undefined;   // undefined in tests
-  },
-
-  // GA4 event names: letters/digits/underscore, ≤40 chars, can't start/end with underscore.
-  _normalizeName(name) {
-    if (!name || typeof name !== 'string') return null;
-    return core.normalizeEventName(name);
   },
 
   // GA4 param contract: each event needs engagement_time_msec (else session bounces),

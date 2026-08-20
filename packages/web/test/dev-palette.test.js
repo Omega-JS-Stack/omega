@@ -85,6 +85,7 @@ function makeElement(tagName) {
     listeners: {},
     append: (...nodes) => element.children.push(...nodes),
     appendChild: (node) => { element.children.push(node); return node; },
+    replaceChildren: (...nodes) => { element.children = nodes; },
     setAttribute: (name, value) => { element.attributes[name] = value; },
     getAttribute: (name) => (name in element.attributes ? element.attributes[name] : null),
     addEventListener: (type, handler) => { (element.listeners[type] ||= []).push(handler); },
@@ -119,6 +120,15 @@ function makeClient(storage) {
   const requests = [];
   const listeners = [];
 
+  // The real Storage writes through JSON.stringify, which DROPS a key whose
+  // value is undefined. The round trip reproduces that in place, so the test's
+  // own reference to the blob stays the object the palette is reading.
+  const persist = () => {
+    const kept = JSON.parse(JSON.stringify(storage));
+    Object.keys(storage).forEach((key) => delete storage[key]);
+    Object.assign(storage, kept);
+  };
+
   const client = {
     signIns,
     requests,
@@ -131,11 +141,14 @@ function makeClient(storage) {
       signInWithEmailAndPassword: async (email, password) => { signIns.push({ email, password }); },
     }),
     // Lodash-pathed exactly like the real one (@omega.js/client's Storage), so
-    // a nested path behaves as it does in a browser.
+    // a nested path behaves as it does in a browser: no path reads (or wipes)
+    // the WHOLE blob, and every write persists through JSON — which is what
+    // makes a key removed by setting it undefined actually leave the object.
     storage: () => ({
-      get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
-      set: (keyPath, value) => _set(storage, keyPath, value),
-      remove: (keyPath) => _set(storage, keyPath, undefined),
+      get: (keyPath, defaultValue) => (keyPath ? _get(storage, keyPath, defaultValue) : storage),
+      set: (keyPath, value) => { _set(storage, keyPath, value); persist(); },
+      remove: (keyPath) => { _set(storage, keyPath, undefined); persist(); },
+      clear: () => { Object.keys(storage).forEach((key) => delete storage[key]); },
     }),
     request: async (url, options) => { requests.push({ url, options }); return {}; },
   };
@@ -187,6 +200,8 @@ async function boot(storage = {}, { pathname = '/' } = {}) {
     // The persona dropdown — the palette's own select, built before any
     // registered section, so the first one in the tree is always it.
     personas: () => all().find((candidate) => candidate.tagName === 'select'),
+    // The storage target dropdown (#390) — found by its name, not its order.
+    storageTarget: () => all().find((candidate) => candidate.tagName === 'select' && candidate.getAttribute('aria-label') === 'Storage target'),
     checkbox: (id) => all().find((candidate) => candidate.tagName === 'input' && candidate.id === id),
     // Every section heading the panel shows, in order.
     labels: () => all().filter((element) => element.className === 'omega-devbar__label').map((element) => element.textContent),
@@ -441,6 +456,113 @@ test('#375: the persona dropdown draws its own chevron, clear of the right edge'
   assert.match(rule, /background-image: url\("data:image\/svg\+xml/, 'a drawn chevron replaces it');
   assert.match(rule, /background-position: right 0\.5rem center;/, 'sitting in from the edge');
   assert.match(rule, /padding: 0\.3125rem 1\.75rem 0\.3125rem 0\.5rem;/, 'with right padding clearing it');
+});
+
+/** Run one function with console.log captured; hand back what it was called with. */
+async function capturingLogs(run) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args);
+
+  try {
+    await run();
+  } finally {
+    console.log = original;
+  }
+
+  return lines;
+}
+
+test('#390: the storage dropdown lists All first, then every LIVE top-level key', async () => {
+  const { labels, open, storageTarget } = await boot({
+    trackingConsent: { status: 'granted' },
+    attribution: { utm_source: 'newsletter' },
+  });
+
+  await open();
+
+  assert.ok(labels().includes('Storage'), 'the panel carries a Storage section');
+  const options = storageTarget().children;
+  assert.strictEqual(options[0].textContent, 'All (2 keys)', 'All leads, counting the keys');
+  assert.strictEqual(options[0].value, '', 'and its value is the empty target');
+  assert.deepStrictEqual(
+    options.slice(1).map((option) => option.value),
+    ['trackingConsent', 'attribution'],
+    'every top-level key is a target',
+  );
+});
+
+test('#390: the options are re-derived on every open, so a key written since is already there', async () => {
+  const { open, storage, storageTarget } = await boot({ trackingConsent: { status: 'granted' } });
+
+  const values = () => storageTarget().children.map((option) => option.value);
+
+  await open();
+  assert.ok(!values().includes('appearance'), 'nothing wrote that key yet');
+
+  // What a page does while the panel is closed — the option set is a snapshot
+  // of the blob, never a list the palette holds onto.
+  storage.appearance = 'dark';
+  await open();
+
+  assert.ok(values().includes('appearance'), 'reopening picks up the key written since');
+  const copies = values().filter((value) => value === 'trackingConsent');
+  assert.strictEqual(copies.length, 1, 'and re-rendering replaces the options rather than stacking them');
+});
+
+test('#390: Clear on a selected key drops that key and leaves the rest', async () => {
+  const { button, open, storage, storageTarget } = await boot({
+    trackingConsent: { status: 'granted' },
+    attribution: { utm_source: 'newsletter' },
+  });
+
+  await open();
+  storageTarget().value = 'trackingConsent';
+  await button('Clear').click();
+
+  assert.deepStrictEqual(
+    storage,
+    { attribution: { utm_source: 'newsletter' } },
+    'only the targeted key leaves the blob',
+  );
+  const values = storageTarget().children.map((option) => option.value);
+  assert.ok(!values.includes('trackingConsent'), 'and its option goes with it');
+  assert.ok(values.includes('attribution'), 'the surviving key keeps its option');
+  assert.strictEqual(storageTarget().value, '', 'the selection falls back to All');
+});
+
+test('#390: Clear on All wipes the whole blob', async () => {
+  const { button, open, storage, storageTarget } = await boot({
+    trackingConsent: { status: 'granted' },
+    attribution: { utm_source: 'newsletter' },
+  });
+
+  await open();
+  await button('Clear').click();
+
+  assert.deepStrictEqual(storage, {}, 'the blob is empty');
+  const options = storageTarget().children;
+  assert.strictEqual(options.length, 1, 'no per-key option survives it');
+  assert.strictEqual(options[0].textContent, 'All (0 keys)', 'and All says so');
+});
+
+test('#390: Log prints the parsed target, not a string dump', async () => {
+  const blob = { trackingConsent: { status: 'granted' } };
+  const { button, open, storageTarget } = await boot(blob);
+
+  await open();
+  const all = await capturingLogs(() => button('Log').click());
+
+  assert.strictEqual(all.length, 1, 'one line');
+  assert.strictEqual(all[0][0], '[@omega.js/web:dev-palette]', 'carrying the runtime log tag (docs/shared/logging.md)');
+  assert.strictEqual(all[0][1], 'storage:', 'saying what it is');
+  assert.strictEqual(all[0][2], blob, 'the object itself — devtools has to be able to explore it');
+
+  storageTarget().value = 'trackingConsent';
+  const one = await capturingLogs(() => button('Log').click());
+
+  assert.strictEqual(one[0][1], 'storage.trackingConsent:', 'a keyed target says which key');
+  assert.strictEqual(one[0][2], blob.trackingConsent, 'and prints that value, still explorable');
 });
 
 test('#234: a section without an id or a builder is a programmer error, loudly', async () => {

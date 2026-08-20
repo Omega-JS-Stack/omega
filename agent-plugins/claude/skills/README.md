@@ -4,13 +4,14 @@ One directory per skill, holding a `SKILL.md`. The directory name and the frontm
 
 The roster follows the packages a session works in: `main` (the hub) plus `web`, `backend`, `desktop`, `extension`, `client`, and `manager` — plus `browser`, which is not a package router but the usage pattern for the plugin's one MCP declaration, the `@omega.js/mcp-router` endpoint.
 
-Three more are checklists rather than routers, and the quality hook fires them on the surfaces they own (the table is in the plugin README):
+Four more are checklists rather than routers, and the quality hook fires them on the surfaces they own (the table is in the plugin README):
 
 | Skill | The checklist |
 |---|---|
 | `seo` | A page's search surface: meta title/description, canonical + social tags, structured data, one h1, sitemap/robots, link shape |
 | `accessibility` | Front-end surfaces: landmarks and heading order, alt text, control names, color through the tokens, focus visibility, reduced motion |
 | `brandcheck` | Config and copy consistency: brand facts read from omega.json5, one brand hex, the merge chain, no secrets in config |
+| `analytics` | Event tracking: every flow fires through the catalog, a new event is a catalog entry first, the placement rule, consent and attribution carried not hand-rolled |
 
 ```
 skills/

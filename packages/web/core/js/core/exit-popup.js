@@ -1,7 +1,7 @@
 // Libraries
 import merge from 'lodash/merge.js';
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Exit Popup Module
 export default function () {
@@ -249,59 +249,28 @@ export default function () {
     }
   }
 
-  // Tracking functions
+  // Tracking functions — one canonical fire each; the catalog decides what
+  // Meta and TikTok are told and in which dialect (#328)
   function trackExitPopupShown() {
-    trackGoogle('event', 'exit_popup_show', {
+    event('exit_popup_show', {
       event_category: 'engagement',
       event_label: config.title,
       page_path: window.location.pathname
     });
-
-    trackMeta('trackCustom', 'ExitPopupShow', {
-      content_name: 'Exit Popup Show',
-      page_path: window.location.pathname
-    });
-
-    trackTikTok('ViewContent', {
-      content_id: 'exit-popup-show',
-      content_type: 'product',
-      content_name: 'Exit Popup Show'
-    });
   }
 
   function trackExitPopupClick() {
-    trackGoogle('event', 'exit_popup_click', {
+    event('exit_popup_click', {
       event_category: 'engagement',
       event_label: config.okButton?.text || 'OK',
       destination_url: config.okButton?.link
     });
-
-    trackMeta('track', 'Lead', {
-      content_name: 'Exit Popup Click',
-      content_category: config.title
-    });
-
-    trackTikTok('ClickButton', {
-      content_id: 'exit-popup-click',
-      content_type: 'product',
-      content_name: 'Exit Popup Click'
-    });
   }
 
   function trackExitPopupDismissed() {
-    trackGoogle('event', 'exit_popup_dismiss', {
+    event('exit_popup_dismiss', {
       event_category: 'engagement',
       event_label: config.title
-    });
-
-    trackMeta('trackCustom', 'ExitPopupDismiss', {
-      content_name: 'Exit Popup Dismiss'
-    });
-
-    trackTikTok('ViewContent', {
-      content_id: 'exit-popup-dismiss',
-      content_type: 'product',
-      content_name: 'Exit Popup Dismiss'
     });
   }
 };

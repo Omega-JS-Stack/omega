@@ -34,8 +34,10 @@ async function initializeConfirmation() {
   // Update UI with loaded data
   updateUI();
 
-  // Track purchase (if track=true param present)
-  // trackPurchaseIfNeeded(state);
+  // The browser half of the purchase (if the track=true param is present) —
+  // Meta's and TikTok's retargeting signal, deduped against the webhook's own
+  // fire (#386). The revenue TRUTH is the webhook's, always.
+  trackPurchaseIfNeeded(state);
 
   // Subscribe to push notifications on CTA click (requires user gesture).
   // Wired before the verification wait so the CTAs are live immediately.

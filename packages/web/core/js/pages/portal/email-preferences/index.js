@@ -7,7 +7,7 @@ import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -167,16 +167,10 @@ function setupForm() {
   formManager.ready();
 }
 
-// Tracking
+// Tracking. The two outcomes are two catalog entries, not one name built from
+// a variable: a canonical name is a literal a reader can grep for.
 function trackEmailPreference(action) {
-  trackGoogle('event', `email_${action}`, {
+  event(action === 'unsubscribe' ? 'email_unsubscribe' : 'email_subscribe', {
     content_type: 'email_preferences',
-  });
-  trackMeta('trackCustom', action === 'unsubscribe' ? 'EmailUnsubscribe' : 'EmailResubscribe', {
-    content_name: 'Email Preferences',
-  });
-  trackTikTok('ViewContent', {
-    content_id: `email-${action}`,
-    content_type: 'product',
   });
 }

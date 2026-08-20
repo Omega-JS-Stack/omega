@@ -11,6 +11,9 @@
 // Libraries
 import omega from '@omega.js/client';
 import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
+import { createLogger } from '__main_assets__/js/libs/logger.js';
+
+const logger = createLogger('dev-palette');
 
 // The personas worth switching between by hand — a CURATED subset of what the
 // backend emulator seeds on boot (packages/backend src/test/test-accounts.js),
@@ -332,6 +335,77 @@ export default function devPalette() {
   signOut.style.marginTop = '0.375rem';
   signOut.style.width = '100%';
 
+  // Storage (#390) — the client blob QA pokes at by hand. ONE row (Ian
+  // 2026-08-20): a target dropdown (All first, then every top-level key,
+  // re-read from the LIVE blob each time the panel opens, so a key a page
+  // wrote a second ago is already listed) and the two verbs, Log and Clear,
+  // acting on whatever the dropdown says. No confirmations — the whole
+  // surface is development-only.
+  const storage = doc.createElement('div');
+  storage.className = 'omega-devbar__fields';
+
+  const storageTarget = doc.createElement('select');
+  storageTarget.className = 'omega-devbar__select';
+  storageTarget.setAttribute('aria-label', 'Storage target');
+
+  const renderStorage = () => {
+    const keys = Object.keys(omega.storage().get() || {});
+    const previous = storageTarget.value;
+    storageTarget.replaceChildren();
+
+    const all = doc.createElement('option');
+    all.value = '';
+    all.textContent = `All (${keys.length} ${keys.length === 1 ? 'key' : 'keys'})`;
+    storageTarget.append(all);
+
+    keys.forEach((key) => {
+      const option = doc.createElement('option');
+      option.value = key;
+      option.textContent = key;
+      storageTarget.append(option);
+    });
+
+    // A re-render keeps the selection while its key still exists; a cleared
+    // key falls back to All, which is the empty value.
+    storageTarget.value = keys.includes(previous) ? previous : '';
+  };
+
+  const logStorage = doc.createElement('button');
+  logStorage.type = 'button';
+  logStorage.className = 'omega-devbar__btn';
+  logStorage.textContent = 'Log';
+  logStorage.addEventListener('click', () => {
+    const key = storageTarget.value;
+    // The parsed value, never a JSON string — devtools renders it explorable.
+    // An ARRAY path, not the bare string: storage paths are lodash paths, and
+    // a top-level key carrying a dot would otherwise read a nested one.
+    if (key) {
+      logger.log(`storage.${key}:`, omega.storage().get([key]));
+    } else {
+      logger.log('storage:', omega.storage().get());
+    }
+  });
+
+  const clearStorage = doc.createElement('button');
+  clearStorage.type = 'button';
+  clearStorage.className = 'omega-devbar__btn';
+  clearStorage.textContent = 'Clear';
+  clearStorage.addEventListener('click', () => {
+    const key = storageTarget.value;
+    if (key) {
+      // The same array-path rule as Log, for the same dotted-key reason.
+      omega.storage().remove([key]);
+    } else {
+      omega.storage().clear();
+    }
+    renderStorage();
+  });
+
+  const storageActions = doc.createElement('div');
+  storageActions.className = 'omega-devbar__grid';
+  storageActions.append(logStorage, clearStorage);
+  storage.append(storageTarget, storageActions);
+
   // Quick links
   const links = doc.createElement('div');
   links.className = 'omega-devbar__grid';
@@ -376,6 +450,7 @@ export default function devPalette() {
     builtIn('personas', 'Switch account', personaSelect),
     reset,
     signOut,
+    builtIn('storage', 'Storage', storage),
     extras,
     builtIn('links', 'Go to', links),
     note,
@@ -408,6 +483,7 @@ export default function devPalette() {
     tab.style.display = open ? 'none' : '';
 
     if (open) {
+      renderStorage();
       renderDevSections();
     }
   };

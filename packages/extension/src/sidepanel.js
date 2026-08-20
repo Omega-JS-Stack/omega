@@ -6,6 +6,7 @@ import Messaging from './lib/messaging.js';
 import { syncWithBackground, setupAuthBroadcastListener, setupSignOutListener, setupAuthEventListeners, openAuthPage as openAuthPageHelper } from './lib/auth-helpers.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
 import { wireAds } from './lib/verts.js';
+import { trackAppLaunch } from './lib/analytics.js';
 
 // Import theme (exposes Bootstrap to window.bootstrap)
 import '__theme__/_theme.js';
@@ -34,6 +35,10 @@ class Manager {
 
     // Initialize
     await this.omega.initialize(configuration);
+
+    // This surface opened — the extension's own launch event (#328 gap 7).
+    // login/logout ride the shared client's auth wiring.
+    trackAppLaunch();
 
     // Set up auth state listener (updates bindings with user/account state)
     this.omega.auth().listen((state) => {

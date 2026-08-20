@@ -67,7 +67,7 @@ const SPECIFIER = '@omega\\.js\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
 // hosts wire them as devDependencies). A dist reference to any OTHER @omega.js
 // package is an error unless it's a declared runtime dependency — publishable
 // packages (web, client, backend, ...) are never folded into a host's dist.
-const VENDORABLE_PACKAGES = ['devkit', 'config', 'account', 'template-kit'];
+const VENDORABLE_PACKAGES = ['devkit', 'config', 'account', 'template-kit', 'analytics'];
 
 // The ways dist code can reference an @omega.js package. Each pattern captures:
 // 1 = prefix (kept verbatim on rewrite), 2 = quote, 3 = package name, 4 = subpath.

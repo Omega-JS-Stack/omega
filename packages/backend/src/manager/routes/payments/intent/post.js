@@ -37,6 +37,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const productId = settings.productId;
   const frequency = settings.frequency;
   const attribution = settings.attribution;
+  const trackingConsent = settings.trackingConsent;
   const discount = settings.discount;
   const supplemental = settings.supplemental;
   const simulate = settings.simulate;
@@ -158,6 +159,17 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     frequency: frequency,
     trial: trial,
     attribution: attribution,
+    trackingConsent: trackingConsent,
+    // The CUSTOMER's request context, captured here because this is the only
+    // moment the backend hears from their browser: the webhook that completes
+    // the order arrives from the processor's servers. Meta and TikTok match a
+    // server conversion to the browsing session on exactly this pair
+    // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)), and the
+    // order fold copies it off the intent.
+    request: {
+      ip: ctx.request.geolocation?.ip || null,
+      userAgent: ctx.request.client?.userAgent || null,
+    },
     discount: resolvedDiscount,
     supplemental: supplemental,
     raw: result.raw,

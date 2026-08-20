@@ -1,0 +1,33 @@
+{
+  "name": "@omega.js/analytics",
+  "version": "0.1.0",
+  "description": "The OMEGA analytics contract — the typed event catalog, one adapter per provider (GA4/Meta/TikTok), the guarded browser transport, and the consent seam shared by @omega.js/web, @omega.js/client, @omega.js/desktop, @omega.js/extension and @omega.js/backend (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "private": true,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./catalog": "./src/catalog.js",
+    "./core": "./src/core.js",
+    "./consent": "./src/consent.js",
+    "./identity": "./src/identity.js",
+    "./logger": "./src/logger.js",
+    "./adapters/ga4": "./src/adapters/ga4.js",
+    "./adapters/meta": "./src/adapters/meta.js",
+    "./adapters/tiktok": "./src/adapters/tiktok.js",
+    "./transports/browser": "./src/transports/browser.js"
+  },
+  "scripts": {
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
+  },
+  "dependencies": {
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@omega.js/devkit": "*"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "Elastic-2.0"
+}

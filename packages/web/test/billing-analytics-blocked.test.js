@@ -30,8 +30,14 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { resolveSubscription } = require('@omega.js/account');
 
-const CORE_DIR = path.join(__dirname, '..', 'core');
+const PKG = path.join(__dirname, '..');
+const ROOT = path.resolve(PKG, '..', '..');
+const CORE_DIR = path.join(PKG, 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
+
+// The client's built module — the door web core reaches the analytics package
+// (catalog, adapters, guarded transport) through.
+const CLIENT_ANALYTICS = path.join(ROOT, 'packages', 'client', 'dist', 'modules', 'analytics.js');
 
 const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-billing-analytics-'));
 const BUNDLE = path.join(BUNDLE_DIR, 'billing.cjs');
@@ -50,6 +56,11 @@ function bundleOnce() {
       setup(build) {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
+        });
+        // The REAL client module: the catalog is what decides which provider
+        // hears an event, so stubbing it would prove nothing.
+        build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
+          return { path: CLIENT_ANALYTICS };
         });
         build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
@@ -138,9 +149,18 @@ async function wireBilling({ analyticsBlocked }) {
     open: (url) => opened.push(url),
   };
   globalThis.__omegaClient = {
+    config: { analytics: { providers: {} } },
     auth: () => ({ resolveSubscription: (account) => resolveSubscription(account) }),
     bindings: () => ({ update: () => {} }),
     utilities: () => ({ showNotification: () => {}, escapeHTML: (value) => value }),
+    // The visitor consented to everything — a denied category is its own suite
+    // (consent-gating.test.js); this one is about blocked GLOBALS.
+    storage: () => ({
+      get: (key, fallback) => (key === 'trackingConsent'
+        ? { analytics: true, marketing: true, region: 'opt-out', version: 1 }
+        : fallback),
+      set: () => {},
+    }),
     request: async (route, options) => {
       requests.push({ route, options });
       return route.endsWith('/portal') ? { url: 'https://portal.example/session' } : {};
@@ -207,15 +227,16 @@ test('#283: a blocked analytics global never stops a billing action', async () =
   await assert.doesNotReject(() => clickById('change-plan-btn'), 'recording the change-plan intent throws nothing');
 });
 
-test('#283: with the scripts present, every provider is still counted', async () => {
-  // The guard must not become a silent opt-out: an unblocked page counts a
-  // billing action on all three providers, exactly as it did before.
+test('#328: with the scripts present, every provider the CATALOG maps is counted', async () => {
+  // The guard must not become a silent opt-out: an unblocked page still counts
+  // the billing action. WHO hears it is the catalog's call, and `billing_action`
+  // is a GA4-only action bucket by ruling — undoing a cancellation is account
+  // bookkeeping, not an ad signal.
   const { tracked, clickById } = await wireBilling({ analyticsBlocked: false });
 
   await clickById('uncancel-confirm-btn');
 
-  const providers = tracked.map(([provider]) => provider);
-  assert.deepStrictEqual(providers, ['gtag', 'fbq', 'ttq'], 'all three providers counted the action');
+  assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the mapped provider counted the action');
 
   const [gtagCall] = tracked;
   assert.strictEqual(gtagCall[1], 'event', 'gtag is called as an event');

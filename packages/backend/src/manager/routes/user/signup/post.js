@@ -128,8 +128,8 @@ async function pollForUserDoc(ctx, uid) {
  *      partial path, e.g. onCreate never firing, still ends up schema-complete).
  *   2. the existing doc — real values win over the schema defaults, so we never clobber the
  *      user's api keys, subscription, roles, affiliate.code, or any custom/non-standard fields.
- *   3. the signup data — attribution / activity / consent / flags / personal we own at signup
- *      land on top.
+ *   3. the signup data — attribution / trackingConsent / activity / consent / flags / personal
+ *      we own at signup land on top.
  *
  * Why a full deep-merge instead of `.set(partial, {merge:true})`: Firestore's merge REPLACES a
  * map field rather than deep-merging it, so writing a partial `attribution` flattened onCreate's
@@ -170,6 +170,7 @@ function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, ex
       },
     },
     attribution: settings.attribution || {},
+    trackingConsent: settings.trackingConsent || null,
     consent: buildConsentRecord(ctx, settings.consent, creationTime, existingDoc?.consent),
     metadata: Manager.Metadata().set({ tag: 'user/signup' }),
     ...(Object.keys(personal).length ? { personal } : {}),

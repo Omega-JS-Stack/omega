@@ -1,5 +1,5 @@
 import omega from '@omega.js/client';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Social Sharing Module
 export default function () {
@@ -267,41 +267,17 @@ export default function () {
 
   // Tracking functions
   function trackShare(platformKey, shareConfig) {
-    const platformName = platforms[platformKey]?.name || platformKey;
-
-    trackGoogle('event', 'share', {
+    event('share', {
       method: platformKey,
       content_type: 'article',
       item_id: shareConfig.url
     });
-
-    trackMeta('track', 'Share', {
-      content_name: shareConfig.title,
-      content_url: shareConfig.url,
-      share_method: platformKey
-    });
-
-    trackTikTok('Share', {
-      content_id: `social-share-${platformKey}`,
-      content_type: 'product',
-      content_name: `Social Share ${platformName}`
-    });
   }
 
   function trackCopyLink(shareConfig) {
-    trackGoogle('event', 'copy_link', {
+    event('copy_link', {
       content_type: 'share',
       item_id: shareConfig.url
-    });
-
-    trackMeta('trackCustom', 'CopyLink', {
-      content_url: shareConfig.url
-    });
-
-    trackTikTok('ClickButton', {
-      content_id: 'social-share-copy-link',
-      content_type: 'product',
-      content_name: 'Social Share Copy Link'
     });
   }
 };

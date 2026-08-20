@@ -23,6 +23,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
   it('dev mode logs events without posting; production posts', async () => {
     const Analytics = (await import(SOURCE_PATH)).default;
 
+
     // Minimal browser surface for the module's page/event paths
     global.window = global.window || { location: { pathname: '/t', href: 'http://t/t' } };
     global.document = global.document || { title: 't' };
@@ -41,7 +42,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
         isDevelopment: () => true,
       });
       dev.init({ id: 'G-TESTONLY', secret: 'test-secret' });
-      dev.event('unit_test');
+      dev.event('app_launch');
       assert.strictEqual(fetchCalls.length, 0, 'dev mode must never hit the Measurement Protocol');
 
       // Production: same config posts for real
@@ -102,25 +103,28 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
       assert.strictEqual(a.clientId, uuidv5(store.get('_omega_device_id'), ns), 'client_id = uuidv5(deviceId, ns)');
       assert.strictEqual(a.clientId, b.clientId, 'stable across instances');
 
-      // user_id = uuidv5(uid, ns) — the raw uid never leaves the device
-      a.setUserId('firebase-uid-1');
-      assert.strictEqual(a.userId, uuidv5('firebase-uid-1', ns));
-      assert.notStrictEqual(a.userId, 'firebase-uid-1');
+      // user_id = uuidv5(uid, ns) — the raw uid never leaves the device.
+      // The fires below run on `b`, the host that init'd LAST: the facade holds
+      // one transport per process, so the most recent host owns it. A runtime
+      // has exactly one client singleton, so only a test ever has two.
+      b.setUserId('firebase-uid-1');
+      assert.strictEqual(b.userId, uuidv5('firebase-uid-1', ns));
+      assert.notStrictEqual(b.userId, 'firebase-uid-1');
 
       sent.length = 0;
-      a.event('unit_identity');
+      b.event('app_launch');
       assert.strictEqual(sent.length, 1, 'production event posts');
       assert.strictEqual(sent[0].body.user_id, uuidv5('firebase-uid-1', ns), 'payload carries the hashed user_id');
-      assert.strictEqual(sent[0].body.client_id, a.clientId);
+      assert.strictEqual(sent[0].body.client_id, b.clientId);
 
       // Logout clears it
-      a.setUserId(null);
-      assert.strictEqual(a.userId, null);
+      b.setUserId(null);
+      assert.strictEqual(b.userId, null);
 
       // user properties ride wrapped as { value }
-      a.setUserProperties({ plan: 'premium' });
+      b.setUserProperties({ plan: 'premium' });
       sent.length = 0;
-      a.event('unit_props');
+      b.event('app_launch');
       assert.deepStrictEqual(sent[0].body.user_properties, { plan: { value: 'premium' } });
     } finally {
       global.fetch = realFetch;
@@ -138,7 +142,9 @@ describe('Analytics on web (#159: gtag delegation)', () => {
     const calls = [];
     const fetchCalls = [];
     const realFetch = global.fetch;
-    global.window.gtag = (...args) => calls.push(args);
+    // The page global as a browser has it: `window.gtag` IS the bare `gtag` the
+    // guarded transport checks for.
+    globalThis.gtag = (...args) => calls.push(args);
     global.fetch = (url) => {
       fetchCalls.push(url);
       return Promise.resolve({ ok: true });
@@ -156,13 +162,13 @@ describe('Analytics on web (#159: gtag delegation)', () => {
       assert.strictEqual(web.initialized, true, 'web initializes without an id or a secret');
       assert.strictEqual(calls.length, 0, 'the page gtag config already fired the page_view, so no second one');
 
-      web.event('vert-click!', { vert_id: 'omega-promo', vert_lane: 'promo' });
+      web.event('vert_click', { vert_id: 'omega-promo', vert_lane: 'promo' });
 
       assert.strictEqual(fetchCalls.length, 0, 'web must never post to the Measurement Protocol');
       assert.strictEqual(calls.length, 1, 'the event reaches the page gtag');
       const [command, name, params] = calls[0];
       assert.strictEqual(command, 'event');
-      assert.strictEqual(name, 'vert_click', 'the name normalizes through analytics-core');
+      assert.strictEqual(name, 'vert_click', 'the catalog decides the native name');
       assert.strictEqual(params.vert_id, 'omega-promo', 'caller params ride along');
       assert.strictEqual(params.page_location, global.window.location.href, 'page data merges in');
 
@@ -174,13 +180,14 @@ describe('Analytics on web (#159: gtag delegation)', () => {
       withSecret.init({ id: 'G-TESTONLY', secret: 'test-secret' });
       assert.strictEqual(withSecret.secret, null, 'the api_secret is never read on web');
 
-      // gtag absent (analytics unconfigured) → logged no-op, never a throw
-      delete global.window.gtag;
+      // gtag absent (blocked, or consent not granted so the loader never
+      // injected it) → silent no-op, never a throw and never a fallback
+      delete globalThis.gtag;
       web.event('vert_click');
       assert.strictEqual(fetchCalls.length, 0, 'a missing gtag never falls back to the fetch path');
     } finally {
       global.fetch = realFetch;
-      delete global.window.gtag;
+      delete globalThis.gtag;
     }
   });
 
@@ -188,7 +195,7 @@ describe('Analytics on web (#159: gtag delegation)', () => {
     const Manager = getManager();
 
     const calls = [];
-    global.window.gtag = (...args) => calls.push(args);
+    globalThis.gtag = (...args) => calls.push(args);
 
     try {
       await Manager.initialize(TEST_CONFIG);
@@ -199,15 +206,15 @@ describe('Analytics on web (#159: gtag delegation)', () => {
       assert.strictEqual(events.length, 1, 'vert_click reaches gtag through the manager');
       assert.strictEqual(events[0][2].vert_lane, 'promo');
     } finally {
-      delete global.window.gtag;
+      delete globalThis.gtag;
     }
   });
 
 });
 
-describe('Analytics event-name normalization (wave-4 F7)', () => {
+describe('Analytics rides the shared catalog (#328 stage E)', () => {
 
-  it('event() normalizes names through analytics-core — same rule as desktop', async () => {
+  it('the catalog decides the name, and an unknown one is never posted', async () => {
     const Analytics = (await import(SOURCE_PATH)).default;
 
     global.window = global.window || { location: { pathname: '/t', href: 'http://t/t' } };
@@ -228,16 +235,96 @@ describe('Analytics event-name normalization (wave-4 F7)', () => {
       prod.init({ id: 'G-TESTONLY', secret: 'test-secret' });
       bodies.length = 0;
 
-      prod.event('signup-completed!');
+      // A canonical name posts under the GA4 mapping's NATIVE name
+      prod.event('screen_view', { screen_name: 'settings' });
       const names = bodies.flatMap((b) => (b.events || []).map((e) => e.name));
-      assert(names.includes('signup_completed'), `GA4-invalid chars must normalize (got: ${names.join(', ')})`);
+      assert(names.includes('screen_view'), `the catalog's GA4 name rides the payload (got: ${names.join(', ')})`);
 
-      // A name that normalizes to nothing is dropped, not posted raw
+      // A name no catalog entry declares is a programmer error: production logs
+      // and skips it rather than shipping junk into the property
       bodies.length = 0;
-      prod.event('!!!');
-      assert.strictEqual(bodies.length, 0, 'unusable names must be dropped');
+      prod.event('signup-completed!');
+      assert.strictEqual(bodies.length, 0, 'an uncatalogued name is never posted');
     } finally {
       global.fetch = realFetch;
+    }
+  });
+
+  it('login/logout fire off auth change on the runtimes that own them', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    const bodies = [];
+    const realFetch = global.fetch;
+    global.fetch = (url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return Promise.resolve({ ok: true });
+    };
+
+    const namesOf = () => bodies.flatMap((b) => (b.events || []).map((e) => e.name));
+
+    try {
+      const extension = new Analytics({
+        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        isDevelopment: () => false,
+      });
+      extension.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });
+
+      bodies.length = 0;
+      extension.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+      assert.deepStrictEqual(namesOf(), ['login'], 'signing in fires login');
+
+      bodies.length = 0;
+      extension.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+      assert.deepStrictEqual(namesOf(), [], 'a repeat callback for the same session fires nothing');
+
+      // `logout` is in the catalog with NO provider mapping — a logout is not
+      // an ad signal, and GA4 reads the session end on its own — so the proof
+      // that it FIRED is the facade's dev line, not a delivery.
+      const dev = new Analytics({
+        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        isDevelopment: () => true,
+      });
+      dev.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });
+
+      const lines = [];
+      const realLog = console.log;
+      console.log = (...args) => lines.push(args.join(' '));
+      try {
+        dev.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+        dev.handleAuthChange(null);
+      } finally {
+        console.log = realLog;
+      }
+
+      assert(lines.some((line) => line.includes('login → ')), 'the login fire logs its walk');
+      assert(lines.some((line) => line.includes('logout → ')), 'signing out fires logout');
+      assert.strictEqual(dev.userId, null, 'and the identity is cleared');
+
+      // Web's auth pages own login (they know the METHOD), so the shared
+      // wiring stays out of their way — identity still follows auth.
+      const calls = [];
+      globalThis.gtag = (...args) => calls.push(args);
+
+      const web = new Analytics({
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      });
+      web.init({ projectId: 'proj-x' });
+
+      bodies.length = 0;
+      calls.length = 0;
+      web.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+
+      assert.deepStrictEqual(namesOf(), [], 'web never posts to the Measurement Protocol');
+      assert.deepStrictEqual(
+        calls.filter(([command, name]) => command === 'event' && name === 'login'),
+        [],
+        'and never double-fires the login the auth page already counted',
+      );
+      assert.deepStrictEqual(calls[0], ['set', { user_id: web.userId }], 'the identity is sent (#159)');
+    } finally {
+      global.fetch = realFetch;
+      delete globalThis.gtag;
     }
   });
 });

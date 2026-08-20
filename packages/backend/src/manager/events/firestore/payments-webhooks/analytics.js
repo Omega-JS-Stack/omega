@@ -1,33 +1,59 @@
-const fetch = require('wonderful-fetch');
 const discountCodes = require('../../../libraries/payment/discount-codes.js');
+const { deliverConversion } = require('../../../libraries/analytics/conversions.js');
+const { buildAttributionContext, buildIdentity } = require('../../../libraries/analytics/match-data.js');
 
 /**
  * Payment analytics tracking
- * Fires server-side events independently to GA4, Meta Conversions API, and TikTok Events API
+ *
+ * The webhook decides WHAT happened; `@omega.js/analytics`' catalog decides what
+ * each platform calls it and what shape it takes
+ * ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)). So this file maps
+ * a transition to a CANONICAL event name plus canonical params, and hands both to
+ * the conversion delivery library — which walks the adapters and the three
+ * platform APIs. No provider dialect lives here any more.
  *
  * Two independent concerns:
  *   1. Transition events (mutually exclusive, one per webhook):
  *      new-subscription (no trial) → purchase
  *      new-subscription (trial)    → start_trial
  *      subscription-winback        → purchase
- *      payment-recovered           → purchase (recurring)
+ *      payment-recovered           → payment_recovered
+ *      subscription-cancelled      → subscription_cancelled
+ *      payment-refunded            → refund
  *      purchase-completed          → purchase (one-time)
+ *      purchase-refunded           → refund (one-time)
  *
  *   2. Payment events (fire whenever money changes hands, including renewals):
- *      subscription renewal        → purchase (recurring)
+ *      subscription renewal        → subscription_renewed
+ *
+ * The two cancellation SCHEDULE transitions (`cancellation-requested`,
+ * `cancellation-removed`) stay deliberately unmapped: nothing ended and no money
+ * moved — the subscription is still active and may never cancel at all. Only the
+ * cancellation that actually took effect is a conversion event.
  */
 
 /**
  * Track payment events across analytics platforms (non-blocking)
- * Fires GA4, Meta, and TikTok independently with per-platform payloads
+ *
+ * @param {object} options
+ * @param {string} options.category - 'subscription' | 'one-time'
+ * @param {string|null} options.transitionName - The detected transition
+ * @param {string} options.eventType - The processor's webhook event name
+ * @param {object} options.unified - The unified subscription/purchase object
+ * @param {object} options.order - The order doc about to be written (attribution, request, consent)
+ * @param {object} [options.userDoc] - The owner's user doc — the email/phone the match data hashes
+ * @param {object|null} [options.refundDetails] - The library's { amount, currency, reason }
+ * @param {string} options.uid - The owner
+ * @param {string} options.processor - The processor that sent the webhook
+ * @param {object} options.ctx - The event context
  */
-function trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx }) {
+function trackPayment({ category, transitionName, eventType, unified, order, userDoc, refundDetails, uid, processor, ctx }) {
   const Manager = ctx.Manager;
   const config = Manager.config;
 
   try {
     // Resolve what kind of payment event this is
-    const resolved = resolvePaymentEvent(category, transitionName, eventType, unified, order);
+    const resolved = resolvePaymentEvent(category, transitionName, eventType, unified, order, refundDetails);
 
     if (!resolved) {
       ctx.log(`trackPayment: skipped — no trackable event (category=${category}, transition=${transitionName || 'null'}, eventType=${eventType})`);
@@ -36,15 +62,74 @@ function trackPayment({ category, transitionName, eventType, unified, order, uid
 
     const currency = config.payment?.currency || 'USD';
 
-    ctx.log(`trackPayment: reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, processor=${processor}`);
+    ctx.log(`trackPayment: event=${resolved.event}, reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, processor=${processor}`);
 
-    // Fire each platform independently (non-blocking, errors isolated)
-    fireGA4({ resolved, currency, uid, processor, ctx, Manager });
-    fireMeta({ resolved, currency, uid, processor, ctx, config });
-    fireTikTok({ resolved, currency, uid, processor, ctx, config });
+    deliverConversion({
+      event: resolved.event,
+      params: buildParams({ resolved, currency, processor }),
+      attribution: buildAttributionContext(order?.attribution),
+      identity: buildIdentity({
+        uid,
+        email: userDoc?.auth?.email,
+        telephone: userDoc?.personal?.telephone,
+        request: order?.request,
+      }),
+      trackingConsent: order?.trackingConsent,
+      eventId: resolveEventId(resolved, order),
+      ctx,
+      Manager,
+    });
   } catch (e) {
     ctx.error(`trackPayment failed: ${e.message}`, e);
   }
+}
+
+/**
+ * The canonical commerce params every money event carries.
+ * GA4's vocabulary IS the canonical one; Meta and TikTok reshape it in the catalog.
+ */
+function buildParams({ resolved, currency, processor }) {
+  return {
+    transaction_id: resolved.resourceId,
+    value: resolved.value,
+    currency: currency,
+    items: [{
+      item_id: resolved.productId,
+      item_name: resolved.productName,
+      price: resolved.value,
+      quantity: 1,
+    }],
+    payment_processor: processor,
+    payment_frequency: resolved.frequency,
+    is_trial: resolved.isTrial,
+    is_recurring: resolved.isRecurring,
+  };
+}
+
+/**
+ * The platform dedupe id for this fire.
+ *
+ * `purchase` is keyed on the ORDER, because it is the one payment event with a
+ * BROWSER twin: the confirmation page fires its own purchase pixel ([#386]) and
+ * the only id it can possibly compute is `purchase.<orderId>` — the webhook's
+ * event id never reaches a browser. Two different ids for the one purchase is a
+ * double count, which is the whole thing dedupe exists to prevent. Reusing an
+ * order id is safe here: Meta's and TikTok's dedupe windows are ~48h, and the
+ * only way one order sees a second `purchase` is a win-back weeks or months
+ * later, long outside any window.
+ *
+ * Everything else keys on the WEBHOOK delivery. A subscription renews against
+ * the same order id month after month, so an order-keyed id would have the
+ * platforms discard every renewal after the first as a duplicate — and none of
+ * these events has a browser twin to match anyway. A redelivery of the SAME
+ * webhook carries the same id, which is exactly what dedupe is for.
+ */
+function resolveEventId(resolved, order) {
+  if (resolved.event === 'purchase') {
+    return `purchase.${order?.id}`;
+  }
+
+  return `${resolved.event}.${order?.metadata?.updatedBy?.event?.id || order?.id}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,9 +138,20 @@ function trackPayment({ category, transitionName, eventType, unified, order, uid
 
 /**
  * Determine what kind of payment event occurred and extract common fields
- * Returns null if nothing should be tracked
+ *
+ * Returns null if nothing should be tracked. `event` is the canonical catalog
+ * name; `reason` is the finer-grained why, which several canonical names share
+ * (three different reasons are all a `purchase`) and which the logs read.
+ *
+ * @param {string} category - 'subscription' | 'one-time'
+ * @param {string|null} transitionName - The detected transition
+ * @param {string} eventType - The processor's webhook event name
+ * @param {object} unified - The unified subscription/purchase object
+ * @param {object} order - The order doc
+ * @param {object|null} [refundDetails] - The library's { amount, currency, reason }
+ * @returns {object|null}
  */
-function resolvePaymentEvent(category, transitionName, eventType, unified, order) {
+function resolvePaymentEvent(category, transitionName, eventType, unified, order, refundDetails) {
   const productId = unified.product?.id;
   const productName = unified.product?.name;
   const frequency = unified.payment?.frequency || null;
@@ -68,31 +164,55 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
 
   const base = { productId, productName, frequency, resourceId, isTrial };
 
+  // --- Refunds (both categories) ---
+  // Detected off the TRANSITION rather than the event type, so the transition
+  // layer's redelivery guard covers this too: a webhook doc that already
+  // completed once detects no transition, and reports no second refund.
+  if (transitionName === 'payment-refunded' || transitionName === 'purchase-refunded') {
+    return {
+      ...base,
+      event: 'refund',
+      reason: 'refund',
+      // What actually went back to the customer — the processor's own number,
+      // and only the price as a last resort (a partial refund reported as the
+      // full price would overstate the reversal).
+      value: resolveRefundValue(refundDetails, unified, price),
+      isRecurring: false,
+    };
+  }
+
   // --- Subscription transitions ---
   if (category === 'subscription') {
     if (transitionName === 'new-subscription' && isTrial) {
-      return { ...base, reason: 'trial-started', value: 0, isRecurring: false };
+      return { ...base, event: 'start_trial', reason: 'trial-started', value: 0, isRecurring: false };
     }
 
     if (transitionName === 'new-subscription') {
-      return { ...base, reason: 'first-purchase', value, isRecurring: false };
+      return { ...base, event: 'purchase', reason: 'first-purchase', value, isRecurring: false };
     }
 
     // A win-back is a returning customer buying again — a purchase, at what they
     // actually paid. Its checkout arrives on a payment event, so without this the
     // renewal branch below claimed it and reported recurring revenue ([#218]).
     if (transitionName === 'subscription-winback') {
-      return { ...base, reason: 'winback-purchase', value, isRecurring: false };
+      return { ...base, event: 'purchase', reason: 'winback-purchase', value, isRecurring: false };
     }
 
     if (transitionName === 'payment-recovered') {
-      return { ...base, reason: 'payment-recovered', value: price, isRecurring: true };
+      return { ...base, event: 'payment_recovered', reason: 'payment-recovered', value: price, isRecurring: true };
+    }
+
+    // The cancellation that TOOK EFFECT. No money moves, so it is not recurring
+    // revenue — the value is the subscription's price, which is what the churn
+    // cost, and what an ad platform optimizing away from churn needs to see.
+    if (transitionName === 'subscription-cancelled') {
+      return { ...base, event: 'subscription_cancelled', reason: 'subscription-cancelled', value: price, isRecurring: false };
     }
 
     // No transition but a payment event fired (renewal)
     // Renewals always use full price (discount is one-time only)
     if (!transitionName && isPaymentEvent(eventType) && price > 0) {
-      return { ...base, reason: 'renewal', value: price, isRecurring: true };
+      return { ...base, event: 'subscription_renewed', reason: 'renewal', value: price, isRecurring: true };
     }
 
     return null;
@@ -101,7 +221,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
   // --- One-time transitions ---
   if (category === 'one-time') {
     if (transitionName === 'purchase-completed') {
-      return { ...base, reason: 'one-time-purchase', value, isRecurring: false, productId: productId || 'unknown', productName: productName || 'Unknown' };
+      return { ...base, event: 'purchase', reason: 'one-time-purchase', value, isRecurring: false, productId: productId || 'unknown', productName: productName || 'Unknown' };
     }
 
     return null;
@@ -129,6 +249,16 @@ function resolveActualValue(price, isTrial, discount) {
 }
 
 /**
+ * What a refund actually reversed: the processor's amount, then the amount the
+ * order fold already recorded, then the price as the last resort.
+ */
+function resolveRefundValue(refundDetails, unified, price) {
+  const amount = refundDetails?.amount ?? unified.payment?.refund?.amount;
+
+  return amount === null || amount === undefined ? price : parseFloat(amount);
+}
+
+/**
  * Check if a webhook event type represents a payment being made
  */
 function isPaymentEvent(eventType) {
@@ -147,189 +277,11 @@ function isPaymentEvent(eventType) {
   ].includes(eventType);
 }
 
-// ---------------------------------------------------------------------------
-// GA4 — Measurement Protocol
-// ---------------------------------------------------------------------------
-
-/**
- * Fire GA4 event via Manager.Analytics (Measurement Protocol)
- * https://developers.google.com/analytics/devguides/collection/protocol/ga4
- */
-function fireGA4({ resolved, currency, uid, processor, ctx, Manager }) {
-  try {
-    // Map reason → GA4 event name
-    const eventName = resolved.reason === 'trial-started' ? 'start_trial' : 'purchase';
-
-    Manager.Analytics({ ctx, uuid: uid }).event(eventName, {
-      transaction_id: resolved.resourceId,
-      value: resolved.value,
-      currency: currency,
-      items: [{
-        item_id: resolved.productId,
-        item_name: resolved.productName,
-        price: resolved.value,
-        quantity: 1,
-      }],
-      payment_processor: processor,
-      payment_frequency: resolved.frequency,
-      is_trial: resolved.isTrial,
-      is_recurring: resolved.isRecurring,
-    });
-
-    ctx.log(`trackPayment [GA4]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
-  } catch (e) {
-    ctx.error(`trackPayment [GA4] failed: ${e.message}`, e);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Meta — Conversions API
-// ---------------------------------------------------------------------------
-
-// Meta event name mapping
-const META_EVENTS = {
-  'trial-started': 'StartTrial',
-  'first-purchase': 'Purchase',
-  'winback-purchase': 'Purchase',
-  'payment-recovered': 'Subscribe',
-  'renewal': 'Subscribe',
-  'one-time-purchase': 'Purchase',
-};
-
-/**
- * Fire Meta Conversions API event
- * https://developers.facebook.com/docs/marketing-api/conversions-api
- */
-function fireMeta({ resolved, currency, uid, processor, ctx, config }) {
-  try {
-    const pixelId = config.analytics?.providers?.meta?.id;
-    const accessToken = process.env.META_ACCESS_TOKEN;
-
-    if (!pixelId || !accessToken) {
-      return;
-    }
-
-    const eventName = META_EVENTS[resolved.reason];
-
-    if (!eventName) {
-      return;
-    }
-
-    const payload = {
-      data: [{
-        event_name: eventName,
-        event_time: Math.floor(Date.now() / 1000),
-        action_source: 'website',
-        user_data: {
-          external_id: uid,
-        },
-        custom_data: {
-          value: resolved.value,
-          currency: currency,
-          content_ids: [resolved.productId],
-          content_name: resolved.productName,
-          content_type: 'product',
-          payment_processor: processor,
-          is_recurring: resolved.isRecurring,
-        },
-      }],
-    };
-
-    fetch(`https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${accessToken}`, {
-      method: 'post',
-      response: 'json',
-      body: payload,
-      timeout: 60000,
-      tries: 2,
-    })
-    .then(() => {
-      ctx.log(`trackPayment [Meta]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
-    })
-    .catch((e) => {
-      ctx.error(`trackPayment [Meta] failed: ${e.message}`, e);
-    });
-  } catch (e) {
-    ctx.error(`trackPayment [Meta] failed: ${e.message}`, e);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// TikTok — Events API
-// ---------------------------------------------------------------------------
-
-// TikTok event name mapping
-const TIKTOK_EVENTS = {
-  'trial-started': 'Subscribe',
-  'first-purchase': 'CompletePayment',
-  'winback-purchase': 'CompletePayment',
-  'payment-recovered': 'Subscribe',
-  'renewal': 'Subscribe',
-  'one-time-purchase': 'CompletePayment',
-};
-
-/**
- * Fire TikTok Events API event
- * https://business-api.tiktok.com/portal/docs?id=1771100865818625
- */
-function fireTikTok({ resolved, currency, uid, processor, ctx, config }) {
-  try {
-    const pixelCode = config.analytics?.providers?.tiktok?.id;
-    const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
-
-    if (!pixelCode || !accessToken) {
-      return;
-    }
-
-    const eventName = TIKTOK_EVENTS[resolved.reason];
-
-    if (!eventName) {
-      return;
-    }
-
-    const payload = {
-      pixel_code: pixelCode,
-      event: eventName,
-      event_id: `${uid}-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      context: {
-        user: {
-          external_id: uid,
-        },
-      },
-      properties: {
-        value: resolved.value,
-        currency: currency,
-        content_id: resolved.productId,
-        content_name: resolved.productName,
-        content_type: 'product',
-        description: `${resolved.reason} via ${processor}`,
-      },
-    };
-
-    fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
-      method: 'post',
-      response: 'json',
-      headers: {
-        'Access-Token': accessToken,
-      },
-      body: { data: [payload] },
-      timeout: 60000,
-      tries: 2,
-    })
-    .then(() => {
-      ctx.log(`trackPayment [TikTok]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
-    })
-    .catch((e) => {
-      ctx.error(`trackPayment [TikTok] failed: ${e.message}`, e);
-    });
-  } catch (e) {
-    ctx.error(`trackPayment [TikTok] failed: ${e.message}`, e);
-  }
-}
-
 module.exports = {
   trackPayment,
   // Exported for testing
   resolvePaymentEvent,
   isPaymentEvent,
+  buildParams,
+  resolveEventId,
 };

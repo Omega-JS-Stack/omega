@@ -159,6 +159,8 @@ test('rules: frontmatter `web_manager:` becomes `client:`, body prose untouched 
     '  auth:',
     '    config:',
     '      policy: "authenticated"',
+    '  cookieConsent:',
+    '    enabled: false',
     '---',
     'Prose about a web_manager: key stays prose.',
   ].join('\n');
@@ -166,7 +168,11 @@ test('rules: frontmatter `web_manager:` becomes `client:`, body prose untouched 
   const lines = text.split('\n');
   assert.strictEqual(lines[2], 'client:');
   assert.strictEqual(lines[3], '  auth:', 'the block children ride along untouched');
-  assert.strictEqual(lines[7], 'Prose about a web_manager: key stays prose.', 'the body is not frontmatter');
+  // #383: the sub-key was renamed too, and a page that disabled the old name
+  // would silently stop disabling anything.
+  assert.strictEqual(lines[6], '  consent:', 'cookieConsent: becomes consent:');
+  assert.strictEqual(lines[7], '    enabled: false', 'its value is untouched');
+  assert.strictEqual(lines[9], 'Prose about a web_manager: key stays prose.', 'the body is not frontmatter');
 });
 
 test('rules: theme-prefixed include paths flatten to the layered path (#248)', () => {
@@ -381,6 +387,16 @@ const LEGACY_JEKYLL = {
       products: [{ id: 'basic', name: 'Basic', type: 'subscription' }],
     },
     sentry: { enabled: true, config: { dsn: 'https://x@sentry.io/1' } },
+    cookieConsent: {
+      enabled: true,
+      config: {
+        type: 'opt-in',
+        theme: 'classic',
+        position: 'bottom-right',
+        palette: { popup: { background: '#fff', text: '#000' } },
+        content: { message: 'We use cookies. { terms }', dismiss: 'I Understand' },
+      },
+    },
   },
   oauth2: { discord: { enabled: true } },
   analytics: { google: 'G-TEST123', meta: '', tiktok: 'TIKTOK1' },
@@ -418,6 +434,15 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.strictEqual(web.client.firebase.app.config, undefined, 'firebase config moved out');
   assert.strictEqual(web.client.firebase.app.enabled, true, 'client firebase toggles stay');
   assert.strictEqual(web.client.sentry.config.dsn, 'https://x@sentry.io/1', 'client sentry settings stay whole');
+
+  // cookieConsent → consent (#383). Carrying the old NAME would emit a config
+  // that fails the retired-key guard, and carrying its settings would emit keys
+  // the rebuilt banner does not read: the panel paints from the --omega-*
+  // tokens, the visitor's region picks opt-in vs opt-out, and "I Understand" is
+  // not an Accept.
+  assert.strictEqual(web.client.cookieConsent, undefined, 'the retired block name does not survive');
+  assert.deepStrictEqual(web.client.consent, { enabled: true, config: { position: 'bottom-right' } }, 'enabled + position are what carries');
+  assert.ok(notes.some((note) => note.includes('cookieConsent') && note.includes('client.consent')), 'the drop is announced, not silent');
   assert.strictEqual(web.collections.recipes.title, 'Recipes', 'custom collections carried (rule 8)');
   assert.strictEqual(web.permalink, '/blog/:title');
   assert.deepStrictEqual(web.purgecss.safelist.standard, ['keep-me'], 'UJM json build settings carried');
@@ -825,8 +850,11 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
   const pages = new Map((await elev.toJSON()).map((result) => [result.url, result.content]));
   const html = pages.get('/');
 
-  assert.ok(html.includes('googletagmanager.com/gtag/js?id=G-COMPOSE1'), 'gtag reads analytics.providers.google.id');
+  // The id reaches the page as CONFIG and nothing else (#383): the chrome no
+  // longer emits a loader, so the runtime gate decides whether gtag.js is ever
+  // fetched. Configuration.analytics is the whole contract now.
   assert.ok(html.includes('"google":{"id":"G-COMPOSE1"}'), 'Configuration.analytics carries the canonical providers shape (flat bridge dead — cp106a)');
+  assert.ok(!html.includes('googletagmanager.com/gtag/js'), 'and no loader ships with the chrome');
   assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into client.firebase.app.config');
   assert.ok(html.includes('"site":"compose"'), 'payment composed into client.payment');
 });

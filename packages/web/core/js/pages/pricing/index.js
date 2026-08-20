@@ -2,7 +2,7 @@
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
 import omega from '@omega.js/client';
 import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -248,17 +248,8 @@ function handlePlanSelection(button) {
 
 // Tracking functions
 function trackPricingToggle(billingType) {
-  trackGoogle('event', 'pricing_toggle', {
+  event('pricing_toggle', {
     billing_type: billingType
-  });
-  trackMeta('track', 'ViewContent', {
-    content_name: 'Pricing',
-    content_category: billingType
-  });
-  trackTikTok('ViewContent', {
-    content_id: 'pricing-page',
-    content_type: 'product',
-    content_name: 'Pricing Toggle'
   });
 }
 
@@ -272,45 +263,16 @@ function trackAddToCart(planId, planName, price, billingType, planType) {
     quantity: 1
   }];
 
-  // Google Analytics 4
-  trackGoogle('event', 'add_to_cart', {
+  event('add_to_cart', {
     currency: 'USD',
     value: price,
     items: items
   });
-
-  // Facebook Pixel
-  trackMeta('track', 'AddToCart', {
-    content_ids: [planId],
-    content_name: planName,
-    content_type: 'product',
-    currency: 'USD',
-    value: price
-  });
-
-  // TikTok Pixel
-  trackTikTok('AddToCart', {
-    content_id: planId,
-    content_type: 'product',
-    content_name: planName,
-    price: price,
-    quantity: 1,
-    currency: 'USD',
-    value: price
-  });
 }
 
 function trackEnterpriseContact() {
-  trackGoogle('event', 'contact_enterprise', {
+  event('contact_enterprise', {
     from_page: 'pricing'
-  });
-  trackMeta('track', 'Contact', {
-    content_name: 'Enterprise Plan'
-  });
-  trackTikTok('Contact', {
-    content_id: 'enterprise-plan',
-    content_type: 'product',
-    content_name: 'Enterprise Plan'
   });
 }
 

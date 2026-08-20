@@ -1,6 +1,6 @@
 # @omega.js/devkit
 
-Shared build-time internals for the OMEGA frameworks. **Private workspace package — never published to npm.** (The vendorable-private set is devkit, config, account, template-kit — `VENDORABLE_PACKAGES` in [tools/vendor.js](../../packages/devkit/tools/vendor.js) is the SSOT.)
+Shared build-time internals for the OMEGA frameworks. **Private workspace package — never published to npm.** (The vendorable-private set is devkit, config, account, template-kit, analytics — `VENDORABLE_PACKAGES` in [tools/vendor.js](../../packages/devkit/tools/vendor.js) is the SSOT.)
 
 ## How frameworks consume it
 

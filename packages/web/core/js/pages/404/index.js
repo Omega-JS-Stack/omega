@@ -1,5 +1,6 @@
 // Libraries
 import omega from '@omega.js/client';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
@@ -28,6 +29,14 @@ function setupPage() {
   if ($pageUrl) {
     $pageUrl.innerText = window.location.href;
   }
+
+  // Count the miss (#328 inventory gap 6: the 404 page tracked nothing at
+  // all). Fired BEFORE the trailing-slash fixer redirects, because the path the
+  // visitor actually asked for is the one worth reading — the fixer's reload
+  // either lands on a real page or reports the corrected path on its own.
+  event('page_not_found', {
+    path: url.pathname,
+  });
 
   // If pathname ends with trailing slash, remove it and reload
   if (url.pathname.match(/\/$/) && !qs404Fixer) {

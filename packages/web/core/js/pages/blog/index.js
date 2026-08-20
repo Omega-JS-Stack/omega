@@ -11,7 +11,7 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { search, formatDate, createIndexLoader } from './_search.mjs';
-import { trackGoogle, trackMeta, trackTikTok } from '__main_assets__/js/libs/analytics.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 
 const logger = createLogger('blog-search');
 
@@ -186,18 +186,8 @@ function resultItem(entry, escapeHTML) {
 
 // Tracking functions
 function trackBlogSearch(query) {
-  trackGoogle('event', 'search', {
+  event('search', {
     search_term: query,
-    event_category: 'engagement',
-    event_label: 'blog_page',
-  });
-  trackMeta('track', 'Search', {
-    search_string: query,
     content_category: 'blog',
-  });
-  trackTikTok('Search', {
-    content_id: 'blog-search',
-    content_type: 'product',
-    search_string: query,
   });
 }

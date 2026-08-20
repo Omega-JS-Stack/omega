@@ -115,7 +115,7 @@ class Notifications {
 
       // Request notification permission if not already granted
       if (Notification.permission === 'default') {
-        const permission = await Notification.requestPermission();
+        const permission = await this._askPermission();
         if (permission !== 'granted') {
           throw new Error('Notification permission denied');
         }
@@ -187,12 +187,43 @@ class Notifications {
         throw new Error('Notifications not supported');
       }
 
-      const permission = await Notification.requestPermission();
+      const permission = await this._askPermission();
       return permission === 'granted';
     } catch (error) {
       console.error('Request permission error:', error);
       return false;
     }
+  }
+
+  /**
+   * Ask the browser, and COUNT the asking ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)
+   * inventory gap 9: nothing fired the permission trio, so the drop-off between
+   * being asked and saying yes was invisible).
+   *
+   * Only a real prompt is counted — a permission the browser has already been
+   * answered for shows the visitor no UI at all. A DISMISSED prompt leaves the
+   * permission at 'default' and fires neither outcome on purpose: the visitor
+   * denied nothing, and the gap between requested and answered is the dismissal.
+   *
+   * @returns {Promise<string>} The browser's permission after the ask.
+   */
+  async _askPermission() {
+    const prompted = Notification.permission === 'default';
+    const analytics = this.manager.analytics();
+
+    if (prompted) {
+      analytics.event('notification_permission_requested');
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (prompted && permission === 'granted') {
+      analytics.event('notification_permission_granted');
+    } else if (prompted && permission === 'denied') {
+      analytics.event('notification_permission_denied');
+    }
+
+    return permission;
   }
 
   // Get current FCM token

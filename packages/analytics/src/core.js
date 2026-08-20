@@ -1,11 +1,13 @@
 /**
- * analytics-core — the ONE place GA4 Measurement Protocol semantics live
+ * core — the ONE place GA4 Measurement Protocol semantics live
  * (C4 cp106b; Ian: "unify it and have it in one place").
  *
  * Pure functions, zero runtime assumptions: no DOM, no storage, no
- * transport. The browser engine (./analytics.js) and @omega.js/desktop's
+ * transport. @omega.js/client's browser engine and @omega.js/desktop's
  * main-process lib both consume THIS module, so identity math and payload
- * shape can never drift between surfaces again.
+ * shape can never drift between surfaces again. It moved here from the client
+ * ([#382](https://github.com/Omega-JS-Stack/omega/issues/382)) so the server
+ * side reaches it without importing the frontend runtime.
  *
  * Cross-surface identity:
  *   namespace = uuidv5(projectId, uuidv5.URL)

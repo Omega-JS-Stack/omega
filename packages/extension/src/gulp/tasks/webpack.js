@@ -505,7 +505,7 @@ function getTemplateReplaceOptions() {
       },
       appCheck: clientConfig.firebase?.appCheck || { enabled: false, config: {} },
     },
-    cookieConsent: clientConfig.cookieConsent || { enabled: true, config: {} },
+    consent: clientConfig.consent || { enabled: true, config: {} },
     inbound: (() => {
       // Curated to the leaves the client runtime reads (#23) — the provisioning-only
       // siblings (template ids, plan, update flags) never ship in the bundle

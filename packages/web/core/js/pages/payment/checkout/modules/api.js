@@ -1,6 +1,7 @@
 // API calls for checkout
 import fetch from 'wonderful-fetch';
 import { getRecaptchaToken } from '../../../../libs/recaptcha.js';
+import { readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
 import omega from '@omega.js/client';
 
 // Check trial eligibility via backend endpoint
@@ -51,13 +52,26 @@ export async function createPaymentIntent({ state, processor, formData }) {
   delete supplemental.frequency;
   delete supplemental.discount;
 
+  // The stored attribution plus the platform cookies as they stand right now.
+  // Spread, never mutated: the stored object is the client storage module's own.
+  const storedAttribution = omega.storage().get('attribution', {});
+  const cookies = readPlatformCookies();
+  const attribution = Object.keys(cookies).length
+    ? { ...storedAttribution, cookies }
+    : storedAttribution;
+
   // Build payload
   const payload = {
     processor,
     productId: state.product.id,
     frequency: state.frequency,
     trial: state.trialEligible,
-    attribution: omega.storage().get('attribution', {}),
+    attribution: attribution,
+    // The tracking-consent snapshot rides along verbatim — the intent doc stores it
+    // beside attribution and the order fold copies it, so a conversion knows what
+    // the user agreed to. Its own key, distinct from the legal/marketing consent
+    // the signup form captures; read as a key, never interpreted here.
+    trackingConsent: omega.storage().get('trackingConsent', null),
     verification: {
       'g-recaptcha-response': recaptchaToken || '',
     },

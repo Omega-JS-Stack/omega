@@ -1,6 +1,6 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
-import { trackGoogle, trackMeta, identifyTikTok } from '__main_assets__/js/libs/analytics.js';
+import { identify } from '__main_assets__/js/libs/analytics.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth');
@@ -70,8 +70,8 @@ export default function () {
         return;
       }
 
-      // Set user ID for analytics tracking
-      setAnalyticsUserId(user);
+      // Attach (or clear) the analytics identity for everything counted after
+      identify(user);
 
       // Check if we're in the process of signing out
       if (authSignout === 'true' && user) {
@@ -249,51 +249,6 @@ function updateAuthLinks() {
   });
 }
 
-function setAnalyticsUserId(user) {
-  const userId = user?.uid;
-  const email = user?.email;
-  const metaPixelId = omega.config.analytics?.meta;
-
-  // Short-circuit if no user
-  if (!userId) {
-    // Clear user ID when logged out
-    trackGoogle('set', { user_id: null });
-
-    // Facebook Pixel - Clear advanced matching
-    trackMeta('init', metaPixelId, {});
-
-    // TikTok Pixel - Clear user data
-    identifyTikTok({});
-
-    // Return early
-    return;
-  }
-
-  // Google Analytics 4 - Set user ID and user properties
-  trackGoogle('set', {
-    user_id: userId,
-    user_properties: {
-      email_domain: email ? email.split('@')[1] : undefined
-    }
-  });
-
-  // Facebook Pixel - Set advanced matching with user data
-  trackMeta('init', metaPixelId, {
-    external_id: userId,
-    // em: email ? btoa(email.toLowerCase().trim()) : undefined,
-    em: email,
-    // ph: phone ? btoa(phone.trim()) : undefined
-  });
-
-  // TikTok Pixel - Identify user
-  identifyTikTok({
-    external_id: userId,
-    // email: email ? btoa(email.toLowerCase().trim()) : undefined,
-    email: email,
-    // phone_number: phone ? btoa(phone.trim()) : undefined
-  });
-}
-
 // Send user metadata to server (affiliate, UTM params, etc.)
 async function sendUserSignupMetadata(account) {
   try {
@@ -321,6 +276,10 @@ async function sendUserSignupMetadata(account) {
     // Get attribution data from storage
     const attribution = omega.storage().get('attribution', {});
     const consent = omega.storage().get('consent', {});
+    // The tracking-consent snapshot: its own key and its own payload field, stored
+    // verbatim beside attribution. Distinct from `consent` above, which is the
+    // legal/marketing decision the signup form captures and the route interprets.
+    const trackingConsent = omega.storage().get('trackingConsent', null);
 
     // Build the payload
     const payload = {
@@ -328,6 +287,7 @@ async function sendUserSignupMetadata(account) {
       attribution: attribution,
       context: omega.utilities().getContext(),
       consent: consent,
+      trackingConsent: trackingConsent,
     };
 
     // Log
