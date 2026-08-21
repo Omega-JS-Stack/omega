@@ -1,7 +1,8 @@
 // Unit tests for src/local.js ensureFreshLocalDist/freshnessBoot — the
 // local-dist freshness guard: detect a stale linked dist at CLI boot, heal a
-// plain local checkout, and STOP on a monorepo link, which is read-only to
-// consumer builds (#281).
+// plain local checkout, and STOP on a monorepo link whose watch is running,
+// because that watch owns the build (#281) — with the watch down the boot heals
+// that link too, since nothing else will (#398).
 //
 // Real-execution only (no mocks): every scenario runs against a scratch
 // package on disk, and the rebuild path spawns the fixture's REAL
@@ -258,8 +259,9 @@ test('a stale vendored copy (monorepo package) is stale even with a fresh own-sr
   setTreeTimes(path.join(pkgDir, 'dist'), 2000); // own dist fresh
   setTreeTimes(path.join(pkgDir, 'dist', 'vendor', 'devkit'), 1500);
   setTreeTimes(path.join(root, 'packages', 'devkit', 'src'), 2500); // devkit edited after the vendor copy
+  writeWatchLock(root);
 
-  // A monorepo link: detected, reported, and left alone (#281)
+  // A monorepo link under a live watch: detected, reported, and left alone (#281)
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
   assert.equal(result.status, 'stale-linked');
   assert.equal(result.reason, 'dist/vendor/devkit is older than packages/devkit/src');
@@ -440,9 +442,10 @@ test('a vendorAssets source newer than its vendored dist copy is stale', (t) => 
   setTreeTimes(path.join(pkgDir, 'src'), 1000);
   setTreeTimes(path.join(pkgDir, 'dist'), 2000); // own dist fresh, copy and all
   setTreeTimes(sourcePkgDir(root), 3000); // the theme edited after the copy
+  writeWatchLock(root);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'stale-linked'); // a monorepo link: reported, never built here (#281)
+  assert.equal(result.status, 'stale-linked'); // a monorepo link under a live watch: reported, never built here (#281)
   assert.equal(result.reason, `dist/assets/themes is older than ${ASSET_SOURCE}'s themes`);
   assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
@@ -487,6 +490,7 @@ test('a single-FILE vendorAssets entry compares that file, not a tree', (t) => {
   setTreeTimes(path.join(pkgDir, 'src'), 1000);
   setTreeTimes(path.join(pkgDir, 'dist'), 2000);
   setTreeTimes(sourcePkgDir(root), 3000); // the one file edited after the copy
+  writeWatchLock(root);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
   assert.equal(result.status, 'stale-linked');
@@ -508,6 +512,7 @@ test('a vendorAssets destination that was never vendored is stale', (t) => {
   setTreeTimes(path.join(pkgDir, 'src'), 1000);
   setTreeTimes(path.join(pkgDir, 'dist'), 5000); // newer than the source, and still missing the copy
   setTreeTimes(sourcePkgDir(root), 2000);
+  writeWatchLock(root);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
   assert.equal(result.status, 'stale-linked');
@@ -551,8 +556,8 @@ test('stale under a live watch lock is reported once the bounded recheck expires
   writeWatchLock(root);
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
-  assert.equal(result.status, 'stale-linked'); // the grace expired, and a monorepo link is still read-only
-  assert.equal(result.watching, true); // which the message says: wait for the watch, do not start it
+  assert.equal(result.status, 'stale-linked'); // the grace expired, and a WATCHED monorepo link is still read-only
+  assert.equal(result.monorepoRoot, root); // the monorepo whose watch the message says to wait for
   assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
 });
 
@@ -890,9 +895,10 @@ test('the walk is transitive through dependencies and never through devDependenc
   assert.equal(list[0].fromDir, depDir); // the granddep resolved from ITS depender
 });
 
-// ---- linked into the monorepo is READ-ONLY to consumer builds (#281)
+// ---- linked into the monorepo is READ-ONLY to consumer builds WHILE THE WATCH
+// RUNS (#281) — and heals itself when it does not (#398)
 
-test('a stale monorepo-linked package is reported, never rebuilt in place (#281)', (t) => {
+test('a stale monorepo-linked package under a live watch is reported, never rebuilt in place (#281)', (t) => {
   const scratch = makeScratch(t);
   const root = path.join(scratch, 'monorepo');
   const pkgDir = path.join(root, 'packages', 'pkg');
@@ -902,6 +908,7 @@ test('a stale monorepo-linked package is reported, never rebuilt in place (#281)
   makeConsumer(consumer, pkgDir);
   setTreeTimes(path.join(pkgDir, 'dist'), 1000);
   setTreeTimes(path.join(pkgDir, 'src'), 2000); // a src edit the watch has not landed yet
+  writeWatchLock(root); // and the watch that owns landing it is alive
   const distMtime = fs.statSync(path.join(pkgDir, 'dist', 'index.js')).mtimeMs;
 
   const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
@@ -915,6 +922,89 @@ test('a stale monorepo-linked package is reported, never rebuilt in place (#281)
   assert.equal(fs.statSync(path.join(pkgDir, 'dist', 'index.js')).mtimeMs, distMtime);
   assert.equal(fs.existsSync(builtSentinel(pkgDir)), false);
   assert.equal(fs.existsSync(path.join(pkgDir, '.omega')), false); // not even a lock is written
+});
+
+test('a stale monorepo link with the watch DOWN heals in place under the heal lock (#398)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir);
+  makeConsumer(consumer, pkgDir);
+  setTreeTimes(path.join(pkgDir, 'dist'), 1000);
+  setTreeTimes(path.join(pkgDir, 'src'), 2000); // stale, and no watch lock: nothing else owns the rebuild
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+
+  assert.equal(result.status, 'rebuilt');
+  assert.equal(result.by, 'self');
+  assert.equal(buildCount(pkgDir), 1);
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.equal(fs.existsSync(path.join(pkgDir, local.HEAL_LOCK)), false); // taken like any heal, and released
+});
+
+test('the watch-down heal re-execs the invocation and still warns about the dead watch (#398)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, { withDist: false }); // the brand-boot shape: a linked dist nobody ever built
+  makeConsumer(consumer, pkgDir);
+
+  const run = runWiredCli(consumer, PKG_NAME);
+
+  assert.equal(run.status, 0, run.stderr); // no loud stop — the boot fixed it
+  assert.equal(fs.existsSync(builtSentinel(pkgDir)), true);
+  assert.deepEqual(run.stdout.match(/CLI_RAN reexec=\d/g), ['CLI_RAN reexec=1']); // the verb ran ONCE, past the heal
+  // The heal freshens this boot; a src edit made during the session still needs
+  // the watch, so the once-per-process warning stays on this path.
+  assert.equal((run.stderr.match(/watch is not running/g) || []).length, 1, run.stderr);
+  assert.match(run.stderr, /npm start/);
+  assert.equal(run.stderr.includes('read-only to consumer builds'), false);
+});
+
+test('a watch-down heal whose prepare FAILS is heal-failed, not a continue-on-stale (#398)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir);
+  fs.writeFileSync(path.join(pkgDir, 'build.js'), 'process.exit(3);\n'); // the prepare a broken src gives you
+  makeConsumer(consumer, pkgDir);
+  setTreeTimes(path.join(pkgDir, 'dist'), 1000);
+  setTreeTimes(path.join(pkgDir, 'src'), 2000);
+
+  const result = local.ensureFreshLocalDist({ packageName: PKG_NAME, fromDir: consumer });
+
+  // The heal was this dist's ONLY chance — nothing else rebuilds it, so the
+  // outcome is a stop for the boot, never a plain checkout's warn-and-continue
+  assert.equal(result.status, 'heal-failed');
+  assert.equal(result.reason, 'dist/index.js is older than src/index.js');
+  assert.equal(result.monorepoRoot, root);
+  assert.match(result.failure, /npm run prepare exited 3/);
+  assert.equal(fs.existsSync(path.join(pkgDir, local.HEAL_LOCK)), false); // released, failure and all
+});
+
+test('a failed watch-down heal stops the boot, naming the prepare to run by hand (#398)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir, { withDist: false });
+  fs.writeFileSync(path.join(pkgDir, 'build.js'), 'process.exit(3);\n');
+  makeConsumer(consumer, pkgDir);
+
+  const run = runWiredCli(consumer, PKG_NAME);
+
+  assert.notEqual(run.status, 0, run.stdout); // before #398 this booted on the stale dist
+  assert.match(run.stderr, new RegExp(PKG_NAME.replace('/', '\\/')));
+  assert.match(run.stderr, /npm run prepare/); // what to run
+  assert.equal(run.stderr.includes(pkgDir), true, run.stderr); // and where
+  assert.equal(run.stdout.includes('CLI_RAN'), false); // the command never ran
 });
 
 // ---- the fan-out sweep: ONE check pass, before any lane spawns (#340)
@@ -1008,7 +1098,7 @@ test('the sweep honours OMEGA_SKIP_FRESHNESS — the test/CI hatch is not a fan-
   assert.equal(buildCount(depDir), 0);
 });
 
-test('a monorepo-linked stale dist comes back from the sweep as the loud stop, nothing built (#340)', (t) => {
+test('a monorepo-linked stale dist under a live watch comes back from the sweep as the loud stop, nothing built (#340)', (t) => {
   const scratch = makeScratch(t);
   const root = path.join(scratch, 'monorepo');
   const pkgDir = path.join(root, 'packages', 'pkg');
@@ -1018,6 +1108,7 @@ test('a monorepo-linked stale dist comes back from the sweep as the loud stop, n
   makeConsumer(consumer, pkgDir);
   setTreeTimes(path.join(pkgDir, 'dist'), 1000);
   setTreeTimes(path.join(pkgDir, 'src'), 2000);
+  writeWatchLock(root);
 
   let sweep;
   const stderr = captureError(() => {
@@ -1028,6 +1119,29 @@ test('a monorepo-linked stale dist comes back from the sweep as the loud stop, n
   assert.equal(sweep.staleLinked[0].packageName, PKG_NAME);
   assert.match(stderr, /read-only to consumer builds/); // the caller stops the boot; the sweep says why
   assert.equal(buildCount(pkgDir), 0);
+});
+
+test('a monorepo-linked heal that FAILS comes back from the sweep as a loud stop too (#398)', (t) => {
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const pkgDir = path.join(root, 'packages', 'pkg');
+  const consumer = path.join(scratch, 'consumer');
+  makeFakeMonorepo(root);
+  makePkg(pkgDir);
+  fs.writeFileSync(path.join(pkgDir, 'build.js'), 'process.exit(3);\n');
+  makeConsumer(consumer, pkgDir);
+  setTreeTimes(path.join(pkgDir, 'dist'), 1000);
+  setTreeTimes(path.join(pkgDir, 'src'), 2000); // no watch lock: this boot's heal is the only one coming
+
+  let sweep;
+  const stderr = captureError(() => {
+    sweep = local.freshnessSweep({ hosts: [{ packageName: PKG_NAME, fromDir: consumer }] });
+  });
+
+  assert.equal(sweep.healFailed.length, 1);
+  assert.equal(sweep.healFailed[0].packageName, PKG_NAME);
+  assert.deepEqual(sweep.failed, []); // a monorepo failure is never the continue-on-stale bucket
+  assert.match(stderr, /npm run prepare/); // the lanes never spawn; the sweep says what to fix
 });
 
 // ---- the fan-out race the sweep closes (#340)
@@ -1127,7 +1241,7 @@ test('swept first, both lanes boot on a complete dist and neither rebuilds (#340
   assert.equal(buildCount(pkgDir), 1, 'the ONE rebuild happened before the fan-out — no lane ran a second prepare');
 });
 
-test('a monorepo-linked dep with no dist fails the build loudly, naming the watch (#281)', (t) => {
+test('a monorepo-linked dep with no dist fails the build loudly under a live watch, naming it (#281)', (t) => {
   const scratch = makeScratch(t);
   const root = path.join(scratch, 'monorepo');
   const pkgDir = path.join(root, 'packages', 'pkg');
@@ -1135,14 +1249,16 @@ test('a monorepo-linked dep with no dist fails the build loudly, naming the watc
   makeFakeMonorepo(root);
   makePkg(pkgDir, { withDist: false }); // never built here, and never built by us
   makeConsumer(consumer, pkgDir);
+  writeWatchLock(root); // the watch that owns the build is alive — this boot waits for it
 
   const run = runWiredCli(consumer, PKG_NAME);
 
   assert.equal(run.status, 1, run.stdout);
   assert.match(run.stderr, /read-only to consumer builds/);
   assert.match(run.stderr, /dist\/ is missing/);
+  assert.match(run.stderr, /is running but has not landed that build yet/); // wait for that watch, do not build over it
   assert.match(run.stderr, /npm start/);
-  assert.equal(run.stderr.includes(root), true, run.stderr); // the monorepo to start it in
+  assert.equal(run.stderr.includes(root), true, run.stderr); // named, so you know which watch
   assert.equal(buildCount(pkgDir), 0);
   assert.equal(fs.existsSync(path.join(pkgDir, 'dist')), false);
   assert.equal(run.stdout.includes('CLI_RAN'), false); // the command never ran

@@ -25,7 +25,7 @@ const { PATHS } = require('./paths.js');
  * @param {object} options.siteData - raw site data (resolved omega config shape)
  * @param {string} options.outDir - output dir (cleared first)
  * @param {string} options.clientEntry - @omega.js/client entry for the `@omega.js/client` esbuild alias
- * @param {string} [options.version] - the consumer package version (build meta / service worker)
+ * @param {string} [options.version] - the consumer package version (build meta / service worker, and the Configuration block the client reads)
  * @param {string} [options.siteAssetsDir] - the consumer's own asset layer (js/pages page modules)
  * @param {string} [options.themesDir] - default: packaged themes
  * @param {string} [options.coreDir] - default: packaged core
@@ -152,6 +152,7 @@ async function buildSite(options) {
           farmDir: options.farmDir,
           assetManifest: manifest,
           environment: options.environment,
+          version: options.version,
           pathPrefix,
         }),
     });

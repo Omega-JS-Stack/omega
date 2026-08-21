@@ -661,7 +661,7 @@ function startVendorPropagation(options) {
 // The vendorable private packages folded into framework dists. Hardcoded here
 // because this module must stay stdlib-only — tools/vendor.js
 // VENDORABLE_PACKAGES is the SSOT (a devkit test pins the two lists equal).
-const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit', 'analytics'];
+const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit', 'analytics', 'monitoring'];
 
 // Directory names the freshness scan never descends into.
 const FRESHNESS_SKIP_DIRS = new Set(['node_modules', '.temp', 'dist']);
@@ -1149,6 +1149,9 @@ let warnedWatchDown = false;
 /**
  * Warn once that the monorepo's src→dist watch is not running: every framework
  * CLI boots through the freshness path, so all five surfaces get this for free.
+ * The boot's own heal (#398) does not retire it — it is a boot-time repair of a
+ * STALE dist, and this warning fires on a fresh one too, so the wording states
+ * the standing deal rather than claiming a heal this boot may not have run.
  * @param {string} monorepoRoot - Monorepo root path.
  */
 function warnWatchDown(monorepoRoot) {
@@ -1156,13 +1159,14 @@ function warnWatchDown(monorepoRoot) {
     return;
   }
   warnedWatchDown = true;
-  console.warn(`omega: the monorepo src→dist watch is not running: nothing rebuilds a linked package's dist, so run \`npm start\` in ${monorepoRoot} before building against it`);
+  console.warn(`omega: the monorepo src→dist watch is not running: a stale linked dist is healed once at boot, but nothing rebuilds it as you edit — run \`npm start\` in ${monorepoRoot} for live rebuilds`);
 }
 
 /**
  * The loud stop for a monorepo-linked package whose dist is missing or stale
- * (#281). A consumer build does not fix it: the package belongs to the monorepo
- * and its watch, so the build says what is unbuilt, where, and what to start.
+ * while its watch RUNS (#281) — the only way a 'stale-linked' result happens
+ * (#398). A consumer build does not fix it: that watch owns the build and is
+ * mid-flight, so the build says what is unbuilt, where, and who is building it.
  * @param {object} result - A 'stale-linked' ensureFreshLocalDist result.
  * @returns {string} The multi-line message, stderr-bound.
  */
@@ -1171,9 +1175,25 @@ function staleLinkedMessage(result) {
     '',
     `omega: ${result.packageName} is linked into the omega monorepo and its dist is not built (${result.reason}).`,
     `omega: linked packages are read-only to consumer builds, so this build will not rebuild ${result.dir}.`,
-    result.watching
-      ? `omega: the monorepo watch (\`npm start\` in ${result.monorepoRoot}) is running but has not landed that build yet: give it a moment, then re-run this command.`
-      : `omega: the monorepo watch owns that dist: run \`npm start\` in ${result.monorepoRoot} (one-off: \`npm run prepare -w ${result.packageName}\`), then re-run this command.`,
+    `omega: the monorepo watch (\`npm start\` in ${result.monorepoRoot}) is running but has not landed that build yet: give it a moment, then re-run this command.`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * The loud stop's sibling for a monorepo-linked package whose watch-down heal
+ * FAILED (#398). That heal was the dist's only chance — no watch is coming to
+ * land the build — so continuing would serve code nobody built, the silent
+ * fallback #281 forbids. Say which prepare broke and where to run it by hand.
+ * @param {object} result - A 'heal-failed' ensureFreshLocalDist result.
+ * @returns {string} The multi-line message, stderr-bound.
+ */
+function healFailedMessage(result) {
+  return [
+    '',
+    `omega: ${result.packageName} is linked into the omega monorepo with a stale dist (${result.reason}), and this boot's rebuild FAILED (${result.failure}).`,
+    `omega: the monorepo watch is not running, so nothing else will build it — running on that dist would serve code nobody built.`,
+    `omega: run \`npm run prepare\` in ${result.dir} by hand, fix what it reports, then re-run this command (or start the watch: \`npm start\` in ${result.monorepoRoot}).`,
     '',
   ].join('\n');
 }
@@ -1190,18 +1210,24 @@ function staleLinkedMessage(result) {
  * for its in-flight copy — then the check reports anyway, because a watcher that
  * silently died is exactly what let a stale dist serve for a day (#195).
  *
- * A link into the OMEGA MONOREPO is read-only here (#281): that checkout is
- * shared (a fleet of agents, several brands, the monorepo's own processes), so
- * a consumer build never prepares it in place — a prepare purges the dist a
- * sibling process is mid-require on, and refetches network caches, all of it
- * invisible to git. Those come back 'stale-linked' and freshnessBoot stops the
- * invocation loudly. Any other local checkout (a link with no watch behind it)
- * still heals, under the package's cross-process lock so N booting CLIs produce
- * one build.
+ * A link into the OMEGA MONOREPO is read-only here WHILE ITS WATCH RUNS (#281,
+ * narrowed by #398): that checkout is shared (a fleet of agents, several brands,
+ * the monorepo's own processes), so a consumer build never prepares out from
+ * under the process that owns the build — a prepare purges the dist a sibling is
+ * mid-require on, and refetches network caches, all of it invisible to git.
+ * Those come back 'stale-linked' and freshnessBoot stops the invocation loudly.
+ * With the watch DOWN nothing else owns that rebuild, so it heals like any other
+ * checkout — the heal lock still serializes the CLIs booting on it, and the
+ * largest concurrent writer is by definition not running. Every heal takes the
+ * package's cross-process lock, so N booting CLIs produce one build. When THAT
+ * heal fails it comes back 'heal-failed', another loud stop: no watch is coming
+ * to land the build, so there is no stale dist to fall back onto. A plain
+ * checkout's failed rebuild stays 'rebuild-failed' and continues — its dist is
+ * the developer's own to fix, and nothing shared depends on this boot stopping.
  * @param {object} options
  * @param {string} options.packageName - The package to check (e.g. '@omega.js/web').
  * @param {string} [options.fromDir] - Resolution origin (default process.cwd()).
- * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'rebuilt'|'stale-linked'|'rebuild-failed', by?: 'self'|'watch'|'peer', packageName: string, dir?: string, reason?: string, monorepoRoot?: string, watching?: boolean}}
+ * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'rebuilt'|'stale-linked'|'rebuild-failed'|'heal-failed', by?: 'self'|'watch'|'peer', packageName: string, dir?: string, reason?: string, failure?: string, monorepoRoot?: string}}
  *   Every HEALED outcome is 'rebuilt' — `by` only says who built it — because
  *   whoever built it, this process booted from the pre-heal dist and must
  *   re-exec.
@@ -1262,10 +1288,12 @@ function ensureFreshLocalDist(options) {
     }
   }
 
-  // Linked into the monorepo: the watch owns this dist, and a consumer build
-  // owns nothing here (#281). Report it and let the boot stop the invocation.
-  if (inMonorepo) {
-    return { status: 'stale-linked', packageName, dir: realDir, reason, monorepoRoot, watching: Boolean(watchPid) };
+  // Linked into the monorepo WITH its watch running: that watch owns this dist
+  // and will land the build itself, so a consumer build stays out of it (#281).
+  // Report it and let the boot stop the invocation. Watch DOWN falls through to
+  // the heal below — nothing else owns the rebuild then (#398).
+  if (inMonorepo && watchPid) {
+    return { status: 'stale-linked', packageName, dir: realDir, reason, monorepoRoot };
   }
 
   return withHealLock(realDir, () => {
@@ -1284,7 +1312,13 @@ function ensureFreshLocalDist(options) {
       shell: process.platform === 'win32',
     });
     if (result.status !== 0) {
-      console.warn(`omega: rebuild failed (npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status} in ${realDir}) — continuing on the stale dist`);
+      const failure = `npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status}`;
+      if (inMonorepo) {
+        // The watch is down (a live one never reaches this heal), so this
+        // prepare was the dist's only chance — the boot stops on it (#398)
+        return { status: 'heal-failed', packageName, dir: realDir, reason, failure, monorepoRoot };
+      }
+      console.warn(`omega: rebuild failed (${failure} in ${realDir}) — continuing on the stale dist`);
       return { status: 'rebuild-failed', packageName, dir: realDir };
     }
     return { status: 'rebuilt', by: 'self', packageName, dir: realDir };
@@ -1355,10 +1389,13 @@ let freshnessBootRan = false;
  * rebuilt leaves this process just as stale as one it rebuilt itself.
  *
  * A 'stale-linked' entry is the LOUD STOP (#281): the package lives in the
- * shared monorepo, nothing here may build it, and running on a dist nobody
- * built is the silent fallback the ruling forbids — so the boot prints what is
- * unbuilt and exits 1 before the verb runs. Every other outcome returns the
- * HOST's result and the boot continues.
+ * shared monorepo with its watch mid-build, nothing here may build over it, and
+ * running on a dist nobody built is the silent fallback the ruling forbids — so
+ * the boot prints what is unbuilt and exits 1 before the verb runs. With that
+ * watch down the entry heals instead (#398) and re-execs like any other — and a
+ * heal that FAILS ('heal-failed') is the same loud stop for the same reason:
+ * with no watch coming, the stale dist is not something to fall back onto. Every
+ * other outcome returns the HOST's result and the boot continues.
  * @param {object} options - Same as ensureFreshLocalDist (packageName = the host).
  * @returns {{status: string, by?: string, packageName: string, dir?: string}}
  */
@@ -1376,6 +1413,10 @@ function freshnessBoot(options) {
     const entryResult = ensureFreshLocalDist(entry);
     if (entryResult.status === 'stale-linked') {
       console.error(staleLinkedMessage(entryResult));
+      process.exit(1);
+    }
+    if (entryResult.status === 'heal-failed') {
+      console.error(healFailedMessage(entryResult));
       process.exit(1);
     }
     healed = healed || entryResult.status === 'rebuilt';
@@ -1417,14 +1458,18 @@ function freshnessBoot(options) {
  * guard is lifted for the pass: a dev boot that re-execed after healing its own
  * host must still hoist the lanes' check, or the fan-out races exactly as before.
  *
- * A 'stale-linked' entry (a monorepo link, read-only here — #281) is REPORTED,
- * message and all, and returned: the caller stops the boot before any lane
- * spawns, instead of each lane discovering it separately, half-booted.
+ * A 'stale-linked' entry (a monorepo link whose watch is mid-build, read-only
+ * here — #281) is REPORTED, message and all, and returned: the caller stops the
+ * boot before any lane spawns, instead of each lane discovering it separately,
+ * half-booted. A 'heal-failed' entry (a monorepo link whose watch-down heal
+ * broke — #398) comes back the same way, for the same reason.
  * @param {object} options
  * @param {Array<{packageName: string, fromDir: string}>} options.hosts - One entry
  *   per lane: the framework package that lane runs, and the app dir it resolves from.
- * @returns {{checked: object[], healed: string[], staleLinked: object[], failed: string[]}}
- *   checked = every ensureFreshLocalDist result, in check order.
+ * @returns {{checked: object[], healed: string[], staleLinked: object[], healFailed: object[], failed: string[]}}
+ *   checked = every ensureFreshLocalDist result, in check order; staleLinked and
+ *   healFailed are the caller's two stop conditions, failed is the plain
+ *   checkouts that warned and carried on.
  */
 function freshnessSweep(options) {
   const { hosts = [] } = options;
@@ -1464,10 +1509,16 @@ function freshnessSweep(options) {
     console.error(staleLinkedMessage(result));
   }
 
+  const healFailed = checked.filter((result) => result.status === 'heal-failed');
+  for (const result of healFailed) {
+    console.error(healFailedMessage(result));
+  }
+
   return {
     checked,
     healed: checked.filter((result) => result.status === 'rebuilt').map((result) => result.packageName),
     staleLinked,
+    healFailed,
     failed: checked.filter((result) => result.status === 'rebuild-failed').map((result) => result.packageName),
   };
 }

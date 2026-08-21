@@ -16,6 +16,11 @@
  *   electron / extension   the Measurement Protocol, fed by the GA4 descriptor.
  *                          Meta and TikTok resolve and then skip — no pixel
  *                          exists in these runtimes to receive them.
+ *   desktop renderer       NO transport at all: the injected IPC bridge
+ *                          ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)).
+ *                          Events forward to the main process, whose sender
+ *                          owns the one device id, the one session id and the
+ *                          real engagement time — one install, one GA client.
  *
  * Identity is real here (#159 is closed): `setUserId` / `setUserProperties` SEND
  * on web through the page's gtag instead of storing values only the Measurement
@@ -40,6 +45,7 @@ class Analytics {
     this.devMode = false;
     this.runtime = null;
     this.config = null;
+    this.bridge = null;
     this.measurementId = null;
     this.secret = null;
     this.projectId = null;
@@ -58,6 +64,16 @@ class Analytics {
   // Web's transport is the page's own pixels, never the Measurement Protocol
   _isWeb() {
     return this.runtime === 'web';
+  }
+
+  // Inside desktop's renderer, where the host injected the preload's IPC bridge
+  // to the main process's sender (#411). It outranks every runtime branch
+  // below: an Electron window sets no `config.runtime`, so a desktop renderer
+  // reads as the WEB runtime and the bridge is the only thing that says
+  // otherwise. Bridged means this client NEVER sends — not the Measurement
+  // Protocol, not a page pixel — so it holds no secret and no device id.
+  _isBridged() {
+    return !!this.bridge;
   }
 
   // Initialize analytics
@@ -84,18 +100,26 @@ class Analytics {
     // fallback credentials are gone by design — C4 cp106a de-ITW).
     this.devMode = this.manager.isDevelopment();
 
+    // The host's seam for a runtime whose events belong to another process
+    // (#411) — the desktop renderer's IPC bridge, null everywhere else.
+    this.bridge = config.bridge || null;
+
     // Canonical handoff: analytics.providers.google.{id,secret} + the
     // brand's projectId for the cross-surface identity namespace
     this.measurementId = config.measurementId || config.id;
     this.projectId = config.projectId || null;
 
     // The Measurement Protocol api_secret is never read on web: the page's
-    // gtag is the transport there, and the secret must never reach a page.
-    this.secret = this._isWeb() ? null : config.secret;
+    // gtag is the transport there, and the secret must never reach a page. Nor
+    // is it read in a bridged renderer — and that is the guard behind desktop's
+    // rule that the secret must never be injected into a renderer's config: a
+    // second sender here would split one install into two GA devices (#396).
+    this.secret = (this._isWeb() || this._isBridged()) ? null : config.secret;
 
     // Skip if no measurement ID. Web has none to require, since the gtag
-    // config is page-side (the consent-gated loader owns it)
-    if (!this.measurementId && !this._isWeb()) {
+    // config is page-side (the consent-gated loader owns it), and a bridged
+    // renderer has none to require because main holds them.
+    if (!this.measurementId && !this._isWeb() && !this._isBridged()) {
       logger.log('No measurement ID provided, skipping initialization');
       return;
     }
@@ -104,8 +128,10 @@ class Analytics {
     // uuidv5 math lives; desktop's main-process lib uses the same module)
     this.namespace = core.deriveNamespace(this.projectId);
 
-    // Generate or retrieve client ID
-    this.clientId = this._getClientId();
+    // Generate or retrieve client ID. A bridged renderer mints none: main's
+    // sender already resolved the install's device id from its OWN storage,
+    // and a second one here is the identity fork this bridge exists to prevent.
+    this.clientId = this._isBridged() ? null : this._getClientId();
 
     // The facade's environment seam is the brand's own `config.environment` —
     // it decides whether an unknown event name throws and whether the fire log
@@ -120,47 +146,59 @@ class Analytics {
     // (a vert click, a permission prompt) counts on a page whose own call sites
     // never loaded. The page keeps the seams only a page can supply: the
     // consent gate and the attribution context.
-    analytics.configure(this._isWeb()
-      ? { transport: analytics.transports.browser }
-      : {
-        transport: { send: (descriptor) => this._sendViaMeasurementProtocol(descriptor) },
-        context: { runtime: this.runtime },
-      });
+    //
+    // A bridged renderer configures NONE: it never resolves a descriptor at
+    // all, because `event()` hands the canonical name to the bridge and main
+    // walks the catalog on the other side.
+    if (!this._isBridged()) {
+      analytics.configure(this._isWeb()
+        ? { transport: analytics.transports.browser }
+        : {
+          transport: { send: (descriptor) => this._sendViaMeasurementProtocol(descriptor) },
+          context: { runtime: this.runtime },
+        });
+    }
 
     // Log initialization
-    logger.log(`Initializing with measurement ID: ${this.measurementId || 'page-side gtag'}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
+    logger.log(`Initializing with ${this._isBridged() ? 'the desktop IPC bridge (main is the sender)' : `measurement ID: ${this.measurementId || 'page-side gtag'}`}${this.devMode ? ' (dev mode)' : ''} [${this.runtime}]`);
 
     // Mark as initialized
     this.initialized = true;
 
     // Send initial pageview, never on web: the page's own gtag config
-    // already fired one and a second would double-count
-    if (!this._isWeb()) {
+    // already fired one and a second would double-count. Nor from a bridged
+    // renderer: main fires the launch events for the whole app (app_launch,
+    // once per launch), and a per-window page_view here would be its own
+    // decision to make, not a side effect of wiring the bridge.
+    if (!this._isWeb() && !this._isBridged()) {
       this.event('page_view');
     }
   }
 
-  // Stable per-install device id, hashed into the project namespace so the
-  // same device is the same GA client across surfaces. Without a projectId
-  // the raw (still stable) device id is used as-is.
+  // Stable per-install device id, hashed into the project namespace so every
+  // event from this browser is the same GA client. The derivation is the
+  // package's ([#396](https://github.com/Omega-JS-Stack/omega/issues/396)) —
+  // all this runtime supplies is where it persists, since a page can read
+  // nothing about the machine to seed from. Without a projectId the raw (still
+  // stable) device id is used as-is.
   _getClientId() {
-    let deviceId = null;
-    try {
-      deviceId = localStorage.getItem(DEVICE_ID_KEY);
-    } catch (e) {
-      // localStorage not available
-    }
-
-    if (!deviceId) {
-      deviceId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `${Math.random().toString(36).substring(2)}.${Date.now()}`;
-      try {
-        localStorage.setItem(DEVICE_ID_KEY, deviceId);
-      } catch (e) {
-        // localStorage not available
-      }
-    }
+    const deviceId = core.deriveDeviceId({
+      get: () => {
+        try {
+          return localStorage.getItem(DEVICE_ID_KEY);
+        } catch (e) {
+          // localStorage not available
+          return null;
+        }
+      },
+      set: (value) => {
+        try {
+          localStorage.setItem(DEVICE_ID_KEY, value);
+        } catch (e) {
+          // localStorage not available
+        }
+      },
+    });
 
     return core.deriveClientId(deviceId, this.namespace);
   }
@@ -190,6 +228,38 @@ class Analytics {
     }
 
     if (!this.initialized) {
+      return;
+    }
+
+    // Bridged (desktop's renderer): the canonical name and the caller's params
+    // cross to main, which resolves the catalog and enriches with ITS identity
+    // — device id, the session id minted once per launch, real engagement time
+    // — and with the app's own page context, which is main's to own and not a
+    // renderer's file:// href. `options` stays behind with the page-pixel
+    // providers it exists to deduplicate: GA4 through main is the one lane here.
+    if (this._isBridged()) {
+      // The catalog check happens HERE, on the facade's own rule (throw in
+      // development, log-and-skip in production): a typo is the CALL SITE's
+      // bug, and it must surface at that stack in that renderer's console —
+      // not as an unattributable warn in the main process's runtime.log.
+      if (!analytics.entryFor(eventName)) {
+        if (analytics.isDevelopment()) {
+          throw new Error(`Unknown analytics event "${eventName}" — every event is declared in the catalog (@omega.js/analytics/catalog)`);
+        }
+
+        logger.warn(`Unknown event "${eventName}" — not in the catalog, skipped`);
+        return;
+      }
+
+      try {
+        this.bridge.event(eventName, params);
+      } catch (e) {
+        // The forward crossing IPC is the one thing here that can fail on the
+        // caller's data (a param that structured-clone cannot carry). The
+        // facade never throws at a visitor mid-action, so neither does this.
+        logger.warn(`Failed to forward "${eventName}" to the main process:`, e.message);
+      }
+
       return;
     }
 
@@ -307,6 +377,21 @@ class Analytics {
       return;
     }
 
+    // Bridged: main's sender owns the user_properties block that rides every
+    // event, so they cross raw (it does the GA4 { value } wrapping) and are
+    // never held here, where nothing would ever read them.
+    if (this._isBridged()) {
+      try {
+        this.bridge.setUserProperties(properties);
+      } catch (e) {
+        // Same rule as the event forward above: a value IPC cannot carry is
+        // never allowed to throw into the caller's action.
+        logger.warn('Failed to forward user properties to the main process:', e.message);
+      }
+
+      return;
+    }
+
     this.userProperties = { ...this.userProperties, ...core.wrapUserProperties(properties) };
 
     if (this._isWeb()) {
@@ -359,12 +444,14 @@ class Analytics {
    * nothing. The wiring belongs here, in the class every runtime shares — with
    * ONE owner per surface:
    *
-   *   web    the auth pages own it (`libs/auth/tracking.js` fires `login` with
-   *          the METHOD the visitor actually used, which an auth-state callback
-   *          cannot know), so this wiring stays out of web's way entirely.
-   *   other  this is the only owner. On desktop the renderer's client is
-   *          normally uninitialized (no Measurement Protocol secret reaches a
-   *          renderer), and the main-process singleton is what delivers.
+   *   web       the auth pages own it (`libs/auth/tracking.js` fires `login`
+   *             with the METHOD the visitor actually used, which an auth-state
+   *             callback cannot know), so this wiring stays out of web's way
+   *             entirely.
+   *   bridged   desktop's main-process singleton owns it: its auth bridge fires
+   *             login/logout off the SAME Firebase user, so forwarding them
+   *             from the renderer would double-count every sign-in (#411).
+   *   other     this is the only owner.
    *
    * @param {object|null} user - The auth user, or null when signed out.
    * @returns {void}
@@ -375,7 +462,7 @@ class Analytics {
     // Identity follows auth on every runtime (user_id = uuidv5(uid, namespace))
     this.setUserId(uid);
 
-    if (this._isWeb()) {
+    if (this._isWeb() || this._isBridged()) {
       return;
     }
 

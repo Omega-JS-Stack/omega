@@ -2,14 +2,17 @@
  * Migrations service — runs data migrations on the brand's Firestore
  * collections. Only runs when the --migration flag is set (bare = all
  * migrations, --migration=<name> = just that one), so a normal manage run
- * never touches collection data.
+ * never touches collection data. Even then the run is an AUDIT: it prints
+ * what every fix WOULD do and writes nothing until `--execute`.
  *
  * The framework (runner, validator, snapshots) plus the two canonical
  * @omega.js/backend-schema migrations (notifications, users) are ported from
  * omega-manager; its other 25 registered migrations are company-instance
  * one-offs (per-app data repairs) and stay there. firebase-admin is
  * replaced by the shared Identity Toolkit + FirestoreREST clients over the
- * brand's own service account.
+ * brand's own service account. The orders and payments-intents migrations are
+ * native to OMEGA: they carry the same #384 attribution fold as users and
+ * notifications onto the two payment collections.
  *
  * Add new migrations by creating handlers in ensure/ and registering them
  * in config.js OPERATIONS.migrations.

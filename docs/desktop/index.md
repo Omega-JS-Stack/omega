@@ -87,13 +87,13 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 | `client-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the @omega.js/client-resolved plan → `getResolvedPlan()` |
 | `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `omega.authPersistence` config) |
 | `auto-updater` | electron-updater wrapper, idle-aware install, 30-day pending gate, dev simulation |
-| `sentry` | per-context split, auto auth attribution, dev-mode gating |
+| `sentry` | `@omega.js/monitoring` — the shared error-reporting contract, auto auth attribution, dev-mode gating |
 | `templating` | `{{ }}` token replacement (BXM/UJM convention), used at build time by `gulp/html` |
 | `context` | runtime info — `manager.context.{geolocation,client,session,app}` |
 | `usage` | `opens` / `hoursTotal` / `hoursThisSession`; crash-safe |
 | `remote-config` | "Hot config" fetched from `${brand.url}/data/resources/main.json`, polled hourly |
 | `remote-scripts` | Emergency remote code execution — OPT-IN (`remoteScripts.enabled: true`) + https-only; fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `manager` + `require` in scope |
-| `analytics` | GA4 Measurement Protocol; cross-platform `uuidv5` identity |
+| `analytics` | GA4 Measurement Protocol; cross-platform `uuidv5` identity; the app's ONE sender — renderer events forward here over IPC ([docs/analytics.md](../../packages/desktop/docs/analytics.md)) |
 | `restart-manager` | external guardian app for crash relaunches — localhost HTTP protocol v1 (register/heartbeat/deregister), silent install when missing (mac zip / win NSIS `/S` / linux AppImage; RM self-updates via its own @omega.js/desktop autoUpdater); split dir ships the protocol SSOT the RM app imports |
 
 ### File-based feature definitions
@@ -201,7 +201,7 @@ All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`, `npx 
 - Short-circuit early returns rather than nested ifs.
 - Prefer **`fs-jetpack`** over `fs-extra`.
 - **No backwards compatibility** unless explicitly requested — this is unreleased v1.
-- **Lib structure — flat file vs directory split.** Default to flat `src/lib/<name>.js`. Split into a directory (`src/lib/<name>/{index,core,main,renderer,preload}.js`) ONLY when each Electron context has materially different logic. Currently only `lib/sentry/` is split. Don't split prophylactically.
+- **Lib structure — flat file vs directory split.** Default to flat `src/lib/<name>.js`. Split into a directory (`src/lib/<name>/{index,core,main,renderer,preload}.js`) ONLY when each Electron context has materially different logic. No lib is split today — `lib/sentry/` was the one, and it moved WHOLE into `@omega.js/monitoring` (#380) once the backend and the client needed the same policy. Don't split prophylactically.
 - **Use `app.getAppPath()`, not `process.cwd()`, for runtime path resolution.** In a packaged app, `process.cwd()` is `/`. Use `require('./utils/app-root.js')()` — tries `app.getAppPath()` first, falls back to `process.cwd()` for tests/non-Electron contexts.
 - **Zero-trust URL handling — `sanitizeURL` for `shell.openExternal` and friends.** Any dynamic URL passed to `shell.openExternal`, `BrowserWindow.loadURL`, `window.location.href =`, etc. MUST be gated through `require('./utils/sanitize-url.js')` first. Returns the URL unchanged when its protocol is `http:`/`https:`, and `''` for anything else (`javascript:`, `data:`, `file:`, `vbscript:`, `chrome:`, custom schemes). Canonical pattern: `const safe = sanitizeURL(url); if (safe) shell.openExternal(safe);`. Hardcoded URLs constructed entirely from internal constants (e.g. the restart-manager feed URLs built from schema-validated config in `lib/restart-manager/install.js`) bypass — not attacker-controllable. See `src/utils/sanitize-url.js` and the `js:patterns/xss-escaping` skill.
 - **`ELECTRON_RUN_AS_NODE` is stripped at the CLI boundary.** When set, Electron silently runs as plain Node — `app` is undefined, no BrowserWindow. The variable leaks from common parent processes (VS Code's Claude Code extension runs as a `node.mojom.NodeService` utility process with the var set). `bin/omega-desktop` and `src/gulp/main.js` both `delete process.env.ELECTRON_RUN_AS_NODE` at the top.
@@ -243,7 +243,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/remote-scripts.md](../../packages/desktop/docs/remote-scripts.md) — emergency remote code execution (opt-in, https-only), content-hash dedup
 - [docs/restart-manager.md](../../packages/desktop/docs/restart-manager.md) — the external guardian app: HTTP protocol v1 (SSOT), silent install, self-updates via its own @omega.js/desktop autoUpdater, threat model
 - [docs/config-schema.md](../../packages/desktop/docs/config-schema.md) — canonical schema + validator
-- [docs/sentry.md](../../packages/desktop/docs/sentry.md) — per-context split, auto auth attribution
+- [docs/sentry.md](../../packages/desktop/docs/sentry.md) — the desktop half of `@omega.js/monitoring`, auto auth attribution
 - [docs/templating.md](../../packages/desktop/docs/templating.md) — `{{ }}` token replacement, page vars, HTML pipeline
 - [docs/logging.md](../../packages/desktop/docs/logging.md) — runtime logger (main + preload + renderer → one `runtime.log`)
 - [docs/themes.md](../../packages/desktop/docs/themes.md) — vendored classy + bootstrap themes, per-page CSS bundles, system-aware appearance (`manager.theme`)

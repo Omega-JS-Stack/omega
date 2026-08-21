@@ -424,30 +424,26 @@ Manager.prototype.init = function (exporter, options) {
     self.ctx.warn('⚠️ Missing config.brand.id');
   }
 
-  // Setup sentry
+  // Setup sentry — @omega.js/monitoring owns the policy (config resolution from
+  // `monitoring.*`, the release tag, the gates) for every OMEGA target (#380).
+  // The gates run at BOOT, not per event: getEnvironment() is env-derived and
+  // stable for the life of a process, so a non-production run that would have
+  // dropped every event in beforeSend now never loads @sentry/node at all.
+  // `libraries.sentry` stays the ONE capture handle (null when off) — the
+  // chokepoint in helpers/context/respond.js reads it exactly as before.
   if (self.options.sentry) {
-    const sentryRelease = `${brandId || self.project.projectId}@${self.package.version}`;
-    const sentryDSN = self.config?.monitoring?.dsn || '';
-    // self.ctx.log('Sentry', sentryRelease, sentryDSN);
-
-    self.libraries.sentry = require('@sentry/node');
-    self.libraries.sentry.init({
-      dsn: sentryDSN,
-      release: sentryRelease,
-      beforeSend(event, hint) {
-        // Skip Sentry in any non-production environment (development OR testing) unless
-        // explicitly opted in. Intentional positive check — we never want test-run errors
-        // polluting production Sentry.
-        if (!self.isProduction() && !self.options.reportErrorsInDev) {
-          self.ctx.error(new Error('Skipping Sentry because we\'re not in production'), hint)
-          return null;
-        }
-        event.tags = event.tags || {};
-        event.tags['function.name'] = self.ctx.meta.name;
-        event.tags['function.type'] = self.ctx.meta.type;
-        event.tags['environment'] = self.getEnvironment();
-        return event;
-      },
+    self.libraries.sentry = require('@omega.js/monitoring/node').initialize({
+      config:       self.config?.monitoring,
+      release:      { id: brandId || self.project.projectId, version: self.package.version },
+      isProduction: self.isProduction(),
+      allowInDev:   self.options.reportErrorsInDev,
+      // Read at capture time: one process serves many invocations, so the
+      // function identity belongs to the event, not the boot.
+      tags: () => ({
+        'function.name': self.ctx.meta.name,
+        'function.type': self.ctx.meta.type,
+        'environment':   self.getEnvironment(),
+      }),
     });
   }
 

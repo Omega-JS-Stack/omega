@@ -1,23 +1,22 @@
+/**
+ * The client runtime's error reporting — a HOST of `@omega.js/monitoring`,
+ * never a second copy of its policy (#380).
+ *
+ * What lives here is what only the client can know: when to load the SDK, which
+ * release tag this page is (`brand.id@version`), where the signed-in user
+ * comes from (the auth storage keys), and the public surface every consumer
+ * calls — `omega.sentry().captureException(err)`.
+ *
+ * Everything else — the send gate, the @omega.js-bundle filter, the PII scrub,
+ * the integrations — is the package's, shared with the backend and the desktop
+ * main process so no surface can drift.
+ */
+
+import monitoring from '@omega.js/monitoring/browser';
+import monitoringCore from '@omega.js/monitoring/core';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('sentry');
-
-// Helper functions
-function isLighthouse() {
-  try {
-    return typeof navigator !== 'undefined' && navigator.userAgent?.includes('Lighthouse');
-  } catch (e) {
-    return false;
-  }
-}
-
-function isAutomatedBrowser() {
-  try {
-    return typeof navigator !== 'undefined' && navigator.webdriver === true;
-  } catch (e) {
-    return false;
-  }
-}
 
 class mod {
   constructor(manager) {
@@ -25,124 +24,56 @@ class mod {
     this.initialized = false;
     this.Sentry = null;
     this.config = null;
-    // Session-hours baseline for beforeSend — no config key carries a page
-    // start time (config.page was a legacy read nothing wrote).
-    this._startTime = Date.now();
   }
 
   /**
    * Initialize Sentry error tracking
-   * @param {Object} config - Sentry configuration object
+   * @param {Object} config - the resolved `monitoring` blob for this surface
    * @returns {Promise} Resolves when initialization is complete
    */
   init(config = {}) {
-    return new Promise((resolve, reject) => {
-      // Dynamically import Sentry to reduce initial bundle size
-      import('@sentry/browser')
-        .then((mod) => {
-          // Store reference and expose globally
-          this.Sentry = mod;
+    // Dynamically imported to keep the SDK out of the initial chunk — and
+    // never reached at all when the config carries no DSN (index.js gates on
+    // `config.sentry.enabled`, which the build maps from `monitoring.dsn`).
+    return import('@sentry/browser')
+      .then((sdk) => {
+        this.Sentry = sdk;
 
-          // Add to window if window is defined
-          if (typeof window !== 'undefined') {
-            window.Sentry = mod;
-          }
+        // Expose globally so page code and devtools can reach the same SDK
+        if (typeof window !== 'undefined') {
+          window.Sentry = sdk;
+        }
 
-          // Build configuration with our defaults
-          this.config = this._buildConfig(config);
-
-          // Initialize Sentry
-          this.Sentry.init(this.config);
-          this.initialized = true;
-
-          resolve({ initialized: true });
-        })
-        .catch((error) => {
-          logger.error('Failed to initialize:', error);
-          reject(error);
+        this.config = monitoring.buildInitOptions({
+          Sentry: sdk,
+          config,
+          release: monitoringCore.releaseTag({
+            id: this.manager.config.brand?.id,
+            // The host blob's app version when it carries one (@omega.js/extension
+            // bakes it, and it is the same key device stats read) — the build stamp
+            // is the fallback for a surface that ships no version yet.
+            version: this.manager.config.version || this.manager.config.buildTime,
+          }),
+          environment: this.manager.config.environment,
+          isDevelopment: () => this.manager.isDevelopment(),
+          getUser: () => {
+            const storage = this.manager.storage();
+            return {
+              uid: storage.get('auth.user.uid', ''),
+              email: storage.get('auth.user.email', ''),
+            };
+          },
         });
-    });
-  }
 
-  /**
-   * Build Sentry configuration with defaults and integrations
-   * @private
-   */
-  _buildConfig(userConfig) {
-    const config = { ...userConfig };
-    const manager = this.manager;
+        sdk.init(this.config);
+        this.initialized = true;
 
-    // Set release version and environment
-    config.release = `${manager.config.brand.id}@${manager.config.buildTime}`;
-    config.environment = manager.config.environment || 'production';
-    config.integrations = config.integrations || [];
-
-    // Add browser tracing integration if not already present
-    if (!config.integrations.some(i => i.name === 'BrowserTracing')) {
-      config.integrations.push(this.Sentry.browserTracingIntegration());
-    }
-
-    // Add replay integration if sample rates are configured
-    const hasReplays = (config.replaysSessionSampleRate > 0) ||
-                      (config.replaysOnErrorSampleRate > 0);
-
-    if (hasReplays && !config.integrations.some(i => i.name === 'Replay')) {
-      config.integrations.push(this.Sentry.replayIntegration({
-        maskAllText: false,
-        blockAllMedia: false,
-      }));
-    }
-
-    // Configure beforeSend to enrich events with user data and session info
-    config.beforeSend = (event, hint) => {
-      const hoursSinceStart = (Date.now() - this._startTime) / (1000 * 3600);
-      const storage = this.manager.storage();
-
-      // Add custom tags
-      event.tags = {
-        ...event.tags,
-        'process.type': 'browser',
-        'usage.session.hours': hoursSinceStart.toFixed(2),
-      };
-
-      // Add user info from storage
-      event.user = {
-        ...event.user,
-        email: storage.get('auth.user.email', ''),
-        uid: storage.get('auth.user.uid', ''),
-      };
-
-      // Log error to console for debugging
-      logger.error('Caught error:', {
-        message: event.message || (event.exception?.values?.[0]?.value) || 'Unknown error',
-        level: event.level,
-        tags: event.tags,
-        user: event.user,
-        hint
+        return { initialized: true };
+      })
+      .catch((error) => {
+        logger.error('Failed to initialize:', error);
+        throw error;
       });
-
-      // Block sending in development mode
-      if (this.manager.isDevelopment()) {
-        logger.log('Development mode - not sending to Sentry');
-        return null;
-      }
-
-      // Block sending if Lighthouse is running
-      if (isLighthouse()) {
-        logger.log('Lighthouse detected - not sending to Sentry');
-        return null;
-      }
-
-      // Block sending if automated browser (Selenium, Puppeteer, etc.)
-      if (isAutomatedBrowser()) {
-        logger.log('Automated browser detected - not sending to Sentry');
-        return null;
-      }
-
-      return event;
-    };
-
-    return config;
   }
 
   /**
@@ -170,36 +101,6 @@ class mod {
       return null;
     }
   }
-
-  // /**
-  //  * Capture a message and send to Sentry
-  //  * Safe to call even if Sentry is not initialized
-  //  * @param {string} message - The message to capture
-  //  * @param {string} level - Severity level (debug, info, warning, error, fatal)
-  //  * @param {Object} captureContext - Additional context for the message
-  //  * @returns {string|null} Event ID if successful, null otherwise
-  //  */
-  // captureMessage(message, level = 'info', captureContext) {
-  //   if (!message) {
-  //     logger.warn('captureMessage called with no message');
-  //     return null;
-  //   }
-
-  //   logger.log(`Capturing message (${level}):`, message);
-
-  //   // Safe to call - won't throw if not initialized
-  //   if (!this.initialized || !this.Sentry) {
-  //     logger.log('Not initialized, skipping capture');
-  //     return null;
-  //   }
-
-  //   try {
-  //     return this.Sentry.captureMessage(message, level, captureContext);
-  //   } catch (captureError) {
-  //     logger.error('Failed to capture message:', captureError);
-  //     return null;
-  //   }
-  // }
 }
 
 export default mod;

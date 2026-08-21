@@ -28,7 +28,7 @@ interop.
 | `adapters/ga4.js` · `meta.js` · `tiktok.js` | One file per provider: its consent category and where attribution attaches |
 | `transports/browser.js` | Executes a descriptor against the page globals, guarded ([#306](https://github.com/Omega-JS-Stack/omega/issues/306)) |
 | `consent.js` | The consent seam — `createConsentGate(providerFn)`, categories, `GRANT_ALL` |
-| `core.js` | GA4 Measurement Protocol semantics (client_id/user_id derivation, payload shape) |
+| `core.js` | GA4 Measurement Protocol semantics (device_id/client_id/user_id derivation, payload shape) |
 | `logger.js` | This package's `[@omega.js/analytics:<module>]` tag ([logging.md](logging.md)) |
 
 **The one call**, from client code and backend code alike:
@@ -63,8 +63,8 @@ globals.
 | Host | transport | consent | context | environment |
 |---|---|---|---|---|
 | web page (`@omega.js/web` `core/js/libs/analytics.js`) | the guarded browser transport | the banner's record, read live | attribution + `runtime: 'web'` | — |
-| `@omega.js/client` | the browser transport on web; the Measurement Protocol on desktop/extension | — | `runtime` on desktop/extension | the brand's `config.environment` |
-| `@omega.js/desktop` main process | its own Measurement Protocol fetch | — | `runtime: 'electron'` | the app's dev flag |
+| `@omega.js/client` | the browser transport on web; the Measurement Protocol in the extension; NONE in a desktop renderer, which forwards over the IPC bridge instead ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)) | — | `runtime` in the extension | the brand's `config.environment` |
+| `@omega.js/desktop` main process | its own Measurement Protocol fetch, and the ONE sender for the whole install — its own windows' events included | — | `runtime: 'electron'` | the app's dev flag |
 | `@omega.js/backend` | the three HTTP APIs (`libraries/analytics/conversions.js`) | the order's/user's snapshot | the order's attribution | — |
 
 Web core reaches the package THROUGH `@omega.js/client` (`@omega.js/client/modules/analytics.js`),
@@ -106,6 +106,12 @@ add_to_cart: {
 - **`providers`** — the per-provider mapping. Each carries `name` (the provider's NATIVE
   event name), `kind`, and an optional `map(params, context) => payload` (default:
   pass-through).
+- **`method`** — the rare fourth key, browser only: the provider's own PIXEL METHOD to call
+  instead of its tracked-event command, for a signal the platform manages itself rather than
+  exposing as a trackable name. Exactly one mapping names one today, TikTok's `page_view` →
+  `ttq.page()` ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)); it takes no name
+  and no payload, the pixel reads the page, and `name`/`kind` stay declared for the catalog
+  and the fire log.
 
 **The three mapping kinds** — and the third one is an absence:
 
@@ -140,7 +146,7 @@ BOTH.**
 
 | Placement | Why | Examples |
 |---|---|---|
-| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `start_trial`, `subscription_cancelled`, `subscription_renewed`, `payment_recovered`, `user_delete` |
+| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `start_trial`, `trial_converted`, `trial_lapsed`, `subscription_cancelled`, `subscription_uncancelled`, `plan_changed`, `subscription_renewed`, `payment_recovered`, `user_delete` |
 | `client` | The event IS the interaction — nothing server-side ever sees it | `view_item`, `add_to_cart`, `begin_checkout`, `add_payment_info`, `page_view`, `file_download`, the exit-popup, consent, notification-permission and account-navigation events |
 | `both` | Ad platforms need the browser signal for retargeting AND the server signal for truth | `sign_up`, `purchase` |
 
@@ -196,7 +202,10 @@ which is what changing what a category COVERS requires.
   match, saves, and collapses to the tab. Refusal is one click at the same size as the grant
   (the EU equal-ease rule). The loader that actually gates the scripts is
   `packages/web/core/js/core/analytics-loader.js`, and it runs FIRST in `main.js` — nothing
-  may count an event ahead of that decision.
+  may count an event ahead of that decision. That loader counts NOTHING of its own: the Meta
+  and TikTok page views it used to fire raw at pixel init now go through the facade like every
+  other event ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)), restricted to the
+  pixel that just installed, since GA4 counts its own page view off the `config` command.
 - **A save that grants nothing IS the denial** — Accept none and an all-off panel are the
   same answer and fire the same `cookie_consent_deny`. That fire is made AFTER the record is
   written, so the gate the visitor just closed is the one it is asked about: a denial is
@@ -245,6 +254,68 @@ server-side delivery with full match data (hashed email/phone, IP, user agent, c
 [#385](https://github.com/Omega-JS-Stack/omega/issues/385);
 [#302](https://github.com/Omega-JS-Stack/omega/issues/302) owns the deep spec for both.
 
+## Running paid ads
+
+Two systems count a paid campaign, they disagree by design, and each is right about a
+different question. This is the reading guide, plus the one thing every campaign has to do
+for either of them to work.
+
+**Every paid ad link carries utm tags.** The system can only credit what the LINK declares:
+the landing capture reads the utm tags off the URL, stores them as that visit's touch, and
+carries the touch onto the user doc, the payment intent and the order. An untagged ad click
+is an organic visit forever, in both ledgers below. So the destination URL of every ad, on
+every platform, is tagged:
+
+```
+https://brand.test/pricing?utm_source=meta&utm_medium=cpc&utm_campaign=launch-2026&utm_content=hero-video&utm_term=project-management
+```
+
+| Tag | What it names |
+|---|---|
+| `utm_source` | The platform the click came from (`meta`, `tiktok`, `google`, `newsletter`) |
+| `utm_medium` | How it was paid for (`cpc`, `paid_social`, `email`) |
+| `utm_campaign` | The campaign, spelled the SAME way it is spelled in the ads manager |
+| `utm_content` | The creative, so two ads in one campaign stay tellable apart |
+| `utm_term` | The keyword or audience (optional: search and interest targeting) |
+
+The platform's own click id (`fbclid`, `ttclid`, `gclid`) rides along on its own and is what
+the server's match data links a conversion to. The utm tags are how a HUMAN reads the result.
+
+**The two ledgers.** Both are honest; they measure different windows with different rules.
+
+| Ledger | What it counts | Read it for |
+|---|---|---|
+| The ads manager (Meta Events Manager, TikTok Ads) | GROSS, short window: the conversions its own pixel and Conversions/Events API saw inside its attribution window, at the value that fired, credited its own way | Steering spend day to day, and feeding the optimizer the signal it bids on |
+| GA4, `first user campaign` | NET, long run: everything a campaign's visitors ever did, renewals included and refunds netted out, credited to the campaign that FIRST brought them | Whether the campaign was worth running at all |
+
+The ads manager runs ahead and reads high: it counts a conversion the moment its window says
+so, it cannot subtract a refund, and each platform credits itself for clicks the other also
+saw. GA4 runs behind and reads low: a renewal thirteen months out still lands on the campaign
+that acquired the customer, and a refund nets against the purchase it reverses. Never subtract
+one from the other and never average them. **The ads manager decides what to do today; GA4
+decides whether to keep doing it.**
+
+**Exclusion audiences are what a churn event is for.** Neither ad platform can subtract
+revenue and neither optimizes against an event, but both can build an AUDIENCE from a custom
+one ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)). So the two churn moments
+reach them as custom events worth zero: `subscription_cancelled` as `SubscriptionCancelled`,
+`refund` as `Refunded`, both `value: 0` because sending the real amount would ADD to the
+return the ads manager reports. Build the platform's exclusion audience off those two, and
+spend stops chasing people who already left. `trial_lapsed` is deliberately NOT in that lane:
+a lapsed trialist is a win-back audience worth RETARGETING, not somebody to hide ads from.
+
+**The Measurement Protocol secret ships inside extension and desktop bundles, and that is an
+accepted tradeoff** ([#413](https://github.com/Omega-JS-Stack/omega/issues/413), Ian's ruling
+2026-08-20). Those runtimes have no page pixels, so they report through GA4's Measurement
+Protocol, which requires an `api_secret` in the request: a distributed bundle therefore
+carries one, and anyone who unpacks it can extract it. The exposure is bounded and known: an
+MP secret is WRITE-ONLY, it reads nothing back, and the worst an abuser can do is post junk
+events into the property. That is data POLLUTION, not data theft, and it is a documented GA4
+limitation rather than a bug here. The reopen trigger is real abuse: if junk events or secret
+misuse ever show up in a live property, reopen #413 and spec the backend proxy (every
+extension event routed through a Cloud Function, which is the cost the ruling declined to pay
+up front).
+
 ## Dev logging — one line per fire
 
 In development the whole walk prints as ONE tagged line, the complete per-provider outcome
@@ -274,14 +345,19 @@ beside the transport rather than inside the catalog, in exactly one module per r
 
 - **web** — `identify(user)` / `reset()` in `core/js/libs/analytics.js`, called by
   `core/js/core/auth.js` off the auth state, guarded per provider like every other page call.
-  It sets GA4's user PROPERTIES, the Meta `init` and the TikTok `identify` — the RAW uid is
-  correct in the last two, because `external_id` is each platform's own key. Every OTHER match
+  It sets GA4's user PROPERTIES, the Meta `init` and the TikTok `identify`. `external_id` is
+  each platform's own key and rides in the shape that platform's spec asks for: RAW for Meta,
+  which only RECOMMENDS hashing and whose own Pixel example passes a bare id, and SHA-256 for
+  TikTok, whose Events API REQUIRES the digest
+  ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)). Every OTHER match
   key is SHA-256 hashed before it reaches a pixel, normalized per that platform's own spec
   (Meta hashes a phone as bare digits, TikTok as E.164), and the rules live in
-  `@omega.js/analytics/identity`. Against the server's match data the EMAIL digest already
-  matches exactly; the PHONE does not yet — `match-data.js` hashes digits-only for both
-  providers, so its TikTok key differs from the browser's until the server converges onto the
-  same helper ([#392](https://github.com/Omega-JS-Stack/omega/issues/392)).
+  `@omega.js/analytics/identity`. The server's match data agrees key for key: `match-data.js`
+  reads the SAME normalizers out of that module and carries both digests
+  (`metaPhoneHash` / `tiktokPhoneHash`, the browser's own key names, plus
+  `tiktokExternalIdHash`), so a pixel event and a server conversion for one person present
+  identical match keys
+  ([#392](https://github.com/Omega-JS-Stack/omega/issues/392)).
 - **every runtime** — `@omega.js/client`'s `setUserId` / `setUserProperties`, which SEND on
   web through the page's gtag and ride the Measurement Protocol payload elsewhere. The
   cross-surface value is `uuidv5(uid, namespace)`: the same human is the same `user_id` on a
@@ -295,6 +371,33 @@ sets no `user_id`, and `reset()` clears none.
 The client also fires `login` / `logout` off auth state — on every runtime EXCEPT web, where
 the auth pages own them, because only the call site knows the method the visitor actually
 used.
+
+### The device id every `client_id` starts from
+
+`client_id` is `uuidv5(deviceId, namespace)`, and the deviceId under it comes from ONE
+derivation — `core.deriveDeviceId({ get, set, seed })` — with each target injecting its own
+world, on the `createRequest(deps)` mold
+([#396](https://github.com/Omega-JS-Stack/omega/issues/396)):
+
+| Target | Persistence | Seed |
+|---|---|---|
+| web · extension (`@omega.js/client`) | `localStorage._omega_device_id` | none — a page can read nothing about the machine, so the generated UUID IS the id |
+| desktop main (`lib/context.js`), for the whole install | electron-store `context.deviceId` | the first non-internal MAC, so a reinstalled app resolves the id it had before its storage was wiped |
+
+A desktop RENDERER derives none and persists none ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)):
+its client is bridged, its events are delivered by main's sender, and main's id is the
+install's identity. A renderer minting its own would be the identity fork the bridge exists to
+prevent — one install counted as two GA clients.
+
+The walk is **stored → seed → uuidv4**: a persisted id always wins (a desktop install survives
+a NIC swap or a VPN), and the floor is the `uuid` package's `v4`, which is a real UUID in every
+runtime — it uses the platform's `crypto.randomUUID` where that exists and `getRandomValues`
+where it does not (an insecure origin), so no surface falls back to a random-looking string.
+
+**One machine is NOT one GA client across surfaces**, and never was: each surface derives its
+device id from its own storage, so the desktop app and the browser on one machine are two
+`client_id`s. What unifies a human is `user_id`, and it rides ALONGSIDE the client id in every
+payload rather than replacing it — providers need the stable client id for session stitching.
 
 ## Verifying
 

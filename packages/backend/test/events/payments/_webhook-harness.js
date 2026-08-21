@@ -29,12 +29,16 @@ const CONFIG = {
  * document path whose write rejects — mid-batch in the real world, before anything
  * lands once the writes are batched.
  *
+ * `authUids` is the project's auth store: the pipeline asks it whether a uid is one
+ * of ours before it will create a user doc ([#399]).
+ *
  * @param {object} options
  * @param {object} options.seed - Document path → data, the state the run starts from
  * @param {string|null} options.failPath - The document path whose write rejects
+ * @param {string[]} options.authUids - The uids that have a Firebase auth user
  * @returns {{ admin: object, store: Map }}
  */
-function buildAdmin({ seed = {}, failPath = null } = {}) {
+function buildAdmin({ seed = {}, failPath = null, authUids = [] } = {}) {
   const store = new Map(Object.entries(seed));
 
   const write = (path, data, options) => {
@@ -64,6 +68,18 @@ function buildAdmin({ seed = {}, failPath = null } = {}) {
   });
 
   const admin = {
+    auth: () => ({
+      getUser: async (uid) => {
+        if (!authUids.includes(uid)) {
+          // The admin SDK's own not-found shape — the code branches on the code
+          const error = new Error(`There is no user record corresponding to the provided identifier.`);
+          error.code = 'auth/user-not-found';
+          throw error;
+        }
+
+        return { uid: uid };
+      },
+    }),
     firestore: () => ({
       doc,
       collection: (name) => query(name, []),
@@ -139,9 +155,11 @@ function subscriptionPayload({ uid, orderId, resourceId }) {
  * @param {object|null} options.payload - The resource the webhook envelope carries (defaults to an active subscription)
  * @param {object} options.seed - Extra documents the run starts from
  * @param {string|null} options.failPath - The document path whose write rejects
- * @returns {Promise<{ store: Map, logs: string[] }>}
+ * @param {string[]} [options.authUids] - The uids that have a Firebase auth user (default: the subscriber, as every real one does)
+ * @param {boolean} [options.reporting] - Whether a Sentry handle is configured at all (false = no DSN, `libraries.sentry` is null)
+ * @returns {Promise<{ store: Map, logs: string[], captures: object[] }>}
  */
-async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'customer.subscription.updated', resourceType = 'subscription', category = 'subscription', payload = null, seed = {}, failPath = null } = {}) {
+async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'customer.subscription.updated', resourceType = 'subscription', category = 'subscription', payload = null, seed = {}, failPath = null, authUids = null, reporting = true } = {}) {
   const resource = payload || subscriptionPayload({ uid, orderId, resourceId });
   const raw = { id: eventId, type: eventType, data: { object: resource } };
   const webhookDoc = {
@@ -157,10 +175,21 @@ async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'cust
   const { admin, store } = buildAdmin({
     seed: { [`payments-webhooks/${eventId}`]: webhookDoc, ...seed },
     failPath: failPath,
+    authUids: authUids || [uid],
   });
 
   const logs = [];
-  const Manager = { config: CONFIG, libraries: { admin } };
+
+  // The error reporter is an external SINK, recorded rather than run — the same
+  // treatment the route harness gives `res`. `libraries.sentry` IS the backend's
+  // one capture handle (helpers/context/respond.js reads exactly this), and it is
+  // null whenever no DSN is configured, which `reporting: false` reproduces.
+  const captures = [];
+  const sentry = reporting
+    ? { captureMessage: (message, context) => captures.push({ message, ...context }) }
+    : null;
+
+  const Manager = { config: CONFIG, libraries: { admin, sentry } };
   const ctx = {
     Manager,
     isTesting: () => true,
@@ -175,7 +204,7 @@ async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'cust
     context: { params: { eventId: eventId } },
   });
 
-  return { store, logs };
+  return { store, logs, captures };
 }
 
 module.exports = { CONFIG, buildAdmin, merge, subscriptionPayload, runTrigger };

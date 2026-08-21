@@ -7,6 +7,7 @@
  * - Flattens `owner.uid` (object) to `owner` (string)
  * - Moves legacy created/updated → metadata.created/metadata.updated
  * - Moves `url` to `context.client.url` and builds the full context structure
+ * - Folds the legacy `attribution.utm` blob into `attribution.first`/`last`
  * - Adds empty `attribution` when missing
  * - Trims whitespace on all string values
  *
@@ -17,6 +18,7 @@ const { runMigration, FieldValue } = require('../lib/migration-runner.js');
 const { createMetadataFix } = require('../lib/ensure-metadata.js');
 const { validateDocument } = require('../lib/schema-validator.js');
 const { createSanitizeFix } = require('../lib/sanitize-strings.js');
+const { createAttributionFoldFix } = require('../lib/attribution-touch.js');
 
 /**
  * Default context structure from @omega.js/client's getContext()
@@ -157,6 +159,15 @@ module.exports = async function ensureNotifications(context) {
         }
         return updates;
       },
+
+      // Fix: fold the legacy attribution.utm blob → attribution.first/last.
+      // A subscription copies the client's stored attribution verbatim
+      // (@omega.js/client notifications _saveSubscription), so docs written
+      // before #384 carry the same blob users and payments do. Placed before
+      // the attribution backfill to match every other surface; unlike users
+      // (whose DEFAULT_USER husks make the order load-bearing) the backfill
+      // here only fires when attribution is absent, so the order is inert.
+      createAttributionFoldFix(),
 
       // Fix: add empty attribution when missing
       (data) => {

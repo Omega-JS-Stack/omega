@@ -96,96 +96,9 @@ try {
   console.warn('[renderer-preload] Could not wire DOM enhancements:', e.message);
 }
 
-// Wire the verts auto-bind against THIS document. Production hands the client
-// singleton to _wireAds via manager.initialize(); here the preload requires
-// the REAL @omega.js/client (same resolution _wireFontAwesome uses) and seeds
-// its config directly — full initialize() is deliberately skipped (firebase,
-// heavy). AdSense is INTENTIONALLY configured and no inhouse source is: the
-// house-lane pin is exactly what must keep the provider lane (remote script)
-// from ever being attempted, and a source-less house render collapses
-// deterministically with zero network.
-(async () => {
-  try {
-    if (!testManager) return;
-    // The client is pure ESM — Electron's preload require() can't load it
-    // (unlike the CJS-compatible icon-renderer), so go through the Node ESM
-    // loader. Resolves well before suites arrive from main.
-    const wmMod = await import('@omega.js/client');
-    testManager.omega = wmMod.default || wmMod;
-    testManager.omega.config = Object.assign({}, testManager.omega.config, {
-      advertising: {
-        providers: { adsense: { client: 'ca-pub-test' } },
-      },
-    });
-    testManager._wireAds();
-  } catch (e) {
-    console.warn('[renderer-preload] Could not wire verts auto-bind:', e.message);
-  }
-})();
-
-// Tooltip instances live in the preload world (page world can't reach the
-// bootstrap namespace across the contextIsolation boundary) — expose a probe so
-// page-world suites can assert instance lifecycle by element id. `error()`
-// surfaces WHY the Bootstrap bundle failed to load (renderer.js swallows the
-// require error into a logger.warn that the harness can't see).
-contextBridge.exposeInMainWorld('__emTestTooltip', {
-  available: () => Boolean(testManager?.bootstrap?.Tooltip),
-  // Lazy — by call time the DOM exists, so a require failure here is the real
-  // reason the bundle can't load (not just "no documentElement yet").
-  error: () => {
-    try {
-      if (process.env.OMEGA_TEST_RENDERER_MANAGER_PATH) {
-        const path = require('path');
-        require(path.join(path.dirname(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH), 'assets', 'js', 'bootstrap.bundle.js'));
-      }
-      return null;
-    } catch (e) {
-      return e.message;
-    }
-  },
-  hasInstance: (id) => {
-    const el = document.getElementById(id);
-    return Boolean(el && testManager?.bootstrap?.Tooltip?.getInstance(el));
-  },
-  // Show the tooltip from the PRELOAD world. Synthetic mouse events dispatched
-  // by page-world test code don't cross the contextIsolation boundary to the
-  // preload world's Bootstrap listeners, so hover can't be simulated from a
-  // suite — real single-world hover behavior is covered by consumer boot
-  // suites. Returns true or the error message.
-  showDirect: (id) => {
-    try {
-      testManager.bootstrap.Tooltip.getOrCreateInstance(document.getElementById(id)).show();
-      return true;
-    } catch (e) {
-      return e.message;
-    }
-  },
-});
-
-contextBridge.exposeInMainWorld('__emTestManager', {
-  isDevelopment:  () => testManager?.isDevelopment(),
-  isProduction:   () => testManager?.isProduction(),
-  isTesting:      () => testManager?.isTesting(),
-  getVersion:     () => testManager?.getVersion(),
-  getEnvironment: () => testManager?.getEnvironment(),
-  getApiUrl:      (env) => testManager?.getApiUrl(env),
-  getFunctionsUrl:(env) => testManager?.getFunctionsUrl(env),
-  getWebsiteUrl:  (env) => testManager?.getWebsiteUrl(env),
-  // Mutator used by tests to flip config flags between assertions.
-  setConfig:      (path, value) => {
-    if (!testManager) return;
-    const parts = path.split('.');
-    let obj = testManager.config;
-    for (let i = 0; i < parts.length - 1; i++) {
-      obj[parts[i]] = obj[parts[i]] || {};
-      obj = obj[parts[i]];
-    }
-    obj[parts[parts.length - 1]] = value;
-  },
-});
 
 // Mirror the production preload surface so renderer test suites can assert against it.
-contextBridge.exposeInMainWorld('desktop', {
+const desktopSurface = {
   ipc: {
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     // Mirror production preload (wave-5 F4): returns an unsubscribe fn.
@@ -262,5 +175,136 @@ contextBridge.exposeInMainWorld('desktop', {
       ipcRenderer.on('desktop:remote-config:update', wrapped);
       return () => ipcRenderer.removeListener('desktop:remote-config:update', wrapped);
     },
+  },
+};
+
+contextBridge.exposeInMainWorld('desktop', desktopSurface);
+
+// Defined ABOVE the client wiring below, which injects `desktopSurface.analytics`
+// as that client's analytics bridge ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)):
+// the surface has to exist before the wiring reads it. Observed, not assumed —
+// with this block further down, the wiring resolved nothing.
+
+// Wire the verts auto-bind against THIS document. Production hands the client
+// singleton to _wireAds via manager.initialize(); here the preload requires
+// the REAL @omega.js/client (same resolution _wireFontAwesome uses) and seeds
+// its config directly — full initialize() is deliberately skipped (firebase,
+// heavy). AdSense is INTENTIONALLY configured and no inhouse source is: the
+// house-lane pin is exactly what must keep the provider lane (remote script)
+// from ever being attempted, and a source-less house render collapses
+// deterministically with zero network.
+(async () => {
+  try {
+    if (!testManager) return;
+    // The client is pure ESM — Electron's preload require() can't load it
+    // (unlike the CJS-compatible icon-renderer), so go through the Node ESM
+    // loader. Resolves well before suites arrive from main.
+    const wmMod = await import('@omega.js/client');
+    testManager.omega = wmMod.default || wmMod;
+    testManager.omega.config = Object.assign({}, testManager.omega.config, {
+      advertising: {
+        providers: { adsense: { client: 'ca-pub-test' } },
+      },
+      // The analytics bridge, INJECTED exactly the way src/renderer.js injects
+      // it in production ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)):
+      // the preload's own analytics surface, handed over as config. The client
+      // reads this key and nothing else — no global is involved either side.
+      analyticsBridge: desktopSurface.analytics,
+    });
+    testManager._wireAds();
+
+    // Analytics, BRIDGED: the real client resolves the injected bridge and
+    // forwards every event over IPC to main's ONE sender. Same
+    // `analytics().init()` call `manager.initialize()` makes — the rest of
+    // initialize (firebase, auth) stays out, as everywhere else here.
+    //
+    // Credentials are handed in ON PURPOSE, the mistake desktop's build must
+    // never make: a bridged renderer has to DROP them (`analytics-bridge`
+    // renderer suite pins that it holds neither).
+    testManager.omega.analytics().init({
+      id:        'G-RENDERER1',
+      secret:    'harness-renderer-secret',
+      projectId: 'demo-app',
+      bridge:    testManager.omega._resolveAnalyticsBridge(),
+    });
+  } catch (e) {
+    console.warn('[renderer-preload] Could not wire verts auto-bind:', e.message);
+  }
+})();
+
+// Page-world probe for the bridged client analytics: `event()` is the call a
+// renderer's own code makes (`omega.analytics().event(...)`), `state()` reads
+// back what the module holds so a suite can pin that no second sender exists.
+contextBridge.exposeInMainWorld('__emTestClientAnalytics', {
+  event: (name, params) => testManager?.omega?.analytics().event(name, params),
+  state: () => {
+    const a = testManager?.omega?.analytics();
+    return {
+      initialized: Boolean(a?.initialized),
+      bridged:     Boolean(a?.bridge),
+      secret:      a?.secret ?? null,
+      clientId:    a?.clientId ?? null,
+    };
+  },
+});
+
+// Tooltip instances live in the preload world (page world can't reach the
+// bootstrap namespace across the contextIsolation boundary) — expose a probe so
+// page-world suites can assert instance lifecycle by element id. `error()`
+// surfaces WHY the Bootstrap bundle failed to load (renderer.js swallows the
+// require error into a logger.warn that the harness can't see).
+contextBridge.exposeInMainWorld('__emTestTooltip', {
+  available: () => Boolean(testManager?.bootstrap?.Tooltip),
+  // Lazy — by call time the DOM exists, so a require failure here is the real
+  // reason the bundle can't load (not just "no documentElement yet").
+  error: () => {
+    try {
+      if (process.env.OMEGA_TEST_RENDERER_MANAGER_PATH) {
+        const path = require('path');
+        require(path.join(path.dirname(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH), 'assets', 'js', 'bootstrap.bundle.js'));
+      }
+      return null;
+    } catch (e) {
+      return e.message;
+    }
+  },
+  hasInstance: (id) => {
+    const el = document.getElementById(id);
+    return Boolean(el && testManager?.bootstrap?.Tooltip?.getInstance(el));
+  },
+  // Show the tooltip from the PRELOAD world. Synthetic mouse events dispatched
+  // by page-world test code don't cross the contextIsolation boundary to the
+  // preload world's Bootstrap listeners, so hover can't be simulated from a
+  // suite — real single-world hover behavior is covered by consumer boot
+  // suites. Returns true or the error message.
+  showDirect: (id) => {
+    try {
+      testManager.bootstrap.Tooltip.getOrCreateInstance(document.getElementById(id)).show();
+      return true;
+    } catch (e) {
+      return e.message;
+    }
+  },
+});
+
+contextBridge.exposeInMainWorld('__emTestManager', {
+  isDevelopment:  () => testManager?.isDevelopment(),
+  isProduction:   () => testManager?.isProduction(),
+  isTesting:      () => testManager?.isTesting(),
+  getVersion:     () => testManager?.getVersion(),
+  getEnvironment: () => testManager?.getEnvironment(),
+  getApiUrl:      (env) => testManager?.getApiUrl(env),
+  getFunctionsUrl:(env) => testManager?.getFunctionsUrl(env),
+  getWebsiteUrl:  (env) => testManager?.getWebsiteUrl(env),
+  // Mutator used by tests to flip config flags between assertions.
+  setConfig:      (path, value) => {
+    if (!testManager) return;
+    const parts = path.split('.');
+    let obj = testManager.config;
+    for (let i = 0; i < parts.length - 1; i++) {
+      obj[parts[i]] = obj[parts[i]] || {};
+      obj = obj[parts[i]];
+    }
+    obj[parts[parts.length - 1]] = value;
   },
 });

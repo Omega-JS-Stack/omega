@@ -26,6 +26,7 @@ const esbuild = require('esbuild');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const SECTIONS_DIR = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections');
+const ACCOUNT_LAYOUT = path.join(__dirname, '..', 'themes', 'base', '_layouts', 'frontend', 'pages', 'account', 'index.html');
 
 const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-account-previews-'));
 const BUNDLE = path.join(BUNDLE_DIR, 'sections.cjs');
@@ -101,9 +102,42 @@ function session(uid, platform, ip, ago) {
   return { uid, platform, ip, timestamp: at.toISOString(), timestampUNIX: Math.floor(at.getTime() / 1000) };
 }
 
-/** The pieces of a DOM element the panels use: text, HTML and a value. */
+/**
+ * The attribution an account that CAME IN through a referral carries —
+ * `attribution.affiliate`, written by routes/user/signup from the request and
+ * seeded onto the Referred persona (buildInboundReferral). Its timestamp is the
+ * same ISO string the referrer's own list entry carries.
+ */
+function inboundReferral(code, ago) {
+  const at = new Date(Date.now() - ago).toISOString();
+
+  return { code, timestamp: at, url: `https://example.com/?ref=${code}`, page: '/' };
+}
+
+/**
+ * The same block on an account NOBODY referred: the schema defaults
+ * (packages/account/src/schema.js), which every real doc carries — the key is
+ * always there, nulled, never missing.
+ */
+function noInboundReferral() {
+  return { code: null, timestamp: null, url: null, page: null };
+}
+
+/** The pieces of a DOM element the panels use: text, HTML, a value and classes. */
 function makeEl(id) {
-  return { id, textContent: '', innerHTML: '', value: '' };
+  const classes = new Set();
+
+  return {
+    id,
+    textContent: '',
+    innerHTML: '',
+    value: '',
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
+  };
 }
 
 // What `GET /user/sessions` answers for the case being run. Read at CALL time
@@ -127,9 +161,16 @@ async function renderPanels(render, { sessions } = {}) {
     'recent-referrals',
     'referrals-badge',
     'referrals-list',
+    'referred-by',
+    'referred-by-code',
+    'referred-by-time',
     'active-sessions-list',
   ];
   const elements = new Map(ids.map((id) => [id, makeEl(id)]));
+
+  // The inbound-referral line ships hidden in the markup, so the harness starts
+  // it the way the page hands it to the panel.
+  elements.get('referred-by').classList.add('d-none');
 
   globalThis.window = {
     location: { href: 'https://example.com/dashboard/account', origin: 'https://example.com', search: '', hash: '#referrals' },
@@ -225,6 +266,61 @@ test('#343: an account that referred nobody still renders its empty state', asyn
 
   assert.equal(elements.get('total-referrals').textContent, '0', 'nothing is counted');
   assert.match(elements.get('referrals-list').innerHTML, /No referrals yet/, 'and the panel says so');
+});
+
+test('#401: an account that arrived through a referral is told who referred it', async () => {
+  // The REFERRED persona: its own affiliate code is unused (nobody signed up
+  // through it), and the one state it carries is the inbound linkage.
+  const elements = await renderPanels(async (bundle) => {
+    bundle.referrals.loadData({
+      affiliate: { code: 'OWNCODE', referrals: [] },
+      attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
+    });
+  });
+
+  assert.equal(elements.get('referred-by-code').textContent, 'TESTREF', 'the code the signup came in on');
+  assert.equal(elements.get('referred-by-time').textContent, '2 days ago', 'dated off the same ISO stamp the referrer\'s half carries');
+  assert.ok(!elements.get('referred-by').classList.contains('d-none'), 'and the line is shown');
+});
+
+test('#401: the inbound line goes away again when the next account carries none', async () => {
+  // `omega.auth().listen` fires per auth state, so ONE page can render a second
+  // account: Referred, then anyone else. Hiding is therefore an ACTIVE branch,
+  // not the markup's default — without it the second account keeps reading
+  // "Referred by TESTREF", a referral it never had.
+  let shownForReferred = null;
+
+  const elements = await renderPanels(async (bundle) => {
+    bundle.referrals.loadData({
+      affiliate: { code: 'OWNCODE', referrals: [] },
+      attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
+    });
+
+    // Read off the document the panel just wrote to, before the second account
+    // lands on the same elements.
+    shownForReferred = !document.getElementById('referred-by').classList.contains('d-none');
+
+    // The next account, carrying the schema's nulled block rather than no block
+    // at all — the shape every doc a backend wrote actually has.
+    bundle.referrals.loadData({
+      affiliate: { code: 'FRESH', referrals: [] },
+      attribution: { affiliate: noInboundReferral() },
+    });
+  });
+
+  assert.ok(shownForReferred, 'the referred account shows the line');
+  assert.ok(elements.get('referred-by').classList.contains('d-none'), 'and it is hidden again for one nobody referred');
+});
+
+test('#401: the inbound line ships hidden in the markup', async () => {
+  // The premise the panel is built on: it UNHIDES. A layout that dropped the
+  // class would show an empty "Referred by" to every account, and no assertion
+  // over the panel alone could see it.
+  const layout = fs.readFileSync(ACCOUNT_LAYOUT, 'utf8');
+  const tag = layout.match(/<[a-z]+[^>]*\bid="referred-by"[^>]*>/);
+
+  assert.ok(tag, 'the account layout carries the inbound-referral element');
+  assert.match(tag[0], /class="[^"]*\bd-none\b/, 'and it ships hidden');
 });
 
 test('#343: the sessions panel renders the devices a persona is signed in on', async () => {

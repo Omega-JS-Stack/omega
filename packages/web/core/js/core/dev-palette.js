@@ -15,27 +15,13 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('dev-palette');
 
-// The personas worth switching between by hand — a CURATED subset of what the
-// backend emulator seeds on boot (packages/backend src/test/test-accounts.js),
-// not a mirror of it: the lifecycle states, then the four billing-journey
-// personas the flows lane drives. Localpart → label; all share TEST_PASSWORD.
-const PERSONAS = [
-  { localpart: '_test.admin', label: 'Admin' },
-  { localpart: '_test.basic', label: 'Basic' },
-  { localpart: '_test.premium-active', label: 'Premium' },
-  { localpart: '_test.premium-trialing', label: 'Trialing' },
-  { localpart: '_test.premium-expired', label: 'Expired' },
-  { localpart: '_test.premium-suspended', label: 'Suspended' },
-  { localpart: '_test.premium-cancelling', label: 'Cancelling' },
-  { localpart: '_test.refunded', label: 'Refunded' },
-  { localpart: '_test.journey-flows-upgrade', label: 'Journey: Upgrade' },
-  { localpart: '_test.journey-flows-cancel', label: 'Journey: Cancel' },
-  { localpart: '_test.journey-flows-failure', label: 'Journey: Failure' },
-  { localpart: '_test.journey-flows-trial', label: 'Journey: Trial' },
-];
-
 // Deterministic seeded password (emulator-only accounts — public by design)
 const TEST_PASSWORD = 'omega-test-password';
+
+// How long the palette waits before asking the emulator for the roster again
+// (#402). Gentle on purpose: an emulator boot takes seconds, and this is a
+// background poll on a surface nobody is staring at.
+const ROSTER_RETRY_MS = 2000;
 
 // Font Awesome Free "flask" (fontawesome.com/license/free — CC BY 4.0),
 // inlined because this module injects at runtime (no omega_icon at this layer)
@@ -104,6 +90,31 @@ const STYLES = `
   border-radius: 6px;
   cursor: pointer;
 }
+.omega-devbar__starting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.78125rem;
+  color: var(--omega-ink-muted, #6d6d6c);
+  background: var(--omega-surface-2, #ececeb);
+  border: 1px solid var(--omega-line, #e8e8e6);
+  border-radius: 8px;
+}
+.omega-devbar__starting[hidden] { display: none; }
+.omega-devbar__spinner {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--omega-line-strong, #d8d8d5);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: omega-devbar-spin 700ms linear infinite;
+}
+@keyframes omega-devbar-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .omega-devbar__spinner { animation: none; }
+}
 .omega-devbar__label {
   font: 650 0.625rem/1 var(--omega-font-ui, system-ui);
   letter-spacing: 0.09em;
@@ -117,6 +128,7 @@ const STYLES = `
   border: 1px solid var(--omega-line, #e8e8e6);
   border-radius: 8px;
   word-break: break-all;
+  white-space: pre-line;
 }
 .omega-devbar__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
 .omega-devbar__btn {
@@ -253,14 +265,47 @@ export default function devPalette() {
   close.setAttribute('aria-label', 'Close the dev palette');
   head.append(badge, title, close);
 
-  // Who am I
+  // The waiting state (#402). A dev page routinely loads before the emulator
+  // has finished booting, and one failed roster fetch used to leave a static
+  // error line that never came back. This sits at the top of the panel for as
+  // long as the roster is unreachable, and it MOVES: a surface that is waiting
+  // says so with an animation, never with bare text (docs/shared/theming.md).
+  // The spinner is drawn here rather than borrowed from Bootstrap because the
+  // palette injects every style it uses.
+  const starting = doc.createElement('div');
+  starting.className = 'omega-devbar__starting';
+  starting.hidden = true;
+  starting.setAttribute('role', 'status');
+  const spinner = doc.createElement('span');
+  spinner.className = 'omega-devbar__spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+  const startingNote = doc.createElement('span');
+  startingNote.textContent = 'Backend starting…';
+  starting.append(spinner, startingNote);
+
+  // Who am I. The line is COMPOSED, never written to directly: auth settles on
+  // its own schedule, and an identity delivered after something failed used to
+  // land on top of the explanation. With no emulator up, the roster fetch
+  // rejects immediately and auth answers "Signed out" a moment later, which is
+  // exactly the moment the panel has the most to say (#400).
   const who = doc.createElement('div');
   who.className = 'omega-devbar__who';
-  who.textContent = 'Checking auth…';
+  let identity = 'Checking auth…';
+  let failure = null;
+
+  const renderWho = () => {
+    who.textContent = failure
+      ? `${identity}\n✕ ${failure}. Is the backend emulator running? (npm run emulator)`
+      : identity;
+  };
+
+  renderWho();
 
   // Persona switcher — one dropdown rather than a grid of buttons, so the list
   // can grow without the panel turning into a wall of them. The placeholder is
-  // what you see when you are signed in as anybody but a persona.
+  // what you see when you are signed in as anybody but a persona. The list
+  // itself is the SEED's ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)):
+  // it arrives from the emulator below, and the palette keeps no copy of it.
   const domain = personaDomain();
   const personaSelect = doc.createElement('select');
   personaSelect.className = 'omega-devbar__select';
@@ -273,13 +318,6 @@ export default function devPalette() {
   placeholder.selected = true;
   placeholder.textContent = 'Switch account…';
   personaSelect.appendChild(placeholder);
-  PERSONAS.forEach((persona) => {
-    const option = doc.createElement('option');
-    option.value = persona.localpart;
-    option.textContent = persona.label;
-    option.title = `${persona.localpart}@${domain}`;
-    personaSelect.appendChild(option);
-  });
   personaSelect.addEventListener('change', async () => {
     const localpart = personaSelect.value;
     if (!localpart) {
@@ -292,9 +330,67 @@ export default function devPalette() {
       window.location.reload();
     } catch (error) {
       personaSelect.dataset.busy = 'false';
-      who.textContent = `✕ ${error.message}. Is the backend emulator running? (npm run emulator)`;
+      failure = error.message;
+      renderWho();
     }
   });
+
+  // The roster the dropdown offers, as the backend handed it over. Held onto
+  // because the dropdown reads as STATE too: the option that matches the
+  // signed-in persona is the selected one, and auth can settle before or after
+  // the roster lands.
+  let personas = [];
+
+  const syncSelection = () => {
+    const localpart = (omega.auth().getUser()?.email || '').split('@')[0];
+    personaSelect.value = personas.some((persona) => persona.localpart === localpart) ? localpart : '';
+  };
+
+  // The seed OWNS the list ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)):
+  // the backend labels its human-facing personas (`palette` in
+  // src/test/test-accounts.js) and hands them over here, so a persona seeded
+  // today is switchable today. There is deliberately no fallback list: a
+  // roster the emulator cannot answer leaves the placeholder standing alone
+  // and says why, exactly as every other control here reports it.
+  // `auth: false` because the roster is read BEFORE anybody is signed in: the
+  // route wants no token, and asking for one warns about the Authorization
+  // header it could not attach on every signed-out dev page load.
+  const loadPersonas = async () => {
+    try {
+      const roster = await omega.request('/omega/test/roster', { auth: false });
+      personas = roster?.personas || [];
+
+      personas.forEach((persona) => {
+        const option = doc.createElement('option');
+        option.value = persona.localpart;
+        option.textContent = persona.label;
+        option.title = `${persona.localpart}@${domain}`;
+        personaSelect.appendChild(option);
+      });
+
+      syncSelection();
+
+      // An attempt that lands after one that did not clears what the waiting
+      // state put on screen: the emulator is up, so both the indicator and the
+      // "is it running?" explanation are stale.
+      if (!starting.hidden) {
+        starting.hidden = true;
+        failure = null;
+        renderWho();
+      }
+    } catch (error) {
+      failure = error.message;
+      renderWho();
+      starting.hidden = false;
+
+      // Retry until the emulator answers — a dev page opened during `npm run
+      // emulator` should fill itself in rather than need a reload. Scheduled
+      // one attempt at a time (never an interval), so a slow answer can never
+      // stack fetches on top of each other. Through `window` because that is
+      // the runtime seam the harness owns.
+      window.setTimeout(loadPersonas, ROSTER_RETRY_MS);
+    }
+  };
 
   // Reset to seed — ONE control on the account you are signed in as (#215).
   // A journey mutates its persona; this puts it back to the shape the backend
@@ -322,7 +418,8 @@ export default function devPalette() {
       window.location.reload();
     } catch (error) {
       reset.dataset.busy = 'false';
-      who.textContent = `✕ ${error.message}. Is the backend emulator running? (npm run emulator)`;
+      failure = error.message;
+      renderWho();
     }
   });
 
@@ -446,6 +543,7 @@ export default function devPalette() {
 
   panel.append(
     head,
+    starting,
     builtIn('auth', 'Signed in as', who),
     builtIn('personas', 'Switch account', personaSelect),
     reset,
@@ -497,16 +595,20 @@ export default function devPalette() {
 
   doc.body.append(tab, panel);
 
+  // The panel is on screen before the roster is: the dropdown fills in when the
+  // emulator answers, which is the only place the list exists.
+  loadPersonas();
+
   // Live auth readout
   omega.auth().listen({}, () => {
     const user = omega.auth().getUser();
-    who.textContent = user?.email || 'Signed out';
+    identity = user?.email || 'Signed out';
+    renderWho();
     reset.hidden = !isPersona(user?.email);
 
     // The dropdown reads as state, not just a menu: it shows the persona you
     // are actually signed in as, and falls back to the placeholder for anybody
-    // else (a real account, signed out, a persona nobody curated into the list)
-    const localpart = (user?.email || '').split('@')[0];
-    personaSelect.value = PERSONAS.some((persona) => persona.localpart === localpart) ? localpart : '';
+    // else (a real account, signed out, a persona the seed does not offer)
+    syncSelection();
   });
 }

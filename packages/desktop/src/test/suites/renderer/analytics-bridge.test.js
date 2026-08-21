@@ -36,6 +36,55 @@ module.exports = {
       },
     },
     {
+      // #411: a renderer's own `omega.analytics().event(...)` used to no-op
+      // silently — the embedded client had no way to deliver. It now forwards
+      // over this bridge, and main's sender is the one that fires it.
+      name: 'a renderer-originated omega.analytics() event reaches main\'s sender exactly once, with main\'s identity',
+      run: async (ctx) => {
+        const read = () => window.desktop.ipc.invoke('desktop:__test:read-analytics-sends');
+        const baseline = (await read()).length;
+
+        window.__emTestClientAnalytics.event('vert_click', { vert_id: 'pin-411' });
+
+        // The forward is fire-and-forget IPC — poll until main records it.
+        let sends = [];
+        const t0 = Date.now();
+        while (sends.length <= baseline) {
+          // The client's own state says WHY when this fails: an unbridged one
+          // carries a client id of its own — the identity fork (#411).
+          if (Date.now() - t0 > 3000) throw new Error(`timed out waiting for main to record the forwarded event — client state ${JSON.stringify(window.__emTestClientAnalytics.state())}`);
+          await new Promise((r) => setTimeout(r, 25));
+          sends = await read();
+        }
+
+        const fired = sends.slice(baseline).filter((s) => s.name === 'vert_click');
+        ctx.expect(fired.length).toBe(1);
+        ctx.expect(fired[0].provider).toBe('ga4');
+        ctx.expect(fired[0].payload.vert_id).toBe('pin-411');
+
+        // Main's identity, never a renderer-minted one — asserted on the WIRE
+        // payload: the `client_id` GA would receive is the one main reports
+        // over its own status channel, and the session id is the one main
+        // minted for this launch, with real engagement time.
+        const status = await window.desktop.analytics.getStatus();
+        const snapshot = await window.desktop.context.get();
+        ctx.expect(fired[0].body.client_id).toBe(status.clientId);
+        ctx.expect(fired[0].body.events[0].name).toBe('vert_click');
+        ctx.expect(fired[0].body.events[0].params.session_id).toBe(snapshot.session.id);
+        ctx.expect(fired[0].body.events[0].params.engagement_time_msec > 0).toBe(true);
+      },
+    },
+    {
+      name: 'the bridged renderer holds no sender of its own — no secret, no second device id',
+      run: (ctx) => {
+        const state = window.__emTestClientAnalytics.state();
+        ctx.expect(state.initialized).toBe(true);
+        ctx.expect(state.bridged).toBe(true);
+        ctx.expect(state.secret).toBe(null);
+        ctx.expect(state.clientId).toBe(null);
+      },
+    },
+    {
       name: 'window.desktop.context.get returns the context snapshot',
       run: async (ctx) => {
         const snap = await window.desktop.context.get();

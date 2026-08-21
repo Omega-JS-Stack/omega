@@ -29,6 +29,23 @@ function makeFixture(name, { packageJSON, files }) {
   return root;
 }
 
+// Every file under dir as relative path → contents, for identity assertions.
+function snapshot(dir) {
+  const files = {};
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const abs = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      files[path.relative(dir, abs)] = fs.readFileSync(abs, 'utf8');
+    }
+  };
+  walk(dir);
+  return files;
+}
+
 const HOST_DEPS = { chalk: '*', 'node-powertools': '*' };
 
 test('copies devkit into dist/vendor, rewrites requires, and the result loads + runs', (t) => {
@@ -200,7 +217,13 @@ test('the comment strip is string-literal aware: // and /* inside strings hide n
   assert.equal(loaded.closer, 'closer');
 });
 
-test('is idempotent: running twice leaves dist identical', (t) => {
+test('is idempotent: running twice leaves dist identical, dist/vendor included (#393)', (t) => {
+  // The real case: the after-hook run standalone (node -e
+  // "require('@omega.js/devkit/vendor')()") against an ALREADY-prepared dist.
+  // The scan finds zero raw @omega.js specifiers — they were rewritten by the
+  // first run — and the tool used to remove dist/vendor wholesale, leaving
+  // every rewritten dist file importing from a directory that no longer
+  // exists (@omega.js/client, 2026-08-20).
   const root = makeFixture('vendor-idem', {
     packageJSON: { name: 'fixture-idem', version: '1.0.0', dependencies: HOST_DEPS, preparePackage: { output: './dist' } },
     files: { 'dist/a.js': `module.exports = require('@omega.js/devkit/logger');` },
@@ -208,10 +231,39 @@ test('is idempotent: running twice leaves dist identical', (t) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   vendorDevkit({ cwd: root });
-  const first = fs.readFileSync(path.join(root, 'dist', 'a.js'), 'utf8');
+  const first = snapshot(path.join(root, 'dist'));
   const second = vendorDevkit({ cwd: root });
-  assert.equal(fs.readFileSync(path.join(root, 'dist', 'a.js'), 'utf8'), first);
+
+  assert.deepEqual(snapshot(path.join(root, 'dist')), first, 'the whole dist, vendored modules included, survives byte-identical');
   assert.equal(second.rewritten, 0);
+  // And it still loads: the rewritten require resolves to a vendored file
+  assert.equal(typeof require(path.join(root, 'dist', 'a.js')), 'function');
+});
+
+test('a MIXED dist (one watch-mode raw specifier beside rewritten files) keeps the already-vendored modules (#393)', (t) => {
+  // Watch mode's single-file copies skip hooks, so a freshly-saved file lands in
+  // an already-rewritten dist carrying a RAW @omega.js specifier. The standalone
+  // hook then sees one seed — enough to look like work to do — and the full
+  // vendor reset used to wipe the modules every ALREADY-rewritten file imports.
+  const root = makeFixture('vendor-mixed', {
+    packageJSON: { name: 'fixture-mixed', version: '1.0.0', dependencies: HOST_DEPS, preparePackage: { output: './dist' } },
+    files: { 'dist/a.js': `module.exports = require('@omega.js/devkit/logger');` },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  vendorDevkit({ cwd: root });
+
+  // The watch-mode copy: raw specifier, no hook run for it
+  fs.writeFileSync(path.join(root, 'dist', 'b.js'), `module.exports = require('@omega.js/devkit/safe-install');`);
+  vendorDevkit({ cwd: root });
+
+  // Both the pre-existing vendored module and the new seed survive
+  assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')), 'the already-vendored logger was wiped');
+  assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'safe-install.js')), 'the new seed was not vendored');
+
+  // And both dist files load: neither require dangles
+  assert.equal(typeof require(path.join(root, 'dist', 'a.js')), 'function');
+  assert.equal(typeof require(path.join(root, 'dist', 'b.js')).safeInstall, 'function');
 });
 
 test('throws when the host is missing a runtime dep the vendored modules need', (t) => {

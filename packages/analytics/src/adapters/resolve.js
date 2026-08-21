@@ -76,6 +76,13 @@ function createAdapter({ provider, consentCategory, attach }) {
       userData: {},
     };
 
+    // The one mapping shape a transport executes differently: a provider's own
+    // pixel method (TikTok's `ttq.page()`), carried only when the catalog names
+    // one so nothing has to test for a key that is normally absent.
+    if (mapping.method) {
+      descriptor.method = mapping.method;
+    }
+
     if (attach) {
       attach(descriptor, context.attribution);
     }

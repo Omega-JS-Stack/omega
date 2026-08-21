@@ -6,7 +6,7 @@ This document covers the full payment system: pipeline architecture, subscriptio
 
 The payment system follows a linear pipeline: **Intent → Webhook → On-Write → Transition**.
 
-1. **Intent** (`POST /payments/intent`): Client requests a payment session. @omega.js/backend validates the product, generates an order ID (`XXXX-XXXX-XXXX`), and delegates to the processor module (e.g., Stripe creates a Checkout Session). Saves to `payments-intents/{orderId}`.
+1. **Intent** (`POST /payments/intent`): Client requests a payment session. @omega.js/backend verifies the purchaser is one of this project's users (an auth user AND a user doc — [below](#a-payment-never-creates-a-user-doc)), validates the product, generates an order ID (`XXXX-XXXX-XXXX`), and delegates to the processor module (e.g., Stripe creates a Checkout Session). Saves to `payments-intents/{orderId}`.
 
 2. **Webhook** (`POST /payments/webhook?processor=X&key=Y`): Processor sends event data. @omega.js/backend parses and categorizes the event (`subscription` or `one-time`), extracts the UID, and saves to `payments-webhooks/{eventId}` with `status: 'pending'`.
 
@@ -33,6 +33,18 @@ A refund can only UPDATE a purchase — it can never DEFINE one. When the refund
 So the pipeline **refuses**, and writes nothing to `payments-orders` or `payments-intents`: no transition is detected, no analytics fire, and the webhook doc completes with `transition: null` — the trail agrees with the record. The refusal is stamped on the event's OWN doc, alongside that transition: `payments-webhooks/{eventId}.refusal` = `{ reason: 'refund-without-order', captureId }`, with a loud `REFUND WITHOUT ORDER` error line carrying the money from `getRefundDetails()`. The doc already holds the refund payload as delivered (`raw`), the owner and the order the refund named; what it adds is the id of the capture the refund reversed — read off the payload's HATEOAS `up` link, which PayPal points at the capture and other processors omit (`null`, never a guess). That capture id is the pointer a human reconciles the missing purchase from ([#335](https://github.com/Omega-JS-Stack/omega/issues/335)).
 
 The webhook is **completed**, not failed: the event reached a terminal decision, so it must not burn the retry ladder or dead-letter. The event doc is keyed by the processor's event id, so a redelivery re-decides the same document rather than piling up duplicates — and `refusal` is written on every completion (`null` when nothing was refused), so a reprocess that now finds its order clears the flag instead of leaving a stale one behind.
+
+### A payment never creates a user doc
+
+A user doc is born at **signup**, behind a real Firebase auth user. A payment event can update one and can never mint one, at either seam ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)):
+
+- **The webhook pipeline** looks the uid up in Auth when `users/{uid}` does not exist. With no auth user it refuses: nothing is written — no user doc, no order, no intent — and the event completes with `refusal` = `{ reason: 'user-without-auth' }` plus a loud `USER WITHOUT AUTH` warning naming the uid and the event. Completed, not failed, so the processor stops redelivering an event nothing here will ever act on. A uid whose doc already exists takes no lookup at all: updates and deletes behave exactly as before.
+  - The refusal also **reports**, at `warning` level, through the backend's one capture handle (`Manager.libraries.sentry`, null and therefore a no-op when no DSN is configured — [monitoring.md](../../../docs/shared/monitoring.md)). It carries the uid, the event id and type, the processor and the reason; no email is assembled, so there is nothing for the PII scrub to take out. The doc stamp is the record a human reconciles from; this is the alarm that tells them to look, since the whole problem is that nobody knows to (Ian, 2026-08-20).
+- **The checkout route** verifies BOTH halves before it starts — missing either answers `403` with a warn line, so there is no processor session, no intent doc, and no half-written account.
+
+The seam is real, not theoretical: a QA checkout run locally against the emulator with real test-mode keys has its webhooks delivered to the **deployed** backend (the emulator has no webhook path), and `customer.subscription.created` for an emulator-only uid used to mint a LIVE `users/{uid}` holding nothing but a subscription block. Residue that predates the guards is cleaned up by the users migration, which flags exactly this shape as an orphan.
+
+The opposite direction is healed rather than refused: a real account whose user doc went missing gets it recreated when it next authenticates ([common-operations.md](common-operations.md#a-missing-user-doc-heals-here)), so a genuine customer never arrives at the checkout guard above without a doc.
 
 ## 3-Layer Architecture
 
@@ -191,7 +203,15 @@ The `transitions/index.js` module compares the **before** state (current `users/
 Two transitions are deliberately log-only:
 
 - `checkout-declined` — the user is standing at the checkout watching the decline. No email, and no analytics either: no money moved.
-- `cancellation-removed` — the `order` template has no copy for a withdrawn cancellation, and an unknown event falls back to the `confirmation` variant, which would show a subscriber a "total paid today" they were never charged. Sending the wrong email is worse than sending none, so it stays a record until the template carries the copy.
+- `cancellation-removed` — the `order` template has no copy for a withdrawn cancellation, and an unknown event falls back to the `confirmation` variant, which would show a subscriber a "total paid today" they were never charged. Sending the wrong email is worse than sending none, so the HANDLER stays a record until the template carries the copy. Analytics is a separate concern and does fire: a withdrawn cancellation is a retention win ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+
+**`subscription-cancelled` inside the trial term is a lapse, not churn** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). The transition and its email are unchanged (the subscription did cancel), but analytics books `trial_lapsed`, because a customer who never paid cannot be lost revenue. It reaches that branch on every processor: Chargebee ends a trial with no card on file by cancelling it, and a Stripe or PayPal subscriber may simply quit mid-trial. The check reads the unified term the way the `payment-failed` lapse does, never a provider name. What stops the sweep telling the same story again is that a cancelled subscription drops out of its `status == active` candidate query; the subscription-keyed event id both paths derive only collapses a race on Meta and TikTok, since GA4 deduplicates nothing across sources.
+
+**A trial that already lapsed is not booked twice.** The processor suspends the subscription at the failed charge, which is where the lapse is reported, then exhausts dunning and cancels what it was holding. That second webhook books **nothing**: its prior state is a suspension whose term never moved past the trial's end, so the outcome it carries was told already, and booking it added paid-churn revenue plus a Meta/TikTok audience signal behind a customer who never paid. A subscriber who converted and lapsed on dunning months later is untouched by the rule, because their term did move.
+
+**The cancelled payload's own evidence overrules the record on file.** The prior state is a stored delivery like any other, so a degraded one carries no term and reads as a long-past trial; a cancellation whose payload names a term reaching past the trial's end is a subscriber who paid, whatever the record lost. Neither the lapse nor the silence above applies then. Both rules read `before` from the user doc, so a cancellation with no prior subscription at all books plain churn.
+
+Which leaves `subscription_cancelled` for the cancellations a trial does not explain: a subscriber who left their trial behind, and one who never had a trial at all. It is no longer where a never-paid trialist lands.
 
 `subscription-winback` sends the customer the same order confirmation a first subscription does — same template, same computed totals — by calling `new-subscription.js` rather than keeping a second copy of it. Analytics fires a **purchase** (`reason: 'winback-purchase'`, non-recurring, at what the customer actually paid) instead of the renewal the payment event would otherwise have been read as.
 
@@ -244,6 +264,12 @@ Guards: authenticated, `confirmed: true`, an active or suspended paid subscripti
 **A trial is exempt from the 24-hour guard.** That guard exists to stop a cancellation racing a PAID checkout that is still settling, and a trial has no payment to settle — blocking it told the most common trial behavior there is, cancelling the same day you started, that the subscription "is still being set up" ([#267](https://github.com/Omega-JS-Stack/omega/issues/267)).
 
 **"Still inside the trial" has ONE definition**, `routes/payments/cancel/_is-trialing.js` — the trial is claimed, the subscription is `active`, and `expires` still equals `trial.expires` (conversion moves `expires` out to the end of the first paid period while `trial.expires` stays put, so the two stop matching the moment real money is involved; an expiry missing on both sides reads false, because a guard must never be waived by absent data). The route and all four cancel processors consult that one function, which is what keeps the guard waiver and the cancel mode from disagreeing — they were three per-processor copies of the same comparison before.
+
+**Analytics consults it too, with one documented widening** (`events/firestore/payments-webhooks/analytics.js` `isInsideTrial()`, which the trial-lapse sweep also reads). Chargebee's in-trial payload names no `current_term_end` at all, so `expires` folds to the epoch and the timestamp match cannot see a Chargebee trial — every Chargebee conversion read as a renewal and every Chargebee lapse reported nothing ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)). An epoch expiry is the ABSENCE of a term, not a term that ended in 1970, so for REPORTING a claimed trial with a real trial expiry and no term at all still counts. That widening stays out of `_is-trialing.js` deliberately: the shared predicate also waives the 24-hour guard, and a guard must never be waived by missing data. Reporting carries no such stake.
+
+**The widening is bounded by the state the payload arrived FROM** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). A degraded delivery carries no term either, because the [stale fallback](#pipeline) hands over the webhook's own body when the processor API is unreachable ([#222](https://github.com/Omega-JS-Stack/omega/issues/222)), and an active PAID subscription in that body is shaped exactly like a Chargebee trial: same claimed trial, same epoch expiry. Nothing inside the payload separates them, so the prior state does. A subscription already paid through a real term did not lose that term by trialing, so a term missing there is a hole in the delivery and the widening does not apply. Unbounded, a renewal on that path matched no branch at all and booked nothing: real revenue, silently unreported. The bound needs one healthy delivery behind it, which is its limit: two degraded deliveries in a row leave no term on either side, so that renewal still books nothing. It fails toward silence, never toward a fabricated number.
+
+The sweep passes no prior state and keeps the unbounded widening. Two other things bound it there: its candidate query only reaches trials whose `trial.expires` sits between 30 days and 24 hours ago, and `trial.outcome` is stamped once and never revisited, so a degraded record can be misread at most once and only inside that window.
 
 How each processor performs the immediate half:
 
@@ -566,8 +592,13 @@ So the sweep **asks the processor**. It never infers a lapse from dates:
 3. **Fetch the live subscription** — with an empty fallback, deliberately: a stale webhook payload is exactly what this sweep must not act on, so a fetch that cannot answer waits for the next run instead of fabricating a cancellation. Only "no such subscription" counts as gone.
 4. **Decide.** Processor says active → the trial `converted`: stamp `trial.outcome` and touch nothing else. Gone or cancelled → the trial `lapsed`: the same end state the cancel route writes (status `cancelled`, back on `basic`, nothing pending) plus the stamp. Anything else (a suspended subscription still in dunning) → neither outcome is true yet, nothing is stamped, and the next run asks again.
 5. **Re-read before writing**, so a webhook that landed since the query is never clobbered.
+6. **Report the outcome** — `trial_converted` or `trial_lapsed`, through the same `deliverConversion` path the payment webhook uses.
 
 No email is sent from here — the sweep is state correction.
+
+**Why the sweep reports at all.** For PayPal this is the ONLY place a trial's outcome is ever known: PayPal fires no trial-end event, so the webhook pipeline is never told and the trial funnel had no signal whatsoever ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+
+**And why it cannot double-count.** The guard is the term: a conversion the payment webhook already saw moved `expires` out past the trial's end, and a lapse it saw left the subscription suspended or cancelled, which this sweep's `status == active` query never selects. So a candidate still inside its trial is exactly one no webhook resolved, and it is the only one the sweep reports — the outcome is still STAMPED either way, because that is state correction. Both paths key the event id on the subscription (`trial_converted.<resourceId>`), which collapses a genuine race on the two platforms that deduplicate; the term guard is what keeps GA4 honest, since GA4 has no cross-source deduplication.
 
 The candidate query needs a composite index on `users`, registered in `src/cli/commands/setup-tests/helpers/required-indexes.js` (the SSOT for required indexes).
 

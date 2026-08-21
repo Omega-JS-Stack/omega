@@ -99,6 +99,33 @@ module.exports = {
       },
     },
     {
+      // #396: a missing deviceId is a broken boot order, never a runtime
+      // condition — an id minted here would persist nowhere and make every
+      // launch a new GA client, so initialize raises instead of limping.
+      name: 'no context.session.deviceId: initialize raises (the boot-order invariant)',
+      run: async (ctx) => {
+        const savedDeviceId = ctx.manager.context.session.deviceId;
+        const savedSecret   = process.env.GOOGLE_ANALYTICS_SECRET;
+        const savedConfig   = ctx.manager.config.analytics;
+
+        ctx.manager.analytics.shutdown();
+        ctx.manager.context.session.deviceId = null;
+        process.env.GOOGLE_ANALYTICS_SECRET  = 'fake-secret';
+        ctx.manager.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
+
+        try {
+          await ctx.expect(() => ctx.manager.analytics.initialize(ctx.manager)).toThrow(/boot sequence/);
+        } finally {
+          ctx.manager.context.session.deviceId = savedDeviceId;
+          ctx.manager.config.analytics = savedConfig;
+          if (savedSecret == null) delete process.env.GOOGLE_ANALYTICS_SECRET;
+          else process.env.GOOGLE_ANALYTICS_SECRET = savedSecret;
+          ctx.manager.analytics.shutdown();
+          ctx.manager.analytics.initialize(ctx.manager);
+        }
+      },
+    },
+    {
       name: 'cross-platform identity: same firebase uid → same uuidv5 across surfaces',
       run: async (ctx) => {
         // The whole point: @omega.js/client and @omega.js/backend seeing the same firebase uid

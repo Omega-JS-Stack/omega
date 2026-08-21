@@ -39,6 +39,7 @@ module.exports = async (options) => {
       strict: options.strict,
       verbose: options.verbose,
       migration: options.migration,
+      execute: options.execute,
       limit: options.limit,
       ids: options.ids,
       resetAssets: options.resetAssets,

@@ -3,6 +3,7 @@ const powertools = require('node-powertools');
 const transitions = require('./transitions/index.js');
 const { trackPayment } = require('./analytics.js');
 const loadProcessor = require('../../../libraries/load-processor.js');
+const { hasAuthUser } = require('../../../libraries/auth-user.js');
 const User = require('../../../helpers/user.js');
 
 /**
@@ -328,6 +329,23 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
 
   ctx.log(`User doc for ${uid}: exists=${userDoc.exists}, email=${userData?.auth?.email || 'null'}, name=${userData?.personal?.name?.first || 'null'}, subscription=${userData?.subscription?.product?.id || 'null'}`);
 
+  // A user doc is born at SIGNUP, never at a payment event. A uid with no auth
+  // user in this project is not this project's customer at all: a QA checkout run
+  // against the emulator with real test-mode keys delivers its webhooks to the
+  // DEPLOYED backend (the emulator has no webhook path), and the event minted a
+  // LIVE users/{uid} holding nothing but a subscription block
+  // ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)).
+  //
+  // So an absent user doc has to prove the uid before anything is written under
+  // it. A doc that already exists takes no auth lookup and no new behavior — an
+  // update or a delete creates nothing, so it is left exactly as it was.
+  if (!userDoc.exists && !(await hasAuthUser(admin, uid))) {
+    return {
+      transition: null,
+      refusal: refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderId }),
+    };
+  }
+
   // Auto-fill user name from payment processor if not already set
   if (!userData?.personal?.name?.first) {
     const customerName = extractCustomerName(resource, resourceType);
@@ -439,9 +457,12 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   }
 
   // Track payment analytics (non-blocking)
-  // Fires independently of transitions — renewals have no transition but still need tracking
+  // Fires independently of transitions — renewals have no transition but still need tracking.
+  // `before` rides along for the same reason the transition detector reads it: a plan change
+  // needs the plan it came from, and a trial's outcome is only legible against the prior term
+  // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
   if (shouldRunHandlers) {
-    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, uid, processor, ctx });
+    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, processor, ctx });
   }
 
   // A persisted discount belongs to the subscription it was applied to, and to
@@ -627,6 +648,62 @@ function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, event
   return {
     reason: 'refund-without-order',
     captureId: captureId,
+  };
+}
+
+/**
+ * Refuse to create a user doc for a uid this project has no auth user for
+ *
+ * The event is acknowledged — the route answered 2xx when it stored it, and the
+ * doc is completed rather than failed, so the processor stops redelivering an
+ * event nothing here will ever act on. What a human needs to see it is the
+ * warning plus the stamp on the event's own doc, which already carries the
+ * payload as delivered ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)).
+ *
+ * @param {object} options
+ * @param {object} options.ctx - Assistant instance
+ * @param {string} options.eventId - The webhook doc id (the processor's event id)
+ * @param {string} options.eventType - The processor's event name
+ * @param {string} options.processor - The processor that sent it
+ * @param {string} options.uid - The owner the event resolved to
+ * @param {string|null} options.orderId - The order the event named, if any
+ * @returns {{ reason: string }} The refusal stamp for the event doc
+ */
+function refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderId }) {
+  ctx.warn(`USER WITHOUT AUTH: ${eventType} (${processor}) resolved to uid=${uid}, which has no auth user in this project and no user doc — refusing to create one from a payment event (event=${eventId}, order=${orderId || 'null'}). Stamped on payments-webhooks/${eventId} as refusal.reason=user-without-auth: the checkout behind this event belongs to another project, typically a local QA run against the emulator with real test-mode keys`);
+
+  // The stamp is the record; this is the alarm. A log line in Cloud Logging is
+  // only ever read by someone already looking, and the whole point of the guard
+  // is that nobody knows to look — money moved somewhere for a uid this project
+  // does not have (Ian 2026-08-20).
+  //
+  // `libraries.sentry` is the backend's ONE capture handle (helpers/context/
+  // respond.js reads the same one) and is null whenever no DSN is configured, so
+  // the optional chain IS the no-op. WARNING, not an exception: nothing here
+  // failed — the pipeline made a decision, correctly. Only the uid rides, the
+  // join key back to the account; no email is assembled at all, so there is
+  // nothing for the PII scrub to take out ([docs/shared/monitoring.md]).
+  ctx.Manager.libraries.sentry?.captureMessage?.(`Payment webhook refused: user without auth (uid=${uid})`, {
+    level: 'warning',
+    tags: {
+      refusal: 'user-without-auth',
+      processor: processor,
+    },
+    user: {
+      id: uid,
+    },
+    extra: {
+      reason: 'user-without-auth',
+      uid: uid,
+      eventId: eventId,
+      eventType: eventType,
+      processor: processor,
+      orderId: orderId || null,
+    },
+  });
+
+  return {
+    reason: 'user-without-auth',
   };
 }
 

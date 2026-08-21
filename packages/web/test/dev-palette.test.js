@@ -27,6 +27,25 @@ const PALETTE_DIR = path.join(CORE_DIR, 'js', 'core');
 const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-palette-'));
 const BUNDLE = path.join(BUNDLE_DIR, 'dev-palette.cjs');
 
+// What the emulator answers `/omega/test/roster` with (#400): the personas the
+// SEED labels as human-facing, in the seeder's own order. A fixture, not a copy
+// of the seed: the palette holds no list of its own any more, so what these
+// tests pin is that it renders whatever the backend hands over. The real roster
+// is pinned where it is owned (packages/backend test/routes/test/roster.test.js).
+const ROSTER = [
+  { localpart: '_test.premium-active', label: 'Premium' },
+  { localpart: '_test.premium-trialing', label: 'Trialing' },
+  { localpart: '_test.premium-expired', label: 'Expired' },
+  { localpart: '_test.referrer', label: 'Referrer' },
+  { localpart: '_test.referred', label: 'Referred' },
+  { localpart: '_test.journey-flows-upgrade', label: 'Journey: Upgrade' },
+  { localpart: '_test.journey-flows-cancel', label: 'Journey: Cancel' },
+  { localpart: '_test.journey-flows-failure', label: 'Journey: Failure' },
+  { localpart: '_test.journey-flows-trial', label: 'Journey: Trial' },
+];
+
+const ROSTER_URL = '/omega/test/roster';
+
 let building = null;
 
 // One entry exposing the palette AND the registry it reads, so a test
@@ -115,7 +134,7 @@ function makeDocument() {
 }
 
 /** The minimum client the palette reaches for, plus the captured calls. */
-function makeClient(storage) {
+function makeClient(storage, roster, signedInAtBoot) {
   const signIns = [];
   const requests = [];
   const listeners = [];
@@ -133,10 +152,22 @@ function makeClient(storage) {
     signIns,
     requests,
     listeners,
-    user: null,
+    // The roster answer, MUTABLE: the retry loop (#402) asks again, and a test
+    // that swaps this between attempts is an emulator finishing its boot.
+    roster,
+    user: signedInAtBoot ? { email: signedInAtBoot } : null,
     config: { brand: { url: 'https://playground.omegajs.dev' } },
     auth: () => ({
-      listen: (options, handler) => listeners.push(handler),
+      // The real listener hands over the settled auth state the moment it is
+      // registered. `signedInAtBoot` is that case, and it lands while the
+      // roster fetch is still in flight.
+      listen: (_options, handler) => {
+        listeners.push(handler);
+
+        if (signedInAtBoot) {
+          handler();
+        }
+      },
       getUser: () => client.user,
       signInWithEmailAndPassword: async (email, password) => { signIns.push({ email, password }); },
     }),
@@ -150,19 +181,35 @@ function makeClient(storage) {
       remove: (keyPath) => { _set(storage, keyPath, undefined); persist(); },
       clear: () => { Object.keys(storage).forEach((key) => delete storage[key]); },
     }),
-    request: async (url, options) => { requests.push({ url, options }); return {}; },
+    // The roster route answers the persona list the palette builds its dropdown
+    // from; an emulator that is not up rejects, which is what `roster` carries
+    // when it is an Error.
+    request: async (url, options) => {
+      requests.push({ url, options });
+
+      if (url === ROSTER_URL) {
+        if (client.roster instanceof Error) {
+          throw client.roster;
+        }
+
+        return { personas: client.roster };
+      }
+
+      return {};
+    },
   };
 
   return client;
 }
 
 /** Boot the real palette against one stub client + document; hand back the seams. */
-async function boot(storage = {}, { pathname = '/' } = {}) {
+async function boot(storage = {}, { pathname = '/', roster = ROSTER, signedInAtBoot = null } = {}) {
   await bundleOnce();
 
   const doc = makeDocument();
-  const client = makeClient(storage);
+  const client = makeClient(storage, roster, signedInAtBoot);
   const reloads = [];
+  const timers = [];
 
   globalThis.document = doc;
   globalThis.window = {
@@ -172,6 +219,10 @@ async function boot(storage = {}, { pathname = '/' } = {}) {
       search: '',
       reload: () => reloads.push(true),
     },
+    // The retry seam (#402): the palette schedules its next roster attempt
+    // through window.setTimeout, which is the stub the harness already owns —
+    // so a test decides when the retry runs instead of waiting out a real one.
+    setTimeout: (handler, delay) => timers.push({ handler, delay }),
   };
   globalThis.__omegaClient = client;
 
@@ -182,16 +233,34 @@ async function boot(storage = {}, { pathname = '/' } = {}) {
   const bundle = require(BUNDLE);
   bundle.default();
 
+  // The palette builds the panel and THEN fetches its roster (#400), so every
+  // test looks at the dropdown the emulator answered with rather than at the
+  // half-second where it holds nothing but the placeholder.
+  await new Promise((resolve) => setImmediate(resolve));
+
   // The panel grows when a registered section renders, so every lookup walks
   // the tree at call time rather than closing over a boot-time snapshot.
   const all = () => flatten(doc.body);
   const buttons = () => all().filter((element) => element.tagName === 'button');
   const tab = doc.body.children.find((element) => element.className === 'omega-devbar-tab');
+  const panel = doc.body.children.find((element) => element.className === 'omega-devbar');
 
   return {
     client,
     reloads,
     storage,
+    panel,
+    // Every retry the palette has scheduled and not yet run.
+    timers,
+    // Run the scheduled retry and let its fetch settle, exactly as the boot
+    // above lets the first attempt settle.
+    retry: async () => {
+      timers.shift().handler();
+      await new Promise((resolve) => setImmediate(resolve));
+    },
+    // The "backend starting" indicator (#402) — present from boot, shown only
+    // while the roster is unreachable.
+    starting: () => all().find((element) => element.className === 'omega-devbar__starting'),
     // Registration happens AFTER boot on purpose: a page module loads on its
     // own schedule, and the palette must still pick it up.
     register: bundle.registerDevSection,
@@ -205,6 +274,9 @@ async function boot(storage = {}, { pathname = '/' } = {}) {
     checkbox: (id) => all().find((candidate) => candidate.tagName === 'input' && candidate.id === id),
     // Every section heading the panel shows, in order.
     labels: () => all().filter((element) => element.className === 'omega-devbar__label').map((element) => element.textContent),
+    // The "Signed in as" line: the panel's one readout, and where a failed
+    // call reports itself.
+    who: () => all().find((element) => element.className === 'omega-devbar__who'),
     // Opening the panel is the moment a one-shot control re-reads its flag and
     // a registered section gets rendered.
     open: () => tab.click(),
@@ -243,6 +315,9 @@ test('dev palette: the four billing-journey personas are offered beside the life
   // The lifecycle personas the journeys joined, not replaced.
   assert.ok(option('Premium'), 'the existing personas should still be offered');
 
+  // The referral pair (#363) is offered because the SEED labels it; that is
+  // pinned where it is owned (packages/backend test/routes/test/roster.test.js).
+
   // The steady-state mid-trial persona (#301) sits among the lifecycle states,
   // between the plan it is trialing and the state a lapsed one lands in.
   const trialing = option('Trialing');
@@ -261,7 +336,155 @@ test('dev palette: the four billing-journey personas are offered beside the life
   const [first] = options;
   assert.strictEqual(first.value, '', 'the first option is a placeholder');
   assert.strictEqual(first.disabled, true, 'and it is not selectable');
-  assert.strictEqual(options.length, 13, 'one placeholder plus the twelve personas');
+  assert.strictEqual(options.length, ROSTER.length + 1, 'one placeholder plus every persona the roster named');
+});
+
+test('#400: the dropdown is the seed\'s roster, fetched, not a list the palette keeps', async () => {
+  const { client, personas } = await boot();
+
+  assert.deepStrictEqual(
+    client.requests,
+    [{ url: ROSTER_URL, options: { auth: false } }],
+    'the palette asks the backend for the roster on build, unauthenticated, because nobody is signed in yet',
+  );
+
+  const options = personas().children.slice(1);
+
+  assert.deepStrictEqual(
+    options.map((option) => [option.value, option.textContent]),
+    ROSTER.map((persona) => [persona.localpart, persona.label]),
+    'every option is a persona the roster named, in the order it named them',
+  );
+  assert.deepStrictEqual(
+    options.map((option) => option.title),
+    ROSTER.map((persona) => `${persona.localpart}@playground.omegajs.dev`),
+    'each one signs in as its seeded email on the brand domain',
+  );
+
+  // The palette holds no copy of the list: a roster of one is a dropdown of one.
+  const { personas: shortlist } = await boot({}, { roster: [{ localpart: '_test.admin', label: 'Admin' }] });
+
+  assert.deepStrictEqual(
+    shortlist().children.map((option) => option.textContent),
+    ['Switch account…', 'Admin'],
+    'the dropdown offers exactly what the backend handed over',
+  );
+});
+
+test('#400: a roster the emulator cannot answer leaves the placeholder alone and says why', async () => {
+  const { personas, signedInAs, who } = await boot({}, { roster: new Error('Failed to fetch') });
+
+  assert.deepStrictEqual(
+    personas().children.map((option) => option.value),
+    [''],
+    'no fallback list: the placeholder stands on its own',
+  );
+  assert.strictEqual(
+    who().textContent,
+    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'and the who line carries the same failure every other control reports',
+  );
+
+  // Auth settles on its own schedule, and with no emulator up the fetch
+  // rejects long before it does. The explanation has to SURVIVE that delivery:
+  // it used to be overwritten by the identity line, so what a developer
+  // actually saw was "Signed out" beside an empty dropdown and no reason.
+  signedInAs(null);
+
+  assert.strictEqual(
+    who().textContent,
+    'Signed out\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'the auth readout lands beside the failure, never on top of it',
+  );
+});
+
+test('#400: signing in before the roster lands still preselects the persona', async () => {
+  // The other order: auth settles while the fetch is in flight, so the options
+  // the selection has to match do not exist yet. Filling the dropdown is what
+  // resolves it, which is why appending the options syncs the selection again.
+  const { personas, who } = await boot({}, { signedInAtBoot: '_test.referrer@playground.omegajs.dev' });
+
+  assert.strictEqual(personas().value, '_test.referrer', 'the roster landing preselects the persona already signed in');
+  assert.strictEqual(who().textContent, '_test.referrer@playground.omegajs.dev', 'and the readout is just the identity');
+});
+
+test('#402: an unreachable backend shows a starting indicator and schedules another attempt', async () => {
+  const { panel, retry, starting, timers, who } = await boot({}, { roster: new Error('Failed to fetch') });
+
+  const indicator = starting();
+  assert.ok(indicator, 'the panel carries a starting indicator');
+  assert.strictEqual(indicator.hidden, false, 'and it is on screen while the roster is unreachable');
+  assert.strictEqual(panel.children.indexOf(indicator), 1, 'at the top of the panel, right under the DEV header row');
+  assert.match(
+    indicator.children.map((child) => child.textContent).join(''),
+    /starting/i,
+    'saying the backend is still coming up',
+  );
+  assert.ok(
+    indicator.children.some((child) => child.className === 'omega-devbar__spinner'),
+    'with a moving indicator beside the copy, never bare text (docs/shared/theming.md)',
+  );
+
+  // The explanation stays where every other failure reports itself: the loop
+  // says the backend is starting, the who line says how to start it.
+  assert.strictEqual(
+    who().textContent,
+    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'the who line keeps carrying the reason during the retry loop',
+  );
+
+  assert.strictEqual(timers.length, 1, 'one retry is scheduled, not a storm of them');
+  assert.ok(timers[0].delay >= 1000, `the interval is gentle, not a busy loop (got ${timers[0].delay}ms)`);
+
+  // Until it answers, not once: an attempt that fails again schedules the next,
+  // which is the whole point of the loop.
+  await retry();
+
+  assert.strictEqual(timers.length, 1, 'the backend is still down, so the next attempt is already scheduled');
+  assert.strictEqual(starting().hidden, false, 'and the indicator stays up between attempts');
+});
+
+test('#402: the attempt that lands fills the dropdown and clears the indicator', async () => {
+  const { client, personas, retry, starting, timers, who } = await boot({}, {
+    roster: new Error('Failed to fetch'),
+    signedInAtBoot: '_test.referrer@playground.omegajs.dev',
+  });
+
+  assert.deepStrictEqual(personas().children.map((option) => option.value), [''], 'nothing to offer yet');
+
+  // The emulator finishes booting between attempts.
+  client.roster = ROSTER;
+  await retry();
+
+  assert.deepStrictEqual(
+    personas().children.slice(1).map((option) => option.value),
+    ROSTER.map((persona) => persona.localpart),
+    'the retry fills the dropdown exactly as a first attempt that landed would',
+  );
+  assert.strictEqual(personas().value, '_test.referrer', 'including the select-sync with whoever is signed in');
+  assert.strictEqual(starting().hidden, true, 'the indicator is gone');
+  assert.strictEqual(who().textContent, '_test.referrer@playground.omegajs.dev', 'and so is the explanation for a failure that is over');
+  assert.strictEqual(timers.length, 0, 'nothing is scheduled once the backend answers');
+});
+
+test('#402: a reachable backend never shows the indicator', async () => {
+  const { starting, timers } = await boot();
+
+  assert.strictEqual(starting().hidden, true, 'the first attempt landed, so the indicator never shows');
+  assert.strictEqual(timers.length, 0, 'and no retry is scheduled');
+
+  // `hidden` is only as good as the CSS that honours it: the indicator's own
+  // rule is display: flex, which OUTRANKS the UA sheet's [hidden] rule, so
+  // losing this one line leaves a spinner turning forever on a working
+  // backend while every assertion above stays green. Read from the source the
+  // #375 way, because the styles are a string this module injects.
+  const source = fs.readFileSync(path.join(PALETTE_DIR, 'dev-palette.js'), 'utf8');
+
+  assert.match(
+    source,
+    /\.omega-devbar__starting\[hidden\] \{ display: none; \}/,
+    'the hidden indicator is display: none, not a flex row the UA sheet cannot suppress',
+  );
 });
 
 test('dev palette: choosing a persona signs it in and reloads', async () => {
@@ -291,7 +514,7 @@ test('dev palette: the placeholder does nothing, and a failed switch stays usabl
     getUser: () => null,
     signInWithEmailAndPassword: async () => { throw new Error('auth/network-request-failed'); },
   });
-  dropdown.value = '_test.basic';
+  dropdown.value = '_test.premium-active';
   await dropdown.change();
 
   assert.deepStrictEqual(reloads, [], 'a failed switch must not reload');
@@ -339,7 +562,8 @@ test('dev palette: resetting posts the dev route, signs the persona back in, and
   await button('Reset to seed').click();
 
   assert.deepStrictEqual(
-    client.requests,
+    // Every boot reads the roster first (#400); this is about what RESETTING sends.
+    client.requests.filter((request) => request.url !== ROSTER_URL),
     [{ url: '/omega/test/reset-account', options: { method: 'POST' } }],
     'the control should post the dev reset route for the signed-in account',
   );

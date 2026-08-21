@@ -1,6 +1,12 @@
 # Sentry
 
-Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with desktop-specific config gating, dev-mode protection, and automatic user attribution from @omega.js/client auth state.
+Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with
+config gating, dev-mode protection, and automatic user attribution from @omega.js/client auth state.
+
+The policy is NOT desktop's own: it lives in `@omega.js/monitoring`, the shared error-reporting
+contract every OMEGA target runs on ([docs/shared/monitoring.md](shared/monitoring.md)). Desktop
+requires the package directly (`require('@omega.js/monitoring')` in `src/main.js`, vendored into
+`dist/vendor/monitoring/` at prepare) — there is no `src/lib/sentry/` any more.
 
 ## Config (`config/omega.json5`)
 
@@ -29,16 +35,24 @@ This means dev builds don't pollute your Sentry project with spurious errors. Ov
 
 ## Per-context architecture
 
+The split moved WHOLE into the shared package (#380) — same files, same shapes:
+
 ```
-src/lib/sentry/
-  index.js     # detects context (main/renderer) and re-exports the right module
-  core.js      # shared: config gating, user normalization, release tagging
-  main.js      # @sentry/electron/main + uncaughtException/unhandledRejection
-  renderer.js  # @sentry/electron/renderer + window error/unhandledrejection
-  preload.js   # minimal — preload is short-lived
+@omega.js/monitoring
+  .            # detects context (main/renderer) and re-exports the right module
+  ./core       # shared policy: config gating, user normalization, release tagging (pure)
+  ./env        # the process.env switches
+  ./main       # @sentry/electron/main + uncaughtException/unhandledRejection
+  ./renderer   # @sentry/electron/renderer + window error/unhandledrejection
+  ./preload    # minimal — preload is short-lived
 ```
 
 Both main and renderer call `Sentry.init()` with the same DSN + release tag, so events from each process are attributed to the same release.
+
+Uncaught exceptions and unhandled rejections in main are captured by the SDK itself — its
+`OnUncaughtException` integration and node's `onUnhandledRejection` integration are both in the
+default set. Desktop's own `process.on('uncaughtException'|'unhandledRejection')` handlers in
+`src/main.js` write to `runtime.log` and are ADDITIVE; nothing here adds a second capture.
 
 ## Public API
 
@@ -56,13 +70,13 @@ In renderer (via preload bridge): `window.desktop.sentry` would expose the same 
 
 When the user signs in via `client-bridge`, @omega.js/desktop automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
 
-The user object is **normalized** before being sent — only `uid`/`id` and `email` are kept; everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
+The user object is **normalized** before being sent — only `uid`/`id` is kept, and everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 
-If you want to scrub email too, set `config.monitoring.scrubEmail: true`.
+The email is **scrubbed by default** (#380). Set `config.monitoring.scrubEmail: false` to opt in to sending it.
 
 ## Release tagging
 
-Every event is tagged with `release: app.getVersion()` automatically. So you can filter Sentry events by app version to see which versions are still erroring out, which is critical for the auto-update flow (you want to verify a release ACTUALLY fixed an error, not just deployed without errors).
+Every event is tagged with `release: <brand.id>@<app.getVersion()>` automatically — the ONE release format every OMEGA target uses ([docs/shared/monitoring.md](shared/monitoring.md)). So you can filter Sentry events by app version to see which versions are still erroring out, which is critical for the auto-update flow (you want to verify a release ACTUALLY fixed an error, not just deployed without errors).
 
 ## Failure modes
 
@@ -72,4 +86,8 @@ Every event is tagged with `release: app.getVersion()` automatically. So you can
 
 ## Tests
 
-`src/test/suites/build/sentry.test.js` — 11 tests covering config gating, dev mode protection, env-var overrides, user normalization, scrubbing, and main-process no-op behavior when SDK absent.
+- `packages/monitoring/test/` — the policy: config off-when-unset (with the SDK never loaded), the
+  env switches, release formats, the scrub default, the browser bundle filter.
+- `src/test/suites/build/sentry.test.js` — the desktop WIRING: the package entry resolves to the
+  main-process module, a DSN-less config initializes to disabled, and every call on a disabled
+  sentry is a silent no-op.

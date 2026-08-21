@@ -16,13 +16,18 @@
 // fetcher (left as a future enhancement so we don't add a brittle dep here).
 //
 // Session is one-shot per launch; deviceId is persistent across launches via
-// `os.networkInterfaces()` (first non-internal MAC) with a `crypto.randomUUID()`
+// `os.networkInterfaces()` (first non-internal MAC) with a generated-UUID
 // fallback persisted to storage on first launch.
 
 const os         = require('os');
 const crypto     = require('crypto');
 const LoggerLite = require('./logger-lite.js');
 const fetch      = require('wonderful-fetch');
+// The device-id walk itself is the shared one — @omega.js/analytics owns it, and
+// @omega.js/client makes the same call with a browser's storage
+// ([#396](https://github.com/Omega-JS-Stack/omega/issues/396)). This module
+// supplies what is genuinely desktop's: electron-store and the MAC seed.
+const core = require('@omega.js/analytics/core');
 
 const logger = new LoggerLite('context');
 
@@ -83,22 +88,22 @@ const context = {
     logger.log(`context initialized — session=${context.session.id} deviceId=${context.session.deviceId} platform=${context.client.platform}`);
   },
 
-  // Resolve a stable per-machine UUID. Order:
+  // Resolve a stable per-machine UUID — the shared walk, with this target's
+  // storage and seed handed in. Order:
   //   1. Storage (already persisted from a prior boot — wins so we're stable across
   //      NIC swaps / VPN changes that would shuffle MAC-derived IDs).
-  //   2. First non-internal MAC from os.networkInterfaces() (stable on a stable rig).
-  //   3. crypto.randomUUID() fallback (works in any context, persisted for next boot).
+  //   2. First non-internal MAC from os.networkInterfaces() (stable on a stable
+  //      rig) — the SEED injected below, so a reinstalled app resolves the same
+  //      id it had before its storage was wiped.
+  //   3. A generated UUID (the shared derivation's floor), persisted for next boot.
   async _resolveDeviceId() {
     const m = context._manager;
 
-    const stored = m.storage.get(`${STORAGE_KEY}.deviceId`);
-    if (stored) return stored;
-
-    const mac = context._readFirstMac();
-    const id = mac || crypto.randomUUID();
-
-    m.storage.set(`${STORAGE_KEY}.deviceId`, id);
-    return id;
+    return core.deriveDeviceId({
+      get:  () => m.storage.get(`${STORAGE_KEY}.deviceId`),
+      set:  (id) => m.storage.set(`${STORAGE_KEY}.deviceId`, id),
+      seed: () => context._readFirstMac(),
+    });
   },
 
   // Walk os.networkInterfaces() and return the first MAC that's not all-zeros and

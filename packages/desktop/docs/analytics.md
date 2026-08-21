@@ -6,16 +6,18 @@ GA4 Measurement Protocol with cross-platform identity. The same human gets unifi
 
 Every event ships with two GA4 fields:
 
-- **`client_id`** — uniquely identifies a *device install*. Stable per-install, anonymous.
-- **`user_id`** — uniquely identifies a *human*. Set when the user is signed in via Firebase Auth.
+- **`client_id`** — uniquely identifies a *desktop install*. Stable per-install, anonymous.
+- **`user_id`** — uniquely identifies a *human*. Set when the user is signed in via Firebase Auth. It rides **alongside** the `client_id`, never in place of it: GA stitches sessions by the client id.
 
 @omega.js/desktop derives both via `uuidv5(input, namespace)` where:
 
 - `namespace = uuidv5(cloud.config.projectId, uuidv5.URL)` — same projectId in @omega.js/backend/UJM/@omega.js/client → same namespace everywhere.
-- `client_id = uuidv5(deviceId, namespace)` — `deviceId` is the first non-internal MAC from `os.networkInterfaces()`, falling back to a persisted `crypto.randomUUID()`.
+- `client_id = uuidv5(deviceId, namespace)` — the `deviceId` comes from the ONE shared derivation, `@omega.js/analytics`' `deriveDeviceId` ([#396](https://github.com/Omega-JS-Stack/omega/issues/396)), with desktop injecting its storage and its MAC seed ([context.md](context.md)).
 - `user_id = uuidv5(firebaseUid, namespace)` — set automatically when `omega.onAuthChange` fires with a uid; cleared on logout.
 
 Why this matters: the same Firebase user signing into the desktop app, the web app, and triggering backend events produces **identical `user_id` values** in every Measurement Protocol call. GA4 stitches the events into one user journey across all surfaces.
+
+What does NOT cross surfaces is the machine. The desktop app's deviceId lives in electron-store and a browser's lives in that browser's localStorage, so one machine is two `client_id`s — the human is the link, and always was.
 
 ## Config
 
@@ -67,6 +69,33 @@ const status = await window.desktop.analytics.getStatus();   // { enabled, measu
 
 The renderer surface is fire-and-forget IPC (`ipcRenderer.send`) for events; only `getStatus` round-trips via `invoke`.
 
+## The renderer NEVER sends — it forwards ([#411](https://github.com/Omega-JS-Stack/omega/issues/411))
+
+A renderer's own `omega.analytics().event(...)` — the embedded @omega.js/client, the surface a vert click or a permission prompt fires through — routes to the bridge above and is delivered by the MAIN process's sender. There is exactly one sender per install:
+
+```
+renderer: omega.analytics().event('vert_click', { … })
+  → @omega.js/client reads config.analyticsBridge (src/renderer.js injects the
+    preload's window.desktop.analytics when it boots the client)
+  → ipcRenderer.send('desktop:analytics:event', { name, params })
+  → main: analytics.event(name, params) → catalog → Measurement Protocol
+```
+
+The bridge is **injected, never sniffed**: the client reads that one config key and no global, so a page that merely carries a `window.desktop` can never route a brand's analytics into a void.
+
+Main owns identity end to end: the device id from electron-store, the session id minted once per launch, the real engagement time, and the app's `page_location` / `page_title` (a renderer's `file://` href is not GA's business). Only the canonical name and the caller's params cross.
+
+What does NOT cross the bridge:
+
+- **The fire's `options`** (`{ eventId, providers }`) — they exist to deduplicate a browser pixel against its server-side half, and GA4 through main is the one lane a desktop window has.
+- **The page data** the web path merges in (`page_path` / `page_title` / `page_location`) — main supplies the app's own.
+
+What the bridged client does NOT do: mint a `client_id` of its own (no `localStorage._omega_device_id` in a desktop renderer), hold an api_secret, or fire `login` / `logout` — main's auth bridge already fires those off the same Firebase user, and a second pair would double-count every sign-in.
+
+An uncatalogued event name never leaves the renderer: the catalog check runs before the forward, so a typo throws at the call site in development (and is logged-and-skipped in a packaged app) instead of surfacing as an unattributable warning in main's `runtime.log`. A forward that IPC cannot carry (a non-cloneable param) is warned about, never thrown at the user mid-action.
+
+> 🚫 **Never inject `GOOGLE_ANALYTICS_SECRET` into a renderer's config.** Desktop's config carries the measurement id alone. A renderer with its own secret would become a second Measurement Protocol sender with its own device id and its own session id — one install counted as two GA clients ([#396](https://github.com/Omega-JS-Stack/omega/issues/396) class). The client backs the rule with a guard: a bridged renderer drops any secret handed to it.
+
 ## Auto-fired events
 
 | Event | When | Notes |
@@ -107,4 +136,5 @@ free-typed string here.
 ## Tests
 
 - `src/test/suites/main/analytics.test.js` — disabled paths, uuidv5 stability, the catalog contract (canonical name in, GA4 descriptor out; unknown names never post), queueing, auth-bridge wiring, IPC handlers, secret-not-leaked guard.
-- `src/test/suites/renderer/analytics-bridge.test.js` — renderer-side surface shape + `getStatus` round-trip.
+- `src/test/suites/renderer/analytics-bridge.test.js` — renderer-side surface shape, `getStatus` round-trip, and the #411 pin: a renderer-originated `omega.analytics().event(...)` reaches main's sender exactly once, and the payload GA would receive carries main's `client_id` and main's session id, while the bridged client holds no secret and no device id of its own (the harness hands it credentials on purpose). The harness taps main's transport (`harness/main-entry.js`) so a renderer suite can read back what the sender was handed — a test run never reaches a real GA property. Harness fidelity, stated plainly: it drives the real client and the real IPC channel into the real main-process sender, but the client runs in the preload world holding the bridge object directly, not the contextBridge proxy a page bundle gets — the proxy hop is the one link this pin does not exercise.
+- `packages/client/test/analytics.test.js` — the client half: the bridge is the injected config value alone (a planted `window.desktop` bridges nothing), a bridged client drops credentials and mints no device id, an uncatalogued name never leaves the renderer, and a forward that throws never reaches the caller.

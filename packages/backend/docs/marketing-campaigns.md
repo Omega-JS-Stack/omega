@@ -167,9 +167,12 @@ Per-brand subusers provide full contact/segment/field isolation under one billin
 
 ## Contact Pruning
 
-`cron/daily/marketing-prune.js` — runs 1st of each month. Two stages:
-1. **Re-engagement**: send email to `engagement_inactive_5m` (excluding `engagement_inactive_6m`)
-2. **Prune**: export `engagement_inactive_6m` contacts, bulk delete from SendGrid + Beehiiv. Never prunes paying customers.
+`cron/daily/marketing-prune.js` — runs 1st of each month. Pruning is strictly PER-PROVIDER: each provider's own engagement decides that provider's removals, so a reader who opens every newsletter but ignores offer mail is never deleted from the newsletter on a SendGrid-only signal ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)). Three stages:
+1. **Re-engagement**: send email to `engagement_inactive_5m` (excluding `engagement_inactive_6m`). Each provider resolves the segment key against its own engagement tracking.
+2. **Prune (SendGrid)**: export `engagement_inactive_6m` contacts, bulk delete from SendGrid only. Never prunes paying customers: the `subscription_paid` segment is excluded from the delete list.
+3. **Prune (Beehiiv)**: list the publication's active subscriptions with Beehiiv's own per-subscriber stats (`expand[]=stats`) and delete the ones that have received at least `NEWSLETTER_RECEIVED_FLOOR` newsletters, joined more than `NEWSLETTER_MIN_AGE_DAYS` ago, and have never opened or clicked. A quiet channel keeps everyone under the floor and prunes nobody, which is the guard working. Never prunes paying customers either: Beehiiv cannot see app subscriptions, so each candidate's email is resolved to its user doc and skipped when `resolveSubscription()` reports an active paid plan, which is the same `subscription_paid` rule stage 2 uses. The skipped count rides the run log as `skippedPaid`, as it does for SendGrid.
+
+Both lanes DELETE the contact/subscription and never unsubscribe it (an unsubscribe revokes marketing consent in Firestore permanently), and both log the deleted emails to `marketing-prune-logs/{brandId}/runs/{YYYY-MM}` (the Beehiiv lane under `{YYYY-MM}-newsletter`) for recoverability.
 
 ## Newsletter Generator
 

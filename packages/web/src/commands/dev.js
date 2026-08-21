@@ -77,6 +77,10 @@ module.exports = async function (options) {
 
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
+  // The app's own package version — read ONCE and handed to both consumers: the
+  // build manifest and the page chrome's Configuration block (the client's
+  // release tag, #380).
+  const version = jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version;
   const clientEntry = resolveClientEntry();
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
 
@@ -170,7 +174,7 @@ module.exports = async function (options) {
       siteData,
       outDir: paths.out,
       environment: 'development',
-      version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
+      version,
       consumerDir: paths.src,
       clientEntry,
       manifest,
@@ -256,6 +260,7 @@ module.exports = async function (options) {
         activeTheme,
         assetManifest: manifest,
         environment: 'development',
+        version,
         dev: devPorts,
       });
     },

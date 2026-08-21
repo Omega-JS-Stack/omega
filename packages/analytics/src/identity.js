@@ -11,10 +11,14 @@
  * normalizes alike: trimmed and lowercased.
  *
  * RAW PII NEVER LEAVES: a caller hashes here and hands the pixel the digest.
- * `external_id` is the deliberate exception and it is not PII — the raw uid is
- * exactly what the SERVER sends as `identity.externalId` (@omega.js/backend's
- * `libraries/analytics/match-data.js`), and the browser half and the server half
- * of one person only link because both carry that same string.
+ * `external_id` is not PII, and it is per provider like the rest
+ * ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)): META's spec only
+ * RECOMMENDS hashing and its own Pixel example passes a bare id, so Meta gets
+ * the RAW uid — exactly what the SERVER sends as `identity.externalId`
+ * (@omega.js/backend's `libraries/analytics/match-data.js`). TIKTOK's Events API
+ * REQUIRES the digest, so both halves send the SHA-256 of that same uid,
+ * normalized by `normalizeExternalId()` below. Either way the browser half and
+ * the server half of one person link only because both carry the same value.
  *
  * Pure and runtime-neutral like the rest of the package's pieces: no DOM, no
  * transport, no state. CJS, so the backend can require() it and the browser
@@ -88,6 +92,19 @@ function normalizeEmail(email) {
 }
 
 /**
+ * External id: trimmed, and NOTHING else. TikTok's advanced-matching table is
+ * the only spec that states the rule ("Trim any leading and trailing spaces
+ * before hashing and ensure you are consistent with the External ID used"), and
+ * an id is case-SENSITIVE — lowercasing it the way an email is normalized would
+ * hand TikTok a digest of a uid that never existed (#410).
+ * @param {string} [uid] - The account's uid.
+ * @returns {string} The normalized id, or '' when there is none.
+ */
+function normalizeExternalId(uid) {
+  return `${uid || ''}`.trim();
+}
+
+/**
  * Phone for META: digits only, country code included, no `+` and no punctuation
  * (Meta's advanced-matching spec hashes the bare number).
  * @param {string} [phone] - Any written form; Auth's `phoneNumber` is E.164.
@@ -113,6 +130,7 @@ function tiktokPhone(phone) {
 module.exports = {
   sha256,
   normalizeEmail,
+  normalizeExternalId,
   metaPhone,
   tiktokPhone,
 };

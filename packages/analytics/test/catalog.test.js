@@ -84,6 +84,40 @@ test('the dropped and renamed names are gone', () => {
   assert.ok(entryFor('file_download'), 'file_download is the canonical name');
 });
 
+// ─── Page view ───
+
+test('page_view maps all three providers, so one fire is the whole page view', () => {
+  // The raw `fbq('track', 'PageView')` / `ttq.page()` the web loader fired at
+  // pixel init are retired ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)):
+  // the catalog is what tells each platform about a page now.
+  const params = { page_path: '/pricing', page_title: 'Pricing', page_location: 'https://brand.test/pricing' };
+
+  const google = ga4.resolve('page_view', params);
+  assert.strictEqual(google.name, 'page_view');
+  assert.strictEqual(google.kind, 'standard');
+  assert.strictEqual(google.payload.page_path, '/pricing', 'GA4 is pass-through, so the page params ride as-is');
+
+  const facebook = meta.resolve('page_view', params);
+  assert.strictEqual(facebook.name, 'PageView', 'Meta defines PageView — the pixel snippet\'s own standard event');
+  assert.strictEqual(facebook.kind, 'standard');
+
+  const tt = tiktok.resolve('page_view', params);
+  assert.strictEqual(tt.name, 'Pageview', 'the event TikTok records for it — for the catalog and the fire log');
+  assert.strictEqual(tt.kind, 'custom', 'a pixel method is not a standard trackable name');
+  assert.strictEqual(tt.method, 'page', 'and the descriptor names the method TikTok documents: ttq.page()');
+});
+
+test('a pixel method is named by exactly one mapping', () => {
+  // `method` exists for TikTok's SDK-managed page view and nothing else. Every
+  // other mapping is a tracked event NAME, and a stray method would silently
+  // stop a fire from reaching `ttq.track`.
+  const named = Object.entries(CATALOG)
+    .filter(([, entry]) => Object.values(entry.providers).some((mapping) => mapping.method !== undefined))
+    .map(([name]) => name);
+
+  assert.deepEqual(named, ['page_view']);
+});
+
 // ─── Commerce mapping ───
 
 const PURCHASE_PARAMS = {
@@ -136,6 +170,91 @@ test('the recurring events ride GA4 purchase with is_recurring set', () => {
   }
 });
 
+// The four subscription lifecycle moments the 2026-08-20 coverage audit found
+// dark or mislabeled ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+
+test('a trial conversion is a purchase to GA4 and a Subscribe to the ad platforms', () => {
+  const params = { ...PURCHASE_PARAMS, is_trial: true, is_recurring: false };
+
+  const google = ga4.resolve('trial_converted', params);
+  assert.strictEqual(google.name, 'purchase', 'the first real charge belongs in GA4\'s revenue report');
+  assert.strictEqual(google.kind, 'standard');
+  assert.strictEqual(google.payload.value, 49.99);
+  assert.strictEqual(google.payload.is_trial, true, 'the pair of flags is what marks it inside GA4 purchase');
+  assert.strictEqual(google.payload.is_recurring, false, 'a conversion is the FIRST payment, never a renewal');
+
+  const facebook = meta.resolve('trial_converted', params);
+  assert.strictEqual(facebook.name, 'Subscribe', 'Meta already heard StartTrial — this is the subscription starting to pay');
+  assert.strictEqual(facebook.kind, 'standard');
+  assert.deepEqual(facebook.payload.content_ids, ['pro']);
+
+  const tt = tiktok.resolve('trial_converted', params);
+  assert.strictEqual(tt.name, 'Subscribe');
+  assert.strictEqual(tt.kind, 'standard');
+  assert.strictEqual(tt.payload.content_id, 'pro');
+});
+
+// The exclusion-audience half ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)).
+
+test('a cancellation and a refund reach the ad platforms as zero-value audience signals', () => {
+  for (const [name, native] of [['subscription_cancelled', 'SubscriptionCancelled'], ['refund', 'Refunded']]) {
+    const facebook = meta.resolve(name, PURCHASE_PARAMS);
+
+    assert.strictEqual(facebook.name, native, `${name} → Meta ${native}`);
+    assert.strictEqual(facebook.kind, 'custom', 'Meta defines no churn event, so this is a custom one and says so');
+    assert.strictEqual(facebook.payload.value, 0, 'a churn signal must never book revenue in an ad account');
+    assert.deepEqual(facebook.payload.content_ids, ['pro'], 'the plan is what makes the audience worth building');
+
+    const tt = tiktok.resolve(name, PURCHASE_PARAMS);
+
+    assert.strictEqual(tt.name, native, `${name} → TikTok ${native}`);
+    assert.strictEqual(tt.kind, 'custom');
+    assert.strictEqual(tt.payload.value, 0, 'TikTok cannot subtract revenue either');
+    assert.strictEqual(tt.payload.content_id, 'pro');
+    assert.strictEqual(tt.payload.price, undefined, 'the per-item price would put the amount back on the wire');
+    assert.strictEqual(tt.payload.quantity, undefined, 'and Meta\'s signal carries neither, by construction');
+  }
+
+  // GA4 is where the money is netted, so it keeps the real number.
+  assert.strictEqual(ga4.resolve('refund', PURCHASE_PARAMS).payload.value, 49.99);
+  assert.strictEqual(ga4.resolve('subscription_cancelled', PURCHASE_PARAMS).payload.value, 49.99);
+});
+
+test('the outcomes an ad platform has no use for stay GA4-only', () => {
+  // `trial_lapsed` is the deliberate omission of the exclusion lane above: a
+  // lapsed trialist is a win-back audience to RETARGET, not one to hide ads
+  // from. The other two are dark to an ad platform for the older reason — no
+  // money moved, and a platform optimizes toward conversions.
+  for (const name of ['trial_lapsed', 'subscription_uncancelled', 'plan_changed']) {
+    const google = ga4.resolve(name, PURCHASE_PARAMS);
+
+    assert.strictEqual(google.name, name, `${name} resolves on GA4 under its own name`);
+    assert.strictEqual(google.kind, 'custom', `no platform defines a standard ${name}`);
+    assert.strictEqual(meta.resolve(name, PURCHASE_PARAMS), null, `${name} has no Meta mapping`);
+    assert.strictEqual(tiktok.resolve(name, PURCHASE_PARAMS), null, `${name} has no TikTok mapping`);
+  }
+});
+
+test('a plan change carries the plan it came from', () => {
+  const entry = entryFor('plan_changed');
+
+  for (const param of ['previous_item_id', 'previous_item_name', 'previous_value']) {
+    assert.ok(entry.params.includes(param), `plan_changed declares ${param}`);
+  }
+
+  const google = ga4.resolve('plan_changed', {
+    ...PURCHASE_PARAMS,
+    previous_item_id: 'starter',
+    previous_item_name: 'Starter',
+    previous_value: 9.99,
+  });
+
+  assert.strictEqual(google.payload.previous_item_id, 'starter', 'GA4 is pass-through, so the from-plan rides as-is');
+  assert.strictEqual(google.payload.previous_item_name, 'Starter');
+  assert.strictEqual(google.payload.previous_value, 9.99);
+  assert.strictEqual(google.payload.items[0].item_id, 'pro', 'and items[] is still the plan they moved TO');
+});
+
 test('search hands the ad platforms search_string, GA4 search_term', () => {
   const params = { search_term: 'omega', content_category: 'blog' };
 
@@ -157,7 +276,7 @@ test('a map never mutates the caller params', () => {
 // ─── No mapping ───
 
 test('an unmapped provider resolves to null', () => {
-  // vert_click is GA4-only; refund_action and page_view likewise.
+  // vert_click is GA4-only; refund_action likewise.
   assert.ok(ga4.resolve('vert_click', { vert_id: 'x' }));
   assert.strictEqual(meta.resolve('vert_click', { vert_id: 'x' }), null);
   assert.strictEqual(tiktok.resolve('vert_click', { vert_id: 'x' }), null);

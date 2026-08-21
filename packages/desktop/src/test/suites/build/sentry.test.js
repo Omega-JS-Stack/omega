@@ -1,141 +1,87 @@
-// Build-layer tests for lib/sentry/{core,index,main,renderer,preload}.js — config gating,
-// dev mode, normalize user, release tagging, no-op behavior when SDK absent.
+// Build-layer tests for the desktop's error-reporting WIRING (#380).
+//
+// The policy itself — config gating, the dev/kill switches, user normalization,
+// release tagging — is @omega.js/monitoring's, proven by its own suite
+// (packages/monitoring/test/). What belongs here is the desktop half: the
+// package entry resolves in a main-process context, the manager's `sentry`
+// surface is the one every lib calls, and a brand with no DSN gets a silent
+// no-op instead of a crash.
 
 const path = require('path');
+
+const FRAMEWORK_ROOT = path.join(__dirname, '..', '..', '..', '..');
 
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'sentry — per-context lib structure',
+  description: 'sentry — the @omega.js/monitoring wiring',
   tests: [
     {
-      name: 'core exports the expected helpers',
+      name: 'the package entry resolves to the main-process module outside a renderer',
       run: (ctx) => {
-        const core = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        ctx.expect(typeof core.resolveConfig).toBe('function');
-        ctx.expect(typeof core.normalizeUser).toBe('function');
-        ctx.expect(typeof core.resolveRelease).toBe('function');
-        ctx.expect(typeof core.DEFAULTS).toBe('object');
-      },
-    },
-    {
-      name: 'index detects context and re-exports a context module',
-      run: (ctx) => {
-        const sentry = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'index.js'));
+        const sentry = require('@omega.js/monitoring');
+        ctx.expect(sentry).toBe(require('@omega.js/monitoring/main'));
         ctx.expect(typeof sentry.initialize).toBe('function');
         ctx.expect(typeof sentry.captureException).toBe('function');
         ctx.expect(typeof sentry.captureMessage).toBe('function');
+        ctx.expect(typeof sentry.setUser).toBe('function');
       },
     },
     {
-      name: 'resolveConfig: disabled when no DSN set',
+      name: 'a desktop config with no DSN initializes to disabled',
       run: (ctx) => {
-        const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
-        ctx.expect(result.shouldEnable).toBe(false);
-        ctx.expect(result.reason).toMatch(/dsn/i);
-      },
-    },
-    {
-      name: 'resolveConfig: disabled in dev mode unless OMEGA_SENTRY_FORCE',
-      run: (ctx) => {
-        const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const orig = { mode: process.env.OMEGA_BUILD_MODE, force: process.env.OMEGA_SENTRY_FORCE };
-        delete process.env.OMEGA_BUILD_MODE;
-        delete process.env.OMEGA_SENTRY_FORCE;
-        try {
-          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
-          ctx.expect(result.shouldEnable).toBe(false);
-          ctx.expect(result.reason).toMatch(/dev mode/);
-        } finally {
-          if (orig.mode !== undefined) process.env.OMEGA_BUILD_MODE = orig.mode;
-          if (orig.force !== undefined) process.env.OMEGA_SENTRY_FORCE = orig.force;
-        }
-      },
-    },
-    {
-      name: 'resolveConfig: enabled in production with DSN',
-      run: (ctx) => {
-        const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const orig = process.env.OMEGA_BUILD_MODE;
-        process.env.OMEGA_BUILD_MODE = 'true';
-        try {
-          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
-          ctx.expect(result.shouldEnable).toBe(true);
-          ctx.expect(result.options.environment).toBe('production');
-          ctx.expect(result.options.dsn).toBe('https://x@y.io/1');
-          // The role discriminator must NOT leak into Sentry.init options
-          ctx.expect(result.options.provider).toBeUndefined();
-        } finally {
-          if (orig === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = orig;
-        }
-      },
-    },
-    {
-      name: 'resolveConfig: OMEGA_SENTRY_ENABLED=false overrides everything',
-      run: (ctx) => {
-        const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const origMode = process.env.OMEGA_BUILD_MODE;
-        const origEnabled = process.env.OMEGA_SENTRY_ENABLED;
-        process.env.OMEGA_BUILD_MODE = 'true';
-        process.env.OMEGA_SENTRY_ENABLED = 'false';
-        try {
-          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
-          ctx.expect(result.shouldEnable).toBe(false);
-          ctx.expect(result.reason).toMatch(/OMEGA_SENTRY_ENABLED/);
-        } finally {
-          if (origMode === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = origMode;
-          if (origEnabled === undefined) delete process.env.OMEGA_SENTRY_ENABLED; else process.env.OMEGA_SENTRY_ENABLED = origEnabled;
-        }
-      },
-    },
-    {
-      name: 'normalizeUser maps uid + email',
-      run: (ctx) => {
-        const { normalizeUser } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const out = normalizeUser({ uid: 'abc123', email: 'foo@bar.com', extraField: 'ignored' });
-        ctx.expect(out.id).toBe('abc123');
-        ctx.expect(out.email).toBe('foo@bar.com');
-        ctx.expect(out.extraField).toBeUndefined();
-      },
-    },
-    {
-      name: 'normalizeUser scrubs email when scrubEmail option set',
-      run: (ctx) => {
-        const { normalizeUser } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const out = normalizeUser({ uid: 'abc', email: 'foo@bar.com' }, { scrubEmail: true });
-        ctx.expect(out.id).toBe('abc');
-        ctx.expect(out.email).toBeUndefined();
-      },
-    },
-    {
-      name: 'normalizeUser returns null for null/empty input',
-      run: (ctx) => {
-        const { normalizeUser } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        ctx.expect(normalizeUser(null)).toBe(null);
-        ctx.expect(normalizeUser({})).toBe(null);
-      },
-    },
-    {
-      name: 'main.initialize is a no-op when sentry disabled (no DSN)',
-      run: (ctx) => {
-        const main = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'main.js'));
+        const main = require('@omega.js/monitoring/main');
         main.shutdown();
-        main.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
+        main.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } }, getVersion: () => '1.0.0' });
+        ctx.expect(main._initialized).toBe(true);
         ctx.expect(main._enabled).toBe(false);
-        // captureException should not throw.
-        main.captureException(new Error('test'));
       },
     },
     {
-      name: 'main.captureException is a no-op when not enabled',
+      name: 'every call on a disabled sentry is a no-op, never a throw',
       run: (ctx) => {
-        const main = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'main.js'));
+        const main = require('@omega.js/monitoring/main');
         main.shutdown();
-        // Don't initialize.
         let threw;
-        try { main.captureException(new Error('test')); } catch (e) { threw = e; }
+        try {
+          main.captureException(new Error('test'));
+          main.captureMessage('test');
+          // client-bridge calls this on every auth change — a documented no-op when off.
+          main.setUser({ uid: 'abc', email: 'user@example.com' });
+        } catch (e) {
+          threw = e;
+        }
         ctx.expect(threw).toBeUndefined();
+      },
+    },
+    {
+      // The renderer's @omega.js/client tags every report `<brand.id>@<version>`
+      // and falls back to the build stamp with no version. The bake is the
+      // renderer's ONLY channel and it hands the client `buildJson.config`
+      // alone — so the app's version has to ride INSIDE that object, not only
+      // in the sibling `package` key.
+      name: 'the webpack bake folds the app version into the config the renderer hands the client',
+      run: (ctx) => {
+        const { composeBuildConfig } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'webpack.js'));
+
+        const packaged = composeBuildConfig({ brand: { id: 'paperloom' } }, null, { version: '3.1.4' });
+        ctx.expect(packaged.version).toBe('3.1.4');
+        ctx.expect(packaged.brand.id).toBe('paperloom');
+        ctx.expect(packaged.dev).toBeUndefined();
+
+        // A dev build carries the resolved local-stack map beside it (#300).
+        const local = composeBuildConfig({ brand: { id: 'paperloom' } }, { ports: { auth: 9099 } }, { version: '3.1.4' });
+        ctx.expect(local.version).toBe('3.1.4');
+        ctx.expect(local.dev.ports.auth).toBe(9099);
+      },
+    },
+    {
+      name: 'the preload surface is reachable and silent when disabled',
+      run: (ctx) => {
+        const preload = require('@omega.js/monitoring/preload');
+        preload.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
+        ctx.expect(preload._enabled).toBe(false);
+        preload.captureException(new Error('test'));
       },
     },
   ],

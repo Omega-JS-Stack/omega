@@ -2,6 +2,12 @@ const path = require('path');
 const powertools = require('node-powertools');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const isAlreadyGone = require('../../../routes/payments/cancel/_processor-errors.js');
+const { deliverConversion } = require('../../../libraries/analytics/conversions.js');
+const { buildAttributionContext, buildIdentity } = require('../../../libraries/analytics/match-data.js');
+// The payment webhook's analytics module owns what "still inside the trial" means
+// for reporting, and this sweep reports the outcomes that webhook never sees — so
+// both read the one predicate rather than keeping a copy each ([#407]).
+const { isInsideTrial } = require('../../firestore/payments-webhooks/analytics.js');
 
 const PROCESSORS_DIR = path.join(__dirname, '../../../libraries/payment/processors');
 
@@ -42,9 +48,17 @@ const SWEEP_LIMIT = 200;
  *    Processor says gone or cancelled → the trial LAPSED: reset to basic + stamp
  *    Anything else (dunning) → leave it; the processor still has it
  * 5. Re-read before writing so a webhook that landed since the query is never clobbered
+ * 6. Report the outcome to analytics — but ONLY when this sweep is the one that saw it
  *
  * No email is sent from here. The sweep is state correction — the customer-facing
  * message for a lapsed trial is its own piece of work.
+ *
+ * **Analytics.** For PayPal this sweep is the only place a trial outcome is ever
+ * known: PayPal fires no trial-end event, so nothing in the webhook pipeline is told
+ * and the funnel had no signal at all ([#407]). So the outcome is reported here, at
+ * the moment it is stamped, through the same `deliverConversion` path the payment
+ * webhook uses. The guard against double-counting is
+ * `resolveTrialOutcomeConversion()` below.
  */
 module.exports = async ({ Manager, ctx, context, libraries }) => {
   const { admin } = libraries;
@@ -184,6 +198,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         await doc.ref.set({ subscription: { trial: { outcome: 'converted' } } }, { merge: true });
 
         ctx.log(`convert ${uid}: processor ${processor} reports the subscription is active, trial.outcome=converted`);
+        trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
         converted++;
         continue;
       }
@@ -200,6 +215,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
       }, { merge: true });
 
       ctx.log(`lapse ${uid}: processor ${processor} reports ${gone ? 'the subscription is gone' : liveStatus}, reset to basic, trial.outcome=lapsed`);
+      trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
       lapsed++;
     } catch (e) {
       ctx.error(`Failed to sweep ${uid}: ${e.message}`);
@@ -209,3 +225,97 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
 
   ctx.log(`Completed! (${lapsed} lapsed, ${converted} converted, ${skipped} skipped, ${failed} failed)`);
 };
+
+/**
+ * The conversion to report for an outcome this sweep just decided, or null when the
+ * outcome was already reported at the moment it happened.
+ *
+ * THE GUARD IS THE TERM. A conversion a payment webhook already saw moved `expires`
+ * out past the trial's end, and a lapse it saw left the subscription suspended or
+ * cancelled — which this sweep's own query (`status == active`) never selects. So a
+ * candidate still inside its trial is exactly one no webhook has resolved, and it is
+ * the only one this backstop has anything new to say about.
+ *
+ * The subscription-keyed event id collapses a genuine race on the two platforms that
+ * deduplicate; this guard is what keeps GA4 honest, because GA4 has no cross-source
+ * deduplication at all.
+ *
+ * The subscription passed in is the one read BEFORE the lapse write — the paid
+ * product that lapsed, not the `basic` the sweep resets it to.
+ *
+ * @param {object} sub - The subscription as it stood before this sweep wrote
+ * @param {string} outcome - 'converted' | 'lapsed'
+ * @param {string} currency - The brand's payment currency
+ * @returns {{ event: string, eventId: string, params: object }|null}
+ */
+function resolveTrialOutcomeConversion(sub, outcome, currency) {
+  if (!isInsideTrial(sub)) {
+    return null;
+  }
+
+  const event = outcome === 'converted' ? 'trial_converted' : 'trial_lapsed';
+  // The full price: a conversion the processor made without telling us leaves no
+  // invoice here to read a discount off, and the plan price is the honest number
+  // this path can actually stand behind.
+  const price = parseFloat(sub.payment?.price || 0);
+
+  return {
+    event: event,
+    eventId: `${event}.${sub.payment?.resourceId}`,
+    params: {
+      transaction_id: sub.payment?.resourceId,
+      value: price,
+      currency: currency,
+      items: [{
+        item_id: sub.product?.id,
+        item_name: sub.product?.name,
+        price: price,
+        quantity: 1,
+      }],
+      payment_processor: sub.payment?.processor,
+      payment_frequency: sub.payment?.frequency || null,
+      is_trial: true,
+      is_recurring: false,
+    },
+  };
+}
+
+/**
+ * Report a trial outcome this sweep decided (non-blocking, never throws at the sweep)
+ *
+ * @param {object} options
+ * @param {string} options.outcome - 'converted' | 'lapsed'
+ * @param {string} options.uid - The owner
+ * @param {object} options.userData - The user doc (attribution + consent + match data)
+ * @param {object} options.sub - The subscription as it stood before the write
+ * @param {object} options.Manager - The backend Manager
+ * @param {object} options.ctx - The event context
+ */
+function trackOutcome({ outcome, uid, userData, sub, Manager, ctx }) {
+  try {
+    const conversion = resolveTrialOutcomeConversion(sub, outcome, Manager.config.payment?.currency || 'USD');
+
+    if (!conversion) {
+      ctx.log(`skip analytics ${uid}: the term has moved past the trial end (expires=${sub.expires?.timestampUNIX || 'null'}, trial.expires=${sub.trial?.expires?.timestampUNIX || 'null'})`);
+      return;
+    }
+
+    deliverConversion({
+      ...conversion,
+      attribution: buildAttributionContext(userData.attribution),
+      identity: buildIdentity({
+        uid: uid,
+        email: userData.auth?.email,
+        telephone: userData.personal?.telephone,
+      }),
+      trackingConsent: userData.trackingConsent,
+      ctx: ctx,
+      Manager: Manager,
+    });
+  } catch (e) {
+    ctx.error(`Trial outcome tracking failed for ${uid}: ${e.message}`, e);
+  }
+}
+
+// The sweep IS the module; these ride alongside it for the pipeline and the tests.
+module.exports.resolveTrialOutcomeConversion = resolveTrialOutcomeConversion;

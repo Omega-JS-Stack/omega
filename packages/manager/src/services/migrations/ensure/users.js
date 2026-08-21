@@ -12,6 +12,7 @@
  *   against Firebase Auth's canonical creation time
  * - Backfills auth.uid/auth.email from Firebase Auth when missing
  * - Backfills consent (implicit grant at signup) for existing users
+ * - Folds the legacy `attribution.utm` blob into `attribution.first`/`last`
  * - Backfills all missing fields with defaults from the @omega.js/backend user schema
  * - Generates dynamic values for affiliate.code, api.clientId, api.privateKey
  * - Normalizes '' and old sentinels ('127.0.0.1', 'ZZ', 'Unknown') to null
@@ -33,6 +34,7 @@ const { runMigration, FieldValue } = require('../lib/migration-runner.js');
 const { createMetadataFix } = require('../lib/ensure-metadata.js');
 const { validateDocument } = require('../lib/schema-validator.js');
 const { createSanitizeFix } = require('../lib/sanitize-strings.js');
+const { createAttributionFoldFix } = require('../lib/attribution-touch.js');
 
 /**
  * Generate a random alphanumeric ID (matches nanoid with URL-safe alphabet minus _ and -)
@@ -187,11 +189,20 @@ const DEFAULT_USER = {
       url: null,
       page: null,
     },
-    utm: {
-      tags: {},
-      timestamp: null,
+    // The #384 touch model. `tags`/`clickIds` are deliberately absent from the
+    // default: a visit that carried none writes no key at all, so backfilling
+    // them here would re-inject the empty husks the fold refuses to write.
+    first: {
+      referrer: null,
       url: null,
       page: null,
+      timestamp: null,
+    },
+    last: {
+      referrer: null,
+      url: null,
+      page: null,
+      timestamp: null,
     },
   },
   consent: {
@@ -217,6 +228,27 @@ const timestampSchema = {
   properties: {
     timestamp: { type: 'string', required: true },
     timestampUNIX: { type: 'number', required: true },
+  },
+};
+
+/**
+ * One attribution touch — @omega.js/account's ATTRIBUTION_TOUCH, shared by
+ * `attribution.first` and `attribution.last`.
+ *
+ * `tags` and `clickIds` are optional because capture writes a key only when the
+ * visit carried one: an organic landing has neither, and demanding them here
+ * would flag every untagged user for a husk nothing should be writing.
+ */
+const attributionTouchSchema = {
+  type: 'object',
+  required: true,
+  properties: {
+    tags: { type: 'object', required: false },
+    clickIds: { type: 'object', required: false },
+    referrer: { type: 'string', required: true, nullable: true },
+    url: { type: 'string', required: true, nullable: true },
+    page: { type: 'string', required: true, nullable: true },
+    timestamp: { type: 'string', required: true, nullable: true },
   },
 };
 
@@ -423,16 +455,8 @@ const schema = {
           page: { type: 'string', required: true, nullable: true },
         },
       },
-      utm: {
-        type: 'object',
-        required: true,
-        properties: {
-          tags: { type: 'object', required: true },
-          timestamp: { type: 'string', required: true, nullable: true },
-          url: { type: 'string', required: true, nullable: true },
-          page: { type: 'string', required: true, nullable: true },
-        },
-      },
+      first: attributionTouchSchema,
+      last: attributionTouchSchema,
     },
   },
   consent: {
@@ -856,7 +880,13 @@ module.exports = async function ensureUsers(context) {
         return Object.keys(updates).length > 0 ? updates : null;
       },
 
-      // Fix 12: Backfill all missing fields with defaults
+      // Fix 12: Fold the legacy attribution.utm blob → attribution.first/last.
+      // Runs before the defaults backfill for the same reason Fix 10 does: once
+      // the backfill has written the empty touches, the fold reads them as an
+      // earlier migration's work and drops the blob it should have folded.
+      createAttributionFoldFix(),
+
+      // Fix 13: Backfill all missing fields with defaults
       (data) => {
         const merged = deepMergeDefaults(data, DEFAULT_USER);
 
@@ -872,7 +902,7 @@ module.exports = async function ensureUsers(context) {
         return Object.keys(updates).length > 0 ? updates : null;
       },
 
-      // Fix 13: Generate dynamic values for empty fields
+      // Fix 14: Generate dynamic values for empty fields
       // The @omega.js/backend user schema generates these at signup: affiliate.code, api.clientId, api.privateKey
       (data) => {
         const updates = {};
@@ -896,7 +926,7 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 14: Normalize empty strings and old sentinel values to null
+      // Fix 15: Normalize empty strings and old sentinel values to null
       // Old defaults used '' for unknown strings and '127.0.0.1'/'ZZ'/'Unknown' for geolocation
       (data) => {
         const NULLABLE_FIELDS = [
@@ -944,10 +974,10 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 15: Recursively trim whitespace from all string values
+      // Fix 16: Recursively trim whitespace from all string values
       createSanitizeFix(),
 
-      // Fix 16: Reset null values to their correct defaults for non-nullable fields
+      // Fix 17: Reset null values to their correct defaults for non-nullable fields
       (data) => {
         const RESET_MAP = {
           // Timestamps should never be null — reset to epoch
@@ -996,8 +1026,8 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 17: Migrate usage.*.period → usage.*.monthly + add usage.*.daily
-      // Sets the whole usage.{metric} object to avoid dot-notation conflicts with Fix 18
+      // Fix 18: Migrate usage.*.period → usage.*.monthly + add usage.*.daily
+      // Sets the whole usage.{metric} object to avoid dot-notation conflicts with Fix 19
       (data) => {
         if (!data.usage || typeof data.usage !== 'object') {
           return null;
@@ -1037,7 +1067,7 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 18: Delete any usage key where total == 0 (unused placeholder)
+      // Fix 19: Delete any usage key where total == 0 (unused placeholder)
       // @omega.js/backend creates usage keys on first use — no need for zero-total placeholders.
       (data) => {
         if (!data.usage || typeof data.usage !== 'object') {

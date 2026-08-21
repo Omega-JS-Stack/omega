@@ -38,7 +38,11 @@ const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-analytics-identi
 const BUNDLE = path.join(BUNDLE_DIR, 'analytics.cjs');
 
 const PIXEL_ID = '_TEST_META_PIXEL';
-const USER = { uid: 'uid-raw-123', email: 'buyer@example.com' };
+// A uid the way one actually looks — Firebase's alphabet is case-SENSITIVE —
+// carrying the padding a stored id can pick up. A fixture that was already trim
+// and lowercase would let a lowercasing or an untrimmed digest pass on either
+// half, and the two halves would stop meeting on a live pixel.
+const USER = { uid: '  AYVZezRcE9CsyI ', email: 'buyer@example.com' };
 const USER_WITH_PHONE = { ...USER, phoneNumber: '+14155550142' };
 
 // FIXED vectors, computed independently of the implementation — a normalizer
@@ -47,6 +51,15 @@ const USER_WITH_PHONE = { ...USER, phoneNumber: '+14155550142' };
 const EMAIL_HASH = '6a6c26195c3682faa816966af789717c3bfa834eee6c599d667d2b3429c27cfd';
 const META_PHONE_HASH = '61c16289716534ac3a5992f613d7a9fefa5e9c12b8fd27f187387da9efeafd8c';
 const TIKTOK_PHONE_HASH = 'abbf04d6f629b136344993dfb197f1fd9296f712eaf103ebc22b1cc29fb0f135';
+
+// external_id is per provider too: TikTok's Events API REQUIRES the digest and
+// its pixel takes "Unhashed or hashed SHA-256", Meta's spec only RECOMMENDS
+// hashing and its Pixel example sends a bare id
+// ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)). The digest is
+// the shasum of the TRIMMED, case-preserved uid — the server's
+// `identity.tiktokExternalIdHash` for the same person, or the two halves of one
+// conversion stop meeting.
+const TIKTOK_EXTERNAL_ID_HASH = '12266491d7fe2f07c833999f4d011444564df71cfd7aaafb346f0edf473572b4';
 
 let building = null;
 
@@ -123,7 +136,7 @@ test('#328: reset() leaves GA4 alone too — the client clears the id it set', a
   );
 });
 
-test('#328: Meta and TikTok still take the raw uid — external_id is their own key', async () => {
+test('#328: Meta takes the raw uid, TikTok the hashed one — each spec\'s own external_id', async () => {
   const { analytics, calls } = await boot();
 
   await analytics.identify(USER);
@@ -135,8 +148,8 @@ test('#328: Meta and TikTok still take the raw uid — external_id is their own 
   ]], 'advanced matching is re-init-ed with the raw uid and a HASHED email');
 
   assert.deepStrictEqual(calls.ttq, [[
-    { external_id: USER.uid, email: EMAIL_HASH },
-  ]]);
+    { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH },
+  ]], '#410: TikTok requires the digest on its Events API half, so the pixel half sends the same one');
 });
 
 test('#328: an account with a phone gets each platform\'s OWN normalization', async () => {
@@ -153,7 +166,7 @@ test('#328: an account with a phone gets each platform\'s OWN normalization', as
   ]]);
 
   assert.deepStrictEqual(calls.ttq, [[
-    { external_id: USER.uid, email: EMAIL_HASH, phone_number: TIKTOK_PHONE_HASH },
+    { external_id: TIKTOK_EXTERNAL_ID_HASH, email: EMAIL_HASH, phone_number: TIKTOK_PHONE_HASH },
   ]]);
 });
 
@@ -166,14 +179,16 @@ test('#328: no phone on the account sends no phone key at all', async () => {
   assert.strictEqual('phone_number' in calls.ttq[0][0], false);
 });
 
-test('#328: a digest that fails still identifies — external_id needs no hash', async () => {
+test('#328: a digest that fails still identifies — external_id falls back to the raw uid', async () => {
   const { analytics, calls } = await boot();
   const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
   // A page whose digest is gone or refuses: the HASHED keys are what is lost,
-  // never the identity itself. `external_id` is the raw uid and needs nothing
-  // computed, and the platforms match on it — the same call the server's match
-  // data makes when it has nothing else.
+  // never the identity itself. Meta's `external_id` is the raw uid and needs
+  // nothing computed; TikTok's pixel documents the field as "Unhashed or hashed
+  // SHA-256", so it takes the raw uid too rather than nothing at all (#410).
+  // The platforms match on it — the same call the server's match data makes
+  // when it has nothing else.
   Object.defineProperty(globalThis, 'crypto', {
     configurable: true,
     value: { subtle: { digest: () => Promise.reject(new Error('no digest on this origin')) } },

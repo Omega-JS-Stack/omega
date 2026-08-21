@@ -120,6 +120,7 @@
     "@omega.js/analytics": "*",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
+    "@omega.js/monitoring": "*",
     "prepare-package": "^2.2.0"
   },
   "peerDependencies": {

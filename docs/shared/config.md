@@ -39,7 +39,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
   advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
   payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
-  monitoring:     { provider: 'sentry', dsn },
+  monitoring:     { provider: 'sentry', org, dsn, environment, sampleRate, tracesSampleRate, scrubEmail, attachScreenshot, bundlePatterns: [] },   // dsn presence IS the enable signal; environment unset = the host's gate names it; scrubEmail defaults true (email OFF), attachScreenshot is desktop-only, bundlePatterns browser-only. docs/shared/monitoring.md
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
   translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/shared/translation.md

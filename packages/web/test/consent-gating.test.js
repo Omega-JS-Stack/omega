@@ -11,10 +11,16 @@
  * in dataLayer BEFORE gtag.js could ever read it, and a later change has to push
  * an `update` even when nothing loads (a denial still has to be told).
  *
+ * The PAGE VIEW is the third thing pinned here (#409): the loader's raw
+ * `fbq('track', 'PageView')` and `ttq.page()` retired, so what each pixel is
+ * told now comes from the catalog through the facade, once per page load, with
+ * GA4 left to its own `config` command.
+ *
  * Browser code behind two bundler aliases, so the harness drives the REAL files
  * through esbuild — ONE entry exposing the loader and the consent state, so a
  * grant in the test reaches the same module instance the loader subscribed to
- * (the shared-chunk guarantee a real split build gives).
+ * (the shared-chunk guarantee a real split build gives) — and the REAL facade
+ * behind it, because the catalog is what decides who hears a page view.
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
@@ -24,8 +30,19 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { get: _get, set: _set } = require('lodash');
 
-const CORE_DIR = path.join(__dirname, '..', 'core');
+const PKG = path.join(__dirname, '..');
+const ROOT = path.resolve(PKG, '..', '..');
+const CORE_DIR = path.join(PKG, 'core');
 const CORE_JS = path.join(CORE_DIR, 'js');
+
+// The client's built module — the door web core reaches the analytics package
+// (catalog, adapters, guarded transport) through. The REAL one, as
+// analytics-blocked.test.js drives it: the catalog is what decides which
+// provider hears a page view, so stubbing it would prove nothing.
+const CLIENT_ANALYTICS = path.join(ROOT, 'packages', 'client', 'dist', 'modules', 'analytics.js');
+
+// Everything the loader writes onto the page, cleared between boots.
+const PAGE_GLOBALS = ['dataLayer', 'gtag', 'fbq', '_fbq', 'ttq', 'TiktokAnalyticsObject'];
 
 const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-consent-gating-'));
 const BUNDLE = path.join(BUNDLE_DIR, 'analytics-loader.cjs');
@@ -54,6 +71,9 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
+        build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
+          return { path: CLIENT_ANALYTICS };
+        });
         build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
@@ -78,7 +98,17 @@ async function boot({ timeZone, ids = IDS, storage = {} } = {}) {
 
   const injected = [];
 
-  globalThis.window = {};
+  // A page's `window` IS its global object, and the guarded transport checks the
+  // BARE names (`typeof fbq`) an ad blocker leaves undefined (#306) — so the
+  // harness has to be one object too, or a pixel this loader just installed
+  // would read as blocked and the facade's page view would deliver nowhere.
+  for (const name of PAGE_GLOBALS) {
+    delete globalThis[name];
+  }
+
+  globalThis.window = globalThis;
+  // The page's own analytics host reads the platform cookies at fire time.
+  globalThis.document = { cookie: '' };
   globalThis.__omegaClient = {
     config: {
       analytics: {
@@ -116,6 +146,10 @@ async function boot({ timeZone, ids = IDS, storage = {} } = {}) {
     consentCommands: () => (globalThis.window.dataLayer || [])
       .map((entry) => Array.from(entry))
       .filter(([command]) => command === 'consent'),
+    // What each pixel was actually told, in the order it was told: the Meta
+    // queue holds `arguments` objects, the TikTok queue plain arrays.
+    metaCalls: () => (globalThis.fbq ? globalThis.fbq.queue : []).map((entry) => Array.from(entry)),
+    tiktokCalls: () => (globalThis.ttq || []).map((entry) => Array.from(entry)),
     // Which provider each injected src belongs to.
     loaded: () => injected.map((src) => {
       if (src.includes('googletagmanager')) return 'google';
@@ -131,6 +165,11 @@ const ORIGINAL_TZ = process.env.TZ;
 test.after(() => {
   process.env.TZ = ORIGINAL_TZ;
   delete globalThis.window;
+  delete globalThis.document;
+
+  for (const name of PAGE_GLOBALS) {
+    delete globalThis[name];
+  }
 });
 
 const DENIED = { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' };
@@ -162,9 +201,71 @@ test('opt-in region: Accept injects the loaders and updates Consent Mode', async
   assert.ok(gate.injected.some((src) => src.includes(`id=${IDS.google}`)), 'gtag.js carries the configured id');
   assert.ok(gate.injected.some((src) => src.includes(`sdkid=${IDS.tiktok}`)), 'the TikTok pixel carries its sdkid');
   assert.ok(gate.dataLayer().some((entry) => entry[0] === 'config' && entry[1] === IDS.google), 'GA4 is configured');
-  assert.deepStrictEqual(Array.from(globalThis.window.fbq.queue[0]), ['init', IDS.meta], 'the Meta pixel is initialized');
-  assert.deepStrictEqual(Array.from(globalThis.window.fbq.queue[1]), ['track', 'PageView'], 'and counts the page view');
-  assert.deepStrictEqual(globalThis.window.ttq[0], ['page'], 'the TikTok pixel counts the page view');
+  assert.deepStrictEqual(gate.metaCalls()[0], ['init', IDS.meta], 'the Meta pixel is initialized');
+});
+
+// ─── The page view (#409) ───
+
+test('the page view is the facade\'s fire, and the raw pixel calls are gone', async () => {
+  // The bypass this replaces: the loader fired `fbq('track', 'PageView')` and
+  // `ttq.page()` itself, which were the ONLY page-view signal Meta and TikTok
+  // got and the only two events on the page that walked past the catalog, the
+  // per-event consent gate and the dedupe ids
+  // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)).
+  const gate = await boot({ timeZone: 'America/New_York' });
+
+  assert.deepStrictEqual(
+    gate.metaCalls(),
+    [['init', IDS.meta], ['track', 'PageView', {}]],
+    'Meta hears its standard PageView through the transport, once, after the init',
+  );
+
+  assert.deepStrictEqual(
+    gate.tiktokCalls(),
+    [['page']],
+    'TikTok keeps its own documented method — the catalog names it and the TRANSPORT calls it',
+  );
+
+  assert.deepStrictEqual(
+    gate.dataLayer().filter(([command]) => command === 'event'),
+    [],
+    'GA4 counts the page view off its own `config` command, so nothing fires it a second time',
+  );
+});
+
+test('a page view is counted once per pixel, however often consent is re-saved', async () => {
+  const gate = await boot({ timeZone: 'Europe/Berlin' });
+
+  gate.setTrackingConsent({ analytics: true, marketing: true });
+  gate.setTrackingConsent({ analytics: true, marketing: true });
+
+  assert.deepStrictEqual(gate.metaCalls().filter(([command]) => command === 'track'), [['track', 'PageView', {}]]);
+  assert.deepStrictEqual(gate.tiktokCalls(), [['page']]);
+});
+
+test('the loader itself counts nothing — the raw calls cannot grow back', () => {
+  // TikTok's half looks the same ON THE WIRE as the retired `ttq.page()`, which
+  // is the point of the mapping — so the retirement gets its own pin. What may
+  // not come back is this file firing a pixel itself: the fire belongs to the
+  // facade, behind the catalog and the per-event consent gate.
+  const loader = fs.readFileSync(path.join(CORE_JS, 'core', 'analytics-loader.js'), 'utf8');
+  // Comment lines dropped: the retired calls are NAMED in that file's prose,
+  // which is documentation of what moved, not a call.
+  const code = loader.split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
+
+  assert.ok(!/ttq\.page\(/.test(code), 'no raw ttq.page() at pixel init');
+  assert.ok(!/fbq\('track'/.test(code), 'no raw fbq track at pixel init');
+  assert.ok(code.includes('countPageView('), 'the page view goes through the facade');
+});
+
+test('a denied marketing category counts no page view at all', async () => {
+  const gate = await boot({ timeZone: 'Europe/Berlin' });
+
+  gate.setTrackingConsent({ analytics: true, marketing: false });
+
+  assert.deepStrictEqual(gate.loaded(), ['google'], 'no marketing pixel exists to count one');
+  assert.deepStrictEqual(gate.metaCalls(), [], 'and nothing is queued for one that never installed');
+  assert.deepStrictEqual(gate.tiktokCalls(), []);
 });
 
 test('a category is gated on its OWN provider — analytics alone loads GA4 alone', async () => {

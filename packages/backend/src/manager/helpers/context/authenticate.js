@@ -9,6 +9,7 @@
 
 const safeCompare = require('../safe-compare.js');
 const redactSecret = require('../redact-secret.js');
+const { healUserDoc, isUserDoc } = require('../../libraries/user-doc.js');
 
 const methods = {
   async authenticate(options) {
@@ -113,22 +114,50 @@ const methods = {
         }
 
         // Get the user
-        await admin.firestore().doc(`users/${decodedIdToken.user_id}`)
-        .get()
-        .then((doc) => {
-          // Set the user
-          if (doc.exists) {
-            self.request.user = Object.assign({}, self.request.user, doc.data());
-            self.request.user.authenticated = true;
-            self.request.user.auth.uid = decodedIdToken.user_id;
-            self.request.user.auth.email = decodedIdToken.email;
-          }
+        const doc = await admin.firestore().doc(`users/${decodedIdToken.user_id}`).get();
 
-          // Log the user
-          if (options.debug) {
-            self.log('Found user doc', self.request.user);
-          }
-        });
+        // Whether a doc was there AT ALL is the pre-heal lane's own question, and
+        // it still decides the answer below on its own. Losing it would turn every
+        // caller the heal declines to touch into a 401 it never used to get.
+        const existed = doc.exists;
+
+        let userDoc = existed ? doc.data() : null;
+
+        // Heal FIRST, then authenticate normally. A token this project signed is
+        // proof the account is real, so a missing users/{uid} is a database out of
+        // sync with Auth rather than a caller to turn away — and every signed-in
+        // surface arrives HERE, so one heal site covers them all
+        // ([#405](https://github.com/Omega-JS-Stack/omega/issues/405)). The doc
+        // requirement below stays exactly as strict: the heal recreates a doc only
+        // behind an auth user that still exists, so a uid this project never
+        // authenticated still cannot mint one (#399).
+        if (!isUserDoc(userDoc)) {
+          // A DECLINED heal (a signup still in flight, an anonymous account, an
+          // account gone from Auth) leaves the caller exactly where the pre-heal
+          // lane left them: whatever the doc held, and the same answer below.
+          // /user/signup arrives inside the signup window holding nothing but
+          // before-signin's activity, and the 30s poll it runs for its own doc
+          // sits behind this authentication.
+          userDoc = await healUserDoc({
+            Manager: self.Manager,
+            ctx: self,
+            admin: admin,
+            uid: decodedIdToken.user_id,
+          }) || userDoc;
+        }
+
+        // Set the user — a healed/real doc, or the pre-heal rule: a doc existed
+        if (isUserDoc(userDoc) || existed) {
+          self.request.user = Object.assign({}, self.request.user, userDoc);
+          self.request.user.authenticated = true;
+          self.request.user.auth.uid = decodedIdToken.user_id;
+          self.request.user.auth.email = decodedIdToken.email;
+        }
+
+        // Log the user
+        if (options.debug) {
+          self.log('Found user doc', self.request.user);
+        }
 
         // Return the user
         return _resolve(self.request.user);

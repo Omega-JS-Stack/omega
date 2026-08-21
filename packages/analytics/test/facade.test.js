@@ -189,7 +189,7 @@ test('a transport that could not deliver reports blocked, never throws', () => {
   });
 
   assert.strictEqual(result.results[0].outcome, 'blocked (no global)');
-  assert.deepEqual(lines, ['[@omega.js/analytics:events] page_view → ga4 blocked (no global), meta skipped (no mapping), tiktok skipped (no mapping)']);
+  assert.deepEqual(lines, ['[@omega.js/analytics:events] page_view → ga4 blocked (no global), meta blocked (no global), tiktok blocked (no global)']);
 });
 
 // ─── The two-half fire (a browser twin of a server event) ───

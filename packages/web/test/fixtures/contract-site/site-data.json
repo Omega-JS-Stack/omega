@@ -2,5 +2,6 @@
   "url": "https://contract.test",
   "brand": { "id": "contract", "name": "Contract" },
   "meta": { "title": "Contract - Theme Contract Fixture", "description": "Contract fixture" },
+  "monitoring": { "provider": "sentry", "dsn": "https://key@o1.ingest.sentry.io/1", "org": "contract-org" },
   "theme": { "id": "classy" }
 }

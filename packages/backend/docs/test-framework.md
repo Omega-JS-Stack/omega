@@ -450,6 +450,8 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 
 **Shared accounts are safe for:** validation-only tests (missing fields, invalid input, auth rejection, unknown processor), read-only operations, and tests with no async side effects.
 
+**A FABRICATED payment uid needs an auth user.** A suite that invents a uid instead of using a persona — a shape no persona holds, a doc the pipeline is meant to write itself — must call `ensureAuthUser(Manager, uid)` from [test/\_helpers/auth-user.js](../test/_helpers/auth-user.js) first. Both payment seams refuse a uid this project has no Firebase auth user for ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)): the checkout answers 403 and the webhook pipeline completes the event with `refusal.reason: 'user-without-auth'`, writing nothing. A seeded user doc alone is not enough.
+
 ## Test Naming Conventions
 
 - **Test names:** kebab-case, descriptive: `'user-can-read-own-doc'`, `'duplicate-submission-rejected'`

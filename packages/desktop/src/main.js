@@ -7,7 +7,10 @@ const LoggerLite = require('./lib/logger-lite.js');
 const storage      = require('./lib/storage.js');
 const theme        = require('./lib/theme.js');
 const fontawesome  = require('./lib/fontawesome.js');
-const sentry       = require('./lib/sentry/index.js');
+// Error reporting is the shared @omega.js/monitoring contract (#380) — the
+// package's entry detects main vs renderer and forwards, exactly as the
+// lib/sentry/ split it replaced did.
+const sentry       = require('@omega.js/monitoring');
 const protocol     = require('./lib/protocol.js');
 const deepLink     = require('./lib/deep-link.js');
 const authFlow     = require('./lib/auth-flow.js');

@@ -658,10 +658,15 @@ function buildSessionFixtures(key, accounts) {
  * Used for testing access control levels
  * Both @omega.js/backend and consuming projects rely on these
  *
- * Structure: { id, uid, email, properties }
+ * Structure: { id, uid, email, palette, properties }
  * - id: Account identifier
  * - uid: Firebase Auth UID
  * - email: Email with {domain} placeholder (resolved at runtime)
+ * - palette: The label the dev palette's account switcher offers this persona
+ *   under ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)). The
+ *   seed is the ONE owner of that roster (routes/test/roster hands it over), so
+ *   a HUMAN-facing persona carries a label, and machinery (the fixtures an
+ *   automated suite drives) carries none and stays invisible.
  * - properties: Object to merge into user doc after auth:on-create
  *
  * IMPORTANT: Premium accounts MUST have subscription.expires set to a future date
@@ -672,6 +677,7 @@ const STATIC_ACCOUNTS = {
     id: 'admin',
     uid: '_test-admin',
     email: '_test.admin@{domain}',
+    palette: 'Admin',
     properties: {
       roles: { admin: true },
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -682,6 +688,7 @@ const STATIC_ACCOUNTS = {
     id: 'basic',
     uid: '_test-basic',
     email: '_test.basic@{domain}',
+    palette: 'Basic',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -700,6 +707,7 @@ const STATIC_ACCOUNTS = {
     id: 'premium-active',
     uid: '_test-premium-active',
     email: '_test.premium-active@{domain}',
+    palette: 'Premium',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-active') },
@@ -717,6 +725,7 @@ const STATIC_ACCOUNTS = {
     id: 'premium-trialing',
     uid: '_test-premium-trialing',
     email: '_test.premium-trialing@{domain}',
+    palette: 'Trialing',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'active', expires: getTrialExpires(), cancellation: { pending: false }, trial: { claimed: true, expires: getTrialExpires(), outcome: null }, payment: getTestPayment('premium-trialing', { startDate: getStamp() }) },
@@ -729,6 +738,7 @@ const STATIC_ACCOUNTS = {
     id: 'premium-expired',
     uid: '_test-premium-expired',
     email: '_test.premium-expired@{domain}',
+    palette: 'Expired',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-expired', { startDate: getPastExpires(2) }) },
@@ -741,6 +751,7 @@ const STATIC_ACCOUNTS = {
     id: 'premium-suspended',
     uid: '_test-premium-suspended',
     email: '_test.premium-suspended@{domain}',
+    palette: 'Suspended',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'suspended', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-suspended') },
@@ -752,6 +763,7 @@ const STATIC_ACCOUNTS = {
     id: 'premium-cancelling',
     uid: '_test-premium-cancelling',
     email: '_test.premium-cancelling@{domain}',
+    palette: 'Cancelling',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: getTestPayment('premium-cancelling') },
@@ -768,6 +780,7 @@ const STATIC_ACCOUNTS = {
     id: 'refunded',
     uid: '_test-refunded',
     email: '_test.refunded@{domain}',
+    palette: 'Refunded',
     properties: {
       roles: {},
       subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getDaysAgo(4), cancellation: { pending: false }, payment: getTestPayment('refunded', { order: false, startDate: getDaysAgo(5) }) },
@@ -796,6 +809,7 @@ const STATIC_ACCOUNTS = {
     id: 'referrer',
     uid: '_test-referrer',
     email: '_test.referrer@{domain}',
+    palette: 'Referrer',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -818,6 +832,7 @@ const STATIC_ACCOUNTS = {
     id: 'referred',
     uid: '_test-referred',
     email: '_test.referred@{domain}',
+    palette: 'Referred',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -1342,6 +1357,7 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-flows-upgrade',
     uid: '_test-journey-flows-upgrade',
     email: '_test.journey-flows-upgrade@{domain}',
+    palette: 'Journey: Upgrade',
     properties: {
       roles: {},
       subscription: {
@@ -1366,6 +1382,7 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-flows-cancel',
     uid: '_test-journey-flows-cancel',
     email: '_test.journey-flows-cancel@{domain}',
+    palette: 'Journey: Cancel',
     properties: {
       roles: {},
       subscription: {
@@ -1389,6 +1406,7 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-flows-failure',
     uid: '_test-journey-flows-failure',
     email: '_test.journey-flows-failure@{domain}',
+    palette: 'Journey: Failure',
     properties: {
       roles: {},
       subscription: {
@@ -1407,6 +1425,7 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-flows-trial',
     uid: '_test-journey-flows-trial',
     email: '_test.journey-flows-trial@{domain}',
+    palette: 'Journey: Trial',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },

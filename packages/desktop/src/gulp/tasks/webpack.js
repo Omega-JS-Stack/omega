@@ -53,6 +53,16 @@ function makeStripModule(isProd) {
   };
 }
 
+// The blob every bundle reads as OMEGA_BUILD_JSON.config — and the ONLY thing
+// the renderer hands @omega.js/client (renderer.js merges `buildJson.config`
+// with the runtime overrides). The app's VERSION rides INSIDE it for that
+// reason: the client tags every error report `<brand.id>@<version>` and falls
+// back to the build stamp without one (#380), and it never sees the sibling
+// `package` key. The dev map (#300) is a dev-build key only.
+function composeBuildConfig(config, dev, pkg) {
+  return { ...config, version: pkg.version, ...(dev ? { dev } : {}) };
+}
+
 module.exports = function webpackTask(done) {
   const mode = Manager.getMode();
   const isProd = mode.environment === 'production';
@@ -75,9 +85,10 @@ module.exports = function webpackTask(done) {
   };
 
   // OMEGA_BUILD_JSON — frozen at build time, accessible at runtime as window/globalThis.OMEGA_BUILD_JSON.
+  const projectPackage = Manager.getPackage('project');
   const buildJson = {
-    config: dev ? { ...config, dev } : config,
-    package: Manager.getPackage('project'),
+    config: composeBuildConfig(config, dev, projectPackage),
+    package: projectPackage,
     mode,
     builtAt: new Date().toISOString(),
   };
@@ -356,3 +367,4 @@ function formatBytes(bytes) {
 
 module.exports.makeSharedResolve = makeSharedResolve;
 module.exports.makeStripModule = makeStripModule;
+module.exports.composeBuildConfig = composeBuildConfig;

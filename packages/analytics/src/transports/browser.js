@@ -54,8 +54,27 @@ function sendMeta(descriptor) {
 // TikTok Pixel — an object of methods, so the method gets its own check. Its
 // dedupe key is `event_id` in the third argument (the Events API half sends the
 // same string).
+//
+// A descriptor carrying a `method` is the signal TikTok manages ITSELF rather
+// than exposing as a trackable name: the page view, whose documented surface is
+// `ttq.page()` and nothing else ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)).
+// It takes no name and no payload — the pixel reads the page — and a build that
+// does not have the method is the same silent no-op a blocked global is (#306).
 function sendTikTok(descriptor) {
-  if (typeof ttq === 'undefined' || typeof ttq.track !== 'function') {
+  if (typeof ttq === 'undefined') {
+    return false;
+  }
+
+  if (descriptor.method) {
+    if (typeof ttq[descriptor.method] !== 'function') {
+      return false;
+    }
+
+    ttq[descriptor.method]();
+    return true;
+  }
+
+  if (typeof ttq.track !== 'function') {
     return false;
   }
 

@@ -36,6 +36,17 @@ test('advertising schema: role-keyed providers with the inhouse source (ads spec
   assert.ok(!paths.some((path) => /^advertising\..*-/.test(path)), 'no kebab-case key survives under advertising');
 });
 
+test('monitoring declares every knob the monitoring package resolves (#380)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const paths = SHARED_SCHEMA.map((entry) => entry.path);
+
+  // Undeclared keys pass validation silently, so a typo (scrubemail) would
+  // vanish instead of failing — every documented knob is declared here.
+  for (const key of ['provider', 'org', 'dsn', 'environment', 'sampleRate', 'tracesSampleRate', 'scrubEmail', 'attachScreenshot', 'bundlePatterns']) {
+    assert.ok(paths.includes(`monitoring.${key}`), `missing monitoring.${key}`);
+  }
+});
+
 test('the de-branded role sections are declared (#23)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const paths = SHARED_SCHEMA.map((entry) => entry.path);

@@ -1,0 +1,29 @@
+{
+  "name": "@omega.js/monitoring",
+  "version": "0.1.0",
+  "description": "The OMEGA error-reporting contract — one config resolution, release tag, PII scrub and capture seam for every target (@omega.js/backend's node process, @omega.js/desktop's electron main/renderer/preload, and the browser bundles @omega.js/client ships into web and extension) (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "private": true,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./core": "./src/core.js",
+    "./env": "./src/env.js",
+    "./browser": "./src/browser.js",
+    "./node": "./src/node.js",
+    "./main": "./src/main.js",
+    "./renderer": "./src/renderer.js",
+    "./preload": "./src/preload.js",
+    "./logger": "./src/logger.js"
+  },
+  "scripts": {
+    "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@omega.js/devkit": "*"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "Elastic-2.0"
+}

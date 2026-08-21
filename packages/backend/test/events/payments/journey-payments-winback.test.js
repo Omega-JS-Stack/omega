@@ -19,6 +19,7 @@
  * Run: npx omega test framework:events/payments/journey-payments-winback
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
+const { ensureAuthUser } = require('../../_helpers/auth-user.js');
 const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
 
 const handler = require('../../../src/manager/routes/payments/intent/post.js');
@@ -34,7 +35,7 @@ module.exports = {
   tests: [
     {
       name: 'setup-cancelled-subscriber',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ firestore, assert, state, config, skip, Manager }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -70,6 +71,10 @@ module.exports = {
             startDate: { timestamp: new Date(startUNIX * 1000).toISOString(), timestampUNIX: startUNIX },
           },
         };
+
+        // A checkout verifies the purchaser is one of ours before it starts, so the
+        // fabricated subscriber needs the auth user a real one has ([#399])
+        await ensureAuthUser(Manager, UID);
 
         // The pipeline reads users/{uid} for its BEFORE state, so the doc has to be
         // the real record the transition is detected against.

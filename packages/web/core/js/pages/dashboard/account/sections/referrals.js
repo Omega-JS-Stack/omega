@@ -15,6 +15,9 @@ export function loadData(account) {
 
   // Update referrals list
   updateReferralsList(account.affiliate?.referrals);
+
+  // Update the inbound referral (the code this account itself signed up with)
+  updateInboundReferral(account.attribution?.affiliate);
 }
 
 // Update referral code display
@@ -46,6 +49,31 @@ function getReferralTime(referral) {
   }
 
   return referral.timestampUNIX ? referral.timestampUNIX * 1000 : 0;
+}
+
+// Update the inbound referral line
+//
+// The OTHER half of a referral: `attribution.affiliate` is what a signup writes
+// on the account that arrived through someone's code (@omega.js/account schema),
+// and it carries the code, not a name, so the code and when it was used is
+// everything there is to show. No code, no line: an account nobody referred
+// keeps the element hidden exactly as the markup ships it.
+function updateInboundReferral(affiliate) {
+  const $referredBy = document.getElementById('referred-by');
+  const $code = document.getElementById('referred-by-code');
+  const $time = document.getElementById('referred-by-time');
+
+  if (!$referredBy) return;
+
+  if (!affiliate?.code) {
+    $referredBy.classList.add('d-none');
+    return;
+  }
+
+  if ($code) $code.textContent = affiliate.code;
+  if ($time) $time.textContent = getTimeSince(getReferralTime(affiliate));
+
+  $referredBy.classList.remove('d-none');
 }
 
 // Update referrals list

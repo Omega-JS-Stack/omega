@@ -13,6 +13,17 @@
  * also names the CANONICAL catalog event each transition is — the name every
  * provider's dialect is derived from — and covers the two outcomes it never
  * mapped: a refund and a cancellation that took effect.
+ *
+ * [#407](https://github.com/Omega-JS-Stack/omega/issues/407) added the four
+ * subscription lifecycle moments that were still dark or mislabeled: a plan
+ * change, an uncancel, a trial that ended unpaid, and the first real charge after
+ * a trial — which the generic renewal branch used to swallow. The last two turn on
+ * the PRIOR state's term, so those cases pass a `before` the way the webhook does.
+ *
+ * [#414](https://github.com/Omega-JS-Stack/omega/issues/414) closed the two holes
+ * that left: a cancellation INSIDE the trial term is the trial's outcome on every
+ * processor, not paid churn, and a degraded payload carrying no term at all is not
+ * a trial when the subscription is on record as already having had one.
  */
 const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
 const paypalProcessor = require('../../../src/manager/routes/payments/webhook/processors/paypal.js');
@@ -31,6 +42,54 @@ function renewedSubscription() {
 
 function resolveRenewal(eventType) {
   return analytics.resolvePaymentEvent('subscription', null, eventType, renewedSubscription(), {});
+}
+
+// The trial term, as every processor reports it: while a trial runs, the
+// subscription's paid-through date IS the trial's end, and only the first real
+// charge moves it past.
+const TRIAL_END_UNIX = 1750000000;
+const NEXT_TERM_UNIX = TRIAL_END_UNIX + 30 * 24 * 60 * 60;
+
+// The subscription DURING its trial — nothing has ever been charged
+function subscriptionInTrial() {
+  return {
+    product: { id: 'premium', name: 'Premium' },
+    status: 'active',
+    trial: { claimed: true, expires: { timestampUNIX: TRIAL_END_UNIX } },
+    expires: { timestampUNIX: TRIAL_END_UNIX },
+    payment: { frequency: 'monthly', price: 9.99, resourceId: '_test-sub-analytics' },
+  };
+}
+
+// The same subscription once a charge has carried it past the trial's end.
+// `trial.claimed` is still true — it means "this subscription HAD a trial", never
+// "it converted", which is exactly why the term has to be the tiebreaker.
+function subscriptionAfterTrial() {
+  return { ...subscriptionInTrial(), expires: { timestampUNIX: NEXT_TERM_UNIX } };
+}
+
+// Chargebee's in-trial payload names no `current_term_end` at all — only
+// `trial_end` and `next_billing_at` (test/fixtures/chargebee/subscription-in-trial.json)
+// — so `expires` folds to the epoch while `trial.expires` is real. Every trial
+// rule has to see THIS shape as a trial, or Chargebee's entire trial funnel is
+// dark on a processor the framework fully supports.
+function chargebeeSubscriptionInTrial() {
+  return { ...subscriptionInTrial(), expires: { timestampUNIX: 0 } };
+}
+
+// The degraded shape [#414] guards against: the processor API was unreachable, so
+// the #222 stale fallback hands over the webhook's own body, and a Chargebee body
+// that named no `current_term_end` would fold `expires` to the epoch for a PAID
+// subscription exactly the way it does for a trialing one.
+//
+// DEFENSIVE, and deliberately so: no fixture in this repo produces an active paid
+// Chargebee body with no `current_term_end` (every cancelled and active fixture
+// carries one), so the premise is the issue's, not something reproduced here. What
+// the fixture DOES prove is the part that matters — the two payloads are
+// indistinguishable on their own (this one IS that one), so nothing but the state
+// the subscription arrived FROM can ever say which is which.
+function degradedPaidSubscription() {
+  return chargebeeSubscriptionInTrial();
 }
 
 // A completed one-time purchase, as the order carries it when the refund lands
@@ -182,15 +241,349 @@ module.exports = {
     },
 
     {
-      name: 'the-cancellation-schedule-transitions-stay-unmapped',
+      // [#414](https://github.com/Omega-JS-Stack/omega/issues/414): Chargebee ends a
+      // trial with no card on file by CANCELLING it, so every no-card lapse was
+      // booked as paid churn for a customer who had never paid a cent.
+      name: 'a-trial-cancelled-with-no-card-on-file-is-a-lapse-not-churn',
       async run({ assert }) {
-        // Requesting a cancellation (and taking it back) changes a schedule, not
-        // an outcome: the subscription is still active and may never cancel.
-        for (const transition of ['cancellation-requested', 'cancellation-removed']) {
-          const resolved = analytics.resolvePaymentEvent('subscription', transition, 'customer.subscription.updated', renewedSubscription(), {});
+        const cancelled = { ...chargebeeSubscriptionInTrial(), status: 'cancelled' };
 
-          assert.equal(resolved, null, `${transition} should track nothing`);
-        }
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'subscription_cancelled', cancelled, {}, null, chargebeeSubscriptionInTrial()
+        );
+
+        assert.ok(resolved, 'a trial cancelled at its end should resolve to a trackable event');
+        assert.equal(resolved.event, 'trial_lapsed', 'nobody churned: a trial ended without ever paying');
+        assert.notEqual(resolved.event, 'subscription_cancelled', 'a customer who never paid cannot be paid churn');
+        assert.equal(resolved.value, 9.99, 'the value is the subscription that never started paying');
+        assert.equal(resolved.isRecurring, false, 'nothing was ever charged');
+
+        // The sweep derives this same id for a lapse, which collapses a race on the
+        // two platforms that deduplicate. It is NOT what keeps GA4 honest — GA4
+        // deduplicates nothing across sources — a cancelled subscription simply
+        // leaves the sweep's `status == active` candidate query.
+        assert.equal(
+          analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } }),
+          'trial_lapsed._test-sub-analytics',
+          'the lapse keys on the SUBSCRIPTION however it was announced',
+        );
+      },
+    },
+
+    {
+      // The rule reads the unified TERM, never a provider name: a subscriber who
+      // simply quits mid-trial on Stripe or PayPal is the same story.
+      name: 'a-cancellation-inside-the-trial-is-a-lapse-on-every-processor',
+      async run({ assert }) {
+        const cancelled = { ...subscriptionInTrial(), status: 'cancelled' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, subscriptionInTrial()
+        );
+
+        assert.equal(resolved.event, 'trial_lapsed', 'quitting mid-trial is the trial\'s outcome, not a churned subscriber');
+        assert.equal(resolved.isRecurring, false);
+      },
+    },
+
+    {
+      name: 'a-cancellation-after-the-trial-is-still-paid-churn',
+      async run({ assert }) {
+        // The term is the only thing that moved: this subscriber converted and paid,
+        // and their cancellation is the churn number it always was.
+        const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, subscriptionAfterTrial()
+        );
+
+        assert.equal(resolved.event, 'subscription_cancelled', 'subscription_cancelled means a PAID subscriber left');
+        assert.equal(resolved.value, 9.99, 'the value is the subscription that ended');
+      },
+    },
+
+    {
+      // The lapse rule reads the PRIOR state, and that state is a stored delivery
+      // like any other: a degraded one carries no term, which reads as a trial the
+      // subscription left long ago. So the cancelled payload's own evidence has the
+      // last word — a term that outlived the trial's end is a subscriber who paid.
+      name: 'a-paid-cancellation-is-churn-even-when-the-stored-record-arrived-degraded',
+      async run({ assert }) {
+        const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, degradedPaidSubscription()
+        );
+
+        assert.equal(resolved.event, 'subscription_cancelled', 'a thin record on file cannot turn paid churn into a trial');
+        assert.equal(resolved.value, 9.99);
+      },
+    },
+
+    {
+      // A trial that lapses tells its story ONCE, at the decline. The processor then
+      // exhausts dunning and cancels the same never-converted subscription, and that
+      // second webhook used to book paid churn at full price on top of the lapse —
+      // the very pollution the lapse rule exists to stop.
+      name: 'the-dunning-that-exhausts-a-lapsed-trial-tells-no-second-story',
+      async run({ assert }) {
+        // A1: the trial's charge declines. This is the outcome, and it is reported.
+        const suspended = { ...subscriptionInTrial(), status: 'suspended' };
+        const lapse = analytics.resolvePaymentEvent(
+          'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionInTrial()
+        );
+
+        assert.equal(lapse.event, 'trial_lapsed', 'the decline is where a lapsed trial is told');
+
+        // A2: dunning runs out and the processor cancels what it was holding.
+        const cancelled = { ...subscriptionInTrial(), status: 'cancelled' };
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, suspended
+        );
+
+        assert.equal(resolved, null, 'the outcome was already told at the decline');
+
+        // Chargebee suspends a mid-trial subscription with no term of its own, so the
+        // same sequence has to read alike through the epoch-expiry shape.
+        const chargebeeSuspended = { ...chargebeeSubscriptionInTrial(), status: 'suspended' };
+        const chargebeeCancelled = { ...chargebeeSubscriptionInTrial(), status: 'cancelled' };
+
+        assert.equal(
+          analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'subscription_cancelled', chargebeeCancelled, {}, null, chargebeeSuspended),
+          null,
+          'a term that never existed never left the trial either',
+        );
+      },
+    },
+
+    {
+      // The boundary of the rule above: this subscriber converted and paid for
+      // months before dunning took them, so the cancellation IS the churn number.
+      name: 'the-dunning-that-exhausts-a-paying-subscriber-is-still-churn',
+      async run({ assert }) {
+        const suspended = { ...subscriptionAfterTrial(), status: 'suspended' };
+        const cancelled = { ...subscriptionAfterTrial(), status: 'cancelled' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, suspended
+        );
+
+        assert.equal(resolved.event, 'subscription_cancelled', 'a subscriber who paid and then lapsed on dunning is churn');
+        assert.equal(resolved.value, 9.99, 'the value is the subscription that ended');
+      },
+    },
+
+    {
+      name: 'requesting-a-cancellation-stays-event-less',
+      async run({ assert }) {
+        // Requesting one changes a SCHEDULE, not an outcome: the subscription is
+        // still active, no money moved, and it may never cancel at all.
+        const resolved = analytics.resolvePaymentEvent('subscription', 'cancellation-requested', 'customer.subscription.updated', renewedSubscription(), {});
+
+        assert.equal(resolved, null, 'cancellation-requested should track nothing');
+      },
+    },
+
+    {
+      // Gap 2 (#407): the uncancel was event-less too, which left a retention win
+      // completely dark. The pair is not symmetric on purpose.
+      name: 'withdrawing-a-cancellation-is-a-retention-win',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent('subscription', 'cancellation-removed', 'customer.subscription.updated', renewedSubscription(), {});
+
+        assert.ok(resolved, 'an uncancel should resolve to a trackable event');
+        assert.equal(resolved.event, 'subscription_uncancelled');
+        assert.equal(resolved.value, 9.99, 'the value is the subscription that was kept');
+        assert.equal(resolved.isRecurring, false, 'nothing was charged');
+      },
+    },
+
+    {
+      // Gap 1 (#407): a plan change sent an order email and fired nothing, so
+      // every upgrade was invisible to every platform.
+      name: 'a-plan-change-reports-the-plan-it-came-from',
+      async run({ assert }) {
+        const before = {
+          ...renewedSubscription(),
+          product: { id: 'starter', name: 'Starter' },
+          payment: { frequency: 'monthly', price: 4.99, resourceId: '_test-sub-analytics' },
+        };
+
+        const resolved = analytics.resolvePaymentEvent('subscription', 'plan-changed', 'customer.subscription.updated', renewedSubscription(), {}, null, before);
+
+        assert.ok(resolved, 'a plan change should resolve to a trackable event');
+        assert.equal(resolved.event, 'plan_changed');
+        assert.equal(resolved.value, 9.99, 'the value is the plan they moved TO');
+        assert.equal(resolved.isRecurring, false, 'no money moves at the switch itself');
+
+        const params = analytics.buildParams({ resolved, currency: 'USD', processor: 'stripe' });
+
+        assert.equal(params.items[0].item_id, 'premium', 'items[] is the new plan');
+        assert.equal(params.previous_item_id, 'starter', 'and the from-plan rides beside it');
+        assert.equal(params.previous_item_name, 'Starter');
+        assert.equal(params.previous_value, 4.99, 'so the direction of the switch is readable without a second event');
+      },
+    },
+
+    {
+      name: 'only-a-plan-change-carries-a-previous-plan',
+      async run({ assert }) {
+        const params = analytics.buildParams({ resolved: resolveRenewal('invoice.payment_succeeded'), currency: 'USD', processor: 'stripe' });
+
+        assert.equal('previous_item_id' in params, false, 'a renewal has no plan it came from');
+      },
+    },
+
+    {
+      // Gap 4 (#407): the conversion charge arrives exactly like a renewal — no
+      // transition, a payment event — so it resolved as subscription_renewed and
+      // the funnel's most valuable step was undercounted.
+      name: 'the-first-charge-after-a-trial-is-a-conversion-not-a-renewal',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionInTrial()
+        );
+
+        assert.ok(resolved, 'a converting trial should resolve to a trackable event');
+        assert.notEqual(resolved.event, 'subscription_renewed', 'a conversion is not a routine renewal');
+        assert.equal(resolved.event, 'trial_converted');
+        assert.equal(resolved.reason, 'trial-converted');
+        assert.equal(resolved.value, 9.99, 'the first real charge is what they actually paid');
+        assert.equal(resolved.isRecurring, false, 'the FIRST payment is not recurring revenue');
+      },
+    },
+
+    {
+      name: 'the-renewal-behind-a-conversion-is-a-renewal-again',
+      async run({ assert }) {
+        // Month two: same trial.claimed, same payment event — only the prior
+        // term differs, and it is already paid past the trial's end.
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionAfterTrial()
+        );
+
+        assert.equal(resolved.event, 'subscription_renewed', 'every charge after the conversion is an ordinary renewal');
+        assert.equal(resolved.isRecurring, true);
+      },
+    },
+
+    {
+      // Gap 3 (#407): a trial ending unpaid routed through payment-failed, which
+      // sent an email and fired nothing at all.
+      name: 'a-trial-that-ends-unpaid-is-a-lapse',
+      async run({ assert }) {
+        const suspended = { ...subscriptionInTrial(), status: 'suspended' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionInTrial()
+        );
+
+        assert.ok(resolved, 'the funnel\'s failure mode should resolve to a trackable event');
+        assert.equal(resolved.event, 'trial_lapsed');
+        assert.equal(resolved.value, 9.99, 'the value is the subscription that never started paying');
+        assert.equal(resolved.isRecurring, false, 'nothing was ever charged');
+      },
+    },
+
+    {
+      // The trial START invoice is $0 and carries no transition, so it lands on
+      // the very same branch the conversion does — and, failing that, on the
+      // renewal branch, which reads the PLAN price and booked 9.99 of revenue for
+      // an invoice that charged nothing. Before and after are both inside the
+      // trial: nothing converted, nothing renewed, nothing was charged, so the
+      // only honest answer is no event at all.
+      name: 'the-zero-dollar-trial-invoice-books-nothing',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', subscriptionInTrial(), {}, null, subscriptionInTrial()
+        );
+
+        assert.notEqual(resolved?.event, 'trial_converted', 'the trial has not converted — the customer is still inside it');
+        assert.equal(resolved, null, 'and a $0 invoice inside a trial is not recurring revenue either');
+      },
+    },
+
+    {
+      name: 'a-chargebee-zero-dollar-trial-invoice-books-nothing-either',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', chargebeeSubscriptionInTrial(), {}, null, chargebeeSubscriptionInTrial()
+        );
+
+        assert.equal(resolved, null, 'the no-term shape is inside the trial on both sides too');
+      },
+    },
+
+    {
+      // Chargebee names no current_term_end while a trial runs, so a term-end
+      // comparison cannot see a Chargebee trial at all — the conversion fell
+      // straight through to the renewal branch and the funnel stayed dark.
+      name: 'a-chargebee-conversion-is-a-conversion-too',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, chargebeeSubscriptionInTrial()
+        );
+
+        assert.ok(resolved, 'a converting Chargebee trial should resolve to a trackable event');
+        assert.equal(resolved.event, 'trial_converted', 'an epoch expiry is the ABSENCE of a term, not a term that ended in 1970');
+        assert.equal(resolved.isRecurring, false);
+      },
+    },
+
+    {
+      name: 'a-chargebee-trial-that-ends-unpaid-is-a-lapse-too',
+      async run({ assert }) {
+        const suspended = { ...chargebeeSubscriptionInTrial(), status: 'suspended' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, chargebeeSubscriptionInTrial()
+        );
+
+        assert.ok(resolved, 'a lapsing Chargebee trial should resolve to a trackable event');
+        assert.equal(resolved.event, 'trial_lapsed');
+      },
+    },
+
+    {
+      // [#414](https://github.com/Omega-JS-Stack/omega/issues/414): the widening that
+      // let the resolver see a Chargebee trial also read a DEGRADED payload as one.
+      // The #222 stale fallback hands over a body with no term at all, and for a paid
+      // subscriber that is a hole in the payload, not a trial. A renewal on that path
+      // matched no branch and booked nothing: silent under-reporting of real revenue.
+      name: 'a-renewal-on-a-degraded-payload-still-books-its-revenue',
+      async run({ assert }) {
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, subscriptionAfterTrial()
+        );
+
+        assert.ok(resolved, 'a renewal must never go unreported because its payload arrived thin');
+        assert.equal(resolved.event, 'subscription_renewed');
+        assert.equal(resolved.value, 9.99, 'the money moved whatever the payload could say about the term');
+        assert.equal(resolved.isRecurring, true);
+
+        // The bound needs one healthy delivery behind it. Two degraded deliveries in
+        // a row leave no term on either side, and that renewal still books nothing —
+        // narrower than the hole it closes, and it fails toward silence.
+        assert.equal(
+          analytics.resolvePaymentEvent('subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, degradedPaidSubscription()),
+          null,
+          'nothing on either side names a term, so nothing can prove this was not a trial',
+        );
+      },
+    },
+
+    {
+      name: 'a-dunning-failure-months-after-a-trial-is-not-a-lapse',
+      async run({ assert }) {
+        // The same active → suspended shape and the same trial.claimed. Only the
+        // term tells them apart: this subscriber has been paying for months.
+        const suspended = { ...subscriptionAfterTrial(), status: 'suspended' };
+
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', 'payment-failed', 'invoice.payment_failed', suspended, {}, null, subscriptionAfterTrial()
+        );
+
+        assert.equal(resolved, null, 'a routine payment failure is not the trial\'s outcome');
       },
     },
 
@@ -241,6 +634,19 @@ module.exports = {
 
         const refund = analytics.resolvePaymentEvent('subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {}, { amount: 9.99 });
         assert.equal(analytics.resolveEventId(refund, order), 'refund.evt_september', 'a refund has no browser twin either');
+
+        // A trial is the one exception on this side: its outcome is keyed to the
+        // SUBSCRIPTION, not the delivery, because two paths can be the one to see
+        // it — this webhook, and the trial-lapse sweep when no webhook ever comes
+        // (PayPal fires no trial-end event). One outcome must never be two
+        // conversions, so both paths compute the same id.
+        const converted = analytics.resolvePaymentEvent('subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionInTrial());
+        assert.equal(analytics.resolveEventId(converted, order), 'trial_converted._test-sub-analytics');
+        assert.equal(
+          analytics.resolveEventId(converted, { id: '_other-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }),
+          'trial_converted._test-sub-analytics',
+          'a redelivery on another order id is still the same one conversion',
+        );
       },
     },
   ],

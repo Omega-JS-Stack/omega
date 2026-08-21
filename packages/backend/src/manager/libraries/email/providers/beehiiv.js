@@ -1,7 +1,7 @@
 /**
  * Beehiiv provider — shared API helpers for subscriber management
  *
- * Used by: marketing/index.js (sync, remove)
+ * Used by: marketing/index.js (sync, remove), cron/daily/marketing-prune.js (newsletter prune)
  */
 const fetch = require('wonderful-fetch');
 const Manager = require('../../../index.js');
@@ -13,6 +13,15 @@ const BASE_URL = 'https://api.beehiiv.com/v2';
 // 60s is generous but harmless — caches are in place for metadata calls so a
 // slow first call costs nothing in steady state.
 const BEEHIIV_TIMEOUT_MS = 60000;
+
+// Beehiiv caps a subscriptions page at 100.
+const SUBSCRIPTION_PAGE_LIMIT = 100;
+
+// A `has_more` that never turns off (or a cursor that stops advancing) would
+// walk the API forever, so the page walk has a hard stop. 500 pages covers
+// 50k subscribers — a publication past that needs a paged prune, not a
+// silently truncated one, which is why hitting the cap fails the call.
+const SUBSCRIPTION_MAX_PAGES = 500;
 
 // --- Internal helpers ---
 
@@ -313,6 +322,84 @@ async function findContact(email) {
 }
 
 /**
+ * List this brand's Beehiiv subscriptions, following cursor pagination to the
+ * end. One publication belongs to one brand, so the result is brand-scoped by
+ * construction — no brand filter needed (unlike SendGrid, whose account is
+ * shared across brands).
+ *
+ * @param {object} [options]
+ * @param {string} [options.status] - Beehiiv status filter ('active', 'inactive', ...); omitted = all
+ * @param {Array<string>} [options.expand] - Expandable objects ('stats', 'custom_fields', ...)
+ * @param {Function} [request] - HTTP call, injectable so the pagination contract
+ *                               is testable without a network (defaults to wonderful-fetch)
+ * @returns {{ success: boolean, subscriptions?: Array<object>, error?: string }}
+ */
+async function listSubscriptions({ status, expand } = {}, request = fetch) {
+  const publicationId = getPublicationId();
+
+  if (!publicationId) {
+    return { success: false, error: 'Publication not found' };
+  }
+
+  const subscriptions = [];
+  let cursor = null;
+
+  try {
+    for (let page = 0; page < SUBSCRIPTION_MAX_PAGES; page++) {
+      // Hand-built rather than URLSearchParams: the expandable list is
+      // Beehiiv's literal `expand[]` key, which URLSearchParams would encode.
+      const params = [`limit=${SUBSCRIPTION_PAGE_LIMIT}`];
+
+      if (status) {
+        params.push(`status=${encodeURIComponent(status)}`);
+      }
+
+      for (const item of (expand || [])) {
+        params.push(`expand[]=${encodeURIComponent(item)}`);
+      }
+
+      if (cursor) {
+        params.push(`cursor=${encodeURIComponent(cursor)}`);
+      }
+
+      const data = await request(`${BASE_URL}/publications/${publicationId}/subscriptions?${params.join('&')}`, {
+        response: 'json',
+        headers: headers(),
+        timeout: BEEHIIV_TIMEOUT_MS,
+      });
+
+      const items = data.data || [];
+
+      subscriptions.push(...items);
+
+      // Beehiiv's deprecated offset shape carries no `has_more` at all, so the
+      // cursor walk below would stop after page 1 and report a truncated list
+      // as a complete one. There is more to come whenever the page count says
+      // so or the page came back full, and a walk that cannot continue fails
+      // rather than under-reporting who is left.
+      if (data.has_more === undefined && (data.total_pages > 1 || items.length >= SUBSCRIPTION_PAGE_LIMIT)) {
+        console.error('[@omega.js/backend:email:providers:beehiiv] listSubscriptions got an offset-paginated response — refusing to report a truncated list');
+
+        return { success: false, error: 'Unexpected offset-paginated response' };
+      }
+
+      if (!data.has_more || !data.next_cursor) {
+        return { success: true, subscriptions };
+      }
+
+      cursor = data.next_cursor;
+    }
+
+    console.error(`[@omega.js/backend:email:providers:beehiiv] listSubscriptions hit the ${SUBSCRIPTION_MAX_PAGES}-page cap — refusing to report a truncated list`);
+
+    return { success: false, error: `Pagination exceeded ${SUBSCRIPTION_MAX_PAGES} pages` };
+  } catch (e) {
+    console.error('[@omega.js/backend:email:providers:beehiiv] listSubscriptions error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
  * Build Beehiiv custom_fields array from a user doc.
  * Resolves all field values, then maps to display names for Beehiiv.
  * Beehiiv matches custom fields by their display name.
@@ -483,6 +570,7 @@ module.exports = {
   addContact,
   findContact,
   findSubscriber,
+  listSubscriptions,
   removeContact,
   buildFields,
 

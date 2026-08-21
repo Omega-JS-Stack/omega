@@ -15,6 +15,9 @@
  * says X" is seeded as an order doc — or, for "the subscription is gone", as no order
  * doc at all.
  */
+const sweep = require('../../../src/manager/events/cron/daily/trial-lapse-sweep.js');
+const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
+
 const DAY = 24 * 60 * 60;
 
 const GONE_UID = '_test-trial-lapse-gone';
@@ -32,6 +35,111 @@ module.exports = {
   timeout: 180000,
 
   tests: [
+    {
+      // The sweep is the ONLY path that ever sees a PayPal trial's outcome: PayPal
+      // fires no trial-end event, so nothing else in the pipeline is told. Before
+      // [#407](https://github.com/Omega-JS-Stack/omega/issues/407) the state was
+      // corrected here and the analytics signal was never sent at all.
+      name: 'the-sweep-reports-a-lapse-no-webhook-will-ever-announce',
+      async run({ assert }) {
+        const nowUNIX = Math.floor(Date.now() / 1000);
+        const trialEndUNIX = nowUNIX - 5 * DAY;
+
+        // PayPal's in-trial shape: `expires` is next_billing_time, which during a
+        // trial IS the trial's end.
+        const paypalTrial = {
+          product: { id: 'premium', name: 'Premium' },
+          status: 'active',
+          expires: stamp(trialEndUNIX),
+          trial: { claimed: true, expires: stamp(trialEndUNIX) },
+          payment: { processor: 'paypal', resourceId: 'I-PAYPAL-TRIAL', frequency: 'monthly', price: 9.99 },
+        };
+
+        const conversion = sweep.resolveTrialOutcomeConversion(paypalTrial, 'lapsed', 'USD');
+
+        assert.ok(conversion, 'a lapse the sweep decided should be reported');
+        assert.equal(conversion.event, 'trial_lapsed');
+        assert.equal(conversion.params.value, 9.99, 'the value is the subscription that never started paying');
+        assert.equal(conversion.params.is_trial, true);
+        assert.equal(conversion.params.is_recurring, false, 'nothing was ever charged');
+        assert.equal(
+          conversion.eventId,
+          'trial_lapsed.I-PAYPAL-TRIAL',
+          'the dedupe id is keyed to the SUBSCRIPTION, which is the one thing this sweep and the payment webhook both know',
+        );
+
+        const converted = sweep.resolveTrialOutcomeConversion({ ...paypalTrial }, 'converted', 'USD');
+
+        assert.equal(converted.event, 'trial_converted');
+        assert.equal(converted.eventId, 'trial_converted.I-PAYPAL-TRIAL');
+      },
+    },
+
+    {
+      // A trial whose outcome a payment webhook already resolved was already
+      // reported at the moment it happened. The sweep still stamps the outcome —
+      // that is state correction — but reporting it again would be a second
+      // conversion, and GA4 has no cross-source deduplication to save us.
+      name: 'the-sweep-never-reports-an-outcome-a-webhook-already-resolved',
+      async run({ assert }) {
+        const nowUNIX = Math.floor(Date.now() / 1000);
+        const trialEndUNIX = nowUNIX - 5 * DAY;
+
+        // The conversion charge moved `expires` out to the end of the first paid
+        // period — the webhook saw it, and fired trial_converted then.
+        const alreadyReported = {
+          product: { id: 'premium', name: 'Premium' },
+          status: 'active',
+          expires: stamp(nowUNIX + 25 * DAY),
+          trial: { claimed: true, expires: stamp(trialEndUNIX) },
+          payment: { processor: 'stripe', resourceId: 'sub_stripe_converted', frequency: 'monthly', price: 9.99 },
+        };
+
+        assert.equal(
+          sweep.resolveTrialOutcomeConversion(alreadyReported, 'converted', 'USD'),
+          null,
+          'the term has already moved past the trial, so a payment webhook reported this conversion',
+        );
+      },
+    },
+
+    {
+      // The two paths that can report a trial outcome derive their dedupe id in
+      // two different files, and the whole no-double-count guarantee rests on the
+      // two strings being IDENTICAL. Nothing else would notice them drifting, so
+      // this compares the real output of both derivations for one subscription
+      // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+      name: 'the-sweep-and-the-webhook-derive-the-same-trial-dedupe-id',
+      async run({ assert }) {
+        const nowUNIX = Math.floor(Date.now() / 1000);
+        const trialEndUNIX = nowUNIX - 5 * DAY;
+        const RESOURCE_ID = 'sub_shared_trial';
+
+        const inTrial = {
+          product: { id: 'premium', name: 'Premium' },
+          status: 'active',
+          expires: stamp(trialEndUNIX),
+          trial: { claimed: true, expires: stamp(trialEndUNIX) },
+          payment: { processor: 'stripe', resourceId: RESOURCE_ID, frequency: 'monthly', price: 9.99 },
+        };
+
+        // The same subscription, one charge later — what the webhook resolves.
+        const converted = { ...inTrial, expires: stamp(nowUNIX + 25 * DAY) };
+
+        for (const [outcome, transition, eventType, after] of [
+          ['converted', null, 'invoice.payment_succeeded', converted],
+          ['lapsed', 'payment-failed', 'invoice.payment_failed', { ...inTrial, status: 'suspended' }],
+        ]) {
+          const resolved = analytics.resolvePaymentEvent('subscription', transition, eventType, after, {}, null, inTrial);
+          const webhookId = analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_whatever' } } } });
+          const sweepId = sweep.resolveTrialOutcomeConversion(inTrial, outcome, 'USD').eventId;
+
+          assert.equal(webhookId, sweepId, `both paths must call a ${outcome} trial the same conversion`);
+          assert.equal(webhookId.endsWith(`.${RESOURCE_ID}`), true, 'and both must key it on the subscription');
+        }
+      },
+    },
+
     {
       name: 'seed-expired-trials',
       async run({ firestore, assert, state, config, skip }) {
@@ -142,7 +250,13 @@ module.exports = {
 
     {
       name: 'a-converted-trial-is-stamped-and-otherwise-untouched',
-      async run({ firestore, assert, state }) {
+      timeout: 60000,
+      async run({ firestore, assert, waitFor, state }) {
+        await waitFor(async () => {
+          const doc = await firestore.get(`users/${CONVERTED_UID}`);
+          return !!doc?.subscription?.trial?.outcome;
+        }, 30000, 500);
+
         const converted = await firestore.get(`users/${CONVERTED_UID}`);
 
         assert.equal(converted.subscription.trial.outcome, 'converted', 'The processor says active — the trial converted');
@@ -201,6 +315,7 @@ module.exports = {
         assert.equal(converted.subscription.status, 'active', 'The converted candidate is still active');
       },
     },
+
   ],
 };
 

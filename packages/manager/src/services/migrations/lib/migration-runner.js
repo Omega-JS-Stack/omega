@@ -6,6 +6,11 @@
  * validating. Handles stats tracking, logging, before/after snapshots
  * (.omega/migrations/{collection}/{timestamp}/), and the summary.
  *
+ * A run is an AUDIT by default (Ian 2026-08-20): every fix is computed,
+ * counted, logged and snapshotted, and Firestore is never touched. `--execute`
+ * is the only path that writes — nobody mutates a brand's collections by
+ * forgetting a flag.
+ *
  * Fix functions receive (data, doc, db):
  *   - data: the plain document object (mutated in place as fixes apply)
  *   - doc: { id, createTime, updateTime } — server metadata (ISO strings,
@@ -103,13 +108,17 @@ function buildPatch(mergedUpdates) {
 async function runMigration(context, options) {
   const { brandRoot, firestore } = context;
   const { collection, fixes = [], validate } = options;
-  const dryRun = context.options?.dryRun || false;
+  // The manage-wide --dry-run vetoes --execute: passing both means "don't write"
+  const execute = (context.options?.execute && !context.options?.dryRun) || false;
   const verbose = context.options?.verbose || false;
   const limit = context.options?.limit || 0;
   const ids = context.options?.ids ? String(context.options.ids).split(',').map((id) => id.trim()) : null;
   const batchSize = limit ? Math.min(options.batchSize || 500, limit) : (options.batchSize || 500);
 
-  const modeLabel = dryRun ? chalk.yellow(' [DRY RUN]') : '';
+  const vetoed = context.options?.execute && context.options?.dryRun;
+  const modeLabel = execute
+    ? chalk.red(' [EXECUTE]')
+    : chalk.yellow(vetoed ? ' [AUDIT — --dry-run vetoes --execute]' : ' [AUDIT — pass --execute to write]');
   const limitLabel = limit ? chalk.dim(` (limit: ${chalk.cyan(limit)})`) : '';
   const idsLabel = ids ? chalk.dim(` (${chalk.cyan(ids.length)} specific IDs)`) : '';
   console.log(`    ${chalk.dim('→')} Processing ${chalk.cyan(collection)} for ${chalk.cyan(firestore.projectId)}...${modeLabel}${limitLabel}${idsLabel}`);
@@ -179,11 +188,11 @@ async function runMigration(context, options) {
               docDeleted = true;
               const reason = updates.reason || 'unknown';
 
-              if (dryRun) {
-                logs.push(`        ${chalk.yellow('~')} ${chalk.yellow(`Would delete document (${chalk.cyan(reason)})`)}`);
-              } else {
+              if (execute) {
                 await firestore.deleteDoc(`${collection}/${doc.id}`);
                 logs.push(`        ${chalk.red('🗑')} ${chalk.red(`Deleted document (${chalk.cyan(reason)})`)}`);
+              } else {
+                logs.push(`        ${chalk.yellow('~')} ${chalk.yellow(`Would delete document (${chalk.cyan(reason)})`)}`);
               }
               break;
             }
@@ -207,10 +216,10 @@ async function runMigration(context, options) {
             const deletedFields = Object.keys(updates).filter((k) => updates[k] === DELETE);
             const desc = [...fixedFields.map((f) => `+${f}`), ...deletedFields.map((f) => `-${f}`)].join(', ');
 
-            if (dryRun) {
-              logs.push(`        ${chalk.yellow('~')} ${chalk.yellow(`Would fix (${chalk.cyan(desc)})`)}`);
-            } else {
+            if (execute) {
               logs.push(`        ${chalk.green('✓')} ${chalk.green(`Fixed (${chalk.cyan(desc)})`)}`);
+            } else {
+              logs.push(`        ${chalk.yellow('~')} ${chalk.yellow(`Would fix (${chalk.cyan(desc)})`)}`);
             }
 
             // Apply updates to local data for subsequent fixes and validation
@@ -303,7 +312,7 @@ async function runMigration(context, options) {
         }
 
         // Write all fixes in a single Firestore call
-        if (docWasFixed && !dryRun && Object.keys(mergedUpdates).length > 0) {
+        if (docWasFixed && execute && Object.keys(mergedUpdates).length > 0) {
           try {
             const { fieldPaths, sets } = buildPatch(mergedUpdates);
             await firestore.patchDoc(`${collection}/${doc.id}`, sets, fieldPaths);
@@ -383,7 +392,7 @@ async function runMigration(context, options) {
       collection,
       brandId: context.brandId,
       projectId: firestore.projectId,
-      dryRun,
+      execute,
       timestamp: new Date().toISOString(),
       stats: {
         totalDocs: stats.totalDocs,

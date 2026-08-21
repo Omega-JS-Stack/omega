@@ -355,6 +355,46 @@ const SHARED_SCHEMA = [
     match:       /^https?:\/\//,
     description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.monitoring.dsn overrides.',
   },
+  {
+    path:        'monitoring.environment',
+    type:        'string',
+    required:    false,
+    description: "Environment tag every event carries. Unset (or null) lets the host's own gate name it: 'production' on a production run, 'development' otherwise.",
+  },
+  {
+    path:        'monitoring.sampleRate',
+    type:        'number',
+    required:    false,
+    min:         0,
+    max:         1,
+    description: 'Fraction of ERROR events kept, 0..1. Defaults to 1 (keep everything).',
+  },
+  {
+    path:        'monitoring.tracesSampleRate',
+    type:        'number',
+    required:    false,
+    min:         0,
+    max:         1,
+    description: 'Fraction of performance traces kept, 0..1. Defaults to 0.1.',
+  },
+  {
+    path:        'monitoring.scrubEmail',
+    type:        'boolean',
+    required:    false,
+    description: 'PII guard on the user attached to an event: the uid always rides, the email only when this is explicitly false. Defaults to true (scrubbed).',
+  },
+  {
+    path:        'monitoring.attachScreenshot',
+    type:        'boolean',
+    required:    false,
+    description: '@omega.js/desktop only: attach a screenshot of the window to a captured event. Defaults to false.',
+  },
+  {
+    path:        'monitoring.bundlePatterns',
+    type:        'array',
+    required:    false,
+    description: "Browser only: the URL fragments that identify OUR bundles — a browser event reports only when a stack frame matches one. Defaults to ['/assets/js/'], where both @omega.js/web and @omega.js/extension serve every framework bundle.",
+  },
 
   // ── oauth2 ───────────────────────────────────────────────────────────────
   {

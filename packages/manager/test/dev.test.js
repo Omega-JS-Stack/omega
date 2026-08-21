@@ -23,6 +23,10 @@ let manageReport = { hasErrors: false, results: {}, brand: {} };
 // boot manage cycle, back to its prior value by the time a leg spawns.
 const nonInteractiveAt = { manage: [], spawn: [], spawnEnv: [] };
 
+// What FORCE_COLOR each leg is spawned with (#395) — the legs pipe, so chalk
+// downstream reads this switch instead of a TTY.
+const forceColorAt = [];
+
 // What each boot cycle asks runManage for — the lane lives here (#228)
 const manageOptions = [];
 
@@ -33,6 +37,7 @@ childProcess.spawn = (command, args, options) => {
   boot.push(`spawn:${path.basename(options.cwd)}`);
   nonInteractiveAt.spawn.push(process.env.OMEGA_NON_INTERACTIVE);
   nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
+  forceColorAt.push(options.env.FORCE_COLOR);
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
@@ -44,7 +49,7 @@ childProcess.spawn = (command, args, options) => {
 // The hoisted freshness sweep (#340): stubbed at its module boundary so its
 // ORDER in the boot and the lane hosts it is handed are observable without a
 // real linked dist on disk.
-let sweepResult = { checked: [], healed: [], staleLinked: [], failed: [] };
+let sweepResult = { checked: [], healed: [], staleLinked: [], healFailed: [], failed: [] };
 const sweepHosts = [];
 const localPath = require.resolve('@omega.js/devkit/local');
 require.cache[localPath] = {
@@ -196,6 +201,7 @@ test('a manage cycle with errors stops dev boot loudly — no app leg spawns', a
 function resetRecorders() {
   boot.length = 0;
   manageOptions.length = 0;
+  forceColorAt.length = 0;
   Object.values(nonInteractiveAt).forEach((seen) => { seen.length = 0; });
 }
 
@@ -306,6 +312,11 @@ test('omega dev --full is declared boolean (yargs would otherwise eat the next p
   assert.ok(BOOLEAN_FLAGS.includes('full'), '--full takes no value — it must be declared boolean');
 });
 
+test('omega manage --execute is declared boolean (yargs would otherwise eat the next positional)', () => {
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  assert.ok(BOOLEAN_FLAGS.includes('execute'), '--execute takes no value — it must be declared boolean');
+});
+
 // ─── Hoisted freshness sweep (#340) ──────────────────────────────────────────
 
 /** Stage a brand with a website AND a backend app, each declaring its framework. */
@@ -335,7 +346,7 @@ function stageFanOutBrand() {
 /** Clear the sweep recorders and put the result back to an all-fresh brand. */
 function resetSweep() {
   sweepHosts.length = 0;
-  sweepResult = { checked: [], healed: [], staleLinked: [], failed: [] };
+  sweepResult = { checked: [], healed: [], staleLinked: [], healFailed: [], failed: [] };
 }
 
 test('the freshness sweep runs ONCE, before the manage cycle and before any leg spawns (#340)', async () => {
@@ -388,6 +399,7 @@ test('a stale monorepo-linked dist stops the boot before the manage cycle — no
     checked: [],
     healed: [],
     staleLinked: [{ packageName: '@omega.js/web', reason: 'dist/ is missing' }],
+    healFailed: [],
     failed: [],
   };
   const root = stageFanOutBrand();
@@ -397,11 +409,29 @@ test('a stale monorepo-linked dist stops the boot before the manage cycle — no
     'the watch owns that dist — half-booting the stack on it is what the loud stop prevents');
 });
 
+test('a monorepo-linked dist whose sweep heal FAILED stops the boot too (#398)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  sweepResult = {
+    checked: [],
+    healed: [],
+    staleLinked: [],
+    healFailed: [{ packageName: '@omega.js/web', reason: 'dist/ is missing' }],
+    failed: [],
+  };
+  const root = stageFanOutBrand();
+
+  await assert.rejects(() => bootDev(root, { only: 'web' }), /@omega\.js\/web/);
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web'],
+    'with the watch down and the rebuild broken, no leg boots on that dist');
+});
+
 test('a heal before the fan-out is announced, so the boot pause has a reason (#340)', async () => {
   resetRecorders();
   resetSweep();
   manageReport = { hasErrors: false, results: {}, brand: {} };
-  sweepResult = { checked: [], healed: ['@omega.js/web'], staleLinked: [], failed: [] };
+  sweepResult = { checked: [], healed: ['@omega.js/web'], staleLinked: [], healFailed: [], failed: [] };
   const root = stageFanOutBrand();
 
   const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
@@ -469,6 +499,39 @@ test('the booted leg prints the collapsed stream — the chatter lands once, the
     'the repeated infra line reaches the terminal exactly once');
   assert.match(log, /\(repeated 2×\)/, 'and the repeats are counted, not silently dropped');
   assert.match(log, /\[web\] ✔  ready/, 'the leg prefix still rides every line');
+});
+
+// ─── Leg color passthrough (#395) ────────────────────────────────────────────
+
+/** Boot one leg with the parent's TTY state (and inherited switch) staged; reports what the leg got. */
+async function forceColorForLeg({ isTTY, inherited }) {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const priorTTY = process.stdout.isTTY;
+  const priorForceColor = process.env.FORCE_COLOR;
+  process.stdout.isTTY = isTTY;
+  if (inherited === undefined) { delete process.env.FORCE_COLOR; } else { process.env.FORCE_COLOR = inherited; }
+
+  try {
+    await bootDev(root, { only: 'web' });
+  } finally {
+    process.stdout.isTTY = priorTTY;
+    if (priorForceColor === undefined) { delete process.env.FORCE_COLOR; } else { process.env.FORCE_COLOR = priorForceColor; }
+  }
+
+  return forceColorAt;
+}
+
+test('a leg booted from a terminal carries FORCE_COLOR — piped stdio would strip chalk at the source (#395)', async () => {
+  assert.deepStrictEqual(await forceColorForLeg({ isTTY: true }), ['1'],
+    'the leg pipes to the orchestrator, so chalk downstream reads the switch instead of a TTY it will never see');
+});
+
+test('no terminal, no forced color — and a caller that asked for it still wins (#395)', async () => {
+  assert.deepStrictEqual(await forceColorForLeg({ isTTY: false }), ['0'], 'nothing is painting for — a runner\'s capture stays plain');
+  assert.deepStrictEqual(await forceColorForLeg({ isTTY: false, inherited: '1' }), ['1'], "the caller's own switch passes straight through");
 });
 
 // ─── Verb log (#197, #231) ───────────────────────────────────────────────────

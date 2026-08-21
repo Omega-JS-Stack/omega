@@ -18,6 +18,7 @@
  * Run: npx omega test framework:routes/payments/intent-discount-amounts
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
+const { ensureAuthUser } = require('../../_helpers/auth-user.js');
 const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
 const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
 
@@ -44,6 +45,10 @@ async function seedBasicUser(firestore, Manager, suffix) {
     roles: {},
     subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active' },
   };
+
+  // A checkout verifies the purchaser is one of ours before it starts, so the
+  // fabricated user needs the auth record a real one has ([#399])
+  await ensureAuthUser(Manager, uid, doc.auth.email);
 
   await firestore.set(`users/${uid}`, doc, { merge: true });
 

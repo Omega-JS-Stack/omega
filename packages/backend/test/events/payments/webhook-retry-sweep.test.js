@@ -12,6 +12,7 @@
  * about the same subscription twice.
  */
 const powertools = require('node-powertools');
+const { ensureAuthUser } = require('../../_helpers/auth-user.js');
 
 const UID = '_test-webhook-retry-uid';
 const ORDER_ID = '5150-5150-5150';
@@ -31,7 +32,11 @@ module.exports = {
   tests: [
     {
       name: 'reset-prior-state',
-      async run({ firestore, state }) {
+      async run({ firestore, state, Manager }) {
+        // The pipeline writes this subscriber's doc from scratch, which it only
+        // does for a uid this project has an auth user for ([#399])
+        await ensureAuthUser(Manager, UID);
+
         // The user/order/intent ids are fixed, so a previous run's leftovers would
         // make the first pass a plan change instead of a new subscription
         await firestore.delete(`users/${UID}`);

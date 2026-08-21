@@ -4,6 +4,7 @@ const powertools = require('node-powertools');
 const OrderId = require('../../../libraries/payment/order-id.js');
 const recaptcha = require('../../../libraries/recaptcha.js');
 const discountCodes = require('../../../libraries/payment/discount-codes.js');
+const { hasAuthUser } = require('../../../libraries/auth-user.js');
 
 /**
  * POST /payments/intent
@@ -16,6 +17,24 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   // Require authentication
   if (!user.authenticated) {
     return ctx.respond('Authentication required', { code: 401 });
+  }
+
+  // A purchaser has to BE a user of this project: an auth user AND the user doc a
+  // signup creates behind it. The pair only ever comes apart for a uid that lives
+  // in ANOTHER project (a local QA checkout run against the emulator) or an
+  // account deleted mid-session — and a checkout begun without it ends as a
+  // webhook with nowhere to write, which the pipeline then refuses on its own
+  // ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)). Refusing HERE
+  // means no processor session, no intent doc, and no half-written account.
+  //
+  // The DOC half is defense in depth on the token lane — authenticate() only calls
+  // a JWT caller authenticated once it has read their user doc — and the live gate
+  // on the omega-admin-key lane, which authenticates carrying no user at all.
+  const missing = await findMissingPurchaser(admin, user.auth.uid);
+
+  if (missing) {
+    ctx.warn(`Checkout refused: uid=${user.auth.uid} has ${missing} in this project — a purchase requires both an auth user and a user doc`);
+    return ctx.respond('Your account could not be verified. Please sign out, sign back in, and try again.', { code: 403 });
   }
 
   // Verify reCAPTCHA (skip during automated tests). verify() owns the whole
@@ -189,6 +208,30 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     url: result.url,
   });
 };
+
+/**
+ * Which half of the purchaser is missing, if either
+ *
+ * @param {object} admin - The firebase-admin app
+ * @param {string} uid - The authenticated caller's uid
+ * @returns {Promise<string|null>} What is missing, phrased for the log line, or null when both exist
+ */
+async function findMissingPurchaser(admin, uid) {
+  // The omega-admin-key lane authenticates with no user token, so there may be no
+  // uid to look up at all — getUser('') throws, which would answer a 500 where the
+  // whole point is a loud 403
+  if (!uid) {
+    return 'no auth user';
+  }
+
+  if (!await hasAuthUser(admin, uid)) {
+    return 'no auth user';
+  }
+
+  const userDoc = await admin.firestore().doc(`users/${uid}`).get();
+
+  return userDoc.exists ? null : 'no user doc';
+}
 
 /**
  * Build the confirmation/success redirect URL

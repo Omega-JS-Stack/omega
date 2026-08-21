@@ -1,6 +1,6 @@
 const fetch = require('wonderful-fetch');
 const moment = require('moment');
-const crypto = require('crypto');
+const { hashEmail, hashName, hashPhoneE164 } = require('../libraries/analytics/match-data.js');
 let uuidv5;
 
 const UUID_REGEX = /[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}/;
@@ -49,7 +49,6 @@ function Analytics(Manager, options) {
   options.pageview = typeof options.pageview === 'undefined' ? true : options.pageview;
   options.version = options.version || Manager.package.version;
   options.userProperties = options.userProperties || {};
-  options.userData = options.userData || {};
 
   // Set user
   // https://www.optimizesmart.com/how-to-create-and-use-user-properties-in-ga4/
@@ -134,20 +133,37 @@ function Analytics(Manager, options) {
   // Fix user data
   // https://developers.google.com/analytics/devguides/collection/ga4/uid-data
   // https://stackoverflow.com/questions/68636233/ga4-measurement-protocol-does-not-display-user-data-location-screen-resolution
+  //
+  // The repeated fields ride as BARE STRINGS on purpose, verified against that
+  // reference ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)): "As
+  // a convenience shortcut, all repeated fields inside the `user_data` object
+  // (such as `address`, `sha256_email_address`, `sha256_phone_number`) can be
+  // passed a singular value instead of an array." An array is only for the
+  // multiple values an account here never has.
   self.userData = {
-    sha256_email_address: authUser?.auth?.email
-      ? toSHA256(authUser?.auth?.email)
-      : undefined,
-    sha256_phone_number: authUser?.personal?.telephone?.number
-      ? toSHA256(authUser?.personal?.telephone?.countryCode + authUser?.personal?.telephone?.number)
-      : undefined,
+    // Hashing the RAW address silently missed every account whose email was
+    // stored with a capital or a stray space in it
+    // ([#397](https://github.com/Omega-JS-Stack/omega/issues/397)): a match key
+    // is the digest of the NORMALIZED value, trimmed and lowercased, which is
+    // the one normalization every platform agrees on. Same home as the phone
+    // below — `libraries/analytics/match-data.js` is where a platform's match
+    // spec is written down once.
+    sha256_email_address: hashEmail(authUser?.auth?.email) || undefined,
+    // The schema's field is `personal.telephone.national` — this read used to say
+    // `.number`, which no account has ever carried, so the key was never sent at
+    // all ([#388](https://github.com/Omega-JS-Stack/omega/issues/388)). The
+    // normalization + the `0`-default guard belong to the conversion match block
+    // (`libraries/analytics/match-data.js`), which is where a platform's phone
+    // spec is written down once: GA4's Measurement Protocol hashes E.164 WITH
+    // the plus, the same digest TikTok takes.
+    sha256_phone_number: hashPhoneE164(authUser?.personal?.telephone) || undefined,
     address: {
-      sha256_first_name: authUser?.personal?.name?.first
-        ? toSHA256(authUser?.personal?.name?.first)
-        : undefined,
-      sha256_last_name: authUser?.personal?.name?.last
-        ? toSHA256(authUser?.personal?.name?.last)
-        : undefined,
+      // Names were hashed RAW, the same silent miss the email had (#403):
+      // GA4's user-data spec matches the digest of the trimmed, lowercased
+      // name, so an account storing `Ada` never met a platform holding `ada`.
+      // Same home as the email and the phone above.
+      sha256_first_name: hashName(authUser?.personal?.name?.first) || undefined,
+      sha256_last_name: hashName(authUser?.personal?.name?.last) || undefined,
       // sha256_street: TODO,
       city: self.request.city || undefined,
       region: self.request.region || undefined,
@@ -466,11 +482,7 @@ Unlike gtag, which automatically hashes sensitive user-provided data, the Measur
 
 All user data fields starting with the sha256 prefix in their name should be only populated with hashed and hex-encoded values.
 
-The following example code performs the necessary encryption and encoding steps:
+The hashing itself lives in `libraries/analytics/match-data.js`, with the normalization each key's spec asks for.
 */
-
-function toSHA256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
-}
 
 module.exports = Analytics;

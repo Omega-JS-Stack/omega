@@ -136,9 +136,11 @@ export function event(name, params = {}, options = {}) {
  * `identify`. Every call is guarded on its own global, because a blocker takes
  * one provider without touching the others (#306).
  *
- * The RAW uid is what Meta and TikTok get: `external_id` is each platform's own
- * key, matched on their side. GA4's `user_id` is a different contract — one id
- * per person across every surface — and @omega.js/client is its single owner.
+ * `external_id` is each platform's own key, matched on their side, and each one
+ * takes the shape its spec asks for: Meta the RAW uid, TikTok the SHA-256 of
+ * that same uid ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)).
+ * GA4's `user_id` is a different contract — one id per person across every
+ * surface — and @omega.js/client is its single owner.
  *
  * @param {object|null} user - The signed-in user (`{ uid, email, phoneNumber }`), or null.
  * @returns {Promise<void>} Resolves once the pixels have been told. Nothing
@@ -175,7 +177,8 @@ export function identify(user) {
 }
 
 /**
- * The pixels' half of the identity: `external_id` raw, every other key SHA-256.
+ * The pixels' half of the identity: every match key SHA-256, and `external_id`
+ * in whichever shape its platform's own spec asks for.
  *
  * The hashing rules are the shared package's (`@omega.js/analytics/identity`),
  * not this file's, so a normalization rule has one home to change. They are PER
@@ -184,15 +187,17 @@ export function identify(user) {
  * one's key to the other matches nobody.
  *
  * Against the SERVER's match data (@omega.js/backend's
- * `libraries/analytics/match-data.js`) the EMAIL digests already agree exactly.
- * The phone does not yet: the server hashes digits-only for both providers, so
- * its TikTok key differs from the spec-correct one above until it converges onto
- * this helper ([#392](https://github.com/Omega-JS-Stack/omega/issues/392)).
+ * `libraries/analytics/match-data.js`) every digest agrees exactly: the email
+ * always did, and the phone converged when the server took each platform's own
+ * normalization ([#392](https://github.com/Omega-JS-Stack/omega/issues/392)).
  *
- * `external_id` stays the RAW uid, which is not a leak: it is each platform's
- * own key, hashed on their side, and it is the exact string the server sends as
- * `identity.externalId`. The two halves of one conversion link only because both
- * carry it.
+ * `external_id` is per provider too, verified against the live specs
+ * ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)). TikTok's Events
+ * API REQUIRES it hashed, so this half hashes the same uid the same way the
+ * server does and the two still meet. Meta only RECOMMENDS hashing and its own
+ * Pixel example passes a bare id, so Meta keeps the raw uid — which is not a
+ * leak: it is Meta's own key, matched on their side, and it is the exact string
+ * the server sends as `identity.externalId`.
  *
  * Consent needs no gate here: a pixel exists on the page only after a marketing
  * grant loaded it (`core/js/core/analytics-loader.js`), so the `typeof` guards
@@ -205,26 +210,37 @@ export function identify(user) {
  *   and says nothing about it, the same silence a blocked global gets (#306).
  */
 async function identifyPixels(userId, email, phone) {
-  const { sha256, normalizeEmail, metaPhone, tiktokPhone } = analytics.identity;
+  const { sha256, normalizeEmail, normalizeExternalId, metaPhone, tiktokPhone } = analytics.identity;
 
-  const keys = { emailHash: null, metaPhoneHash: null, tiktokPhoneHash: null };
+  const keys = { emailHash: null, metaPhoneHash: null, tiktokPhoneHash: null, tiktokExternalIdHash: null };
 
   try {
     // A page's only digest is `crypto.subtle`, which is asynchronous — the one
     // reason this half of `identify()` is not synchronous like the gtag half.
-    const [emailHash, metaPhoneHash, tiktokPhoneHash] = await Promise.all([
+    const [emailHash, metaPhoneHash, tiktokPhoneHash, tiktokExternalIdHash] = await Promise.all([
       sha256(normalizeEmail(email)),
       sha256(metaPhone(phone)),
       sha256(tiktokPhone(phone)),
+      // TikTok's rule for external_id is the trim and nothing else — the same
+      // normalizer the server's `hashExternalId()` runs before it hashes.
+      sha256(normalizeExternalId(userId)),
     ]);
 
-    Object.assign(keys, { emailHash, metaPhoneHash, tiktokPhoneHash });
+    Object.assign(keys, { emailHash, metaPhoneHash, tiktokPhoneHash, tiktokExternalIdHash });
   } catch (e) {
-    // A digest that cannot be computed costs the HASHED keys, never the whole
-    // identity: `external_id` needs nothing computed, and an identity carrying
-    // only external_id is worth more than one nobody ever sent — the same call
-    // the server's match data makes when it has nothing else to send.
+    // A digest that REFUSED. The quieter path is the common one and never lands
+    // here: on an insecure origin there is no `crypto.subtle` at all, and the
+    // shared `sha256()` answers null rather than throwing (#306). Both paths
+    // cost the HASHED keys and neither costs the identity — see the `||` on
+    // TikTok's `external_id` below, which covers them together.
   }
+
+  // A digest that could not be computed, by either path, costs the hashed keys
+  // and nothing more: `external_id` still goes as the raw uid — Meta's own
+  // shape, and one TikTok's pixel documents as accepted ("Unhashed or hashed
+  // SHA-256") — because an identity carrying only external_id is worth more
+  // than one nobody ever sent, the same call the server's match data makes when
+  // it has nothing else to send.
 
   // Meta's advanced matching is re-`init`ed with the match keys; the pixel id
   // is the same one the consent-gated loader initialized with.
@@ -238,7 +254,9 @@ async function identifyPixels(userId, email, phone) {
 
   if (typeof ttq !== 'undefined' && typeof ttq.identify === 'function') {
     ttq.identify(compact({
-      external_id: userId,
+      // The digest the Events API half sends, so one person is one person
+      // across the two halves; the raw uid only when no digest exists at all.
+      external_id: keys.tiktokExternalIdHash || userId,
       email: keys.emailHash,
       phone_number: keys.tiktokPhoneHash,
     }));

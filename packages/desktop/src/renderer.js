@@ -40,11 +40,26 @@ Manager.prototype.initialize = async function (overrides) {
   self.logger.log('Initializing @omega.js/desktop (renderer)...');
 
   // Boot @omega.js/client so Firebase Auth is available in this renderer.
+  //
+  // `analyticsBridge` is the preload's analytics surface, handed over as config:
+  // a renderer NEVER sends analytics itself — the client forwards every event
+  // through this bridge to main, whose sender owns the one device id
+  // (electron-store, MAC-seeded), the one session id minted per launch, and the
+  // real engagement time ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)).
+  // The client reads this key alone, so nothing but THIS line can bridge it.
+  //
+  // 🚫 The GA Measurement Protocol secret must NEVER be injected into this
+  // config. A second sender in a renderer would split one install into two GA
+  // clients (the #396 class) — which is why desktop's config carries the
+  // measurement id alone, and why the client drops any secret handed to a
+  // bridged renderer.
   try {
     const wmMod = require('@omega.js/client');
     self.omega = wmMod.default || wmMod;
     if (self.omega?.initialize) {
-      await self.omega.initialize(self.config);
+      await self.omega.initialize(Object.assign({}, self.config, {
+        analyticsBridge: (typeof window !== 'undefined' && window.desktop?.analytics) || null,
+      }));
     }
   } catch (e) {
     self.logger.warn('@omega.js/client not available — auth bridge running in no-op mode.', e?.message);

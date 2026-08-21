@@ -57,8 +57,11 @@ EventMiddleware.prototype.run = function (handlerName, options) {
     try {
       handler = require(handlerPath);
     } catch (e) {
-      ctx.error(`EventMiddleware: Failed to load handler @ ${handlerPath}:`, e);
-      return reject(e);
+      // A handler that will not load is a server fault, so it goes through the
+      // SAME door a 5xx route does: report() logs it AND captures it to Sentry
+      // (#380). The require failure rides as the `cause`, keeping its own stack
+      // and code — Sentry's linked-errors integration follows the chain.
+      return reject(ctx.report(new Error(`EventMiddleware: Failed to load handler @ ${handlerPath}`, { cause: e })));
     }
 
     // Execute with hooks support
@@ -81,12 +84,24 @@ EventMiddleware.prototype.run = function (handlerName, options) {
 
       return resolve(result);
     } catch (e) {
-      // Re-throw auth errors (like HttpsError) to block the action
-      if (e.code || e.httpErrorCode) {
+      // Re-throw a deliberate block untouched: it is the trigger's CLIENT fault,
+      // the 4xx lane that never captures. Exactly TWO shapes qualify — an
+      // HttpsError (its constructor always sets httpErrorCode, so that property
+      // IS how a real block is recognized) and an explicit NUMERIC 4xx code. A
+      // string `.code` (ENOENT, messaging/invalid-token) is a system error, not
+      // a block, and respond.js rules the same way: its parseInt turns a string
+      // code into NaN, which lands on the 500 lane and reports.
+      const code = parseInt(e.code);
+      if (e.httpErrorCode || (code >= 400 && code <= 499)) {
         return reject(e);
       }
-      ctx.error(`EventMiddleware: Handler error:`, e);
-      return reject(e);
+
+      // Anything else is a server fault: report() logs it AND captures it (#380).
+      // It decorates the SAME object in place (code/tag/usage land on the Error)
+      // and hands it back, so the rejection value the trigger sees is that one
+      // error — `e.code` reads report()'s 500 after capture. A trigger has no
+      // res, which report() handles — its header attach is a no-op there.
+      return reject(ctx.report(e));
     }
   });
 };

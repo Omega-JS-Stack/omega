@@ -199,7 +199,7 @@ async function runSuites() {
   // After main suites finish, optionally run renderer suites in a hidden BrowserWindow.
   if (rendererSuiteFiles.length > 0) {
     try {
-      const r = await runRendererSuites(rendererSuiteFiles);
+      const r = await runRendererSuites(rendererSuiteFiles, manager);
       passed  += r.passed;
       failed  += r.failed;
       skipped += r.skipped;
@@ -216,7 +216,7 @@ async function runSuites() {
 // Spawn a hidden BrowserWindow and run each renderer suite inside it. Each suite file is
 // loaded via require() in main, then its tests are serialized to { name, runSource } and
 // shipped over IPC for the renderer to reconstruct + execute.
-async function runRendererSuites(files) {
+async function runRendererSuites(files, manager) {
   // Serialize suites for transport. We can't ship functions directly via IPC, so we extract
   // the function body of each test's `run` and ship that as a string. The renderer rebuilds
   // it with `new Function('ctx', body)`.
@@ -281,6 +281,42 @@ async function runRendererSuites(files) {
   // forwarded log payload. Returns null if none yet.
   try { ipcMain.removeHandler('desktop:__test:read-last-log'); } catch (_) { /* ignore */ }
   ipcMain.handle('desktop:__test:read-last-log', () => global.__emTestLastForwardedLog);
+  // Analytics sender tap ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)):
+  // renderer-originated omega.analytics() calls forward over IPC and must fire
+  // through main's ONE sender, so a renderer suite needs to read back what that
+  // sender was handed. The harness boots with no GA credentials (the sender is
+  // disabled), so enable it with harness ones — and replace the Measurement
+  // Protocol POST with a recorder FIRST, because a test run must never reach a
+  // real GA property. Everything upstream of that one transport call is the real
+  // path: the catalog resolution, main's client id, main's session enrichment.
+  //
+  // The recorder builds the WIRE payload the way the transport does (the same
+  // shared `core.buildPayload` the real `_send` calls, with the sender's own
+  // identity fields), so a suite asserts on `client_id` as GA would receive it
+  // rather than on a field the tap made up.
+  const analyticsCore = require('@omega.js/analytics/core');
+  global.__emTestAnalyticsSends = [];
+  manager.analytics.shutdown();
+  manager.analytics._send = (descriptor) => {
+    global.__emTestAnalyticsSends.push({
+      provider: descriptor.provider,
+      name:     descriptor.name,
+      payload:  descriptor.payload,
+      body:     analyticsCore.buildPayload({
+        clientId:       manager.analytics._clientId,
+        userId:         manager.analytics._userId,
+        userProperties: manager.analytics._userProperties,
+        eventName:      descriptor.name,
+        params:         descriptor.payload,
+      }),
+    });
+    return true;
+  };
+  process.env.GOOGLE_ANALYTICS_SECRET = 'harness-secret';
+  manager.config.analytics = { providers: { google: { id: 'G-HARNESS1' } } };
+  manager.analytics.initialize(manager);
+  try { ipcMain.removeHandler('desktop:__test:read-analytics-sends'); } catch (_) { /* ignore */ }
+  ipcMain.handle('desktop:__test:read-analytics-sends', () => global.__emTestAnalyticsSends);
   const win = new BrowserWindow({
     show:           false,
     width:          800,
@@ -294,7 +330,7 @@ async function runRendererSuites(files) {
   });
 
   return new Promise((resolve, reject) => {
-    let counts = { passed: 0, failed: 0, skipped: 0 };
+    const counts = { passed: 0, failed: 0, skipped: 0 };
     let resolved = false;
     const finish = (val, err) => {
       if (resolved) return;

@@ -4,12 +4,19 @@
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
-//   client_id = uuidv5(deviceId, namespace)    // anonymous-but-stable per device
+//   client_id = uuidv5(deviceId, namespace)    // anonymous-but-stable per install
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
+//
+// The HUMAN is what crosses surfaces, never the machine: this app's deviceId comes
+// from desktop's own storage and a browser's comes from its localStorage, so one
+// machine is two client_ids and always was (#396). The derivation is shared
+// (@omega.js/analytics' `deriveDeviceId`), the storage it reads is not. user_id
+// rides ALONGSIDE the client_id in every payload — it never replaces it, because
+// GA stitches sessions by client_id.
 //
 // `namespace` is the consumer's `cloud.config.projectId` re-encoded as a UUIDv5
 // namespace via uuidv5.URL of the projectId string. Same projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop
-// → identical uuidv5 outputs everywhere → unified analytics.
+// → the same uid hashes to the same user_id everywhere → unified analytics.
 //
 // Anonymous (client-bridge hasn't reported auth yet) → user_id stays null.
 // Authed (auth event fires) → user_id is set + a `login` event is dispatched. On
@@ -40,7 +47,6 @@
 // DefinePlugin injects it at build time so packaged apps don't need .env at runtime.
 // Without the secret, the module logs a warning + becomes a no-op.
 
-const crypto     = require('crypto');
 const LoggerLite = require('./logger-lite.js');
 const fetch      = require('wonderful-fetch');
 // The MP semantics live in ONE place — @omega.js/analytics' core
@@ -114,10 +120,17 @@ const analytics = {
       analytics._pendingUid = null;
     }
 
-    // client_id = stable per-device UUID. context.session.deviceId is async-resolved;
-    // by the time analytics.initialize() runs (post-context init in boot sequence),
-    // it's already populated. Fall back to a fresh UUID if for any reason it isn't.
-    const deviceId = manager.context.session.deviceId || crypto.randomUUID();
+    // client_id = the PERSISTED per-install device id. context.session.deviceId is
+    // async-resolved and context.initialize() runs before this in the boot sequence,
+    // so an empty one is a broken boot order, never a runtime condition — and a
+    // fresh id minted here would persist nowhere, making every launch a new GA
+    // client (#396). It raises instead.
+    const deviceId = manager.context.session.deviceId;
+
+    if (!deviceId) {
+      throw new Error('analytics.initialize() ran before context.initialize() resolved session.deviceId — the boot sequence must init context first');
+    }
+
     analytics._clientId = core.deriveClientId(deviceId, analytics._namespace);
 
     // The facade's seams for THIS process. The transport is the Measurement
@@ -153,8 +166,10 @@ const analytics = {
       for (const item of queued) analytics.event(item.name, item.params);
     }
 
-    // Auto-emit app_launch from the main process. Renderer modules emit their own
-    // page_view from each renderer's initialize() (renderer/preload bridge below).
+    // Auto-emit app_launch from the main process — the one launch event for the
+    // whole app. A renderer emits nothing of its own on init: it forwards the
+    // events its own code fires through the IPC bridge below, and this sender
+    // is what delivers them ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)).
     if (analytics._isMain()) {
       analytics.event('app_launch');
     }

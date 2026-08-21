@@ -66,6 +66,36 @@ test('ttq.track takes the native name and payload', (t) => {
   assert.deepEqual(calls, [['Search', { search_string: 'omega' }]]);
 });
 
+test('a mapping that names a pixel METHOD calls it instead of ttq.track', (t) => {
+  // TikTok documents its page view as the SDK-managed `ttq.page()`, and
+  // `ttq.track('Pageview')` appears nowhere in that surface — sending one would
+  // risk a Pageview metric that silently reads zero
+  // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)). So the catalog
+  // names the method and the transport calls exactly that.
+  clearGlobals();
+  t.after(clearGlobals);
+
+  const calls = [];
+  globalThis.ttq = {
+    page: (...args) => calls.push(['page', ...args]),
+    track: (...args) => calls.push(['track', ...args]),
+  };
+
+  assert.strictEqual(browser.send(tiktok.resolve('page_view', { page_path: '/pricing' })), true);
+  assert.deepEqual(calls, [['page']], 'the pixel method takes no name and no payload');
+});
+
+test('a named method the pixel does not have is a no-op, not a throw', (t) => {
+  clearGlobals();
+  t.after(clearGlobals);
+
+  // The blocked-global contract (#306) reaches the method lane too: an older
+  // pixel build, or a stub an extension left behind, has no `page`.
+  globalThis.ttq = { track: () => {} };
+
+  assert.strictEqual(browser.send(tiktok.resolve('page_view', { page_path: '/' })), false);
+});
+
 test('a dedupe id rides in each platform\'s own option slot', (t) => {
   clearGlobals();
   t.after(clearGlobals);

@@ -16,7 +16,7 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
 
 1. 🚫 **The legacy repos are READ-ONLY.** Never modify `omega-manager`, `backend-manager`, `ultimate-jekyll-manager`, `browser-extension-manager`, `electron-manager`, `mobile-app-manager`, `web-manager`, `jekyll-uj-powertools`, or any consumer brand repo. They are reference/history and keep serving production. All work happens HERE.
 2. **Every package here is `@omega.js/*`-named; zero npm publishes until Ian finalizes versions.** Old-name releases ship from the LEGACY repos; the monorepo's `pre-*-rename` tags are the backup lane.
-3. **Publish policy — internal by default**: private shared packages (`account`, `analytics`, `config`, `devkit`, `template-kit`) are vendored into published frameworks at prepare time and never publish.
+3. **Publish policy — internal by default**: private shared packages (`account`, `analytics`, `config`, `devkit`, `monitoring`, `template-kit`) are vendored into published frameworks at prepare time and never publish.
    - Published = frameworks + `@omega.js/manager` + `@omega.js/client` (a real runtime dependency of backend/desktop/extension — never vendored) + `@omega.js/mcp-router` (a real runtime dependency of manager, so the vendored plugin's MCP declaration resolves inside the install — Ian 2026-07-30).
    - All seven publishables carry a mechanical `private: true` latch until the proving checkpoint ([docs/shared/publishing.md](docs/shared/publishing.md)) unlatches them.
 4. **MAM is parked.** No `packages/mobile`, no mobile work — slot reserved only.
@@ -60,6 +60,7 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 | `@omega.js/config` | Internal: the omega.json5 loader, schema, merge, validator | [docs/shared/config.md](docs/shared/config.md) |
 | `@omega.js/account` | Internal: user/account schema + subscription resolution, shared by backend and client | [packages/account/src](packages/account/src) |
 | `@omega.js/analytics` | Internal: the ONE analytics contract — event catalog, per-provider adapters (GA4/Meta/TikTok), guarded browser transport, consent seam | [docs/shared/analytics.md](docs/shared/analytics.md) |
+| `@omega.js/monitoring` | Internal: the ONE error-reporting contract — config resolution, release tags, PII scrub, the client-side @omega.js-bundle filter, per-platform SDK entries | [docs/shared/monitoring.md](docs/shared/monitoring.md) |
 | `@omega.js/template-kit` | Internal: the `omega_*` template filters/tags as engine-neutral JS | [docs/web/template-kit.md](docs/web/template-kit.md) |
 
 ## The map — brands
@@ -119,6 +120,7 @@ Single config format everywhere: shared sections (brand, cloud, analytics, payme
 - [theming.md](docs/shared/theming.md) — the `--omega-*` design-system contract, shell chrome, motion
 - [translation.md](docs/shared/translation.md) — the AI translation engine + config-driven cache
 - [analytics.md](docs/shared/analytics.md) — the event catalog, the placement rule, consent gating, attribution
+- [monitoring.md](docs/shared/monitoring.md) — the error-reporting contract: the doctrine, the switches, the release tags, the capture seams
 - [agent-docs.md](docs/shared/agent-docs.md) — the agent-docs chain: thin pointers here, the brand chain in consumers
 - [breaking-changes.md](docs/shared/breaking-changes.md) — the legacy→OMEGA breaking-changes register: what changed shape, and the by-hand migration step for each
 - [brands.md](docs/shared/brands.md) — brand topology, history, the local era

@@ -37,13 +37,13 @@ manager.context.app = {
 
 ## Device ID resolution
 
-Order:
+The walk itself is the shared one — `@omega.js/analytics`' `deriveDeviceId({ get, set, seed })`, the same call `@omega.js/client` makes on a page ([#396](https://github.com/Omega-JS-Stack/omega/issues/396)). What this module supplies is desktop's own world: electron-store, and the MAC as the seed. Order:
 
 1. **Storage** — already persisted from a prior boot. Wins so we're stable across NIC swaps / VPN changes.
-2. **First non-internal MAC** from `os.networkInterfaces()`. Stable on a stable rig.
-3. **`crypto.randomUUID()`** fallback. Persisted on first launch.
+2. **First non-internal MAC** from `os.networkInterfaces()`, the injected seed. Stable on a stable rig, and it hands a reinstalled app the id it had before its storage was wiped.
+3. **A generated UUID** — the shared derivation's floor. Persisted on first launch.
 
-Once resolved on first launch it never changes. This is the input to `analytics._clientId = uuidv5(deviceId, projectIdNamespace)`.
+Once resolved on first launch it never changes. This is the input to `analytics._clientId = uuidv5(deviceId, projectIdNamespace)`, and it is desktop's alone: a browser on the same machine derives its own id from its own localStorage.
 
 ## Geolocation
 
@@ -78,4 +78,4 @@ const country = manager.context.geolocation.country
 
 ## Tests
 
-- `src/test/suites/main/context.test.js` — session shape, deviceId stability across re-init, client info, IPC handler, JSON-roundtrippability.
+- `src/test/suites/main/context.test.js` — session shape, deviceId stability across re-init, the injected seed + persistence of the shared derivation, client info, IPC handler, JSON-roundtrippability.

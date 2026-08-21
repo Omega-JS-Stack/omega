@@ -10,7 +10,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
-const { buildTheme, themeOutDir } = require('./lib/contract-build.js');
+const { buildTheme, themeOutDir, FIXTURE_VERSION } = require('./lib/contract-build.js');
 
 const PKG = path.resolve(__dirname, '..');
 
@@ -155,6 +155,25 @@ test('manifest-injected assets on every theme (hashed main css/js, valid Configu
     assert.match(html, /<script type="module" src="\/assets\/js\/main-[A-Z0-9]{8}\.js"><\/script>/, `${theme}: hashed main js linked as an ESM module`);
     assert.ok(html.includes('brand: {"id":"contract","name":"Contract"}'), `${theme}: Configuration brand`);
     assert.ok(html.includes(`data-theme-id="${theme}"`), `${theme}: active theme id in chrome`);
+  }
+});
+
+// #380: the ONE place web hands the client its error-reporting config. Evaluated,
+// not string-matched, so a Liquid slip that renders unparseable JS fails HERE
+// rather than as a blank page in a browser.
+test('#380: omega.json5 `monitoring` reaches the client as its sentry contract', () => {
+  for (const theme of THEMES) {
+    const html = page(theme, 'pricing.html');
+    const source = html.match(/var Configuration = (\{[\s\S]*?\});\s*<\/script>/);
+    assert.ok(source, `${theme}: the Configuration block is present`);
+
+    const config = new Function(`return ${source[1]}`)();
+    assert.strictEqual(config.sentry.enabled, true, `${theme}: a configured DSN is the enable signal`);
+    assert.strictEqual(config.sentry.config.dsn, 'https://key@o1.ingest.sentry.io/1', `${theme}: the DSN rides`);
+    assert.strictEqual(config.sentry.config.provider, 'sentry', `${theme}: the raw role block rides — @omega.js/monitoring strips the discriminator`);
+    // The release tag's version half: the WEBSITE APP's own package version, so
+    // every host tags `brand.id@version` instead of falling back to buildTime.
+    assert.strictEqual(config.version, FIXTURE_VERSION, `${theme}: the app's own version rides the Configuration block`);
   }
 });
 

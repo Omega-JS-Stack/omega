@@ -1,6 +1,11 @@
 // Main-layer tests for lib/context.js — session id, deviceId resolution,
 // client info, geolocation cache restore + persistence.
 
+const path = require('path');
+const fs   = require('fs');
+
+const MOD_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'context.js');
+
 module.exports = {
   type: 'suite',
   layer: 'main',
@@ -33,6 +38,54 @@ module.exports = {
         await ctx.manager.context.initialize(ctx.manager);
         const after = ctx.manager.context.session.deviceId;
         ctx.expect(after).toBe(before);
+      },
+    },
+    {
+      // The WIRING, not just the outcome: desktop's own walk is gone and the
+      // shared derivation is what runs (#396). The behavior below is identical
+      // either way, so this is the assertion that tells the two apart.
+      name: 'deviceId resolution calls the shared core.deriveDeviceId, not a local walk',
+      run: (ctx) => {
+        const source = fs.readFileSync(MOD_PATH, 'utf8');
+
+        // Vendored into dist at prepare time, live via the package in a linked
+        // monorepo — either specifier is the same module.
+        ctx.expect(/require\('(\.\.\/vendor\/analytics\/core\.js|@omega\.js\/analytics\/core)'\)/.test(source)).toBe(true);
+        ctx.expect(source.includes('core.deriveDeviceId({')).toBe(true);
+        ctx.expect(source.includes('seed: () => context._readFirstMac()')).toBe(true);
+        ctx.expect(source.includes('const id = mac ||')).toBe(false);
+      },
+    },
+    {
+      // The derivation is @omega.js/analytics' one walk (#396); what desktop
+      // owns is the pair injected into it — electron-store, and the MAC seed
+      // that hands a wiped install back the id it had before.
+      name: 'deviceId derives from the injected MAC seed and persists to storage',
+      run: async (ctx) => {
+        const storage = ctx.manager.storage;
+        const saved = storage.get('context.deviceId');
+
+        try {
+          // A wiped install: nothing stored, so the seed decides
+          storage.delete('context.deviceId');
+          const derived = await ctx.manager.context._resolveDeviceId();
+          const mac = ctx.manager.context._readFirstMac();
+
+          if (mac) {
+            ctx.expect(derived).toBe(mac);
+          } else {
+            ctx.expect(derived).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+          }
+
+          // Persisted on that first resolve, and read back on every one after
+          ctx.expect(storage.get('context.deviceId')).toBe(derived);
+
+          storage.set('context.deviceId', 'stored-wins-over-the-seed');
+          ctx.expect(await ctx.manager.context._resolveDeviceId()).toBe('stored-wins-over-the-seed');
+        } finally {
+          if (saved) storage.set('context.deviceId', saved);
+          else storage.delete('context.deviceId');
+        }
       },
     },
     {

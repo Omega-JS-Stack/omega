@@ -322,6 +322,69 @@ module.exports = {
       },
     },
 
+    // The dev palette's roster ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)).
+    // The palette kept its own hand-curated copy of this list, so a persona
+    // seeded without somebody remembering to add it was invisible in the
+    // switcher for weeks (the referral pair, #363). The `palette` label makes
+    // the SEED the one owner: a labeled persona is human-facing, and what
+    // routes/test/roster hands the palette is exactly the list below, in
+    // exactly this order.
+    {
+      name: 'the-palette-roster-is-the-seeds-own',
+      async run({ assert, config }) {
+        const labelled = Object.entries(TEST_ACCOUNTS).filter(([, account]) => account.palette);
+
+        assert.deepEqual(
+          labelled.map(([, account]) => [account.email.split('@')[0], account.palette]),
+          [
+            ['_test.admin', 'Admin'],
+            ['_test.basic', 'Basic'],
+            ['_test.premium-active', 'Premium'],
+            ['_test.premium-trialing', 'Trialing'],
+            ['_test.premium-expired', 'Expired'],
+            ['_test.premium-suspended', 'Suspended'],
+            ['_test.premium-cancelling', 'Cancelling'],
+            ['_test.refunded', 'Refunded'],
+            ['_test.referrer', 'Referrer'],
+            ['_test.referred', 'Referred'],
+            ['_test.journey-flows-upgrade', 'Journey: Upgrade'],
+            ['_test.journey-flows-cancel', 'Journey: Cancel'],
+            ['_test.journey-flows-failure', 'Journey: Failure'],
+            ['_test.journey-flows-trial', 'Journey: Trial'],
+          ],
+          'The palette-facing personas are these, in the order the seeder declares them',
+        );
+
+        // The machinery an automated suite drives is never offered to somebody
+        // mid-suite: a deletion fixture, a signup the suite has to perform
+        // itself, a consent state a lifecycle test establishes.
+        for (const key of ['delete', 'delete-by-admin', 'signup-merge', 'consent-granted']) {
+          assert.equal(TEST_ACCOUNTS[key].palette, undefined, `Persona '${key}' is machinery, so the palette must not offer it`);
+        }
+
+        // A persona a human signs in as is a persona a human LOOKS at, so every
+        // labeled one is a full account (#327): the same leaves the sweep
+        // above requires of the whole table, asserted here as the roster's own
+        // entry requirement.
+        const definitions = getAccountDefinitions('example.com', config);
+
+        for (const [key] of labelled) {
+          const definition = definitions[key];
+
+          assert.ok(definition, `Palette persona '${key}' must be a seeded account`);
+
+          for (const path of REAL_ACCOUNT_LEAVES) {
+            const value = leafAt(definition.properties, path);
+
+            assert.ok(
+              value !== undefined && value !== null && value !== '',
+              `Palette persona '${key}' must carry ${path}: QA signs in as it and sees exactly that`,
+            );
+          }
+        }
+      },
+    },
+
     // The profile is DERIVED from the persona key, never rolled — so the account
     // QA screenshotted last week is the account in front of them today, and a
     // reseed never shuffles who anybody is.

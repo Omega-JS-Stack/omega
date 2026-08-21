@@ -92,7 +92,8 @@ async function runService(serviceName, brand, brandState, options = {}) {
  * @param {Object} options - { service?, lane? ('boot' = the local slice a dev
  *   boot needs; omitted = every service), continueOnError?, dryRun?, verbose?,
  *   strict? (preflight failures fail hard instead of skipping),
- *   migration? (true = all, string = one), limit?, ids? (migrations service),
+ *   migration? (true = all, string = one), execute? (the migrations write
+ *   gate — without it the run only audits), limit?, ids? (migrations service),
  *   resetAssets? (true = both kinds, string = 'logos'/'templates'; assets
  *   service) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}

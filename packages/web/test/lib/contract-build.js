@@ -18,6 +18,10 @@ const { fork } = require('node:child_process');
 const PKG = path.resolve(__dirname, '..', '..');
 const ROOT = path.resolve(PKG, '..', '..');
 const SITE = path.join(PKG, 'test', 'fixtures', 'contract-site');
+// The fixture app's own package version — what `omega build`/`omega dev` read
+// from the app root's package.json and hand to buildSite. It rides into the
+// Configuration block as `version` (the client's release-tag half, #380).
+const FIXTURE_VERSION = '7.7.7';
 
 /**
  * Output dir of a theme's contract build.
@@ -57,9 +61,10 @@ if (require.main === module) {
     consumerDir: SITE,
     siteData: { ...siteData, theme: { id: theme } },
     outDir: themeOutDir(theme),
+    version: FIXTURE_VERSION,
     clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
     skipPurge: true, // purge is pinned in assets.test.js; contract pins rendering
   }).then((result) => process.send(result));
 }
 
-module.exports = { buildTheme, themeOutDir, SITE, PKG };
+module.exports = { buildTheme, themeOutDir, SITE, PKG, FIXTURE_VERSION };

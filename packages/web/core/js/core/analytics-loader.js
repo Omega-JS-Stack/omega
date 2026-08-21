@@ -25,6 +25,7 @@
 import omega from '@omega.js/client';
 
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { event } from '__main_assets__/js/libs/analytics.js';
 import { getTrackingConsent, onTrackingConsentChange } from '__main_assets__/js/libs/tracking-consent.js';
 
 const logger = createLogger('analytics-loader');
@@ -197,6 +198,31 @@ function installTikTokQueue() {
   };
 }
 
+/**
+ * This pixel's page view, counted through the FACADE
+ * ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)). The raw
+ * `fbq('track', 'PageView')` and `ttq.page()` this file used to fire at init
+ * were the only page-view signal Meta and TikTok ever got, and they walked past
+ * the catalog and the per-event consent gate every other event goes through.
+ *
+ * GA4 is deliberately NOT in the fire: `gtag('config', id)` counts the page view
+ * itself, so a second one here would double-count every page.
+ *
+ * No params: both pixels read the page's own URL and title, exactly as the raw
+ * calls left them to. The catalog's page params are for the runtimes that have
+ * no document to read — desktop and the extension fire the same canonical event
+ * through @omega.js/client.
+ *
+ * @param {string} provider - The CATALOG's provider key for the pixel that just
+ *   initialized ('meta' | 'tiktok'), not this file's loader key — the two agree
+ *   on both marketing providers and disagree on Google ('google' here, `ga4`
+ *   there), and a key the catalog does not know would skip in silence.
+ * @returns {void}
+ */
+function countPageView(provider) {
+  event('page_view', {}, { providers: [provider] });
+}
+
 /** Inject one provider script; a blocked or failed load is never fatal. */
 function inject(provider, src) {
   omega.dom().loadScript({ src: src })
@@ -214,14 +240,14 @@ const LOADERS = {
   meta: (id) => {
     installMetaQueue();
     window.fbq('init', id);
-    window.fbq('track', 'PageView');
+    countPageView('meta');
     inject('meta', META_SRC);
   },
 
   tiktok: (id) => {
     installTikTokQueue();
     window.ttq.load(id);
-    window.ttq.page();
+    countPageView('tiktok');
     inject('tiktok', `${TIKTOK_SRC}?sdkid=${encodeURIComponent(id)}&lib=ttq`);
   },
 };

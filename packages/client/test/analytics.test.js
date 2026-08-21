@@ -132,6 +132,58 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
     }
   });
 
+  it('the device id is the shared derivation, storage-backed, always a real UUID (#396)', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    // The wiring: one derivation for every surface, and the only thing this
+    // runtime supplies is where it persists (no machine seed exists on a page).
+    assert(SOURCE.includes('core.deriveDeviceId'), 'the client hosts the shared derivation');
+    assert(!SOURCE.includes('crypto.randomUUID'), 'the local generator is gone');
+    assert(!SOURCE.includes('Math.random'), 'the weak non-UUID fallback is gone');
+
+    const store = new Map();
+    global.localStorage = {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, value),
+    };
+    global.window = global.window || { location: { pathname: '/t', href: 'http://t/t' } };
+    global.document = global.document || { title: 't' };
+
+    // An insecure origin: `crypto.getRandomValues` is there, `crypto.randomUUID`
+    // is NOT — where the old fallback minted `<base36>.<timestamp>` (#396)
+    const realCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', {
+      value: { getRandomValues: (array) => realCrypto.getRandomValues(array) },
+      configurable: true,
+    });
+
+    try {
+      const manager = {
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      };
+
+      const first = new Analytics(manager);
+      first.init({ projectId: 'proj-x' });
+
+      const deviceId = store.get('_omega_device_id');
+      assert.match(
+        deviceId,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+        'a UUID even with no crypto.randomUUID to make one',
+      );
+
+      // Persisted, so the next boot on this browser is the same GA client
+      const second = new Analytics(manager);
+      second.init({ projectId: 'proj-x' });
+      assert.strictEqual(store.get('_omega_device_id'), deviceId, 'the stored id is never re-derived');
+      assert.strictEqual(second.clientId, first.clientId);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: realCrypto, configurable: true });
+      delete global.localStorage;
+    }
+  });
+
 });
 
 describe('Analytics on web (#159: gtag delegation)', () => {
@@ -206,6 +258,181 @@ describe('Analytics on web (#159: gtag delegation)', () => {
       assert.strictEqual(events.length, 1, 'vert_click reaches gtag through the manager');
       assert.strictEqual(events[0][2].vert_lane, 'promo');
     } finally {
+      delete globalThis.gtag;
+    }
+  });
+
+});
+
+describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)", () => {
+
+  it('a bridged renderer forwards every event to main and never sends one itself', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    global.window = global.window || { location: { pathname: '/t', href: 'http://t/t' } };
+    global.document = global.document || { title: 't' };
+
+    const fetchCalls = [];
+    const realFetch = global.fetch;
+    global.fetch = (url) => {
+      fetchCalls.push(url);
+      return Promise.resolve({ ok: true });
+    };
+
+    // The preload's surface: fire-and-forget IPC into the main process, whose
+    // sender owns the device id, the session id and the engagement time.
+    const forwarded = [];
+    const properties = [];
+    const bridge = {
+      event: (name, params) => forwarded.push({ name, params }),
+      setUserProperties: (props) => properties.push(props),
+    };
+
+    try {
+      // An Electron window sets no config.runtime, so a desktop renderer
+      // resolves as the WEB runtime — the bridge, not the runtime name, is
+      // what makes this client a forwarder.
+      const renderer = new Analytics({
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      });
+      renderer.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x', bridge });
+
+      assert.strictEqual(renderer.initialized, true, 'a bridged renderer initializes');
+      assert.strictEqual(renderer.secret, null, 'the Measurement Protocol secret is never held in a renderer');
+      assert.strictEqual(renderer.clientId, null, 'and no second device id is ever minted here');
+
+      renderer.event('vert_click', { vert_id: 'omega-promo' });
+      assert.strictEqual(forwarded.length, 1, 'the event forwards exactly once');
+      assert.deepStrictEqual(
+        forwarded[0],
+        { name: 'vert_click', params: { vert_id: 'omega-promo' } },
+        'the canonical name and the caller params are all that cross — main owns the page context',
+      );
+      assert.strictEqual(fetchCalls.length, 0, 'a bridged renderer never posts to the Measurement Protocol');
+
+      renderer.setUserProperties({ plan: 'premium' });
+      assert.deepStrictEqual(properties, [{ plan: 'premium' }], 'user properties ride the same bridge, unwrapped');
+
+      // Main's auth bridge fires login/logout off the same Firebase user, so a
+      // bridged renderer firing its own would double-count every sign-in.
+      forwarded.length = 0;
+      renderer.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+      assert.deepStrictEqual(forwarded, [], 'login stays main\'s to fire');
+
+      // The drop is the BRIDGE's doing, not web's: an electron-runtime client
+      // handed credentials keeps neither, so the guard holds wherever a host
+      // wires the bridge.
+      const electron = new Analytics({
+        utilities: () => ({ getRuntime: () => 'electron' }),
+        isDevelopment: () => false,
+      });
+      electron.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x', bridge });
+
+      assert.strictEqual(electron.secret, null, 'a bridged electron client drops the api_secret too');
+      assert.strictEqual(electron.clientId, null, 'and mints no device id of its own');
+
+      fetchCalls.length = 0;
+      forwarded.length = 0;
+      electron.event('vert_click');
+      assert.strictEqual(fetchCalls.length, 0, 'it never reaches the Measurement Protocol');
+      assert.strictEqual(forwarded.length, 1, 'it forwards instead');
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
+
+  it('a forward never throws at the caller, and an unknown name never leaves the renderer', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    const forwarded = [];
+    const bridge = {
+      event: (name, params) => forwarded.push({ name, params }),
+      setUserProperties: () => {},
+    };
+    // What an IPC bridge does when handed something structured clone cannot
+    // carry (a DOM node, a function): it throws where the caller stands.
+    const uncloneable = {
+      event: () => { throw new Error('An object could not be cloned.'); },
+      setUserProperties: () => { throw new Error('An object could not be cloned.'); },
+    };
+
+    // An uncatalogued name is a PROGRAMMER error, and it is the renderer's
+    // programmer: it must surface at this call site in development, not as a
+    // warn in the main process's log with nothing to blame.
+    const dev = new Analytics({
+      utilities: () => ({ getRuntime: () => 'web' }),
+      isDevelopment: () => true,
+    });
+    dev.init({ projectId: 'proj-x', bridge });
+
+    assert.throws(() => dev.event('signup-completed!'), /Unknown analytics event/, 'dev throws at the call site');
+    assert.strictEqual(forwarded.length, 0, 'and nothing crossed to main');
+
+    const prod = new Analytics({
+      utilities: () => ({ getRuntime: () => 'web' }),
+      isDevelopment: () => false,
+    });
+    prod.init({ projectId: 'proj-x', bridge });
+
+    forwarded.length = 0;
+    prod.event('signup-completed!');
+    assert.strictEqual(forwarded.length, 0, 'production skips it instead of shipping junk to main');
+
+    const broken = new Analytics({
+      utilities: () => ({ getRuntime: () => 'web' }),
+      isDevelopment: () => false,
+    });
+    broken.init({ projectId: 'proj-x', bridge: uncloneable });
+
+    broken.event('vert_click', { vert_id: 'x' });
+    broken.setUserProperties({ plan: 'premium' });
+  });
+
+  it('the seam is the host\'s injected config value alone — a global can never bridge a page', async () => {
+    const Manager = getManager();
+    const savedConfig = Manager.config;
+
+    const calls = [];
+    globalThis.gtag = (...args) => calls.push(args);
+
+    try {
+      const injected = { event: () => {} };
+
+      Manager.config = { analyticsBridge: injected };
+      assert.strictEqual(Manager._resolveAnalyticsBridge(), injected, 'the injected surface IS the seam');
+
+      Manager.config = {};
+      assert.strictEqual(Manager._resolveAnalyticsBridge(), null, 'a host that injects nothing gets no bridge');
+
+      // The global is inert BY CONSTRUCTION now: a page carrying a
+      // `window.desktop.analytics` (a brand's own script, an extension, a
+      // stray global) bridges nothing, so a brand's analytics can never be
+      // silently routed into a void.
+      global.window.desktop = { analytics: { event: () => { throw new Error('a global must never bridge'); } } };
+      assert.strictEqual(Manager._resolveAnalyticsBridge(), null, 'a planted window.desktop is not a seam');
+
+      // A host that injects a broken surface is a broken host — loud, never a
+      // quiet fall back to the sender a desktop renderer must not have.
+      Manager.config = { analyticsBridge: { pageview: () => {} } };
+      assert.throws(() => Manager._resolveAnalyticsBridge(), /carries no event\(\)/, 'a malformed injection raises');
+
+      // And web is untouched with that same global still planted: no bridge was
+      // injected, so the event goes to the page's gtag exactly as before.
+      const Analytics = (await import(SOURCE_PATH)).default;
+      const web = new Analytics({
+        utilities: () => ({ getRuntime: () => 'web' }),
+        isDevelopment: () => false,
+      });
+      web.init({ projectId: 'proj-x' });
+
+      calls.length = 0;
+      web.event('vert_click', { vert_lane: 'promo' });
+      assert.strictEqual(calls.length, 1, 'the event still reaches the page gtag');
+      assert.strictEqual(calls[0][1], 'vert_click');
+    } finally {
+      Manager.config = savedConfig;
+      delete global.window.desktop;
       delete globalThis.gtag;
     }
   });

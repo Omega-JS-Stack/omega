@@ -166,13 +166,21 @@ class Manager {
       // Web is the exception: its transport is the page's own gtag, so there
       // is no id or secret to require here (#159): the api_secret must never
       // reach a page at all.
+      // Desktop's renderer is the other exception: it never sends at all
+      // ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)). When the
+      // host injected an analytics bridge, every event forwards over IPC to the
+      // main process, whose sender owns the one device id, the one session id
+      // and the real engagement time — so a bridged renderer initializes with
+      // no id and no secret of its own.
       const googleAnalytics = this.config.analytics?.providers?.google;
       const isWebRuntime = this._utilities.getRuntime() === 'web';
-      if (isWebRuntime || (googleAnalytics?.id && googleAnalytics?.secret)) {
+      const analyticsBridge = this._resolveAnalyticsBridge();
+      if (isWebRuntime || analyticsBridge || (googleAnalytics?.id && googleAnalytics?.secret)) {
         this._analytics.init({
           id: googleAnalytics?.id || null,
           secret: googleAnalytics?.secret,
           projectId: this._resolveFirebaseConfig()?.projectId || this.config.brand?.id || null,
+          bridge: analyticsBridge,
         });
       } else {
         analyticsLogger.log('Skipped: missing analytics.providers.google id or secret');
@@ -471,6 +479,33 @@ class Manager {
 
     // Set device - mobile, tablet, desktop
     $html.dataset.device = this._utilities.getDevice();
+  }
+
+  // Resolve the desktop renderer's analytics bridge — the ONE seam that turns
+  // this client into a forwarder instead of a sender
+  // ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)).
+  //
+  // INJECTED by the host, never sniffed off a global: @omega.js/desktop's
+  // renderer passes its preload's analytics surface as `config.analyticsBridge`
+  // when it boots this client. A page that merely happens to carry a
+  // `window.desktop` can never bridge a brand's analytics into a void, and web
+  // and the extension inject nothing, so they keep every path they have today.
+  //
+  // An injected value with no `event()` is a broken host, not a runtime
+  // condition — it raises rather than quietly falling back to a sender the
+  // desktop app must not have.
+  _resolveAnalyticsBridge() {
+    const bridge = this.config?.analyticsBridge;
+
+    if (!bridge) {
+      return null;
+    }
+
+    if (typeof bridge.event !== 'function') {
+      throw new Error('config.analyticsBridge carries no event() — the host must inject its preload\'s analytics surface, or nothing at all');
+    }
+
+    return bridge;
   }
 
   // Resolve the Firebase web SDK config blob. `cloud.config` first (canonical

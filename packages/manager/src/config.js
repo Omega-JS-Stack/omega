@@ -619,7 +619,7 @@ const SERVICE_ORDER = [
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every app
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
-  'migrations',      // Firestore data migrations — only with --migration, after the deployed backend is current
+  'migrations',      // Firestore data migrations — only with --migration (audit unless --execute), after the deployed backend is current
   'bookmark',        // brand bookmarks → the companion Chrome extension (interactive sessions only)
   'testing',         // health checks after everything else ran
 ];
@@ -806,6 +806,8 @@ const OPERATIONS = {
   migrations: [
     { name: 'notifications', ensure: true }, // uid→owner + metadata/context/attribution + validate schema
     { name: 'users', ensure: true },         // plan→subscription + @omega.js/backend-schema backfill + orphan cleanup + validate
+    { name: 'orders', ensure: true },        // payments-orders: legacy attribution.utm blob → first/last touches
+    { name: 'payments-intents', ensure: true }, // payments-intents: legacy attribution.utm blob → first/last touches
   ],
 
   bookmark: [

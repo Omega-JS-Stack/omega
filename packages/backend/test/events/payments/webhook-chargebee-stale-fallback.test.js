@@ -11,6 +11,8 @@
  * Chargebee is unconfigured in this brand (no CHARGEBEE_API_KEY), so the fetch fails
  * for real, locally, with no network call and no credential.
  */
+const { ensureAuthUser } = require('../../_helpers/auth-user.js');
+
 const UID = '_test-chargebee-stale-uid';
 const ORDER_ID = '6161-6161-6161';
 
@@ -22,7 +24,11 @@ module.exports = {
   tests: [
     {
       name: 'send-chargebee-subscription-webhook',
-      async run({ http, firestore, assert, state, config }) {
+      async run({ http, firestore, assert, state, config, Manager }) {
+        // The pipeline writes this subscriber's doc from scratch, which it only
+        // does for a uid this project has an auth user for ([#399])
+        await ensureAuthUser(Manager, UID);
+
         await firestore.delete(`users/${UID}`);
         await firestore.delete(`payments-orders/${ORDER_ID}`);
 

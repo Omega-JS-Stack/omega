@@ -23,6 +23,13 @@
  *                  map  — OPTIONAL (params, context) => payload, only where
  *                         the provider's shape genuinely differs. Default is
  *                         pass-through.
+ *                  method — OPTIONAL, browser only: the provider's own PIXEL
+ *                         METHOD to call instead of its tracked-event command,
+ *                         for the one signal a platform manages itself rather
+ *                         than exposing as a trackable name (TikTok's
+ *                         `ttq.page()`). The name and kind stay declared for the
+ *                         catalog and the fire log; the transport calls the
+ *                         method, with no name and no payload.
  *
  * The canonical param vocabulary is GA4-flavoured (flat params plus an `items`
  * array), because that is what the live call sites and the backend's payment
@@ -76,6 +83,26 @@ function tiktokCommerce(params) {
   });
 }
 
+// A churn moment's ad-platform half: an EXCLUSION-AUDIENCE signal, never money
+// ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)). Neither platform
+// can subtract revenue, so a cancellation or a refund carrying its amount would
+// ADD to the return their ads manager reports — the exact opposite of the truth.
+// `value: 0` is the honest number on that side; GA4 keeps the real one, where a
+// refund is a standard event the revenue report knows how to net.
+function metaAudienceSignal(params) {
+  return { ...metaCommerce(params), value: 0 };
+}
+
+function tiktokAudienceSignal(params) {
+  // TikTok's per-item `price` and `quantity` come off with the value: zeroing
+  // one field while the amount rides in another is not a zero-value signal.
+  // Meta's shaper carries neither by construction, and this matches it — what
+  // is left is who and which plan, which is the whole point of the audience.
+  const { price, quantity, ...signal } = tiktokCommerce(params);
+
+  return { ...signal, value: 0 };
+}
+
 // Both ad platforms call the query `search_string`; GA4 calls it `search_term`.
 function metaSearch(params) {
   return compact({
@@ -99,12 +126,18 @@ function ga4Recurring(params) {
 // The canonical commerce param contract, shared by every money event.
 const COMMERCE_PARAMS = ['transaction_id', 'value', 'currency', 'items', 'is_trial', 'is_recurring', 'payment_processor', 'payment_frequency'];
 
+// A plan change is the one money event with a BEFORE: `items` is the plan the
+// subscriber moved to, and these carry the one they came from, so the direction
+// of the switch is readable without a second event
+// ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+const PLAN_CHANGE_PARAMS = [...COMMERCE_PARAMS, 'previous_item_id', 'previous_item_name', 'previous_value'];
+
 // ─── The catalog ────────────────────────────────────────────────────────────
 
 const CATALOG = {
   // ─── Auth ───
 
-  // Funnel entry (inventory gap 1 — nothing fires this today). No provider
+  // The funnel entry, fired when the signup form is submitted. No provider
   // mapping: the signup FUNNEL is ours to read, not an ad platform's.
   sign_up_started: {
     params: ['method'],
@@ -152,11 +185,25 @@ const CATALOG = {
     },
   },
 
+  // Every platform hears the page view through THIS entry
+  // ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)): the web
+  // loader's raw `fbq('track', 'PageView')` and `ttq.page()` at pixel init are
+  // retired, so a page view walks the same consent gate and the same catalog as
+  // every other event. Pass-through: a page's own params are all any of them
+  // wants, and each pixel reads the URL itself when a fire carries none.
   page_view: {
     params: ['page_path', 'page_title', 'page_location'],
     placement: 'client',
     providers: {
       ga4: { name: 'page_view', kind: 'standard' },
+      meta: { name: 'PageView', kind: 'standard' },
+      // TikTok's page view is a pixel METHOD it manages itself (`ttq.page()`),
+      // not a name in its trackable set — `ttq.track('Pageview')` appears
+      // nowhere in TikTok's documented surface, and sending it would risk a
+      // Pageview metric that silently reads zero. So the mapping names the
+      // METHOD and the browser transport calls exactly that; the name and the
+      // honest `custom` kind stay for the catalog and the fire log.
+      tiktok: { name: 'Pageview', kind: 'custom', method: 'page' },
     },
   },
 
@@ -252,21 +299,85 @@ const CATALOG = {
     },
   },
 
-  // Inventory gap 4 — no truth event exists today; GA4's native refund is unused.
+  // The FIRST real charge after a trial — the funnel step the generic renewal
+  // branch used to swallow, which made a conversion indistinguishable from a
+  // routine renewal ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
+  //
+  // GA4 hears its standard `purchase`, because this is where the money finally
+  // moves and revenue belongs in the revenue report; the pair `is_trial: true` +
+  // `is_recurring: false` is what marks it inside that stream, so the conversion
+  // is still countable on its own. The ad platforms already heard
+  // `StartTrial`/`Subscribe` at trial start, and this is that subscription
+  // starting to pay — their own standard Subscribe.
+  trial_converted: {
+    params: COMMERCE_PARAMS,
+    placement: 'server',
+    providers: {
+      ga4: { name: 'purchase', kind: 'standard' },
+      meta: { name: 'Subscribe', kind: 'standard', map: metaCommerce },
+      tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
+    },
+  },
+
+  // The other end of the same funnel: a trial that ended without ever paying.
+  // GA4-only, and DELIBERATELY out of the exclusion lane the two entries below
+  // joined ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)): a
+  // lapsed trialist is a win-back audience worth RETARGETING, not somebody to
+  // stop showing ads to. An ad platform optimizes toward conversions, so the
+  // failure itself buys nothing either.
+  trial_lapsed: {
+    params: COMMERCE_PARAMS,
+    placement: 'server',
+    providers: {
+      ga4: { name: 'trial_lapsed', kind: 'custom' },
+    },
+  },
+
+  // GA4's own refund event, fired by the payment webhook's refund transitions.
+  // The ad platforms hear a zero-value custom `Refunded` — an audience to stop
+  // paying to reach, and the one thing they can do with a churn moment.
   refund: {
     params: ['transaction_id', 'value', 'currency', 'items'],
     placement: 'server',
     providers: {
       ga4: { name: 'refund', kind: 'standard' },
+      meta: { name: 'Refunded', kind: 'custom', map: metaAudienceSignal },
+      tiktok: { name: 'Refunded', kind: 'custom', map: tiktokAudienceSignal },
     },
   },
 
-  // Inventory gap 3 — the three cancellation transitions fire nothing today.
+  // The cancellation that TOOK EFFECT. Cancellation-REQUESTED stays event-less by
+  // design: a schedule changed, nothing ended, no money moved, and the
+  // subscription may never cancel at all.
   subscription_cancelled: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
       ga4: { name: 'subscription_cancelled', kind: 'custom' },
+      meta: { name: 'SubscriptionCancelled', kind: 'custom', map: metaAudienceSignal },
+      tiktok: { name: 'SubscriptionCancelled', kind: 'custom', map: tiktokAudienceSignal },
+    },
+  },
+
+  // The uncancel — a scheduled cancellation withdrawn. The request had no event
+  // to be the pair of, which is the point: a retention win is an outcome, and it
+  // was completely dark before [#407].
+  subscription_uncancelled: {
+    params: COMMERCE_PARAMS,
+    placement: 'server',
+    providers: {
+      ga4: { name: 'subscription_uncancelled', kind: 'custom' },
+    },
+  },
+
+  // An upgrade or downgrade between two paid plans. GA4-only: no money moves at
+  // the switch itself, and firing a platform's Subscribe here would count a
+  // second subscription for a customer who already has one.
+  plan_changed: {
+    params: PLAN_CHANGE_PARAMS,
+    placement: 'server',
+    providers: {
+      ga4: { name: 'plan_changed', kind: 'custom' },
     },
   },
 
@@ -614,7 +725,8 @@ const CATALOG = {
     },
   },
 
-  // Inventory gap 6 — the 404 page has zero tracking today.
+  // The 404 page's own event, carrying the path that missed. GA4 only: a broken
+  // link is ours to fix, never an ad signal.
   page_not_found: {
     params: ['path'],
     placement: 'client',

@@ -16,7 +16,7 @@
  * browser facade walks:
  *   1. consent — the order's/user's `trackingConsent` snapshot gates the category
  *   2. adapter — the catalog mapping, or null when the provider has none
- *      (`refund` and `subscription_cancelled` are GA4-only by catalog design)
+ *      (`plan_changed` and `trial_lapsed` are GA4-only by catalog design)
  *   3. transport — the platform's HTTP API, fire-and-forget, errors isolated
  *
  * Delivery is NON-BLOCKING and never throws at its caller: a payment webhook or
@@ -97,7 +97,7 @@ function deliverConversion({ event, params = {}, attribution = {}, identity = {}
 
   // A name the catalog does not know reaches every adapter and resolves to null
   // in each — indistinguishable, per-provider, from a real event a provider
-  // deliberately does not map (`refund` on Meta). So a typo in a canonical name
+  // deliberately does not map (`plan_changed` on Meta). So a typo in a canonical name
   // would stop reporting revenue and say nothing about it. It gets its OWN
   // outcome and one loud line, and it still never throws: a webhook that has
   // already taken the customer's money must not die on a misspelling.
@@ -185,13 +185,18 @@ function buildMetaBody({ descriptor, identity, eventId }) {
   const userData = { ...descriptor.userData };
 
   if (identity.externalId) {
+    // RAW on purpose, verified against the live spec (#410): Meta's
+    // customer-information reference marks external_id "Hashing recommended",
+    // not required, and its Pixel example passes a bare id — so both Meta
+    // halves carry the same raw uid. TikTok's is the half that must be hashed.
     userData.external_id = identity.externalId;
   }
   if (identity.emailHash) {
     userData.em = identity.emailHash;
   }
-  if (identity.phoneHash) {
-    userData.ph = identity.phoneHash;
+  if (identity.metaPhoneHash) {
+    // Meta's own spec: the phone hashed as BARE DIGITS (#392).
+    userData.ph = identity.metaPhoneHash;
   }
   if (identity.ip) {
     userData.client_ip_address = identity.ip;
@@ -234,8 +239,8 @@ function sendMeta({ descriptor, identity, eventId, ctx, Manager }) {
 /**
  * Build the Events API body for one descriptor.
  *
- * TikTok's match block is `context.user` (hashed email/phone + external id, plus
- * `ttp`), with the click id in `context.ad.callback` and the request pair at
+ * TikTok's match block is `context.user` (hashed email, phone and external id,
+ * plus `ttp`), with the click id in `context.ad.callback` and the request pair at
  * context level. The adapter has already put `ttclid`/`ttp` in `userData`; this
  * is where they land in TikTok's own vocabulary.
  *
@@ -252,14 +257,19 @@ function buildTikTokBody({ descriptor, identity, eventId, pixelCode }) {
   const user = {};
   const context = {};
 
-  if (identity.externalId) {
-    user.external_id = identity.externalId;
+  if (identity.tiktokExternalIdHash) {
+    // TikTok's Events API reference: "SHA-256 hashing is required" for
+    // external_id, where Meta's spec only recommends it (#410). The browser
+    // half hashes the same uid the same way, so the two still link.
+    user.external_id = identity.tiktokExternalIdHash;
   }
   if (identity.emailHash) {
     user.email = identity.emailHash;
   }
-  if (identity.phoneHash) {
-    user.phone_number = identity.phoneHash;
+  if (identity.tiktokPhoneHash) {
+    // TikTok's own spec: the phone hashed in E.164, WITH the plus (#392) — a
+    // different digest from Meta's for the same person.
+    user.phone_number = identity.tiktokPhoneHash;
   }
   if (descriptor.userData.ttp) {
     user.ttp = descriptor.userData.ttp;

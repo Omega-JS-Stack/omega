@@ -18,14 +18,42 @@
  *
  * RAW PII NEVER LEAVES. Email and phone are SHA256 hex, the same mechanism the
  * GA4 Measurement Protocol helper uses (`helpers/analytics.js`) — with the
- * normalization Meta and TikTok both require on top (trimmed + lowercased email,
- * digits-only phone), because an unnormalized hash matches nobody.
+ * normalization each platform requires on top, because an unnormalized hash
+ * matches nobody. Email is the one value everybody normalizes alike (trimmed +
+ * lowercased); the PHONE is not (#392): Meta's advanced matching hashes bare
+ * digits, GA4's Measurement Protocol and TikTok's Events API both hash the E.164
+ * form WITH the `+`. So the identity block carries BOTH digests under the same
+ * key names the browser half uses (`web core/js/libs/analytics.js`), and each
+ * sender picks its own.
+ *
+ * The normalizers themselves are the shared package's — `@omega.js/analytics/identity`
+ * is where a platform's spec is written down, once, for both halves of a
+ * conversion. Only the digest is local: the shared `sha256()` is async (a page's
+ * only hash is `crypto.subtle`), and everything here is sync. The NAME rule
+ * (#403) is the one normalizer written down here instead: no browser surface
+ * sends a name, so the shared package carries no name key — the day one does,
+ * this rule moves there with the rest.
  *
  * Everything here tolerates absence. The raw-API recovery lane writes orders with
  * no attribution and no request context at all, and a fire with external_id alone
  * is worth more than a throw.
  */
 const crypto = require('crypto');
+
+// @omega.js/analytics is a private workspace package: in the monorepo the bare
+// specifier resolves via the workspace link (and the prepare-package vendor hook
+// rewrites it in dist/), but src/ ships in the tarball UNREWRITTEN and the test
+// corpus deep-requires it in consumers — so fall back to the copy vendored into
+// dist/, which sits at the same depth from both trees.
+let normalizeEmail;
+let normalizeExternalId;
+let metaPhone;
+let tiktokPhone;
+try {
+  ({ normalizeEmail, normalizeExternalId, metaPhone, tiktokPhone } = require('@omega.js/analytics/identity'));
+} catch (e) {
+  ({ normalizeEmail, normalizeExternalId, metaPhone, tiktokPhone } = require('../../../../dist/vendor/analytics/identity.js'));
+}
 
 // The campaign params GA4's Measurement Protocol reads, and the utm key each one
 // is captured under by the landing-page capture (`web core/js/core/query-strings.js`).
@@ -52,14 +80,29 @@ function toSHA256(value) {
  * @returns {string|null} The digest, or null when there is no email.
  */
 function hashEmail(email) {
-  const normalized = `${email || ''}`.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
 
   return normalized ? toSHA256(normalized) : null;
 }
 
 /**
- * Hash a phone number per Meta/TikTok spec: digits only (country code included,
- * no `+`, no punctuation), then SHA256.
+ * Hash a NAME per GA4's user-data spec: trimmed, lowercased, then SHA256 — the
+ * same rule email gets, and for the same reason: an account doc's casing is its
+ * own business, and a raw digest misses every user who typed `Ada` where the ad
+ * platform holds `ada`.
+ *
+ * @param {string} [name] - A given or family name as the account stores it.
+ * @returns {string|null} The digest, or null when there is no name.
+ */
+function hashName(name) {
+  const normalized = `${name || ''}`.trim().toLowerCase();
+
+  return normalized ? toSHA256(normalized) : null;
+}
+
+/**
+ * The bare digits of a stored phone — country code included, no `+`, no
+ * punctuation — which is what both normalizations are built from.
  *
  * The account schema stores `{ countryCode, national }` as NUMBERS defaulting to
  * 0, and 0 means "no phone on file" — hashing it would hand every phoneless
@@ -67,22 +110,74 @@ function hashEmail(email) {
  *
  * @param {object|string} [telephone] - The user doc's `personal.telephone`
  *   ({ countryCode, national }), or a plain E.164 string (Auth's `phoneNumber`).
- * @returns {string|null} The digest, or null when there is no number.
+ * @returns {string} The digits, or '' when there is no number.
  */
-function hashPhone(telephone) {
+function phoneDigits(telephone) {
   if (typeof telephone === 'string') {
-    const digits = telephone.replace(/\D/g, '');
-
-    return digits ? toSHA256(digits) : null;
+    return metaPhone(telephone);
   }
 
   if (!telephone?.national) {
-    return null;
+    return '';
   }
 
-  const digits = `${telephone.countryCode || ''}${telephone.national}`.replace(/\D/g, '');
+  return metaPhone(`${telephone.countryCode || ''}${telephone.national}`);
+}
+
+/**
+ * Hash a phone number per META's advanced-matching spec: digits only (country
+ * code included, no `+`, no punctuation), then SHA256.
+ *
+ * @param {object|string} [telephone] - `{ countryCode, national }`, or an E.164 string.
+ * @returns {string|null} The digest, or null when there is no number.
+ */
+function hashPhone(telephone) {
+  const digits = phoneDigits(telephone);
 
   return digits ? toSHA256(digits) : null;
+}
+
+/**
+ * Hash a phone number in E.164 WITH the leading `+`, then SHA256 — what GA4's
+ * Measurement Protocol and TikTok's Events API both ask for. A different digest
+ * for the same person than `hashPhone()`, which is the entire point (#392).
+ *
+ * @param {object|string} [telephone] - `{ countryCode, national }`, or an E.164 string.
+ * @returns {string|null} The digest, or null when there is no number.
+ */
+function hashPhoneE164(telephone) {
+  const e164 = tiktokPhone(phoneDigits(telephone));
+
+  return e164 ? toSHA256(e164) : null;
+}
+
+/**
+ * Hash the uid the way TIKTOK's Events API demands of `external_id`: trimmed,
+ * then SHA256 ([#410](https://github.com/Omega-JS-Stack/omega/issues/410)).
+ *
+ * Verified against the live docs, because a raw id here was the #397 failure
+ * mode again — accepted by the API and matched to nobody. TikTok's
+ * `/event/track/` reference: "external_id ... SHA-256 hashing is required", and
+ * its Advanced Matching table takes the pixel half "Unhashed or hashed SHA-256.
+ * Trim any leading and trailing spaces before hashing and ensure you are
+ * consistent with the External ID used" — so the browser half hashes the same
+ * uid the same way and the two halves still meet. The trim rule itself is the
+ * shared package's `normalizeExternalId()`, like every other normalizer here:
+ * one home, so the two halves cannot drift apart a character at a time.
+ *
+ * META is the deliberate exception and stays RAW on `identity.externalId`: its
+ * customer-information reference marks external_id "Hashing recommended" (not
+ * required), and its own Pixel example passes a bare id — so the raw uid is
+ * what both Meta halves carry. GA4's sender needs it raw for a third reason:
+ * `Manager.Analytics({ uuid })` derives the `user_id` from it.
+ *
+ * @param {string} [uid] - The owner's uid.
+ * @returns {string|null} The digest, or null when there is no uid.
+ */
+function hashExternalId(uid) {
+  const normalized = normalizeExternalId(uid);
+
+  return normalized ? toSHA256(normalized) : null;
 }
 
 /**
@@ -167,7 +262,8 @@ function buildAttributionContext(attribution) {
  * Who the conversion belongs to.
  *
  * @param {object} options
- * @param {string} options.uid - The owner's uid — the external_id every platform gets.
+ * @param {string} options.uid - The owner's uid — the external_id every platform
+ *   gets, raw for Meta and GA4, hashed for TikTok (`hashExternalId()`).
  * @param {string} [options.email] - The account's email address (hashed here, never sent raw).
  * @param {object|string} [options.telephone] - `{ countryCode, national }`, or an E.164 string.
  * @param {object} [options.request] - The captured `{ ip, userAgent }` of the checkout.
@@ -176,8 +272,13 @@ function buildAttributionContext(attribution) {
 function buildIdentity({ uid, email, telephone, request }) {
   return compact({
     externalId: uid || null,
+    // TikTok's Events API requires the digest where Meta only recommends it, so
+    // the id ships in both shapes and each sender picks its own (#410).
+    tiktokExternalIdHash: hashExternalId(uid),
     emailHash: hashEmail(email),
-    phoneHash: hashPhone(telephone),
+    // One person, two digests — the normalization is the platform's, not ours.
+    metaPhoneHash: hashPhone(telephone),
+    tiktokPhoneHash: hashPhoneE164(telephone),
     ip: request?.ip || null,
     userAgent: request?.userAgent || null,
   });
@@ -202,6 +303,9 @@ module.exports = {
   buildIdentity,
   constructFbc,
   hashEmail,
+  hashExternalId,
+  hashName,
   hashPhone,
+  hashPhoneE164,
   toSHA256,
 };

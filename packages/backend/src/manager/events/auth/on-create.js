@@ -1,4 +1,5 @@
 const { retryWrite, runAuthHook, MAX_RETRIES } = require('./utils.js');
+const { buildUserDoc, isUserDoc, extractProviderName } = require('../../libraries/user-doc.js');
 const { deliverConversion } = require('../../libraries/analytics/conversions.js');
 const { buildAttributionContext, buildIdentity } = require('../../libraries/analytics/match-data.js');
 
@@ -52,42 +53,17 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
       return null;
     });
 
-  if (existingDoc?.exists && existingDoc.data()?.auth?.uid) {
+  if (isUserDoc(existingDoc?.exists ? existingDoc.data() : null)) {
     ctx.log(`onCreate: User doc already exists for ${user.uid}, skipping creation (${Date.now() - startTime}ms)`);
     return;
   }
 
   // Extract name from provider data (e.g., Google, Facebook, GitHub)
-  const providerName = extractProviderName(user);
+  ctx.log(`onCreate: Inferred name from provider:`, extractProviderName(user));
 
-  ctx.log(`onCreate: Inferred name from provider:`, providerName);
-
-  // Create user record using Manager.User() helper
-  const userRecord = Manager.User({
-    auth: {
-      uid: user.uid,
-      email: user.email,
-    },
-    personal: providerName ? {
-      name: providerName,
-    } : undefined,
-  }).properties;
-
-  // Add metadata tag (merge into existing metadata to preserve metadata.created from User schema)
-  const meta = Manager.Metadata().set({ tag: 'auth:on-create' });
-  userRecord.metadata = { ...userRecord.metadata, ...meta };
-
-  // Stamp metadata.created from Firebase Auth's creationTime (the canonical account-creation
-  // moment) rather than the User schema's "now" — otherwise the doc lands a beat after Auth,
-  // and the OMEGA user migration reconciles every new signup against Auth on its next run.
-  const creationTime = user.metadata?.creationTime;
-  if (creationTime) {
-    const createdDate = new Date(creationTime);
-    userRecord.metadata.created = {
-      timestamp: createdDate.toISOString(),
-      timestampUNIX: Math.round(createdDate.getTime() / 1000),
-    };
-  }
+  // Build the user doc — the same shape the sign-in heal recreates when this doc
+  // goes missing later ([#405](https://github.com/Omega-JS-Stack/omega/issues/405))
+  const userRecord = buildUserDoc({ Manager: Manager, user: user, tag: 'auth:on-create' });
 
   ctx.log(`onCreate: Creating user doc for ${user.uid}`, userRecord);
 
@@ -187,30 +163,6 @@ function resolveSignupMethod(user) {
   }
 
   return providerId.replace(/\.com$/, '');
-}
-
-/**
- * Extract first/last name from provider data (Google, Facebook, GitHub, etc.)
- * Returns { first, last } or null if no name found
- */
-function extractProviderName(user) {
-  // Try provider-specific displayName first, then top-level displayName
-  const displayName = user.providerData?.find(p =>
-    p.providerId !== 'password'
-    && p.providerId !== 'anonymous'
-    && p.displayName
-  )?.displayName || user.displayName;
-
-  if (!displayName) {
-    return null;
-  }
-
-  const parts = displayName.trim().split(/\s+/);
-
-  return {
-    first: parts[0] || null,
-    last: parts.slice(1).join(' ') || null,
-  };
 }
 
 // Exported for testing — the signup method vocabulary is a contract with the

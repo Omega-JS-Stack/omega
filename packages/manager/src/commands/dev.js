@@ -181,6 +181,11 @@ module.exports = async (options = {}) => {
     // unbuilt and what to start; nothing boots on top of it.
     throw new Error(`omega dev: ${sweep.staleLinked.map((entry) => entry.packageName).join(', ')} — see above; nothing booted`);
   }
+  if (sweep.healFailed.length > 0) {
+    // The watch is down and the sweep's own rebuild broke (#398) — the sweep
+    // printed the prepare to run by hand; no leg boots on a dist nobody built.
+    throw new Error(`omega dev: ${sweep.healFailed.map((entry) => entry.packageName).join(', ')} — see above; nothing booted`);
+  }
 
   // Boot opens with a full manage cycle (#44): the app watchers see only
   // their own app, so brand-level sources — assets/logo/brandmark.svg, .env,
@@ -250,7 +255,9 @@ module.exports = async (options = {}) => {
     const child = spawn(leg[0], leg.slice(1), {
       cwd: app.path,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, ...nodeEnvFor(node) },
+      // Legs pipe their output — keep chalk colors when the parent's terminal
+      // has them (the log tee strips ANSI either way)
+      env: { ...process.env, ...nodeEnvFor(node), FORCE_COLOR: process.stdout.isTTY ? '1' : process.env.FORCE_COLOR || '0' },
     });
     forward(child.stdout, console.log, target);
     forward(child.stderr, console.error, target);
