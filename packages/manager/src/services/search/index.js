@@ -8,9 +8,10 @@
  * after analytics (the GA property is what ga-link associates with).
  *
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env (OAuth2;
- * tokens cache to .omega/auth/google-search-console-tokens.json — the
- * webmasters + siteverification scopes are separate from firebase's and
- * analytics' tokens). No credentials → the service skips.
+ * tokens cache to the ONE shared .omega/auth/google-tokens.json store
+ * (lib/google-auth.js) alongside the firebase and analytics grants — the
+ * webmasters + siteverification scopes ride the same file). No credentials →
+ * the service skips.
  */
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');

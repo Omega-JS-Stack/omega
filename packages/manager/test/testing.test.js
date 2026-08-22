@@ -36,8 +36,8 @@ function stageBrand() {
  * nudge instead.
  */
 function seedDeployRecord(root, ...targets) {
-  const deploy = Object.fromEntries(targets.map((target) => [target, { at: '2026-07-17T00:00:00.000Z' }]));
-  jetpack.write(join(root, '.omega', 'state.json'), { deploy });
+  const records = Object.fromEntries(targets.map((target) => [target, { at: '2026-07-17T00:00:00.000Z' }]));
+  jetpack.write(join(root, '.omega', 'deploys.json'), records);
 }
 
 function brandConfig(overrides = {}) {
@@ -382,8 +382,8 @@ test('testing: record-less brand with a LIVE site passes and ADOPTS the deploy r
   const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
-  const state = jetpack.read(join(root, '.omega', 'state.json'), 'json');
-  assert.equal(state.deploy.web.adopted, true, 'live hit on a record-less brand writes the record (fresh clones self-heal)');
+  const records = jetpack.read(join(root, '.omega', 'deploys.json'), 'json');
+  assert.equal(records.web.adopted, true, 'live hit on a record-less brand writes the record (fresh clones self-heal)');
 });
 
 test('testing: no brand.url → homepage and API health warn, zero fetches', async () => {

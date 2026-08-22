@@ -17,11 +17,10 @@
  * FILTER (mirrored from ultimate-jekyll-manager/src/commands/setup.js:419-428):
  * blank lines and `#` comments are skipped, the key must be UPPER_SNAKE
  * (`[A-Z_][A-Z0-9_]*`), wrapping quotes are stripped, and the VALUE must be
- * non-empty. There is no non-secret exclusion list: the legacy published
- * everything in `.env`, and so does this (a `.env` key is a secret by
- * definition — placeholders ship commented out). One consequence rides along
- * verbatim: an inline `KEY=v # note` comment is part of the value, exactly as
- * it was in UJM.
+ * non-empty. A `.env` key is a secret by definition — placeholders ship
+ * commented out — with ONE named exception lane, MACHINE_LOCAL_KEYS below. One
+ * consequence rides along verbatim: an inline `KEY=v # note` comment is part of
+ * the value, exactly as it was in UJM.
  *
  * ONE deliberate deviation: the legacy's lazy `["']?(.+?)["']?$` group leaves
  * `KEY=""` with a lone `"` as its value, which would publish a junk secret AND
@@ -43,6 +42,18 @@ const ENV_LINE = /^([A-Z_][A-Z0-9_]*)=(.*)$/;
 // Keys the workflow template already declares at the env: block — never
 // duplicated by the generated block (a repeated YAML mapping key is invalid).
 const WORKFLOW_OWNED_KEYS = ['GH_TOKEN', 'NODE_VERSION', 'NODE_ENV'];
+
+// MACHINE-LOCAL keys: developer-tooling values that belong in `.env` but are
+// NOT secrets and mean nothing off this laptop ([#454](https://github.com/Omega-JS-Stack/omega/issues/454)).
+// They never publish as Actions secrets and never inject into a workflow —
+// enforced once, in collectEnvSecrets, which is the source of both.
+//
+// OMEGA_FONTAWESOME_ROOT is a filesystem path to the developer's local Pro
+// download (`~/.omega/fontawesome`). Enrolling it churned the brand's secret
+// list with each machine and handed CI a path that does not exist there. CI
+// resolves Pro icons through the `@fortawesome` npm token lane instead
+// ([docs/shared/icons.md](../../../docs/shared/icons.md)).
+const MACHINE_LOCAL_KEYS = ['OMEGA_FONTAWESOME_ROOT'];
 
 // Rendered in place of the block when nothing is collected, so the generated
 // region is always a valid, self-explaining line of YAML.
@@ -84,7 +95,8 @@ function parseEnvFile(contents) {
  * NON-EMPTY value wins — local .env over brand .env over company .env — and the
  * shell overrides any of them for a key the files declare. A key that exists
  * only in the shell is never collected: `.env` names the key set, the cascade
- * supplies the value (D15).
+ * supplies the value (D15). MACHINE_LOCAL_KEYS drop out of the collected set
+ * entirely, at any layer (#454).
  *
  * @param {object} options
  * @param {string} options.targetDir - The target root (its .env is the local layer)
@@ -102,6 +114,8 @@ function collectEnvSecrets(options) {
     if (!envPath || !fs.existsSync(envPath)) continue;
     Object.assign(secrets, parseEnvFile(fs.readFileSync(envPath, 'utf8')));
   }
+
+  for (const key of MACHINE_LOCAL_KEYS) delete secrets[key];
 
   for (const key of Object.keys(secrets)) {
     const shell = env[key];
@@ -230,5 +244,6 @@ module.exports = {
   declaredBrandRepo,
   ENV_LINE,
   WORKFLOW_OWNED_KEYS,
+  MACHINE_LOCAL_KEYS,
   EMPTY_BLOCK,
 };

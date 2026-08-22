@@ -129,7 +129,6 @@ Manager.prototype.getManifest = Manager.getManifest;
 // shared sections at the top level, targets.extension overlaid onto them (brand
 // walk-up applies in brand monorepos). Secrets never live in the file; the loader
 // hard-fails on secret-shaped keys.
-let warnedConfigSchema = false;
 Manager.getConfig = function () {
   const { hasOmegaConfig, loadConfig, formatErrors } = require('@omega.js/config');
 
@@ -142,10 +141,14 @@ Manager.getConfig = function () {
 
   const { config, errors } = loadConfig(cwd, 'extension');
 
-  // Warn ONCE per process — gulp tasks each call getConfig() at require time.
-  if (errors.length && !warnedConfigSchema) {
-    warnedConfigSchema = true;
-    console.warn(`[@omega.js/extension] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+  // Validation findings are FATAL at build time — same contract as the web
+  // build's loadSiteData ([#426](https://github.com/Omega-JS-Stack/omega/issues/426)).
+  // A retired key reads as nothing at all, so a build that only warned shipped
+  // a bundle missing whatever lived under it and still exited 0. Thrown on
+  // EVERY call, never warn-once: tasks call this at require time, and a
+  // once-per-process flag left calls 2..n silently building on the bad config.
+  if (errors.length) {
+    throw new Error(`[@omega.js/extension] config/omega.json5 is invalid:\n${formatErrors(errors)}`);
   }
 
   return config;

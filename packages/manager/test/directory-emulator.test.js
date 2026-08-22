@@ -11,20 +11,20 @@
  * service-account JWT. Everything above it is the real service: the real
  * setup gates, the real runner, the real diff, the real updateMask.
  *
- * The lane SKIPS (never fails) without the firebase CLI or a JVM, matching how
- * every other emulator-dependent lane in this repo handles a missing tool.
+ * The emulator itself — boot, ready-watch, and the teardown that lets node
+ * exit (#440) — is test/lib/emulator.js. The lane SKIPS (never fails) without
+ * the firebase CLI or a JVM, matching how every other emulator-dependent lane
+ * in this repo handles a missing tool.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { spawn, spawnSync } = require('node:child_process');
-const net = require('node:net');
 const os = require('node:os');
-const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { OPERATIONS } = require('../src/config.js');
 const { encodeFields, decodeFields } = require('../src/lib/firestore-rest.js');
 const service = require('../src/services/directory/index.js');
+const { missingTool, startEmulator } = require('./lib/emulator.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.DIRECTORY_SERVICE_ACCOUNT;
@@ -32,98 +32,6 @@ delete process.env.DIRECTORY_SERVICE_ACCOUNT;
 const PROJECT_ID = 'demo-omega-directory';
 const BRAND_ID = 'emulator-brand';
 const DOC_PATH = `brands/${BRAND_ID}`;
-const READY_TIMEOUT_MS = Number(process.env.OMEGA_EMULATOR_READY_TIMEOUT || 180000);
-
-// ─── Tool availability ───────────────────────────────────────────────────────
-
-/** @returns {string|null} Why this lane cannot run, or null when it can. */
-function missingTool() {
-  const firebase = spawnSync('firebase', ['--version'], { stdio: 'ignore' });
-  if (firebase.error || firebase.status !== 0) {
-    return 'the firebase CLI is not on PATH';
-  }
-
-  const java = spawnSync('java', ['-version'], { stdio: 'ignore' });
-  if (java.error || java.status !== 0) {
-    return 'no JVM is installed (the Firestore emulator is a java process)';
-  }
-
-  return null;
-}
-
-// ─── Emulator lifecycle ──────────────────────────────────────────────────────
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-/**
- * Boot a standalone Firestore emulator in its own throwaway project dir.
- *
- * @returns {Promise<{ port: number, dir: string, stop: Function }>}
- */
-async function startEmulator() {
-  const port = await freePort();
-  const dir = jetpack.tmpDir({ prefix: 'omega-directory-emulator' }).cwd();
-
-  jetpack.write(join(dir, 'firebase.json'), {
-    emulators: { firestore: { host: '127.0.0.1', port }, ui: { enabled: false } },
-    firestore: { rules: 'firestore.rules' },
-  });
-  // The push is server-side tooling; client access is denied exactly as the
-  // real parent project's rules deny it.
-  jetpack.write(
-    join(dir, 'firestore.rules'),
-    'rules_version = "2";\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /{document=**} { allow read, write: if false; }\n  }\n}\n',
-  );
-
-  const child = spawn(
-    'firebase',
-    ['emulators:start', '--only', 'firestore', '--project', PROJECT_ID],
-    { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
-
-  const output = [];
-  const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Firestore emulator never reported ready in ${READY_TIMEOUT_MS}ms:\n${output.join('')}`)),
-      READY_TIMEOUT_MS,
-    );
-
-    const watch = (chunk) => {
-      output.push(String(chunk));
-      if (output.join('').includes('All emulators ready')) {
-        clearTimeout(timer);
-        resolve();
-      }
-    };
-
-    child.stdout.on('data', watch);
-    child.stderr.on('data', watch);
-    child.on('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Firestore emulator exited with code ${code}:\n${output.join('')}`));
-    });
-  });
-
-  await ready;
-
-  return {
-    port,
-    dir,
-    stop: () => new Promise((resolve) => {
-      child.once('exit', resolve);
-      child.kill('SIGTERM');
-    }),
-  };
-}
 
 // ─── The client under the service ────────────────────────────────────────────
 
@@ -219,7 +127,7 @@ const unavailable = missingTool();
 const laneOptions = unavailable ? { skip: unavailable } : {};
 
 test('directory: a config price change lands in the parent doc; an unchanged config writes nothing', laneOptions, async (t) => {
-  const emulator = await startEmulator();
+  const emulator = await startEmulator({ projectId: PROJECT_ID, prefix: 'omega-directory-emulator' });
   t.after(async () => {
     await emulator.stop();
     jetpack.remove(emulator.dir);

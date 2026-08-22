@@ -15,7 +15,9 @@
  * successful deploy verb and read by the testing service. It is neither a
  * provisioned fact nor a secret, it is owned outside the manager, and it
  * keeps its file: a state.json carrying only `deploy` is rewritten, not
- * deleted.
+ * deleted. deploy-record takes it from there — it adopts that key into
+ * `.omega/deploys.json` and removes the emptied file on its next read or
+ * write (#449).
  *
  * Unlike its Firestore siblings this migration touches only the brand's own
  * files, so it runs without a service account.

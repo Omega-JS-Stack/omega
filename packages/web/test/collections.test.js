@@ -132,17 +132,19 @@ test('allByUrl sorts by BYTE order, so no ICU build can reorder a sitemap', () =
 
 test('taxonomy groups by slug and the most frequent spelling names the term', () => {
   const items = [
-    post({ slug: 'a', date: '2024-03-01', categories: ['marketing', 'Growth'] }),
-    post({ slug: 'b', date: '2024-02-01', categories: ['Marketing'] }),
-    post({ slug: 'c', date: '2024-01-01', categories: ['marketing'] }),
+    post({ slug: 'a', date: '2024-03-01', categories: ['marketing', 'Growth', 'A.I.'] }),
+    post({ slug: 'b', date: '2024-02-01', categories: ['Marketing', 'A.I.'] }),
+    post({ slug: 'c', date: '2024-01-01', categories: ['marketing', 'a i'] }),
   ];
 
   const categories = registry(new Map()).get('postCategories')(api(items));
 
   assert.deepStrictEqual(categories.map((c) => [c.name, c.slug, c.posts.length]), [
-    // 'marketing' ×2 beats 'Marketing' ×1; sorted by display name.
+    // 'A.I.' ×2 beats 'a i' ×1 — punctuation is what still tells two same-slug
+    // spellings apart once the winner humanizes (#457). Sorted by display name.
+    ['A.i.', 'a-i', 3],
     ['Growth', 'growth', 1],
-    ['marketing', 'marketing', 3],
+    ['Marketing', 'marketing', 3],
   ]);
   assert.deepStrictEqual(
     categories.find((c) => c.slug === 'marketing').posts.map((p) => p.page.fileSlug),
@@ -151,14 +153,47 @@ test('taxonomy groups by slug and the most frequent spelling names the term', ()
   );
 });
 
+test('a term DISPLAYS humanized — hyphens are word breaks, legacy UJM parity (#457)', () => {
+  // The clockii regressions, verbatim: legacy UJM's blog-taxonomy generator
+  // titleized every term it named a page after, so a migrating brand's
+  // taxonomy titles must not drift. The URL (slug) never moves.
+  const items = [
+    post({ slug: 'a', date: '2024-03-01', tags: ['time-tracking-tools'] }),
+    post({ slug: 'b', date: '2024-02-01', tags: ['employee-well-being'] }),
+    post({ slug: 'c', date: '2024-01-01', tags: ['work-life-balance'] }),
+  ];
+
+  const tags = registry(new Map()).get('postTags')(api(items));
+
+  assert.deepStrictEqual(tags.map((t) => [t.name, t.slug]), [
+    ['Employee Well Being', 'employee-well-being'],
+    ['Time Tracking Tools', 'time-tracking-tools'],
+    ['Work Life Balance', 'work-life-balance'],
+  ]);
+});
+
+test('underscores break words too, and separator RUNS collapse (#457)', () => {
+  const items = [
+    post({ slug: 'a', date: '2024-02-01', categories: ['product_updates'] }),
+    // Legacy shipped two spellings of titleize and they disagree only here
+    // (blog-taxonomy.rb left a double space, dynamic-pages.rb did not) — a
+    // double space in a <title> is an artifact, so runs collapse.
+    post({ slug: 'b', date: '2024-01-01', categories: ['ai --_ ops'] }),
+  ];
+
+  const categories = registry(new Map()).get('postCategories')(api(items));
+
+  assert.deepStrictEqual(categories.map((c) => c.name), ['Ai Ops', 'Product Updates']);
+});
+
 test('a post never lands in the same term twice, however it spells it', () => {
   const items = [post({ slug: 'a', date: '2024-01-01', tags: ['AI', 'ai', 'A.I.'] })];
 
   const tags = registry(new Map()).get('postTags')(api(items));
 
   assert.deepStrictEqual(tags.map((t) => [t.name, t.slug, t.posts.length]), [
-    ['A.I.', 'a-i', 1],
-    ['AI', 'ai', 1],
+    ['A.i.', 'a-i', 1],
+    ['Ai', 'ai', 1],
   ]);
 });
 

@@ -207,8 +207,8 @@ async function proveInstances(brandRoot, cell) {
   // Deploy records key by target dir: main stays `web`, admin lands `web:admin`
   recordDeploy({ dir: mainDir, target: 'web', instance: targetInstance(mainDir, 'web'), detail: { method: 'corpus' } });
   recordDeploy({ dir: adminDir, target: 'web', instance: targetInstance(adminDir, 'web'), detail: { method: 'corpus' } });
-  const state = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'state.json'), 'utf8'));
-  need(!!(state.deploy && state.deploy.web && state.deploy['web:admin']), 'deploy records key per instance dir');
+  const records = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'deploys.json'), 'utf8'));
+  need(!!(records.web && records['web:admin']), 'deploy records key per instance dir');
 
   // Real Eleventy build of BOTH instances — each branded as ITS instance
   const mainPages = await buildWebTarget(brandRoot, 'website');

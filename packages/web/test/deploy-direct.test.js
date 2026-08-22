@@ -221,3 +221,35 @@ test('direct plan: a repo that names itself NOWHERE refuses, naming every way ou
   // custom-domain plan above throws with brand.url set), so it is not offered.
   assert.doesNotMatch(message, /brand\.url/, 'brand.url is never advertised as a way out of a missing slug');
 });
+
+// #426 — the direct lane loaded the config and dropped its validation findings
+// on the floor (the old guard tested `!config`, which the loader never returns).
+// A fatal finding is a refusal, not a plan: it stops the lane before the build,
+// the CNAME write and the push, and it stops a DRY RUN too — a plan printed
+// from a config nothing will read is a lie about what would happen.
+test('deploy --direct: a fatal config finding stops the lane before any deploy work (#426)', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-invalid-'));
+  const previous = process.cwd();
+  t.after(() => {
+    process.chdir(previous);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Everything a plan needs IS here (org + repo + brand.url) — the retired key
+  // is the only reason to refuse.
+  fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), `{
+  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+  repo: { providers: { github: { org: 'Org', repo: 'site' } } },
+  payment: { processors: { stripe: {} } },
+  targets: { web: {} },
+}`);
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'acme-website', private: true }));
+
+  process.chdir(dir);
+  await assert.rejects(
+    require('../src/commands/deploy.js')({ direct: true, dryRun: true }),
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    'the findings surface as a thrown fatal, not a silently-ignored array',
+  );
+});

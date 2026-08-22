@@ -37,10 +37,6 @@
           href: '/blog',
         },
         {
-          label: 'Discord',
-          href: '/discord',
-        },
-        {
           label: 'Careers',
           href: '/careers',
         },

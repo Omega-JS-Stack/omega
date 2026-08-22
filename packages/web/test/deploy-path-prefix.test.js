@@ -125,3 +125,23 @@ test('the package exports the deploy module CI requires by name', () => {
   const pkg = require('../package.json');
   assert.equal(pkg.exports['./deploy'], './dist/commands/deploy.js', 'the workflow one-liner resolves in a published install');
 });
+
+// #426 — the CI lane calls this REMOTELY to decide where the build mounts, so
+// a config with fatal findings must not quietly yield a base path: the run that
+// consumed it would publish a site mounted from a config nothing reads. It fails
+// where it is called, one step before the build refuses the same file.
+test('targetPathPrefix: a fatal config finding is a refusal, never a base path (#426)', () => {
+  const broken = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, payment: { processors: { stripe: {} } }, targets: { web: {} } }\n");
+
+  assert.throws(
+    () => targetPathPrefix(broken, {}),
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+  );
+  assert.throws(
+    () => targetPathPrefix(broken, { OMEGA_PATH_PREFIX: '/workkit' }),
+    /payment\.processors is retired/,
+    'an explicit prefix does not buy a broken config a pass — the build refuses it anyway',
+  );
+
+  fs.rmSync(broken, { recursive: true, force: true });
+});

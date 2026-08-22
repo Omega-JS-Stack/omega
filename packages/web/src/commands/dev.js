@@ -46,6 +46,7 @@ const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
+const { readRedirects } = require('../redirects.js');
 const { configureOmega } = require('../engine.js');
 const reads = require('@omega.js/devkit/reads');
 const { reconcileSampleContent } = require('../sample-content.js');
@@ -115,6 +116,11 @@ module.exports = async function (options) {
   // proxy resolve the sibling backend's map at use time (#300).
   const devPorts = devPortsOption(paths.root, port, origin);
   const authPort = () => devPorts().ports.auth;
+
+  // The path-redirect map (#442) the dev server answers with — the same
+  // compiled entries the build inlines into the 404 page, so a `/c/<id>` QR
+  // code resolves locally exactly as it does in production.
+  const redirects = readRedirects(siteData.redirects);
 
   // ---- Sample content on disk (spec §8): mirror the injected filler under
   // the gitignored .omega/sample-content/ so it can be read and copied —
@@ -242,7 +248,7 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts));
+      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts, redirects));
       // Arms the watch registration for the config build below — the engine's
       // captured reads are what fill it in (#200). The reset union goes to
       // Eleventy, the rescan union to the light content watcher; a config
@@ -349,10 +355,13 @@ const SERVER_OPTIONS = new Map();
  *   identity would otherwise change on every config reset
  * @param {function} [devChrome] - the live dev-chrome getter (devPortsOption);
  *   given, every HTML response is rewritten to carry it (#346)
+ * @param {Array<object>} [redirects] - the compiled path-redirect map
+ *   (readRedirects output, #442); empty/absent mounts no redirect middleware
  * @returns {object} setServerOptions() payload
  */
-function devServerOptions(outDir, authPort, devChrome) {
-  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort} ${devChrome ? 'inject' : 'plain'}`;
+function devServerOptions(outDir, authPort, devChrome, redirects) {
+  const map = redirects && redirects.length ? redirects : [];
+  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort} ${devChrome ? 'inject' : 'plain'} ${JSON.stringify(map)}`;
 
   if (!SERVER_OPTIONS.has(key)) {
     SERVER_OPTIONS.set(key, {
@@ -363,6 +372,10 @@ function devServerOptions(outDir, authPort, devChrome) {
         ...(devChrome ? [devInjectDevPorts(devChrome)] : []),
         devCleanUrls(outDir),
         devImageFallback(outDir),
+        // LAST: production reaches the map only through the 404 page, i.e.
+        // when nothing real answered — so here too, everything the site
+        // actually built answers first (#442)
+        ...(map.length ? [devRedirects(outDir, map)] : []),
       ],
       watch: [
         path.join(outDir, 'assets', 'css'),
@@ -807,6 +820,52 @@ function devCleanUrls(outDir) {
     }
 
     return next();
+  };
+}
+
+/**
+ * Path redirects in dev (#442): the SAME compiled map the build inlines into
+ * the 404 page, answered here with a real status code so local QA lands where
+ * production lands. It runs last and only for a path nothing built — in
+ * production the map is only ever reached through the 404 page, which is by
+ * definition "no file answered".
+ * @param {string} outDir
+ * @param {Array<{ pattern: string, target: string, type: number }>} redirects - readRedirects output
+ * @returns {function} connect-style middleware
+ */
+function devRedirects(outDir, redirects) {
+  const root = path.resolve(outDir);
+
+  return (req, res, next) => {
+    const [pathname, query] = (req.url || '').split('?');
+
+    // A malformed percent-escape is not a redirect candidate (devCleanUrls'
+    // rule, same reason).
+    let decoded;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch (e) {
+      return next();
+    }
+
+    // devCleanUrls already rewrote the URL to `<path>.html` when the site
+    // built that page, so a real file is exactly what this check sees.
+    const built = path.resolve(root, `.${decoded}`);
+    if (built.startsWith(root + path.sep) && jetpack.exists(built) === 'file') {
+      return next();
+    }
+
+    const entry = redirects.find(({ pattern }) => new RegExp(pattern).test(decoded));
+    if (!entry) {
+      return next();
+    }
+
+    const location = decoded.replace(new RegExp(entry.pattern), entry.target);
+    // The target carries its own querystring (`/code?id=:id`), so an incoming
+    // one is appended with the right separator.
+    res.writeHead(entry.type, { location: query ? `${location}${location.includes('?') ? '&' : '?'}${query}` : location });
+
+    return res.end();
   };
 }
 

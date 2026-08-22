@@ -28,6 +28,8 @@ const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections, BUILT_IN_COLLECTIONS } = require('./collections.js');
 const { applyCollectionLimits } = require('./limit-collections.js');
 const { readCollections, collectionPages, applyDocumentData } = require('./dynamic-pages.js');
+const { readSocials, socialPages } = require('./social-pages.js');
+const { readRedirects, redirectMap } = require('./redirects.js');
 const { resolvePageAsset } = require('./assets.js');
 const { resolvePathPrefix, prefixHtml } = require('./path-prefix.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
@@ -666,6 +668,15 @@ function buildConfig(eleventyConfig, options) {
     eleventyConfig.addTemplate(page.virtual, page.raw, renderGate(() => !decisions.suppresses(page.url), allCollections));
   }
 
+  // ---- Social shortlinks (#429): a redirect page per entry of the socials
+  // block, on the same lane and the same gate as the default pages above — the
+  // permalink is a config-time fact (`/<platform>`), so a consumer page at one
+  // of them takes just that URL over.
+  const shortlinkPages = socialPages(readSocials(site.socials));
+  for (const page of shortlinkPages) {
+    eleventyConfig.addTemplate(page.virtual, page.raw, renderGate(() => !decisions.suppresses(page.url), allCollections));
+  }
+
   // ---- Dynamic pages (#207): the listing and category pages of every
   // collection the brand declared, generated as virtual templates on the SAME
   // lane as the default pages above. Their permalink is only known per RENDER
@@ -688,7 +699,7 @@ function buildConfig(eleventyConfig, options) {
   // URL is a config-time fact (a listing's own page 1). A category page's URL
   // is a CONTENT fact — it exists because a document names that term — so it
   // can only be answered by the render-time gate above.
-  decisions.framework([...frameworkPages, ...dynamicPages].filter((page) => page.url));
+  decisions.framework([...frameworkPages, ...shortlinkPages, ...dynamicPages].filter((page) => page.url));
 
   // ---- Sample content (development only): a content-less brand still gets
   // living pages locally. Injected as virtual templates under the matching
@@ -728,6 +739,12 @@ function buildConfig(eleventyConfig, options) {
     version: options.version || null,
     date: { year: new Date().getFullYear(), iso: new Date().toISOString() },
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
+    // The compiled path-redirect map (#442), JSON or '' — the 404 layout is
+    // its only reader (static hosting serves that page for an unbuilt path,
+    // which is the one hook a captured-segment redirect has). Validated HERE,
+    // so a malformed entry fails the config build instead of quietly
+    // answering nothing.
+    redirects: redirectMap(readRedirects(site.redirects)),
     ...(site.omega || {}),
   };
   // site.characters: the literal-character set templates interpolate rather

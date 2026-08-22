@@ -53,6 +53,21 @@ test('a category page titles and describes its own term', async () => {
   assert.strictEqual(description, 'Browse all blog posts in the Marketing category.');
 });
 
+test('a hyphenated term reads as WORDS on its page — title, h1, description (#457)', async () => {
+  // The fixture's `growth-hacks` tag stands in for clockii's
+  // `time-tracking-tools`: legacy UJM titleized the term (hyphens are word
+  // breaks), OMEGA kept the corpus spelling and sentence-cased it, and every
+  // migrating brand's taxonomy SEO titles drifted. The URL never moves.
+  const all = await pages();
+  const html = all.get('/blog/tags/growth-hacks');
+  const { title, description } = head(html);
+
+  assert.ok(html, `the tag page still lives at its slug: ${[...all.keys()].filter((url) => url.startsWith('/blog/tags')).join(', ')}`);
+  assert.strictEqual(title, 'Growth Hacks - Blog Tags - MiniCo');
+  assert.strictEqual(description, 'Browse all blog posts tagged with Growth Hacks.');
+  assert.match(html, /<h1[^>]*>\s*Growth Hacks\s*</, 'the masthead h1 reads the same words');
+});
+
 test('every generated taxonomy page carries its OWN title', async () => {
   const all = await pages();
   const termPages = [...all.keys()].filter((url) => /^\/blog\/(tags|categories)\/./.test(url));

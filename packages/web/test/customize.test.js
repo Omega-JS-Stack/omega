@@ -120,6 +120,64 @@ test('cp220: resolver lanes — composition where the theme wraps one, shell els
   assert.ok(list.every((entry) => !entry.url.includes('{')), 'generator permalinks never list');
 });
 
+test('#458: a PAGINATING default page materializes — addressed by its logical URL, permalink byte-identical, default suppressed', async () => {
+  const consumer = path.join(PKG, '.omega', 'customize-paginating');
+  fs.rmSync(consumer, { recursive: true, force: true });
+  fs.mkdirSync(consumer, { recursive: true });
+
+  // The blog hub's permalink is a pagination TEMPLATE, so no URL can equal it
+  // — the index skipped it and `omega customize /blog` reported "unknown".
+  const plan = resolveCustomization({ url: '/blog', consumerDir: consumer, siteData: miniData });
+  assert.strictEqual(plan.status, 'ok', 'the blog hub is addressable by the URL its page 1 serves');
+  assert.strictEqual(plan.lane, 'shell');
+  assert.ok(plan.target.endsWith(path.join('pages', 'blog.md')), `lands at the default's own path: ${plan.target}`);
+
+  const before = await buildConsumer(consumer, 'customize-blog-a');
+  assert.ok(before.has('/blog'), 'the packaged default ships the hub before customizing');
+
+  // (a) materialized with the permalink copied BYTE-IDENTICAL — the only
+  // thing the build-time suppression lane keys on (consumer-scan.js).
+  const created = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
+  assert.strictEqual(created.status, 'created');
+  const written = fs.readFileSync(created.target, 'utf8');
+  const permalinkLine = (raw) => (raw.match(/^permalink:.*$/m) || [])[0];
+  assert.strictEqual(
+    permalinkLine(written),
+    'permalink: "/blog{% if pagination.pageNumber > 0 %}/page/{{ pagination.pageNumber | plus: 1 }}{% endif %}.html"',
+  );
+  assert.strictEqual(permalinkLine(written), permalinkLine(created.defaultPage.raw), 'byte-identical to the packaged default');
+  assert.ok(written.includes('# Verbatim copy'), 'shell explains itself in frontmatter comments');
+
+  // (b) the build suppresses the default: the same page set, one /blog.
+  const after = await buildConsumer(consumer, 'customize-blog-b');
+  assert.deepStrictEqual([...after.keys()].sort(), [...before.keys()].sort(), 'same page set — no duplicate hub');
+  for (const [url, content] of before) {
+    assert.strictEqual(normalize(url, after.get(url)), normalize(url, content), `${url} unchanged by materializing the hub`);
+  }
+
+  // Idempotent, like every other lane.
+  const again = materialize({ url: '/blog', consumerDir: consumer, siteData: miniData });
+  assert.ok(again.status === 'owned' || again.status === 'exists', `no-op on rerun (${again.status})`);
+  assert.strictEqual(fs.readFileSync(created.target, 'utf8'), written, 'rerun never rewrites the file');
+
+  // (c) non-paginating customize is untouched, and no Liquid ever LISTS as a URL.
+  const empty = path.join(PKG, '.omega', 'customize-paginating-empty');
+  fs.rmSync(empty, { recursive: true, force: true });
+  fs.mkdirSync(empty, { recursive: true });
+  const pricing = resolveCustomization({ url: '/pricing', consumerDir: empty, siteData: miniData });
+  assert.strictEqual(pricing.lane, 'shell');
+  assert.ok(pricing.target.endsWith(path.join('pages', 'pricing.md')));
+  assert.strictEqual(resolveCustomization({ url: '/', consumerDir: empty, siteData: miniData }).lane, 'composition');
+
+  const list = listCustomizable({ consumerDir: empty, siteData: miniData });
+  assert.ok(list.every((entry) => !entry.url.includes('{')), 'a pagination template never lists as a URL');
+  assert.deepStrictEqual(
+    list.filter((entry) => /^\/blog(\/|$)/.test(entry.url)).map((entry) => entry.url).sort(),
+    ['/blog', '/blog/categories', '/blog/categories/category', '/blog/index.json', '/blog/tags', '/blog/tags/tag'],
+    'every blog default is addressable, generators included',
+  );
+});
+
 test('cp220: the {% composition %} guard — append without the flag (legacy), replace with composition: true', async () => {
   const consumer = path.join(PKG, '.omega', 'customize-replace');
   fs.rmSync(consumer, { recursive: true, force: true });

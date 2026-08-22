@@ -41,6 +41,18 @@ const STOP_GRACE_MS = 2000;
 const PORT_RELEASE_TIMEOUT_MS = 5000;
 const POLL_INTERVAL_MS = 100;
 
+// How long the port→pid lookup gets to answer before a sweep gives up on it.
+// lsof stats every mounted filesystem first, so a machine with a network mount
+// pays for the walk on every call — measured at ~90ms a call here, and a stall
+// on the smbfs volume runs to MINUTES
+// ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)). The call is
+// synchronous, so an unbounded one freezes the whole run: the boot path
+// absorbed that in its ready window, and the stop path simply sat there until
+// a ship gate's lane budget was gone
+// ([#459](https://github.com/Omega-JS-Stack/omega/issues/459)). This is ~50x a
+// healthy answer, and the same window the port verdict already waits.
+const PORT_LOOKUP_TIMEOUT_MS = 5000;
+
 /**
  * Does this command line name the given project as an ARGUMENT?
  *
@@ -132,15 +144,30 @@ async function heldPorts(ports, isFree = isPortFree) {
  * The one step with no Node primitive: only lsof maps a port to a process. It
  * is reached solely for a port heldPorts() already proved is held, so a normal
  * boot never shells here at all.
+ *
+ * And it is BOUNDED, because the tool can stall indefinitely on a network
+ * mount (PORT_LOOKUP_TIMEOUT_MS). A lookup that overruns names nobody, which
+ * is what every caller already does with a port whose holder it cannot
+ * identify: report it, leave it running. The bound can only ever spare a
+ * process, never take one.
  * @param {number} port - A port something is known to hold.
- * @returns {string[]} The listening pids, or [] when the read fails.
+ * @returns {string[]} The listening pids, or [] when the read fails or overruns.
  */
 function listListeningPids(port) {
-  const { execSync } = require('child_process');
+  const { execFileSync } = require('child_process');
 
   try {
-    return execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
-      .trim().split('\n').filter(Boolean);
+    // No shell: the bound has to land on lsof ITSELF, and an `sh -c` wrapper
+    // is one more process for the kill to hit instead. stderr is dropped by
+    // the stdio map, which is all the old `2>/dev/null` was doing. SIGKILL
+    // because a process wedged in a filesystem call is exactly the one that
+    // would ignore a polite signal and hold the run past its own timeout.
+    return execFileSync('lsof', ['-ti', `TCP:${port}`, '-sTCP:LISTEN'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: PORT_LOOKUP_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+    }).trim().split('\n').filter(Boolean);
   } catch (error) {
     return [];
   }
@@ -1354,6 +1381,8 @@ class EmulatorCommand extends BaseCommand {
 // so tests exercise it directly with real `ps` rows instead of live processes.
 EmulatorCommand.resolveReadyTimeout = resolveReadyTimeout;
 EmulatorCommand.heldPorts = heldPorts;
+EmulatorCommand.listListeningPids = listListeningPids;
+EmulatorCommand.PORT_LOOKUP_TIMEOUT_MS = PORT_LOOKUP_TIMEOUT_MS;
 EmulatorCommand.plannedEmulatorPorts = plannedEmulatorPorts;
 EmulatorCommand.assertPlannedPortsFree = assertPlannedPortsFree;
 EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;

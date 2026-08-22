@@ -22,6 +22,67 @@
         </form>
       </div>
     </div>
+  {% elsif demo.type == "form" %}
+    <div class="card {% if demo.options.class %}{{ demo.options.class }}{% endif %} mx-auto">
+      <div class="card-body p-3">
+        <form id="hero-demo-form" {% iftruthy demo.options.redirect %}data-redirect="{{ demo.options.redirect }}"{% endiftruthy %} data-form-state="initializing" onsubmit="return false">
+          <div class="row g-3 text-start">
+            {% for field in demo.options.fields %}
+              {% assign field_size = field.size | default: "half" %}
+              <div class="col-12 {% if field_size == 'half' %}col-sm-6{% endif %}">
+                <label for="hero-demo-{{ field.name }}" class="form-label d-flex align-items-center mb-2">
+                  {% iftruthy field.icon %}
+                    {% omega_icon field.icon, "me-2" %}
+                  {% endiftruthy %}
+                  {{ field.label | default: field.placeholder | default: field.name }}
+                  {% iftruthy field.required %}<span class="text-danger ms-1" aria-hidden="true">*</span>{% endiftruthy %}
+                </label>
+                {% if field.type == "select" %}
+                  <select
+                    id="hero-demo-{{ field.name }}"
+                    name="{{ field.name }}"
+                    class="form-select form-select-lg"
+                    {% iftruthy field.required %}required{% endiftruthy %}
+                  >
+                    <option value="" disabled selected>{{ field.placeholder }}</option>
+                    {% for option in field.options %}
+                      <option value="{{ option.value }}">{{ option.label }}</option>
+                    {% endfor %}
+                  </select>
+                {% elsif field.type == "textarea" %}
+                  <textarea
+                    id="hero-demo-{{ field.name }}"
+                    name="{{ field.name }}"
+                    class="form-control form-control-lg"
+                    placeholder="{{ field.placeholder }}"
+                    rows="{{ field.rows | default: 3 }}"
+                    {% iftruthy field.required %}required{% endiftruthy %}
+                  ></textarea>
+                {% else %}
+                  <input
+                    id="hero-demo-{{ field.name }}"
+                    type="{{ field.type | default: 'text' }}"
+                    name="{{ field.name }}"
+                    class="form-control form-control-lg"
+                    placeholder="{{ field.placeholder }}"
+                    {% iftruthy field.required %}required{% endiftruthy %}
+                  >
+                {% endif %}
+              </div>
+            {% endfor %}
+            {% assign form_btn_class = demo.options.button.class | default: "btn-adaptive" %}
+            <div class="col-12 {% unless demo.options.button.full_width %}col-sm-auto{% endunless %}">
+              <button type="submit" class="btn {{ form_btn_class }} btn-lg w-100">
+                {% iftruthy demo.options.button.icon %}
+                  {% omega_icon demo.options.button.icon, "me-2" %}
+                {% endiftruthy %}
+                {{ demo.options.button.text }}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   {% elsif demo.type == "custom" %}
     <div id="hero-demo-custom" class="mx-auto {{ demo.options.class }}">
       {{ demo.options.content }}
@@ -71,12 +132,12 @@
     {% endiftruthy %}
 
     <div class="omega-hero__ctas" data-omega-reveal>
-      {% iftruthy args.primary_button.text %}
+      {% if args.primary_button.enabled != false and args.primary_button.text %}
         <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ args.primary_button.text }}
           <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
-      {% endiftruthy %}
+      {% endif %}
       {% iftruthy args.command %}
         <a href="{{ args.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
           <span class="omega-cmd-prompt">$</span>{{ args.command }}
@@ -101,6 +162,20 @@
     {% if demo.enabled or args.demo_html != blank %}
       <div class="mt-4" data-omega-reveal>
         {% if args.demo_html != blank %}{{ args.demo_html }}{% else %}{{ hero_demo_content }}{% endif %}
+      </div>
+    {% endif %}
+
+    {% if args.cards and args.cards.size > 0 %}
+      <div class="omega-hero__cards" data-omega-reveal>
+        {% for card in args.cards %}
+          <div class="omega-hero__card">
+            {% iftruthy card.icon %}
+              <span class="omega-hero__card-ico">{% omega_icon card.icon %}</span>
+            {% endiftruthy %}
+            <span class="omega-hero__card-num">{{ card.number }}</span>
+            <span class="omega-hero__card-label">{{ card.label }}</span>
+          </div>
+        {% endfor %}
       </div>
     {% endif %}
 

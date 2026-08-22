@@ -153,6 +153,29 @@ function deployPathPrefix(config, env, cwd) {
 }
 
 /**
+ * A target's composed config, with validation findings treated as FATAL — the
+ * deploy lanes' twin of the build's loadSiteData
+ * ([#426](https://github.com/Omega-JS-Stack/omega/issues/426)). Every finding
+ * the loader returns names a key nothing will read at runtime, so deriving a
+ * deploy address or publishing from that config ships a site the config does
+ * not describe. The build refuses the same file; these lanes refuse it first.
+ *
+ * @param {string} dir - The consumer target dir.
+ * @returns {object} The resolved config.
+ * @throws {Error} When the config carries validation findings.
+ */
+function loadDeployConfig(dir) {
+  const { loadConfig, formatErrors } = require('@omega.js/config');
+  const { config, errors } = loadConfig(dir, 'web');
+
+  if (errors && errors.length) {
+    throw new Error(`config/omega.json5 is invalid:\n${formatErrors(errors)}`);
+  }
+
+  return config;
+}
+
+/**
  * `deployPathPrefix` for a target dir, loading that target's composed config —
  * the entry point for callers holding no config yet. The scaffolded CI
  * workflow runs exactly this (`@omega.js/web/deploy`) from the target dir, so
@@ -163,10 +186,7 @@ function deployPathPrefix(config, env, cwd) {
  * @returns {string} '/' or '/<name>/'.
  */
 function targetPathPrefix(dir, env) {
-  const { loadConfig } = require('@omega.js/config');
-  const { config } = loadConfig(dir || process.cwd(), 'web');
-
-  return deployPathPrefix(config || {}, env);
+  return deployPathPrefix(loadDeployConfig(dir || process.cwd()), env);
 }
 
 /**
@@ -237,11 +257,9 @@ function buildDirectPlan(config, options) {
  * github service reconciles the Pages settings on its next run.
  */
 function deployDirect({ dryRun }) {
-  const { loadConfig } = require('@omega.js/config');
-  const { config, errors } = loadConfig(process.cwd(), 'web');
-  if (!config) {
-    throw new Error(`Could not load the omega config${errors?.length ? `: ${errors.join('; ')}` : ''}`);
-  }
+  // Fatal BEFORE anything is planned, printed or pushed — including a dry run,
+  // whose whole job is to say what a real run would do (#426).
+  const config = loadDeployConfig(process.cwd());
 
   const plan = buildDirectPlan(config);
   const dist = path.join(process.cwd(), 'dist');

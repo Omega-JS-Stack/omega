@@ -151,6 +151,9 @@ test('legacy module bundles emit at their fixed URLs (redirect pages script them
   const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
   assert.ok(redirect.includes('redirect-config'), 'redirect module bundled at its fixed URL');
   assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');
+  // The 404 page scripts the path-redirect module at its own fixed URL (#442)
+  const redirectMap = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect-map.bundle.js'), 'utf8');
+  assert.ok(redirectMap.includes('omega-redirect-map'), 'the path-redirect module reads the inlined map');
   // The legacy ad modules are retired (verts spec step 5) — the verts/unit
   // section + shared client verts module are the one implementation.
   assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'vert.bundle.js')), 'vert.bundle.js retired');

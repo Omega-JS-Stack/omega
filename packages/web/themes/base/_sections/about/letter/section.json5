@@ -1,9 +1,11 @@
 {
-  description: 'About letter — mission & vision as editorial statements beside the living ops-feed aside (theme flavor markup). Supply image: and a photo sits at the top of the aside, so the statements read beside a picture instead of a wall. The layout bridges mission:/vision: objects from the page.',
+  description: 'About letter — mission & vision as editorial statements beside the living ops-feed aside (theme flavor markup). Supply image: and a photo sits at the top of the aside, so the statements read beside a picture instead of a wall. Supply feed_items:/feed_status: and the brand\'s real ops feed replaces the placeholder one. The layout bridges mission:/vision: objects from the page, and honors the page\'s letter: false kill switch.',
 
   args: {
     aside_label: 'string',
     feed_label: 'string',
+    feed_items: 'array', // [{ icon, text }] — the ops feed's messages; text carries markup
+    feed_status: 'string', // the chip riding the foot of the feed
     mission: 'object', // { title, description }
     vision: 'object', // { title, description }
     image: 'string', // aside photo; unset = no frame, the aside as it was
@@ -14,6 +16,14 @@
   defaults: {
     aside_label: 'Why we exist',
     feed_label: 'This week at {{ site.brand.name }}',
+    // Placeholder copy, the photo-band way: the demo feed ships so the aside
+    // reads as a living one, and a brand's own items REPLACE it wholesale.
+    feed_items: [
+      { icon: 'rocket', text: '<strong>v2.4</strong> shipped to production' },
+      { icon: 'user-plus', text: 'Two new faces on support' },
+      { icon: 'quote-left', text: '"Best tool we\'ve adopted this year"' },
+    ],
+    feed_status: 'All systems go',
     mission: {
       title: 'Our mission',
       description: 'To empower individuals and businesses with technology that <em>simplifies</em> complex challenges and unlocks new possibilities for growth.',

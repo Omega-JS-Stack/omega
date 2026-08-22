@@ -18,6 +18,7 @@ const {
   renderSecretsBlock,
   publishEnvSecrets,
   EMPTY_BLOCK,
+  MACHINE_LOCAL_KEYS,
 } = require('../src/github-secrets.js');
 const { scaffoldDefaults } = require('../src/scaffold.js');
 
@@ -101,6 +102,39 @@ test('collect: the brand .env layers under the local .env (cascade precedence)',
   });
 
   fs.rmSync(brand, { recursive: true, force: true });
+});
+
+test('#454: machine-local keys are collected by the parser but never published', () => {
+  // The line filter is UJM's and stays literal — the key IS in the file.
+  assert.deepStrictEqual(
+    parseEnvFile('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n'),
+    { OMEGA_FONTAWESOME_ROOT: '/Users/ian/.omega/fontawesome', STRIPE_KEY: 'sk_live' },
+  );
+
+  // Collection is the publishable set, and a developer-machine path is not one.
+  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n');
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir, env: {} }), { STRIPE_KEY: 'sk_live' });
+
+  // Not even from the shell, where the fleet convention also sets it.
+  assert.deepStrictEqual(
+    collectEnvSecrets({ targetDir: dir, env: { OMEGA_FONTAWESOME_ROOT: '/somewhere/else' } }),
+    { STRIPE_KEY: 'sk_live' },
+  );
+
+  assert.ok(MACHINE_LOCAL_KEYS.includes('OMEGA_FONTAWESOME_ROOT'), 'the list names the seeded key');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('#454: a machine-local key never reaches the workflow env block either', () => {
+  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n');
+
+  scaffoldDefaults({ outputDir: dir, logger: quiet });
+  const workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
+
+  assert.ok(!workflow.includes('OMEGA_FONTAWESOME_ROOT'), 'the machine-local path is not injected into CI');
+  assert.ok(workflow.includes('\n  STRIPE_KEY: ${{ secrets.STRIPE_KEY }}'), 'every other key is unaffected');
+
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('block: one `KEY: ${{ secrets.KEY }}` line per key, sorted, template-owned keys dropped', () => {

@@ -7,7 +7,7 @@ sitemap:
 Website: {{ site.brand.name }}
 Site: {{ site.url }}
 {%- if site.socials.twitter %}
-Twitter: {{ site.socials.twitter }}
+Twitter: {{ site.socials.twitter.handle | default: site.socials.twitter }}
 {%- endif %}
 {%- if site.brand.location %}
 Location: {{ site.brand.location }}

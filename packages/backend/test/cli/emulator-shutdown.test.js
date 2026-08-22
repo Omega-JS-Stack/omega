@@ -35,7 +35,7 @@ const powertools = require('node-powertools');
 const EmulatorCommand = require('../../src/cli/commands/emulator.js');
 const WatchCommand = require('../../src/cli/commands/watch.js');
 
-const { isStoppableEmulatorProcess } = EmulatorCommand;
+const { isStoppableEmulatorProcess, listListeningPids, PORT_LOOKUP_TIMEOUT_MS } = EmulatorCommand;
 
 const OURS = 'demo-sandbox-brand';
 
@@ -205,6 +205,31 @@ async function bootableCommand(script) {
 }
 
 /**
+ * Run `fn` with an `lsof` on PATH that never answers — the smbfs stall of
+ * [#332](https://github.com/Omega-JS-Stack/omega/issues/332), made
+ * deterministic. Nothing about the sweep is stubbed: it shells out for real,
+ * to a real process, and the only fixture is that the process never replies.
+ *
+ * `exec` in the shim is the point: the hung process must BE the one the lookup
+ * spawned, so the bound's kill lands on the thing holding its stdout — a shell
+ * left waiting on a `sleep` grandchild would hang past any timeout.
+ */
+async function withHungLsof(fn) {
+  const binDir = path.join(os.tmpdir(), `omega-lsof-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const savedPath = process.env.PATH;
+
+  jetpack.file(path.join(binDir, 'lsof'), { content: '#!/bin/sh\nexec sleep 600\n', mode: '755' });
+  process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
+
+  try {
+    return await fn();
+  } finally {
+    process.env.PATH = savedPath;
+    jetpack.remove(binDir);
+  }
+}
+
+/**
  * Run `fn` with the background watcher swapped for a REAL detached process.
  *
  * The watcher itself is a nodemon over the framework's own src/ — pointing one
@@ -323,6 +348,57 @@ module.exports = {
 
           assert.equal(server.listening, true, 'the foreign listener keeps its port');
           assert.match(lines.join('\n'), new RegExp(`still in use after shutdown: ${port}`));
+        } finally {
+          server.close();
+          cleanup();
+        }
+      },
+    },
+
+    {
+      name: 'a-port-lookup-that-hangs-is-bounded-and-names-nobody',
+      timeout: 60000,
+      async run({ assert }) {
+        // lsof is the one step with no Node primitive, and on a machine with a
+        // network mount it can stall for MINUTES before it answers
+        // ([#332](https://github.com/Omega-JS-Stack/omega/issues/332)). The
+        // call was unbounded, and being synchronous it blocks the event loop —
+        // so nothing downstream, not even a test's own timeout, could cut it
+        // short ([#459](https://github.com/Omega-JS-Stack/omega/issues/459)).
+        const port = await freePort();
+        const startedAt = Date.now();
+        const pids = await withHungLsof(() => listListeningPids(port));
+        const elapsed = Date.now() - startedAt;
+
+        assert.deepEqual(pids, [], 'a lookup that never answered names nobody — no ownership, so no kill order');
+        assert.equal(elapsed >= 1000, true, `the hung stub really was reached (a missing lsof returns at once), took ${elapsed}ms`);
+        assert.equal(elapsed < PORT_LOOKUP_TIMEOUT_MS * 2, true, `the lookup must return inside its bound, took ${elapsed}ms`);
+      },
+    },
+
+    {
+      name: 'a-stop-path-whose-lookup-hangs-still-finishes-and-kills-nothing',
+      timeout: 60000,
+      async run({ assert }) {
+        // The gate failure this bound exists for: a held port sends the sweep
+        // to lsof, lsof stalls on the smbfs mount, and the stop path sat there
+        // until the lane's whole 113s budget was gone. The verdict was never
+        // wrong — there was simply no bound on reaching it. A sweep that could
+        // not prove ownership takes the branch it already had: report, not kill.
+        const server = net.createServer();
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = server.address().port;
+
+        const { command, lines, cleanup } = commandWithRecord([]);
+        const startedAt = Date.now();
+
+        try {
+          await withHungLsof(() => command.terminateRecordedEmulatorProcesses({ hosting: port }, NO_SHARED_SWEEP));
+          const elapsed = Date.now() - startedAt;
+
+          assert.equal(server.listening, true, 'a holder the sweep could not identify keeps its port');
+          assert.match(lines.join('\n'), new RegExp(`still in use after shutdown: ${port}`));
+          assert.equal(elapsed < 30000, true, `the stop path must stay bounded end to end, took ${elapsed}ms`);
         } finally {
           server.close();
           cleanup();

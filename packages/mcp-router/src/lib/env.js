@@ -21,6 +21,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseEnv } = require('node:util');
 
 const { log } = require('./log.js');
 const { PACKAGE_ROOT, envFile } = require('./paths.js');
@@ -29,29 +30,21 @@ const RESERVED = { MCP_ROUTER_ROOT: PACKAGE_ROOT };
 const RESOLVABLE_BINS = new Set(['node', 'npm', 'npx']);
 
 /**
- * Read the overlay .env into a plain object.
+ * Read the overlay .env into a plain object. Node's own `util.parseEnv` does
+ * the parsing — quoting, escapes inside double quotes, `export` prefixes and
+ * trailing comments are all its business, never ours (Ian 2026-08-21).
  *
  * @param {string} [file] - Path to read; defaults to the resolved env file
  * @returns {object} NAME → value (missing file is not an error — process.env may still answer)
  */
 function loadEnvFile(file) {
-  const secrets = {};
   let raw;
   try {
     raw = fs.readFileSync(file || envFile(), 'utf8');
   } catch {
-    return secrets;
+    return {};
   }
-  for (const line of raw.split('\n')) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (!match) continue;
-    let value = match[2];
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    secrets[match[1]] = value;
-  }
-  return secrets;
+  return parseEnv(raw);
 }
 
 /**

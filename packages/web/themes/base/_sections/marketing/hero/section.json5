@@ -1,5 +1,5 @@
 {
-  description: 'Serif display hero — rotating italic second line, ink CTA + mono command, floating product frame, optional demo capture (input/custom). The classy homepage opener.',
+  description: 'Serif display hero — rotating italic second line, ink CTA + mono command, optional stat cards, floating product frame, optional demo capture (input/form/custom). The classy homepage opener.',
 
   // Top-level arg contract (validation is warn-only; names are API — renames
   // follow deprecation discipline, spec §6)
@@ -14,6 +14,7 @@
     command_href: 'string',
     secondary_button: 'object',
     meta: 'array',
+    cards: 'array', // stat cards under the hero ({ number, label, icon? }) — the marketing/stats vocabulary, no default: brand content is never a theme's voice
     frame: 'object',
     demo: 'object',
     demo_html: 'html', // finished markup for the demo position ({% slot demo_html %}) — replaces the typed demo lanes when set

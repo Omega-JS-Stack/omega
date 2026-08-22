@@ -75,15 +75,21 @@ const omegaExternal = {
   },
 };
 
-// {% omega_social platform %} — profile URL from page.resolved.socials.{platform}
+// {% omega_social platform %} — profile URL from resolved.socials.{platform}
 const omegaSocial = {
   block: false,
   render(ctx, markup) {
     const platform = resolveInput(ctx.lookup, markup.trim()) || markup.trim();
     if (!ctx.page) return '';
 
-    const resolved = ctx.page.resolved;
-    const handle = resolved && resolved.socials && resolved.socials[platform];
+    // Two shapes of the same scope: legacy UJM injected `resolved` INTO the
+    // page; @omega.js/web's data cascade puts it beside `page` (its migrate
+    // rule 1: `page.resolved.` → `resolved.`).
+    const resolved = ctx.page.resolved || ctx.lookup('resolved');
+    const entry = resolved && resolved.socials && resolved.socials[platform];
+    // An entry is a handle, or { handle, redirect } when the shortlink goes
+    // somewhere other than the profile (#429) — sameAs reads the PROFILE.
+    const handle = entry && typeof entry === 'object' ? entry.handle : entry;
     if (!handle) return '';
 
     const pattern = SOCIAL_URLS[platform];

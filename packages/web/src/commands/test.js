@@ -7,8 +7,9 @@
  *
  * Smoke checks: pages rendered, 404.html (the guaranteed default page —
  * consumers own their home page) carries the theme root, the manifest's main
- * bundle exists on disk. The deeper 3-layer test framework (build/page/boot
- * vs a real browser) is a later devkit adoption step.
+ * bundle exists on disk, and every internal link the built pages emit resolves
+ * to something the same build wrote (#430). The deeper 3-layer test framework
+ * (build/page/boot vs a real browser) is a later devkit adoption step.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -17,6 +18,7 @@ const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 const { consumerPaths } = require('../consumer.js');
+const { checkDistLinks, loadLinkExceptions, EXCEPTIONS_FILE } = require('../link-resolver.js');
 
 const logger = new Logger('omega:test');
 
@@ -70,10 +72,12 @@ module.exports = async function (options) {
     failures.push('manifest js.main bundle is missing from dist/');
   }
 
+  failures.push(...linkCheckFailures({ distDir: paths.out, targetRoot: paths.root }));
+
   if (failures.length) {
     throw new Error(`Smoke checks failed:\n  - ${failures.join('\n  - ')}`);
   }
-  logger.log(`Smoke checks passed (${result.htmlCount} pages)`);
+  logger.log(`Smoke checks passed (${result.htmlCount} pages, every internal link resolves)`);
 
   // ---- Consumer test suite
   const testDir = path.join(paths.root, 'test');
@@ -83,6 +87,31 @@ module.exports = async function (options) {
     execSync(`node --test ${projectTests}`, { stdio: 'inherit' });
   }
 };
+
+/**
+ * The built-output link check as smoke-check lines ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)).
+ *
+ * Both halves are failures: a link that resolves to nothing, and a declared
+ * exception that has started resolving (an exception standing over a fixed link
+ * masks the next regression at that URL, so the declared list has to shrink).
+ *
+ * @param {object} options
+ * @param {string} options.distDir - the build output
+ * @param {string} options.targetRoot - the consumer root (holds the exception list)
+ * @returns {string[]} one line per failure (empty = the check passed)
+ */
+function linkCheckFailures(options) {
+  const { offenders, stale } = checkDistLinks({
+    distDir: options.distDir,
+    exceptions: loadLinkExceptions(options.targetRoot),
+  });
+
+  return [
+    ...offenders.map((entry) => `dead internal link: ${entry} — add the page or fix the link`),
+    ...stale.map((entry) => `stale link exception in ${EXCEPTIONS_FILE}: ${entry} resolves now — drop it`),
+  ];
+}
+module.exports.linkCheckFailures = linkCheckFailures;
 
 /**
  * The framework suite's two phases — the SAME split the package's own

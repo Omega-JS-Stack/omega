@@ -37,11 +37,32 @@ npx omega test pages           # project scope, filtered to test/pages*
 ### What project scope actually runs
 
 1. **A production build** — the same code path as `npx omega build` (assets → Eleventy → PurgeCSS → `dist/`, plus translation when configured).
-2. **Smoke checks over the output**, all three of which must pass or the command throws `Smoke checks failed`:
+2. **Smoke checks over the output**, all four of which must pass or the command throws `Smoke checks failed`:
    - the build produced at least one HTML page,
    - `dist/404.html` exists (the guaranteed default page — consumers own their home page) **and** contains `data-theme-id`, proving it rendered through the theme root layout,
-   - the asset manifest's `js.main` bundle exists on disk in `dist/`.
+   - the asset manifest's `js.main` bundle exists on disk in `dist/`,
+   - **every internal link resolves** ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)) — see below.
 3. **Your suite** — `node --test` over `test/` at the target root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
+
+### The internal link check
+
+Every `href`/`src` in `dist/**/*.html` must land on something the same build wrote ([src/link-resolver.js](../src/link-resolver.js)). Nothing else in a build reads a link and asks whether the far end exists, so a nav pointing at pages that stopped being generated used to ship green.
+
+Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dist/foo.html` or `dist/foo/index.html`, an asset path is the file itself, a relative value resolves against its emitting page's directory, and a trailing slash is the same page. A directory is **not** a page — `/blog` needs `blog.html` or `blog/index.html`, never just `dist/blog/`. Anything with a scheme (`https:`, `mailto:`, `tel:`, `data:`, a brand's own app protocol), a protocol-relative host, or a bare `#fragment` leaves the site and is skipped.
+
+**Exceptions are a last resort, declared per SOURCE PAGE** in `config/link-exceptions.json` at the target root — no file at all is the state a brand should be in:
+
+```json
+{
+  "admin.html": ["/admin/legacy-report"]
+}
+```
+
+- The key is the dist-relative page emitting the link; the values are the site-absolute URLs it may leave unresolved. **Any other page linking at the same URL still fails**, so a brand page never rides on a declared gap.
+- **A declared exception that has started resolving is itself a failure** — an exception standing over a fixed link is a mask over the next regression at that URL, so the list has to shrink when the break is fixed.
+- A malformed file is a hard error, never a silently empty map.
+
+`@omega.js/web`'s own default pages resolve with **zero exceptions** ([#427](https://github.com/Omega-JS-Stack/omega/issues/427), guarded by the framework suite's `default-page-links` test through the same resolver), so anything the check reports in a brand is the brand's.
 
 ### What framework scope runs
 

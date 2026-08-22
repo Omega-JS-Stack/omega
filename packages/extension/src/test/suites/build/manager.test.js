@@ -97,6 +97,32 @@ module.exports = {
       },
     },
     {
+      // A retired key was renamed outright — nothing reads the old name, so the
+      // settings under it are silently lost. Printing that as a "schema warning"
+      // let every gulp task build on a config it knew was wrong and the run
+      // still exited 0 ([#426](https://github.com/Omega-JS-Stack/omega/issues/426)).
+      // Fatal on EVERY call, not once per process: tasks call getConfig() at
+      // require time, one after another, and a warn-once flag left calls 2..n
+      // reading the broken config in silence.
+      name: 'getConfig hard-fails on a retired key — every call, not once per process',
+      run: (ctx) => {
+        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, payment: { processors: { stripe: {} } }, targets: { extension: {} } }` });
+        try {
+          inDir(tmp, (Manager) => {
+            let first = null;
+            try { Manager.getConfig(); } catch (e) { first = e; }
+            ctx.expect(first ? first.message : '').toMatch(/payment\.processors is retired/);
+
+            let second = null;
+            try { Manager.getConfig(); } catch (e) { second = e; }
+            ctx.expect(second ? second.message : '').toMatch(/payment\.processors is retired/);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'getManifest returns parsed JSON5 from src/manifest.json',
       run: (ctx) => {
         const tmp = stageProject({ manifest: `{ manifest_version: 3, name: 'Test', version: '1.0.0' }` });

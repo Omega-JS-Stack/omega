@@ -1,8 +1,11 @@
 {
-  description: 'Serif quote rotator — one large quote cycling via the shared word-rotator (single item renders static). SHARED across pages (index, pricing, alternatives each pass their own copy), so defaults carry no copy: page quotes ride the data bridge. superheadline accepts a string or { text } (no schema type on purpose).',
+  description: 'Serif quote rotator — optional head cluster (headline with <em> accent + sub, via heading/section-head) over one large quote cycling through the shared word-rotator (single item renders static). SHARED across pages (index, pricing, alternatives each pass their own copy), so defaults carry no copy: page quotes ride the data bridge. superheadline accepts a string or { text } (no schema type on purpose) and leads the head cluster whenever there is one.',
 
   args: {
     superheadline: { description: 'string or { text } — both render as the micro label' },
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
     items: 'array',
     placeholder: 'string',
   },
@@ -16,7 +19,8 @@
 
   // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
   // the demo carries its own generic copy. The two variants also exercise
-  // both superheadline shapes (bare string vs { text }).
+  // both superheadline shapes (bare string vs { text }) and both head states
+  // (bare quote vs the full headline cluster).
   demo: [
     {
       label: 'Single quote (static)',
@@ -33,9 +37,12 @@
       },
     },
     {
-      label: 'Rotating trio',
+      label: 'Rotating trio, full head',
       args: {
         superheadline: { text: 'Loved by teams' },
+        headline: 'Words from the',
+        headline_accent: 'people shipping',
+        subheadline: 'Every quote below came from a team running this in production.',
         items: [
           {
             quote: 'Setup took an afternoon. The polish took zero.',

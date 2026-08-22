@@ -350,6 +350,15 @@ never render) and deleting the file returns the URL to the packaged default.
   deepMerge), while object and string keys merge over the defaults as they
   always did. Pinned by `test/sidecar-data.test.js`.
 
+A default page whose permalink is a TEMPLATE — the blog hub's pagination, the
+per-term tag/category pages — is addressed by its SOURCE PATH, because no URL
+can ever equal a Liquid permalink ([#458](https://github.com/Omega-JS-Stack/omega/issues/458)):
+`omega customize /blog` materializes `defaults/pages/blog.md`,
+`/blog/tags/tag` materializes the tag generator. Both list like any other
+customizable URL. The permalink is copied BYTE-IDENTICAL, which is the only
+thing build-time suppression keys on, so the materialized page takes the
+default's place with no duplicate output. Pinned by `test/customize.test.js`.
+
 The `{% composition %}` wrap is tri-state, byte-parity with the
 `{{ content | omega_content_format }}` line it replaces in the layout:
 

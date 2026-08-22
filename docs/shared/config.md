@@ -43,6 +43,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
   translation:    { enabled, default, languages: [], providers: { claude: {} } | { chatgpt: {} }, model, exclude: [] }, // presence picks the engine; absent = claude. docs/shared/translation.md
+  socials:        { twitter: 'somiibo', spotify: { handle, redirect } },   // platform → handle. The handle derives the profile URL every surface reads (JSON-LD sameAs, the footer row, omega_social) and @omega.js/web emits a shortlink redirect page at /<platform> per entry (#429); the object form adds a redirect target that WINS for the shortlink when it is not the profile URL. Blank handle = no entry, no page. Not a disperse-owned SHARED_SECTION — brand-level content, read by the web target
 
   // MANAGER-read brand-level sections (#277). Schema-known at the TOP level: the
   // manager loads the brand config unfolded, and a website-only brand has no
@@ -62,7 +63,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // enabled-with-defaults. Unknown keys are validation errors. A value may
   // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
-    web:       { imagemin, collections, client: { consent, … }, dev: { limitCollections } },   // client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …) — a settings bag the client normalizes; only `consent` is schema-known, see "Consent" below. collections: the brand's OWN content collections — name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
+    web:       { imagemin, collections, redirects, client: { consent, … }, dev: { limitCollections } },   // redirects: ORDERED [{ from, to, type }] path redirects (#442) — `from` may capture ONE `:name` segment ('/c/:id') that `to` references ('/code?id=:id'); type 301 (default), 302, 307, 308. Static hosting = the hop is CLIENT-side, materialized through the built 404 page (docs/web/index.md). client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …) — a settings bag the client normalizes; only `consent` is schema-known, see "Consent" below. collections: the brand's OWN content collections — name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling — collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
     backend:   { auth: { signup: { maxPerIpPerDay } } },   // auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, remoteScripts, restartManager },

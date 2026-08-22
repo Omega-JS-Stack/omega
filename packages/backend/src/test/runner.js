@@ -856,6 +856,14 @@ class TestRunner {
   createPubSubHelper() {
     const config = this.config;
 
+    // The port the RUNNING emulator resolved, never the classic 8085. Anything
+    // else on the machine holding 8085 bumps this stack's Pub/Sub emulator off
+    // it (N7), and a hardcoded endpoint then published into whatever owns that
+    // port instead: the scheduled function never fired HERE, so every
+    // cron-driven test sat out its full waitFor deadline with no error to name
+    // ([#404](https://github.com/Omega-JS-Stack/omega/issues/404)).
+    const pubsubPort = this.options.emulatorPorts?.pubsub;
+
     return {
       /**
        * Trigger a Firebase scheduled function via PubSub
@@ -863,10 +871,14 @@ class TestRunner {
        * @returns {Promise<string>} The message ID
        */
       async trigger(functionName) {
+        if (!pubsubPort) {
+          throw new Error(`Cannot trigger ${functionName}: the test config carries no resolved Pub/Sub port (emulatorPorts.pubsub)`);
+        }
+
         const { PubSub } = require('@google-cloud/pubsub');
         const pubsub = new PubSub({
           projectId: config.cloud?.config?.projectId,
-          apiEndpoint: 'localhost:8085',
+          apiEndpoint: `127.0.0.1:${pubsubPort}`,
         });
 
         const topicName = `firebase-schedule-${functionName}`;

@@ -1,8 +1,16 @@
 {% if args.items and args.items.size > 0 %}
   <section>
     <div class="container">
+      {%- comment %} superheadline takes a plain string OR { icon, text }: the
+      object shape resolves to the icon + label the section-head renders as
+      one micro line, the string passes straight through. {% endcomment -%}
+      {%- if args.superheadline.text -%}
+        {%- capture superheadline %}{% iftruthy args.superheadline.icon %}{% omega_icon args.superheadline.icon, "me-1" %}{% endiftruthy %}{{ args.superheadline.text }}{% endcapture -%}
+      {%- else -%}
+        {%- assign superheadline = args.superheadline -%}
+      {%- endif %}
       <div class="omega-section-head omega-section-head--center mb-5" data-omega-reveal>
-        {% component "heading/section-head", superheadline: args.superheadline, headline: args.headline, sub: args.subheadline %}
+        {% component "heading/section-head", superheadline: superheadline, headline: args.headline, sub: args.subheadline %}
       </div>
 
       <div class="omega-bento" data-omega-reveal-stagger="70">
@@ -53,6 +61,15 @@
           </div>
         {% endfor %}
       </div>
+      {%- if args.cta_button.enabled != false and args.cta_button.text %}
+
+      <div class="text-center mt-5" data-omega-reveal>
+        <a href="{{ args.cta_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ args.cta_button.text }}
+          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      </div>
+      {%- endif %}
     </div>
   </section>
 {% endif %}

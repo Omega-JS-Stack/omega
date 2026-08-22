@@ -11,3 +11,14 @@ meta:
 ---
 
 {{ content | omega_content_format }}
+
+<!-- Path redirects (targets.web.redirects, #442). Static hosting serves THIS
+     page for a path it has no file for, so it is the only place a redirect
+     that captures a path segment can be answered — the build compiles the map
+     (src/redirects.js) and the module applies it. Nothing configured, nothing
+     shipped. It lives on the BLUEPRINT layout so a themed or consumer-owned
+     404 body keeps the redirects. -->
+{%- iftruthy site.omega.redirects -%}
+  <div id="omega-redirect-map" style="display: none;" data-redirects="{{ site.omega.redirects | escape }}"></div>
+  <script type="text/javascript" src="{{ '/assets/js/modules/redirect-map.bundle.js' | omega_cachebreak }}"></script>
+{%- endiftruthy -%}

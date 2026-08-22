@@ -28,10 +28,12 @@ contact_form:
   headline: "Send us a <em>message</em>"
   subheadline: "Fill out the form below and we'll get back to you within 24 hours."
 
-# Response facts — the rail footer
+# Response facts — the rail footer. Copy lands in markup UNESCAPED, so an
+# angle bracket ships as an entity (#451): a raw `<` opens a bogus tag the
+# production minifier resolves by eating the value's closing tags.
 stats:
   items:
-    - number: "<15m"
+    - number: "&lt;15m"
       label: "Response time"
       sublabel: "Median first reply"
     - number: "24/7"

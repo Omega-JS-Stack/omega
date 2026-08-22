@@ -153,6 +153,14 @@ const SHARED_SCHEMA = [
     description: 'Parent/legal-entity wordmark (brand.company) rendered in the transactional email footer. Omitted from the footer when unset.',
   },
 
+  // ── socials ──────────────────────────────────────────────────────────────
+  {
+    path:        'socials',
+    type:        'object',
+    required:    false,
+    description: "Platform → handle ({ twitter: 'somiibo' }). The handle derives the profile URL every surface reads (JSON-LD sameAs, the footer row, omega_social), and @omega.js/web emits a redirect shortlink page at /<platform> for each entry (#429). An entry that redirects somewhere OTHER than its profile URL takes the object form { handle, redirect } — the redirect target wins for the shortlink, the handle still names the profile.",
+  },
+
   // ── cloud (role: app/cloud platform; D12 provider-discriminated) ─────────
   {
     path:        'cloud.provider',
@@ -863,6 +871,12 @@ const TARGET_SCHEMAS = {
       type:        'object',
       required:    false,
       description: "The brand's own content collections (#207): collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
+    },
+    {
+      path:        'redirects',
+      type:        'array',
+      required:    false,
+      description: "Path redirects (#442), ORDERED — first match wins: [{ from, to, type }] where `from` may carry ONE captured `:name` segment ('/c/:id') that `to` references ('/code?id=:id'), and `type` is 301 (default), 302, 307 or 308. Static hosting has no server to answer with, so @omega.js/web materializes the map through the built 404 page and the redirect is CLIENT-side (`omega dev` serves the same map as a real status-code redirect). Entry shapes are validated hard by the web build (unknown key, malformed pattern, a `to` naming a segment `from` never captured).",
     },
     {
       path:        'purgecss',

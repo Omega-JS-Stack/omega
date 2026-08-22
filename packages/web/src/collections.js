@@ -98,13 +98,37 @@ function registerCollections(eleventyConfig, collectionsHolder, dynamicCollectio
 }
 
 /**
+ * The DISPLAY name of a taxonomy term. Legacy UJM titleized every term it
+ * named a page after — hyphens and underscores are word breaks, then each
+ * word capitalizes Ruby-style (first char up, rest down) — so
+ * `time-tracking-tools` reads "Time Tracking Tools" in its page's title, h1
+ * and description. Keeping the corpus's own spelling drifted every migrating
+ * brand's taxonomy SEO titles (#457); the SLUG is untouched, so no URL moves.
+ *
+ * Runs of separators COLLAPSE. Legacy shipped two spellings of this transform
+ * and they disagree only there (blog-taxonomy.rb's `split(/[\s_-]/)` left a
+ * double space where dynamic-pages.rb's `split(/[\s_-]+/)` did not), and a
+ * double space in a <title> is an artifact, not a contract.
+ * @param {string} name - the term as the corpus spelled it
+ * @returns {string}
+ */
+function humanizeTerm(name) {
+  return String(name)
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/**
  * Aggregate a collection's taxonomy from a dotted frontmatter field
  * (`post.categories` for the blog, whatever `targets.web.collections.<name>.field`
  * names for a brand collection). Terms are keyed by SLUG — real corpora mix
  * spellings ("Marketing" ×673 vs "marketing" ×11 in somiibo) and case variants
  * would generate duplicate taxonomy pages at the same permalink (Jekyll
  * silently last-write-won; Eleventy hard-errors). The most frequent spelling
- * becomes the display name; a document never lands in the same term twice.
+ * becomes the display name, humanized (humanizeTerm); a document never lands
+ * in the same term twice.
  * @param {object} api - Eleventy collection API
  * @param {object} options
  * @param {string} options.tag - the collection tag to aggregate
@@ -136,7 +160,7 @@ function aggregateTaxonomy(api, { tag, field, order }) {
   return [...groups.values()]
     .map(({ spellings, ...group }) => ({
       ...group,
-      name: [...spellings.entries()].sort((a, b) => b[1] - a[1])[0][0],
+      name: humanizeTerm([...spellings.entries()].sort((a, b) => b[1] - a[1])[0][0]),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

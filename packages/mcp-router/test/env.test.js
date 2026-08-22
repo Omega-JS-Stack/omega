@@ -39,6 +39,12 @@ test('.env parsing takes plain, quoted, and spaced forms and ignores the rest', 
   assert.deepEqual(loadEnvFile(file), { PLAIN: 'one', QUOTED: 'two', SINGLE: 'three', SPACED: 'four' });
 });
 
+test('a double-quoted value takes its escapes, and a trailing comment is not part of the value', () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-router-env-')), '.env');
+  fs.writeFileSync(file, 'ESCAPED="line1\\nline2"\nCOMMENTED="token" # rotated 2026-08-21\nexport EXPORTED="from-a-sourced-file"\n');
+  assert.deepEqual(loadEnvFile(file), { ESCAPED: 'line1\nline2', COMMENTED: 'token', EXPORTED: 'from-a-sourced-file' });
+});
+
 test('a missing .env is not an error — process.env may still answer', () => {
   assert.deepEqual(loadEnvFile(path.join(os.tmpdir(), 'mcp-router-nope', '.env')), {});
 });

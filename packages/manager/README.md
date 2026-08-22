@@ -40,7 +40,7 @@ Works from the brand root, from inside any `targets/{dir}`, or from inside a bac
 | `.env` (brand root) | **Every secret** — loaded before any service runs; `@omega.js/config` hard-fails on secret-shaped keys in omega.json5 | Gitignored, per-machine |
 | `.omega/runs/{ts}.json` | **Transient per-run output** (counts, status flags, errors) | One file per process |
 
-The old third bucket, `.omega/state.json`, is **retired** ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)): a durable cache of derived data that mostly duplicated what each idempotent ensure re-reads from the platform anyway, and that kept ids and secrets out of the homes the frameworks actually read. Brands that still carry one convert with `npx omega manage --migration=state-retirement --execute`. The file lives on only as the home of `@omega.js/devkit`'s per-machine `deploy` record.
+The old third bucket, `.omega/state.json`, is **retired** ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)): a durable cache of derived data that mostly duplicated what each idempotent ensure re-reads from the platform anyway, and that kept ids and secrets out of the homes the frameworks actually read. Brands that still carry one convert with `npx omega manage --migration=state-retirement --execute`. Its last tenant, `@omega.js/devkit`'s per-machine `deploy` record, moved to `.omega/deploys.json` ([#449](https://github.com/Omega-JS-Stack/omega/issues/449)) — adopted there on the record's first read or write, so the file itself is gone.
 
 ## Service runner contract (ported verbatim from omega-manager)
 

@@ -23,8 +23,10 @@ vision:
   description: "A world where powerful tools feel effortless, where anyone can build, launch, and grow without wrestling the machinery. That's the product we <em>refuse to stop</em> working toward."
   icon: "lightbulb"
 
-# The letter's aside photo — point image at your own picture and it sits at
-# the head of the aside beside the statements; unset renders no frame.
+# The letter band — mission & vision as editorial statements (letter: false
+# kills it). Point image at your own picture and it sits at the head of the
+# aside beside the statements; unset renders no frame; the aside's ops feed
+# rides the section's own feed_items/feed_status args.
 letter:
   image: ""
   image_alt: ""
@@ -127,8 +129,10 @@ team_cta:
 ---
 {% composition %}
 {% section "about/hero", data: resolved.hero, facts: resolved.stats.items %}
-<!-- ═══ The letter — mission & vision as editorial statements ═══ -->
-{% section "about/letter", data: resolved.letter, mission: resolved.mission, vision: resolved.vision %}
+<!-- ═══ The letter — mission & vision as editorial statements (letter: false kills it) ═══ -->
+{% unless resolved.letter == false %}
+  {% section "about/letter", data: resolved.letter, mission: resolved.mission, vision: resolved.vision %}
+{% endunless %}
 <!-- ═══ The journey — sticky head + timeline ═══ -->
 {% section "about/timeline", data: resolved.story %}
 <!-- ═══ Life in pictures — photo band (gallery: false kills it) ═══ -->

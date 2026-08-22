@@ -127,6 +127,27 @@ test('omega_social builds platform URLs from page.resolved.socials', () => {
   assert.strictEqual(TAGS.omega_social.render(makeCtx({ page: {} }), '"twitter"'), '');
 });
 
+test('omega_social reads the SSG\'s own `resolved` scope too, and the { handle, redirect } entry form (#429)', () => {
+  // @omega.js/web's data cascade puts `resolved` beside `page`, not inside it
+  // (its migrate rule 1 is literally `page.resolved.` → `resolved.`), so the
+  // page-only lookup resolved nothing on every omega build — an empty href on
+  // the footer's social row and an empty JSON-LD sameAs entry.
+  const engineCtx = makeCtx({ page: { url: '/' }, resolved: { socials: { twitter: 'somiibo' } } });
+  assert.strictEqual(TAGS.omega_social.render(engineCtx, '"twitter"'), 'https://twitter.com/somiibo');
+
+  // The object form names a PROFILE with its handle; where its shortlink
+  // redirects is the socials page lane's business, never sameAs's.
+  const objectCtx = makeCtx({
+    page: { url: '/' },
+    resolved: { socials: { spotify: { handle: 'somiibo', redirect: 'https://open.spotify.com/artist/1k6' } } },
+  });
+  assert.strictEqual(TAGS.omega_social.render(objectCtx, '"spotify"'), 'https://open.spotify.com/user/somiibo');
+
+  // Redirect-only (a platform with no URL pattern): nothing to derive.
+  const redirectOnly = makeCtx({ page: { url: '/' }, resolved: { socials: { spotify: { redirect: 'https://open.spotify.com/artist/1k6' } } } });
+  assert.strictEqual(TAGS.omega_social.render(redirectOnly, '"spotify"'), '');
+});
+
 test('omega_language resolves english/native names, echoes unknown codes', () => {
   const ctx = makeCtx({ lang: 'es' });
 

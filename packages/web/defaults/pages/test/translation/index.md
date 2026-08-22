@@ -29,8 +29,8 @@ By vising {{ brand }}, you agree to comply.
 - External URL: [https://www.google.com](https://www.google.com)
 
 ## Test Internal URL
-- Relative URL: [/test-page](/test-page)
-- Absolute URL: [{{ site.url }}/test-page]({{ site.url }}/test-page)
+- Relative URL: [/test](/test)
+- Absolute URL: [{{ site.url }}/test]({{ site.url }}/test)
 
 ## Test Anchor URL
 - Anchor URL: [#test-anchor](#test-anchor)
@@ -39,7 +39,7 @@ By vising {{ brand }}, you agree to comply.
 ## Test Ignored URL
 - Account page: [/dashboard/account](/dashboard/account)
 - Admin page: [/admin](/admin)
-- Admin sub-page: [/admin/subpage](/admin/subpage)
+- Admin sub-page: [/admin/users](/admin/users)
 
 ## This is an input
 <div class="form-group">

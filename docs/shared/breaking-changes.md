@@ -227,9 +227,15 @@ lands in the brand `.env`, and everything else re-derives.** The handler
 return key `state` survives as the WITHIN-RUN carry (how the zone operation
 hands its zone id to the operations after it) and is written to no file.
 
-`.omega/runs/{ts}.json` is unchanged, and `.omega/state.json` lives on for
-exactly one key: `deploy`, the per-machine deploy record
-`@omega.js/devkit/deploy-record` writes on every successful deploy verb.
+`.omega/runs/{ts}.json` is unchanged. `.omega/state.json` lived on for exactly
+one key — `deploy`, the per-machine deploy record
+`@omega.js/devkit/deploy-record` writes on every successful deploy verb — and
+that key has since moved to its own `.omega/deploys.json`
+([#449](https://github.com/Omega-JS-Stack/omega/issues/449)), so the retired
+name is gone for good. The move needs no migration step: deploy-record adopts
+the old key on its first read or write and removes the file once nothing else
+is left in it (a brand that has not run state-retirement yet keeps its file,
+minus the key, for that migration to finish).
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|

@@ -128,23 +128,50 @@ function normalizeUrl(url) {
 }
 
 /**
- * Index the packaged default pages by their static permalinks. Generator
- * pages (Liquid in the permalink) are not URL-addressable and are skipped.
+ * The URL a page's SOURCE PATH names: `blog.md` → `/blog`,
+ * `blog/tags/tag.html` → `/blog/tags/tag`. This is how a GENERATOR page — one
+ * whose permalink is a pagination/term template, so no URL can ever equal it —
+ * is addressed by the customize index (#458). Suppression still keys on the
+ * permalink verbatim (consumer-scan.js), which is exactly why materialize
+ * copies that permalink byte-identical.
+ * @param {string} rel - the page's path under pages/ (platform-native)
+ * @returns {string}
+ */
+function sourceUrl(rel) {
+  const posix = rel.split(path.sep).join('/');
+  return normalizeUrl(`/${posix}`.replace(/\.(md|html)$/, '').replace(/\/index$/, '/'));
+}
+
+/**
+ * Index the packaged default pages by the URL `omega customize <url>` takes.
+ * A static permalink IS that page's address; a generator page (Liquid in the
+ * permalink) is addressed by its source path, and never takes a URL a real
+ * permalink already claims.
  * @returns {Map<string, { rel: string, abs: string, raw: string }>}
  */
 function defaultPagesByUrl() {
   const map = new Map();
+  const generators = [];
+
   for (const [rel, abs] of collectLayered([path.join(PATHS.defaults, 'pages')])) {
     const raw = fs.readFileSync(abs, 'utf8');
     const url = permalinkOf(raw);
-    if (!url || url.includes('{')) continue;
-    map.set(url, { rel, abs, raw });
+    if (!url) continue;
+    if (url.includes('{')) generators.push([sourceUrl(rel), { rel, abs, raw }]);
+    else map.set(url, { rel, abs, raw });
+  }
+
+  for (const [url, entry] of generators) {
+    if (!map.has(url)) map.set(url, entry);
   }
   return map;
 }
 
 /**
- * The consumer's already-owned page URLs, mapped to their files.
+ * The consumer's already-owned page URLs, mapped to their files. Addressed
+ * the same way the default index is, so a consumer who already took a
+ * generator page over (its permalink is Liquid, matched byte-for-byte) reads
+ * as owning that URL instead of as a second candidate for it.
  * @param {string} consumerDir
  * @returns {Map<string, string>} url → absolute file
  */
@@ -156,8 +183,10 @@ function consumerPagesByUrl(consumerDir) {
   for (const entry of fs.readdirSync(pagesDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !/\.(md|html)$/.test(entry.name)) continue;
     const file = path.join(entry.parentPath, entry.name);
-    const url = permalinkOf(fs.readFileSync(file, 'utf8'));
-    if (url && !map.has(url)) map.set(url, file);
+    const permalink = permalinkOf(fs.readFileSync(file, 'utf8'));
+    if (!permalink) continue;
+    const url = permalink.includes('{') ? sourceUrl(path.relative(pagesDir, file)) : permalink;
+    if (!map.has(url)) map.set(url, file);
   }
   return map;
 }

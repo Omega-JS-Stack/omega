@@ -5,19 +5,29 @@
   alternatives all pass their own copy (items: quote / author / role /
   company / initial / avatar) — so json5 defaults stay NEUTRAL and page copy
   rides the data bridge, never the section.
+
+  The optional head cluster (headline / headline_accent / subheadline) rides
+  the shared heading/section-head component like every sibling band; when it
+  is present the superheadline eyebrow leads THAT cluster instead of the
+  quote, so the band never renders a label below its own headline.
 {% endcomment %}
-{% assign _t = args %}
+{% assign _t = args %}{% if _t.headline or _t.subheadline %}{% assign _head = true %}{% endif %}
 {% if _t.items and _t.items.size > 0 %}
 <section>
   <div class="container">
+    {%- if _head %}
+    <div class="omega-section-head omega-section-head--center mb-5" data-omega-reveal>
+      {% component "heading/section-head", superheadline: _t.superheadline.text | default: _t.superheadline, headline: _t.headline, headline_accent: _t.headline_accent, sub: _t.subheadline %}
+    </div>
+    {%- endif %}
     <div class="omega-quote" data-omega-reveal>
-      {% iftruthy _t.superheadline %}
+      {% unless _head %}{% iftruthy _t.superheadline %}
         {% if _t.superheadline.text %}
           <span class="omega-micro d-block mb-4">{{ _t.superheadline.text }}</span>
         {% else %}
           <span class="omega-micro d-block mb-4">{{ _t.superheadline }}</span>
         {% endif %}
-      {% endiftruthy %}
+      {% endiftruthy %}{% endunless %}
 
       <div data-omega-rotate="5200" class="w-100">
         {% for item in _t.items %}

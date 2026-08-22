@@ -1,12 +1,13 @@
 {
-  description: 'The hairline feature grid — mixed-size tiles (span: big/tall/wide) with typed demo bodies (type: code/terminal/split/brand/default). Empty items suppresses the band.',
+  description: 'The hairline feature grid — mixed-size tiles (span: big/tall/wide) with typed demo bodies (type: code/terminal/split/brand/default), closing on the optional cta_button. Empty items suppresses the band. superheadline accepts a string or { icon, text } (no schema type on purpose).',
 
   args: {
-    superheadline: 'string',
+    superheadline: { description: 'string or { icon, text } — both render as the micro label; the icon rides the shared omega_icon mechanism' },
     headline: 'string',
     subheadline: 'string',
     items: 'array',
     config_demo: 'object',
+    cta_button: { type: 'object', description: 'the closing CTA under the grid — { text, href, enabled }; enabled: false suppresses it' },
   },
 
   defaults: {
@@ -65,10 +66,12 @@
   demo: [
     { label: 'Default grid' },
     {
-      label: 'Three tiles',
+      label: 'Three tiles, icon eyebrow + closing CTA',
       args: {
+        superheadline: { icon: 'bolt', text: 'The short list' },
         headline: 'The essentials',
         subheadline: 'A tighter grid: layout self-adjusts to the item count.',
+        cta_button: { text: 'See every feature', href: '/pricing' },
         items: [
           {
             type: 'terminal',

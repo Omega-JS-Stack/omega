@@ -7,9 +7,9 @@ hero:
 ---
 
 <!-- ═══ Masthead ═══ -->
-{% comment %} The term as it DISPLAYS: the aggregation keeps the corpus's own
-   spelling ("automation"), and the tag cloud on /blog/tags title-cases the
-   same way — one presentation of one term (#294). {% endcomment %}
+{% comment %} The term as it DISPLAYS: the aggregation humanizes the winning
+   spelling ("Growth Hacks", #457); the tag cloud on /blog/tags title-cases the
+   RAW spelling ("Growth-hacks") — a split legacy UJM shipped too (#294). {% endcomment %}
 {% assign tag_name = resolved.tag.name | omega_title_case %}
 <section class="omega-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
