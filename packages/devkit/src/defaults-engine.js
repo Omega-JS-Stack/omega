@@ -17,7 +17,7 @@
 //                             Actions' `${{ secrets.X }}` passes through)
 //   merge      bool           JSON5 defaults-merge with the existing file
 //   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/AGENTS.md)
-//   retire     bool           brand-context per-app doc retirement: NEVER scaffold
+//   retire     bool           brand-context per-target doc retirement: NEVER scaffold
 //                             the file; an existing framework-owned-only copy is
 //                             DELETED (one-time heal — the brand root is the doc
 //                             home), a copy carrying consumer content stays with a
@@ -176,10 +176,10 @@ function applyDefaults(config) {
         jetpack.remove(destination);
         pruneEmptyDirs(path.dirname(destination), outputDir);
         result.removed.push(finalRelative);
-        logger.warn(`Retired ${finalRelative} — framework-owned per-app doc; in a brand monorepo the BRAND ROOT (AGENTS.md / CHANGELOG.md / docs/) is the one doc home`);
+        logger.warn(`Retired ${finalRelative} — framework-owned per-target doc; in a brand monorepo the BRAND ROOT (AGENTS.md / CHANGELOG.md / docs/) is the one doc home`);
       } else {
         result.skipped.push(finalRelative);
-        logger.warn(`Kept ${finalRelative} — it carries consumer content. Per-app docs are retired in brand monorepos: move that content to the brand root (AGENTS.md notes / brand CHANGELOG.md / brand docs/), then delete the file`);
+        logger.warn(`Kept ${finalRelative} — it carries consumer content. Per-target docs are retired in brand monorepos: move that content to the brand root (AGENTS.md notes / brand CHANGELOG.md / brand docs/), then delete the file`);
       }
       continue;
     }

@@ -5,7 +5,7 @@
 const path = require('node:path');
 
 // Resolve the .env cascade from the consumer project before any command runs
-// (shell > app .env > brand .env > company .env)
+// (shell > local .env > brand .env > company .env)
 require('@omega.js/config').loadEnv(process.cwd());
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');

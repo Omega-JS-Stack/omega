@@ -8,7 +8,7 @@
  *   guard exists for settlement games on a PAID subscription; a trial has no
  *   payment to settle, and a same-day trial cancel is the most common trial
  *   behavior there is), and
- * - every processor cancels a trial NOW instead of at period end — Ian's ruling
+ * - every provider cancels a trial NOW instead of at period end — Ian's ruling
  *   (2026-08-15): we do not keep serving a trial we know will not convert.
  *
  * The test: the trial is claimed, the subscription is live, and the subscription
@@ -21,7 +21,7 @@
  * the answer this flow wants: nothing was ever paid, so there is nothing to let
  * ride to a period end.
  *
- * The expiry has to EXIST to match. The three processors this was folded out of
+ * The expiry has to EXIST to match. The three providers this was folded out of
  * compared the two timestamps directly, so a subscription carrying neither one
  * matched itself on `undefined` and read as trialing — harmless while the answer
  * only chose a cancel mode, but this now also waives a guard, and a guard must

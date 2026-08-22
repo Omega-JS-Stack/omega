@@ -41,12 +41,12 @@ const chalk = require('chalk').default;
 // v3.0.0 is merge-by-match + the settled helper API (#353).
 const RULES_VERSION = '3.0.0';
 
-// The brand's authored source, at the app root — the file the brand edits.
+// The brand's authored source, at the target root — the file the brand edits.
 const BRAND_RULES_FILE = 'firestore.rules';
 
 // The compiled artifact, inside the staged output tree (src/dist pillar:
 // dist/ is the generated tree every runtime surface reads — emulator, serve,
-// test, deploy). Relative to the app root, which is how firebase.json spells
+// test, deploy). Relative to the target root, which is how firebase.json spells
 // it. Re-created by every stage, so it can never go stale or missing.
 const COMPILED_RULES_FILE = 'dist/firestore.rules';
 
@@ -627,7 +627,7 @@ function compileRules(options) {
  * name, which fails loudly at the next surface that wants one — and the build
  * still never writes the brand's authored file (#255).
  * @param {object} options
- * @param {string} options.projectDir - The app root.
+ * @param {string} options.projectDir - The target root.
  * @param {function} [options.onWarn] - Loud reporter (defaults to a yellow console line).
  * @returns {{ compiledPath: string, merged: string[], seededFallback: boolean, refused: boolean }}
  */
@@ -639,7 +639,7 @@ function compileFirestoreRules(options) {
 
   const seededFallback = !jetpack.exists(sourcePath);
   if (seededFallback) {
-    onWarn(`No ${BRAND_RULES_FILE} at the app root — compiling the framework half against the shipped defaults. Run \`npx omega setup\` to seed your own.`);
+    onWarn(`No ${BRAND_RULES_FILE} at the target root — compiling the framework half against the shipped defaults. Run \`npx omega setup\` to seed your own.`);
   }
 
   const brandSource = seededFallback ? jetpack.read(BRAND_RULES_SEED) : jetpack.read(sourcePath);
@@ -683,7 +683,7 @@ function compileFirestoreRules(options) {
  *                        customized one as an ordinary brand function, and
  *                        refresh a header that still documents the hook model
  * @param {object} options
- * @param {string} options.projectDir - The app root.
+ * @param {string} options.projectDir - The target root.
  * @returns {{ created: boolean, migrated: boolean, strippedHooks: string[], keptHooks: string[] }}
  */
 function ensureBrandRulesSource(options) {

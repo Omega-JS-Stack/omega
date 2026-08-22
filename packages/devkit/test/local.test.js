@@ -1,7 +1,7 @@
 // Unit tests for src/local.js — local-development linking (master plan §8).
 //
 // Real-execution only (no mocks): monorepo resolution runs against THIS repo
-// (the tests live inside it, so self-location must find it), brand/app
+// (the tests live inside it, so self-location must find it), brand/target
 // detection runs against committed fixtures, and linking is exercised in
 // dryRun mode plus a real-symlink skip case in a temp dir. ONE real
 // `npm install` runs (cp194): the tree-wide link regression lives in npm's
@@ -75,50 +75,50 @@ test('packageDir maps a scoped name to its packages/ directory', () => {
   assert.equal(local.packageDir('/repo', '@omega.js/client'), path.join('/repo', 'packages', 'client'));
 });
 
-// ---- findBrandRoot / discoverApps
+// ---- findBrandRoot / discoverTargets
 
-test('findBrandRoot walks up from an app to the brand monorepo root', () => {
+test('findBrandRoot walks up from a target to the brand monorepo root', () => {
   const brand = path.join(FIXTURES, 'brand');
-  assert.equal(local.findBrandRoot(path.join(brand, 'apps', 'site')), brand);
-  assert.equal(local.findBrandRoot(path.join(brand, 'apps', 'backend-app', 'functions')), brand);
+  assert.equal(local.findBrandRoot(path.join(brand, 'targets', 'site')), brand);
+  assert.equal(local.findBrandRoot(path.join(brand, 'targets', 'backend-api', 'functions')), brand);
   assert.equal(local.findBrandRoot(brand), brand);
 });
 
-test('findBrandRoot treats a standalone app as its own root — never the Omega monorepo', () => {
-  const standalone = path.join(FIXTURES, 'standalone-app');
-  // The fixture lives INSIDE the Omega monorepo (which has apps/) — the walk
-  // must stop at the app, not classify the monorepo as a brand.
+test('findBrandRoot treats a standalone project as its own root — never the Omega monorepo', () => {
+  const standalone = path.join(FIXTURES, 'standalone-project');
+  // The fixture lives INSIDE the Omega monorepo (which has brands/) — the walk
+  // must stop at the project, not classify the monorepo as a brand.
   assert.equal(local.findBrandRoot(standalone), standalone);
 });
 
-test('discoverApps lists the brand root plus every app with a package.json', () => {
+test('discoverTargets lists the brand root plus every target with a package.json', () => {
   const brand = path.join(FIXTURES, 'brand');
-  assert.deepEqual(local.discoverApps(brand), [
+  assert.deepEqual(local.discoverTargets(brand), [
     brand,
-    path.join(brand, 'apps', 'backend-app'),
-    path.join(brand, 'apps', 'site'),
+    path.join(brand, 'targets', 'backend-api'),
+    path.join(brand, 'targets', 'site'),
   ]);
 });
 
-test('discoverApps on a standalone app returns just the app', () => {
-  const standalone = path.join(FIXTURES, 'standalone-app');
-  assert.deepEqual(local.discoverApps(standalone), [standalone]);
+test('discoverTargets on a standalone project returns just that project', () => {
+  const standalone = path.join(FIXTURES, 'standalone-project');
+  assert.deepEqual(local.discoverTargets(standalone), [standalone]);
 });
 
 // ---- frameworkPackagesOf
 
 test('frameworkPackagesOf finds deps and devDeps with placement flags', () => {
-  const site = path.join(FIXTURES, 'brand', 'apps', 'site');
+  const site = path.join(FIXTURES, 'brand', 'targets', 'site');
   assert.deepEqual(local.frameworkPackagesOf(site), [
     { name: '@omega.js/client', spec: '^5.0.0', dev: false, dir: site },
     { name: '@omega.js/web', spec: '^0.2.0', dev: true, dir: site },
   ]);
 });
 
-test('frameworkPackagesOf reads the app-root manifest (src/dist pillar — no functions/ probe)', () => {
-  const backendApp = path.join(FIXTURES, 'brand', 'apps', 'backend-app');
-  assert.deepEqual(local.frameworkPackagesOf(backendApp), [
-    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: backendApp },
+test('frameworkPackagesOf reads the target-root manifest (src/dist pillar — no functions/ probe)', () => {
+  const backendTarget = path.join(FIXTURES, 'brand', 'targets', 'backend-api');
+  assert.deepEqual(local.frameworkPackagesOf(backendTarget), [
+    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: backendTarget },
   ]);
 });
 
@@ -128,13 +128,13 @@ test('frameworkPackagesOf is empty for a package with no @omega.js deps', () => 
 
 // ---- linkLocalPackages (dryRun + real-symlink skip detection)
 
-test('linkLocalPackages plans the WHOLE brand tree: sibling apps included (cp194)', async () => {
-  const site = path.join(FIXTURES, 'brand', 'apps', 'site');
+test('linkLocalPackages plans the WHOLE brand tree: sibling targets included (cp194)', async () => {
+  const site = path.join(FIXTURES, 'brand', 'targets', 'site');
   const actions = await local.linkLocalPackages({ dir: site, monorepoRoot: FAKE_MONOREPO, dryRun: true });
   assert.deepEqual(
     actions.map(({ name, action }) => ({ name, action })),
     [
-      { name: '@omega.js/backend', action: 'missing' }, // sibling app scanned too — npm resolves the whole workspace tree
+      { name: '@omega.js/backend', action: 'missing' }, // sibling target scanned too — npm resolves the whole workspace tree
       { name: '@omega.js/client', action: 'link' },     // fake monorepo has packages/client
       { name: '@omega.js/web', action: 'missing' },     // ...but no packages/web
     ]
@@ -145,7 +145,7 @@ test('linkLocalPackages skips deps already resolving to the monorepo copy', asyn
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-test-'));
   try {
     fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
-      name: 'scratch-app',
+      name: 'scratch-target',
       dependencies: { '@omega.js/client': '^5.0.0' },
     }));
     fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
@@ -161,38 +161,38 @@ test('linkLocalPackages skips deps already resolving to the monorepo copy', asyn
 });
 
 test('linkLocalPackages links a fresh outside brand with ONE real install — unpublished sibling specs cannot 404 (cp194)', async () => {
-  // Two apps whose @omega.js deps exist ONLY in the fake monorepo: with the
-  // old per-dep `npm install <path>` mechanics, linking app-a died on app-b's
+  // Two targets whose @omega.js deps exist ONLY in the fake monorepo: with the
+  // old per-dep `npm install <path>` mechanics, linking target-a died on target-b's
   // registry-unresolvable spec. The tree-wide flip must link both offline.
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-brand-'));
   try {
     fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
-      name: 'scratch-brand', private: true, workspaces: ['apps/*'],
+      name: 'scratch-brand', private: true, workspaces: ['targets/*'],
     }));
-    const appA = path.join(scratch, 'apps', 'app-a');
-    const appB = path.join(scratch, 'apps', 'app-b');
-    fs.mkdirSync(appA, { recursive: true });
-    fs.mkdirSync(appB, { recursive: true });
-    fs.writeFileSync(path.join(appA, 'package.json'), JSON.stringify({
-      name: 'scratch-app-a', private: true, dependencies: { '@omega.js/client': '*' },
+    const targetA = path.join(scratch, 'targets', 'target-a');
+    const targetB = path.join(scratch, 'targets', 'target-b');
+    fs.mkdirSync(targetA, { recursive: true });
+    fs.mkdirSync(targetB, { recursive: true });
+    fs.writeFileSync(path.join(targetA, 'package.json'), JSON.stringify({
+      name: 'scratch-target-a', private: true, dependencies: { '@omega.js/client': '*' },
     }));
-    fs.writeFileSync(path.join(appB, 'package.json'), JSON.stringify({
-      name: 'scratch-app-b', private: true, devDependencies: { '@omega.js/devkit': '*' },
+    fs.writeFileSync(path.join(targetB, 'package.json'), JSON.stringify({
+      name: 'scratch-target-b', private: true, devDependencies: { '@omega.js/devkit': '*' },
     }));
 
-    const actions = await local.linkLocalPackages({ dir: appA, monorepoRoot: FAKE_MONOREPO });
+    const actions = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
     assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
       { name: '@omega.js/client', action: 'link' },
       { name: '@omega.js/devkit', action: 'link' },
     ]);
 
     // Specs flipped in place, placement preserved
-    const pkgA = JSON.parse(fs.readFileSync(path.join(appA, 'package.json'), 'utf8'));
-    const pkgB = JSON.parse(fs.readFileSync(path.join(appB, 'package.json'), 'utf8'));
+    const pkgA = JSON.parse(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'));
+    const pkgB = JSON.parse(fs.readFileSync(path.join(targetB, 'package.json'), 'utf8'));
     assert.match(pkgA.dependencies['@omega.js/client'], /^file:/, 'app-a dep flipped to file:');
     assert.match(pkgB.devDependencies['@omega.js/devkit'], /^file:/, 'app-b devDep flipped to file: in place');
 
-    // The one real install materialized links for BOTH apps (hoisted)
+    // The one real install materialized links for BOTH targets (hoisted)
     assert.equal(
       fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'client')),
       fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client')),
@@ -205,10 +205,10 @@ test('linkLocalPackages links a fresh outside brand with ONE real install — un
     );
 
     // Rerun converges: everything skips, no manifest churn
-    const before = fs.readFileSync(path.join(appA, 'package.json'), 'utf8');
-    const again = await local.linkLocalPackages({ dir: appA, monorepoRoot: FAKE_MONOREPO });
+    const before = fs.readFileSync(path.join(targetA, 'package.json'), 'utf8');
+    const again = await local.linkLocalPackages({ dir: targetA, monorepoRoot: FAKE_MONOREPO });
     assert.deepEqual(again.map(({ action }) => action), ['skip', 'skip'], 'second run all-skip');
-    assert.equal(fs.readFileSync(path.join(appA, 'package.json'), 'utf8'), before, 'no rewrite on rerun');
+    assert.equal(fs.readFileSync(path.join(targetA, 'package.json'), 'utf8'), before, 'no rewrite on rerun');
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
@@ -490,29 +490,29 @@ test('restoreRegistrySpecs plans ^<linked version> for file: specs and skips reg
     fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
 
     const brand = path.join(scratch, 'brand');
-    const app = path.join(brand, 'apps', 'site');
-    fs.mkdirSync(app, { recursive: true });
-    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['apps/*'] }));
-    fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
+    const targetDir = path.join(brand, 'targets', 'site');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
+    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
       name: 'site',
       dependencies: {
-        '@omega.js/client': `file:${path.relative(app, pkgDir).split(path.sep).join('/')}`,
+        '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
         '@omega.js/web': '^0.1.0',
       },
     }));
 
-    const actions = await local.restoreRegistrySpecs({ dir: app, dryRun: true });
+    const actions = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
     assert.deepEqual(actions.map(({ name, spec, action }) => ({ name, spec, action })), [
       { name: '@omega.js/client', spec: '^0.1.0', action: 'flip' },
       { name: '@omega.js/web', spec: '^0.1.0', action: 'skip' },
     ]);
 
     // Explicit range override wins over the derived version
-    const overridden = await local.restoreRegistrySpecs({ dir: app, dryRun: true, range: '^0.2.0' });
+    const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^0.2.0' });
     assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^0.2.0');
 
     // dryRun writes nothing — the file: spec survives verbatim
-    const manifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
+    const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
     assert.ok(manifest.dependencies['@omega.js/client'].startsWith('file:'));
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

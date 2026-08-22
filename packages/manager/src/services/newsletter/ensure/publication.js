@@ -1,14 +1,14 @@
 /**
  * Ensure the brand's Beehiiv publication is configured and accessible.
  *
- * Resolution: marketing.newsletter.publicationId from config → publicationId
- * from state → auto-match by brand name/id across the account's
- * publications. Publications can't be created via API — when nothing
- * matches, the exact values to copy into the dashboard are printed, and
- * interactive runs open the create page and poll until the new publication
- * auto-matches; non-interactive/dry runs warn instead. The resolved id is
- * written back into omega.json5 (marketing.newsletter.publicationId —
- * comment-preserving) and mirrored in state.
+ * Resolution: marketing.newsletter.providers.beehiiv.publicationId from
+ * config → auto-match by brand name/id across the account's publications.
+ * Publications can't be created via API — when nothing matches, the exact
+ * values to copy into the dashboard are printed, and interactive runs open
+ * the create page and poll until the new publication auto-matches;
+ * non-interactive/dry runs warn instead. The resolved id is written back
+ * into omega.json5 (marketing.newsletter.providers.beehiiv.publicationId —
+ * comment-preserving), its ONE authoritative home.
  */
 const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
@@ -18,25 +18,24 @@ const { canPrompt } = require('../../../lib/run-gates.js');
 const CREATE_URL = 'https://app.beehiiv.com/settings/workspace/overview?create_publication=true';
 
 module.exports = async function ensurePublication(context) {
-  const { beehiivApi: api, brandConfig, serviceData } = context;
+  const { beehiivApi: api, brandConfig } = context;
 
   const brandName = brandConfig.brand?.name || '';
   const brandId = brandConfig.brand?.id || '';
-  const configuredId = brandConfig.marketing?.newsletter?.publicationId;
-  const knownId = configuredId || serviceData.publicationId;
+  const configuredId = brandConfig.marketing?.newsletter?.providers?.beehiiv?.publicationId;
 
-  // 1. Known id (config or state) — verify access
-  if (knownId) {
-    const publication = await api.getPublication(knownId);
+  // 1. Configured id — verify access
+  if (configuredId) {
+    const publication = await api.getPublication(configuredId);
 
     if (!publication) {
-      console.log(`      ${chalk.yellow('⚠')} Publication ${chalk.cyan(knownId)} is not accessible with this API key — fix the id or the key, then rerun`);
-      return { status: 'warned', output: { publication: { publicationId: knownId, accessible: false } } };
+      console.log(`      ${chalk.yellow('⚠')} Publication ${chalk.cyan(configuredId)} is not accessible with this API key — fix the id or the key, then rerun`);
+      return { status: 'warned', output: { publication: { publicationId: configuredId, accessible: false } } };
     }
 
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(publication.name)} ${chalk.dim(`(${publication.id})`)}`);
     if (publication.id !== configuredId) {
-      writeBrandConfig(context, { 'marketing.newsletter.publicationId': publication.id });
+      writeBrandConfig(context, { 'marketing.newsletter.providers.beehiiv.publicationId': publication.id });
     }
     return { state: { publicationId: publication.id, publicationName: publication.name } };
   }
@@ -57,7 +56,7 @@ module.exports = async function ensurePublication(context) {
 
   if (match) {
     console.log(`      ${chalk.green('✓')} Auto-matched ${chalk.cyan(match.name)} ${chalk.dim(`(${match.id})`)}`);
-    writeBrandConfig(context, { 'marketing.newsletter.publicationId': match.id });
+    writeBrandConfig(context, { 'marketing.newsletter.providers.beehiiv.publicationId': match.id });
     return { state: { publicationId: match.id, publicationName: match.name } };
   }
 
@@ -86,7 +85,7 @@ module.exports = async function ensurePublication(context) {
     if (result.success && result.result) {
       const created = result.result;
       console.log(`      ${chalk.green('✓')} ${chalk.cyan(created.name)} ${chalk.dim(`(${created.id})`)}`);
-      writeBrandConfig(context, { 'marketing.newsletter.publicationId': created.id });
+      writeBrandConfig(context, { 'marketing.newsletter.providers.beehiiv.publicationId': created.id });
       return { state: { publicationId: created.id, publicationName: created.name } };
     }
   }

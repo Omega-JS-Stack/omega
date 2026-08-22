@@ -5,9 +5,9 @@
  * most one FirebaseLink, and a Firebase project links to at most one
  * property — so when our project is linked to the WRONG property, it's
  * unlinked there and linked here (config is the source of truth). Links may
- * store the project NUMBER rather than the ID; the number comes from the
- * firebase service's state (sdkConfig.messagingSenderId IS the project
- * number) — no second API client needed.
+ * store the project NUMBER rather than the ID; the number comes from config
+ * (cloud.config.messagingSenderId IS the project number) — no second API
+ * client needed.
  *
  * omega-manager retried "link still propagating" failures with sleeps and a
  * Firebase-API fallback; the port reports warned and lets the rerun converge
@@ -20,7 +20,7 @@ const chalk = require('chalk').default;
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureGoogleFirebaseLink(context) {
-  const { analyticsApi: api, propertyId, brandConfig, brandState, options = {} } = context;
+  const { analyticsApi: api, propertyId, brandConfig, options = {} } = context;
 
   // Same derivation as the cloud service: ONE home (#23) — the client web
   // config names the project (cp100)
@@ -37,7 +37,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
   }
 
   // Links can reference the project by ID or number
-  const projectNumber = brandState.cloud?.sdkConfig?.messagingSenderId || null;
+  const projectNumber = brandConfig.cloud?.config?.messagingSenderId || null;
   const isOurProject = (linkedProject) => linkedProject === projectId
     || (projectNumber && linkedProject === projectNumber);
 
@@ -50,7 +50,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
     if (isOurProject(linkedProject)) {
       console.log(`      ${chalk.green('✓')} GA property linked to this Firebase project`);
       const streamResult = await normalizeFirebaseStream(api, propertyId, brandConfig.brand.name, projectId, options);
-      return { state: { firebaseLink: { propertyId, linked: true, streamUpdated: streamResult } } };
+      return { output: { firebaseLink: { propertyId, linked: true, streamUpdated: streamResult } } };
     }
 
     // The property belongs to another project — that's not ours to break
@@ -94,7 +94,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
 
   const streamResult = await normalizeFirebaseStream(api, propertyId, brandConfig.brand.name, projectId, options);
 
-  return { state: { firebaseLink: { propertyId, linked: true, linkName: link.name || null, streamUpdated: streamResult } } };
+  return { output: { firebaseLink: { propertyId, linked: true, linkName: link.name || null, streamUpdated: streamResult } } };
 };
 
 /**

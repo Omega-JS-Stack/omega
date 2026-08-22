@@ -41,7 +41,7 @@ module.exports = {
         state.subscriptionBefore = before?.subscription || null;
 
         const response = await http.as('journey-payments-one-time').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: oneTimeProduct.id,
           simulate: 'decline',
         });
@@ -86,7 +86,7 @@ module.exports = {
         assert.ok(orderDoc, 'Order doc should exist');
         assert.equal(orderDoc.type, 'one-time', 'Type should be one-time');
         assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.processor, 'test', 'Processor should be test');
+        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
         assert.equal(orderDoc.productId, state.productId, 'Order should name the attempted product');
         assert.notEqual(orderDoc.unified.status, 'completed', 'The purchase must not read as completed');
       },

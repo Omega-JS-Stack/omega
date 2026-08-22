@@ -9,7 +9,7 @@
  * {projectId}.firebaseapp.com), so the handler no longer 404s on site
  * domains (the 2026-07-19 live find). The API base derives from brand.url,
  * never authDomain.
- * The fetched config is durable state; drift against omega.json5 is written
+ * omega.json5 is the fetched config's ONE home: drift against it is written
  * back into the file key-by-key (comment-preserving), so per-key comments
  * survive. Dry-run prints the paste-able block instead and warns.
  */
@@ -56,7 +56,7 @@ module.exports = async function ensureSdkConfig(context) {
 
   console.log(`      ${chalk.green('✓')} Got SDK config ${chalk.dim(`(apiKey: ${sdkConfig.apiKey.substring(0, 10)}...)`)}`);
 
-  // === Drift check: omega.json5's cloud.config is what the apps run on ===
+  // === Drift check: omega.json5's cloud.config is what the targets run on ===
   const configured = brandConfig.cloud?.config || {};
   const drifted = SDK_KEYS.filter((key) => (configured[key] || '') !== (sdkConfig[key] || ''));
 

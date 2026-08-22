@@ -12,12 +12,12 @@
 //   product, frequency        → ../index.js (initializeCheckout)
 //   _dev_preDelay             → ../index.js (artificial pre-delay)
 //   _dev_trialEligible        → ../index.js (trial override)
-//   _dev_cardProcessor        → ./state.js  (resolveProcessor)
+//   _dev_cardProvider        → ./state.js  (resolveProvider)
 //   _dev_recaptcha            → ../../../../libs/recaptcha.js
 //   _dev_decline              → ./api.js    (the intent POST's simulate)
 // So "apply" navigates with the params set rather than pretending it can
 // change a decision the page already made. Session storage would not help:
-// resolveProcessor reads the URL, and only the URL.
+// resolveProvider reads the URL, and only the URL.
 
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 
@@ -49,8 +49,8 @@ const CONTROLS = [
     options: [['', '(use API)'], ['true', 'Force true'], ['false', 'Force false']],
   },
   {
-    param: '_dev_cardProcessor',
-    label: 'Card processor',
+    param: '_dev_cardProvider',
+    label: 'Card provider',
     options: [['', '(auto)'], ['test', 'Test'], ['stripe', 'Stripe'], ['chargebee', 'Chargebee']],
   },
   {
@@ -101,7 +101,7 @@ function field(doc, { param, label, options }, value) {
 }
 
 /**
- * Arm the checkout to be declined by the processor, so the failure path is one
+ * Arm the checkout to be declined by the provider, so the failure path is one
  * click away instead of a card number to remember. A checkbox rather than a
  * select because it is the one two-state control, but it applies with the rest:
  * checked writes the param, unchecked drops it, and the arm lasts until it is

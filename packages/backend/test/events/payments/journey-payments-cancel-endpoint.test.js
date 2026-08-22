@@ -2,7 +2,7 @@
  * Test: Payment Journey - Cancel via endpoint
  * Simulates: paid active → POST /payments/cancel → cancellation pending
  *
- * The test processor's cancelAtPeriodEnd writes a Stripe-shaped webhook doc directly
+ * The test provider's cancelAtPeriodEnd writes a Stripe-shaped webhook doc directly
  * to payments-webhooks/{eventId}, triggering the full on-write pipeline automatically.
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
@@ -28,7 +28,7 @@ module.exports = {
         state.product = payments.products[paidProduct.id];
         // Create subscription via test intent — auto-fires webhook pipeline
         const response = await http.as('journey-payments-cancel-route').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
@@ -51,7 +51,7 @@ module.exports = {
     {
       name: 'call-cancel-endpoint',
       async run({ http, assert }) {
-        // Test processor writes a payments-webhooks doc directly,
+        // Test provider writes a payments-webhooks doc directly,
         // triggering the on-write pipeline automatically — no manual webhook needed.
         // skipGuards bypasses the 24-hour subscription-age guard.
         const response = await http.as('journey-payments-cancel-route').post('backend-manager/payments/cancel', {

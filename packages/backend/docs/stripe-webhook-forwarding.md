@@ -15,7 +15,7 @@ npx omega stripe
 
 If any prerequisite is missing, webhook forwarding is silently skipped with an info message.
 
-The forwarding URL is: `http://localhost:{hostingPort}/omega/payments/webhook?processor=stripe&key={OMEGA_WEBHOOK_KEY}`
+The forwarding URL is: `http://localhost:{hostingPort}/omega/payments/webhook?provider=stripe&key={OMEGA_WEBHOOK_KEY}`
 
 ## Signature verification locally
 
@@ -25,4 +25,4 @@ The forwarding URL is: `http://localhost:{hostingPort}/omega/payments/webhook?pr
 stripe listen --print-secret
 ```
 
-and puts that `whsec_…` value in `functions/.env`. Leaving `STRIPE_WEBHOOK_SECRET` unset keeps the route on the key-only path (a warn per processor per instance) — the right setting for a brand not yet migrated.
+and puts that `whsec_…` value in `functions/.env`. Leaving `STRIPE_WEBHOOK_SECRET` unset keeps the route on the key-only path (a warn per provider per instance) — the right setting for a brand not yet migrated.

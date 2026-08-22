@@ -12,6 +12,8 @@
  * Auth: BEEHIIV_API_KEY in the brand .env; the webhook operation
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
+const { chosenProvider } = require('@omega.js/config');
+
 const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
@@ -26,9 +28,14 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'marketing.newsletter.enabled = false' };
     }
 
-    const provider = newsletter.provider || 'beehiiv';
+    // The vendor is a KEY under marketing.newsletter.providers (#425) — no
+    // entry means none chosen and this service skips.
+    const provider = chosenProvider(newsletter.providers);
+    if (!provider) {
+      return { skip: true, reason: 'no marketing.newsletter.providers entry' };
+    }
     if (provider !== 'beehiiv') {
-      return { skip: true, reason: `marketing.newsletter.provider = '${provider}'` };
+      return { skip: true, reason: `marketing.newsletter.providers.${provider} is not a known newsletter provider` };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

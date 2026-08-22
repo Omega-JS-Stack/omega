@@ -33,7 +33,7 @@ function userDoc(overrides) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { processor: 'stripe', orderId: 'sub_275', resourceId: 'cus_275' },
+      payment: { provider: 'stripe', orderId: 'sub_275', resourceId: 'cus_275' },
     },
     roles: { admin: false, betaTester: true, developer: false },
     affiliate: { code: 'aff275', referrals: [] },

@@ -2,7 +2,7 @@
  * Test: Chargebee toUnifiedOneTime()
  * Unit tests for the Chargebee library's invoice → unified one-time transformation
  */
-const Chargebee = require('../../../../src/manager/libraries/payment/processors/chargebee.js');
+const Chargebee = require('../../../../src/manager/libraries/payment/providers/chargebee.js');
 
 const FIXTURE_INVOICE = require('../../../fixtures/chargebee/invoice-one-time.json');
 
@@ -60,10 +60,10 @@ module.exports = {
     },
 
     {
-      name: 'processor-always-chargebee',
+      name: 'provider-always-chargebee',
       async run({ assert }) {
         const result = toUnifiedOneTime({});
-        assert.equal(result.payment.processor, 'chargebee', 'Processor should be chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Provider should be chargebee');
       },
     },
 
@@ -125,7 +125,7 @@ module.exports = {
       async run({ assert }) {
         const result = toUnifiedOneTime(FIXTURE_INVOICE);
         assert.equal(result.status, 'completed', 'Fixture paid → completed');
-        assert.equal(result.payment.processor, 'chargebee', 'Processor is chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Provider is chargebee');
         assert.equal(result.payment.resourceId, FIXTURE_INVOICE.id, 'Resource ID matches fixture');
         assert.equal(result.payment.orderId, '6789-0123-4567', 'Order ID from meta_data');
         assert.equal(result.product.id, 'credits-100', 'Product from meta_data productId');

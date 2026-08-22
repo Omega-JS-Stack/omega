@@ -49,7 +49,7 @@ function app() {
   // RESOLVED path — on macOS /var/folders/… is a symlink to /private/var/…
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dev-watch-')));
   const src = path.join(root, 'src');
-  // The packaged tree lives OUTSIDE the app root — in a real linked brand the
+  // The packaged tree lives OUTSIDE the target root — in a real linked brand the
   // symlink resolves to the monorepo, far outside cwd, and an escaping `../`
   // relative watch target makes Eleventy re-root its watcher and drop EVERY
   // reset (#134 verification). In-root would hide that regression.

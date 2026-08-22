@@ -4,7 +4,7 @@
  *
  * A subscription renewal produces NO state transition — active → active, same
  * product — so the invoice event is the only signal that money moved. Stripe's
- * webhook processor listed `invoice.payment_failed` but not
+ * webhook provider listed `invoice.payment_failed` but not
  * `invoice.payment_succeeded`, so every renewal was dropped at the door as an
  * unsupported event type and Stripe recurring revenue never reached analytics
  * (whose `isPaymentEvent()` had been expecting that exact string all along).
@@ -23,7 +23,7 @@
 const { callHandler, withEnvironment } = require('./_route-harness.js');
 
 const handler = require('../../../src/manager/routes/payments/webhook/post.js');
-const stripeProcessor = require('../../../src/manager/routes/payments/webhook/processors/stripe.js');
+const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
 
 const FIXTURE_INVOICE_RENEWAL = require('../../fixtures/stripe/invoice-subscription-payment-succeeded.json');
 
@@ -43,7 +43,7 @@ function deliver(Manager, event) {
     handler,
     functionName: 'payments-webhook',
     req: {
-      query: { processor: 'stripe', key: VALID_KEY() },
+      query: { provider: 'stripe', key: VALID_KEY() },
       body: event,
       rawBody: Buffer.from(JSON.stringify(event)),
     },
@@ -60,7 +60,7 @@ module.exports = {
       name: 'supports-invoice-payment-succeeded',
       auth: 'none',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('invoice.payment_succeeded'), 'A Stripe renewal must be a supported event');
+        assert.ok(stripeProvider.isSupported('invoice.payment_succeeded'), 'A Stripe renewal must be a supported event');
       },
     },
 
@@ -70,7 +70,7 @@ module.exports = {
       async run({ assert }) {
         // Stripe fires this alongside invoice.payment_succeeded for the same
         // invoice; ingesting both would double-count the renewal's revenue.
-        assert.equal(stripeProcessor.isSupported('invoice.paid'), false, 'invoice.paid must stay out of the ingest');
+        assert.equal(stripeProvider.isSupported('invoice.paid'), false, 'invoice.paid must stay out of the ingest');
       },
     },
 
@@ -78,7 +78,7 @@ module.exports = {
       name: 'maps-a-renewal-invoice-to-its-subscription',
       auth: 'none',
       async run({ assert }) {
-        const parsed = stripeProcessor.parseWebhook({ body: renewalEvent('_test-evt-renewal-parse') });
+        const parsed = stripeProvider.parseWebhook({ body: renewalEvent('_test-evt-renewal-parse') });
 
         assert.equal(parsed.category, 'subscription', 'A subscription_cycle invoice is a subscription event');
         assert.equal(parsed.resourceType, 'subscription', 'The pipeline must re-fetch the SUBSCRIPTION, not the invoice');
@@ -98,7 +98,7 @@ module.exports = {
           data: { object: { id: 'in_test_manual', billing_reason: 'manual', metadata: { uid: 'test-uid-manual' } } },
         };
 
-        const parsed = stripeProcessor.parseWebhook({ body: event });
+        const parsed = stripeProvider.parseWebhook({ body: event });
 
         assert.equal(parsed.category, 'one-time', 'A manual invoice is a one-time event');
         assert.equal(parsed.resourceType, 'invoice', 'A one-time invoice re-fetches as an invoice');

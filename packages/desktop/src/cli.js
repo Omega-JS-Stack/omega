@@ -3,7 +3,7 @@ const path = require('path');
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
 // Resolve the .env cascade from the project root
-// (shell > app .env > brand .env > company .env)
+// (shell > local .env > brand .env > company .env)
 require('@omega.js/config').loadEnv(process.cwd());
 
 // Main class — dispatch (positional/flag alias resolution, command loading,

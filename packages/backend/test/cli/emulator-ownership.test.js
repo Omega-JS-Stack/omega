@@ -25,7 +25,7 @@ const OURS = 'demo-sandbox-brand';
 // carry no signal). The firestore jar is the ONE child whose command names the
 // project; the firebase parent and the other emulators name nothing.
 const FIREBASE_PARENT = 'node /Users/ian/.nvm/versions/node/v22.22.1/bin/firebase emulators:start --only functions,firestore,auth,database,hosting,pubsub --config firebase.resolved.json';
-const FIRESTORE_JAR = 'java -Dgoogle.cloud_firestore.debug_log_level=FINE -Duser.language=en -jar /Users/ian/.cache/firebase/emulators/cloud-firestore-emulator-v1.21.0.jar --host 127.0.0.1 --port 8080 --websocket_port 9150 --database-edition standard --project_id demo-sandbox-brand --rules /Users/ian/Developer/Repositories/Omega/omega/apps/sandbox-brand/apps/backend/firestore.rules --single_project_mode true';
+const FIRESTORE_JAR = 'java -Dgoogle.cloud_firestore.debug_log_level=FINE -Duser.language=en -jar /Users/ian/.cache/firebase/emulators/cloud-firestore-emulator-v1.21.0.jar --host 127.0.0.1 --port 8080 --websocket_port 9150 --database-edition standard --project_id demo-sandbox-brand --rules /Users/ian/Developer/Repositories/Omega/omega/brands/sandbox-brand/targets/backend/firestore.rules --single_project_mode true';
 const PUBSUB_JAR = 'java -jar /Users/ian/.cache/firebase/emulators/pubsub-emulator-0.8.34/pubsub-emulator/lib/cloud-pubsub-emulator-0.8.34-all.jar --host=127.0.0.1 --port=8085';
 
 // The processes the sweep must never touch.
@@ -34,7 +34,7 @@ const FOREIGN_FIRESTORE_JAR = FIRESTORE_JAR.replace(OURS, 'demo-other-brand');
 // The hot-reload watcher: its command line mentions both "firebase" paths and
 // `emulator.log.reset`, so a name-only signature matches it — and it is
 // reparented to PID 1, so an orphan-shaped check matches it too.
-const RELOAD_WATCHER = 'node /Users/ian/.nvm/versions/node/v22.22.1/bin/nodemon --on-change-only --delay 1 --watch /Users/ian/Developer/Repositories/Omega/omega/packages/backend/src --ext js,json --exec node -e "fs.writeFileSync(\'/Users/ian/Developer/Repositories/Omega/omega/apps/sandbox-brand/apps/backend/.temp/emulator.log.reset\',\'\')"';
+const RELOAD_WATCHER = 'node /Users/ian/.nvm/versions/node/v22.22.1/bin/nodemon --on-change-only --delay 1 --watch /Users/ian/Developer/Repositories/Omega/omega/packages/backend/src --ext js,json --exec node -e "fs.writeFileSync(\'/Users/ian/Developer/Repositories/Omega/omega/brands/sandbox-brand/targets/backend/.temp/emulator.log.reset\',\'\')"';
 
 module.exports = {
   description: 'emulator orphan sweep ownership matcher',

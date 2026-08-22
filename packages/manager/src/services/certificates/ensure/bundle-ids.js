@@ -1,7 +1,7 @@
 /**
  * Ensure the brand's bundle ID exists with the required capabilities.
  *
- * Bundle ID = composeBundleId(certificates.apple.bundleIdPrefix, brand.id)
+ * Bundle ID = composeBundleId(certificates.providers.apple.bundleIdPrefix, brand.id)
  * — reverse-DNS prefix (config; the onboard wizard derives it from the
  * company/brand domain) + the brand id with hyphens as dots, e.g.
  * com.itwcreativeworks.omega.playground. Platforms derive from the enabled
@@ -24,12 +24,12 @@ module.exports = catchAgreements(async (context) => {
   const { appleClient, brandConfig, brandId } = context;
   const dryRun = context.options?.dryRun || false;
 
-  const appleConfig = brandConfig.certificates.apple || {};
+  const appleConfig = brandConfig.certificates.providers?.apple || {};
   const prefix = appleConfig.bundleIdPrefix;
   if (!prefix) {
     return {
       status: 'error',
-      error: 'certificates.apple.bundleIdPrefix not set — add it to config/omega.json5 (reverse-DNS of your domain, e.g. "com.yourcompany" — the onboard wizard seeds this; the bundle ID becomes <prefix>.<brand.id with dashes as dots>)',
+      error: 'certificates.providers.apple.bundleIdPrefix not set — add it to config/omega.json5 (reverse-DNS of your domain, e.g. "com.yourcompany" — the onboard wizard seeds this; the bundle ID becomes <prefix>.<brand.id with dashes as dots>)',
     };
   }
 

@@ -50,10 +50,10 @@ async function generateBuildJs(outputDir) {
     // Get git info
     const gitInfo = getGitInfo();
 
-    // omega.json5 `monitoring` → the client's sentry contract. The blob feeds
-    // Sentry.init directly, so the provider discriminator is stripped.
-    const sentryConfig = { ...(config.monitoring || {}) };
-    delete sentryConfig.provider;
+    // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
+    // (#425). The provider block feeds Sentry.init directly; the role level
+    // (`enabled`) never rides along.
+    const sentryConfig = { ...(config.monitoring?.providers?.sentry || {}) };
 
     // The live sibling website's published origin, or null when none is up (#262)
     const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
@@ -383,7 +383,7 @@ async function compileManifest(outputDir, target) {
     });
 
     // Add package version to manifest. Chrome REFUSES a manifest with no
-    // version — an app whose package.json has none used to build a perfectly
+    // version — a target whose package.json has none used to build a perfectly
     // normal-looking extension that no browser would load (#46). Fail here.
     if (!project.version) {
       throw new Error('Cannot build the manifest: the extension app\'s package.json has no "version" (Chrome refuses to load a manifest without one)');

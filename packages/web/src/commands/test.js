@@ -23,7 +23,7 @@ const logger = new Logger('omega:test');
 module.exports = async function (options) {
   const paths = consumerPaths();
 
-  // Tee the whole run to <appRoot>/logs/test.log (#197) — the file to grep
+  // Tee the whole run to <targetRoot>/logs/test.log (#197) — the file to grep
   // after a failure instead of scrolling scrollback.
   attachLogFile(path.join(paths.root, 'logs', 'test.log'));
 

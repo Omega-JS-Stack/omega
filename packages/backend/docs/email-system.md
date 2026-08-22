@@ -191,7 +191,7 @@ await email.send({
 |---|---|
 | **card** | `{ title, message, button: { text, url } }` |
 | **plain** | `{ greeting, message, link: { url, text }, signoff }` |
-| **order** | `{ event, id, type, unified, _computed, processor }` |
+| **order** | `{ event, id, type, unified, _computed, provider }` |
 | **feedback** | (none — self-contained) |
 
 Marketing campaigns add `discountCode` to `data.content`:
@@ -271,7 +271,7 @@ Handles ALL 9 order event types in one template. Event from `data.content.event`
 |---|---|
 | `_header()` | Emoji + title + subtitle per event type |
 | `_summary()` | Product/price/discount/total table (only for `SUMMARY_EVENTS`) |
-| `_details()` | Date, processor, frequency, account email |
+| `_details()` | Date, provider, frequency, account email |
 | `_explanation()` | Conditional paragraphs: trial notice, promo code, cancellation reason, etc. |
 | `_ctaButton()` | CTA pointing to dashboard/billing/pricing depending on event |
 | `_helpText()` | "Questions? Contact support" |

@@ -20,7 +20,7 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-capture
  */
-const PayPal = require('../../../../src/manager/libraries/payment/processors/paypal.js');
+const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
 
 const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
 const FIXTURE_CAPTURE = require('../../../fixtures/paypal/capture-completed.json');

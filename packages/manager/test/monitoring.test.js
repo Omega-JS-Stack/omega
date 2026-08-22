@@ -42,8 +42,11 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
     name: "Fixture Brand",
   },
   monitoring: {
-    provider: "sentry",
-    dsn: null,
+    providers: {
+      sentry: {
+        dsn: null,
+      },
+    },
   },
   targets: {
     web: {},
@@ -54,7 +57,7 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
 }
 `;
 
-function brandConfig({ monitoring = { provider: 'sentry' }, targets = structuredClone(ALL_TARGETS) } = {}) {
+function brandConfig({ monitoring = { providers: { sentry: {} } }, targets = structuredClone(ALL_TARGETS) } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
     monitoring,
@@ -92,9 +95,8 @@ function runService(config, { sentry, options = {}, serviceData = {}, brandRoot 
     brandId: 'fixture-brand',
     brandRoot: brandRoot || makeBrandRoot(WRITEBACK_CONFIG),
     brandConfig: config,
-    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: 'fixture-brand', config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.monitoring,
     options,
     serviceData,
@@ -104,8 +106,8 @@ function runService(config, { sentry, options = {}, serviceData = {}, brandRoot 
 
 // ─── Registry / skip semantics ───────────────────────────────────────────────
 
-test('monitoring: registered between adsense and sendgrid with the two operations', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('adsense') + 1], 'monitoring');
+test('monitoring: registered between advertising and campaigns with the two operations', () => {
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('advertising') + 1], 'monitoring');
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('monitoring') + 1], 'campaigns');
   assert.deepEqual(OPERATIONS.monitoring.map((op) => op.name), ['projects', 'dsn']);
 });
@@ -119,9 +121,14 @@ test('monitoring: skips without a monitoring section, when disabled, and on anot
   assert.equal(disabled.status, 'skipped');
   assert.match(disabled.reason, /disabled/);
 
-  const other = await runService(brandConfig({ monitoring: { provider: 'other' } }), { sentry: fakeSentry() });
+  const other = await runService(brandConfig({ monitoring: { providers: { other: {} } } }), { sentry: fakeSentry() });
   assert.equal(other.status, 'skipped');
-  assert.match(other.reason, /other/);
+  assert.match(other.reason, /monitoring\.providers\.other/);
+
+  // Empty providers block = none chosen, exactly what a null provider meant (#425)
+  const unchosen = await runService(brandConfig({ monitoring: { providers: {} } }), { sentry: fakeSentry() });
+  assert.equal(unchosen.status, 'skipped');
+  assert.match(unchosen.reason, /no monitoring\.providers entry/);
 });
 
 test('monitoring: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingEnv)', async () => {
@@ -192,16 +199,16 @@ test('monitoring: a fully converged brand is a zero-mutation no-op and the file 
   const configured = `// Converged fixture
 {
   brand: { id: 'fixture-brand' },
-  monitoring: { provider: "sentry", org: "fixture-org" },
+  monitoring: { providers: { sentry: { org: "fixture-org" } } },
   targets: {
-    web: { monitoring: { dsn: "${dsnOf('web')}" } },
+    web: { monitoring: { providers: { sentry: { dsn: "${dsnOf('web')}" } } } },
   },
 }
 `;
   const brandRoot = makeBrandRoot(configured);
   const config = brandConfig({
-    monitoring: { provider: 'sentry', org: 'fixture-org' },
-    targets: { web: { monitoring: { dsn: dsnOf('web') } } },
+    monitoring: { providers: { sentry: { org: 'fixture-org' } } },
+    targets: { web: { monitoring: { providers: { sentry: { dsn: dsnOf('web') } } } } },
   });
   const api = fakeSentry({
     getOrganizations: [ORG],
@@ -221,8 +228,8 @@ test('monitoring: a fully converged brand is a zero-mutation no-op and the file 
 test('monitoring: a hand-set stale DSN is drift and gets patched', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const config = brandConfig({
-    monitoring: { provider: 'sentry', org: 'fixture-org' },
-    targets: { web: { monitoring: { dsn: 'https://stale@old.ingest.sentry.io/1' } } },
+    monitoring: { providers: { sentry: { org: 'fixture-org' } } },
+    targets: { web: { monitoring: { providers: { sentry: { dsn: 'https://stale@old.ingest.sentry.io/1' } } } } },
   });
   const api = fakeSentry({
     getOrganizations: [ORG],
@@ -239,7 +246,7 @@ test('monitoring: a hand-set stale DSN is drift and gets patched', async () => {
 
 // ─── Org resolution ──────────────────────────────────────────────────────────
 
-test('monitoring: multiple orgs without monitoring.org warns and mutates nothing', async () => {
+test('monitoring: multiple orgs without monitoring.providers.sentry.org warns and mutates nothing', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const api = fakeSentry({
     getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b' }],
@@ -254,7 +261,7 @@ test('monitoring: multiple orgs without monitoring.org warns and mutates nothing
 });
 
 test('monitoring: a configured org the token cannot see warns honestly', async () => {
-  const config = brandConfig({ monitoring: { provider: 'sentry', org: 'someone-elses-org' } });
+  const config = brandConfig({ monitoring: { providers: { sentry: { org: 'someone-elses-org' } } } });
   const api = fakeSentry({ getOrganizations: [ORG] });
 
   const result = await runService(config, { sentry: api });

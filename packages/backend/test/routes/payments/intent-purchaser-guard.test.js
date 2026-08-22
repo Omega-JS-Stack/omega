@@ -5,7 +5,7 @@
  * ends as a webhook with nowhere to write — the seam that minted a LIVE
  * users/{uid} holding nothing but a subscription block
  * ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)). The route now
- * refuses before the processor is ever called, so there is no session, no intent
+ * refuses before the provider is ever called, so there is no session, no intent
  * doc, and no half-written account.
  *
  * Direct handler calls against the REAL emulator (the _route-harness technique):
@@ -35,7 +35,7 @@ function checkout(Manager, uid, { productId }) {
     functionName: 'payments-intent',
     user: buildUser(Manager, doc),
     settings: {
-      processor: 'test',
+      provider: 'test',
       productId: productId,
       frequency: 'monthly',
     },
@@ -127,7 +127,7 @@ module.exports = {
 
       async run({ assert, Manager, accounts }) {
         // A product the brand does not sell: the 400 it earns proves the request
-        // reached the route's own validation, and no processor is ever called
+        // reached the route's own validation, and no provider is ever called
         const sent = await checkout(Manager, accounts['basic'].uid, { productId: '_test-nonexistent-product' });
 
         assert.equal(sent.code, 400, `A seeded persona has both halves and must get past the guard, got ${sent.code}: ${sent.body}`);

@@ -78,7 +78,7 @@ function rewriteGuideLinks(contents, short) {
  * | `docs/shared/<x>.md` | `shared/<x>.md` | the manager's own vendored shared contracts sit beside it |
  * | `docs/manager/<x>.md` | `<x>.md` | the manager's guide tree lands FLAT in the same dir |
  * | `docs/<other>/<x>.md` | `../../<other>/docs/<x>.md` | a sibling package under the same @omega.js scope |
- * | `packages/…`, `apps/…` | the link text alone | no published target exists — the words survive, the link doesn't |
+ * | `packages/…`, `brands/…` | the link text alone | no published target exists — the words survive, the link doesn't |
  *
  * A sibling that isn't installed, never publishes (`devkit`), or publishes
  * without a guide tree (`mcp-router` is not in DOCUMENTED_PACKAGES) leaves a
@@ -100,7 +100,7 @@ function rewriteMapLinks(contents) {
     if (sibling) {
       return `[${text}](../../${sibling[1]}/docs/${sibling[2]})`;
     }
-    if (/^(packages|apps)\//.test(target)) {
+    if (/^(packages|brands)\//.test(target)) {
       return text;
     }
     return link;

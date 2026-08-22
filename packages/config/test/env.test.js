@@ -1,6 +1,6 @@
 /**
- * .env cascade tests for @omega.js/config — chain resolution (app/brand/
- * company via the .omega/company.json marker), precedence (shell > app >
+ * .env cascade tests for @omega.js/config — chain resolution (local/brand/
+ * company via the .omega/company.json marker), precedence (shell > local >
  * brand > company), and loading tolerances (missing files, malformed
  * markers, vanished company roots).
  *
@@ -38,12 +38,12 @@ function cleanup(t, root, envKeys = []) {
 
 // ─── Full cascade ───
 
-test('app in a company-stamped brand: shell > app .env > brand .env > company .env', (t) => {
+test('local in a company-stamped brand: shell > local .env > brand .env > company .env', (t) => {
   const root = makeFixture('env-full', {
     'company/.env': 'ENVT1_B=company\nENVT1_C=company\nENVT1_S=company\n',
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'ENVT1_A=brand\nENVT1_B=brand\nENVT1_S=brand\n',
-    'brand/apps/site/.env': 'ENVT1_A=app\nENVT1_S=app\n',
+    'brand/targets/site/.env': 'ENVT1_A=local\nENVT1_S=local\n',
   });
   cleanup(t, root, ['ENVT1_A', 'ENVT1_B', 'ENVT1_C', 'ENVT1_S']);
 
@@ -54,33 +54,33 @@ test('app in a company-stamped brand: shell > app .env > brand .env > company .e
 
   process.env.ENVT1_S = 'shell';
 
-  const { chain, loaded } = loadEnv(path.join(brandRoot, 'apps', 'site'));
+  const { chain, loaded } = loadEnv(path.join(brandRoot, 'targets', 'site'));
 
   assert.deepStrictEqual(chain, {
-    app: path.join(brandRoot, 'apps', 'site', '.env'),
+    local: path.join(brandRoot, 'targets', 'site', '.env'),
     brand: path.join(brandRoot, '.env'),
     company: path.join(companyRoot, '.env'),
   });
-  assert.deepStrictEqual(loaded, [chain.app, chain.brand, chain.company]);
+  assert.deepStrictEqual(loaded, [chain.local, chain.brand, chain.company]);
 
-  assert.strictEqual(process.env.ENVT1_A, 'app');      // app beats brand
+  assert.strictEqual(process.env.ENVT1_A, 'local');      // local beats brand
   assert.strictEqual(process.env.ENVT1_B, 'brand');    // brand beats company
   assert.strictEqual(process.env.ENVT1_C, 'company');  // company fills the gaps
   assert.strictEqual(process.env.ENVT1_S, 'shell');    // shell beats every file
 });
 
-test('backend functions dir: functions/.env is the app layer, brand discovered through the functions/ normalization', (t) => {
+test('backend functions dir: functions/.env is the local layer, brand discovered through the functions/ normalization', (t) => {
   const root = makeFixture('env-functions', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'ENVT2_X=brand\nENVT2_Y=brand\n',
-    'brand/apps/backend/functions/.env': 'ENVT2_X=functions\n',
+    'brand/targets/backend/functions/.env': 'ENVT2_X=functions\n',
   });
   cleanup(t, root, ['ENVT2_X', 'ENVT2_Y']);
 
-  const functionsDir = path.join(root, 'brand', 'apps', 'backend', 'functions');
+  const functionsDir = path.join(root, 'brand', 'targets', 'backend', 'functions');
   const { chain, loaded } = loadEnv(functionsDir);
 
-  assert.strictEqual(chain.app, path.join(functionsDir, '.env'));
+  assert.strictEqual(chain.local, path.join(functionsDir, '.env'));
   assert.strictEqual(chain.brand, path.join(root, 'brand', '.env'));
   assert.strictEqual(chain.company, null);
   assert.strictEqual(loaded.length, 2);
@@ -89,24 +89,24 @@ test('backend functions dir: functions/.env is the app layer, brand discovered t
   assert.strictEqual(process.env.ENVT2_Y, 'brand');
 });
 
-test('backend dist dir: dist/.env is the app layer, brand discovered through the dist/ normalization', (t) => {
+test('backend dist dir: dist/.env is the local layer, brand discovered through the dist/ normalization', (t) => {
   // `omega test` resolves the cascade from the staged dist/ (the runner's
   // functions dir for the run). Without the dist/ normalization the walk
-  // looked for apps/ one level too low, so the brand layer came back null and
+  // looked for targets/ one level too low, so the brand layer came back null and
   // the run died on a missing secret that was sitting at the brand root —
   // exactly where the D15 cascade says to keep it
   // ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
   const root = makeFixture('env-dist', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'ENVT2D_X=brand\nENVT2D_Y=brand\n',
-    'brand/apps/backend/dist/.env': 'ENVT2D_X=dist\n',
+    'brand/targets/backend/dist/.env': 'ENVT2D_X=dist\n',
   });
   cleanup(t, root, ['ENVT2D_X', 'ENVT2D_Y']);
 
-  const distDir = path.join(root, 'brand', 'apps', 'backend', 'dist');
+  const distDir = path.join(root, 'brand', 'targets', 'backend', 'dist');
   const { chain, loaded } = loadEnv(distDir);
 
-  assert.strictEqual(chain.app, path.join(distDir, '.env'));
+  assert.strictEqual(chain.local, path.join(distDir, '.env'));
   assert.strictEqual(chain.brand, path.join(root, 'brand', '.env'));
   assert.strictEqual(chain.company, null);
   assert.strictEqual(loaded.length, 2);
@@ -117,9 +117,9 @@ test('backend dist dir: dist/.env is the app layer, brand discovered through the
 
 // ─── Partial chains ───
 
-test('standalone project: app .env only; a project with no .env at all loads nothing and never throws', (t) => {
+test('standalone project: local .env only; a project with no .env at all loads nothing and never throws', (t) => {
   const root = makeFixture('env-standalone', {
-    'proj/.env': 'ENVT3_X=app\n',
+    'proj/.env': 'ENVT3_X=local\n',
     'bare/README.md': 'no env here',
   });
   cleanup(t, root, ['ENVT3_X']);
@@ -128,13 +128,13 @@ test('standalone project: app .env only; a project with no .env at all loads not
   assert.strictEqual(withEnv.chain.brand, null);
   assert.strictEqual(withEnv.chain.company, null);
   assert.deepStrictEqual(withEnv.loaded, [path.join(root, 'proj', '.env')]);
-  assert.strictEqual(process.env.ENVT3_X, 'app');
+  assert.strictEqual(process.env.ENVT3_X, 'local');
 
   const bare = loadEnv(path.join(root, 'bare'));
   assert.deepStrictEqual(bare.loaded, []);
 });
 
-test('brand root as startDir (the manager shape): its own .env is the app layer, its marker supplies the company layer', (t) => {
+test('brand root as startDir (the manager shape): its own .env is the local layer, its marker supplies the company layer', (t) => {
   const root = makeFixture('env-brand-root', {
     'company/.env': 'ENVT4_B=company\nENVT4_C=company\n',
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
@@ -148,7 +148,7 @@ test('brand root as startDir (the manager shape): its own .env is the app layer,
 
   const { chain } = loadEnv(brandRoot);
 
-  assert.strictEqual(chain.app, path.join(brandRoot, '.env'));
+  assert.strictEqual(chain.local, path.join(brandRoot, '.env'));
   assert.strictEqual(chain.brand, null);
   assert.strictEqual(chain.company, path.join(root, 'company', '.env'));
 
@@ -161,7 +161,7 @@ test('brand root as startDir (the manager shape): its own .env is the app layer,
 test('marker pointing at a vanished company root: the chain names it, loading skips it silently', (t) => {
   const root = makeFixture('env-vanished', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
-    'brand/apps/site/.env': 'ENVT5_X=app\n',
+    'brand/targets/site/.env': 'ENVT5_X=local\n',
   });
   cleanup(t, root, ['ENVT5_X']);
 
@@ -170,11 +170,11 @@ test('marker pointing at a vanished company root: the chain names it, loading sk
   fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: gone }));
 
-  const { chain, loaded } = loadEnv(path.join(brandRoot, 'apps', 'site'));
+  const { chain, loaded } = loadEnv(path.join(brandRoot, 'targets', 'site'));
 
   assert.strictEqual(chain.company, path.join(gone, '.env'));
-  assert.deepStrictEqual(loaded, [chain.app]);
-  assert.strictEqual(process.env.ENVT5_X, 'app');
+  assert.deepStrictEqual(loaded, [chain.local]);
+  assert.strictEqual(process.env.ENVT5_X, 'local');
 });
 
 test('malformed or rootless markers read as unstamped', (t) => {
@@ -221,11 +221,11 @@ test('resolveEnvChain resolves paths without touching process.env', (t) => {
   const root = makeFixture('env-resolve-only', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'ENVT7_X=brand\n',
-    'brand/apps/site/.env': 'ENVT7_X=app\n',
+    'brand/targets/site/.env': 'ENVT7_X=local\n',
   });
   cleanup(t, root, ['ENVT7_X']);
 
-  const chain = resolveEnvChain(path.join(root, 'brand', 'apps', 'site'));
+  const chain = resolveEnvChain(path.join(root, 'brand', 'targets', 'site'));
 
   assert.strictEqual(chain.brand, path.join(root, 'brand', '.env'));
   assert.strictEqual(process.env.ENVT7_X, undefined);
@@ -233,20 +233,20 @@ test('resolveEnvChain resolves paths without touching process.env', (t) => {
 
 // ─── Empty file-layer values never claim a key (dogfood friction #20) ───
 
-test('empty app-layer values (KEY= / KEY="") never shadow the brand layer; shell empties still win', (t) => {
+test('empty local-layer values (KEY= / KEY="") never shadow the brand layer; shell empties still win', (t) => {
   const root = makeFixture('env-empty', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'ENVT9_A=brand-real\nENVT9_B=brand-real\nENVT9_S=brand-real\n',
-    'brand/apps/site/.env': 'ENVT9_A=\nENVT9_B=""\nENVT9_S=""\nENVT9_ONLY=""\n',
+    'brand/targets/site/.env': 'ENVT9_A=\nENVT9_B=""\nENVT9_S=""\nENVT9_ONLY=""\n',
   });
   cleanup(t, root, ['ENVT9_A', 'ENVT9_B', 'ENVT9_S', 'ENVT9_ONLY']);
 
   process.env.ENVT9_S = '';
 
-  loadEnv(path.join(root, 'brand', 'apps', 'site'));
+  loadEnv(path.join(root, 'brand', 'targets', 'site'));
 
-  assert.strictEqual(process.env.ENVT9_A, 'brand-real', 'unquoted-empty app line must not shadow the brand value');
-  assert.strictEqual(process.env.ENVT9_B, 'brand-real', 'quoted-empty app line must not shadow the brand value');
+  assert.strictEqual(process.env.ENVT9_A, 'brand-real', 'unquoted-empty local line must not shadow the brand value');
+  assert.strictEqual(process.env.ENVT9_B, 'brand-real', 'quoted-empty local line must not shadow the brand value');
   assert.strictEqual(process.env.ENVT9_S, '', 'a deliberately empty SHELL var still beats every file');
   assert.strictEqual(process.env.ENVT9_ONLY, undefined, 'empty in every layer = key stays unset');
 });

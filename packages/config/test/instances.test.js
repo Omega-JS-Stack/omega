@@ -1,6 +1,6 @@
 /**
  * Multi-instance targets (_attic/plans/multi-instance-targets.md): normalization
- * (object → [{ id: 'main', ...entry }]), the app-dir ↔ instance walk, the
+ * (object → [{ id: 'main', ...entry }]), the target-dir ↔ instance walk, the
  * validator's array rules (ids required/dir-safe/unique; >1 backend warns),
  * the instance dimension in loadConfig/composeTargetConfig, port offsets,
  * and per-instance URL resolution.
@@ -15,9 +15,9 @@ const path = require('node:path');
 
 const {
   loadConfig, composeTargetConfig, validateConfig,
-  normalizeTargetInstances, instanceIdFromDirName, instanceAppDir, appInstance,
+  normalizeTargetInstances, instanceIdFromDirName, instanceTargetDir, targetInstance,
   resolveInstanceEntry, instancePortOffset, resolveInstanceUrl,
-  APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE,
+  DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE,
 } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
@@ -55,9 +55,9 @@ test('normalizeTargetInstances: object → [{ id: main, ...entry }]; array passe
   assert.deepStrictEqual(normalizeTargetInstances({ id: 'primary' }), [{ id: 'primary' }]);
 });
 
-// ─── App-dir ↔ instance walk ───
+// ─── Target-dir ↔ instance walk ───
 
-test('instanceIdFromDirName / instanceAppDir: canonical dir = main, <canonical>-<id> = the instance, and they invert', () => {
+test('instanceIdFromDirName / instanceTargetDir: canonical dir = main, <canonical>-<id> = the instance, and they invert', () => {
   assert.strictEqual(instanceIdFromDirName('website', 'web'), 'main');
   assert.strictEqual(instanceIdFromDirName('website-admin', 'web'), 'admin');
   assert.strictEqual(instanceIdFromDirName('website-cdn', 'web'), 'cdn');
@@ -65,42 +65,42 @@ test('instanceIdFromDirName / instanceAppDir: canonical dir = main, <canonical>-
   // Unconventional dir names behave as today — the primary
   assert.strictEqual(instanceIdFromDirName('api', 'backend'), 'main');
 
-  assert.strictEqual(instanceAppDir('web', 'main'), 'website');
-  assert.strictEqual(instanceAppDir('web', 'admin'), 'website-admin');
-  assert.strictEqual(instanceAppDir('backend', 'main'), 'backend');
+  assert.strictEqual(instanceTargetDir('web', 'main'), 'website');
+  assert.strictEqual(instanceTargetDir('web', 'admin'), 'website-admin');
+  assert.strictEqual(instanceTargetDir('backend', 'main'), 'backend');
 
   // The mapping SSOT moved here from the manager — both directions agree
-  assert.strictEqual(APP_DIR_TARGETS.website, 'web');
-  assert.strictEqual(TARGET_APP_DIRS.web, 'website');
+  assert.strictEqual(DIR_TARGETS.website, 'web');
+  assert.strictEqual(TARGET_DIRS.web, 'website');
   assert.strictEqual(MAIN_INSTANCE, 'main');
 });
 
-test('appInstance: brand apps resolve through the dir walk (functions/ normalizes up); standalone dirs are always main', (t) => {
+test('targetInstance: brand targets resolve through the dir walk (functions/ normalizes up); standalone dirs are always main', (t) => {
   const root = makeFixture('inst-appinstance', {
     'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { web: [{ id: 'main' }, { id: 'admin' }], backend: {} } }`,
-    'apps/website/package.json': '{}',
-    'apps/website-admin/package.json': '{}',
-    'apps/backend/functions/package.json': '{}',
+    'targets/website/package.json': '{}',
+    'targets/website-admin/package.json': '{}',
+    'targets/backend/functions/package.json': '{}',
   });
   cleanup(t, root);
 
-  assert.strictEqual(appInstance(path.join(root, 'apps', 'website'), 'web'), 'main');
-  assert.strictEqual(appInstance(path.join(root, 'apps', 'website-admin'), 'web'), 'admin');
-  assert.strictEqual(appInstance(path.join(root, 'apps', 'backend', 'functions'), 'backend'), 'main');
+  assert.strictEqual(targetInstance(path.join(root, 'targets', 'website'), 'web'), 'main');
+  assert.strictEqual(targetInstance(path.join(root, 'targets', 'website-admin'), 'web'), 'admin');
+  assert.strictEqual(targetInstance(path.join(root, 'targets', 'backend', 'functions'), 'backend'), 'main');
 
-  // The staged dist/ normalizes up the same way: reading `dist` as the app dir
+  // The staged dist/ normalizes up the same way: reading `dist` as the target dir
   // name resolved every instance to main, so a second instance's staged view
   // silently took the main instance's config
   // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
-  assert.strictEqual(appInstance(path.join(root, 'apps', 'website-admin', 'dist'), 'web'), 'admin');
-  assert.strictEqual(appInstance(path.join(root, 'apps', 'website', 'dist'), 'web'), 'main');
+  assert.strictEqual(targetInstance(path.join(root, 'targets', 'website-admin', 'dist'), 'web'), 'admin');
+  assert.strictEqual(targetInstance(path.join(root, 'targets', 'website', 'dist'), 'web'), 'main');
 
   // A STANDALONE project whose dir happens to look suffixed stays main
   const standalone = makeFixture('website-admin', {
     'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { web: {} } }`,
   });
   cleanup(t, standalone);
-  assert.strictEqual(appInstance(standalone, 'web'), 'main');
+  assert.strictEqual(targetInstance(standalone, 'web'), 'main');
 });
 
 // ─── resolveInstanceEntry (the merge layer) ───
@@ -108,7 +108,7 @@ test('appInstance: brand apps resolve through the dir walk (functions/ normalize
 test('resolveInstanceEntry: object form applies to every instance; array form is exact-id with the id stripped', () => {
   const objectForm = { theme: { id: 'classy' } };
   assert.strictEqual(resolveInstanceEntry(objectForm, 'main'), objectForm);
-  assert.strictEqual(resolveInstanceEntry(objectForm, 'docs'), objectForm, 'single-object form is today\'s behavior for ANY app of the type');
+  assert.strictEqual(resolveInstanceEntry(objectForm, 'docs'), objectForm, 'single-object form is today\'s behavior for ANY target of the type');
 
   const arrayForm = [{ id: 'main', flavor: 'primary' }, { id: 'admin', flavor: 'console' }];
   assert.deepStrictEqual(resolveInstanceEntry(arrayForm, 'admin'), { flavor: 'console' });
@@ -167,7 +167,7 @@ test('validator: single-object form is untouched — object required, warnings e
 const TWO_INSTANCE_BRAND = {
   'config/omega.json5': `{
     brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
-    monitoring: { dsn: 'https://brand-shared.example.com' },
+    monitoring: { providers: { sentry: { dsn: 'https://brand-shared.example.com' } } },
     targets: {
       web: [
         { id: 'main', flavor: 'primary' },
@@ -176,70 +176,70 @@ const TWO_INSTANCE_BRAND = {
           url: 'https://admin.acme.test',
           flavor: 'console',
           brand: { name: 'Acme Admin' },
-          monitoring: { dsn: 'https://admin-override.example.com' },
+          monitoring: { providers: { sentry: { dsn: 'https://admin-override.example.com' } } },
         },
       ],
       backend: {},
     },
   }`,
-  'apps/website/package.json': '{}',
-  'apps/website-admin/package.json': '{}',
+  'targets/website/package.json': '{}',
+  'targets/website-admin/package.json': '{}',
 };
 
-test('loadConfig: the instance entry is the target layer — scoped to ITS app dir only', (t) => {
+test('loadConfig: the instance entry is the target layer — scoped to ITS target dir only', (t) => {
   const root = makeFixture('inst-compose', TWO_INSTANCE_BRAND);
   cleanup(t, root);
 
-  const main = loadConfig(path.join(root, 'apps', 'website'), 'web');
+  const main = loadConfig(path.join(root, 'targets', 'website'), 'web');
   assert.deepStrictEqual(main.errors, []);
   assert.strictEqual(main.instance, 'main');
   assert.strictEqual(main.enabled, true);
   assert.strictEqual(main.config.flavor, 'primary');
   assert.strictEqual(main.config.brand.name, 'Acme');
-  assert.strictEqual(main.config.monitoring.dsn, 'https://brand-shared.example.com');
+  assert.strictEqual(main.config.monitoring.providers.sentry.dsn, 'https://brand-shared.example.com');
   assert.strictEqual(main.config.id, undefined, 'the instance id is bookkeeping, never config');
 
-  const admin = loadConfig(path.join(root, 'apps', 'website-admin'), 'web');
+  const admin = loadConfig(path.join(root, 'targets', 'website-admin'), 'web');
   assert.strictEqual(admin.instance, 'admin');
   assert.strictEqual(admin.config.flavor, 'console');
   assert.strictEqual(admin.config.url, 'https://admin.acme.test', 'instance-level url lands top-level like any target-entry key');
   assert.strictEqual(admin.config.brand.name, 'Acme Admin', 'shared key inside the instance entry overrides brand shared for that instance');
   assert.strictEqual(admin.config.brand.url, 'https://acme.test', 'sibling shared keys survive the merge');
-  assert.strictEqual(admin.config.monitoring.dsn, 'https://admin-override.example.com');
+  assert.strictEqual(admin.config.monitoring.providers.sentry.dsn, 'https://admin-override.example.com');
   assert.strictEqual(admin.config.id, undefined);
 
-  // The APP_SUBDIRS views of the same app resolve the same instance — the
+  // The TARGET_SUBDIRS views of the same target resolve the same instance — the
   // dist/ leg was missing, so a staged resolution answered `main` and merged
   // the wrong instance's layer
   // ([#299](https://github.com/Omega-JS-Stack/omega/issues/299)).
   for (const subdir of ['functions', 'dist']) {
-    const staged = loadConfig(path.join(root, 'apps', 'website-admin', subdir), 'web');
-    assert.strictEqual(staged.instance, 'admin', `${subdir}/ resolves its app dir's instance`);
+    const staged = loadConfig(path.join(root, 'targets', 'website-admin', subdir), 'web');
+    assert.strictEqual(staged.instance, 'admin', `${subdir}/ resolves its target dir's instance`);
     assert.strictEqual(staged.config.flavor, 'console');
   }
 });
 
-test('loadConfig: app shared/target layers still merge ABOVE the instance entry', (t) => {
-  const root = makeFixture('inst-app-layer', {
+test('loadConfig: local shared/target layers still merge ABOVE the instance entry', (t) => {
+  const root = makeFixture('inst-local-layer', {
     ...TWO_INSTANCE_BRAND,
-    'apps/website-admin/config/omega.json5': `{
-      flavor: 'app-shared',
-      targets: { web: { flavor: 'app-target' } },
+    'targets/website-admin/config/omega.json5': `{
+      flavor: 'local-shared',
+      targets: { web: { flavor: 'local-target' } },
     }`,
   });
   cleanup(t, root);
 
-  const admin = loadConfig(path.join(root, 'apps', 'website-admin'), 'web');
-  assert.strictEqual(admin.config.flavor, 'app-target', 'app target beats app shared beats the instance entry');
-  assert.strictEqual(admin.config.brand.name, 'Acme Admin', 'instance layer still contributes below the app layers');
+  const admin = loadConfig(path.join(root, 'targets', 'website-admin'), 'web');
+  assert.strictEqual(admin.config.flavor, 'local-target', 'local target beats local shared beats the instance entry');
+  assert.strictEqual(admin.config.brand.name, 'Acme Admin', 'instance layer still contributes below the local layers');
 });
 
-test('composeTargetConfig: freezes the app dir\'s instance interleave', (t) => {
+test('composeTargetConfig: freezes the target dir\'s instance interleave', (t) => {
   const root = makeFixture('inst-stage', TWO_INSTANCE_BRAND);
   cleanup(t, root);
 
-  const main = composeTargetConfig(path.join(root, 'apps', 'website'), 'web');
-  const admin = composeTargetConfig(path.join(root, 'apps', 'website-admin'), 'web');
+  const main = composeTargetConfig(path.join(root, 'targets', 'website'), 'web');
+  const admin = composeTargetConfig(path.join(root, 'targets', 'website-admin'), 'web');
 
   assert.strictEqual(main.config.flavor, 'primary');
   assert.strictEqual(admin.config.flavor, 'console');
@@ -247,14 +247,14 @@ test('composeTargetConfig: freezes the app dir\'s instance interleave', (t) => {
   assert.deepStrictEqual(Object.keys(admin.config.targets).sort(), ['backend', 'web'], 'targets stay presence-only');
 });
 
-test('an app dir with no matching instance id rides shared config alone (array form)', (t) => {
+test('a target dir with no matching instance id rides shared config alone (array form)', (t) => {
   const root = makeFixture('inst-unmatched', {
     ...TWO_INSTANCE_BRAND,
-    'apps/website-docs/package.json': '{}',
+    'targets/website-docs/package.json': '{}',
   });
   cleanup(t, root);
 
-  const docs = loadConfig(path.join(root, 'apps', 'website-docs'), 'web');
+  const docs = loadConfig(path.join(root, 'targets', 'website-docs'), 'web');
   assert.strictEqual(docs.instance, 'docs');
   assert.strictEqual(docs.enabled, true, 'type enablement is key presence, unchanged');
   assert.strictEqual(docs.config.flavor, undefined, 'no instance layer applied');
@@ -267,15 +267,15 @@ test('single-object brands are byte-identical to before — the instance dimensi
       brand: { id: 'acme', name: 'Acme' },
       targets: { web: { flavor: 'only' } },
     }`,
-    'apps/website/package.json': '{}',
-    'apps/website-docs/package.json': '{}',
+    'targets/website/package.json': '{}',
+    'targets/website-docs/package.json': '{}',
   });
   cleanup(t, root);
 
-  // Object form applies to EVERY web app, suffixed dirs included (today's rule)
-  assert.strictEqual(loadConfig(path.join(root, 'apps', 'website'), 'web').config.flavor, 'only');
-  assert.strictEqual(loadConfig(path.join(root, 'apps', 'website-docs'), 'web').config.flavor, 'only');
-  assert.strictEqual(loadConfig(path.join(root, 'apps', 'website'), 'web').instance, 'main');
+  // Object form applies to EVERY web target, suffixed dirs included (today's rule)
+  assert.strictEqual(loadConfig(path.join(root, 'targets', 'website'), 'web').config.flavor, 'only');
+  assert.strictEqual(loadConfig(path.join(root, 'targets', 'website-docs'), 'web').config.flavor, 'only');
+  assert.strictEqual(loadConfig(path.join(root, 'targets', 'website'), 'web').instance, 'main');
 });
 
 // ─── Port offsets + instance URLs ───

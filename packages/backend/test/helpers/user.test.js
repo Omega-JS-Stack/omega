@@ -400,11 +400,11 @@ module.exports = {
       async run({ assert }) {
         const user = createUser({
           subscription: {
-            payment: { processor: 'stripe', resourceId: 'sub_123' },
+            payment: { provider: 'stripe', resourceId: 'sub_123' },
           },
         });
 
-        assert.equal(user.subscription.payment.processor, 'stripe', 'processor preserved');
+        assert.equal(user.subscription.payment.provider, 'stripe', 'provider preserved');
         assert.equal(user.subscription.payment.orderId, null, 'missing orderId defaults to null');
         assert.equal(user.subscription.payment.resourceId, 'sub_123', 'resourceId preserved');
         assert.equal(user.subscription.payment.frequency, null, 'missing frequency defaults to null');
@@ -722,7 +722,7 @@ module.exports = {
             status: 'active',
             expires: { timestamp: '2026-12-31T00:00:00.000Z', timestampUNIX: 1798761600 },
             trial: { claimed: true, expires: { timestamp: '2024-01-01T00:00:00.000Z', timestampUNIX: 1704067200 } },
-            payment: { processor: 'stripe', resourceId: 'sub_abc', frequency: 'annually' },
+            payment: { provider: 'stripe', resourceId: 'sub_abc', frequency: 'annually' },
           },
           roles: { admin: true, betaTester: true, developer: true, superAdmin: true },
           flags: { signupProcessed: true, onboarded: true },

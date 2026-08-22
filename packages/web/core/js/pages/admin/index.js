@@ -430,7 +430,7 @@ async function loadRecentOrders() {
     const data = doc.data();
     const orderId = doc.id;
     const product = data?.productId || 'Unknown';
-    const processor = data?.processor || 'Unknown';
+    const provider = data?.provider || 'Unknown';
     const created = data?.metadata?.created?.timestampUNIX;
     const timeAgo = created ? formatTimeAgo(created * 1000) : 'Unknown';
 
@@ -438,7 +438,7 @@ async function loadRecentOrders() {
     $row.innerHTML = `
       <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities().escapeHTML(orderId)}">${omega.utilities().escapeHTML(orderId)}</td>
       <td><span class="omega-chip omega-chip--accent">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
-      <td class="small">${omega.utilities().escapeHTML(capitalize(processor))}</td>
+      <td class="small">${omega.utilities().escapeHTML(capitalize(provider))}</td>
       <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);

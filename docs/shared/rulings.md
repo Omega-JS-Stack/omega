@@ -19,7 +19,7 @@ Ian's durable rulings, migrated verbatim from PROGRESS.md's Rulings lane when th
 - Ian 2026-07-10: data-shape preservation — Firestore shapes + route semantics presumed good; breaking changes needing migration = flag with plan, don't build
 - Ian 2026-07-06: no backwards compat (dual-read cancelled) — new way only
 - Ian 2026-07-09: legacy repos READ-ONLY (omega-manager, all framework + consumer repos); migrators/verifiers/B5 verify/audit port PINNED; MAM parked
-- Ian 2026-07-20: per-app docs retire in brand context — the brand root is the ONE home (AGENTS.md chain + one README/docs/CHANGELOG)
+- Ian 2026-07-20: per-target docs retire in brand context — the brand root is the ONE home (AGENTS.md chain + one README/docs/CHANGELOG)
 - Standing: secrets never in omega.json5 (.env only; config hard-fails); npu never raw npm/npx; explicit `git -C`; commit-and-continue; de-ITW to config = standard scope
 - Standing: checkpoint discipline — survey → design → implement → tests → sandbox/fixture proof → docs → commit; live checks never touch real ITW resources outside sanctioned paths
 - Ian 2026-07-30: uniformity — commands/surfaces of the same TYPE act the SAME; no split defaults within one family (the CLI read/write emulator split was the offense: every backend CLI subcommand now defaults to the emulator, `--production` the only path to live)

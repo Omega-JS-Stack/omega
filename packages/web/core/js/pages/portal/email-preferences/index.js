@@ -170,7 +170,7 @@ function setupForm() {
 // Tracking. The two outcomes are two catalog entries, not one name built from
 // a variable: a canonical name is a literal a reader can grep for.
 function trackEmailPreference(action) {
-  event(action === 'unsubscribe' ? 'email_unsubscribe' : 'email_subscribe', {
+  event(action === 'unsubscribe' ? 'marketing_email_unsubscribe' : 'marketing_email_subscribe', {
     content_type: 'email_preferences',
   });
 }

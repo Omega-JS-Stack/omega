@@ -282,7 +282,7 @@ function hasSectionMarkers(content) {
 /**
  * Extract the consumer-owned Custom section of a marker file (everything after
  * the Custom marker), or '' when there is no marker. The defaults engine's
- * `retire` rule uses this to judge whether a per-app doc carries consumer
+ * `retire` rule uses this to judge whether a per-target doc carries consumer
  * content or is framework-owned-only.
  * @param {string} content
  * @returns {string}

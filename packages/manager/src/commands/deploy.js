@@ -1,21 +1,21 @@
 /**
  * `omega deploy` at a brand root — D13's brand layer: fan the DELIBERATE
- * publish out over the brand's apps, each in its own framework's hands
- * (each app's own `omega deploy` verb — web sync/dispatch or direct lane,
+ * publish out over the brand's targets, each in its own framework's hands
+ * (each target's own `omega deploy` verb — web sync/dispatch or direct lane,
  * backend `firebase deploy`, desktop release, extension publish; the full
  * per-target contract is docs/shared/deploys.md).
  *
- *   omega deploy                       → every app, backend first
- *   omega deploy --only backend        → one app (target or app dir name)
+ *   omega deploy                       → every target, backend first
+ *   omega deploy --only backend        → one target (target key or dir name)
  *   omega deploy --only web,backend    → explicit set
  *   omega deploy --except web          → everything minus
- *   omega deploy --dry-run             → forwarded — each app prints its plan
+ *   omega deploy --dry-run             → forwarded — each target prints its plan
  *
  * ORDER: backend deploys FIRST, then web, then the rest — the API must be
  * live before the site that points at it. Every flag except --only/--except
- * forwards verbatim to each app's framework deploy (--dry-run, --no-sync,
- * --direct, --platforms, …); apps run sequentially with streamed output. A
- * failing app STOPS the run (a broken API is no base for the site) unless
+ * forwards verbatim to each target's framework deploy (--dry-run, --no-sync,
+ * --direct, --platforms, …); targets run sequentially with streamed output. A
+ * failing target STOPS the run (a broken API is no base for the site) unless
  * --continue-on-error; any failure → exit 1. A filter matching nothing is an
  * error, never a deploy-everything fallback — and deploys stay deliberate:
  * nothing invokes this command but the human-typed verb (D13).
@@ -24,42 +24,42 @@ const path = require('node:path');
 const chalk = require('chalk').default;
 
 const { findTarget } = require('@omega.js/devkit/omega-bin');
-const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
+const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveFrameworkBin } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 
 // Deploy order — backend's API goes live before the surfaces that call it
 const DEPLOY_ORDER = ['backend', 'web', 'extension', 'desktop', 'mobile'];
 
-// Brand-level flags consumed HERE — everything else forwards to the apps.
+// Brand-level flags consumed HERE — everything else forwards to the targets.
 // `_`/`$0` are yargs bookkeeping; continue-on-error is the manage-parity
-// bail switch; only/except are the app filter.
+// bail switch; only/except are the target filter.
 const CONSUMED_KEYS = new Set(['_', '$0', 'only', 'except', 'continue-on-error', 'continueOnError']);
 
 /**
- * Pure app selection — which apps deploy for a given flag set, in order.
- * Filter tokens match an app's target ('web') or its dir name ('website').
+ * Pure target selection — which targets deploy for a given flag set, in order.
+ * Filter tokens match a target's key ('web') or its dir name ('website').
  *
  * @param {object} input
- * @param {Array<{ name: string, target: string|null }>} input.apps - target-mapped apps
+ * @param {Array<{ name: string, target: string|null }>} input.targets - the target-mapped target dirs
  * @param {string} [input.only] - comma list: exact set to deploy
  * @param {string} [input.except] - comma list: subtract from the set
  * @returns {{ selected: Array, unknown: string[] }}
  */
-function selectDeployApps({ apps, only, except }) {
+function selectDeployTargets({ targets, only, except }) {
   const parse = (value) => String(value || '').split(',').map((part) => part.trim()).filter(Boolean);
-  const matches = (app, token) => app.target === token || app.name === token;
+  const matches = (entry, token) => entry.target === token || entry.name === token;
 
   const onlyTokens = parse(only);
   const exceptTokens = parse(except);
-  const unknown = [...onlyTokens, ...exceptTokens].filter((token) => !apps.some((app) => matches(app, token)));
+  const unknown = [...onlyTokens, ...exceptTokens].filter((token) => !targets.some((entry) => matches(entry, token)));
 
-  const selected = apps
-    .filter((app) => (onlyTokens.length === 0 || onlyTokens.some((token) => matches(app, token)))
-      && !exceptTokens.some((token) => matches(app, token)))
+  const selected = targets
+    .filter((entry) => (onlyTokens.length === 0 || onlyTokens.some((token) => matches(entry, token)))
+      && !exceptTokens.some((token) => matches(entry, token)))
     .sort((a, b) => {
-      const rank = (app) => {
-        const index = DEPLOY_ORDER.indexOf(app.target);
+      const rank = (entry) => {
+        const index = DEPLOY_ORDER.indexOf(entry.target);
         return index === -1 ? DEPLOY_ORDER.length : index;
       };
       return rank(a) - rank(b);
@@ -96,21 +96,21 @@ function buildForwardedFlags(options) {
 module.exports = async (options = {}) => {
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside an app for that app\'s deploy.'));
+    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s deploy.'));
     process.exitCode = 1;
     return;
   }
 
-  const apps = discoverApps(brandRoot).filter((app) => app.target);
-  const { selected, unknown } = selectDeployApps({ apps, only: options.only, except: options.except });
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target);
+  const { selected, unknown } = selectDeployTargets({ targets, only: options.only, except: options.except });
 
   for (const token of unknown) {
-    console.log(chalk.yellow(`  ⚠ Unknown deploy filter "${token}" — know targets/dirs: ${apps.map((app) => app.target).join(', ')}`));
+    console.log(chalk.yellow(`  ⚠ Unknown deploy filter "${token}" — know targets/dirs: ${targets.map((entry) => entry.target).join(', ')}`));
   }
 
   if (selected.length === 0) {
     // Never fall back to deploy-everything on a bad filter — deploys publish.
-    console.error(chalk.red('✗ No app matches the requested deploy set — nothing deployed.'));
+    console.error(chalk.red('✗ No target matches the requested deploy set — nothing deployed.'));
     process.exitCode = 1;
     return;
   }
@@ -118,19 +118,19 @@ module.exports = async (options = {}) => {
   const forwarded = buildForwardedFlags(options);
   const continueOnError = !!(options['continue-on-error'] || options.continueOnError);
 
-  console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((app) => app.target).join(' → ')})`)}`));
+  console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target).join(' → ')})`)}`));
 
-  // ─── Execute in order, streaming each app's output ─────────────────────────
+  // ─── Execute in order, streaming each target's output ──────────────────────
   const summary = [];
   let failed = false;
 
-  for (const [index, app] of selected.entries()) {
-    const label = `[${index + 1}/${selected.length}] ${app.name}`;
-    const target = findTarget(app.path);
+  for (const [index, entry] of selected.entries()) {
+    const label = `[${index + 1}/${selected.length}] ${entry.name}`;
+    const target = findTarget(entry.path);
 
     if (!target || target.kind !== 'framework') {
-      console.log(chalk.red(`\n✗ ${label}: no framework dependency detected (app-root package.json)`));
-      summary.push({ name: app.name, ok: false, detail: 'no framework dependency detected' });
+      console.log(chalk.red(`\n✗ ${label}: no framework dependency detected (target-root package.json)`));
+      summary.push({ name: entry.name, ok: false, detail: 'no framework dependency detected' });
       failed = true;
       if (!continueOnError) break;
       continue;
@@ -139,20 +139,20 @@ module.exports = async (options = {}) => {
     const binPath = resolveFrameworkBin(target.dir, target.name);
     if (!binPath) {
       console.log(chalk.red(`\n✗ ${label}: ${target.name} is not installed (node_modules climb from ${target.dir} found no bin)`));
-      summary.push({ name: app.name, ok: false, detail: `${target.name} is not installed` });
+      summary.push({ name: entry.name, ok: false, detail: `${target.name} is not installed` });
       failed = true;
       if (!continueOnError) break;
       continue;
     }
 
     console.log(chalk.cyan(`\n─── ${label} ${chalk.dim(`(${target.name})`)} — omega deploy ${forwarded.join(' ')}`.trimEnd() + ' ───'));
-    const result = await runCommand(process.execPath, [binPath, 'deploy', ...forwarded], app.path);
+    const result = await runCommand(process.execPath, [binPath, 'deploy', ...forwarded], entry.path);
 
-    summary.push({ name: app.name, ok: result.success, detail: result.error });
+    summary.push({ name: entry.name, ok: result.success, detail: result.error });
     if (!result.success) {
       failed = true;
       if (!continueOnError) {
-        console.error(chalk.red(`\n✗ ${app.name} deploy failed — stopping (later apps depend on it; --continue-on-error overrides)`));
+        console.error(chalk.red(`\n✗ ${entry.name} deploy failed — stopping (later targets depend on it; --continue-on-error overrides)`));
         break;
       }
     }
@@ -167,7 +167,7 @@ module.exports = async (options = {}) => {
   }
   const skipped = selected.length - summary.length;
   if (skipped > 0) {
-    console.log(chalk.dim(`  ⊘ ${skipped} app${skipped === 1 ? '' : 's'} not attempted after the failure`));
+    console.log(chalk.dim(`  ⊘ ${skipped} target${skipped === 1 ? '' : 's'} not attempted after the failure`));
   }
 
   if (failed) {
@@ -175,6 +175,6 @@ module.exports = async (options = {}) => {
   }
 };
 
-module.exports.selectDeployApps = selectDeployApps;
+module.exports.selectDeployTargets = selectDeployTargets;
 module.exports.buildForwardedFlags = buildForwardedFlags;
 module.exports.DEPLOY_ORDER = DEPLOY_ORDER;

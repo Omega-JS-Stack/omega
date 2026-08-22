@@ -16,7 +16,7 @@ export const state = {
   hasFreeTrial: false,
 
   // Whether the purchase has actually landed in the account yet (#232). The
-  // page opens UNSURE — the redirect is the processor's claim, and the webhook
+  // page opens UNSURE — the redirect is the provider's claim, and the webhook
   // that grants entitlement arrives after the browser does.
   // 'processing' | 'confirmed' | 'timeout'
   status: 'processing',

@@ -47,8 +47,8 @@ const lookup = async (name) => {
   return REGISTRY[name];
 };
 
-/** Stage an app dir with a package.json and optional installed copies. */
-function stageApp(manifest, installed = {}) {
+/** Stage a target dir with a package.json and optional installed copies. */
+function stageTarget(manifest, installed = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'devkit-update-'));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
   for (const [name, version] of Object.entries(installed)) {
@@ -110,8 +110,8 @@ test('isRegistrySpec: file/link/git/url/shorthand specs are non-registry', () =>
 // ─── Report ──────────────────────────────────────────────────────────────────
 
 test('buildUpdateReport: rows classify, quarantine flags, file: specs skipped', async () => {
-  const dir = stageApp({
-    name: 'fixture-app',
+  const dir = stageTarget({
+    name: 'fixture-target',
     dependencies: {
       'stable-pkg': '^1.2.3',
       'fresh-pkg': '^2.0.0',
@@ -125,7 +125,7 @@ test('buildUpdateReport: rows classify, quarantine flags, file: specs skipped', 
 
   const report = await update.buildUpdateReport({ dir, lookup, now: NOW, minAge: 7 });
 
-  assert.equal(report.project, 'fixture-app');
+  assert.equal(report.project, 'fixture-target');
   assert.deepEqual(report.locals, [{ name: '@omega.js/web', group: 'prod', spec: 'file:../../omega/packages/web' }]);
 
   const names = report.rows.map((row) => row.name);
@@ -156,11 +156,11 @@ test('buildUpdateReport: rows classify, quarantine flags, file: specs skipped', 
 });
 
 test('buildUpdateReport: quarantine clears once installed matches latest, and at min-age 0', async () => {
-  const dir = stageApp({ name: 'x', dependencies: { 'fresh-pkg': '^2.1.0' } }, { 'fresh-pkg': '2.1.0' });
+  const dir = stageTarget({ name: 'x', dependencies: { 'fresh-pkg': '^2.1.0' } }, { 'fresh-pkg': '2.1.0' });
   const report = await update.buildUpdateReport({ dir, lookup, now: NOW, minAge: 7 });
   assert.equal(report.rows.length, 0, 'installed latest = nothing to report');
 
-  const dir2 = stageApp({ name: 'y', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
+  const dir2 = stageTarget({ name: 'y', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
   const report2 = await update.buildUpdateReport({ dir: dir2, lookup, now: NOW, minAge: 0 });
   assert.equal(report2.rows[0].quarantined, false, 'min-age 0 disables the quarantine');
 
@@ -169,7 +169,7 @@ test('buildUpdateReport: quarantine clears once installed matches latest, and at
 });
 
 test('buildUpdateReport: lookup failure surfaces as a row error, not a crash', async () => {
-  const dir = stageApp({ name: 'z', dependencies: { 'missing-pkg': '^1.0.0' } });
+  const dir = stageTarget({ name: 'z', dependencies: { 'missing-pkg': '^1.0.0' } });
   const report = await update.buildUpdateReport({ dir, lookup, now: NOW });
   assert.equal(report.rows[0].error, '404 for missing-pkg');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -178,7 +178,7 @@ test('buildUpdateReport: lookup failure surfaces as a row error, not a crash', a
 // ─── Apply selection ─────────────────────────────────────────────────────────
 
 async function fixtureRows(minAge = 7) {
-  const dir = stageApp({
+  const dir = stageTarget({
     name: 'sel',
     dependencies: { 'stable-pkg': '^1.2.3', 'fresh-pkg': '^2.0.0' },
     devDependencies: { 'breaking-pkg': '^1.0.0' },
@@ -238,7 +238,7 @@ function collectLogger() {
 }
 
 test('runUpdate: report-only by default — no exec ever fires', async () => {
-  const dir = stageApp({ name: 'ro', dependencies: { 'stable-pkg': '^1.2.3' } }, { 'stable-pkg': '1.2.3' });
+  const dir = stageTarget({ name: 'ro', dependencies: { 'stable-pkg': '^1.2.3' } }, { 'stable-pkg': '1.2.3' });
   const logger = collectLogger();
   const calls = [];
 
@@ -256,7 +256,7 @@ test('runUpdate: report-only by default — no exec ever fires', async () => {
 });
 
 test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on missing npu', async () => {
-  const dir = stageApp({
+  const dir = stageTarget({
     name: 'ap',
     dependencies: { 'stable-pkg': '^1.2.3', 'fresh-pkg': '^2.0.0' },
     devDependencies: { 'breaking-pkg': '^1.0.0' },
@@ -273,7 +273,7 @@ test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on 
     'npu install stable-pkg@1.4.2',
     'npu install breaking-pkg@1.9.4 --save-dev',
   ]);
-  assert.equal(calls[0].cwd, dir, 'installs run in the app dir');
+  assert.equal(calls[0].cwd, dir, 'installs run in the target dir');
   assert.ok(logger.lines.some((line) => line.startsWith('WARN held fresh-pkg@2.1.0')), 'quarantine hold logged');
   assert.ok(logger.lines.some((line) => line.includes('--major to include')), 'major hold logged');
   assert.equal(result.selection.updates.length, 2);
@@ -292,7 +292,7 @@ test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on 
 });
 
 test('runUpdate --apply --force-fresh: quarantined release installs', async () => {
-  const dir = stageApp({ name: 'ff', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
+  const dir = stageTarget({ name: 'ff', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
   const calls = [];
   await update.runUpdate({
     dir, logger: collectLogger(), lookup, now: NOW,
@@ -304,7 +304,7 @@ test('runUpdate --apply --force-fresh: quarantined release installs', async () =
 });
 
 test('formatReport: QUARANTINED status + legends + local skips', async () => {
-  const dir = stageApp({
+  const dir = stageTarget({
     name: 'fmt',
     dependencies: { 'fresh-pkg': '^2.0.0', 'breaking-pkg': '^1.0.0', '@omega.js/web': 'file:../x' },
   }, { 'fresh-pkg': '2.0.5', 'breaking-pkg': '1.0.0' });

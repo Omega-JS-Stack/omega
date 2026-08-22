@@ -55,7 +55,7 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 /**
  * Write consent.marketing.status = 'revoked' (source: 'admin') to the user doc that
  * matches the removed email. Same lookup + write shape as the marketing webhook
- * processors' revoke write. Silent when no user matches.
+ * providers' revoke write. Silent when no user matches.
  */
 async function mirrorRevokedConsent({ ctx, Manager, email }) {
   const { admin } = Manager.libraries;

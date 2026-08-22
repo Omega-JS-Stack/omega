@@ -2,7 +2,7 @@
  * Test: the webhook and dispute-alert doors deduplicate ATOMICALLY
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
- * Both routes used to read the doc, then write it. Processors retry, and a retry
+ * Both routes used to read the doc, then write it. Providers retry, and a retry
  * can arrive while the first delivery is still in flight — in that window both
  * deliveries see no doc and both write, and the pipeline runs the same event
  * twice (for a dispute, that is two refunds). Both routes now claim the doc
@@ -33,7 +33,7 @@ const disputeHandler = require('../../../src/manager/routes/payments/dispute-ale
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
-// The `test` processor fabricates Stripe-shaped events locally and signs nothing,
+// The `test` provider fabricates Stripe-shaped events locally and signs nothing,
 // so a webhook delivery here never needs a secret or the network.
 function deliverWebhook(Manager, eventId) {
   return callHandler({
@@ -41,7 +41,7 @@ function deliverWebhook(Manager, eventId) {
     handler: webhookHandler,
     functionName: 'payments-webhook',
     req: {
-      query: { processor: 'test', key: VALID_KEY() },
+      query: { provider: 'test', key: VALID_KEY() },
       body: {
         id: eventId,
         type: 'customer.subscription.updated',

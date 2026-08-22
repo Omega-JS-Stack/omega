@@ -1,6 +1,6 @@
 /**
- * Ensure .omega/ and logs/ are gitignored at the brand root — durable state
- * and run output never get committed. Idempotent: checks for existing entries
+ * Ensure .omega/ and logs/ are gitignored at the brand root — the secrets
+ * store and run output never get committed. Idempotent: checks for existing entries
  * before appending. The shared ensure also covers company roots (runCompany).
  */
 const chalk = require('chalk').default;

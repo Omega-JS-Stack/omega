@@ -1,6 +1,6 @@
 /**
  * Test: POST /payments/cancel - Validation errors
- * Tests rejection cases before any processor call is made.
+ * Tests rejection cases before any provider call is made.
  * See test/events/payments/journey-payments-cancel-endpoint.js for the full end-to-end journey.
  */
 module.exports = {
@@ -43,14 +43,14 @@ module.exports = {
     },
 
     {
-      name: 'rejects-no-processor-or-resource-id',
+      name: 'rejects-no-provider-or-resource-id',
       async run({ http, assert }) {
-        // cancel-no-processor starts with payment.processor=null
-        const response = await http.as('cancel-no-processor').post('backend-manager/payments/cancel', {
+        // cancel-no-provider starts with payment.provider=null
+        const response = await http.as('cancel-no-provider').post('backend-manager/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject when no processor or resourceId is set');
+        assert.isError(response, 400, 'Should reject when no provider or resourceId is set');
       },
     },
 
@@ -79,14 +79,14 @@ module.exports = {
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       async run({ http, assert }) {
-        // cancel-unknown-processor starts with processor='unknown-processor'
-        const response = await http.as('cancel-unknown-processor').post('backend-manager/payments/cancel', {
+        // cancel-unknown-provider starts with provider='unknown-provider'
+        const response = await http.as('cancel-unknown-provider').post('backend-manager/payments/cancel', {
           confirmed: true,
         });
 
-        assert.isError(response, 400, 'Should reject unknown processor');
+        assert.isError(response, 400, 'Should reject unknown provider');
       },
     },
 
@@ -114,7 +114,7 @@ module.exports = {
     },
 
     {
-      name: 'succeeds-with-test-processor',
+      name: 'succeeds-with-test-provider',
       async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['route-cancel-success'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
@@ -124,7 +124,7 @@ module.exports = {
 
         // Step 1: Create a test subscription intent to set up a proper paid subscription
         const intentResponse = await http.as('route-cancel-success').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -134,7 +134,7 @@ module.exports = {
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${uid}`);
-          return userDoc?.subscription?.payment?.processor === 'test'
+          return userDoc?.subscription?.payment?.provider === 'test'
             && userDoc?.subscription?.payment?.resourceId
             && userDoc?.subscription?.status === 'active';
         }, 15000, 500);

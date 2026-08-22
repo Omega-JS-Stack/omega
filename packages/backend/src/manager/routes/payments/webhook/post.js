@@ -1,21 +1,21 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
-// Processors already warned about running key-only, so the notice lands once per
+// Providers already warned about running key-only, so the notice lands once per
 // instance instead of once per event
 const keyOnlyWarned = new Set();
 
 /**
- * POST /payments/webhook?processor=stripe&key=XXX
- * Receives payment processor webhooks, validates them, and saves to Firestore
+ * POST /payments/webhook?provider=stripe&key=XXX
+ * Receives payment provider webhooks, validates them, and saves to Firestore
  * The Firestore onWrite trigger handles async processing
  *
- * This handler is processor-agnostic. Each processor module defines:
+ * This handler is provider-agnostic. Each provider module defines:
  *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, raw, uid }
  *   - isSupported(eventType) — returns true for events we should process
- *   - verifySignature(req) — optional; verifies the processor's native signature
+ *   - verifySignature(req) — optional; verifies the provider's native signature
  *     over the raw bytes, returning { status: 'verified' | 'invalid' | 'unconfigured' }
  */
 module.exports = async ({ ctx, Manager, libraries }) => {
@@ -23,13 +23,13 @@ module.exports = async ({ ctx, Manager, libraries }) => {
   const data = ctx.request.data;
   const query = ctx.request.query;
 
-  // Get processor and key from query params
-  const processor = query.processor;
+  // Get provider and key from query params
+  const provider = query.provider;
   const key = query.key;
 
-  // Validate processor
-  if (!processor) {
-    return ctx.respond('Missing processor parameter', { code: 400 });
+  // Validate provider
+  if (!provider) {
+    return ctx.respond('Missing provider parameter', { code: 400 });
   }
 
   // Validate key
@@ -37,11 +37,11 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond('Invalid key', { code: 401 });
   }
 
-  // Guard: test processor is not available in production
-  // (mirrors the intent side's guard — the webhook processors receive only the raw
+  // Guard: test provider is not available in production
+  // (mirrors the intent side's guard — the webhook providers receive only the raw
   // req, so the dispatch layer is where this side has a ctx to ask)
-  if (processor === 'test' && ctx.isProduction()) {
-    return ctx.respond('Test processor is not available in production', { code: 403 });
+  if (provider === 'test' && ctx.isProduction()) {
+    return ctx.respond('Test provider is not available in production', { code: 403 });
   }
 
   // Validate brand — quit if a brand is specified and doesn't match ours
@@ -52,36 +52,36 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond({ received: true, ignored: true });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Verify the processor's native signature — the key param above is a defense
-  // layer, not the boundary. A processor that ships a signing scheme verifies
+  // Verify the provider's native signature — the key param above is a defense
+  // layer, not the boundary. A provider that ships a signing scheme verifies
   // strictly once its secret is configured; without it the route stays on the
   // key-only path and says so. Nothing is parsed or stored before this passes.
-  if (processorModule.verifySignature) {
-    const verification = processorModule.verifySignature(ctx.ref.req);
+  if (providerModule.verifySignature) {
+    const verification = providerModule.verifySignature(ctx.ref.req);
 
     if (verification.status === 'invalid') {
-      ctx.error(`Rejected ${processor} webhook: signature verification failed (${verification.reason})`);
+      ctx.error(`Rejected ${provider} webhook: signature verification failed (${verification.reason})`);
       return ctx.respond('Invalid signature', { code: 401 });
     }
 
-    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(processor)) {
-      keyOnlyWarned.add(processor);
-      ctx.warn(`${processor} webhooks are running key-only: ${verification.reason}. Set it to verify every event's signature.`);
+    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(provider)) {
+      keyOnlyWarned.add(provider);
+      ctx.warn(`${provider} webhooks are running key-only: ${verification.reason}. Set it to verify every event's signature.`);
     }
   }
 
-  // Parse the webhook using the processor
+  // Parse the webhook using the provider
   let parsed;
   try {
-    parsed = processorModule.parseWebhook(ctx.ref.req);
+    parsed = providerModule.parseWebhook(ctx.ref.req);
   } catch (e) {
     return ctx.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
   }
@@ -90,8 +90,8 @@ module.exports = async ({ ctx, Manager, libraries }) => {
 
   ctx.log(`Parsed webhook: eventId=${eventId}, eventType=${eventType}, category=${category || 'null'}, resourceType=${resourceType || 'null'}, uid=${uid || 'null'}, api_version=${raw?.api_version || 'unknown'}`);
 
-  // Let the processor decide if this event type is relevant
-  if (processorModule.isSupported && !processorModule.isSupported(eventType)) {
+  // Let the provider decide if this event type is relevant
+  if (providerModule.isSupported && !providerModule.isSupported(eventType)) {
     ctx.log(`Ignoring unsupported event type: ${eventType}`);
     return ctx.respond({ received: true, ignored: true });
   }
@@ -106,7 +106,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
   const now = powertools.timestamp(new Date(), { output: 'string' });
   const nowUNIX = powertools.timestamp(now, { output: 'unix' });
 
-  // Claim the event, then save — in ONE transaction. Processors retry, and a
+  // Claim the event, then save — in ONE transaction. Providers retry, and a
   // retry can arrive while the first delivery is still in flight: a read
   // followed by a separate write leaves a window where both deliveries see no
   // doc and both write, so the pipeline runs the same event twice. The
@@ -128,7 +128,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     // Save with status=pending (trigger handles the rest)
     transaction.set(docRef, {
       id: eventId,
-      processor: processor,
+      provider: provider,
       status: 'pending',
       raw: raw,
       owner: uid,
@@ -163,7 +163,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     ctx.log(`Retrying previously failed webhook ${eventId}`);
   }
 
-  ctx.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, processor=${processor}, uid=${uid}`);
+  ctx.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, provider=${provider}, uid=${uid}`);
 
   // Return 200 immediately
   return ctx.respond({ received: true });

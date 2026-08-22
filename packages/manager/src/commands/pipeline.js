@@ -10,13 +10,13 @@
  * asserts the machine-readable run record (.omega/runs/{ts}.json):
  *
  *  - Any service at status "error" fails the pipeline.
- *  - CORE services (workspace, github, cloudflare, domain, firebase,
+ *  - CORE services (workspace, repo, edge, domain, firebase,
  *    testing) must RUN green (success/warned) — a core skip means a
  *    broken seed (missing token, unconfigured section) and fails.
  *  - Everything else may succeed, warn, or skip; skips are listed with
  *    reasons for visibility, not failure.
  *  - `--require=a,b` promotes more services into the core set (tighten as
- *    seeds land: --require=sendgrid,account,recaptcha).
+ *    seeds land: --require=sendgrid,account,captcha).
  *  - `--service=<name>` narrows the child run to one service; the
  *    core-presence check only applies to full runs.
  *  - `--dry-run` forwards to the child (plan-only pass, still asserted).
@@ -43,11 +43,11 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 
-const { resolveBrandRoot, loadBrand, discoverApps } = require('../lib/brand.js');
+const { resolveBrandRoot, loadBrand, discoverTargets } = require('../lib/brand.js');
 const { runVerifyLegs, VERIFY_LEGS } = require('../lib/verify-live.js');
 
-// deploy target → the command run in that target's app dir (desktop/
-// extension apps carry no deploy script — their D13 verb is the local bin)
+// deploy target → the command run in that target's dir (desktop/
+// extension targets carry no deploy script — their D13 verb is the local bin)
 const DEPLOY_LEGS = {
   web: ['npm', 'run', 'deploy', '--', '--direct'],
   backend: ['npm', 'run', 'deploy'],
@@ -63,11 +63,11 @@ const PUBLISH_LEGS = new Set(['desktop', 'extension']);
 
 // Services that must RUN green on a full pipeline pass — these are the
 // provisioning spine; a skip here means a seed is missing, not a choice.
-// search-console/campaigns/account/recaptcha graduated into the spine once
+// search/campaigns/account/captcha graduated into the spine once
 // their seeds converged (cp116–120): a skip there is a regression now.
 const CORE_SERVICES = [
-  'workspace', 'github', 'cloudflare', 'domain', 'cloud', 'testing',
-  'search-console', 'campaigns', 'account', 'recaptcha',
+  'workspace', 'repo', 'edge', 'domain', 'cloud', 'testing',
+  'search', 'campaigns', 'account', 'captcha',
 ];
 
 const STATUS_ICONS = { success: chalk.green('✓'), warned: chalk.yellow('⚠'), skipped: chalk.dim('⊘'), error: chalk.red('✗') };
@@ -219,20 +219,20 @@ module.exports = async (argv = {}) => {
     return;
   }
 
-  // Deploy legs — spawned in the owning app's dir, same non-interactive
+  // Deploy legs — spawned in the owning target's dir, same non-interactive
   // construction; results join the record as deploy:<target> rows so the
   // evaluator's any-error rule covers them
   const deployTargets = String(argv.deploy || '').split(',').map((s) => s.trim()).filter(Boolean);
   for (const target of deployTargets) {
     const leg = DEPLOY_LEGS[target];
-    const app = discoverApps(brandRoot).find((a) => a.target === target);
+    const entry = discoverTargets(brandRoot).find((item) => item.target === target);
 
-    if (!leg || !app) {
+    if (!leg || !entry) {
       found.record.services.push({
         service: `deploy:${target}`,
         status: 'error',
         output: null,
-        error: leg ? `no ${target} app in this brand` : `unknown deploy target (${Object.keys(DEPLOY_LEGS).join(', ')})`,
+        error: leg ? `no ${target} dir in this brand` : `unknown deploy target (${Object.keys(DEPLOY_LEGS).join(', ')})`,
       });
       continue;
     }
@@ -251,10 +251,10 @@ module.exports = async (argv = {}) => {
       continue;
     }
 
-    console.log(chalk.bold(`\n🧪 Deploy leg: ${target} ${chalk.dim(`(${leg.join(' ')} in ${app.dir})`)}`));
+    console.log(chalk.bold(`\n🧪 Deploy leg: ${target} ${chalk.dim(`(${leg.join(' ')} in ${entry.dir})`)}`));
     const legExit = await new Promise((resolve) => {
       const child = spawn(leg[0], leg.slice(1), {
-        cwd: app.path,
+        cwd: entry.path,
         stdio: ['ignore', 'inherit', 'inherit'],
         env: { ...process.env, OMEGA_NON_INTERACTIVE: '1' },
       });

@@ -5,10 +5,10 @@
  *
  *   birth   → the REAL onboard wizard (flags mode) in a temp dir OUTSIDE
  *             the monorepo — where hoist-luck can't save anything
- *   link    → `omega i local` from the website app (tree-wide file: flip +
+ *   link    → `omega i local` from the website target (tree-wide file: flip +
  *             ONE brand-root install; also links @omega.js/manager at the
  *             brand root so brand-level verbs exist at all)
- *   setup   → every scaffolded app's framework setup, headless
+ *   setup   → every scaffolded target's framework setup, headless
  *   boot    → `omega dev` at the brand root (web + backend emulator, N7
  *             ports), probe the rendered homepage over the announced URL
  *   manage  → headless creds-scrubbed manage; scorecard from the run file
@@ -36,7 +36,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { createStepsLog } = require('./steps-log.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
-// real app builds dominate; a warm rerun finishes far inside them.
+// real target builds dominate; a warm rerun finishes far inside them.
 const TIMEOUTS = {
   onboard: 120000,
   link: 1800000,
@@ -46,9 +46,9 @@ const TIMEOUTS = {
   manage: 2400000,
 };
 
-// Setup/boot ordering preference (cosmetic — matches the rehearsal); apps
+// Setup/boot ordering preference (cosmetic — matches the rehearsal); targets
 // themselves come from the scaffold output on disk, never from a map here.
-const APP_ORDER = ['website', 'backend', 'desktop', 'extension', 'mobile'];
+const TARGET_ORDER = ['website', 'backend', 'desktop', 'extension', 'mobile'];
 
 // Lockstep with @omega.js/backend cli/commands/emulator.js (same marker the
 // devkit e2e-harness waits for — it fires AFTER persona seeding).
@@ -118,22 +118,22 @@ function latestRunFile(brandRoot) {
   return names.length > 0 ? path.join(runsDir, names.at(-1)) : null;
 }
 
-/** The brand's app dirs (scaffold output truth), in APP_ORDER. */
-function discoverBrandApps(brandRoot) {
-  const appsDir = path.join(brandRoot, 'apps');
+/** The brand's target dirs (scaffold output truth), in TARGET_ORDER. */
+function discoverBrandTargets(brandRoot) {
+  const targetsDir = path.join(brandRoot, 'targets');
   let entries;
   try {
-    entries = fs.readdirSync(appsDir);
+    entries = fs.readdirSync(targetsDir);
   } catch (e) {
     return [];
   }
   return entries
-    .filter((name) => fs.existsSync(path.join(appsDir, name, 'package.json')))
+    .filter((name) => fs.existsSync(path.join(targetsDir, name, 'package.json')))
     .sort((a, b) => {
-      const rank = (name) => { const i = APP_ORDER.indexOf(name); return i === -1 ? APP_ORDER.length : i; };
+      const rank = (name) => { const i = TARGET_ORDER.indexOf(name); return i === -1 ? TARGET_ORDER.length : i; };
       return rank(a) - rank(b) || a.localeCompare(b);
     })
-    .map((name) => path.join(appsDir, name));
+    .map((name) => path.join(targetsDir, name));
 }
 
 /** GET a URL (self-signed ok), resolving { status, body }. */
@@ -383,16 +383,16 @@ async function runJourney(options) {
       return run.brandRoot;
     });
 
-    const apps = discoverBrandApps(run.brandRoot);
+    const targets = discoverBrandTargets(run.brandRoot);
 
-    // ── Link — one `i local` from the website app links the whole tree ────
+    // ── Link — one `i local` from the website target links the whole tree ─
     await run.step('`omega i local` links every framework + the manager (one tree install)', async () => {
-      const linkFrom = apps.find((dir) => path.basename(dir) === 'website') || apps[0];
+      const linkFrom = targets.find((dir) => path.basename(dir) === 'website') || targets[0];
       const webBin = path.join(run.monorepoRoot, 'packages', 'web', 'bin', 'omega');
       await run.runToExit('link', process.execPath, [webBin, 'i', 'local'],
         { cwd: linkFrom, env: run.childEnv(), timeout: TIMEOUTS.link });
 
-      // Every app's framework — and the brand root's manager — must resolve
+      // Every target's framework — and the brand root's manager — must resolve
       // to the monorepo copy (realpath through the hoisted symlinks).
       const resolveFrom = (dir, name) => {
         let current = dir;
@@ -405,7 +405,7 @@ async function runJourney(options) {
         }
       };
       const misses = [];
-      for (const dir of [run.brandRoot, ...apps]) {
+      for (const dir of [run.brandRoot, ...targets]) {
         const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
         for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
           if (!name.startsWith('@omega.js/')) continue;
@@ -418,15 +418,15 @@ async function runJourney(options) {
       if (misses.length > 0) {
         throw new Error(`not linked to the monorepo: ${misses.join(', ')}`);
       }
-      return `${apps.length} apps + brand root`;
+      return `${targets.length} targets + brand root`;
     });
 
-    // ── Setups — each app's framework, headless, via the consumer bin ─────
-    for (const appDir of apps) {
-      const appName = path.basename(appDir);
-      await run.step(`${appName} setup`, async () => {
-        await run.runToExit(`setup-${appName}`, run.dispatcherBin(appDir), ['setup'], {
-          cwd: appDir,
+    // ── Setups — each target's framework, headless, via the consumer bin ──
+    for (const targetDir of targets) {
+      const targetName = path.basename(targetDir);
+      await run.step(`${targetName} setup`, async () => {
+        await run.runToExit(`setup-${targetName}`, run.dispatcherBin(targetDir), ['setup'], {
+          cwd: targetDir,
           env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }),
           timeout: TIMEOUTS.setup,
         });
@@ -434,8 +434,8 @@ async function runJourney(options) {
     }
 
     // ── Boot — `omega dev` at the brand root, probe the homepage ──────────
-    const bootsWeb = apps.some((dir) => path.basename(dir) === 'website');
-    const bootsBackend = apps.some((dir) => path.basename(dir) === 'backend');
+    const bootsWeb = targets.some((dir) => path.basename(dir) === 'website');
+    const bootsBackend = targets.some((dir) => path.basename(dir) === 'backend');
     if (bootsWeb || bootsBackend) {
       await run.step(`\`omega dev\` boots${bootsWeb ? ' web' : ''}${bootsBackend ? ' + backend emulator' : ''}`, async () => {
         const readyPatterns = {};
@@ -481,13 +481,13 @@ async function runJourney(options) {
           throw new Error(`homepage never satisfied the probe (last: ${last})`);
         });
 
-        // Spec §8: dev boot materializes the sample filler under the app's
+        // Spec §8: dev boot materializes the sample filler under the target's
         // gitignored .omega/sample-content with LIVE rolling dates (this env
         // carries no OMEGA_SAMPLE_ANCHOR pin — the newest sample post is
         // authored 10 days before the corpus epoch, so it must land ~10 days
         // before today; ±1 day absorbs a UTC midnight between boot and now).
         await run.step('sample content materialized (gitignored tree, rolling dates)', async () => {
-          const sampleRoot = path.join(run.brandRoot, 'apps', 'website', '.omega', 'sample-content');
+          const sampleRoot = path.join(run.brandRoot, 'targets', 'website', '.omega', 'sample-content');
           const posts = fs.readdirSync(path.join(sampleRoot, '_posts')).sort();
           if (posts.length !== 11) throw new Error(`expected 11 sample posts, found ${posts.length}`);
           if (fs.readFileSync(path.join(sampleRoot, '.gitignore'), 'utf8') !== '*\n') {
@@ -509,7 +509,7 @@ async function runJourney(options) {
     }
 
     // ── Manage — headless, creds scrubbed, judged by the run file ─────────
-    await run.step('headless manage: update builds every app; no service errors beyond the allowed set', async () => {
+    await run.step('headless manage: update builds every target; no service errors beyond the allowed set', async () => {
       // Exit code is judged via the run file — a designed testing-service
       // error (live probe of a never-deployed brand) may flip the exit.
       // 'manage' is the named verb (#229) — bare `omega` prints help now, so a
@@ -537,8 +537,8 @@ async function runJourney(options) {
         throw new Error(`unexpected service errors: ${unexpected.map((entry) => `${entry.service} (${entry.error || 'no detail'})`).join(', ')} (${runFile})`);
       }
 
-      if (bootsWeb && !fs.existsSync(path.join(run.brandRoot, 'apps', 'website', 'dist', 'index.html'))) {
-        throw new Error('update reported success but apps/website/dist/index.html is missing');
+      if (bootsWeb && !fs.existsSync(path.join(run.brandRoot, 'targets', 'website', 'dist', 'index.html'))) {
+        throw new Error('update reported success but targets/website/dist/index.html is missing');
       }
       return `${services.length} services; update success; errors only in {${[...allowedErrors].join(', ')}}`;
     });
@@ -566,4 +566,4 @@ async function runJourney(options) {
 
 // JourneyRun is exported for its unit pins — the step recorder is testable
 // without a two-hour brand birth; nothing else constructs one.
-module.exports = { runJourney, JourneyRun, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandApps };
+module.exports = { runJourney, JourneyRun, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandTargets };

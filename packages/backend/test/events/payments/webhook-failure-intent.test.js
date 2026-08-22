@@ -7,7 +7,7 @@
  * started that nothing ever closes.
  *
  * The failure path now resolves the orderId from what IS available (the webhook
- * payload the processor library can read one out of) and fails the intent with it.
+ * payload the provider library can read one out of) and fails the intent with it.
  */
 const powertools = require('node-powertools');
 
@@ -31,7 +31,7 @@ module.exports = {
         await firestore.set(`payments-intents/${ORDER_ID}`, {
           id: ORDER_ID,
           status: 'pending',
-          processor: 'test',
+          provider: 'test',
           metadata: {
             created: {
               timestamp: now,
@@ -50,7 +50,7 @@ module.exports = {
       async run({ http, assert, state, config }) {
         // Carries the orderId but no uid, and names a subscription no order was ever
         // written for — so nothing can reconstruct the uid and processing throws
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'customer.subscription.updated',
           data: {

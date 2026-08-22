@@ -42,7 +42,13 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', publicationId
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url, description: 'A fixture brand' },
     parent,
-    marketing: { newsletter: { ...structuredClone(DEFAULTS.marketing.newsletter), publicationId, ...newsletter } },
+    marketing: {
+      newsletter: {
+        ...structuredClone(DEFAULTS.marketing.newsletter),
+        providers: { beehiiv: { publicationId } },
+        ...newsletter,
+      },
+    },
     targets: { web: {} },
   };
 }
@@ -106,9 +112,8 @@ function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKe
     brandId: 'fixture-brand',
     brandRoot: brandRoot || makeBrandRoot(WRITEBACK_CONFIG), // the publication op writes into config/omega.json5 here
     brandConfig: config,
-    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: 'fixture-brand', config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.newsletter,
     options,
     serviceData,
@@ -131,9 +136,15 @@ test('newsletter: marketing.newsletter.enabled = false skips the service', async
 });
 
 test('newsletter: a different newsletter provider skips the service', async () => {
-  const result = await runService(brandConfig({ newsletter: { provider: 'other' } }), { beehiiv: fakeBeehiiv() });
+  const result = await runService(brandConfig({ newsletter: { providers: { other: {} } } }), { beehiiv: fakeBeehiiv() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /provider = 'other'/);
+  assert.match(result.reason, /marketing\.newsletter\.providers\.other/);
+});
+
+test('newsletter: an empty providers block means none chosen — the service skips (#425)', async () => {
+  const result = await runService(brandConfig({ newsletter: { providers: {} } }), { beehiiv: fakeBeehiiv() });
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /no marketing\.newsletter\.providers entry/);
 });
 
 test('newsletter: skips without brand.url', async () => {
@@ -143,8 +154,7 @@ test('newsletter: skips without brand.url', async () => {
 });
 
 test('newsletter: the newsletter defaults carry no company values', () => {
-  assert.equal(DEFAULTS.marketing.newsletter.provider, 'beehiiv');
-  assert.equal(DEFAULTS.marketing.newsletter.publicationId, null);
+  assert.equal(DEFAULTS.marketing.newsletter.providers.beehiiv.publicationId, null);
 });
 
 // ─── Converged no-op ─────────────────────────────────────────────────────────
@@ -174,13 +184,13 @@ test('newsletter: an inaccessible configured publication warns and gates the dow
 
   assert.equal(result.status, 'warned');
   assert.equal(result.output.publication.accessible, false);
-  // No publication in state → fields/segments/webhook have nothing to work on
+  // No publication resolved → fields/segments/webhook have nothing to work on
   assert.equal(api.callsTo('getCustomFields').length, 0);
   assert.equal(api.callsTo('getSegments').length, 0);
   assert.equal(api.callsTo('listWebhooks').length, 0);
 });
 
-test('newsletter: no configured id auto-matches a publication by brand name into state', async () => {
+test('newsletter: no configured id auto-matches a publication by brand name into config', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     listPublications: [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }],
@@ -197,16 +207,6 @@ test('newsletter: no configured id auto-matches a publication by brand name into
   const written = readConfigSource(brandRoot);
   assert.ok(written.includes(`publicationId: "${PUB_ID}",`));
   assert.ok(written.includes('enabled: true, // the resolved id lands next to this'));
-});
-
-test('newsletter: a state-known id is promoted into omega.json5 on verify', async () => {
-  const api = fakeBeehiiv(convergedResponses());
-  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
-
-  const result = await runService(brandConfig(), { beehiiv: api, serviceData: { publicationId: PUB_ID }, brandRoot });
-
-  assert.equal(result.state.publicationId, PUB_ID);
-  assert.ok(readConfigSource(brandRoot).includes(`publicationId: "${PUB_ID}",`));
 });
 
 test('newsletter: no matching publication warns with the values to copy into the dashboard', async () => {

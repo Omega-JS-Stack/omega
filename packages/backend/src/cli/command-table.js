@@ -104,7 +104,7 @@ const COMMANDS = [
   },
   {
     name: 'cwd',
-    description: 'print the resolved app root',
+    description: 'print the resolved target root',
     run: (self) => new CwdCommand(self).execute(),
   },
   {
@@ -115,7 +115,7 @@ const COMMANDS = [
   {
     name: 'setup',
     default: true,
-    description: 'validate + heal the app',
+    description: 'validate + heal the target',
     run: (self) => new SetupCommand(self).execute(),
   },
   {

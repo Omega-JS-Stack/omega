@@ -38,19 +38,19 @@ test('pipeline: any service error fails, naming the service and error', () => {
 });
 
 test('pipeline: core service skipped = seed missing = fail; non-core skip is listed, not failed', () => {
-  const record = greenRecord([{ service: 'adsense', status: 'skipped', output: null, error: null, reason: 'no adsense.accountId configured' }]);
-  record.services.find((s) => s.service === 'cloudflare').status = 'skipped';
-  record.services.find((s) => s.service === 'cloudflare').reason = 'missing CLOUDFLARE_TOKEN — add to the brand .env';
+  const record = greenRecord([{ service: 'advertising', status: 'skipped', output: null, error: null, reason: 'no advertising.providers.adsense.client configured' }]);
+  record.services.find((s) => s.service === 'edge').status = 'skipped';
+  record.services.find((s) => s.service === 'edge').reason = 'missing CLOUDFLARE_TOKEN — add to the brand .env';
 
   const verdict = evaluatePipeline(record);
   assert.equal(verdict.pass, false);
-  assert.match(verdict.failures[0], /cloudflare: CORE service skipped — missing CLOUDFLARE_TOKEN/);
+  assert.match(verdict.failures[0], /edge: CORE service skipped — missing CLOUDFLARE_TOKEN/);
   assert.equal(verdict.skips.length, 1);
-  assert.match(verdict.skips[0], /adsense — no adsense\.accountId/);
+  assert.match(verdict.skips[0], /advertising — no advertising\.providers\.adsense\.client/);
 });
 
 test('pipeline: full run missing a core service fails; --service scoping waives presence', () => {
-  const record = { services: [{ service: 'github', status: 'success', output: null, error: null }] };
+  const record = { services: [{ service: 'repo', status: 'success', output: null, error: null }] };
 
   const full = evaluatePipeline(record);
   assert.equal(full.pass, false);
@@ -69,8 +69,8 @@ test('pipeline: --require promotes a service into the core set', () => {
   assert.match(strict.failures[0], /seo: CORE service skipped/);
 });
 
-test('pipeline: the graduated seeds are core now — a campaigns/search-console skip fails a full run', () => {
-  for (const service of ['campaigns', 'search-console', 'account', 'recaptcha']) {
+test('pipeline: the graduated seeds are core now — a campaigns/search skip fails a full run', () => {
+  for (const service of ['campaigns', 'search', 'account', 'captcha']) {
     assert.ok(CORE_SERVICES.includes(service), `${service} graduated into the core spine`);
   }
 

@@ -163,13 +163,13 @@ function showReviewModal(reviewURL, data) {
 
 // Tracking functions
 function trackFeedbackSubmit(rating) {
-  event('feedback_submitted', {
+  event('feedback_submit', {
     feedback_rating: rating,
   });
 }
 
 function trackReviewPromptShown(url) {
-  event('review_prompt_shown', {
+  event('review_prompt_show', {
     review_url: url,
   });
 }

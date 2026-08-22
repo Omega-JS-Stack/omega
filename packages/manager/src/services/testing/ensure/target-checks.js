@@ -1,10 +1,10 @@
 /**
- * Per-target health checks, grouped by app — omega-manager's target-checks
+ * Per-target health checks, grouped by target — omega-manager's target-checks
  * for brand monorepos. Local checks always run; live checks (homepage, API
  * health, npm latest, GitHub Actions) are skipped in dry-run with a "would"
  * line, so a dry run never touches the network.
  *
- * Checks by app target:
+ * Checks by target:
  *   web      → package.json, dist/index.html, installed framework vs npm
  *              latest, homepage fetch
  *   backend  → package.json, firebase.json, staged dist/ (build output),
@@ -29,7 +29,7 @@ const chalk = require('chalk').default;
 const {
   createRecorder,
   defaultExec,
-  checkAppFiles,
+  checkTargetFiles,
   checkFrameworkVersion,
   checkWorkingTree,
   checkHomepage,
@@ -38,7 +38,7 @@ const {
 } = require('../lib/checks.js');
 
 module.exports = async (context) => {
-  const { brandId, brandRoot, brandConfig, apps, options } = context;
+  const { brandId, brandRoot, brandConfig, targets, options } = context;
 
   // Tests inject fetch/exec/retryDelayMs via options (they ride runManage
   // options so full-loop tests stay network-free); production uses the reals
@@ -55,18 +55,18 @@ module.exports = async (context) => {
 
   const recorder = createRecorder();
 
-  for (const app of apps.filter((a) => a.target)) {
-    console.log(`      ${chalk.cyan('┌')} ${chalk.cyan.bold(app.name)} ${chalk.dim(`→ ${app.target}`)}`);
+  for (const entry of targets.filter((item) => item.target)) {
+    console.log(`      ${chalk.cyan('┌')} ${chalk.cyan.bold(entry.name)} ${chalk.dim(`→ ${entry.target}`)}`);
 
-    checkAppFiles(recorder, app);
-    checkFrameworkVersion(recorder, app, ctx);
+    checkTargetFiles(recorder, entry);
+    checkFrameworkVersion(recorder, entry, ctx);
 
-    if (app.target === 'web') {
-      await checkHomepage(recorder, app, ctx);
+    if (entry.target === 'web') {
+      await checkHomepage(recorder, entry, ctx);
     }
 
-    if (app.target === 'backend') {
-      await checkApiHealth(recorder, app, ctx);
+    if (entry.target === 'backend') {
+      await checkApiHealth(recorder, entry, ctx);
     }
 
     console.log(`      ${chalk.cyan('└')}`);

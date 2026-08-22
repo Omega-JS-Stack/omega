@@ -172,58 +172,58 @@ function installedVersion(fromDir, packageName) {
 // ── Local checks ────────────────────────────────────────────────────────────
 
 /**
- * Per-app file checks: package.json parses; web apps produced a build;
- * backend apps have their Firebase scaffolding.
+ * Per-target file checks: package.json parses; web targets produced a build;
+ * backend targets have their Firebase scaffolding.
  */
-function checkAppFiles(recorder, app) {
-  const pkg = jetpack.read(path.join(app.path, 'package.json'), 'json');
+function checkTargetFiles(recorder, entry) {
+  const pkg = jetpack.read(path.join(entry.path, 'package.json'), 'json');
   if (pkg) {
-    recorder.pass(`${app.name}: package.json`);
+    recorder.pass(`${entry.name}: package.json`);
   } else {
-    recorder.fail(`${app.name}: package.json`, 'missing or unparseable');
+    recorder.fail(`${entry.name}: package.json`, 'missing or unparseable');
   }
 
-  if (app.target === 'web') {
-    if (fs.existsSync(path.join(app.path, 'dist', 'index.html'))) {
-      recorder.pass(`${app.name}: build output`);
+  if (entry.target === 'web') {
+    if (fs.existsSync(path.join(entry.path, 'dist', 'index.html'))) {
+      recorder.pass(`${entry.name}: build output`);
     } else {
-      recorder.fail(`${app.name}: build output`, 'dist/index.html missing — run the update service');
+      recorder.fail(`${entry.name}: build output`, 'dist/index.html missing — run the update service');
     }
   }
 
-  if (app.target === 'backend') {
-    if (fs.existsSync(path.join(app.path, 'firebase.json'))) {
-      recorder.pass(`${app.name}: firebase.json`);
+  if (entry.target === 'backend') {
+    if (fs.existsSync(path.join(entry.path, 'firebase.json'))) {
+      recorder.pass(`${entry.name}: firebase.json`);
     } else {
-      recorder.fail(`${app.name}: firebase.json`, 'missing');
+      recorder.fail(`${entry.name}: firebase.json`, 'missing');
     }
     // Staged output (src/dist pillar) — the backend's build-output twin of
     // web's dist/index.html check
-    if (fs.existsSync(path.join(app.path, 'dist', 'package.json'))) {
-      recorder.pass(`${app.name}: staged dist/`);
+    if (fs.existsSync(path.join(entry.path, 'dist', 'package.json'))) {
+      recorder.pass(`${entry.name}: staged dist/`);
     } else {
-      recorder.fail(`${app.name}: staged dist/`, 'dist/package.json missing — run the update service (omega build)');
+      recorder.fail(`${entry.name}: staged dist/`, 'dist/package.json missing — run the update service (omega build)');
     }
   }
 }
 
 /**
- * Framework version check: the app's installed framework package vs the npm
- * latest. Silent when the app doesn't declare the target's framework;
+ * Framework version check: the target's installed framework package vs the npm
+ * latest. Silent when the target doesn't declare its framework;
  * dims out when the registry lookup fails (e.g. package not published yet).
  */
-function checkFrameworkVersion(recorder, app, ctx) {
-  const framework = TARGET_FRAMEWORKS[app.target];
+function checkFrameworkVersion(recorder, entry, ctx) {
+  const framework = TARGET_FRAMEWORKS[entry.target];
   if (!framework) return;
 
-  // Deps live on the ONE app manifest for every target (src/dist pillar)
-  const pkgDir = app.path;
+  // Deps live on the ONE manifest per target (src/dist pillar)
+  const pkgDir = entry.path;
   const pkg = jetpack.read(path.join(pkgDir, 'package.json'), 'json');
   const declared = pkg?.dependencies?.[framework] || pkg?.devDependencies?.[framework];
   if (!declared) return;
 
   const installed = installedVersion(pkgDir, framework) || declared.replace(/^[\^~>=<]+/, '');
-  const name = `${app.name}: ${framework}`;
+  const name = `${entry.name}: ${framework}`;
 
   if (!/^\d/.test(installed)) {
     recorder.note(name, `${installed} (not installed — run the update service)`);
@@ -298,10 +298,10 @@ function checkWorkingTree(recorder, ctx) {
  * URL for the single-instance world. Deploy records key per instance too, so
  * a never-deployed admin instance nudges without failing a live main.
  */
-async function checkHomepage(recorder, app, ctx) {
-  const instance = instanceIdFromDirName(app.name, app.target);
-  const url = resolveInstanceUrl(ctx.brandConfig.targets?.[app.target], instance, ctx.brandConfig);
-  const name = `${app.name}: homepage`;
+async function checkHomepage(recorder, entry, ctx) {
+  const instance = instanceIdFromDirName(entry.name, entry.target);
+  const url = resolveInstanceUrl(ctx.brandConfig.targets?.[entry.target], instance, ctx.brandConfig);
+  const name = `${entry.name}: homepage`;
 
   if (!url) {
     recorder.warn(name, 'no brand.url configured — cannot check');
@@ -317,14 +317,14 @@ async function checkHomepage(recorder, app, ctx) {
   // (never-deployed vs deployed-but-down — Ian 2026-07-17). A live HIT on a
   // record-less brand adopts: the record is per-machine, so fresh clones of
   // deployed brands self-heal here.
-  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: app.target, instance });
+  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: entry.target, instance });
   const { response, duration, error } = await fetchWithRetry(ctx, url);
   const live = !error && response.status >= 200 && response.status < 400;
 
   if (live) {
     recorder.pass(name, `${url} → ${response.status} (${duration}ms)`);
     if (!deployed) {
-      recordDeploy({ dir: ctx.brandRoot, target: app.target, instance, detail: { adopted: true } });
+      recordDeploy({ dir: ctx.brandRoot, target: entry.target, instance, detail: { adopted: true } });
     }
   } else if (!deployed) {
     recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${url})`);
@@ -339,8 +339,8 @@ async function checkHomepage(recorder, app, ctx) {
  * from the health payload. Skipped for shared Firebase projects (the owning
  * brand deploys the backend).
  */
-async function checkApiHealth(recorder, app, ctx) {
-  const name = `${app.name}: API health`;
+async function checkApiHealth(recorder, entry, ctx) {
+  const name = `${entry.name}: API health`;
 
   if (ctx.brandConfig.cloud?.shared === true) {
     recorder.note(name, 'shared Firebase project (owning brand deploys the backend)');
@@ -362,7 +362,7 @@ async function checkApiHealth(recorder, app, ctx) {
   }
 
   // Same never-deployed vs deployed-but-down split as checkHomepage
-  const deployRecord = readDeployRecord({ dir: ctx.brandRoot, target: app.target });
+  const deployRecord = readDeployRecord({ dir: ctx.brandRoot, target: entry.target });
   const { response, duration, error } = await fetchWithRetry(ctx, apiUrl);
   const live = !error && response.status >= 200 && response.status < 400;
 
@@ -377,7 +377,7 @@ async function checkApiHealth(recorder, app, ctx) {
 
   recorder.pass(name, `${apiUrl} → ${response.status} (${duration}ms)`);
   if (!deployRecord) {
-    recordDeploy({ dir: ctx.brandRoot, target: app.target, detail: { adopted: true } });
+    recordDeploy({ dir: ctx.brandRoot, target: entry.target, detail: { adopted: true } });
   }
 
   // Deployed-version comparison from the health payload
@@ -388,11 +388,11 @@ async function checkApiHealth(recorder, app, ctx) {
     return;
   }
 
-  const framework = TARGET_FRAMEWORKS[app.target];
+  const framework = TARGET_FRAMEWORKS[entry.target];
   const deployed = data?.backendVersion;
   if (!deployed) return;
 
-  const deployedName = `${app.name}: deployed backend`;
+  const deployedName = `${entry.name}: deployed backend`;
   const latest = getLatestVersion(ctx, framework);
 
   if (!latest) {
@@ -450,7 +450,7 @@ module.exports = {
   compareVersions,
   installedVersion,
   parseWorkingTree,
-  checkAppFiles,
+  checkTargetFiles,
   checkFrameworkVersion,
   checkWorkingTree,
   checkHomepage,

@@ -1,7 +1,7 @@
 /**
  * Ensure the org, the brand's team, and one Sentry project per enabled
- * target. Org resolution: monitoring.org from config wins; otherwise the
- * token's single org is used and written back to monitoring.org
+ * target. Org resolution: monitoring.providers.sentry.org from config wins;
+ * otherwise the token's single org is used and written back there
  * (self-heal). The team is the brand id; projects are `{brand.id}-{target}`
  * with the target's Sentry platform. Existing projects (matched by slug)
  * are converged proof — nothing is renamed or deleted here.
@@ -28,16 +28,16 @@ module.exports = async function ensureProjects(context) {
 
   // === Resolve the org (config wins; a lone token org self-heals into config) ===
   const orgs = await api.getOrganizations();
-  const configured = brandConfig.monitoring.org;
+  const configured = brandConfig.monitoring.providers.sentry.org;
   const org = configured
     ? orgs.find((candidate) => candidate.slug === configured)
     : (orgs.length === 1 ? orgs[0] : null);
 
   if (!org) {
     if (configured) {
-      console.log(`      ${chalk.yellow('⚠')} monitoring.org '${configured}' is not visible to this token ${chalk.dim(`(it sees: ${orgs.map((candidate) => candidate.slug).join(', ') || 'none'})`)}`);
+      console.log(`      ${chalk.yellow('⚠')} monitoring.providers.sentry.org '${configured}' is not visible to this token ${chalk.dim(`(it sees: ${orgs.map((candidate) => candidate.slug).join(', ') || 'none'})`)}`);
     } else {
-      console.log(`      ${chalk.yellow('⚠')} The token sees ${orgs.length} orgs — set monitoring.org in omega.json5 to pick one`);
+      console.log(`      ${chalk.yellow('⚠')} The token sees ${orgs.length} orgs — set monitoring.providers.sentry.org in omega.json5 to pick one`);
     }
     return { status: 'warned', output: { projects: { orgUnresolved: true } } };
   }
@@ -46,7 +46,7 @@ module.exports = async function ensureProjects(context) {
   api.setRegionUrl(org.links?.regionUrl);
 
   if (!configured) {
-    writeBrandConfig(context, { 'monitoring.org': org.slug });
+    writeBrandConfig(context, { 'monitoring.providers.sentry.org': org.slug });
   }
 
   const targets = Object.keys(brandConfig.targets || {}).filter((target) => TARGET_PLATFORMS[target]);

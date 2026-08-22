@@ -2,7 +2,7 @@
  * Test: `config.resolved.*` — the config-DERIVED values @omega.js/backend hands
  * consumer code ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)).
  *
- * A brand app cannot require @omega.js/config (private, vendored), so a brand
+ * A brand target cannot require @omega.js/config (private, vendored), so a brand
  * that needed the GitHub repo slug at runtime re-implemented the derivation and
  * the copy drifted from the real merge rules. The framework runs the recipe at
  * boot and publishes the finished value at `config.resolved.github`.

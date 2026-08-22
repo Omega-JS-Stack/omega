@@ -364,7 +364,7 @@ const FIELDS = {
   user_subscription_trial_claimed:       { display: 'Trial Claimed', source: 'user', path: 'subscription.trial.claimed', type: 'text' },
   user_subscription_cancelling:          { display: 'Cancelling', source: 'resolved', path: 'cancelling', type: 'text' },
   user_subscription_ever_paid:           { display: 'Ever Paid', source: 'resolved', path: 'everPaid', type: 'text' },
-  user_subscription_payment_processor:   { display: 'Payment Processor', source: 'user', path: 'subscription.payment.processor', type: 'text' },
+  user_subscription_payment_provider:     { display: 'Payment Provider', source: 'user', path: 'subscription.payment.provider', type: 'text' },
   user_subscription_payment_frequency:   { display: 'Payment Frequency', source: 'user', path: 'subscription.payment.frequency', type: 'text' },
   user_subscription_payment_price:       { display: 'Payment Price', source: 'user', path: 'subscription.payment.price', type: 'number' },
   user_subscription_payment_last_date:   { display: 'Last Payment Date', source: 'user', path: 'subscription.payment.updatedBy.date.timestamp', type: 'date' },

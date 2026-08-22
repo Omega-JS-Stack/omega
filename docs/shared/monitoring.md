@@ -26,21 +26,28 @@ supplies only what it alone can know.
 
 ## Config
 
-One block, `monitoring`, in omega.json5. DSN presence IS the enable signal — there is no separate
-`enabled` flag (the same convention every other role section follows: a block's credentials are its
-switch). Per-surface DSNs are `targets.<type>.monitoring.dsn` overrides.
+One block, `monitoring`, in omega.json5, with the monitor named as a KEY under `providers`
+([#425](https://github.com/Omega-JS-Stack/omega/issues/425) — the same shape every role uses). DSN
+presence IS the enable signal at runtime — there is no separate runtime `enabled` flag (the same
+convention every other role section follows: a block's credentials are its switch); the role-level
+`enabled: false` is the manager's skip switch for the provisioning service. Per-surface DSNs are
+`targets.<type>.monitoring.providers.sentry.dsn` overrides.
 
 ```jsonc
 monitoring: {
-  provider:         'sentry',   // the role discriminator — stripped before the SDK sees the block
-  org:              'acme',     // provisioning only (the manager's sentry service writes it)
-  dsn:              'https://…@o1.ingest.sentry.io/1',
-  environment:      null,       // null = the host's gate names it ('production' / 'development')
-  sampleRate:       1,          // error events kept, 0..1 — the sampling knob
-  tracesSampleRate: 0.1,
-  scrubEmail:       true,       // set false to opt IN to sending emails
-  attachScreenshot: false,      // desktop only
-  bundlePatterns:   ['/assets/js/'],  // browser only — the URLs that identify our bundles
+  enabled: true,                  // role-level, optional — false skips the monitoring service
+  providers: {
+    sentry: {                     // presence picks the monitor; no entry = none chosen
+      org:              'acme',   // provisioning only (the manager's monitoring service writes it)
+      dsn:              'https://…@o1.ingest.sentry.io/1',
+      environment:      null,     // null = the host's gate names it ('production' / 'development')
+      sampleRate:       1,        // error events kept, 0..1 — the sampling knob
+      tracesSampleRate: 0.1,
+      scrubEmail:       true,     // set false to opt IN to sending emails
+      attachScreenshot: false,    // desktop only
+      bundlePatterns:   ['/assets/js/'],  // browser only — the URLs that identify our bundles
+    },
+  },
 }
 ```
 
@@ -91,9 +98,9 @@ Each host supplies its own version identity:
 |---|---|
 | `@omega.js/backend` | the functions package version. The id is `brand.id`, falling back to the project id on a config missing one (which already warns at boot). |
 | `@omega.js/desktop` (main + renderer) | `app.getVersion()` — the packaged app version, with `brand.id` read off the resolved config |
-| `@omega.js/client` in `@omega.js/extension` | the extension app's package version, baked into the build blob as `config.version` |
-| `@omega.js/client` in `@omega.js/web` | the website app's package version, read off the app root's package.json and emitted in the page `Configuration` block as `version` |
-| `@omega.js/client` in the `@omega.js/desktop` renderer | the desktop app's package version, folded into `OMEGA_BUILD_JSON.config` at bake time (the renderer only ever sees `buildJson.config`) |
+| `@omega.js/client` in `@omega.js/extension` | the extension target's package version, baked into the build blob as `config.version` |
+| `@omega.js/client` in `@omega.js/web` | the website target's package version, read off the target root's package.json and emitted in the page `Configuration` block as `version` |
+| `@omega.js/client` in the `@omega.js/desktop` renderer | the desktop target's package version, folded into `OMEGA_BUILD_JSON.config` at bake time (the renderer only ever sees `buildJson.config`) |
 
 The client reads `config.version` and falls back to `config.buildTime`. Every host above bakes a
 version now, so the fallback covers only a blob that carries none — a surface embedding the client
@@ -125,11 +132,13 @@ raise with no usable stack) and the filter drops it, by design.
 ## How the config reaches a browser
 
 The client reads a `sentry: { enabled, config }` namespace on its init blob, and every framework
-maps it from `monitoring.*`:
+maps it from `monitoring.providers.sentry`:
 
 | Framework | Where |
 |---|---|
-| `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring` → `sentry`, emitted before the `resolved.client` loop so an explicit `client.sentry` still wins |
+| `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring.providers.sentry` → `sentry`, emitted before the `resolved.client` loop so an explicit `client.sentry` still wins |
 | `@omega.js/extension` | `src/gulp/tasks/webpack.js` and `src/gulp/tasks/package.js` (the generated `build.js`) |
 
-`provider` is stripped by core at read time, so a host may pass the raw role block through.
+The client's `sentry.config` is the PROVIDER block, flat — nothing role-level ever rides into
+`Sentry.init`. Node/Electron hosts pass the whole `monitoring` section instead and core's
+`providerOptions()` reaches in for them: one home for the nesting, on the runtime side.

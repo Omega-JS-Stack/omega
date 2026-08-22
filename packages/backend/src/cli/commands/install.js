@@ -53,7 +53,7 @@ class InstallCommand extends BaseCommand {
       return;
     }
 
-    // Read the app manifest (APP ROOT under the src/dist pillar — runtime deps
+    // Read the target manifest (TARGET ROOT under the src/dist pillar — runtime deps
     // live there; functions/package.json is derived output)
     const projectPkgPath = `${this.firebaseProjectPath}/package.json`;
     const projectPkg = jetpack.read(projectPkgPath, 'json');

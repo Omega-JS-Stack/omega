@@ -14,7 +14,7 @@ modern Firebase Cloud Functions backends. A single `Manager.init(exports, {...})
 
 - built-in functions (`omega_api`, auth events, cron jobs)
 - helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata)
-- payment processor integrations (Stripe / PayPal) and Firestore-trigger pipelines
+- payment provider integrations (Stripe / PayPal) and Firestore-trigger pipelines
 - a deploy/emulator/watch tooling pipeline
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
@@ -27,7 +27,7 @@ modern Firebase Cloud Functions backends. A single `Manager.init(exports, {...})
 
 ## Quick start
 
-All commands run from the **app root** (this directory). `dist/` is staged build output; never edit it.
+All commands run from the **target root** (this directory). `dist/` is staged build output; never edit it.
 
 ```bash
 npx omega setup             # validate config + scaffold defaults + stage dist/ + run checks
@@ -50,15 +50,15 @@ npx omega install live      # restore the published @omega.js/backend from npm
 
 ## Where things live
 
-- `package.json`: THE app manifest, carrying scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
+- `package.json`: THE target manifest, carrying scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
 - `src/index.js`: entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
 - `src/routes/<verb>/<path>.js`: custom routes mounted at runtime (e.g. `src/routes/get/hello.js` → `GET /hello`).
 - `src/schemas/<name>.js`: schema definitions for `Manager.Settings()` validation.
 - `src/hooks/<area>/<event>.js`: auth/cron hooks.
 - `src/public/`: OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
-- `config/omega.json5`: STANDALONE apps only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this app's settings) and this app carries NO config file.
+- `config/omega.json5`: STANDALONE projects only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this target's settings) and this target carries NO config file.
 - `.env`: secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored; staged into `dist/` for the deploy artifact.
-- `service-account.json`: Firebase Admin credentials (STANDALONE apps; brand apps keep it in the brand's `.omega/secrets/`). Gitignored.
+- `service-account.json`: Firebase Admin credentials (STANDALONE projects; brand targets keep it in the brand's `.omega/secrets/`). Gitignored.
 - `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
 - `.firebaserc`: Firebase project ID alias.
 - `firestore.rules`: YOUR security rules — the whole file, no managed block. `omega build` compiles it with @omega.js/backend's framework half into `dist/firestore.rules`, which the emulator and `firebase deploy` read (never edit that).

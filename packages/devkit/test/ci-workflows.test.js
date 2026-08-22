@@ -1,10 +1,10 @@
 // Unit tests for src/ci-workflows.js — brand-monorepo CI composition (#265).
 //
 // GitHub only executes workflows from the REPO ROOT's .github/workflows/, so a
-// per-app `apps/<app>/.github/workflows/*.yml` scaffolded into a brand monorepo
+// per-target `targets/<dir>/.github/workflows/*.yml` scaffolded into a brand monorepo
 // is dead on arrival: CI builds and store publishes silently never exist. Setup
-// composes the app's workflow into the root dir instead, scoped to the app's
-// path, one file per app, regenerated (never duplicated) on every setup.
+// composes the target's workflow into the root dir instead, scoped to the target's
+// path, one file per target, regenerated (never duplicated) on every setup.
 //
 // Each test builds a brand tree under .temp/ programmatically.
 
@@ -12,7 +12,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeWorkflow, composeAppWorkflows, composedWorkflowName } = require('../src/ci-workflows');
+const { composeWorkflow, composeTargetWorkflows, composedWorkflowName } = require('../src/ci-workflows');
 
 const TEMP = path.join(__dirname, '..', '.temp', `ci-workflows-${process.pid}`);
 let caseIndex = 0;
@@ -87,47 +87,47 @@ function jobBlocks(composed) {
     .slice(1);
 }
 
-// Stage a brand root with `apps/<name>/.github/workflows/<file>` sources.
-function stageBrand(apps) {
+// Stage a brand root with `targets/<name>/.github/workflows/<file>` sources.
+function stageBrand(targets) {
   const brandRoot = path.join(TEMP, `case-${caseIndex++}`);
   jetpack.write(path.join(brandRoot, 'package.json'), '{ "name": "brand" }');
 
   const staged = {};
-  for (const [name, workflows] of Object.entries(apps)) {
-    const appDir = path.join(brandRoot, 'apps', name);
-    const sourceDir = path.join(appDir, '__defaults', '.github', 'workflows');
+  for (const [name, workflows] of Object.entries(targets)) {
+    const targetDir = path.join(brandRoot, 'targets', name);
+    const sourceDir = path.join(targetDir, '__defaults', '.github', 'workflows');
     for (const [file, contents] of Object.entries(workflows)) {
       jetpack.write(path.join(sourceDir, file), contents);
     }
-    staged[name] = { appDir, sourceDir };
+    staged[name] = { targetDir, sourceDir };
   }
 
-  return { brandRoot, apps: staged };
+  return { brandRoot, targets: staged };
 }
 
 const rootWorkflow = (brandRoot, file) => path.join(brandRoot, '.github', 'workflows', file);
 
-test('composeWorkflow: scopes the run to the app, keeps the workflow itself intact', () => {
-  const composed = composeWorkflow(TEMPLATE, { appPath: 'apps/extension', appName: 'extension' });
+test('composeWorkflow: scopes the run to the target, keeps the workflow itself intact', () => {
+  const composed = composeWorkflow(TEMPLATE, { targetPath: 'targets/extension', targetName: 'extension' });
 
   // Says where it came from and that setup owns it
   assert.match(composed, /omega setup/);
-  assert.match(composed, /apps\/extension/);
+  assert.match(composed, /targets\/extension/);
 
-  // Every `run:` step AFTER the checkout executes in the app dir — the whole
+  // Every `run:` step AFTER the checkout executes in the target dir — the whole
   // point of composing
-  assert.match(composed, / {6}- name: Build\n {8}working-directory: apps\/extension\n {8}run: npx omega setup && npm run build\n/);
+  assert.match(composed, / {6}- name: Build\n {8}working-directory: targets\/extension\n {8}run: npx omega setup && npm run build\n/);
 
   // …and the step that runs BEFORE the checkout is left at the repo root: the
-  // app dir does not exist yet, so scoping it kills the job on step 1
+  // target dir does not exist yet, so scoping it kills the job on step 1
   assert.match(composed, / {6}- name: Setup git config\n {8}run: \|\n/);
 
   // No workflow-level default — it would scope those pre-checkout steps too
   assert.doesNotMatch(composed, /^defaults:/m);
 
-  // Per-app identity: two apps' runs never cancel each other, and the Actions
-  // list shows which app a run belongs to
-  assert.match(composed, /^name: Build and Publish Extension \(apps\/extension\)$/m);
+  // Per-target identity: two targets' runs never cancel each other, and the
+  // Actions list shows which target a run belongs to
+  assert.match(composed, /^name: Build and Publish Extension \(targets\/extension\)$/m);
   assert.match(composed, /^ {2}group: extension-\$\{\{ github\.ref \}\}$/m);
 
   // The workflow's own content is carried over verbatim
@@ -136,13 +136,13 @@ test('composeWorkflow: scopes the run to the app, keeps the workflow itself inta
   assert.match(composed, /types: \[omega-deploy\]/);
 });
 
-test('the REAL framework templates: nothing before a job\'s checkout is scoped to the app dir', () => {
+test('the REAL framework templates: nothing before a job\'s checkout is scoped to the target dir', () => {
   const templates = frameworkTemplates();
   assert.ok(templates.length > 0, 'no framework workflow templates found — the pin would be vacuous');
 
   for (const template of templates) {
-    const composed = composeWorkflow(template.contents, { appPath: 'apps/extension', appName: 'extension' });
-    const scoped = 'working-directory: apps/extension';
+    const composed = composeWorkflow(template.contents, { targetPath: 'targets/extension', targetName: 'extension' });
+    const scoped = 'working-directory: targets/extension';
 
     // A workflow-level default applies to every job, including the ones that
     // run a command before (or entirely without) a checkout
@@ -160,18 +160,18 @@ test('the REAL framework templates: nothing before a job\'s checkout is scoped t
   }
 });
 
-test('the REAL extension template: the git config step stays at the root, the build step runs in the app', () => {
+test('the REAL extension template: the git config step stays at the root, the build step runs in the target', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'extension/publish.yml');
   assert.ok(template, 'the extension publish template is missing');
 
-  const composed = composeWorkflow(template.contents, { appPath: 'apps/extension', appName: 'extension' });
+  const composed = composeWorkflow(template.contents, { targetPath: 'targets/extension', targetName: 'extension' });
 
   // Step 1 of the shipped template: a `run:` before actions/checkout
   assert.match(composed, / {6}- name: Setup git config\n {8}run: \|\n/);
 
   // Post-checkout `run:` steps carry the scope, in both YAML shapes
-  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: apps\/extension\n {8}run: sfw npm install\n/);
-  assert.match(composed, / {6}- name: Build and publish extension\n {8}working-directory: apps\/extension\n {8}run: \|\n/);
+  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm install\n/);
+  assert.match(composed, / {6}- name: Build and publish extension\n {8}working-directory: targets\/extension\n {8}run: \|\n/);
 
   // `uses:` steps are never scoped — checkout and friends want the repo root
   assert.match(composed, / {6}- name: Checkout repository\n {8}uses: actions\/checkout@v4\n/);
@@ -180,98 +180,98 @@ test('the REAL extension template: the git config step stays at the root, the bu
 
 test('the REAL templates: no hashFiles() pattern is left pointing at the repo root', () => {
   for (const template of frameworkTemplates()) {
-    const composed = composeWorkflow(template.contents, { appPath: 'apps/extension', appName: 'extension' });
+    const composed = composeWorkflow(template.contents, { targetPath: 'targets/extension', targetName: 'extension' });
 
     for (const [, pattern] of composed.matchAll(/hashFiles\(\s*['"]([^'"]+)['"]/g)) {
       // hashFiles() globs from GITHUB_WORKSPACE whatever step it sits in — a
-      // root-relative pattern in a composed app workflow hashes nothing
-      assert.ok(pattern.startsWith('apps/extension/'), `${template.label}: hashFiles('${pattern}') never sees the app`);
+      // root-relative pattern in a composed target workflow hashes nothing
+      assert.ok(pattern.startsWith('targets/extension/'), `${template.label}: hashFiles('${pattern}') never sees the target`);
     }
   }
 });
 
-test('the REAL web template: the action inputs a working-directory can never reach are app-scoped', () => {
+test('the REAL web template: the action inputs a working-directory can never reach are target-scoped', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'web/build.yml');
   assert.ok(template, 'the web build template is missing');
 
-  const composed = composeWorkflow(template.contents, { appPath: 'apps/website', appName: 'website' });
+  const composed = composeWorkflow(template.contents, { targetPath: 'targets/website', targetName: 'website' });
 
   // `working-directory:` is a `run:` key — an action's inputs ignore it, so the
   // gh-pages publish pushed a repo-root dist/ that no build ever wrote
-  assert.match(composed, /^ {10}publish_dir: apps\/website\/dist$/m);
-  assert.match(composed, /^ {10}path: apps\/website\/\.omega\/cache\/imagemin$/m);
-  assert.match(composed, /hashFiles\('apps\/website\/src\/assets\/images\/\*\*'\)/);
+  assert.match(composed, /^ {10}publish_dir: targets\/website\/dist$/m);
+  assert.match(composed, /^ {10}path: targets\/website\/\.omega\/cache\/imagemin$/m);
+  assert.match(composed, /hashFiles\('targets\/website\/src\/assets\/images\/\*\*'\)/);
 
   // Untouched: the action's own inputs, and the key's literal prefix
   assert.match(composed, /^ {10}github_token: \$\{\{ secrets\.GH_TOKEN \}\}$/m);
   assert.match(composed, /^ {10}key: omega-imagemin-\$\{\{ hashFiles\(/m);
 
-  // A standalone app IS the repo root: the scaffolded template is unchanged,
+  // A standalone project IS the repo root: the scaffolded template is unchanged,
   // scoping belongs to composition alone
   assert.match(template.contents, /^ {10}publish_dir: \.\/dist$/m);
   assert.match(template.contents, /^ {10}path: \.omega\/cache\/imagemin$/m);
-  assert.doesNotMatch(template.contents, /apps\//);
+  assert.doesNotMatch(template.contents, /targets\//);
 });
 
-test('the REAL desktop template: artifact paths ride the app dir, in both YAML shapes', () => {
+test('the REAL desktop template: artifact paths ride the target dir, in both YAML shapes', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'desktop/build.yml');
   assert.ok(template, 'the desktop build template is missing');
 
-  const composed = composeWorkflow(template.contents, { appPath: 'apps/desktop', appName: 'desktop' });
+  const composed = composeWorkflow(template.contents, { targetPath: 'targets/desktop', targetName: 'desktop' });
 
   // upload-artifact's `path:` is a block scalar — every line is a repo-root glob
-  assert.match(composed, /^ {12}apps\/desktop\/release\/\*\.exe$/m);
-  assert.match(composed, /^ {12}apps\/desktop\/release\/\*\.yml$/m);
-  assert.match(composed, /^ {12}apps\/desktop\/release\/\*\.blockmap$/m);
+  assert.match(composed, /^ {12}targets\/desktop\/release\/\*\.exe$/m);
+  assert.match(composed, /^ {12}targets\/desktop\/release\/\*\.yml$/m);
+  assert.match(composed, /^ {12}targets\/desktop\/release\/\*\.blockmap$/m);
 
-  // download-artifact lands where the (app-scoped) signing run step looks
-  assert.match(composed, /^ {10}path: apps\/desktop\/release$/m);
+  // download-artifact lands where the (target-scoped) signing run step looks
+  assert.match(composed, /^ {10}path: targets\/desktop\/release$/m);
   assert.match(composed, /^ {10}name: windows-unsigned$/m);
 
   // checkout's own inputs are never rewritten — they are not paths in the tree
   assert.match(composed, /^ {10}fetch-depth: 0$/m);
 });
 
-test('the REAL extension template: an app with no path-bearing action inputs is unchanged beyond its run steps', () => {
+test('the REAL extension template: a target with no path-bearing action inputs is unchanged beyond its run steps', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'extension/publish.yml');
-  const composed = composeWorkflow(template.contents, { appPath: 'apps/extension', appName: 'extension' });
+  const composed = composeWorkflow(template.contents, { targetPath: 'targets/extension', targetName: 'extension' });
 
   assert.doesNotMatch(composed, /^ {8}(?:path|publish_dir):/m);
-  assert.equal(composed.match(/apps\/extension/g).length, composed.match(/working-directory: apps\/extension/g).length + 3); // + the 3 header lines
+  assert.equal(composed.match(/targets\/extension/g).length, composed.match(/working-directory: targets\/extension/g).length + 3); // + the 3 header lines
 });
 
-test('the sweep is unaffected: the app copy of a REAL template still compares byte-equal', () => {
+test('the sweep is unaffected: the target copy of a REAL template still compares byte-equal', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'web/build.yml');
-  const { brandRoot, apps } = stageBrand({ website: { 'build.yml': template.contents } });
+  const { brandRoot, targets } = stageBrand({ website: { 'build.yml': template.contents } });
 
-  // What a prior app-level scaffold wrote: the framework template, untouched.
+  // What a prior target-level scaffold wrote: the framework template, untouched.
   // Scoping happens at COMPOSE time, so this still matches and is still swept —
   // a token rendered into the template would have made every dead copy "differ".
-  jetpack.write(path.join(apps.website.appDir, '.github', 'workflows', 'build.yml'), template.contents);
+  jetpack.write(path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml'), template.contents);
 
   const warnings = [];
-  const result = composeAppWorkflows({
-    sourceDir: apps.website.sourceDir,
-    appDir: apps.website.appDir,
+  const result = composeTargetWorkflows({
+    sourceDir: targets.website.sourceDir,
+    targetDir: targets.website.targetDir,
     brandRoot,
     logger: { ...quiet, warn: (message) => warnings.push(message) },
   });
 
   assert.deepEqual(result.removed, ['.github/workflows/build.yml']);
   assert.deepEqual(warnings, []);
-  assert.equal(jetpack.exists(path.join(apps.website.appDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.website.targetDir, '.github')), false);
 });
 
-test('two-app monorepo: one root workflow per app, each scoped to its own app', () => {
-  const { brandRoot, apps } = stageBrand({
+test('two-target monorepo: one root workflow per target, each scoped to its own dir', () => {
+  const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE },
     website: { 'build.yml': TEMPLATE.replace('Build and Publish Extension', 'Compile and Build Site') },
   });
 
-  for (const app of ['extension', 'website']) {
-    composeAppWorkflows({
-      sourceDir: apps[app].sourceDir,
-      appDir: apps[app].appDir,
+  for (const name of ['extension', 'website']) {
+    composeTargetWorkflows({
+      sourceDir: targets[name].sourceDir,
+      targetDir: targets[name].targetDir,
       brandRoot,
       logger: quiet,
     });
@@ -282,21 +282,21 @@ test('two-app monorepo: one root workflow per app, each scoped to its own app', 
 
   const extension = jetpack.read(rootWorkflow(brandRoot, 'extension-publish.yml'));
   const website = jetpack.read(rootWorkflow(brandRoot, 'website-build.yml'));
-  assert.match(extension, /working-directory: apps\/extension/);
-  assert.match(website, /working-directory: apps\/website/);
+  assert.match(extension, /working-directory: targets\/extension/);
+  assert.match(website, /working-directory: targets\/website/);
   assert.match(extension, /group: extension-/);
   assert.match(website, /group: website-/);
 
-  // No per-app .github/ in a monorepo — GitHub would never run it
-  assert.equal(jetpack.exists(path.join(apps.extension.appDir, '.github')), false);
-  assert.equal(jetpack.exists(path.join(apps.website.appDir, '.github')), false);
+  // No per-target .github/ in a monorepo — GitHub would never run it
+  assert.equal(jetpack.exists(path.join(targets.extension.targetDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.website.targetDir, '.github')), false);
 });
 
-test('idempotent: re-running setup updates the app\'s file and never duplicates', () => {
-  const { brandRoot, apps } = stageBrand({ extension: { 'publish.yml': TEMPLATE } });
-  const compose = () => composeAppWorkflows({
-    sourceDir: apps.extension.sourceDir,
-    appDir: apps.extension.appDir,
+test('idempotent: re-running setup updates the target\'s file and never duplicates', () => {
+  const { brandRoot, targets } = stageBrand({ extension: { 'publish.yml': TEMPLATE } });
+  const compose = () => composeTargetWorkflows({
+    sourceDir: targets.extension.sourceDir,
+    targetDir: targets.extension.targetDir,
     brandRoot,
     logger: quiet,
   });
@@ -316,41 +316,41 @@ test('idempotent: re-running setup updates the app\'s file and never duplicates'
   assert.equal(jetpack.list(path.join(brandRoot, '.github', 'workflows')).length, 1);
 
   // A changed template updates the composed file in place
-  jetpack.write(path.join(apps.extension.sourceDir, 'publish.yml'), TEMPLATE.replace('ubuntu-latest', 'ubuntu-24.04'));
+  jetpack.write(path.join(targets.extension.sourceDir, 'publish.yml'), TEMPLATE.replace('ubuntu-latest', 'ubuntu-24.04'));
   const third = compose();
   assert.deepEqual(third.written, ['.github/workflows/extension-publish.yml']);
   assert.match(jetpack.read(rootWorkflow(brandRoot, 'extension-publish.yml')), /ubuntu-24\.04/);
   assert.equal(jetpack.list(path.join(brandRoot, '.github', 'workflows')).length, 1);
 });
 
-test('sweeps the dead per-app copy, keeps one the consumer edited', () => {
-  const { brandRoot, apps } = stageBrand({
+test('sweeps the dead per-target copy, keeps one the consumer edited', () => {
+  const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE },
     website: { 'build.yml': TEMPLATE },
   });
 
-  // What a prior setup scaffolded into the app dirs: one untouched, one edited
-  const deadCopy = path.join(apps.extension.appDir, '.github', 'workflows', 'publish.yml');
-  const editedCopy = path.join(apps.website.appDir, '.github', 'workflows', 'build.yml');
+  // What a prior setup scaffolded into the target dirs: one untouched, one edited
+  const deadCopy = path.join(targets.extension.targetDir, '.github', 'workflows', 'publish.yml');
+  const editedCopy = path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml');
   jetpack.write(deadCopy, TEMPLATE);
   jetpack.write(editedCopy, `${TEMPLATE}      - name: My own step\n        run: echo hi\n`);
 
   const warnings = [];
   const logger = { ...quiet, warn: (message) => warnings.push(message) };
 
-  const extension = composeAppWorkflows({ sourceDir: apps.extension.sourceDir, appDir: apps.extension.appDir, brandRoot, logger });
-  const website = composeAppWorkflows({ sourceDir: apps.website.sourceDir, appDir: apps.website.appDir, brandRoot, logger });
+  const extension = composeTargetWorkflows({ sourceDir: targets.extension.sourceDir, targetDir: targets.extension.targetDir, brandRoot, logger });
+  const website = composeTargetWorkflows({ sourceDir: targets.website.sourceDir, targetDir: targets.website.targetDir, brandRoot, logger });
 
   // Framework-owned: deleted, and the empty .github/ goes with it
   assert.equal(jetpack.exists(deadCopy), false);
-  assert.equal(jetpack.exists(path.join(apps.extension.appDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.extension.targetDir, '.github')), false);
   assert.deepEqual(extension.removed, ['.github/workflows/publish.yml']);
 
   // Consumer content is NEVER destroyed — it is reported instead
   assert.equal(jetpack.exists(editedCopy), 'file');
   assert.deepEqual(website.removed, []);
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /apps\/website\/\.github\/workflows\/build\.yml/);
+  assert.match(warnings[0], /targets\/website\/\.github\/workflows\/build\.yml/);
   // A kept copy carries lines the current template does not ship, which is all
   // the compare can prove, so the warning never claims edits by name; it does
   // name the composed file to compare against
@@ -368,58 +368,58 @@ test('sweeps a copy left by a superseded template, keeps one that changed a line
     `  NODE_VERSION: '22'\n  # Generated from the brand's .env cascade by \`omega setup\`.\n  API_KEY: \${{ secrets.API_KEY }}\n`,
   );
 
-  const { brandRoot, apps } = stageBrand({
+  const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': current },
     website: { 'build.yml': current },
   });
 
   // One copy is the superseded generation verbatim; the other CHANGED a line
   // the framework wrote, which no template of this framework ever shipped
-  const supersededCopy = path.join(apps.extension.appDir, '.github', 'workflows', 'publish.yml');
-  const editedCopy = path.join(apps.website.appDir, '.github', 'workflows', 'build.yml');
+  const supersededCopy = path.join(targets.extension.targetDir, '.github', 'workflows', 'publish.yml');
+  const editedCopy = path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml');
   jetpack.write(supersededCopy, TEMPLATE);
   jetpack.write(editedCopy, current.replace('ubuntu-latest', 'ubuntu-24.04'));
 
   const warnings = [];
   const logger = { ...quiet, warn: (message) => warnings.push(message) };
 
-  const extension = composeAppWorkflows({ sourceDir: apps.extension.sourceDir, appDir: apps.extension.appDir, brandRoot, logger });
-  const website = composeAppWorkflows({ sourceDir: apps.website.sourceDir, appDir: apps.website.appDir, brandRoot, logger });
+  const extension = composeTargetWorkflows({ sourceDir: targets.extension.sourceDir, targetDir: targets.extension.targetDir, brandRoot, logger });
+  const website = composeTargetWorkflows({ sourceDir: targets.website.sourceDir, targetDir: targets.website.targetDir, brandRoot, logger });
 
   // The superseded copy is framework-owned: swept, empty .github/ pruned with it
   assert.equal(jetpack.exists(supersededCopy), false);
-  assert.equal(jetpack.exists(path.join(apps.extension.appDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.extension.targetDir, '.github')), false);
   assert.deepEqual(extension.removed, ['.github/workflows/publish.yml']);
 
   // The changed line is content no framework template wrote: kept and warned
   assert.equal(jetpack.exists(editedCopy), 'file');
   assert.deepEqual(website.removed, []);
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /apps\/website\/\.github\/workflows\/build\.yml/);
+  assert.match(warnings[0], /targets\/website\/\.github\/workflows\/build\.yml/);
 });
 
 test('composedWorkflowName: the root name in a monorepo, the plain name standalone', () => {
   assert.equal(composedWorkflowName({
-    appDir: '/brand/apps/extension',
+    targetDir: '/brand/targets/extension',
     brandRoot: '/brand',
     workflow: 'publish.yml',
   }), 'extension-publish.yml');
 
   assert.equal(composedWorkflowName({
-    appDir: '/standalone-extension',
+    targetDir: '/standalone-extension',
     brandRoot: null,
     workflow: 'publish.yml',
   }), 'publish.yml');
 });
 
 test('a transform hook renders the template before composing (site tokens)', () => {
-  const { brandRoot, apps } = stageBrand({
+  const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE.replace(`'22'`, `'[versions.node]'`) },
   });
 
-  composeAppWorkflows({
-    sourceDir: apps.extension.sourceDir,
-    appDir: apps.extension.appDir,
+  composeTargetWorkflows({
+    sourceDir: targets.extension.sourceDir,
+    targetDir: targets.extension.targetDir,
     brandRoot,
     transform: (contents) => contents.replace('[versions.node]', '22'),
     logger: quiet,

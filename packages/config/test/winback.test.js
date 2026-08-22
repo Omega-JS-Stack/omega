@@ -87,7 +87,7 @@ test('the schema rejects a percent that is not a percentage', () => {
 });
 
 test('the schema rejects a fractional percent', () => {
-  // The percent is baked into a processor's deterministic coupon id
+  // The percent is baked into a provider's deterministic coupon id
   // (BEM_WINBACK50_50OFF_ONCE), so 12.5 would mint a DOTTED id — a shape no
   // brand asked for and nothing downstream reads back.
   const errors = runSchema(brandConfig({ winback: { percent: 12.5 } }), SHARED_SCHEMA);
@@ -95,7 +95,7 @@ test('the schema rejects a fractional percent', () => {
   assert.ok(errors.some((e) => e.includes('payment.winback.percent')), `expected a percent error, got ${JSON.stringify(errors)}`);
 });
 
-test('the schema rejects a duration the processors cannot build a coupon for', () => {
+test('the schema rejects a duration the providers cannot build a coupon for', () => {
   const errors = runSchema(brandConfig({ winback: { duration: 'repeating' } }), SHARED_SCHEMA);
 
   assert.ok(errors.some((e) => e.includes('payment.winback.duration')), `expected a duration error, got ${JSON.stringify(errors)}`);
@@ -104,7 +104,7 @@ test('the schema rejects a duration the processors cannot build a coupon for', (
 test('the validator refuses an offer that is both percent and amount', () => {
   // A coupon is one shape or the other everywhere in the payment stack. Two
   // shapes on one offer has no honest reading, so it fails the config rather
-  // than letting a processor pick one.
+  // than letting a provider pick one.
   const { errors } = validateConfig(brandConfig({ winback: { percent: 50, amount: 10 } }), { target: 'web' });
 
   assert.ok(errors.some((e) => e.includes('payment.winback')), `expected a winback error, got ${JSON.stringify(errors)}`);

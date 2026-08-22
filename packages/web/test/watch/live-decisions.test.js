@@ -119,9 +119,9 @@ test('a missing rescan dir is skipped, not fatal', (t) => {
 });
 
 // A content-less brand: the sample corpus renders, and pages/ + the collection
-// dirs are the rescan lane. The packaged tree sits OUTSIDE the app root and is
+// dirs are the rescan lane. The packaged tree sits OUTSIDE the target root and is
 // reached through a node_modules symlink, the way a linked brand reaches it.
-function app() {
+function target() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-live-')));
   const packaged = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-live-pkg-')));
   const src = path.join(root, 'src');
@@ -237,7 +237,7 @@ async function startWatch(t, fixture) {
 }
 
 test('the first real post ends the samples on the next rebuild — no config reset', async (t) => {
-  const fixture = app();
+  const fixture = target();
   const watch = await startWatch(t, fixture);
 
   assert.match(watch.page(), /data-post="Sample Post"/, 'a content-less brand blogs the sample corpus');

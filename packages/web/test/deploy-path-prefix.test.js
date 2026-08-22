@@ -22,14 +22,14 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { deployPathPrefix, appPathPrefix } = require('../src/commands/deploy.js');
+const { deployPathPrefix, targetPathPrefix } = require('../src/commands/deploy.js');
 const { resolvePathPrefix } = require('../src/path-prefix.js');
 const { scaffoldDefaults } = require('../src/scaffold.js');
 
 const quiet = { log() {}, warn() {}, error() {} };
 
-/** An app dir carrying a standalone omega.json5 (the real loader reads it). */
-function tmpApp(config) {
+/** A target dir carrying a standalone omega.json5 (the real loader reads it). */
+function tmpTarget(config) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-prefix-'));
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), config);
@@ -82,14 +82,14 @@ test('the value normalizes through resolvePathPrefix — ONE normalizer (#355 ow
   assert.equal(resolvePathPrefix(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, {})), '', 'a domain-root deploy runs no prefix pass at all');
 });
 
-test('appPathPrefix: the app-dir entry point loads the composed config (the CI lane calls this)', () => {
-  const project = tmpApp("{ brand: { id: 'acme', name: 'Acme' }, targets: { web: {} } }\n");
-  assert.equal(appPathPrefix(project, {}), '/acme/', 'no brand.url → the project address');
+test('targetPathPrefix: the target-dir entry point loads the composed config (the CI lane calls this)', () => {
+  const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, targets: { web: {} } }\n");
+  assert.equal(targetPathPrefix(project, {}), '/acme/', 'no brand.url → the project address');
   fs.rmSync(project, { recursive: true, force: true });
 
-  const domain = tmpApp("{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
-  assert.equal(appPathPrefix(domain, {}), '/', 'brand.url → the domain root');
-  assert.equal(appPathPrefix(domain, { OMEGA_PATH_PREFIX: '/workkit' }), '/workkit', 'explicit still wins');
+  const domain = tmpTarget("{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  assert.equal(targetPathPrefix(domain, {}), '/', 'brand.url → the domain root');
+  assert.equal(targetPathPrefix(domain, { OMEGA_PATH_PREFIX: '/workkit' }), '/workkit', 'explicit still wins');
   fs.rmSync(domain, { recursive: true, force: true });
 });
 
@@ -107,7 +107,7 @@ test('the scaffolded CI workflow derives the same value before its build step', 
   scaffoldDefaults({ outputDir: root, logger: quiet });
 
   const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8');
-  assert.match(workflow, /require\('@omega\.js\/web\/deploy'\)\.appPathPrefix\(\)/, 'CI calls the ONE derivation, not a copy of the rule');
+  assert.match(workflow, /require\('@omega\.js\/web\/deploy'\)\.targetPathPrefix\(\)/, 'CI calls the ONE derivation, not a copy of the rule');
   assert.match(workflow, /OMEGA_PATH_PREFIX=.*>> "\$GITHUB_ENV"/, 'the derived value becomes the job env for the build');
   assert.ok(
     workflow.indexOf('OMEGA_PATH_PREFIX') < workflow.indexOf('npx omega setup && npm run build'),

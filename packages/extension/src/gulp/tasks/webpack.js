@@ -515,10 +515,9 @@ function getTemplateReplaceOptions() {
         : { enabled: false } } } };
     })(),
     sentry: clientConfig.sentry || (() => {
-      // omega.json5 `monitoring` → client sentry contract (provider discriminator
-      // stripped — the blob feeds Sentry.init directly)
-      const sentryConfig = { ...(options.monitoring || {}) };
-      delete sentryConfig.provider;
+      // omega.json5 `monitoring.providers.sentry` → client sentry contract
+      // (#425 — the provider block feeds Sentry.init directly)
+      const sentryConfig = { ...(options.monitoring?.providers?.sentry || {}) };
       return { enabled: !!sentryConfig.dsn, config: sentryConfig };
     })(),
     exitPopup: clientConfig.exitPopup || { enabled: false, config: {} },

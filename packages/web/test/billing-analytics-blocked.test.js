@@ -100,7 +100,7 @@ function cancellingAccount() {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: MONTH_FROM_NOW },
       cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } },
     },
@@ -229,7 +229,7 @@ test('#283: a blocked analytics global never stops a billing action', async () =
 
 test('#328: with the scripts present, every provider the CATALOG maps is counted', async () => {
   // The guard must not become a silent opt-out: an unblocked page still counts
-  // the billing action. WHO hears it is the catalog's call, and `billing_action`
+  // the billing action. WHO hears it is the catalog's call, and `user_billing_action`
   // is a GA4-only action bucket by ruling — undoing a cancellation is account
   // bookkeeping, not an ad signal.
   const { tracked, clickById } = await wireBilling({ analyticsBlocked: false });
@@ -240,7 +240,7 @@ test('#328: with the scripts present, every provider the CATALOG maps is counted
 
   const [gtagCall] = tracked;
   assert.strictEqual(gtagCall[1], 'event', 'gtag is called as an event');
-  assert.strictEqual(gtagCall[2], 'billing_action', 'with the billing action name');
+  assert.strictEqual(gtagCall[2], 'user_billing_action', 'with the billing action name');
   assert.strictEqual(gtagCall[3].action, 'uncancel_submit', 'and the action that happened');
 });
 

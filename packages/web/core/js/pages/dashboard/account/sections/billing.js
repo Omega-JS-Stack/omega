@@ -16,10 +16,10 @@ let paymentConfig = null;
 let cancelFormManager = null;
 let currentAccount = null;
 
-// Whether the account's processor can do these at all is the BACKEND's answer
+// Whether the account's provider can do these at all is the BACKEND's answer
 // (the capability gate): we attempt the route and branch on the code that comes
-// back, never on a processor map here. A refusal retires the button for the
-// session — the billing portal is the path that works for that processor.
+// back, never on a provider map here. A refusal retires the button for the
+// session — the billing portal is the path that works for that provider.
 let uncancelSupported = true;
 let planSwitchSupported = true;
 let winbackSupported = true;
@@ -224,12 +224,12 @@ function buildBillingState(account) {
   // default has one home and the browser never applies one of its own.
   //
   // The offer is only pitchable to a subscription the apply route can REACH:
-  // it discounts the live subscription at the processor, so it needs the
-  // processor and the resource it holds it under. A paid, active subscription
+  // it discounts the live subscription at the provider, so it needs the
+  // provider and the resource it holds it under. A paid, active subscription
   // can carry neither — granted by an admin, imported, a backfill that never
   // landed — and pitching that account an offer whose only button can 400 is a
   // dead end in front of the cancel it came to make ([#311]).
-  const reachable = !!subscription.payment?.processor && !!subscription.payment?.resourceId;
+  const reachable = !!subscription.payment?.provider && !!subscription.payment?.resourceId;
 
   const offer = paymentConfig?.winback;
   const offerable = canCancel
@@ -256,7 +256,7 @@ function buildBillingState(account) {
   const retentionCancel = canCancel && !offerable && !trialCancel;
 
   // The discount riding the subscription right now ([#325]). Accepting the save
-  // offer applies a real discount at the processor and the card said nothing
+  // offer applies a real discount at the provider and the card said nothing
   // about it at all, so the saving a customer had just been given was invisible
   // on the one page that exists to explain their billing.
   //
@@ -344,7 +344,7 @@ function buildBillingState(account) {
         cancel: canCancel,
         // Undo reads the SAME raw flag Change does, not `resolved.cancelling`
         // (which is `pending && !trialing`): a TRIALING subscription with a
-        // scheduled cancellation is reachable — the processor's own billing
+        // scheduled cancellation is reachable — the provider's own billing
         // portal schedules one — and reading the derived flag left that account
         // with neither button, a dead end on its own billing page.
         uncancel: uncancelSupported && isPaid && rawStatus === 'active' && subscription.cancellation?.pending === true,
@@ -357,7 +357,7 @@ function buildBillingState(account) {
 // Change button and by the pricing page's preselect alike — a modal that opens
 // on a plan the button would not have offered is the same bug twice.
 //
-// Change is hidden while a cancellation is scheduled: the processors swap the
+// Change is hidden while a cancellation is scheduled: the providers swap the
 // price, never the schedule, so the backend refuses the switch outright
 // (`cancellation-pending`, [#237]). Undo cancellation is the honest button in
 // that state, and this reads the SAME raw flag the backend guard does so the
@@ -444,7 +444,7 @@ function setupUncancelConfirm() {
 }
 
 // Withdraw the scheduled cancellation so the subscription just keeps renewing.
-// Nothing is charged today — the processor resumes the existing term.
+// Nothing is charged today — the provider resumes the existing term.
 async function uncancelSubscription($confirmBtn) {
   const $btnText = $confirmBtn.querySelector('.button-text');
   const originalText = $btnText?.textContent;
@@ -480,11 +480,11 @@ async function uncancelSubscription($confirmBtn) {
   } catch (error) {
     logger.error('Failed to withdraw cancellation:', error);
 
-    // The processor cannot resume a subscription AT ALL (the backend's
+    // The provider cannot resume a subscription AT ALL (the backend's
     // capability gate). The button is a dead end for this account, so retire it
     // for the session — the message already points at the billing portal, which
     // is the "Manage billing" button right beside it.
-    if (error.properties?.additional?.code === 'not-supported-by-processor') {
+    if (error.properties?.additional?.code === 'not-supported-by-provider') {
       uncancelSupported = false;
       updateUI(currentAccount);
       collapseUncancelConfirm();
@@ -892,7 +892,7 @@ function getSelectedPlan() {
   return { productId: $selected.value, frequency: $selected.dataset.frequency };
 }
 
-// Move the live subscription onto another plan. The processor prorates the
+// Move the live subscription onto another plan. The provider prorates the
 // difference — no cancel-and-resubscribe, no second checkout.
 async function changePlan($confirmBtn, $modal) {
   const selection = getSelectedPlan();
@@ -943,10 +943,10 @@ async function changePlan($confirmBtn, $modal) {
   } catch (error) {
     logger.error('Failed to change plan:', error);
 
-    // Same capability gate as uncancel: the processor cannot move a live
+    // Same capability gate as uncancel: the provider cannot move a live
     // subscription at all, so retire the button for the session and let the
     // message send them to the billing portal
-    if (error.properties?.additional?.code === 'not-supported-by-processor') {
+    if (error.properties?.additional?.code === 'not-supported-by-provider') {
       planSwitchSupported = false;
       updateUI(currentAccount);
       hidePlanSwitcher($modal);
@@ -1135,7 +1135,7 @@ function setupWinbackOffer() {
 }
 
 // Apply the discount to the live subscription and call the cancel off. The
-// route talks to the processor and the webhook pipeline writes whatever state
+// route talks to the provider and the webhook pipeline writes whatever state
 // changes — the subscription the customer keeps is the one they already had, so
 // the only thing patched locally is the discount the route hands back, which is
 // what the billing card's indicator reads ([#325]).
@@ -1168,7 +1168,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
   } catch (error) {
     logger.error('Failed to apply the winback offer:', error);
 
-    // Same capability gate uncancel and plan-switch ride: the processor cannot
+    // Same capability gate uncancel and plan-switch ride: the provider cannot
     // discount a live subscription at all, the claim has nowhere to be
     // recorded, or it was already claimed once (the offer's memory lives on the
     // order doc, which the account this card reads never carries, so a past
@@ -1180,12 +1180,12 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
     // ends for the same reason: the brand turned the offer off since this page
     // loaded, the subscription is not the state the offer is for (ended,
     // suspended, trialing, already scheduled to cancel), or it carries no
-    // processor to discount through. Pressing the button again changes none of
+    // provider to discount through. Pressing the button again changes none of
     // them. The one refusal LEFT OFF is `confirmation-required`: that is a
     // request that went out without its confirmation, which the same button
     // sending it again is the fix for.
     const deadEndCodes = [
-      'not-supported-by-processor',
+      'not-supported-by-provider',
       'offer-not-claimable',
       'offer-already-claimed',
       'offer-disabled',
@@ -1193,7 +1193,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
       'trial-not-eligible',
       'cancellation-pending',
       'missing-payment-details',
-      'unknown-processor',
+      'unknown-provider',
     ];
     if (deadEndCodes.includes(error.properties?.additional?.code)) {
       winbackSupported = false;
@@ -1625,11 +1625,11 @@ function shuffleArray(arr) {
 // names are simply never defined — and every caller here counts before it acts,
 // so one ReferenceError turned "Undo cancellation" into a dead button. The
 // guard this card was given first is now the ONE canonical call ([#328]): the
-// catalog decides who hears `billing_action`, and the transport under it asks
+// catalog decides who hears `user_billing_action`, and the transport under it asks
 // for each provider on its own — blockers work per list, so a page with Google
 // allowed and Meta blocked still counts what it can.
 function trackBilling(action) {
-  event('billing_action', {
+  event('user_billing_action', {
     action: action,
   });
 }

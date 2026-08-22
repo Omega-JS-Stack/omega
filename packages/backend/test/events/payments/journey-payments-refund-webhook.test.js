@@ -5,7 +5,7 @@
  * Verifies that refund webhook events:
  * 1. Flow through the pipeline correctly
  * 2. Trigger the payment-refunded transition (not subscription-cancelled)
- * 3. Extract refundDetails via the processor library's getRefundDetails()
+ * 3. Extract refundDetails via the provider library's getRefundDetails()
  * 4. Record the transition name on the webhook doc for auditing
  *
  * 5. Fire exactly once when the same refund event is reprocessed
@@ -37,7 +37,7 @@ module.exports = {
         state.product = payments.products[paidProduct.id];
         // Create subscription via test intent
         const response = await http.as('journey-payments-refund-webhook').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
         });
@@ -67,7 +67,7 @@ module.exports = {
 
         state.cancelEventId = `_test-evt-journey-refund-cancel-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.cancelEventId,
           type: 'customer.subscription.updated',
           data: {
@@ -113,12 +113,12 @@ module.exports = {
     {
       name: 'send-charge-refunded-webhook',
       async run({ http, assert, state, config }) {
-        // Simulate a charge.refunded event (Stripe-shaped, used by test processor)
+        // Simulate a charge.refunded event (Stripe-shaped, used by test provider)
         // This carries refund amount data that getRefundDetails() extracts
         state.refundEventId = `_test-evt-journey-refund-charge-${Date.now()}`;
         state.refundAmountCents = 2800; // $28.00
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.refundEventId,
           type: 'charge.refunded',
           data: {

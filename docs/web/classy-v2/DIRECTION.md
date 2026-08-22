@@ -69,7 +69,7 @@ Ink on paper. Glassy nav (transparent until scroll → blur + hairline; ink CTA)
 
 ## Consumer contract (THE product surface — every OMEGA consumer starts on classy)
 
-- **Tier 1 — customize classy from your app's `main.scss`** (most consumers stay here):
+- **Tier 1 — customize classy from your target's `main.scss`** (most consumers stay here):
   - `omega.json5 → brand.color` recolors every accent surface at build time (zero CSS).
   - Sass knobs: `@use 'omega:theme' with ($primary: …, $font-family-sans-serif: …, $border-radius: …)` — every `_config.scss` var ships `!default`.
   - Token overrides: redefine any `--omega-*` custom property in `:root` / `[data-bs-theme=dark]` for surgical re-vibing (grays, radii, speed, type presets, density).

@@ -26,10 +26,10 @@ const jetpack = require('fs-jetpack');
 const { input, select, checkbox, confirm } = require('@omega.js/devkit/prompt');
 const { TARGETS, hasOmegaConfig } = require('@omega.js/config');
 
-const { TARGET_APP_DIRS, TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
+const { TARGET_DIRS, TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
 const { DEFAULT_BRAND_ROOTS, resolveManageRoot, readRawConfig, stampCompanyMarker } = require('./lib/company.js');
 const { loadBrand } = require('./lib/brand.js');
-const { buildScaffoldPlan, applyScaffoldPlan } = require('./lib/scaffold.js');
+const { buildScaffoldPlan, applyScaffoldPlan, printPlanResults } = require('./lib/scaffold.js');
 const { canPrompt } = require('./lib/run-gates.js');
 const { deriveBundleIdPrefix } = require('./lib/bundle-id.js');
 
@@ -217,7 +217,7 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
       ? await checkbox({
         message: 'Targets (key presence in omega.json5 = enabled):',
         choices: TARGETS.map((target) => ({
-          name: `${target} — apps/${TARGET_APP_DIRS[target] || target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved — MAM overhaul pending)'}`,
+          name: `${target} — targets/${TARGET_DIRS[target] || target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved — MAM overhaul pending)'}`,
           value: target,
           checked: DEFAULT_TARGETS.includes(target),
         })),
@@ -291,8 +291,8 @@ function answersFromBrand(brandRoot) {
     description: brand.config.brand?.description || null,
     tagline: brand.config.brand?.tagline || null,
     email: brand.config.brand?.contact?.email || deriveEmail(url),
-    targets: brand.targets.length > 0 ? brand.targets : DEFAULT_TARGETS,
-    bundleIdPrefix: brand.config.certificates?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
+    targets: brand.enabledTargets.length > 0 ? brand.enabledTargets : DEFAULT_TARGETS,
+    bundleIdPrefix: brand.config.certificates?.providers?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
   };
 }
 
@@ -343,27 +343,15 @@ function spawnManage(brandRoot) {
   });
 }
 
-function printPlanResults({ created, kept, planned }) {
-  for (const file of planned) {
-    console.log(`  ${chalk.dim('⊘')} would create ${chalk.cyan(file)}`);
-  }
-  for (const file of created) {
-    console.log(`  ${chalk.green('✓')} created ${chalk.cyan(file)}`);
-  }
-  for (const file of kept) {
-    console.log(`  ${chalk.dim('•')} kept ${chalk.dim(file)} ${chalk.dim('(exists)')}`);
-  }
-}
-
 function printNextSteps(answers) {
   console.log('');
   console.log(chalk.bold('Next steps'));
 
   const frameworks = answers.targets
     .filter((target) => TARGET_FRAMEWORKS[target])
-    .map((target) => `${TARGET_FRAMEWORKS[target]} → apps/${TARGET_APP_DIRS[target]}`);
+    .map((target) => `${TARGET_FRAMEWORKS[target]} → targets/${TARGET_DIRS[target]}`);
   if (frameworks.length > 0) {
-    console.log(`  1. Install each app's framework and run its setup: ${frameworks.join(', ')}`);
+    console.log(`  1. Install each target's framework and run its setup: ${frameworks.join(', ')}`);
   }
   console.log(`  ${frameworks.length > 0 ? 2 : 1}. Fill in .env as the brand adopts external services (the stub lists every key)`);
   console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npm run manage')} to reconcile everything — rerun any time`);
@@ -443,7 +431,7 @@ async function runOnboard(cwd, options = {}) {
   const valid = !brand.configError && brand.configErrors.length === 0;
   console.log('');
   if (valid) {
-    console.log(`${chalk.green('✓')} Config loads and validates ${chalk.dim(`(targets: ${brand.targets.join(', ')})`)}`);
+    console.log(`${chalk.green('✓')} Config loads and validates ${chalk.dim(`(targets: ${brand.enabledTargets.join(', ')})`)}`);
   } else {
     console.log(`${chalk.red('✗')} Config problem: ${brand.configError || brand.configErrors.join('; ')}`);
   }

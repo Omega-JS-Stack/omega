@@ -157,7 +157,7 @@ async function ensurePrices(api, stripeProductId, product, dryRun) {
 }
 
 module.exports = async function ensureStripeProducts(context) {
-  const { brandConfig, brandId, stripeApi: api, options, serviceData } = context;
+  const { brandConfig, brandId, stripeApi: api, options } = context;
   const dryRun = options?.dryRun || false;
 
   if (!api) {
@@ -170,18 +170,16 @@ module.exports = async function ensureStripeProducts(context) {
   }
 
   const products = paidProducts(brandConfig);
-  const knownIds = { ...(serviceData.stripeProducts || {}) };
   const configEdits = {};
-  let stateChanged = false;
-  let catalog = null; // Lazy-listed only when a product has no known ID
+  let catalog = null; // Lazy-listed only when a product has no configured ID
 
   for (const product of products) {
     console.log(`      ${chalk.bold(product.name)} (${product.id}):`);
 
     const desired = buildProductDetails(brandConfig, brandId, product);
 
-    // --- Resolve the Stripe product: config → state → metadata match → create ---
-    let stripeId = product.stripe?.productId || knownIds[product.id] || null;
+    // --- Resolve the Stripe product: config → metadata match → create ---
+    const stripeId = product.stripe?.productId || null;
     let stripeProduct = null;
 
     if (stripeId) {
@@ -196,8 +194,6 @@ module.exports = async function ensureStripeProducts(context) {
       ) || null;
 
       if (stripeProduct) {
-        knownIds[product.id] = stripeProduct.id;
-        stateChanged = true;
         console.log(`        ${chalk.green('✓')} Matched existing product by metadata: ${chalk.dim(stripeProduct.id)}`);
       }
     }
@@ -231,9 +227,6 @@ module.exports = async function ensureStripeProducts(context) {
         url: desired.url,
       });
       console.log(`        ${chalk.green('✓')} Created product: ${chalk.cyan(stripeProduct.id)}`);
-
-      knownIds[product.id] = stripeProduct.id;
-      stateChanged = true;
     }
 
     if (stripeProduct.id !== product.stripe?.productId) {
@@ -248,9 +241,5 @@ module.exports = async function ensureStripeProducts(context) {
     writeBrandConfig(context, configEdits);
   }
 
-  const result = { output: { stripeSync: { productsProcessed: products.length } } };
-  if (stateChanged && !dryRun) {
-    result.state = { stripeProducts: knownIds };
-  }
-  return result;
+  return { output: { stripeSync: { productsProcessed: products.length } } };
 };

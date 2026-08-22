@@ -1,16 +1,17 @@
 /**
- * Test: the test intent processor applies a validated discount to the amounts
+ * Test: the test intent provider applies a validated discount to the amounts
  *
- * The route validates the code and records it, and the Stripe processor hands it
+ * The route validates the code and records it, and the Stripe provider hands it
  * to Stripe as a coupon — Stripe then does the math on its own checkout page. The
- * test processor has no such page, so a discounted checkout moved no number a
+ * test provider has no such page, so a discounted checkout moved no number a
  * human could see: the confirmation URL still quoted the full price
  * ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
  *
- * Each case calls the handler DIRECTLY through the shared route harness: the
- * starting state (a basic user who has never bought anything) is a SHAPE, and one
- * uid per case keeps the checkout guard from rejecting the next one. Everything
- * downstream — the processor, the auto-fired webhook, the webhook route, the
+ * Each case calls the handler DIRECTLY through the shared route harness, as its
+ * OWN seeded persona (`intent-discount-<case>`, declared in the seed roster —
+ * #406): every case buys a subscription, so one account per case is what keeps
+ * the checkout guard from rejecting the next one. Everything
+ * downstream — the provider, the auto-fired webhook, the webhook route, the
  * on-write trigger — is the real pipeline.
  *
  * Product-agnostic: resolves the first paid product from config.payment.products.
@@ -18,7 +19,6 @@
  * Run: npx omega test framework:routes/payments/intent-discount-amounts
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
-const { ensureAuthUser } = require('../../_helpers/auth-user.js');
 const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
 const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
 
@@ -35,24 +35,27 @@ const AMOUNT_CODE = 'WELCOME10OFF';
 const AMOUNT_OFF = 10;
 
 /**
- * A fresh basic user, one uid per case — the checkout guard rejects a caller who
- * already holds a paid subscription, and every case here buys one
+ * This suite's purchaser for one case, from the seed roster
+ * ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)). Every case here
+ * BUYS a subscription and the checkout guard rejects a caller who already holds
+ * one, so each case drives its own account — declared up front as
+ * `intent-discount-<case>`, never minted mid-test. The caller is built from the
+ * seeded DOC, so it is the record the route reads, not a shape invented here.
  */
-async function seedBasicUser(firestore, Manager, suffix) {
-  const uid = `_test-intent-discount-${suffix}`;
-  const doc = {
-    auth: { uid: uid, email: `${uid}@example.com` },
-    roles: {},
-    subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active' },
-  };
+async function purchaser(accounts, firestore, Manager, name) {
+  const account = accounts[`intent-discount-${name}`];
 
-  // A checkout verifies the purchaser is one of ours before it starts, so the
-  // fabricated user needs the auth record a real one has ([#399])
-  await ensureAuthUser(Manager, uid, doc.auth.email);
+  if (!account) {
+    throw new Error(`No seeded persona for the intent-discount case '${name}'`);
+  }
 
-  await firestore.set(`users/${uid}`, doc, { merge: true });
+  const doc = await firestore.get(`users/${account.uid}`);
 
-  return { uid, user: buildUser(Manager, doc) };
+  if (!doc) {
+    throw new Error(`The seeded persona for '${name}' has no user doc — the checkout guard would refuse it`);
+  }
+
+  return { uid: account.uid, user: buildUser(Manager, doc) };
 }
 
 /**
@@ -61,7 +64,7 @@ async function seedBasicUser(firestore, Manager, suffix) {
  */
 function checkoutSettings(overrides) {
   return {
-    processor: 'test',
+    provider: 'test',
     frequency: null,
     trial: false,
     verification: {},
@@ -79,7 +82,7 @@ function amountFromUrl(url) {
 }
 
 /**
- * The webhook doc the test processor's auto-fired event lands in
+ * The webhook doc the test provider's auto-fired event lands in
  */
 async function waitForWebhook(waitFor, firestore, eventId) {
   return waitFor(async () => {
@@ -93,7 +96,7 @@ function eventIdFor(sessionId) {
 }
 
 module.exports = {
-  description: 'Test intent processor: discounts move the first-charge amounts',
+  description: 'Test intent provider: discounts move the first-charge amounts',
   type: 'group',
   timeout: 90000,
 
@@ -128,8 +131,8 @@ module.exports = {
 
     {
       name: 'a-percent-discount-lands-in-the-confirmation-url',
-      async run({ assert, firestore, Manager, state }) {
-        const { user } = await seedBasicUser(firestore, Manager, 'percent-url');
+      async run({ accounts, assert, firestore, Manager, state }) {
+        const { user } = await purchaser(accounts, firestore, Manager, 'percent-url');
         const expected = parseFloat((state.price * 0.85).toFixed(2));
 
         const sent = await callHandler({
@@ -146,21 +149,21 @@ module.exports = {
     },
 
     {
-      name: 'the-route-discounts-the-url-for-every-processor',
+      name: 'the-route-discounts-the-url-for-every-provider',
       async run({ assert, state }) {
-        // WHERE this happens is the whole point. A real processor applies its
+        // WHERE this happens is the whole point. A real provider applies its
         // coupon on its own hosted page and never revisits this URL, so doing the
-        // math processor-side left a discounted Stripe checkout landing on the
+        // math provider-side left a discounted Stripe checkout landing on the
         // confirmation page quoting the LIST price — and the client's tracking
         // modules read that param straight into GA4/pixel revenue. Calling the
-        // route's own builder with processor=stripe is what proves the discount
-        // is the ROUTE's promise and not the test processor's.
+        // route's own builder with provider=stripe is what proves the discount
+        // is the ROUTE's promise and not the test provider's.
         const args = {
           product: state.product,
           productId: state.product.id,
           productType: 'subscription',
           frequency: state.frequency,
-          processor: 'stripe',
+          provider: 'stripe',
           trial: false,
           orderId: '0000-0000-0000',
         };
@@ -184,8 +187,8 @@ module.exports = {
 
     {
       name: 'a-percent-discount-lands-on-the-webhook-subscription',
-      async run({ assert, firestore, Manager, state, waitFor }) {
-        const { user } = await seedBasicUser(firestore, Manager, 'percent-payload');
+      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
+        const { user } = await purchaser(accounts, firestore, Manager, 'percent-payload');
 
         const sent = await callHandler({
           Manager,
@@ -212,11 +215,11 @@ module.exports = {
 
     {
       name: 'a-declined-first-invoice-bills-the-discounted-amount',
-      async run({ assert, firestore, Manager, state, waitFor }) {
+      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
         // The subscription event carries the coupon; the INVOICE is where Stripe
         // reports the money — and the declined checkout is the one path that fires
         // one, so it is where the discounted first charge is provable end to end
-        const { user } = await seedBasicUser(firestore, Manager, 'percent-invoice');
+        const { user } = await purchaser(accounts, firestore, Manager, 'percent-invoice');
         const expectedCents = Math.round(parseFloat((state.price * 0.85).toFixed(2)) * 100);
 
         const sent = await callHandler({
@@ -237,12 +240,12 @@ module.exports = {
 
     {
       name: 'a-one-time-purchase-is-discounted-in-the-url-and-the-session',
-      async run({ assert, firestore, Manager, state, waitFor, skip }) {
+      async run({ accounts, assert, firestore, Manager, state, waitFor, skip }) {
         if (!state.oneTimeProduct) {
           skip('No one-time product configured in this brand');
         }
 
-        const { user } = await seedBasicUser(firestore, Manager, 'one-time');
+        const { user } = await purchaser(accounts, firestore, Manager, 'one-time');
         const price = state.oneTimeProduct.prices.once;
         const expected = parseFloat((price * 0.8).toFixed(2));
 
@@ -267,8 +270,8 @@ module.exports = {
 
     {
       name: 'no-discount-leaves-the-amounts-alone',
-      async run({ assert, firestore, Manager, state, waitFor }) {
-        const { user } = await seedBasicUser(firestore, Manager, 'none');
+      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
+        const { user } = await purchaser(accounts, firestore, Manager, 'none');
 
         const sent = await callHandler({
           Manager,
@@ -289,12 +292,12 @@ module.exports = {
 
     {
       name: 'a-trial-with-a-discount-still-charges-nothing-now',
-      async run({ assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, Manager, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
 
-        const { user } = await seedBasicUser(firestore, Manager, 'trial');
+        const { user } = await purchaser(accounts, firestore, Manager, 'trial');
 
         const sent = await callHandler({
           Manager,
@@ -311,12 +314,12 @@ module.exports = {
 
     {
       name: 'an-amount-discount-lands-in-the-confirmation-url',
-      async run({ assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, Manager, state, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
 
-        const { user } = await seedBasicUser(firestore, Manager, 'amount-url');
+        const { user } = await purchaser(accounts, firestore, Manager, 'amount-url');
         const expected = parseFloat((state.amountPrice - AMOUNT_OFF).toFixed(2));
 
         const sent = await callHandler({
@@ -334,12 +337,12 @@ module.exports = {
 
     {
       name: 'an-amount-discount-lands-on-the-webhook-subscription-in-cents',
-      async run({ assert, firestore, Manager, state, waitFor, skip }) {
+      async run({ accounts, assert, firestore, Manager, state, waitFor, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
 
-        const { user } = await seedBasicUser(firestore, Manager, 'amount-payload');
+        const { user } = await purchaser(accounts, firestore, Manager, 'amount-payload');
 
         const sent = await callHandler({
           Manager,
@@ -367,12 +370,12 @@ module.exports = {
 
     {
       name: 'a-trial-with-an-amount-discount-still-charges-nothing-now',
-      async run({ assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, Manager, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
 
-        const { user } = await seedBasicUser(firestore, Manager, 'amount-trial');
+        const { user } = await purchaser(accounts, firestore, Manager, 'amount-trial');
 
         const sent = await callHandler({
           Manager,
@@ -469,7 +472,7 @@ module.exports = {
       name: 'an-amount-discount-comes-off-the-first-charge',
       async run({ assert }) {
         // Stripe coupons come in both shapes (percent_off, amount_off), so the math
-        // the test processor runs handles both — pinned here on the pure function
+        // the test provider runs handles both — pinned here on the pure function
         // across the edges the seeded codes do not reach.
         assert.equal(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', amount: 15, duration: 'once' }), 84.99, '$15 off $99.99 should be $84.99');
         assert.equal(discountCodes.applyToAmount(99.99, { valid: true, code: 'X', percent: 15, duration: 'once' }), 84.99, '15% off $99.99 should be $84.99');

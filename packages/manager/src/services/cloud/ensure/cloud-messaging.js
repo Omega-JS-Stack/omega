@@ -1,19 +1,28 @@
 /**
  * Ensure Firebase Cloud Messaging is ready: the FCM API is enabled and a
- * VAPID key pair (web push) is in state.
+ * VAPID key pair (web push) is on hand.
  *
  * There is no public API for Web Push certificates — missing keys print the
  * console URL and, in an interactive terminal, prompt to paste both back
  * (length-validated; omega-manager's auto-open of the console is dropped —
  * the URL is printed and clickable). Non-interactive runs warn and move on.
- * The private key lives in gitignored state, never omega.json5.
+ *
+ * The halves go to their own homes (#434): the PUBLIC key to
+ * `cloud.messaging.vapidKey` in omega.json5 (it ships to every browser — the
+ * client reads it from there), the PRIVATE key to VAPID_PRIVATE_KEY in the
+ * gitignored brand .env.
  */
 const chalk = require('chalk').default;
 const { input, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
+const { writeEnvValue } = require('../../../lib/env-secret.js');
 const { canPrompt, dryRunPlan, needsInteractiveSkip } = require('../../../lib/run-gates.js');
 
+const VAPID_PUBLIC_PATH = 'cloud.messaging.vapidKey';
+const VAPID_PRIVATE_ENV = 'VAPID_PRIVATE_KEY';
+
 module.exports = async function ensureCloudMessaging(context) {
-  const { firebaseApi: api, projectId, serviceData = {}, options = {} } = context;
+  const { firebaseApi: api, brandConfig, brandRoot, projectId, options = {} } = context;
 
   // === FCM API ===
   const fcmEnabled = await api.isServiceEnabled(projectId, 'fcm.googleapis.com');
@@ -33,32 +42,25 @@ module.exports = async function ensureCloudMessaging(context) {
     }
   }
 
-  // === VAPID key pair (from state — no API to create/read them) ===
-  const existing = serviceData.cloudMessaging;
+  // === VAPID key pair (config + .env — no API to create or read them) ===
+  const existingPublicKey = brandConfig.cloud?.messaging?.vapidKey;
 
-  if (existing?.vapidPublicKey && existing?.vapidPrivateKey) {
-    console.log(`      ${chalk.green('✓')} VAPID key pair exists ${chalk.dim(`(${existing.vapidPublicKey.substring(0, 20)}...)`)}`);
-    return {
-      state: {
-        cloudMessaging: {
-          vapidPublicKey: existing.vapidPublicKey,
-          vapidPrivateKey: existing.vapidPrivateKey,
-        },
-      },
-    };
+  if (existingPublicKey && process.env[VAPID_PRIVATE_ENV]) {
+    console.log(`      ${chalk.green('✓')} VAPID key pair exists ${chalk.dim(`(${existingPublicKey.substring(0, 20)}...)`)}`);
+    return {};
   }
 
   const consoleUrl = `https://console.firebase.google.com/project/${projectId}/settings/cloudmessaging`;
-  console.log(`      ${chalk.yellow('⚠')} No VAPID key pair in state — web push won't work without one`);
+  console.log(`      ${chalk.yellow('⚠')} No VAPID key pair — web push won't work without one`);
   console.log(`      ${chalk.dim('→')} Under "Web Push certificates": generate (or reveal via ⋮) the key pair`);
 
   if (!canPrompt(options)) {
     console.log(`      ${chalk.dim('→')} ${chalk.cyan(consoleUrl)}`);
-    console.log(`      ${chalk.dim('→')} Rerun in an interactive terminal to paste both keys; they land in .omega/state.json`);
+    console.log(`      ${chalk.dim('→')} Rerun in an interactive terminal to paste both keys; the public half lands in omega.json5 (${chalk.cyan(VAPID_PUBLIC_PATH)}), the private half in the brand .env (${chalk.cyan(VAPID_PRIVATE_ENV)})`);
     return needsInteractiveSkip(
       'cloudMessaging',
       'paste the VAPID key pair from the Cloud Messaging settings',
-      'no VAPID key pair in state (needs an interactive run)',
+      'no VAPID key pair (needs an interactive run)',
     );
   }
 
@@ -93,14 +95,11 @@ module.exports = async function ensureCloudMessaging(context) {
     },
   });
 
-  console.log(`      ${chalk.green('✓')} VAPID key pair saved`);
+  writeBrandConfig(context, { [VAPID_PUBLIC_PATH]: vapidPublicKey.trim() });
+  writeEnvValue(brandRoot, VAPID_PRIVATE_ENV, vapidPrivateKey.trim());
+  process.env[VAPID_PRIVATE_ENV] = vapidPrivateKey.trim();
 
-  return {
-    state: {
-      cloudMessaging: {
-        vapidPublicKey: vapidPublicKey.trim(),
-        vapidPrivateKey: vapidPrivateKey.trim(),
-      },
-    },
-  };
+  console.log(`      ${chalk.green('✓')} VAPID key pair saved ${chalk.dim(`(${VAPID_PUBLIC_PATH} + .env ${VAPID_PRIVATE_ENV})`)}`);
+
+  return {};
 };

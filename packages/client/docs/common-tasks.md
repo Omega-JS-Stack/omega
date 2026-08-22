@@ -20,13 +20,13 @@
 ## Modifying Configuration Defaults
 
 1. Edit `_processConfiguration()` in `src/index.js`
-2. Add to `defaults` object (e.g., `payment: { processors: {}, products: [] }`)
+2. Add to `defaults` object (e.g., `payment: { providers: {}, products: [] }`)
 3. Document in README.md Configuration section
 
 ## Payment Configuration
 
 Payment config shape mirrors OMEGA (the SSOT) — same key names used in @omega.js/backend, UJM, and @omega.js/desktop:
-- `processors`: Stripe, PayPal, Chargebee, Coinbase (publishable keys / client IDs)
+- `providers`: Stripe, PayPal, Chargebee, Coinbase (publishable keys / client IDs)
 - `products`: Array of `{ id, name, type, limits: { feature: N }, prices, trial, paypal, stripe, chargebee }` — used to resolve usage limits on the frontend AND drive checkout flows
 
 ## Adding a Data Binding Action

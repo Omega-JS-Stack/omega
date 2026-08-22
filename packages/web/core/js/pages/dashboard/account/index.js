@@ -343,7 +343,7 @@ function showSection(sectionId) {
 
 // Tracking functions
 function trackAccountSectionView(sectionId) {
-  event('account_section_view', {
+  event('user_section_view', {
     section_name: sectionId
   });
 }

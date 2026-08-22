@@ -112,7 +112,7 @@ function refundableAccount() {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'cancelled',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
     },
   };
 }
@@ -219,7 +219,7 @@ test('#306: a blocked analytics global never stops the refund', async () => {
 
 test('#328: with the scripts present, every provider the CATALOG maps is counted', async () => {
   // The guard must not become a silent opt-out: an unblocked page still counts
-  // the refund action. WHO hears it is the catalog's call, and `refund_action`
+  // the refund action. WHO hears it is the catalog's call, and `user_refund_request`
   // is a GA4-only action bucket by ruling — an ad platform has nothing to do
   // with a support click, and the pre-catalog site's `RefundAction` /
   // `ViewContent` pair was noise in two ad accounts.
@@ -228,7 +228,7 @@ test('#328: with the scripts present, every provider the CATALOG maps is counted
   await submit();
 
   assert.deepStrictEqual(tracked.map(([provider]) => provider), ['gtag'], 'the mapped provider counted the refund');
-  assert.deepStrictEqual(tracked[0], ['gtag', 'event', 'refund_action', { action: 'submit' }], 'gtag is called exactly as before');
+  assert.deepStrictEqual(tracked[0], ['gtag', 'event', 'user_refund_request', { action: 'submit' }], 'gtag is called exactly as before');
 });
 
 test('#306: a half-blocked page counts what it can and still refunds', async () => {

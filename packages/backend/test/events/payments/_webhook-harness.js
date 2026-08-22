@@ -25,7 +25,7 @@ const CONFIG = {
 
 /**
  * Minimal in-memory Firestore stand-in: the doc reads/writes, the collection query
- * the test processor's fetchResource() makes, and the write batch. `failPath` is the
+ * the test provider's fetchResource() makes, and the write batch. `failPath` is the
  * document path whose write rejects — mid-batch in the real world, before anything
  * lands once the writes are batched.
  *
@@ -120,7 +120,7 @@ function merge(existing, data) {
 }
 
 /**
- * A Stripe-shaped active subscription — the test processor's payload shape
+ * A Stripe-shaped active subscription — the test provider's payload shape
  *
  * @param {object} options - uid, orderId, resourceId
  * @returns {object}
@@ -149,7 +149,7 @@ function subscriptionPayload({ uid, orderId, resourceId }) {
  * @param {string} options.orderId - The order the event writes
  * @param {string} options.resourceId - The subscription the event is about
  * @param {string} options.eventId - The webhook doc id
- * @param {string} options.eventType - The processor's event name
+ * @param {string} options.eventType - The provider's event name
  * @param {string} options.resourceType - The parsed event's resource type (a subscription-category event can ride an invoice or sale resource)
  * @param {string} options.category - The parsed event's category ('subscription' | 'one-time')
  * @param {object|null} options.payload - The resource the webhook envelope carries (defaults to an active subscription)
@@ -164,7 +164,7 @@ async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'cust
   const raw = { id: eventId, type: eventType, data: { object: resource } };
   const webhookDoc = {
     id: eventId,
-    processor: 'test',
+    provider: 'test',
     status: 'pending',
     raw: raw,
     owner: uid,

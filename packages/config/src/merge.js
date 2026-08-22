@@ -4,13 +4,13 @@
  * One merge behavior at every level of the hierarchy:
  *
  *   framework defaults ← company ← brand shared ← brand targets.<type>
- *                      ← app shared ← app targets.<type>
+ *                      ← local shared ← local targets.<type>
  *
  * Semantics:
  *   - Plain objects merge recursively; every other value (string, number,
  *     boolean, array, null) REPLACES. A later payment.products array wins
  *     whole — it never concatenates with an earlier one.
- *   - `null` replaces: an app-level file can explicitly null-out a brand
+ *   - `null` replaces: a local-level file can explicitly null-out a brand
  *     value.
  *   - `undefined` values are skipped — they never erase an earlier layer.
  *   - Falsy LAYERS are skipped, so callers can pass optional layers (missing

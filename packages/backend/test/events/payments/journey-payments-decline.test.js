@@ -5,8 +5,8 @@
  *
  * Unlike journey-payments-failure (which posts invoice.payment_failed straight to
  * the webhook route on an already-paid subscription), this journey reaches the
- * decline THROUGH checkout: the test processor fires the subscription in a dunning
- * state plus its failed first invoice, exactly as a real processor would.
+ * decline THROUGH checkout: the test provider fires the subscription in a dunning
+ * state plus its failed first invoice, exactly as a real provider would.
  *
  * Suspended is the dunning ENTRY state, not an access state — the user holds the
  * attempted product but resolves to no access until the payment recovers.
@@ -38,7 +38,7 @@ module.exports = {
         state.product = payments.products[paidProduct.id];
 
         const response = await http.as('journey-payments-decline').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
           simulate: 'decline',
@@ -175,7 +175,7 @@ module.exports = {
 
         state.recoveryEventId = `_test-evt-journey-decline-recover-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.recoveryEventId,
           type: 'customer.subscription.updated',
           data: {

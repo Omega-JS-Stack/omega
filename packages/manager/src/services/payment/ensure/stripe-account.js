@@ -3,7 +3,7 @@
  * (name, url, support email, support url). Diff-then-update; account
  * updates aren't supported on every account type (org sub-accounts), so an
  * update failure warns instead of erroring. Disable entirely with
- * payment.processors.stripe.updateAccountInfo = false.
+ * payment.providers.stripe.updateAccountInfo = false.
  */
 const chalk = require('chalk').default;
 
@@ -49,7 +49,7 @@ module.exports = async function ensureStripeAccount(context) {
     return {};
   }
 
-  if (brandConfig.payment?.processors?.stripe?.updateAccountInfo === false) {
+  if (brandConfig.payment?.providers?.stripe?.updateAccountInfo === false) {
     console.log(`      ${chalk.dim('⊘ Account updates disabled (updateAccountInfo = false)')}`);
     return {};
   }

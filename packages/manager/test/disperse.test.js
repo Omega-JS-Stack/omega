@@ -1,7 +1,7 @@
 /**
  * Disperse service tests — the two remnant operations against real temp
  * brand monorepos on disk. certs: signing artifacts copied from
- * .omega/certificates/apple/ into desktop/mobile apps (byte-compared
+ * .omega/certificates/apple/ into desktop/mobile targets (byte-compared
  * idempotency, optional-vs-required miss semantics, the self-protecting
  * certs .gitignore, dry-run zero-write). env: composition of the .env files
  * that must PHYSICALLY exist (D15 — everything else rides the runtime
@@ -60,19 +60,19 @@ const APPLE_FIXTURES = {
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 /**
- * Stage a temp brand monorepo: app dirs (with optional .env seed content)
+ * Stage a temp brand monorepo: target dirs (with optional .env seed content)
  * and .omega/certificates/apple/ artifacts.
  */
-function stageBrand({ apps = { desktop: {} }, apple = null } = {}) {
+function stageBrand({ targets = { desktop: {} }, apple = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'omega-disperse-'));
 
-  const appList = Object.entries(apps).map(([target, { envFile, name = target } ]) => {
-    const appPath = join(root, 'apps', name);
-    jetpack.dir(appPath);
+  const targetList = Object.entries(targets).map(([target, { envFile, name = target } ]) => {
+    const targetPath = join(root, 'targets', name);
+    jetpack.dir(targetPath);
     if (envFile !== undefined) {
-      jetpack.write(join(appPath, ENV_MAP[target]?.file || '.env'), envFile);
+      jetpack.write(join(targetPath, ENV_MAP[target]?.file || '.env'), envFile);
     }
-    return { name, dir: `apps/${name}`, path: appPath, target, declaredTargets: null };
+    return { name, dir: `targets/${name}`, path: targetPath, target, declaredTargets: null };
   });
 
   if (apple) {
@@ -81,7 +81,7 @@ function stageBrand({ apps = { desktop: {} }, apple = null } = {}) {
     }
   }
 
-  return { root, apps: appList };
+  return { root, targets: targetList };
 }
 
 function brandConfig({ targets = { desktop: {} }, certificates } = {}) {
@@ -92,32 +92,44 @@ function brandConfig({ targets = { desktop: {} }, certificates } = {}) {
   };
 }
 
-function runService({ root, apps }, { config = brandConfig(), brandState = {}, options = {}, companyRoot = null } = {}) {
+/**
+ * `streamSecrets` = { target: secret }. Each target's GA4 Measurement
+ * Protocol secret lives in the brand .env under
+ * GOOGLE_ANALYTICS_SECRET_{TARGET} (#434), which manage.js has loaded into
+ * process.env by the time disperse runs — so that is where the fixture puts
+ * it too.
+ */
+function runService({ root, targets }, { config = brandConfig(), streamSecrets = {}, options = {}, companyRoot = null } = {}) {
+  for (const target of ['web', 'backend', 'desktop', 'extension', 'mobile']) {
+    delete process.env[`GOOGLE_ANALYTICS_SECRET_${target.toUpperCase()}`];
+  }
+  for (const [target, secret] of Object.entries(streamSecrets)) {
+    process.env[`GOOGLE_ANALYTICS_SECRET_${target.toUpperCase()}`] = secret;
+  }
+
   return service.run({
     brandId: BRAND_ID,
     brandRoot: root,
     companyRoot,
     brandConfig: config,
-    brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps },
-    brandState,
-    apps,
+    brand: { id: BRAND_ID, config, enabledTargets: Object.keys(config.targets || {}), targets },
+    targets,
     operations: OPERATIONS.disperse,
     options,
-    serviceData: {},
   });
 }
 
-const certsPath = (brand, ...rest) => join(brand.root, 'apps', 'desktop', 'config', 'certs', ...rest);
+const certsPath = (brand, ...rest) => join(brand.root, 'targets', 'desktop', 'config', 'certs', ...rest);
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('disperse: skips without target-mapped apps', async () => {
+test('disperse: skips without target-mapped dirs', async () => {
   setEnv();
-  const brand = stageBrand({ apps: {} });
+  const brand = stageBrand({ targets: {} });
 
   const result = await runService(brand);
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no target-mapped apps/);
+  assert.match(result.reason, /no target-mapped dirs/);
 });
 
 // ─── certs ───────────────────────────────────────────────────────────────────
@@ -137,7 +149,7 @@ test('certs: a company-managed brand disperses from the COMPANY signing tree', a
   assert.equal(jetpack.read(certsPath(brand, 'developer-id-application.p12')), 'dev-id-application-p12-bytes');
 });
 
-test('certs: desktop app receives the full signing set + a self-protecting .gitignore', async () => {
+test('certs: the desktop target receives the full signing set + a self-protecting .gitignore', async () => {
   setEnv({ APPLE_API_KEY_ID: KEY_ID });
   const brand = stageBrand({ apple: APPLE_FIXTURES });
 
@@ -214,10 +226,10 @@ test('certs: certificates disabled in config skips the copy', async () => {
   assert.equal(jetpack.exists(certsPath(brand, 'developer-id-application.p12')), false);
 });
 
-test('certs: mobile app uses build/certs/ paths', async () => {
+test('certs: the mobile target uses build/certs/ paths', async () => {
   setEnv({ APPLE_API_KEY_ID: KEY_ID });
   const brand = stageBrand({
-    apps: { mobile: {} },
+    targets: { mobile: {} },
     apple: {
       'certificates/IOS_DISTRIBUTION.p12': 'ios-distribution-p12-bytes',
       [`AuthKey_${KEY_ID}.p8`]: 'authkey-p8-bytes',
@@ -229,7 +241,7 @@ test('certs: mobile app uses build/certs/ paths', async () => {
 
   assert.equal(result.status, 'success');
   assert.equal(result.output.certs.copied, 3);
-  const mobileCerts = join(brand.root, 'apps', 'mobile', 'build', 'certs');
+  const mobileCerts = join(brand.root, 'targets', 'mobile', 'build', 'certs');
   assert.equal(jetpack.read(join(mobileCerts, 'ios-distribution.p12')), 'ios-distribution-p12-bytes');
   assert.equal(jetpack.read(join(mobileCerts, `AuthKey_${KEY_ID}.p8`)), 'authkey-p8-bytes');
   assert.equal(jetpack.read(join(mobileCerts, `${BRAND_ID}.mobileprovision`)), 'ios-profile-bytes');
@@ -244,12 +256,12 @@ test('certs: dry-run plans the copies without writing', async () => {
   assert.equal(result.status, 'success');
   assert.equal(result.output.certs.planned, 4);
   assert.equal(result.output.certs.copied, 0);
-  assert.equal(jetpack.exists(join(brand.root, 'apps', 'desktop', 'config')), false);
+  assert.equal(jetpack.exists(join(brand.root, 'targets', 'desktop', 'config')), false);
 });
 
 // ─── env ─────────────────────────────────────────────────────────────────────
 
-test('env: desktop .env composes only app-owned values against the real framework template', async () => {
+test('env: desktop .env composes only target-owned values against the real framework template', async () => {
   setEnv({
     APPLE_API_KEY_ID: KEY_ID,
     GH_TOKEN: 'fixture-gh-token',
@@ -259,18 +271,18 @@ test('env: desktop .env composes only app-owned values against the real framewor
     APPLE_TEAM_ID: 'FIXTEAM99',
   });
   const brand = stageBrand({
-    apps: { desktop: { envFile: DESKTOP_TEMPLATE } },
+    targets: { desktop: { envFile: DESKTOP_TEMPLATE } },
     apple: APPLE_FIXTURES,
   });
 
   const result = await runService(brand, {
-    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+    streamSecrets: { desktop: 'ga-desktop-secret' },
   });
 
   assert.equal(result.status, 'success');
   assert.equal(result.output.env.updated, 1);
 
-  const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
+  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
   assert.match(env, /^CSC_LINK="config\/certs\/developer-id-application\.p12"$/m);
   assert.match(env, new RegExp(`^APPLE_API_KEY="config/certs/AuthKey_${KEY_ID}\\.p8"$`, 'm'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
@@ -285,25 +297,25 @@ test('env: desktop .env composes only app-owned values against the real framewor
 
 test('env: signing paths are not stamped when the cert files are absent', async () => {
   setEnv({ APPLE_API_KEY_ID: KEY_ID, GH_TOKEN: 'fixture-gh-token' });
-  const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } } }); // no apple artifacts
+  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } } }); // no apple artifacts
 
   await runService(brand);
 
-  const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
+  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
   assert.match(env, /^# CSC_LINK=$/m);
   assert.match(env, /^# APPLE_API_KEY=$/m);
 });
 
 test('env: a missing .env is created with the section markers', async () => {
   setEnv();
-  const brand = stageBrand(); // desktop app without any .env
+  const brand = stageBrand(); // desktop target without any .env
 
   const result = await runService(brand, {
-    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+    streamSecrets: { desktop: 'ga-desktop-secret' },
   });
 
   assert.equal(result.status, 'success');
-  const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
+  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
   const defaultAt = env.indexOf('Default Values');
   const keyAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
   const customAt = env.indexOf('Custom Values');
@@ -320,13 +332,13 @@ test('env: appended keys land in the Default section, above the Custom marker', 
     'MY_CUSTOM="keep"',
     '',
   ].join('\n');
-  const brand = stageBrand({ apps: { desktop: { envFile: seed } } });
+  const brand = stageBrand({ targets: { desktop: { envFile: seed } } });
 
   await runService(brand, {
-    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+    streamSecrets: { desktop: 'ga-desktop-secret' },
   });
 
-  const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
+  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
   const customAt = env.indexOf('Custom Values');
   const gaAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
   assert.ok(gaAt >= 0 && gaAt < customAt, 'appended key sits above the Custom marker');
@@ -335,20 +347,20 @@ test('env: appended keys land in the Default section, above the Custom marker', 
   assert.match(env, /^MY_CUSTOM="keep"$/m);
 });
 
-test('env: backend app composes its app-root .env with its own stream secret', async () => {
+test('env: the backend target composes its target-root .env with its own stream secret', async () => {
   setEnv({ GH_TOKEN: 'fixture-gh-token', STRIPE_SECRET_KEY: 'sk_fixture', SENDGRID_API_KEY: 'SG.fixture' });
   const brand = stageBrand({
-    apps: { backend: { envFile: BACKEND_TEMPLATE } },
+    targets: { backend: { envFile: BACKEND_TEMPLATE } },
   });
 
   const result = await runService(brand, {
     config: brandConfig({ targets: { backend: {} } }),
-    brandState: { analytics: { streams: { backend: { apiSecret: 'ga-backend-secret' } } } },
+    streamSecrets: { backend: 'ga-backend-secret' },
   });
 
   assert.equal(result.status, 'success');
-  // App-root .env (src/dist pillar) — `omega build` stages it into functions/
-  const env = jetpack.read(join(brand.root, 'apps', 'backend', '.env'));
+  // Target-root .env (src/dist pillar) — `omega build` stages it into functions/
+  const env = jetpack.read(join(brand.root, 'targets', 'backend', '.env'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-backend-secret"$/m);
   // Backend keeps the FULL pass-through — its .env rides the deploy artifact
   assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
@@ -362,15 +374,15 @@ test('env: backend app composes its app-root .env with its own stream secret', a
 
 test('env: a converged second run rewrites nothing', async () => {
   setEnv({ APPLE_API_KEY_ID: KEY_ID });
-  const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } }, apple: APPLE_FIXTURES });
-  const brandState = { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } };
+  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } }, apple: APPLE_FIXTURES });
+  const streamSecrets = { desktop: 'ga-desktop-secret' };
 
-  await runService(brand, { brandState });
-  const envPath = join(brand.root, 'apps', 'desktop', '.env');
+  await runService(brand, { streamSecrets });
+  const envPath = join(brand.root, 'targets', 'desktop', '.env');
   assert.match(jetpack.read(envPath), /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
 
   const before = statSync(envPath).mtimeMs;
-  const result = await runService(brand, { brandState });
+  const result = await runService(brand, { streamSecrets });
 
   assert.equal(result.output.env.updated, 0);
   assert.equal(result.output.env.current, 1);
@@ -379,16 +391,16 @@ test('env: a converged second run rewrites nothing', async () => {
 
 test('env: dry-run reports the plan without touching the file', async () => {
   setEnv();
-  const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } } });
+  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } } });
 
   const result = await runService(brand, {
-    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+    streamSecrets: { desktop: 'ga-desktop-secret' },
     options: { dryRun: true },
   });
 
   assert.equal(result.output.env.updated, 0);
-  assert.deepEqual(result.output.env.files['apps/desktop/.env'].planned, ['GOOGLE_ANALYTICS_SECRET']);
-  assert.equal(jetpack.read(join(brand.root, 'apps', 'desktop', '.env')), DESKTOP_TEMPLATE);
+  assert.deepEqual(result.output.env.files['targets/desktop/.env'].planned, ['GOOGLE_ANALYTICS_SECRET']);
+  assert.equal(jetpack.read(join(brand.root, 'targets', 'desktop', '.env')), DESKTOP_TEMPLATE);
 });
 
 // ─── updateEnvContent unit — the multi-line replacement hazard ───────────────

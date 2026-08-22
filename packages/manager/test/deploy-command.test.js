@@ -12,7 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const deployCommand = require('../src/commands/deploy.js');
-const { selectDeployApps, buildForwardedFlags } = deployCommand;
+const { selectDeployTargets, buildForwardedFlags } = deployCommand;
 
 // ─── Fixture staging (test-command.test.js pattern) ──────────────────────────
 
@@ -49,7 +49,7 @@ function stageBrand() {
   const brand = path.join(scratch, 'brand');
 
   write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['apps/*'],
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
@@ -57,15 +57,15 @@ function stageBrand() {
 }
 `);
 
-  write(path.join(brand, 'apps', 'website', 'package.json'), JSON.stringify({
+  write(path.join(brand, 'targets', 'website', 'package.json'), JSON.stringify({
     name: 'website', private: true, devDependencies: { '@omega.js/web': '*' },
   }));
-  write(path.join(brand, 'apps', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
+  write(path.join(brand, 'targets', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
-  write(path.join(brand, 'apps', 'backend', 'package.json'), JSON.stringify({
+  write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
   }));
-  write(path.join(brand, 'apps', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
+  write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
   for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
@@ -99,7 +99,7 @@ async function runDeployCommand(cwd, options = {}) {
 
 // ─── Execution over the staged brand ─────────────────────────────────────────
 
-test('bare run fans out to every app, BACKEND FIRST, each spawned `deploy` in its own cwd', async () => {
+test('bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in its own cwd', async () => {
   const { brand } = stageBrand();
   const code = await runDeployCommand(brand);
 
@@ -108,14 +108,14 @@ test('bare run fans out to every app, BACKEND FIRST, each spawned `deploy` in it
   // Order is DEPLOY_ORDER (backend → web), not the directory listing
   assert.deepEqual(calls.map((c) => c.name), ['backend', 'web']);
   for (const call of calls) {
-    assert.deepEqual(call.argv, ['deploy'], 'bare per-app: only the deploy command, no flags');
+    assert.deepEqual(call.argv, ['deploy'], 'bare per-target: only the deploy command, no flags');
   }
-  assert.equal(calls[0].cwd, path.join(brand, 'apps', 'backend'));
-  assert.equal(calls[1].cwd, path.join(brand, 'apps', 'website'));
-  assert.equal(code, undefined, 'all apps green → no error exit code');
+  assert.equal(calls[0].cwd, path.join(brand, 'targets', 'backend'));
+  assert.equal(calls[1].cwd, path.join(brand, 'targets', 'website'));
+  assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
-test('flags forward verbatim to every app; --only/--except are consumed here', async () => {
+test('flags forward verbatim to every target; --only/--except are consumed here', async () => {
   const { brand } = stageBrand();
   // yargs shape: kebab original + camelCase twin (the twin must NOT forward twice)
   await runDeployCommand(brand, { 'dry-run': true, dryRun: true, direct: true });
@@ -127,7 +127,7 @@ test('flags forward verbatim to every app; --only/--except are consumed here', a
   }
 });
 
-test('--only filters by target or app dir name; nothing else runs', async () => {
+test('--only filters by target or target dir name; nothing else runs', async () => {
   const { brand } = stageBrand();
   await runDeployCommand(brand, { only: 'web' });
 
@@ -156,7 +156,7 @@ test('a filter matching nothing NEVER falls back to deploy-everything — error,
   assert.equal(code, 1);
 });
 
-test('a failing backend STOPS the run before web (later apps depend on it) — exit 1', async () => {
+test('a failing backend STOPS the run before web (later targets depend on it) — exit 1', async () => {
   const { brand } = stageBrand();
   fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
   const code = await runDeployCommand(brand);
@@ -192,22 +192,22 @@ test('cli routes `deploy` through ALIASES to the command file', () => {
 
 // ─── Units ───────────────────────────────────────────────────────────────────
 
-test('selectDeployApps: full DEPLOY_ORDER — backend, web, then the rest', () => {
-  const apps = [
+test('selectDeployTargets: full DEPLOY_ORDER — backend, web, then the rest', () => {
+  const targets = [
     { name: 'desktop', target: 'desktop' },
     { name: 'website', target: 'web' },
     { name: 'extension', target: 'extension' },
     { name: 'backend', target: 'backend' },
   ];
-  const { selected, unknown } = selectDeployApps({ apps });
-  assert.deepEqual(selected.map((app) => app.target), ['backend', 'web', 'extension', 'desktop']);
+  const { selected, unknown } = selectDeployTargets({ targets });
+  assert.deepEqual(selected.map((entry) => entry.target), ['backend', 'web', 'extension', 'desktop']);
   assert.deepEqual(unknown, []);
 });
 
-test('selectDeployApps: unknown tokens are reported, matched ones still select', () => {
-  const apps = [{ name: 'website', target: 'web' }];
-  const { selected, unknown } = selectDeployApps({ apps, only: 'web,hosting' });
-  assert.deepEqual(selected.map((app) => app.name), ['website']);
+test('selectDeployTargets: unknown tokens are reported, matched ones still select', () => {
+  const targets = [{ name: 'website', target: 'web' }];
+  const { selected, unknown } = selectDeployTargets({ targets, only: 'web,hosting' });
+  assert.deepEqual(selected.map((entry) => entry.name), ['website']);
   assert.deepEqual(unknown, ['hosting']);
 });
 

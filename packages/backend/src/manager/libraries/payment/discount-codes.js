@@ -91,7 +91,7 @@ function validate(code, user) {
   // amount would quietly charge full price everywhere. The absent shape is
   // OMITTED, never set to undefined: `POST /payments/intent` writes this object
   // into payments-intents/{orderId}, and firebase-admin refuses a document
-  // carrying an undefined value — synchronously, after the processor has already
+  // carrying an undefined value — synchronously, after the provider has already
   // created the real checkout session
   // ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
   return {
@@ -107,7 +107,7 @@ function validate(code, user) {
  * Which shape a discount can be QUOTED as, or null for neither.
  *
  * A code in the table always declares exactly one shape, so a fresh validate()
- * result always answers 'percent' or 'amount' — the processors branch on that
+ * result always answers 'percent' or 'amount' — the providers branch on that
  * directly. A discount read back off a STORED order is the case this exists for:
  * one written before the amount field existed is `valid` and carries no shape at
  * all, and a reader that assumed one would throw on it

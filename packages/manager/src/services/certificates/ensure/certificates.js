@@ -3,7 +3,7 @@
  * of certificates signs all of an Apple Developer account's apps, so this
  * reconciles the account, not the brand.
  *
- * Per cert type in certificates.apple.certificates:
+ * Per cert type in certificates.providers.apple.certificates:
  *   - valid cert on the account → download the .cer if the local file is
  *     missing (delete it to force a re-download), refresh the .p12 if stale
  *   - no valid cert + automatable → create via CSR (reused across runs —
@@ -34,7 +34,7 @@ const {
 
 const APPLE_PORTAL_CERTIFICATES_URL = 'https://developer.apple.com/account/resources/certificates/list';
 
-/** Trim an API cert record to the durable fields state.json keeps. */
+/** Trim an API cert record to the fields the later operations need. */
 function trimCert(cert) {
   return {
     id: cert.id,
@@ -47,7 +47,7 @@ module.exports = catchAgreements(async (context) => {
   const { appleClient, appleSecrets, appleDir, brandConfig, keychainImport } = context;
   const dryRun = context.options?.dryRun || false;
 
-  const appleConfig = brandConfig.certificates.apple || {};
+  const appleConfig = brandConfig.certificates.providers?.apple || {};
   const certConfigs = appleConfig.certificates || [];
   const certificatePassword = appleSecrets.certificatePassword || '';
 

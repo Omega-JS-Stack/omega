@@ -656,7 +656,7 @@ test('#234: the page carries no dev chrome of its own — the palette owns it', 
   const section = fs.readFileSync(
     path.join(PKG, 'core', 'js', 'pages', 'payment', 'checkout', 'modules', 'dev-section.js'), 'utf8',
   );
-  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProcessor', '_dev_recaptcha']) {
+  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProvider', '_dev_recaptcha']) {
     assert.ok(section.includes(`'${param}'`), `the palette section carries the "${param}" control`);
   }
 });

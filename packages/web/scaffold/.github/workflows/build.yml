@@ -87,7 +87,7 @@ jobs:
       # slug); an explicitly set OMEGA_PATH_PREFIX wins and passes through.
       - name: Resolve base path
         run: |
-          PREFIX="$(node -p "require('@omega.js/web/deploy').appPathPrefix()")"
+          PREFIX="$(node -p "require('@omega.js/web/deploy').targetPathPrefix()")"
           echo "Base path: $PREFIX"
           echo "OMEGA_PATH_PREFIX=$PREFIX" >> "$GITHUB_ENV"
 

@@ -54,7 +54,7 @@ const DEV_HOOKS = {
   // The checkout's controls, all six on one registered section (#234).
   _dev_preDelay: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   _dev_trialEligible: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
-  _dev_cardProcessor: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
+  _dev_cardProvider: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   _dev_recaptcha: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   _dev_decline: { offeredBy: 'core/js/pages/payment/checkout/modules/dev-section.js' },
   // The auth pages' returning-redirect rehearsal.

@@ -11,7 +11,7 @@ export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];
 export const state = {
   // From config (stored once, never transformed)
   product: null,
-  processors: null,
+  providers: null,
 
   // User selections
   frequency: 'annually',
@@ -31,25 +31,25 @@ export const state = {
   error: { show: false, message: '' },
 };
 
-// Resolve which processor handles a payment method
-export function resolveProcessor(paymentMethod) {
+// Resolve which provider handles a payment method
+export function resolveProvider(paymentMethod) {
   if (paymentMethod === 'card') {
     /* @dev-only:start */
     {
-      // The dev palette's card-processor override, a URL param like every
+      // The dev palette's card-provider override, a URL param like every
       // other checkout dev control. The read lives INSIDE the block, so
       // production never looks and the literal never reaches a real bundle
-      // (#235) — a visitor can't point a real checkout at another processor.
+      // (#235) — a visitor can't point a real checkout at another provider.
       if (omega.isDevelopment()) {
-        const forced = new URLSearchParams(window.location.search).get('_dev_cardProcessor');
+        const forced = new URLSearchParams(window.location.search).get('_dev_cardProvider');
         if (forced) return forced;
       }
     }
     /* @dev-only:end */
 
     // Prefer Stripe, fall back to Chargebee
-    if (state.processors?.stripe?.publishableKey) return 'stripe';
-    if (state.processors?.chargebee?.site) return 'chargebee';
+    if (state.providers?.stripe?.publishableKey) return 'stripe';
+    if (state.providers?.chargebee?.site) return 'chargebee';
     return 'stripe';
   }
 
@@ -156,11 +156,11 @@ export function buildBindingsState() {
         errorMessage: state.discountUI.message || 'Invalid discount code',
       },
       paymentMethods: {
-        card: !!(state.processors?.stripe?.publishableKey || state.processors?.chargebee?.site),
-        paypal: !!state.processors?.paypal?.clientId,
+        card: !!(state.providers?.stripe?.publishableKey || state.providers?.chargebee?.site),
+        paypal: !!state.providers?.paypal?.clientId,
         applePay: false,
         googlePay: false,
-        crypto: state.processors?.coinbase?.enabled === true,
+        crypto: state.providers?.coinbase?.enabled === true,
       },
       error: {
         show: state.error.show,
@@ -211,7 +211,7 @@ function buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount) {
   if (hasFreeTrial) {
     // The charge that lands when the trial ends is the FIRST invoice, and a
     // first-payment code is attached to exactly that one (the intent route
-    // sends the `once` coupon alongside the trial — intent/processors/
+    // sends the `once` coupon alongside the trial — intent/providers/
     // stripe.js). So the trial line prices the first charge DISCOUNTED and
     // names the renewal price separately; quoting list price here promised a
     // bigger first charge than the card will see (#254).

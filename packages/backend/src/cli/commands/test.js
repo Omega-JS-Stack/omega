@@ -142,7 +142,7 @@ class TestCommand extends BaseCommand {
     const self = this.main;
     const argv = self.argv;
 
-    // Tee THIS process to <appRoot>/logs/test.log (#197) — the setup lines, the
+    // Tee THIS process to <targetRoot>/logs/test.log (#197) — the setup lines, the
     // port summary and the emulator boot that the runner-child's dist/test.log
     // never sees.
     this.attachVerbLog('test');
@@ -394,7 +394,7 @@ class TestCommand extends BaseCommand {
    * GOOGLE_APPLICATION_CREDENTIALS is unset (as in the functions emulator). The
    * key is a freshly-generated RSA key — emulator-only, never authenticates
    * against Google (the project is a `demo-` project), so it is generated at
-   * runtime and gitignored, never committed. Written to the APP ROOT (the
+   * runtime and gitignored, never committed. Written to the TARGET ROOT (the
    * authored home under the src/dist pillar) — the stage step carries it into
    * functions/.
    */
@@ -441,7 +441,7 @@ class TestCommand extends BaseCommand {
   }
 
   /**
-   * Symlink the local framework + firebase deps into the fixture's APP-ROOT
+   * Symlink the local framework + firebase deps into the fixture's TARGET-ROOT
    * node_modules so the emulator's function workers can resolve them — Node
    * resolution walks up from the staged functions/ tree (which carries no
    * node_modules of its own under the src/dist pillar). Mirrors what
@@ -481,7 +481,7 @@ class TestCommand extends BaseCommand {
     // handlers IN-PROCESS, so its Manager's URL getters answer from
     // OMEGA_*_PORT the same way a function worker's do — unset, they fell back
     // to the classic 5002, which under `omega emulator`'s HTTPS default is the
-    // mkcert proxy, not hosting: the test processor's auto-webhook followed the
+    // mkcert proxy, not hosting: the test provider's auto-webhook followed the
     // proxy's 307 to https and died on a cert this process has no CA for
     // ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)). `https` is
     // deliberately dropped — the runner is a plain-http client of the stack

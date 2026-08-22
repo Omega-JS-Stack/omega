@@ -4,8 +4,8 @@
  * The single home for every "work against the local framework source" mechanic:
  * - resolveMonorepoRoot()  — find the Omega monorepo on this machine
  * - findBrandRoot()        — walk up from a cwd to the brand repo root
- * - discoverApps()         — list the brand's app directories
- * - frameworkPackagesOf()  — which @omega.js packages an app depends on
+ * - discoverTargets()      — list the brand's target directories
+ * - frameworkPackagesOf()  — which @omega.js packages a target depends on
  * - linkLocalPackages()    — file:-install those from the monorepo (idempotent)
  * - startMonorepoWatch()   — spawn the monorepo's src→dist watch (`npm start`)
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
@@ -103,14 +103,14 @@ function packageDir(monorepoRoot, name) {
 }
 
 /**
- * Check whether a directory contains at least one apps/<name>/package.json.
+ * Check whether a directory contains at least one targets/<name>/package.json.
  * @param {string} dir - Directory to test.
  * @returns {boolean}
  */
-function hasApps(dir) {
-  const appsDir = path.join(dir, 'apps');
+function hasTargets(dir) {
+  const targetsDir = path.join(dir, 'targets');
   try {
-    return fs.readdirSync(appsDir).some((entry) => fs.existsSync(path.join(appsDir, entry, 'package.json')));
+    return fs.readdirSync(targetsDir).some((entry) => fs.existsSync(path.join(targetsDir, entry, 'package.json')));
   } catch (e) {
     return false;
   }
@@ -118,10 +118,10 @@ function hasApps(dir) {
 
 /**
  * Walk up from a starting directory to the brand repo root: the first
- * directory with BOTH a package.json and an apps/<name>/package.json (a brand
+ * directory with BOTH a package.json and a targets/<name>/package.json (a brand
  * monorepo). The Omega monorepo itself is never a brand root — a standalone
- * app living inside it (spike, fixture) resolves to itself. Falls back to the
- * nearest package.json (a standalone app), then to the starting directory.
+ * project living inside it (spike, fixture) resolves to itself. Falls back to the
+ * nearest package.json (a standalone project), then to the starting directory.
  * @param {string} startDir - Directory to walk up from (usually process.cwd()).
  * @returns {string} Absolute brand root path.
  */
@@ -132,7 +132,7 @@ function findBrandRoot(startDir) {
   while (true) {
     if (fs.existsSync(path.join(dir, 'package.json'))) {
       nearestPackage = nearestPackage || dir;
-      if (hasApps(dir) && !isMonorepoRoot(dir)) {
+      if (hasTargets(dir) && !isMonorepoRoot(dir)) {
         return dir;
       }
     }
@@ -147,48 +147,48 @@ function findBrandRoot(startDir) {
 }
 
 /**
- * List a brand's app directories: the brand root itself plus every
- * apps/<name> that has a package.json.
+ * List a brand's target directories: the brand root itself plus every
+ * targets/<name> that has a package.json.
  * @param {string} brandRoot - Brand root path.
- * @returns {string[]} Absolute app directory paths.
+ * @returns {string[]} Absolute target directory paths.
  */
-function discoverApps(brandRoot) {
-  const apps = [brandRoot];
-  const appsDir = path.join(brandRoot, 'apps');
+function discoverTargets(brandRoot) {
+  const targets = [brandRoot];
+  const targetsDir = path.join(brandRoot, 'targets');
 
   try {
-    for (const entry of fs.readdirSync(appsDir).sort()) {
-      const appDir = path.join(appsDir, entry);
-      if (fs.existsSync(path.join(appDir, 'package.json'))) {
-        apps.push(appDir);
+    for (const entry of fs.readdirSync(targetsDir).sort()) {
+      const targetDir = path.join(targetsDir, entry);
+      if (fs.existsSync(path.join(targetDir, 'package.json'))) {
+        targets.push(targetDir);
       }
     }
   } catch (e) {
-    // No apps/ directory — standalone brand, the root is the only app
+    // No targets/ directory — standalone brand, the root is the only target
   }
 
-  return apps;
+  return targets;
 }
 
 /**
- * Collect an app's @omega.js dependencies from its package.json (the ONE
- * app manifest at the app root — scripts + runtime deps; src/dist pillar).
- * @param {string} appDir - App directory.
+ * Collect a target's @omega.js dependencies from its package.json (the ONE
+ * manifest at the target root — scripts + runtime deps; src/dist pillar).
+ * @param {string} targetDir - Target directory.
  * @returns {Array<{name: string, spec: string, dev: boolean, dir: string}>}
  */
-function frameworkPackagesOf(appDir) {
+function frameworkPackagesOf(targetDir) {
   const entries = [];
 
   let pkg;
   try {
-    pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+    pkg = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
   } catch (e) {
     return entries;
   }
   for (const [depKey, dev] of [['dependencies', false], ['devDependencies', true]]) {
     for (const [name, spec] of Object.entries(pkg[depKey] || {})) {
       if (name.startsWith(SCOPE)) {
-        entries.push({ name, spec, dev, dir: appDir });
+        entries.push({ name, spec, dev, dir: targetDir });
       }
     }
   }
@@ -229,13 +229,13 @@ function isLinkedTo(dir, name, targetDir) {
 /**
  * Rewrite one dependency's spec in a manifest, preserving its dev/prod
  * placement (the same in-place rewrite npm does on --save).
- * @param {string} appDir - Directory holding the package.json.
+ * @param {string} targetDir - Directory holding the package.json.
  * @param {string} name - Dependency name.
  * @param {boolean} dev - Whether the entry lives in devDependencies.
  * @param {string} spec - New spec value.
  */
-function setDependencySpec(appDir, name, dev, spec) {
-  const manifestPath = path.join(appDir, 'package.json');
+function setDependencySpec(targetDir, name, dev, spec) {
+  const manifestPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   pkg[dev ? 'devDependencies' : 'dependencies'][name] = spec;
   fs.writeFileSync(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
@@ -255,19 +255,19 @@ function relativeSpecPath(fromDir, target) {
  * file:-install a brand's @omega.js dependencies from the local monorepo.
  *
  * Tree-wide by construction: npm resolves the WHOLE workspace tree on any
- * install anchored in a brand monorepo, so linking one app while a SIBLING
- * app still carries an unpublished registry spec (`@omega.js/backend: *`)
+ * install anchored in a brand monorepo, so linking one target while a SIBLING
+ * target still carries an unpublished registry spec (`@omega.js/backend: *`)
  * 404s before anything links (the cp194 wizard-rehearsal catch — only
  * reachable in a brand OUTSIDE the omega monorepo, the real consumer
- * topology). Every app's @omega.js specs are therefore flipped to file:
+ * topology). Every target's @omega.js specs are therefore flipped to file:
  * first (dev/prod placement preserved — the entry is edited in place), then
  * ONE `npm install` materializes the links for the whole tree. Standalone
- * apps degenerate to themselves.
+ * targets degenerate to themselves.
  *
  * Idempotent: dependencies already resolving to the monorepo copy are
  * skipped, and when nothing needs linking no install runs.
  * @param {object} options
- * @param {string} options.dir - App directory to link from (any app in the brand).
+ * @param {string} options.dir - Target directory to link from (any target in the brand).
  * @param {string} options.monorepoRoot - Monorepo root path.
  * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
  * @param {boolean} [options.dryRun] - Plan only, write and install nothing.
@@ -284,15 +284,15 @@ async function linkLocalPackages(options) {
   // install, so an install failure must restore the originals — a
   // half-flipped tree is a quiet git-dirty diff someone could commit.
   const manifestBackups = new Map();
-  const backupManifest = (appDir) => {
-    const manifestPath = path.join(appDir, 'package.json');
+  const backupManifest = (targetDir) => {
+    const manifestPath = path.join(targetDir, 'package.json');
     if (!manifestBackups.has(manifestPath)) {
       manifestBackups.set(manifestPath, fs.readFileSync(manifestPath, 'utf8'));
     }
   };
 
-  for (const appDir of discoverApps(installRoot)) {
-    for (const entry of frameworkPackagesOf(appDir)) {
+  for (const targetDir of discoverTargets(installRoot)) {
+    for (const entry of frameworkPackagesOf(targetDir)) {
       const target = packageDir(monorepoRoot, entry.name);
 
       if (!fs.existsSync(path.join(target, 'package.json'))) {
@@ -345,7 +345,7 @@ async function linkLocalPackages(options) {
 /**
  * Flip a brand tree's @omega.js `file:` specs back to registry ranges — the
  * publish-day inverse of linkLocalPackages(). Every file:-spec'd entry in
- * every app manifest becomes `^<version>` of the CURRENTLY LINKED copy (read
+ * every target manifest becomes `^<version>` of the CURRENTLY LINKED copy (read
  * from the file: target's own package.json — no monorepo lookup, no registry
  * call, so it works on any machine), then ONE `npm install` re-resolves the
  * tree from the registry. Idempotent: registry-spec'd entries are untouched;
@@ -366,15 +366,15 @@ async function restoreRegistrySpecs(options) {
   let installNeeded = false;
 
   const manifestBackups = new Map();
-  const backupManifest = (appDir) => {
-    const manifestPath = path.join(appDir, 'package.json');
+  const backupManifest = (targetDir) => {
+    const manifestPath = path.join(targetDir, 'package.json');
     if (!manifestBackups.has(manifestPath)) {
       manifestBackups.set(manifestPath, fs.readFileSync(manifestPath, 'utf8'));
     }
   };
 
-  for (const appDir of discoverApps(installRoot)) {
-    for (const entry of frameworkPackagesOf(appDir)) {
+  for (const targetDir of discoverTargets(installRoot)) {
+    for (const entry of frameworkPackagesOf(targetDir)) {
       if (!entry.spec.startsWith('file:')) {
         actions.push({ name: entry.name, dir: entry.dir, spec: entry.spec, action: 'skip' });
         continue;
@@ -382,7 +382,7 @@ async function restoreRegistrySpecs(options) {
 
       let spec = range;
       if (!spec) {
-        const target = path.resolve(appDir, entry.spec.slice('file:'.length));
+        const target = path.resolve(targetDir, entry.spec.slice('file:'.length));
         try {
           spec = `^${JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8')).version}`;
         } catch (e) {
@@ -1465,7 +1465,7 @@ function freshnessBoot(options) {
  * broke — #398) comes back the same way, for the same reason.
  * @param {object} options
  * @param {Array<{packageName: string, fromDir: string}>} options.hosts - One entry
- *   per lane: the framework package that lane runs, and the app dir it resolves from.
+ *   per lane: the framework package that lane runs, and the target dir it resolves from.
  * @returns {{checked: object[], healed: string[], staleLinked: object[], healFailed: object[], failed: string[]}}
  *   checked = every ensureFreshLocalDist result, in check order; staleLinked and
  *   healFailed are the caller's two stop conditions, failed is the plain
@@ -1479,7 +1479,7 @@ function freshnessSweep(options) {
   for (const host of hosts) {
     for (const entry of freshnessCheckList(host)) {
       // The resolved dir is the identity — the same package reached from two
-      // apps is ONE dist. Unresolvable entries keep their own key so
+      // targets is ONE dist. Unresolvable entries keep their own key so
       // ensureFreshLocalDist still gets to classify them.
       const key = resolvePackageRealDir(entry.packageName, entry.fromDir) || `${entry.packageName}\u0000${entry.fromDir}`;
       if (seen.has(key)) {
@@ -1532,7 +1532,7 @@ module.exports = {
   resolveMonorepoRoot,
   packageDir,
   findBrandRoot,
-  discoverApps,
+  discoverTargets,
   frameworkPackagesOf,
   linkLocalPackages,
   restoreRegistrySpecs,

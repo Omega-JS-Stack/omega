@@ -373,7 +373,7 @@ async function generate(Manager, ctx, settings, opts = {}) {
     try {
       const beehiivProvider = require('../providers/beehiiv.js');
       const result = await beehiivProvider.createPost({
-        publicationId: newsletterRoleConfig.publicationId,
+        publicationId: newsletterRoleConfig.providers?.beehiiv?.publicationId,
         title:         structure.subject,
         subject:       structure.subject,
         preheader:     structure.preheader,

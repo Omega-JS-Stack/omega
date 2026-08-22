@@ -153,14 +153,14 @@ jobs:
       # npm's script-approval gating skips puppeteer's postinstall (its Chrome download)
       # on the runner, so fetch the browser explicitly via puppeteer's own CLI.
       - name: Install puppeteer browser
-        working-directory: apps/sandbox-brand
+        working-directory: brands/sandbox-brand
         run: npx puppeteer browsers install chrome
 
       # The backend APP ROOT owns the install (src/dist pillar: dist/ is staged
       # output; the ONE app manifest carries @omega.js/backend via file: to
       # packages/backend). Standalone install, no lockfile → npm install.
       - name: Sandbox backend deps
-        working-directory: apps/sandbox-brand/apps/backend
+        working-directory: brands/sandbox-brand/targets/backend
         run: npm install
 
       # Runner headroom snapshot — the corpus keeps dying runner-level on CI
@@ -172,13 +172,13 @@ jobs:
 
       # Full @omega.js/backend corpus (routes/events/rules/email/mcp) against the fresh consumer
       - name: Sandbox backend corpus
-        working-directory: apps/sandbox-brand
+        working-directory: brands/sandbox-brand
         run: npm run test:backend
 
       # Real stack, real browser: emulator + built website (@omega.js/client bundle) +
       # puppeteer signup → @omega.js/backend onCreate → signin → session persistence → subscription
       - name: Cross-stack e2e
-        working-directory: apps/sandbox-brand
+        working-directory: brands/sandbox-brand
         run: npm test
 
       # Catch the resource spike in the act (see the suites job's twin step) —

@@ -6,7 +6,7 @@
  *   node scripts/copy-legacy-env.js --dry-run       # show the plan only
  *   node scripts/copy-legacy-env.js --include=signing,stores
  *   node scripts/copy-legacy-env.js --only=CLOUDFLARE_TOKEN
- *   node scripts/copy-legacy-env.js --brand=apps/other-brand --force
+ *   node scripts/copy-legacy-env.js --brand=brands/other-brand --force
  *
  * Ian runs this himself (credential moves are human-run by policy); the
  * script never prints secret values — only key names and what happened.
@@ -31,7 +31,7 @@ const path = require('node:path');
 // Defaults
 const REPO_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_SOURCE = '/Users/ian/Developer/Repositories/ITW-Creative-Works/omega-manager/.env';
-const DEFAULT_BRAND = 'apps/omega-playground';
+const DEFAULT_BRAND = 'brands/omega-playground';
 
 // One authoritative list per group — key names only, never values.
 const KEY_GROUPS = {

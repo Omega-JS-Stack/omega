@@ -1,6 +1,6 @@
 /**
  * Resolve a framework's `omega` bin FILE via the node_modules directory climb
- * from where the app declares it. A manual walk (not require.resolve) because
+ * from where the target declares it. A manual walk (not require.resolve) because
  * exports-restricted packages don't expose ./package.json. Shared by the
  * brand-root fan-out commands (`omega test`, `omega deploy`).
  */

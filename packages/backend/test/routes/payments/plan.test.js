@@ -1,13 +1,13 @@
 /**
- * Test: POST /payments/plan — guards and the per-processor capability gate
+ * Test: POST /payments/plan — guards and the per-provider capability gate
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
  * Plan-switch is an OWNED route next to cancel, cross-provider and capability-gated
- * the same way uncancel is: a processor that can move a live subscription between
+ * the same way uncancel is: a provider that can move a live subscription between
  * plans EXPORTS `switchPlan`, one that cannot simply lacks the export.
  *
  * The route is called directly against a real ctx (the _route-harness technique),
- * so one test can choose a processor, a product and a frequency without minting a
+ * so one test can choose a provider, a product and a frequency without minting a
  * persona per permutation. The full end-to-end pipeline run lives in
  * test/events/payments/journey-payments-plan-switch.test.js.
  *
@@ -17,10 +17,10 @@ const { buildUser, callHandler, recordingResponse } = require('./_route-harness.
 
 const handler = require('../../../src/manager/routes/payments/plan/post.js');
 
-const PROCESSORS = ['stripe', 'chargebee', 'paypal', 'test'];
+const PROVIDERS = ['stripe', 'chargebee', 'paypal', 'test'];
 
-function processorModule(name) {
-  return require(`../../../src/manager/routes/payments/plan/processors/${name}.js`);
+function providerModule(name) {
+  return require(`../../../src/manager/routes/payments/plan/providers/${name}.js`);
 }
 
 // Two distinct paid subscription products from the brand's own config — the
@@ -36,7 +36,7 @@ function paidPair(config, skip) {
 }
 
 // A paying subscriber sitting on `product` at `frequency`.
-function subscriber(Manager, { uid, product, frequency, processor, resourceId, pending }) {
+function subscriber(Manager, { uid, product, frequency, provider, resourceId, pending }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
 
   return buildUser(Manager, {
@@ -47,7 +47,7 @@ function subscriber(Manager, { uid, product, frequency, processor, resourceId, p
       status: 'active',
       cancellation: { pending: pending === true },
       payment: {
-        processor: processor === undefined ? 'test' : processor,
+        provider: provider === undefined ? 'test' : provider,
         resourceId: resourceId === undefined ? 'sub_test_plan_guard' : resourceId,
         frequency: frequency,
         startDate: { timestamp: new Date(lastYearUNIX * 1000).toISOString(), timestampUNIX: lastYearUNIX },
@@ -100,7 +100,7 @@ function frequencyOf(product) {
 }
 
 module.exports = {
-  description: 'Payment plan endpoint: guards + processor capability gate',
+  description: 'Payment plan endpoint: guards + provider capability gate',
   type: 'group',
   timeout: 15000,
 
@@ -225,7 +225,7 @@ module.exports = {
       async run({ assert, Manager, config, skip }) {
         // The QA repro's actual state: `payment.frequency` never got recorded,
         // so a pair comparison alone ('monthly' === undefined) let the no-op
-        // through to a real processor call. With nothing to compare, the product
+        // through to a real provider call. With nothing to compare, the product
         // id decides and EVERY cadence of it is refused — the same conservatism
         // the modal applies, and the reason the backend can stop leaning on it.
         const { from } = paidPair(config, skip);
@@ -248,11 +248,11 @@ module.exports = {
         // The conservative branch keys on the PRODUCT — it must not become a
         // blanket refusal for an account whose frequency was never written.
         const { from, to } = paidPair(config, skip);
-        const user = subscriber(Manager, { uid: '_test-plan-no-frequency-other', product: from, frequency: undefined, processor: 'unknown-processor' });
+        const user = subscriber(Manager, { uid: '_test-plan-no-frequency-other', product: from, frequency: undefined, provider: 'unknown-provider' });
 
         const sent = await switchPlan(Manager, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `Expected the unknown-processor gate, got ${sent.code}`);
+        assert.equal(sent.code, 400, `Expected the unknown-provider gate, got ${sent.code}`);
         assert.ok(!/already on/i.test(`${sent.body}`), `A different product must clear the same-plan guard, got: ${sent.body}`);
       },
     },
@@ -280,14 +280,14 @@ module.exports = {
       async run({ assert, Manager, config, skip }) {
         // Swapping the price under a scheduled cancellation would land the user
         // on a NEW plan still set to end at period end, silently. Undo the
-        // cancellation first — the processor is deliberately unknown here, so a
+        // cancellation first — the provider is deliberately unknown here, so a
         // refusal before that gate is the proof nothing was dispatched.
         const { from, to } = paidPair(config, skip);
         const user = subscriber(Manager, {
           uid: '_test-plan-cancelling',
           product: from,
           frequency: frequencyOf(from),
-          processor: 'unknown-processor',
+          provider: 'unknown-provider',
           pending: true,
         });
 
@@ -304,7 +304,7 @@ module.exports = {
       auth: 'none',
       async run({ assert, Manager, config, skip }) {
         // Monthly → annually on ONE product is a real switch: the same-plan guard
-        // keys on product AND frequency, never on product alone. The processor is
+        // keys on product AND frequency, never on product alone. The provider is
         // deliberately unknown, so the route stops at the NEXT gate — reaching it
         // is the proof, and nothing is dispatched.
         const { from } = paidPair(config, skip);
@@ -314,11 +314,11 @@ module.exports = {
           skip(`Product ${from.id} is priced at a single frequency`);
         }
 
-        const user = subscriber(Manager, { uid: '_test-plan-frequency', product: from, frequency: frequencies[0], processor: 'unknown-processor' });
+        const user = subscriber(Manager, { uid: '_test-plan-frequency', product: from, frequency: frequencies[0], provider: 'unknown-provider' });
 
         const sent = await switchPlan(Manager, user, { productId: from.id, frequency: frequencies[1] });
 
-        assert.equal(sent.code, 400, `Expected the unknown-processor gate, got ${sent.code}`);
+        assert.equal(sent.code, 400, `Expected the unknown-provider gate, got ${sent.code}`);
         assert.ok(!/already on/i.test(`${sent.body}`), `A frequency change must clear the same-plan guard, got: ${sent.body}`);
       },
     },
@@ -328,37 +328,37 @@ module.exports = {
       auth: 'none',
       async run({ assert, Manager, config, skip }) {
         const { from, to } = paidPair(config, skip);
-        const user = subscriber(Manager, { uid: '_test-plan-no-processor', product: from, frequency: frequencyOf(from), processor: null, resourceId: null });
+        const user = subscriber(Manager, { uid: '_test-plan-no-provider', product: from, frequency: frequencyOf(from), provider: null, resourceId: null });
 
         const sent = await switchPlan(Manager, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `Without a processor there is nothing to call, got ${sent.code}`);
+        assert.equal(sent.code, 400, `Without a provider there is nothing to call, got ${sent.code}`);
       },
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       auth: 'none',
       async run({ assert, Manager, config, skip }) {
         const { from, to } = paidPair(config, skip);
-        const user = subscriber(Manager, { uid: '_test-plan-unknown-processor', product: from, frequency: frequencyOf(from), processor: 'unknown-processor' });
+        const user = subscriber(Manager, { uid: '_test-plan-unknown-provider', product: from, frequency: frequencyOf(from), provider: 'unknown-provider' });
 
         const sent = await switchPlan(Manager, user, { productId: to.id, frequency: frequencyOf(to) });
 
-        assert.equal(sent.code, 400, `An unknown processor must be refused, got ${sent.code}`);
+        assert.equal(sent.code, 400, `An unknown provider must be refused, got ${sent.code}`);
       },
     },
 
     // ─── the capability TABLE: the export list IS the contract ───
 
     {
-      name: 'every-processor-supports-plan-switch',
+      name: 'every-provider-supports-plan-switch',
       auth: 'none',
       async run({ assert }) {
-        // Unlike uncancel, every processor here can move a live subscription:
+        // Unlike uncancel, every provider here can move a live subscription:
         // Stripe updates the item, Chargebee updates for items, PayPal revises.
-        PROCESSORS.forEach((name) => {
-          assert.equal(typeof processorModule(name).switchPlan, 'function', `${name} should export switchPlan()`);
+        PROVIDERS.forEach((name) => {
+          assert.equal(typeof providerModule(name).switchPlan, 'function', `${name} should export switchPlan()`);
         });
       },
     },

@@ -1,6 +1,6 @@
 /**
  * Shared comp-plan reconciliation for the operator-product services
- * (slapform, chatsy, replyify): the brand's owner account on the product is
+ * (forms, chat, email): the brand's owner account on the product is
  * set to the configured plan as an internal comp.
  *
  * Diff-synced on the subscription's leaf fields, and the patch masks only
@@ -15,7 +15,7 @@ const SUBSCRIPTION_FIELD_PATHS = [
   'subscription.product.id',
   'subscription.product.name',
   'subscription.status',
-  'subscription.payment.processor',
+  'subscription.payment.provider',
   'subscription.payment.frequency',
   'subscription.payment.price',
   'subscription.payment.resourceId',
@@ -38,7 +38,7 @@ async function ensureOwnerPlan({ db, ownerUid, plan, dryRun }) {
     product: { id: plan.id, name: plan.name },
     status: 'active',
     payment: {
-      processor: 'internal',
+      provider: 'internal',
       frequency: 'annually',
       price: 0,
       resourceId: null,
@@ -52,7 +52,7 @@ async function ensureOwnerPlan({ db, ownerUid, plan, dryRun }) {
   const drifted = sub.product?.id !== plan.id
     || sub.product?.name !== plan.name
     || sub.status !== 'active'
-    || sub.payment?.processor !== 'internal'
+    || sub.payment?.provider !== 'internal'
     || sub.payment?.frequency !== 'annually'
     || sub.payment?.price !== 0
     || (sub.payment?.resourceId ?? null) !== null

@@ -11,7 +11,8 @@ async function initOptions(config) {
   await manager.initialize({ ...TEST_CONFIG, ...config });
 
   const sentry = manager.sentry();
-  await sentry.init({ provider: 'sentry', dsn: 'https://key@o1.ingest.sentry.io/1' }).catch(() => {});
+  // The flat SENTRY PROVIDER block the build maps from monitoring.providers.sentry (#425)
+  await sentry.init({ dsn: 'https://key@o1.ingest.sentry.io/1' }).catch(() => {});
 
   return sentry.config;
 }

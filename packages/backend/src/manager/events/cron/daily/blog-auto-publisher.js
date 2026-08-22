@@ -58,7 +58,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
   const contentArray = powertools.arrayify(blog.content);
   const { admin } = libraries;
 
-  const providerName = blog.provider || 'ghostii';
+  const providerName = Object.keys(blog.providers || {}).find((key) => blog.providers[key]) || 'ghostii';
   const provider = require(`../../../libraries/content/${providerName}.js`);
 
   for (const entry of contentArray) {
@@ -159,14 +159,13 @@ async function harvest(ctx, entry, admin, provider, Manager) {
     const resolved = buildPromptFromSource(source, entry);
 
     if (allKnownTitles.length) {
-      resolved.description += '\n\nTOPIC DEDUPLICATION (STRICT):\n'
-        + 'These articles were RECENTLY published on our blog. You MUST NOT write about the same topic, theme, or subject area as ANY of them.\n'
-        + 'Do NOT cover the same story from a different angle, do NOT write about the same theme with different examples, '
-        + 'and do NOT reuse the same primary keyword/category combination. '
-        + 'If a recent article covers "lifestyle tech + habits", do NOT write about "lifestyle tech + policy" — that is the SAME theme. '
-        + 'Pick an entirely different domain.\n'
-        + 'Recent articles:\n'
-        + allKnownTitles.slice(0, 25).map((t) => `- ${t}`).join('\n');
+      resolved.description += `\n\nTOPIC DEDUPLICATION (STRICT):\n`
+        + `These articles were RECENTLY published on our blog. You MUST NOT write about the same topic, theme, or subject area as ANY of them.\n`
+        + `Do NOT cover the same story from a different angle, do NOT write about the same theme with different examples, `
+        + `and do NOT reuse the same primary keyword/category combination. `
+        + `If a recent article covers "lifestyle tech + habits", do NOT write about "lifestyle tech + policy" — that is the SAME theme. `
+        + `Pick an entirely different domain.\n`
+        + `Recent articles:\n${allKnownTitles.slice(0, 25).map((t) => `- ${t}`).join('\n')}`;
     }
 
     ctx.log('harvest(): Resolved source', { type: source.type, title: source.title, url: source.url });

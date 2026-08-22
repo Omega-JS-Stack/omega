@@ -2,13 +2,13 @@
  * Brand-monorepo scaffolding — the file plan the onboard wizard writes.
  *
  * buildScaffoldPlan() turns the wizard's answers into the plan-§0 skeleton:
- * config/omega.json5, root package.json (apps/* workspaces), .gitignore, the
+ * config/omega.json5, root package.json (targets/* workspaces), .gitignore, the
  * .env credential stub, README.md, and a minimal package.json per enabled
- * target's app dir. applyScaffoldPlan() writes it with fill-missing
+ * target's own dir. applyScaffoldPlan() writes it with fill-missing
  * semantics: existing files are NEVER touched, so onboarding is idempotent
  * and re-running it into a partial brand only fills the gaps.
  *
- * App package.jsons carry their framework dep (`*` — satisfied by workspace
+ * Target package.jsons carry their framework dep (`*` — satisfied by workspace
  * links in a monorepo, `mgr i local` pre-publish, npm post-publish; dogfood
  * friction #2), so install → setup works without hand-editing; each
  * framework's own setup still owns the consumer INTERIOR (scripts, config,
@@ -20,8 +20,9 @@
 const path = require('node:path');
 const { randomBytes, randomUUID } = require('node:crypto');
 const jetpack = require('fs-jetpack');
+const chalk = require('chalk').default;
 
-const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
+const { TARGET_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
 // The canonical group list + renderer live in env-order.js (the ordering
 // SSOT, cp137) — the stub is just a canonical render with generated Omega
 // keys, so a scaffolded .env and a reordered one have the same shape.
@@ -31,7 +32,7 @@ const { renderCanonicalEnv } = require('./env-order.js');
 const { MANAGE_SCRIPT } = require('./package-scripts.js');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
-// step derives dist/package.json from the app manifest's `dependencies`
+// step derives dist/package.json from the target manifest's `dependencies`
 // (src/dist pillar). Every other target's framework is build-time only.
 const RUNTIME_DEP_TARGETS = ['backend'];
 
@@ -42,8 +43,8 @@ const RUNTIME_DEP_TARGETS = ['backend'];
  */
 function renderOmegaConfig(answers) {
   const lines = [
-    `// ${answers.name} — brand-level omega.json5: the shared config layer every app`,
-    '// under apps/ inherits. App files override any key per-surface; key presence',
+    `// ${answers.name} — brand-level omega.json5: the shared config layer every target`,
+    '// under targets/ inherits. Local files override any key per-surface; key presence',
     '// under `targets` = this brand supports that target. Secrets NEVER live here —',
     '// they go in the gitignored .env (the loader hard-fails on secret-shaped keys).',
     '{',
@@ -119,7 +120,7 @@ function renderOmegaConfig(answers) {
   lines.push(
     '  // Payment catalog — pricing pages render THESE products (no products =',
     '  // honest empty state). Uncomment + edit to start selling; ids are',
-    '  // permanent once live. Processor id fields (stripe/paypal/chargebee) are',
+    '  // permanent once live. Provider id fields (stripe/paypal/chargebee) are',
     '  // filled by the payment service — leave them null. Presentation fields',
     '  // (tagline, popular, features) are optional card garnish.',
     '  // payment: {',
@@ -149,8 +150,10 @@ function renderOmegaConfig(answers) {
       '  // the company/brand domain at onboarding. Bundle IDs mint as',
       '  // <prefix>.<brand id with dashes as dots>.',
       '  certificates: {',
-      '    apple: {',
-      `      bundleIdPrefix: ${JSON.stringify(answers.bundleIdPrefix)},`,
+      '    providers: {',
+      '      apple: {',
+      `        bundleIdPrefix: ${JSON.stringify(answers.bundleIdPrefix)},`,
+      '      },',
       '    },',
       '  },',
       '',
@@ -177,7 +180,7 @@ function renderRootPackageJson(answers) {
     name: answers.id,
     private: true,
     ...(answers.description ? { description: answers.description } : {}),
-    workspaces: ['apps/*'],
+    workspaces: ['targets/*'],
     // npm scripts put node_modules/.bin on PATH, so plain `omega` (the
     // context-aware dispatcher) resolves — never the retired omega-manager name
     // `npm start` boots the dev stack (`dev` stays as its alias); the bare
@@ -239,11 +242,11 @@ function renderEnvStub(answers) {
 }
 
 function renderReadme(answers) {
-  const appList = answers.targets
+  const targetList = answers.targets
     .map((target) => {
-      const dir = TARGET_APP_DIRS[target] || target;
+      const dir = TARGET_DIRS[target] || target;
       const framework = TARGET_FRAMEWORKS[target];
-      return `- \`apps/${dir}/\` — the ${target} app${framework ? ` (framework: \`${framework}\`)` : ''}`;
+      return `- \`targets/${dir}/\` — the ${target} target${framework ? ` (framework: \`${framework}\`)` : ''}`;
     })
     .join('\n');
 
@@ -257,36 +260,36 @@ to it, idempotently.
 
 ## Structure
 
-- \`config/omega.json5\` — brand-level shared config (apps inherit + override)
-${appList}
+- \`config/omega.json5\` — brand-level shared config (targets inherit + override)
+${targetList}
 - \`.env\` — credentials (gitignored; see the stub for every service's keys)
 - \`.omega/\` — manager state + run output (gitignored, machine-owned)
 
 ## Next steps
 
-1. \`npm install\` — each app declares its framework (workspace link in a
-   monorepo; standalone pre-publish: \`npx mgr i local\` inside each app).
-2. Per app: \`cd apps/<dir> && npx omega setup\` — the framework scaffolds its
+1. \`npm install\` — each target declares its framework (workspace link in a
+   monorepo; standalone pre-publish: \`npx mgr i local\` inside each target).
+2. Per target: \`cd targets/<dir> && npx omega setup\` — the framework scaffolds its
    consumer interior.
 3. Fill in \`.env\` as the brand adopts external services.
 4. \`npm run manage\` — reconcile everything; rerun any time.
 `;
 }
 
-function renderAppPackageJson(answers, target, dir) {
+function renderTargetPackageJson(answers, target, dir) {
   const framework = TARGET_FRAMEWORKS[target];
   // `*`: satisfied by a workspace link in-monorepo, `mgr i local` pre-publish,
   // and the npm registry once @omega.js/* publish.
   const depKey = RUNTIME_DEP_TARGETS.includes(target) ? 'dependencies' : 'devDependencies';
 
   // version + author: electron-builder hard-requires version and warns on
-  // author (the cp142 rehearsal catch) — every app gets both, they're healthy
+  // author (the cp142 rehearsal catch) — every target gets both, they're healthy
   return `${JSON.stringify({
     name: `${answers.id}-${dir}`,
     version: '0.0.1',
     author: answers.name,
     private: true,
-    description: `${answers.name} ${target} app`,
+    description: `${answers.name} ${target} target`,
     ...(framework ? { [depKey]: { [framework]: '*' } } : {}),
   }, null, 2)}\n`;
 }
@@ -307,8 +310,8 @@ function buildScaffoldPlan(answers) {
   ];
 
   for (const target of answers.targets) {
-    const dir = TARGET_APP_DIRS[target] || target;
-    plan.push({ path: `apps/${dir}/package.json`, contents: renderAppPackageJson(answers, target, dir) });
+    const dir = TARGET_DIRS[target] || target;
+    plan.push({ path: `targets/${dir}/package.json`, contents: renderTargetPackageJson(answers, target, dir) });
   }
 
   return plan;
@@ -348,4 +351,20 @@ function applyScaffoldPlan(brandRoot, plan, { dryRun = false } = {}) {
   return { created, kept, planned };
 }
 
-module.exports = { buildScaffoldPlan, applyScaffoldPlan };
+/**
+ * Print what a plan did — the one rendering of created/kept/planned, shared
+ * by every scaffolding verb (onboard's brand plan, company init's).
+ */
+function printPlanResults({ created, kept, planned }) {
+  for (const file of planned) {
+    console.log(`  ${chalk.dim('⊘')} would create ${chalk.cyan(file)}`);
+  }
+  for (const file of created) {
+    console.log(`  ${chalk.green('✓')} created ${chalk.cyan(file)}`);
+  }
+  for (const file of kept) {
+    console.log(`  ${chalk.dim('•')} kept ${chalk.dim(file)} ${chalk.dim('(exists)')}`);
+  }
+}
+
+module.exports = { buildScaffoldPlan, applyScaffoldPlan, printPlanResults };

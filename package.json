@@ -6,7 +6,7 @@
   "license": "Elastic-2.0",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "brands/*"
   ],
   "engines": {
     "node": ">=22"

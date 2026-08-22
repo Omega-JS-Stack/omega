@@ -4,7 +4,7 @@ The repeatable recipe for driving a REAL PayPal sandbox payment through the depl
 playground backend, proven 2026-08-17 on the [#240](https://github.com/Omega-JS-Stack/omega/issues/240)
 v1 sale fixture drive. Use it whenever a webhook change needs a live delivery instead
 of a fixture replay. [#348](https://github.com/Omega-JS-Stack/omega/issues/348) precreated
-what it could: the QA product's processor objects exist on every processor. The BUYER
+what it could: the QA product's provider objects exist on every provider. The BUYER
 stays hand-made — PayPal retired the sandbox-accounts API (see below).
 
 ## The standing fixtures
@@ -13,20 +13,20 @@ stays hand-made — PayPal retired the sandbox-accounts API (see below).
   "test facilitator's Test Store", PayPal's default; rename in the developer
   dashboard if the checkout header matters). Creds: `PAYPAL_CLIENT_ID` +
   `PAYPAL_CLIENT_SECRET` in the playground backend's `.env`
-  (`apps/omega-playground/apps/backend/.env`). The manager wants the client id in
-  config (`payment.processors.paypal.clientId`) and only the secret in `.env`;
+  (`brands/omega-playground/targets/backend/.env`). The manager wants the client id in
+  config (`payment.providers.paypal.clientId`) and only the secret in `.env`;
   the backend wants both as env vars.
 - **Webhook** — registered by the manager payment walk, pointing at the deployed
   playground backend (`api.playground.omegajs.dev/omega/payments/webhook`).
   Deliveries arrive with real signature headers; the deployed backend is the
   verification surface (a local emulator receives nothing — no forwarding path).
 - **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial)
-  in `apps/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
+  in `brands/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
   tier carries a 14-day trial, which defers a subscription's first sale two weeks.
   It lists on the playground /pricing page on purpose (Ian 2026-08-19, #348) so
   real checkouts can be run against it by hand; the `hidden: true` mechanism
   remains available for products that should stay off /pricing.
-  The manager payment walk owns the processor objects
+  The manager payment walk owns the provider objects
   (`npx mgr manage --service=payment` at the playground root); read the current
   ids from the config write-backs (`stripe.productId`, `paypal.productId`) and
   list plans via `GET /v1/billing/plans?product_id=<paypal.productId>`.
@@ -39,13 +39,16 @@ stays hand-made — PayPal retired the sandbox-accounts API (see below).
   carries no sandbox-account scope (asking for one downgrades the token to
   `openid`), the legacy `/v1/customer/partners/{merchant_id}/accounts` route 404s
   even with our real merchant id, and every `developer.paypal.com` account path
-  redirects to an interactive login. Don't spend time re-probing it.
+  redirects to an interactive login. Don't spend time re-probing it. Because the
+  walk cannot precreate the buyer, it REMINDS instead: a payment walk whose PayPal
+  credentials resolve to sandbox closes `paypal-products` with the buyer note and
+  the Sandbox → Accounts deep link (silent in live mode).
 
 ## Two lanes — pick deliberately (Ian's ruling, 2026-08-17)
 
 - **Default: through omega's checkout.** Drive the deployed playground site's
   checkout page as a user. That exercises the FULL pipeline — payments-intent,
-  cart, processor object, confirmation redirect — and the webhook folds onto an
+  cart, provider object, confirmation redirect — and the webhook folds onto an
   existing trail. Any "does the pipeline work" drive belongs here.
 - **Exception: raw API, only when the test target is the recovery path.** A
   subscription created straight through PayPal's API arrives at the webhook with

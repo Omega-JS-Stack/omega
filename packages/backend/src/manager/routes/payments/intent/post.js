@@ -1,5 +1,5 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 const OrderId = require('../../../libraries/payment/order-id.js');
 const recaptcha = require('../../../libraries/recaptcha.js');
@@ -25,7 +25,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   // account deleted mid-session — and a checkout begun without it ends as a
   // webhook with nowhere to write, which the pipeline then refuses on its own
   // ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)). Refusing HERE
-  // means no processor session, no intent doc, and no half-written account.
+  // means no provider session, no intent doc, and no half-written account.
   //
   // The DOC half is defense in depth on the token lane — authenticate() only calls
   // a JWT caller authenticated once it has read their user doc — and the live gate
@@ -52,7 +52,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   }
 
   const uid = user.auth.uid;
-  const processor = settings.processor;
+  const provider = settings.provider;
   const productId = settings.productId;
   const frequency = settings.frequency;
   const attribution = settings.attribution;
@@ -62,7 +62,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const simulate = settings.simulate;
   let trial = settings.trial;
 
-  ctx.log(`Intent request: uid=${uid}, processor=${processor}, product=${productId}, frequency=${frequency}, trial=${trial}, simulate=${simulate || 'none'}`);
+  ctx.log(`Intent request: uid=${uid}, provider=${provider}, product=${productId}, frequency=${frequency}, trial=${trial}, simulate=${simulate || 'none'}`);
 
   // Validate product exists in config
   const product = (Manager.config.payment?.products || []).find(p => p.id === productId);
@@ -126,21 +126,21 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   ctx.log(`Generated orderId=${orderId}`);
 
   // Build redirect URLs
-  const confirmationUrl = buildConfirmationUrl(Manager.project.websiteUrl, { product, productId, productType, frequency, processor, trial, orderId, discount: resolvedDiscount });
+  const confirmationUrl = buildConfirmationUrl(Manager.project.websiteUrl, { product, productId, productType, frequency, provider, trial, orderId, discount: resolvedDiscount });
   const cancelUrl = buildCancelUrl(Manager.project.websiteUrl, { productId, frequency });
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Create the intent via the processor
+  // Create the intent via the provider
   let result;
   try {
-    result = await processorModule.createIntent({
+    result = await providerModule.createIntent({
       uid,
       orderId,
       product,
@@ -154,13 +154,13 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       ctx,
     });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to create ${processor} intent: uid=${uid}, product=${productId}, error=${e.message}`);
+    ctx.error(`Failed to create ${provider} intent: uid=${uid}, product=${productId}, error=${e.message}`);
     return ctx.respond('We could not start your checkout right now. Please try again shortly.', { code: 500 });
   }
 
-  ctx.log(`${processor} intent created: id=${result.id}, url=${result.url}`);
+  ctx.log(`${provider} intent created: id=${result.id}, url=${result.url}`);
 
   // Build timestamps
   const now = powertools.timestamp(new Date(), { output: 'string' });
@@ -170,7 +170,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   await admin.firestore().doc(`payments-intents/${orderId}`).set({
     id: orderId,
     intentId: result.id,
-    processor: processor,
+    provider: provider,
     owner: uid,
     status: 'pending',
     productId: productId,
@@ -181,7 +181,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     trackingConsent: trackingConsent,
     // The CUSTOMER's request context, captured here because this is the only
     // moment the backend hears from their browser: the webhook that completes
-    // the order arrives from the processor's servers. Meta and TikTok match a
+    // the order arrives from the provider's servers. Meta and TikTok match a
     // server conversion to the browsing session on exactly this pair
     // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)), and the
     // order fold copies it off the intent.
@@ -239,12 +239,12 @@ async function findMissingPurchaser(admin, uid) {
  * `amount` is what the customer is charged TODAY, not the list price: the
  * confirmation page hands that param straight to the client's analytics modules,
  * so quoting the list price on a discounted checkout over-reports revenue to
- * GA4/pixels. The discount comes off HERE rather than in a processor, because a
- * real processor applies the coupon on its own hosted page and never revisits
- * this URL — quoting it processor-side would have left every Stripe checkout
+ * GA4/pixels. The discount comes off HERE rather than in a provider, because a
+ * real provider applies the coupon on its own hosted page and never revisits
+ * this URL — quoting it provider-side would have left every Stripe checkout
  * reporting the full price ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
  */
-function buildConfirmationUrl(baseUrl, { product, productId, productType, frequency, processor, trial, orderId, discount }) {
+function buildConfirmationUrl(baseUrl, { product, productId, productType, frequency, provider, trial, orderId, discount }) {
   const listPrice = productType === 'subscription'
     ? (product.prices?.[frequency] || 0)
     : (product.prices?.once || 0);
@@ -261,7 +261,7 @@ function buildConfirmationUrl(baseUrl, { product, productId, productType, freque
   url.searchParams.set('amount', String(amount));
   url.searchParams.set('currency', 'USD');
   url.searchParams.set('frequency', frequency || 'once');
-  url.searchParams.set('paymentMethod', processor);
+  url.searchParams.set('paymentMethod', provider);
   url.searchParams.set('trial', String(!!trial && !!product.trial?.days));
   url.searchParams.set('orderId', orderId);
   url.searchParams.set('track', 'true');
@@ -285,6 +285,6 @@ function buildCancelUrl(baseUrl, { productId, frequency }) {
   return url.toString();
 }
 
-// Exported for testing — the discounted `amount` is a processor-independent
-// promise of this route, not of whichever processor happens to run
+// Exported for testing — the discounted `amount` is a provider-independent
+// promise of this route, not of whichever provider happens to run
 module.exports.buildConfirmationUrl = buildConfirmationUrl;

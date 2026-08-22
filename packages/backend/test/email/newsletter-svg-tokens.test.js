@@ -17,7 +17,7 @@ const { generateSectionImage } = require('../../src/manager/libraries/email/gene
 const NO_SVG_PROMPT = '[[reply:a description, not markup]]';
 
 const NEWSLETTER_CONFIG = { provider: { svg: 'test' }, model: { svg: 'test' } };
-const BRAND = { name: 'Paperloom', color: { primary: '#5B5BFF', secondary: '#1E1E2A' } };
+const BRAND = { name: 'OMEGA Playground', color: { primary: '#5B5BFF', secondary: '#1E1E2A' } };
 
 module.exports = {
   description: 'Newsletter SVG illustrator (retry token accounting)',

@@ -130,7 +130,7 @@ Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and 
 
 ### Defaults system
 
-`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so setup composes the app's CI into the brand root as `.github/workflows/<app>-publish.yml` — app-scoped, per-app concurrency, regenerated (never duplicated) on every setup, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
+`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so setup composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every setup, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
 
 ### Auto-translation
 

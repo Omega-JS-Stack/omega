@@ -71,7 +71,7 @@ const FIXTURES = {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
       payment: {
-        processor: 'stripe',
+        provider: 'stripe',
         orderId: 'or_123',
         resourceId: 'sub_123',
         frequency: 'monthly',

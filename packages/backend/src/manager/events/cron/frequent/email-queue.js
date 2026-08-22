@@ -9,7 +9,7 @@ const SEND_AT_LIMIT = 71;
 const MAX_RETRIES = 5;
 
 /**
- * Email queue processor cron job
+ * Email queue provider cron job
  *
  * Picks up emails from the `emails-queue` collection that are now within
  * SendGrid's 71-hour scheduling window and sends them back through the

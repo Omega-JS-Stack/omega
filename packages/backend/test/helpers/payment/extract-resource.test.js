@@ -1,20 +1,20 @@
 /**
- * Test: processor extractResource() — each library names its own webhook envelope
+ * Test: provider extractResource() — each library names its own webhook envelope
  *
  * The webhook trigger takes the stale fallback (the payload to use when the API
  * re-fetch fails) out of the event it received. It used to read Stripe's envelope
- * for every processor — `raw.data.object` — so a Chargebee event (`content.<type>`)
+ * for every provider — `raw.data.object` — so a Chargebee event (`content.<type>`)
  * or a PayPal event (`resource`) degraded to an empty fallback and the failed fetch
  * threw instead of falling back at all ([#222]).
  *
  * Each library now names its own shape, and these assert the shape against the
- * real fixtures each processor's route parser already reads.
+ * real fixtures each provider's route parser already reads.
  */
 const assert = require('node:assert');
-const Stripe = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const PayPal = require('../../../src/manager/libraries/payment/processors/paypal.js');
-const Chargebee = require('../../../src/manager/libraries/payment/processors/chargebee.js');
-const Test = require('../../../src/manager/libraries/payment/processors/test.js');
+const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../src/manager/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const Test = require('../../../src/manager/libraries/payment/providers/test.js');
 
 const chargebeeSubscriptionCreated = require('../../fixtures/chargebee/webhook-subscription-created.json');
 const chargebeeInvoiceOneTime = require('../../fixtures/chargebee/invoice-one-time.json');
@@ -24,7 +24,7 @@ const stripeCheckoutSession = require('../../fixtures/stripe/checkout-session-co
 const stripeEvent = { id: 'evt_test_session', type: 'checkout.session.completed', data: { object: stripeCheckoutSession } };
 
 module.exports = {
-  description: 'Processor extractResource() envelope shapes',
+  description: 'Provider extractResource() envelope shapes',
   type: 'group',
 
   tests: [
@@ -38,14 +38,14 @@ module.exports = {
     },
 
     {
-      name: 'test-processor-reads-stripes-envelope',
+      name: 'test-provider-reads-stripes-envelope',
       async run() {
-        // The test processor BUILDS Stripe-shaped payloads, so it reads the Stripe
+        // The test provider BUILDS Stripe-shaped payloads, so it reads the Stripe
         // envelope. Without its own extractResource it fell to the empty fallback —
-        // which is the whole journey lane, since every journey runs on this processor
+        // which is the whole journey lane, since every journey runs on this provider
         const resource = Test.extractResource(stripeEvent);
 
-        assert.equal(resource.id, stripeCheckoutSession.id, 'The test processor speaks Stripe, envelope included');
+        assert.equal(resource.id, stripeCheckoutSession.id, 'The test provider speaks Stripe, envelope included');
         assert.equal(Test.extractResource({ id: 'evt_empty' }), null, 'And answers nothing the same way Stripe does');
       },
     },

@@ -4,7 +4,7 @@
  * `getFirestore(brandId)` (which read `.output/{brandId}/secrets/`).
  *
  * Used by the services that write into an external product's Firestore
- * (slapform, and chatsy/replyify when they port): the operator provides a
+ * (forms, and chat/email when they port): the operator provides a
  * service-account JSON for that product's Firebase project via an env var
  * holding a file path (absolute, or relative to the brand root — e.g.
  * `.omega/secrets/slapform-service-account.json`).

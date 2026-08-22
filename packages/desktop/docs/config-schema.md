@@ -52,7 +52,7 @@ A non-empty credential value enables a feature — there is no separate `enabled
 
 | Feature | Enable signal | Disable signal |
 |---|---|---|
-| Sentry | `monitoring.dsn = 'https://...'` | `monitoring.dsn = ''` |
+| Sentry | `monitoring.providers.sentry.dsn = 'https://...'` | `monitoring.providers.sentry.dsn = ''` |
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
 | Firebase Auth (renderer) | `cloud.config.projectId = '...'` (etc.) | empty `cloud.config` |
 
@@ -101,7 +101,7 @@ Errors are numbered so you can fix everything in one pass instead of fix-rebuild
 ```js
 {
   payment: {
-    processors: {
+    providers: {
       stripe: { publishableKey: 'pk_live_...' },     // schema: match /^pk_(test|live)_/
       paypal: { clientId: '...' },
     },

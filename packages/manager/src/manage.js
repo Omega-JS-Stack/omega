@@ -1,10 +1,11 @@
 /**
  * The manage orchestrator — omega-manager's src/manage/index.js reborn for
  * brand monorepos. Resolves the brand root from the cwd, loads the brand
- * (omega.json5 + enabled targets + apps), then walks SERVICE_ORDER running
- * each service's operations idempotently. Durable state persists to
- * .omega/state.json after every service; transient output lands in
- * .omega/runs/{timestamp}.json; the summary prints last.
+ * (omega.json5 + enabled targets + target dirs), then walks SERVICE_ORDER running
+ * each service's operations idempotently. Every provisioned fact a service
+ * resolves lands in config/omega.json5 (secrets in .env) as it goes;
+ * transient output lands in .omega/runs/{timestamp}.json; the summary
+ * prints last.
  *
  * Company mode (many brands from one workspace — Ian's omega-manager case)
  * layers on top of this later: runManage() is already per-brand, so the
@@ -19,9 +20,10 @@ const { loadEnvChain } = require('@omega.js/config');
 const { SERVICE_ORDER, BOOT_SERVICES, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
 const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
-const { readState, writeState, writeRunOutput } = require('./lib/state.js');
+const { writeRunOutput } = require('./lib/run-output.js');
 const { formatDuration } = require('./lib/duration.js');
 const { runPreflight } = require('./lib/preflight.js');
+const ensureTargetsRename = require('./services/migrations/ensure/targets-rename.js');
 const { CONSENT_REQUIRED } = require('./lib/google-auth.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
@@ -33,11 +35,10 @@ const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-');
  *
  * @param {string} serviceName - Service to run
  * @param {Object} brand - Loaded brand (from loadBrand)
- * @param {Object} brandState - Durable state (per-service keyed)
  * @param {Object} options - Run options
  * @returns {Object} - { status, error?, state?, output? }
  */
-async function runService(serviceName, brand, brandState, options = {}) {
+async function runService(serviceName, brand, options = {}) {
   const operations = OPERATIONS[serviceName] || [];
 
   if (operations.length === 0) {
@@ -52,8 +53,9 @@ async function runService(serviceName, brand, brandState, options = {}) {
       return { status: 'skipped', reason: 'no run export' };
     }
 
-    // Pass service-specific state as initial serviceData; full brandState for
-    // cross-service access (e.g. analytics checking cloud.sdkConfig)
+    // No cross-run seed: a service reads what it needs from brandConfig (the
+    // one home for provisioned facts) or re-derives it from the platform, and
+    // a setup() may still seed serviceData for its own operations (#434)
     return await serviceModule.run({
       brandId: brand.id,
       brandRoot: brand.root,
@@ -65,11 +67,9 @@ async function runService(serviceName, brand, brandState, options = {}) {
       companyConfig: brand.companyConfig || null,
       brandConfig: brand.config,
       brand,
-      brandState,
-      apps: brand.apps,
+      targets: brand.targets,
       operations,
       options,
-      serviceData: brandState[serviceName] || {},
     });
   } catch (error) {
     // A consent gate thrown at setup time is a pending HUMAN step, not a
@@ -95,7 +95,8 @@ async function runService(serviceName, brand, brandState, options = {}) {
  *   migration? (true = all, string = one), execute? (the migrations write
  *   gate — without it the run only audits), limit?, ids? (migrations service),
  *   resetAssets? (true = both kinds, string = 'logos'/'templates'; assets
- *   service) }
+ *   service), force? (ignore the update service's incremental cache and
+ *   rebuild every target) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}
  */
 async function runManage(startDir, options = {}) {
@@ -106,6 +107,23 @@ async function runManage(startDir, options = {}) {
       `No brand monorepo found at or above ${startDir} — `
       + `expected a config/omega.json5 at the brand root (see docs/shared/config.md).`,
     );
+  }
+
+  // One vocabulary (#443): the apps/ → targets/ rename is a ONE-TIME
+  // migration, never healing inside a run. The brand it fixes cannot be
+  // walked — discovery fails loud on the old shape and every service below
+  // reads targets/ — so this ONE migration runs ALONE, ahead of the load that
+  // would throw on it, and stops there. It is registered like every other
+  // migration too (config.js OPERATIONS.migrations), so a bare `--migration`
+  // walk re-checks it on a converged brand.
+  if (options.migration === ensureTargetsRename.MIGRATION_NAME) {
+    console.log('');
+    console.log(chalk.bold.cyan(`🚀 Omega Manager ${chalk.dim(`— migration: ${ensureTargetsRename.MIGRATION_NAME}`)}`));
+    console.log(`  ${chalk.dim('Root:')}     ${brandRoot}`);
+
+    const result = await ensureTargetsRename({ brandRoot, options });
+
+    return { hasErrors: false, results: { migrations: result }, brand: null };
   }
 
   // Company layer: a company-managed brand carries a .omega/company.json
@@ -179,8 +197,8 @@ async function runManage(startDir, options = {}) {
   if (companyConfig) {
     console.log(`  ${chalk.dim('Company:')}  ${marker.companyRoot}`);
   }
-  console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.join(', ') || chalk.yellow('none enabled')}`);
-  console.log(`  ${chalk.dim('Apps:')}     ${brand.apps.map((a) => `${a.name}${a.target ? chalk.dim(`→${a.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
+  console.log(`  ${chalk.dim('Enabled:')}  ${brand.enabledTargets.join(', ') || chalk.yellow('none enabled')}`);
+  console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.map((entry) => `${entry.name}${entry.target ? chalk.dim(`→${entry.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
 
   // Preflight (the REQUIRES registry): check the enabled services' declared
@@ -200,8 +218,6 @@ async function runManage(startDir, options = {}) {
     options,
   });
 
-  // Load durable state (derived/runtime data)
-  const brandState = readState(brandRoot);
   const summary = new RunSummary();
   const results = {};
 
@@ -235,7 +251,7 @@ async function runManage(startDir, options = {}) {
       };
     } else {
       const startedAt = Date.now();
-      result = await runService(serviceName, brand, brandState, options);
+      result = await runService(serviceName, brand, options);
       // Wall time for the services that actually ran — the gated branches
       // above step aside instantly, so timing them is noise
       result.durationMs = Date.now() - startedAt;
@@ -250,21 +266,13 @@ async function runManage(startDir, options = {}) {
 
     summary.add(brand.id, brand.config.brand?.name || brand.id, serviceName, result);
 
-    // Persist durable state if the service returned any. Services split their
-    // return into result.state (durable IDs → state.json) and result.output
-    // (transient counts/errors → runs/{ts}.json). See lib/service-runner.js.
-    if (result.state) {
-      brandState[serviceName] = result.state;
-      writeState(brandRoot, brandState);
-    }
-
     if (result.status === 'error' && !options.continueOnError) {
       console.log(`  ${chalk.red(`Stopping due to error in ${serviceName}`)} ${chalk.dim('(--continue-on-error to keep going)')}`);
       break;
     }
   }
 
-  // Persist run output — transient stuff that does NOT belong in state.json
+  // Persist run output — this run's transients, for post-mortem debugging
   writeRunOutput(brandRoot, RUN_TIMESTAMP, brand.id, Object.entries(results).map(([service, result]) => ({
     service,
     status: result.status,

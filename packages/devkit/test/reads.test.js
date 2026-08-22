@@ -81,7 +81,7 @@ test('the union is deduped across reads and probes', (t) => {
 
 test('a path outside the consumer dir is recorded realpath-resolved', (t) => {
   const root = fixture(t, { 'packaged/core/_layouts/core.html': 'core', 'src/pages/index.html': 'page' });
-  // The linked-brand shape: node_modules sits at the APP root, beside src/
+  // The linked-brand shape: node_modules sits at the TARGET root, beside src/
   const linked = path.join(root, 'node_modules', '@omega.js', 'web');
   fs.mkdirSync(path.dirname(linked), { recursive: true });
   fs.symlinkSync(path.join(root, 'packaged'), linked);

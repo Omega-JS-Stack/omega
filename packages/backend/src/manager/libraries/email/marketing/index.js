@@ -73,7 +73,7 @@ function isMarketingRevoked(userDoc) {
 }
 
 /**
- * Look up a user doc by email (same query the marketing webhook processors use).
+ * Look up a user doc by email (same query the marketing webhook providers use).
  * Returns the doc data, or null when no user matches OR the lookup fails (fail open —
  * a rare duplicate add is recoverable; silently dropping contacts is not).
  *

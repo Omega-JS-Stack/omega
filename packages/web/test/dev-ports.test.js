@@ -75,15 +75,15 @@ test('config ports.website pins', async () => {
 // ---- websiteWantedPort (multi-instance offsets — deterministic, no binding)
 
 test('websiteWantedPort: each instance wants base + its array position, side-by-side capable', () => {
-  // 2-instance web brand: apps/website (main) + apps/website-admin
+  // 2-instance web brand: targets/website (main) + targets/website-admin
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-instances-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{
     brand: { id: 'acme', name: 'Acme' },
     targets: { web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.acme.test' }] },
   }`);
-  const website = path.join(brand, 'apps', 'website');
-  const admin = path.join(brand, 'apps', 'website-admin');
+  const website = path.join(brand, 'targets', 'website');
+  const admin = path.join(brand, 'targets', 'website-admin');
   fs.mkdirSync(website, { recursive: true });
   fs.mkdirSync(admin, { recursive: true });
 
@@ -106,7 +106,7 @@ test('websiteWantedPort: single-object brands and config-less dirs stay on the c
     brand: { id: 'acme', name: 'Acme' },
     targets: { web: {} },
   }`);
-  const website = path.join(brand, 'apps', 'website');
+  const website = path.join(brand, 'targets', 'website');
   fs.mkdirSync(website, { recursive: true });
 
   assert.equal(websiteWantedPort(website), 4000);
@@ -116,15 +116,15 @@ test('websiteWantedPort: single-object brands and config-less dirs stay on the c
 // ---- devPortsOption (the live dev chrome the engine bakes per render)
 
 /**
- * A brand with a website app and a backend publishing `ports` — no `ports`
+ * A brand with a website target and a backend publishing `ports` — no `ports`
  * means the backend has not published yet (the boot-order case, #346).
  */
 function bumpedBrand(ports) {
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-brand-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{}');
-  const backend = path.join(brand, 'apps', 'backend');
-  const website = path.join(brand, 'apps', 'website');
+  const backend = path.join(brand, 'targets', 'backend');
+  const website = path.join(brand, 'targets', 'website');
   fs.mkdirSync(path.join(backend, '.temp'), { recursive: true });
   fs.mkdirSync(path.join(website, '.temp'), { recursive: true });
   const publish = (map) => fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
@@ -166,10 +166,10 @@ test('the dev website ORIGIN is a resolved fact: published beside the map, carri
   // The chrome every client reads carries it beside the ports
   assert.equal(devPortsOption(website, 4001, devWebsiteOrigin(4001, true))().origin, 'https://localhost:4001');
 
-  // And so does the ports file, so a sibling app's BUILD can bake it
+  // And so does the ports file, so a sibling target's BUILD can bake it
   writePortsFile(website, { website: 4001 }, { origin: devWebsiteOrigin(4001, true) });
-  assert.equal(readSiblingOrigin(path.join(brand, 'apps', 'extension')), 'https://localhost:4001',
-    'the extension app beside it reads the resolved origin, protocol included');
+  assert.equal(readSiblingOrigin(path.join(brand, 'targets', 'extension')), 'https://localhost:4001',
+    'the extension target beside it reads the resolved origin, protocol included');
   assert.deepEqual(readPortsFile(website), { website: 4001 }, 'the port map reads back unchanged');
 });
 

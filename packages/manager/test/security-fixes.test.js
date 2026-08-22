@@ -52,7 +52,7 @@ test('redactWebhookUrl masks the key param and keeps the rest', () => {
   assert.ok(url.includes('key=super-secret-key'));
   assert.ok(!redacted.includes('super-secret-key'), redacted);
   assert.ok(redacted.includes('key=***'), redacted);
-  assert.ok(redacted.includes('processor=stripe'), redacted);
+  assert.ok(redacted.includes('provider=stripe'), redacted);
 });
 
 test('saveTokens writes the token store 0600 in a 0700 dir', { skip: process.platform === 'win32' }, () => {

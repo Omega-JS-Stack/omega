@@ -131,7 +131,7 @@ Manager.prototype.getMode = Manager.getMode;
 // @omega.js/config: shared sections (brand, cloud, analytics, payment, monitoring,
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
-// config merges underneath the app's. Then @omega.js/desktop's derived defaults:
+// config merges underneath the target's. Then @omega.js/desktop's derived defaults:
 //   app.appId       ← reverse-domain of brand.url (`https://foo.example.com` →
 //                     `com.example.foo`), else `app.${brand.id}` — the BRAND
 //                     owns the identity, never a hardcoded company (friction #18)

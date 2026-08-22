@@ -2,14 +2,14 @@
  * Test: POST /payments/portal — `returnUrl` must be the brand's own
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
- * `returnUrl` is client-settable and lands inside the processor's hosted billing
+ * `returnUrl` is client-settable and lands inside the provider's hosted billing
  * page as the "back to the site" link. An arbitrary host there turns the brand's
  * own billing portal into a redirector to anywhere — a phishing hop that wears
  * the brand's checkout. The route now accepts only the brand's own resolved
  * origins and falls back to the brand's account page, with a warning, otherwise.
  *
- * The `test` portal processor answers with the returnUrl it was handed, so the
- * response IS the assertion about what the processor would have received.
+ * The `test` portal provider answers with the returnUrl it was handed, so the
+ * response IS the assertion about what the provider would have received.
  *
  * Run: npx omega test backend:routes/payments/portal-return-url
  */
@@ -27,7 +27,7 @@ function subscriber(Manager) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { processor: 'test', resourceId: 'sub_test_portal_return_url' },
+      payment: { provider: 'test', resourceId: 'sub_test_portal_return_url' },
     },
   });
 }
@@ -55,7 +55,7 @@ module.exports = {
         const sent = await openPortal(Manager, 'https://evil.example/steal');
 
         assert.equal(sent.code, 200, `The portal should still open, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'An off-brand host must never reach the processor');
+        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'An off-brand host must never reach the provider');
       },
     },
 

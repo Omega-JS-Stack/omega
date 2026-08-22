@@ -41,7 +41,7 @@ function parseRepoSlug(value) {
  * `targets.backend.github` — the CMS's content identity — onto the top level,
  * and per the merge chain the target wins).
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {object} Merged `{ org, repo, … }` keys.
  */
 function githubKeys(config) {
@@ -51,7 +51,7 @@ function githubKeys(config) {
 /**
  * The brand repo's bare name (no owner).
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {string} Repo name ('' when nothing in the chain resolves).
  */
 function brandRepoName(config) {
@@ -62,7 +62,7 @@ function brandRepoName(config) {
 /**
  * The brand repo's owner (GitHub org or user).
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {string} Owner ('' when nothing in the chain resolves).
  */
 function brandRepoOwner(config) {
@@ -74,10 +74,10 @@ function brandRepoOwner(config) {
  * The brand repo as ONE finished value: owner, name, and the "owner/name" slug
  * the GitHub API takes. This is the form a FRAMEWORK hands to consumer code —
  * @omega.js/backend exposes it as `config.resolved.github` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)),
- * because a brand app cannot require this private package and must never
+ * because a brand target cannot require this private package and must never
  * re-derive the merge rules for itself.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {{ owner: string, name: string, repo: string }} `repo` is the slug, '' unless BOTH halves resolve (half an address addresses nothing).
  */
 function brandRepo(config) {

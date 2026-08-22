@@ -28,7 +28,7 @@ const CHECKOUT_ID = '_test-checkout-id';
 const EVENT_ID = '_test-refund-refusal-evt';
 
 /**
- * The refund resource the processor answers with: a bare charge that moved the
+ * The refund resource the provider answers with: a bare charge that moved the
  * money back, naming no product and no price, linking `up` at the capture it
  * reversed the way PayPal's does.
  */
@@ -54,13 +54,13 @@ function existingOrder() {
     type: 'one-time',
     owner: UID,
     productId: 'premium',
-    processor: 'test',
+    provider: 'test',
     resourceId: CHECKOUT_ID,
     unified: {
       product: { id: 'premium', name: 'Premium' },
       status: 'completed',
       payment: {
-        processor: 'test',
+        provider: 'test',
         orderId: ORDER_ID,
         resourceId: CHECKOUT_ID,
         price: 9.99,
@@ -162,7 +162,7 @@ module.exports = {
         const { logs } = await runRefund({ eventType: 'PAYMENT.SALE.REFUNDED', resourceType: 'sale', payload: payload });
         const output = logs.join('\n');
 
-        assert.match(output, /Fetched resource: type=sale, id=_test-refund-id, status=refunded, source=processor API/, 'a v1 sale fetch logs its real state');
+        assert.match(output, /Fetched resource: type=sale, id=_test-refund-id, status=refunded, source=provider API/, 'a v1 sale fetch logs its real state');
       },
     },
   ],

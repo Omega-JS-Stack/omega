@@ -48,7 +48,7 @@ test('the only zero-provider entries are the deliberate ones', () => {
 test('the live call sites the audit found all resolve — none can throw at rewire', () => {
   const live = [
     'pricing_toggle', 'contact_enterprise', 'copy_link',
-    'contact_form_spam', 'review_prompt_shown', 'status_subscribe', 'screen_view',
+    'contact_form_spam', 'review_prompt_show', 'status_subscribe', 'screen_view',
   ];
 
   for (const name of live) {
@@ -82,6 +82,24 @@ test('the dropped and renamed names are gone', () => {
   // GA4's standard name replaces the literal `download` the page sends today.
   assert.strictEqual(entryFor('download'), null);
   assert.ok(entryFor('file_download'), 'file_download is the canonical name');
+});
+
+test('the email-preferences pair carries the same marketing prefix', () => {
+  // One ternary on one page fires both halves ([#416]): an opt-out named for a
+  // different family than the opt-in it sits beside is a reporting trap.
+  assert.strictEqual(entryFor('email_unsubscribe'), null, 'the unprefixed opt-out name is gone');
+
+  for (const name of ['marketing_email_subscribe', 'marketing_email_unsubscribe']) {
+    const google = ga4.resolve(name, { content_type: 'marketing' });
+
+    assert.strictEqual(google.name, name, `${name} resolves on GA4 under its own name`);
+    assert.strictEqual(google.kind, 'custom', `${name} is a GA4 custom event`);
+  }
+
+  // Meta's wire names are the live custom ones, untouched by the rename: the
+  // canonical key moved, the data continuity in the ad account did not.
+  assert.strictEqual(meta.resolve('marketing_email_subscribe', {}).name, 'EmailSubscribe');
+  assert.strictEqual(meta.resolve('marketing_email_unsubscribe', {}).name, 'EmailUnsubscribe');
 });
 
 // ─── Page view ───
@@ -127,7 +145,7 @@ const PURCHASE_PARAMS = {
   items: [{ item_id: 'pro', item_name: 'Pro Plan', item_category: 'subscription', price: 49.99, quantity: 1 }],
   is_trial: false,
   is_recurring: false,
-  payment_processor: 'stripe',
+  payment_provider: 'stripe',
 };
 
 test('purchase maps to Purchase/CompletePayment with value and currency intact', () => {
@@ -160,7 +178,7 @@ test('purchase maps to Purchase/CompletePayment with value and currency intact',
 });
 
 test('the recurring events ride GA4 purchase with is_recurring set', () => {
-  for (const name of ['subscription_renewed', 'payment_recovered']) {
+  for (const name of ['subscription_renew', 'payment_recovered']) {
     const google = ga4.resolve(name, { ...PURCHASE_PARAMS, is_recurring: false });
     assert.strictEqual(google.name, 'purchase', `${name} → GA4 purchase`);
     assert.strictEqual(google.payload.is_recurring, true, `${name} is flagged recurring for GA4`);
@@ -176,19 +194,19 @@ test('the recurring events ride GA4 purchase with is_recurring set', () => {
 test('a trial conversion is a purchase to GA4 and a Subscribe to the ad platforms', () => {
   const params = { ...PURCHASE_PARAMS, is_trial: true, is_recurring: false };
 
-  const google = ga4.resolve('trial_converted', params);
+  const google = ga4.resolve('trial_convert', params);
   assert.strictEqual(google.name, 'purchase', 'the first real charge belongs in GA4\'s revenue report');
   assert.strictEqual(google.kind, 'standard');
   assert.strictEqual(google.payload.value, 49.99);
   assert.strictEqual(google.payload.is_trial, true, 'the pair of flags is what marks it inside GA4 purchase');
   assert.strictEqual(google.payload.is_recurring, false, 'a conversion is the FIRST payment, never a renewal');
 
-  const facebook = meta.resolve('trial_converted', params);
+  const facebook = meta.resolve('trial_convert', params);
   assert.strictEqual(facebook.name, 'Subscribe', 'Meta already heard StartTrial — this is the subscription starting to pay');
   assert.strictEqual(facebook.kind, 'standard');
   assert.deepEqual(facebook.payload.content_ids, ['pro']);
 
-  const tt = tiktok.resolve('trial_converted', params);
+  const tt = tiktok.resolve('trial_convert', params);
   assert.strictEqual(tt.name, 'Subscribe');
   assert.strictEqual(tt.kind, 'standard');
   assert.strictEqual(tt.payload.content_id, 'pro');
@@ -197,7 +215,7 @@ test('a trial conversion is a purchase to GA4 and a Subscribe to the ad platform
 // The exclusion-audience half ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)).
 
 test('a cancellation and a refund reach the ad platforms as zero-value audience signals', () => {
-  for (const [name, native] of [['subscription_cancelled', 'SubscriptionCancelled'], ['refund', 'Refunded']]) {
+  for (const [name, native] of [['subscription_cancel', 'SubscriptionCancel'], ['refund', 'Refund']]) {
     const facebook = meta.resolve(name, PURCHASE_PARAMS);
 
     assert.strictEqual(facebook.name, native, `${name} → Meta ${native}`);
@@ -217,15 +235,15 @@ test('a cancellation and a refund reach the ad platforms as zero-value audience 
 
   // GA4 is where the money is netted, so it keeps the real number.
   assert.strictEqual(ga4.resolve('refund', PURCHASE_PARAMS).payload.value, 49.99);
-  assert.strictEqual(ga4.resolve('subscription_cancelled', PURCHASE_PARAMS).payload.value, 49.99);
+  assert.strictEqual(ga4.resolve('subscription_cancel', PURCHASE_PARAMS).payload.value, 49.99);
 });
 
 test('the outcomes an ad platform has no use for stay GA4-only', () => {
-  // `trial_lapsed` is the deliberate omission of the exclusion lane above: a
+  // `trial_lapse` is the deliberate omission of the exclusion lane above: a
   // lapsed trialist is a win-back audience to RETARGET, not one to hide ads
   // from. The other two are dark to an ad platform for the older reason — no
   // money moved, and a platform optimizes toward conversions.
-  for (const name of ['trial_lapsed', 'subscription_uncancelled', 'plan_changed']) {
+  for (const name of ['trial_lapse', 'subscription_uncancel', 'subscription_plan_change']) {
     const google = ga4.resolve(name, PURCHASE_PARAMS);
 
     assert.strictEqual(google.name, name, `${name} resolves on GA4 under its own name`);
@@ -236,13 +254,13 @@ test('the outcomes an ad platform has no use for stay GA4-only', () => {
 });
 
 test('a plan change carries the plan it came from', () => {
-  const entry = entryFor('plan_changed');
+  const entry = entryFor('subscription_plan_change');
 
   for (const param of ['previous_item_id', 'previous_item_name', 'previous_value']) {
-    assert.ok(entry.params.includes(param), `plan_changed declares ${param}`);
+    assert.ok(entry.params.includes(param), `subscription_plan_change declares ${param}`);
   }
 
-  const google = ga4.resolve('plan_changed', {
+  const google = ga4.resolve('subscription_plan_change', {
     ...PURCHASE_PARAMS,
     previous_item_id: 'starter',
     previous_item_name: 'Starter',
@@ -268,7 +286,7 @@ test('a map never mutates the caller params', () => {
   const params = { ...PURCHASE_PARAMS };
   meta.resolve('purchase', params);
   tiktok.resolve('purchase', params);
-  ga4.resolve('subscription_renewed', params);
+  ga4.resolve('subscription_renew', params);
 
   assert.deepEqual(params, PURCHASE_PARAMS, 'the caller object is untouched');
 });
@@ -276,7 +294,7 @@ test('a map never mutates the caller params', () => {
 // ─── No mapping ───
 
 test('an unmapped provider resolves to null', () => {
-  // vert_click is GA4-only; refund_action likewise.
+  // vert_click is GA4-only; user_refund_request likewise.
   assert.ok(ga4.resolve('vert_click', { vert_id: 'x' }));
   assert.strictEqual(meta.resolve('vert_click', { vert_id: 'x' }), null);
   assert.strictEqual(tiktok.resolve('vert_click', { vert_id: 'x' }), null);

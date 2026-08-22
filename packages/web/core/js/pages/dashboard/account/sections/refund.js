@@ -144,7 +144,7 @@ function shuffleArray(arr) {
 // ─── Tracking ───────────────────────────────────────────────
 
 function trackRefund(action) {
-  event('refund_action', {
+  event('user_refund_request', {
     action: action,
   });
 }

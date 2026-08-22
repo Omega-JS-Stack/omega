@@ -114,23 +114,23 @@ function brandSourceWith(rules) {
   return `${seed.slice(0, lineEnd + 1)}${rules}\n${seed.slice(lineEnd + 1)}`;
 }
 
-function seedApp(prefix, brandSource) {
-  const appPath = jetpack.tmpDir({ prefix }).path();
+function seedTarget(prefix, brandSource) {
+  const targetPath = jetpack.tmpDir({ prefix }).path();
 
-  jetpack.write(path.join(appPath, 'package.json'), JSON.stringify({ name: 'rules-compile-app', dependencies: {} }, null, 2));
-  jetpack.write(path.join(appPath, 'src', 'index.js'), '// entry\n');
-  jetpack.write(path.join(appPath, 'config', 'omega.json5'), JSON.stringify({
+  jetpack.write(path.join(targetPath, 'package.json'), JSON.stringify({ name: 'rules-compile-app', dependencies: {} }, null, 2));
+  jetpack.write(path.join(targetPath, 'src', 'index.js'), '// entry\n');
+  jetpack.write(path.join(targetPath, 'config', 'omega.json5'), JSON.stringify({
     brand: { name: 'Rules Compile', url: 'https://rules-compile.test' },
     cloud: { config: { projectId: 'demo-rules-compile' } },
     targets: { backend: {} },
   }, null, 2));
-  jetpack.write(path.join(appPath, 'firebase.json'), JSON.stringify({ firestore: { rules: COMPILED_RULES_FILE } }, null, 2));
+  jetpack.write(path.join(targetPath, 'firebase.json'), JSON.stringify({ firestore: { rules: COMPILED_RULES_FILE } }, null, 2));
 
   if (brandSource) {
-    jetpack.write(path.join(appPath, 'firestore.rules'), brandSource);
+    jetpack.write(path.join(targetPath, 'firestore.rules'), brandSource);
   }
 
-  return appPath;
+  return targetPath;
 }
 
 function compileSeed() {
@@ -388,10 +388,10 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp('omega-rules-hooks-', HOOK_ERA_SOURCE);
+        const targetPath = seedTarget('omega-rules-hooks-', HOOK_ERA_SOURCE);
 
-        const result = ensureBrandRulesSource({ projectDir: appPath });
-        const migrated = jetpack.read(path.join(appPath, 'firestore.rules'));
+        const result = ensureBrandRulesSource({ projectDir: targetPath });
+        const migrated = jetpack.read(path.join(targetPath, 'firestore.rules'));
 
         assert.equal(result.migrated, true, 'the hook era must be detected');
         assert.deepEqual(result.strippedHooks, ['protectedFields'], 'the default-bodied hook must be reported as stripped');
@@ -410,9 +410,9 @@ module.exports = {
         assert.match(migrated, /MERGE-BY-MATCH/, 'the stale header must be replaced with the current one');
 
         // Idempotent: a second setup has nothing left to do.
-        const second = ensureBrandRulesSource({ projectDir: appPath });
+        const second = ensureBrandRulesSource({ projectDir: targetPath });
         assert.equal(second.migrated, false, 'the migration must run once');
-        assert.equal(jetpack.read(path.join(appPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
+        assert.equal(jetpack.read(path.join(targetPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
 
         // …and the question SETTLES. The kept function is the brand's own code
         // now, so a migrated file must stop answering "unmigrated" — otherwise
@@ -433,10 +433,10 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp('omega-rules-legacy-', LEGACY_SOURCE);
+        const targetPath = seedTarget('omega-rules-legacy-', LEGACY_SOURCE);
 
-        const first = ensureBrandRulesSource({ projectDir: appPath });
-        const migrated = jetpack.read(path.join(appPath, 'firestore.rules'));
+        const first = ensureBrandRulesSource({ projectDir: targetPath });
+        const migrated = jetpack.read(path.join(targetPath, 'firestore.rules'));
 
         assert.equal(first.migrated, true, 'the legacy marker block must be detected');
         assert.match(migrated, /match \/leaderboards\/\{id\}/, 'the brand\'s custom region must be preserved');
@@ -444,9 +444,9 @@ module.exports = {
         assert.equal(migrated.includes('End OMEGA Rules'), false, 'the closing marker must be gone too');
         assert.equal(migrated.includes('function protectedFields('), false, 'the migration must seed no hooks — they are retired');
 
-        const second = ensureBrandRulesSource({ projectDir: appPath });
+        const second = ensureBrandRulesSource({ projectDir: targetPath });
         assert.equal(second.migrated, false, 'migration must run once');
-        assert.equal(jetpack.read(path.join(appPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
+        assert.equal(jetpack.read(path.join(targetPath, 'firestore.rules')), migrated, 'a second setup must not touch the file');
 
         // The migrated file still compiles, and the framework half comes back.
         const compiled = compileRules({ brandSource: migrated }).compiled;
@@ -463,13 +463,13 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp('omega-rules-refuse-', LEGACY_SOURCE);
+        const targetPath = seedTarget('omega-rules-refuse-', LEGACY_SOURCE);
         const warnings = [];
 
-        const result = compileFirestoreRules({ projectDir: appPath, onWarn: (message) => warnings.push(message) });
+        const result = compileFirestoreRules({ projectDir: targetPath, onWarn: (message) => warnings.push(message) });
 
         assert.equal(result.refused, true, 'the build must report the refusal');
-        assert.equal(jetpack.exists(path.join(appPath, COMPILED_RULES_FILE)), false, 'an unmigrated source must leave no artifact behind');
+        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), false, 'an unmigrated source must leave no artifact behind');
         assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
         assert.match(warnings[0], /legacy OMEGA Rules marker block/, 'the refusal must name what it found');
         assert.match(warnings[0], /npx omega setup/, 'the refusal must name the migration');
@@ -488,10 +488,10 @@ module.exports = {
 
         // The STAGE only reports it, because setup stages before its checks
         // run — a throw here would kill the very run that migrates the file.
-        const { staged } = stageFunctions({ projectDir: appPath });
+        const { staged } = stageFunctions({ projectDir: targetPath });
 
         assert.equal(staged.some((step) => step.includes('firestore.rules')), false, 'the stage must not claim a compile it refused');
-        assert.equal(jetpack.exists(path.join(appPath, COMPILED_RULES_FILE)), false, 'and it must still leave no artifact');
+        assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), false, 'and it must still leave no artifact');
       },
     },
 
@@ -502,18 +502,18 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp('omega-rules-stage-', jetpack.read(BRAND_RULES_SEED));
-        const artifact = path.join(appPath, COMPILED_RULES_FILE);
+        const targetPath = seedTarget('omega-rules-stage-', jetpack.read(BRAND_RULES_SEED));
+        const artifact = path.join(targetPath, COMPILED_RULES_FILE);
 
-        const { staged } = stageFunctions({ projectDir: appPath });
+        const { staged } = stageFunctions({ projectDir: targetPath });
         assert.equal(staged.some((step) => step.includes('firestore.rules')), true, 'the stage must report the compile step');
         assert.equal(jetpack.exists(artifact), 'file', 'the stage must write the compiled artifact');
 
         // A brand-source edit reaches the artifact on the next stage — this is
         // what the watch does when firestore.rules changes.
-        const source = path.join(appPath, 'firestore.rules');
+        const source = path.join(targetPath, 'firestore.rules');
         jetpack.write(source, brandSourceWith('    match /posts/{id} {\n      allow read: if true;\n    }'));
-        stageFunctions({ projectDir: appPath });
+        stageFunctions({ projectDir: targetPath });
 
         assert.equal(jetpack.read(artifact).includes('match /posts/{id} {'), true, 'a brand-source edit must recompile');
       },
@@ -541,11 +541,11 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp('omega-rules-stale-', jetpack.read(BRAND_RULES_SEED));
+        const targetPath = seedTarget('omega-rules-stale-', jetpack.read(BRAND_RULES_SEED));
         const warnings = [];
 
-        jetpack.write(path.join(appPath, 'firebase.json'), JSON.stringify({ firestore: { rules: 'firestore.rules' } }, null, 2));
-        compileFirestoreRules({ projectDir: appPath, onWarn: (message) => warnings.push(message) });
+        jetpack.write(path.join(targetPath, 'firebase.json'), JSON.stringify({ firestore: { rules: 'firestore.rules' } }, null, 2));
+        compileFirestoreRules({ projectDir: targetPath, onWarn: (message) => warnings.push(message) });
 
         assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
         assert.match(warnings[0], /firebase\.json points firestore\.rules at "firestore\.rules"/, 'the warning must name the stale target');

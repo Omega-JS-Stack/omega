@@ -8,20 +8,24 @@
  * API exists); omega-manager opened a browser and polled. Not-enabled prints
  * the console instructions and warns — reruns converge once it's enabled
  * (the API verifies). The OAuth client's redirect URIs have no API either:
- * instructions + an interactive confirm that records completion in state
- * (`authentication.oauthRedirectsConfigured`); non-interactive runs warn.
+ * instructions + an interactive confirm. A confirmation nothing can re-check
+ * is the one kind of reconcile flag config keeps (#434): it lands at
+ * `cloud.oauthRedirectsConfigured`. Non-interactive runs warn.
  *
  * OAuth client credentials land in the brand's gitignored
- * .omega/secrets/google-oauth.json (never in state or omega.json5).
+ * .omega/secrets/google-oauth.json (never in omega.json5).
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
+const OAUTH_REDIRECTS_PATH = 'cloud.oauthRedirectsConfigured';
+
 module.exports = async function ensureAuthentication(context) {
-  const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;
+  const { firebaseApi: api, brandConfig, brandRoot, projectId, domain, options = {} } = context;
 
   let warned = false;
   let needsInteractive = null; // #32: set when a step steps aside for lack of a TTY
@@ -164,7 +168,7 @@ module.exports = async function ensureAuthentication(context) {
   }
 
   // === OAuth client redirect URIs (no API — instructions + confirm until done) ===
-  let oauthRedirectsConfigured = serviceData.authentication?.oauthRedirectsConfigured || false;
+  let oauthRedirectsConfigured = brandConfig.cloud?.oauthRedirectsConfigured === true;
   if (googleClientId && !oauthRedirectsConfigured) {
     const gcpCredentialsUrl = `https://console.cloud.google.com/apis/credentials/oauthclient/${googleClientId}?project=${projectId}`;
     const authorizedOrigins = [
@@ -193,6 +197,7 @@ module.exports = async function ensureAuthentication(context) {
       const done = await confirm({ message: 'Origins + redirect URIs configured in the OAuth client?', default: false });
       if (done) {
         oauthRedirectsConfigured = true;
+        writeBrandConfig(context, { [OAUTH_REDIRECTS_PATH]: true });
         console.log(`      ${chalk.green('✓')} OAuth client redirect URIs confirmed`);
       } else {
         warned = true;
@@ -233,13 +238,13 @@ module.exports = async function ensureAuthentication(context) {
 
   return {
     status: warned ? 'warned' : 'success',
-    state: {
+    output: {
       authentication: {
         enabled,
         authorizedDomains: [domain, `${projectId}.firebaseapp.com`, `${projectId}.web.app`],
         oauthRedirectsConfigured,
+        ...(needsInteractive ? { needsInteractive } : {}),
       },
     },
-    ...(needsInteractive ? { output: { authentication: { needsInteractive } } } : {}),
   };
 };

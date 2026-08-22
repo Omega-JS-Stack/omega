@@ -1,6 +1,6 @@
 /**
  * Test: POST /payments/portal - Validation errors
- * Tests rejection cases before any processor call is made.
+ * Tests rejection cases before any provider call is made.
  */
 module.exports = {
   description: 'Payment portal endpoint: validation errors',
@@ -31,31 +31,31 @@ module.exports = {
     },
 
     {
-      name: 'rejects-no-processor',
+      name: 'rejects-no-provider',
       async run({ http, assert }) {
-        // portal-no-processor starts with payment.processor=null
-        const response = await http.as('portal-no-processor').post('backend-manager/payments/portal', {
+        // portal-no-provider starts with payment.provider=null
+        const response = await http.as('portal-no-provider').post('backend-manager/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 400, 'Should reject when no processor is set');
+        assert.isError(response, 400, 'Should reject when no provider is set');
       },
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       async run({ http, assert }) {
-        // portal-unknown-processor starts with processor='unknown-processor'
-        const response = await http.as('portal-unknown-processor').post('backend-manager/payments/portal', {
+        // portal-unknown-provider starts with provider='unknown-provider'
+        const response = await http.as('portal-unknown-provider').post('backend-manager/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
-        assert.isError(response, 400, 'Should reject unknown processor');
+        assert.isError(response, 400, 'Should reject unknown provider');
       },
     },
 
     {
-      name: 'succeeds-with-test-processor',
+      name: 'succeeds-with-test-provider',
       async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['journey-payments-portal-route'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
@@ -63,9 +63,9 @@ module.exports = {
           skip('No paid product with monthly price configured in this brand');
         }
 
-        // Set up a paid subscription with the test processor
+        // Set up a paid subscription with the test provider
         const intentResponse = await http.as('journey-payments-portal-route').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -75,7 +75,7 @@ module.exports = {
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${uid}`);
-          return userDoc?.subscription?.payment?.processor === 'test'
+          return userDoc?.subscription?.payment?.provider === 'test'
             && userDoc?.subscription?.status === 'active';
         }, 15000, 500);
 

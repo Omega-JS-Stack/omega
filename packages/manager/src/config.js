@@ -1,9 +1,9 @@
 /**
  * Manager registry — SERVICE_ORDER, per-service OPERATIONS, and the manager
  * defaults layer. This is omega-manager's config.js reborn for the brand-
- * monorepo world: the brand's config/omega.json5 is the single source of
- * user choices (no .brands/ mirror), durable derived data lives in
- * .omega/state.json, and per-run transients in .omega/runs/{ts}.json.
+ * monorepo world: the brand's config/omega.json5 is the single home of every
+ * provisioned fact (no .brands/ mirror), secrets live in the brand .env, and
+ * per-run transients in .omega/runs/{ts}.json.
  *
  * omega-manager's full provisioning order is ported — every service in
  *
@@ -14,7 +14,7 @@
  *
  * now runs here, plus the workspace service (brand structure/config
  * health) the monorepo world added. disperse is the remnant of its old
- * self (signing artifacts + composed app .env files — the config
+ * self (signing artifacts + composed target .env files — the config
  * dispersal dissolved into the omega.json5 hierarchy), and bookmark +
  * the beehiiv segment automation talk to the companion Chrome extension
  * in extension/ (the last piece, ported with it). Onboarding is the
@@ -22,25 +22,29 @@
  *
  * Provider-named services renamed to their config ROLE key (cp134, Ian:
  * "rename services so they match the config key"): firebase→cloud,
- * sendgrid→campaigns, beehiiv→newsletter, sentry→monitoring. Provider
- * STRINGS in config (cloud.provider: 'firebase', marketing.campaigns
- * .provider: 'sendgrid', …) are unchanged — the service is the role, the
- * provider is a value. State uses the role keys only — a legacy service-name
- * key in .omega/state.json is ignored (docs/shared/breaking-changes.md).
+ * sendgrid→campaigns, beehiiv→newsletter, sentry→monitoring; the last eight
+ * followed in #418: github→repo, cloudflare→edge, recaptcha→captcha,
+ * search-console→search, adsense→advertising, slapform→forms, chatsy→chat,
+ * replyify→email. Provider STRINGS and provider KEYS in config
+ * (cloud.provider: 'firebase', edge.providers.cloudflare,
+ * inbound.chat.providers.chatsy, …) are unchanged — the service is the role,
+ * the provider is a value.
  */
 
 // =============================================================================
-// APP DIRECTORY CONVENTIONS
+// TARGET DIRECTORY CONVENTIONS
 // =============================================================================
-// apps/<dir> → target mapping when the app doesn't declare its target in its
-// own omega.json5. Exact match or `<name>-<id>` suffix (apps/website-admin →
+// targets/<dir> → target mapping when the target dir doesn't declare its target
+// in its
+// own omega.json5. Exact match or `<name>-<id>` suffix (targets/website-admin →
 // web, instance admin). The mapping's SSOT moved to @omega.js/config with the
 // multi-instance work (the config loader walks the same dirs) — re-exported
 // here so every existing manager import keeps working.
-const { APP_DIR_TARGETS, TARGET_APP_DIRS, isDemoProject } = require('@omega.js/config');
+const { DIR_TARGETS, TARGET_DIRS, isDemoProject, chosenProvider } = require('@omega.js/config');
+const { resolveRegistrar } = require('./services/domain/lib/registrars.js');
 
 // Framework package per target — used by the testing service to compare each
-// app's installed framework against the npm latest. Names flip to their
+// target's installed framework against the npm latest. Names flip to their
 // @omega.js/* successors at each rename cutover; mobile is reserved (MAM
 // parked, no framework to check).
 const TARGET_FRAMEWORKS = {
@@ -78,19 +82,21 @@ const DEFAULTS = {
     },
   },
 
-  // Domain registrar + email. The domain service reconciles registrar
-  // nameservers from `provider`; the cloudflare dns/email-routing operations
-  // read `email.provider` + `email.forwarding`
+  // Domain registrar + email — two roles, one providers block each (#425).
+  // The domain service reconciles registrar nameservers from the KEY under
+  // `providers`; the cloudflare dns/email-routing operations read the key
+  // under `email.providers` + `email.forwarding`. No entry = not chosen yet,
+  // and the service skips (what a null provider meant).
   domain: {
-    provider: null, // 'squarespace' | 'namecheap' | null (not chosen yet — the service skips)
+    providers: {},    // { namecheap: {} } | { squarespace: {} } — one registrar
     email: {
-      provider: null, // 'squarespace' | 'privateemail' | 'cloudflare' | null
-      forwarding: [], // [{ from: 'support' | '*', to: 'inbox@example.com' }]
+      providers: {},  // { cloudflare: {} } | { squarespace: {} } | { privateemail: {} }
+      forwarding: [], // [{ from: 'support' | '*', to: 'inbox@example.com' }] — role-level, provider-agnostic
     },
   },
 
   // Cloud settings — ONE home (#23): the provisioning fields the manager owns
-  // sit beside `cloud.provider`/`cloud.config` (the app config @omega.js/config
+  // sit beside `cloud.provider`/`cloud.config` (the target config @omega.js/config
   // declares), including the platform-level org + billing account the project
   // ensures consume. Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the
   // brand .env. projectId has no default and lives ONLY at cloud.config.projectId
@@ -110,9 +116,15 @@ const DEFAULTS = {
   // in the brand .env (analytics.edit scope, tokens cached separately from
   // firebase's). propertyId is required config — interactive runs offer the
   // account + property selection/creation flow and land both ids here
-  // (comment-preserving writeback). Meta/TikTok pixel IDs are public config;
-  // their access tokens live in the brand .env (META_ACCESS_TOKEN /
-  // TIKTOK_ACCESS_TOKEN — the names @omega.js/backend reads).
+  // (comment-preserving writeback). Meta/TikTok pixel IDs are public config
+  // too — the service CREATES the pixel on the platform's accountId and lands
+  // its id here (#417); Meta needs neither filled in, since an interactive run
+  // pastes the token in and discovers the ad account from it (a provider set
+  // to `false` opts out of all of it). Their access tokens live in the brand
+  // .env (META_ACCESS_TOKEN / TIKTOK_ACCESS_TOKEN — the names @omega.js/backend
+  // reads, and the credentials the creates authenticate with). Per-target
+  // GA4 measurement ids land under targets.{target}.analytics.providers
+  // .google.id — one stream per surface, so one id per surface.
   analytics: {
     providers: {
       google: {
@@ -131,8 +143,14 @@ const DEFAULTS = {
           formInteractionsEnabled: true,
         },
       },
-      meta: { id: null },   // Meta Pixel ID
-      tiktok: { id: null }, // TikTok Pixel Code
+      meta: {
+        id: null,        // Meta Pixel ID — the create lands it (public config: it ships in the frontend)
+        accountId: null, // Meta AD ACCOUNT number (bare, no act_ prefix) the pixel is created on — discovered from META_ACCESS_TOKEN when unset
+      },
+      tiktok: {
+        id: null,        // TikTok Pixel Code — the create lands it
+        accountId: null, // TikTok ADVERTISER id the pixel is created on — no account, no create
+      },
     },
   },
 
@@ -141,22 +159,25 @@ const DEFAULTS = {
   // last `lookbackDays` days, has the provider (Ghostii) write the article,
   // and publishes to `destinations`. Not a service — never runs during manage.
   devlog: {
-    enabled: false,
-    provider: 'ghostii',        // Article writer (only ghostii supported)
-    lookbackDays: 5,
-    orgs: [],                   // GitHub orgs/users to fully scan — for NON-brand repos (frameworks, tooling); brand repos are always scanned via the brand configs
-    excludeRepos: [],           // Repo names never fetched or mentioned
-    excludeCommits: [],         // Regex patterns (case-insensitive) — matching commit messages never reach the digest
-    excludeTopics: [],          // Topics the writer must never discuss
-    includePrivate: true,       // Scan private repos too — exclude rules govern what gets WRITTEN, not what gets read
-    postPath: 'devlog',         // Sub-folder under src/_posts/{year}/ in the website app
-    destinations: ['website'],  // website | devto | hashnode | medium (planned)
-    overrides: {                // Ghostii API overrides
-      length: 'long',
-      research: false,          // The digest is the source — no web research
-      insertImages: false,      // Local publisher doesn't mirror images into the repo (yet)
-      headerImageUrl: 'disabled',
-      maxLinks: 10,             // Backlinks are the point — allow more than Ghostii's default 6
+    enabled: false,               // Role-level: the whole pipeline's switch
+    providers: {
+      ghostii: {                  // Article writer — presence picks it (only ghostii exists)
+        lookbackDays: 5,
+        orgs: [],                 // GitHub orgs/users to fully scan — for NON-brand repos (frameworks, tooling); brand repos are always scanned via the brand configs
+        excludeRepos: [],         // Repo names never fetched or mentioned
+        excludeCommits: [],       // Regex patterns (case-insensitive) — matching commit messages never reach the digest
+        excludeTopics: [],        // Topics the writer must never discuss
+        includePrivate: true,     // Scan private repos too — exclude rules govern what gets WRITTEN, not what gets read
+        postPath: 'devlog',       // Sub-folder under src/_posts/{year}/ in the website target
+        destinations: ['website'], // website | devto | hashnode | medium (planned)
+        overrides: {              // Ghostii API overrides
+          length: 'long',
+          research: false,        // The digest is the source — no web research
+          insertImages: false,    // Local publisher doesn't mirror images into the repo (yet)
+          headerImageUrl: 'disabled',
+          maxLinks: 10,           // Backlinks are the point — allow more than Ghostii's default 6
+        },
+      },
     },
   },
 
@@ -182,9 +203,12 @@ const DEFAULTS = {
   // the provider entry — even empty — to opt in; `client` (ca-pub-…) comes
   // from config or the interactive selection flow.
 
-  // Marketing. campaigns = the email-marketing provider (the sendgrid
-  // service); newsletter = the newsletter provider (the newsletter service (Beehiiv)).
-  // listId/publicationId are resolved by the services and written back here
+  // Marketing — TWO roles, one providers block each (#425). campaigns = email
+  // marketing (the campaigns service); newsletter = the newsletter (the
+  // newsletter service). The vendor is a KEY under `providers`; `enabled`
+  // stays role-level, and so does `newsletter.content` (it configures
+  // @omega.js/backend's generator, not Beehiiv). listId/publicationId are
+  // resolved by the services and written back under their provider
   // (comment-preserving writeback), with a state mirror as the resolution
   // cache. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
   // (+ OMEGA_WEBHOOK_KEY for the webhook operations).
@@ -194,21 +218,27 @@ const DEFAULTS = {
   marketing: {
     campaigns: {
       enabled: true,
-      provider: 'sendgrid',
-      listId: null,
+      providers: {
+        sendgrid: {
+          listId: null,
+        },
+      },
     },
     newsletter: {
       enabled: true,
-      provider: 'beehiiv',
-      publicationId: null,
+      providers: {
+        beehiiv: {
+          publicationId: null,
+        },
+      },
     },
   },
 
-  // Payment processors + products. Public halves live here (publishableKey,
+  // Payment providers + products. Public halves live here (publishableKey,
   // clientId, site); secrets come from the brand .env (STRIPE_SECRET_KEY,
   // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY). Interactive runs offer the
-  // key-collection flow when an enabled processor is missing credentials
-  // (public keys land here, secrets in the .env). Set a processor to
+  // key-collection flow when an enabled provider is missing credentials
+  // (public keys land here, secrets in the .env). Set a provider to
   // `false` to disable it — the flow's Disable answer writes that.
   // Product IDs are written back here by the services (state keeps a mirror).
   // omega-manager's DEFAULTS also carried the company's Stripe organizationId
@@ -216,7 +246,7 @@ const DEFAULTS = {
   // the company CDN for product images (brand.images.brandmark now).
   payment: {
     enabled: true,
-    processors: {
+    providers: {
       stripe: {
         publishableKey: null,
         updateAccountInfo: true, // false = leave the account's business profile alone
@@ -373,26 +403,28 @@ const DEFAULTS = {
   // .output/_shared/; the port keeps everything brand-local.
   certificates: {
     enabled: true,
-    apple: {
-      // Full bundle ID = composeBundleId(prefix, brand.id) — the brand id's
-      // dashes become dots (Android-safe segments), e.g.
-      // com.itwcreativeworks + omega-playground → com.itwcreativeworks.omega.playground
-      bundleIdPrefix: null,
-      // Capabilities enabled on the brand's bundle ID
-      capabilities: ['APPLE_ID_AUTH'],
-      // Cert types that get a provisioning profile per applicable platform
-      profiles: ['IOS_DISTRIBUTION', 'MAC_APP_DISTRIBUTION', 'DEVELOPER_ID_APPLICATION_G2'],
-      // Certificate types to manage (one set per Apple Developer account).
-      // manual: Apple's API cannot create these — the Account Holder
-      // downloads the .cer from the developer portal.
-      certificates: [
-        { type: 'DEVELOPMENT' },
-        { type: 'IOS_DISTRIBUTION' },
-        { type: 'MAC_INSTALLER_DISTRIBUTION' },
-        { type: 'MAC_APP_DISTRIBUTION' },
-        { type: 'DEVELOPER_ID_APPLICATION_G2', manual: true },
-        { type: 'DEVELOPER_ID_INSTALLER_G2', manual: true },
-      ],
+    providers: {
+      apple: {
+        // Full bundle ID = composeBundleId(prefix, brand.id) — the brand id's
+        // dashes become dots (Android-safe segments), e.g.
+        // com.itwcreativeworks + omega-playground → com.itwcreativeworks.omega.playground
+        bundleIdPrefix: null,
+        // Capabilities enabled on the brand's bundle ID
+        capabilities: ['APPLE_ID_AUTH'],
+        // Cert types that get a provisioning profile per applicable platform
+        profiles: ['IOS_DISTRIBUTION', 'MAC_APP_DISTRIBUTION', 'DEVELOPER_ID_APPLICATION_G2'],
+        // Certificate types to manage (one set per Apple Developer account).
+        // manual: Apple's API cannot create these — the Account Holder
+        // downloads the .cer from the developer portal.
+        certificates: [
+          { type: 'DEVELOPMENT' },
+          { type: 'IOS_DISTRIBUTION' },
+          { type: 'MAC_INSTALLER_DISTRIBUTION' },
+          { type: 'MAC_APP_DISTRIBUTION' },
+          { type: 'DEVELOPER_ID_APPLICATION_G2', manual: true },
+          { type: 'DEVELOPER_ID_INSTALLER_G2', manual: true },
+        ],
+      },
     },
   },
 
@@ -596,28 +628,28 @@ const DEFAULTS = {
 // =============================================================================
 const SERVICE_ORDER = [
   'workspace',       // brand monorepo structure + config health — everything depends on a sane workspace
-  'github',          // the brand repo must exist before services that write to it
-  'cloudflare',      // zone must exist before DNS-dependent services
-  'domain',          // registrar nameservers point at the zone cloudflare just created/verified
+  'repo',            // the brand repo must exist before services that write to it
+  'edge',            // zone must exist before DNS-dependent services
+  'domain',          // registrar nameservers point at the zone the edge service just created/verified
   'cloud',           // cloud project (Firebase provider) must exist before analytics/backend-dependent services
-  'recaptcha',       // validates the shared keys the frontend/backend consume from .env
-  'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
-  'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
-  'adsense',         // domain present in the AdSense account + approval state (read-only API)
+  'captcha',         // validates the shared keys the frontend/backend consume from .env
+  'analytics',       // GA4 streams need the firebase link; search links to analytics next
+  'search',          // needs the edge zone (DNS verification) + the GA property (association)
+  'advertising',     // domain present in the AdSense account + approval state (read-only API)
   'monitoring',      // error-monitoring project per target + DSN writeback (Sentry provider; own API, no cross-service deps)
-  'campaigns',       // email marketing (SendGrid provider): domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
+  'campaigns',       // email marketing (SendGrid provider): domain auth (DNS via the edge zone), sender, list, fields, segments, webhook
   'newsletter',      // newsletter publication (Beehiiv provider): access, fields, segments (verify-only), webhook
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
-  'slapform',        // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
-  'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
-  'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
+  'forms',           // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
+  'chat',            // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
+  'email',           // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
   'directory',       // brand's own entry pushed into the PARENT project's brands collection (opt-in; no cross-service deps)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
-  'disperse',        // signing artifacts + composed app .env files land in the apps (after certificates, before update builds)
+  'disperse',        // signing artifacts + composed .env files land in the targets (after certificates, before update builds)
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
-  'update',          // installs deps + builds every app
+  'update',          // installs deps + builds every target
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
   'migrations',      // Firestore data migrations — only with --migration (audit unless --execute), after the deployed backend is current
   'bookmark',        // brand bookmarks → the companion Chrome extension (interactive sessions only)
@@ -631,8 +663,8 @@ const SERVICE_ORDER = [
 // slow the boot by default, and promoting one is a deliberate edit here.
 const BOOT_SERVICES = [
   'workspace',       // brand structure + config health — a broken brand must not serve
-  'assets',          // derived logo/icon variants the apps read from their own dirs
-  'disperse',        // composed app .env files + signing artifacts land in the apps
+  'assets',          // derived logo/icon variants the targets read from their own dirs
+  'disperse',        // composed .env files + signing artifacts land in the targets
 ];
 
 // =============================================================================
@@ -640,26 +672,26 @@ const BOOT_SERVICES = [
 // =============================================================================
 const OPERATIONS = {
   workspace: [
-    { name: 'structure', ensure: true },  // Root workspaces + an app per enabled target
-    { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-app)
+    { name: 'structure', ensure: true },  // Root workspaces + a dir per enabled target
+    { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-target)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` (legacy omega-manager healed) + a deploy script exists
     { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
-    { name: 'translation-sdk', ensure: true }, // Translating web apps declare + install @anthropic-ai/claude-agent-sdk (#168)
+    { name: 'translation-sdk', ensure: true }, // Translating web targets declare + install @anthropic-ai/claude-agent-sdk (#168)
   ],
 
-  github: [
+  repo: [
     { name: 'org', ensure: true },        // Org profile matches the brand (skipped for shared orgs)
     { name: 'repo', ensure: true },       // The brand-monorepo repo exists with the right settings
     { name: 'pages', ensure: true },      // GitHub Pages on gh-pages + custom domain (web target)
   ],
 
-  cloudflare: [
+  edge: [
     { name: 'zone', ensure: true },                     // Zone exists (created when missing; nameservers reported when pending)
     { name: 'dns-records', ensure: true },              // Required + custom records diff-synced
-    { name: 'email-routing', ensure: true },            // Cloudflare Email Routing (only when domain.email.provider === 'cloudflare')
+    { name: 'email-routing', ensure: true },            // Cloudflare Email Routing (only when domain.email.providers names cloudflare)
     { name: 'zone-settings', ensure: true },            // Generic — diffs all /zones/{id}/settings values + addons
     { name: 'cache-rules', ensure: true },
     { name: 'rules-managed-transforms', ensure: true },
@@ -691,30 +723,30 @@ const OPERATIONS = {
     { name: 'sdk-config', ensure: true },       // Web SDK config → state + omega.json5 drift check
   ],
 
-  recaptcha: [
+  captcha: [
     { name: 'site-key', ensure: true }, // Secret key proven valid via siteverify; domain list is manual guidance (no classic API)
   ],
 
   analytics: [
-    { name: 'google-streams', ensure: true },       // One GA4 web stream per target (+ enhanced measurement + MP secret)
+    { name: 'google-streams', ensure: true },       // One GA4 web stream per target (+ enhanced measurement + MP secret + the per-target measurement id in config)
     { name: 'google-firebase-link', ensure: true }, // GA property ↔ Firebase project link (+ auto-stream normalization)
-    { name: 'meta-pixel', ensure: true },           // Pixel ID + META_ACCESS_TOKEN presence
-    { name: 'tiktok-pixel', ensure: true },         // Pixel Code + TIKTOK_ACCESS_TOKEN presence
+    { name: 'meta-pixel', ensure: true },           // Pixel created on meta.accountId when missing + META_ACCESS_TOKEN presence
+    { name: 'tiktok-pixel', ensure: true },         // Pixel created on tiktok.accountId when missing + TIKTOK_ACCESS_TOKEN presence
   ],
 
-  'search-console': [
+  search: [
     { name: 'property', ensure: true }, // sc-domain property exists (DNS TXT verification via Cloudflare, one-pass)
     { name: 'ga-link', ensure: true },  // GA association — no API exists; warned + URL until confirmed
     { name: 'sitemaps', ensure: true }, // Missing sitemaps submitted (existing ones are converged, not resubmitted)
   ],
 
-  adsense: [
+  advertising: [
     { name: 'sites', ensure: true }, // Domain present in AdSense + approval state (read-only API — adding is manual)
   ],
 
   monitoring: [
-    { name: 'projects', ensure: true }, // Org/team resolution + one Sentry project per enabled target (monitoring.org written back)
-    { name: 'dsn', ensure: true },      // Client-key DSNs → targets.<type>.monitoring.dsn (comment-preserving writeback)
+    { name: 'projects', ensure: true }, // Org/team resolution + one Sentry project per enabled target (monitoring.providers.sentry.org written back)
+    { name: 'dsn', ensure: true },      // Client-key DSNs → targets.<type>.monitoring.providers.sentry.dsn (comment-preserving writeback)
   ],
 
   campaigns: [
@@ -747,17 +779,17 @@ const OPERATIONS = {
     { name: 'chargebee-products', ensure: true }, // Item family → items → item prices (deterministic IDs; legacy plans reported)
   ],
 
-  slapform: [
+  forms: [
     { name: 'form', ensure: true }, // Form name + enabled diffed against Slapform Firestore
     { name: 'user', ensure: true }, // Form-owner account set to forms.providers.slapform.plan (internal comp)
   ],
 
-  chatsy: [
+  chat: [
     { name: 'chat', ensure: true }, // Agent settings + knowledge diffed against Chatsy Firestore
     { name: 'user', ensure: true }, // Agent-owner account set to inbound.chat.providers.chatsy.plan (internal comp)
   ],
 
-  replyify: [
+  email: [
     { name: 'agent', ensure: true }, // Agent filter + knowledge diffed against Replyify Firestore
     { name: 'user', ensure: true },  // Agent-owner account set to inbound.email.providers.replyify.plan (internal comp)
   ],
@@ -787,8 +819,8 @@ const OPERATIONS = {
   ],
 
   disperse: [
-    { name: 'certs', write: true },  // Signing artifacts copied into desktop/mobile apps' certs dirs
-    { name: 'env', write: true },    // Each app's gitignored .env composed (brand env + stream secrets + signing paths)
+    { name: 'certs', write: true },  // Signing artifacts copied into desktop/mobile targets' certs dirs
+    { name: 'env', write: true },    // Each target's gitignored .env composed (brand env + stream secrets + signing paths)
   ],
 
   seo: [
@@ -796,7 +828,7 @@ const OPERATIONS = {
   ],
 
   update: [
-    { name: 'targets', write: true },     // Installs deps, builds every app
+    { name: 'targets', write: true },     // Installs deps, builds every target
   ],
 
   account: [
@@ -804,10 +836,13 @@ const OPERATIONS = {
   ],
 
   migrations: [
+    { name: 'targets-rename', ensure: true, local: true }, // #443: the brand's apps/ → targets/, workspaces glob following (runs ALONE — see manage.js)
     { name: 'notifications', ensure: true }, // uid→owner + metadata/context/attribution + validate schema
     { name: 'users', ensure: true },         // plan→subscription + @omega.js/backend-schema backfill + orphan cleanup + validate
     { name: 'orders', ensure: true },        // payments-orders: legacy attribution.utm blob → first/last touches
     { name: 'payments-intents', ensure: true }, // payments-intents: legacy attribution.utm blob → first/last touches
+    { name: 'payment-provider', ensure: true }, // #428 word rename: the stored `processor` field → `provider`, across all five payment collections
+    { name: 'state-retirement', ensure: true, local: true }, // #434: .omega/state.json → config/omega.json5 + .env, then the file goes
   ],
 
   bookmark: [
@@ -815,7 +850,7 @@ const OPERATIONS = {
   ],
 
   testing: [
-    { name: 'target-checks', ensure: true }, // Per-app local checks (build output, backend files, framework version) + live checks (homepage, API health, GitHub Actions)
+    { name: 'target-checks', ensure: true }, // Per-target local checks (build output, backend files, framework version) + live checks (homepage, API health, GitHub Actions)
   ],
 };
 
@@ -848,7 +883,7 @@ const OPERATIONS = {
 //            call; the live grant is proven at call time (the google-auth
 //            403 diagnostics are the backstop).
 // Services NOT listed keep their own setup gates untouched (their needs are
-// conditional in ways config can't see up front — per-processor payment
+// conditional in ways config can't see up front — per-provider payment
 // keys, operator-only service accounts).
 
 // The shared Google OAuth app credentials — the ONE identity every Google
@@ -859,7 +894,7 @@ const GOOGLE_ENV = [
 ];
 
 const REQUIRES = {
-  cloudflare: {
+  edge: {
     why: 'reconciles the zone, DNS records, rulesets, and settings via the Cloudflare API',
     when: (config) => config.edge?.providers?.cloudflare?.enabled !== false,
     env: [
@@ -870,11 +905,11 @@ const REQUIRES = {
 
   domain: {
     why: 'points the registrar nameservers at the Cloudflare zone',
-    when: (config) => config.domain?.enabled !== false && Boolean(config.domain?.provider),
+    when: (config) => config.domain?.enabled !== false && Boolean(resolveRegistrar(config)),
     env: [
       { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
-      { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username', prompted: true, when: (config) => config.domain?.provider === 'namecheap' },
-      { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/', prompted: true, when: (config) => config.domain?.provider === 'namecheap' },
+      { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
+      { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
     ],
     scopes: [],
   },
@@ -898,7 +933,7 @@ const REQUIRES = {
     ],
   },
 
-  recaptcha: {
+  captcha: {
     why: "proves the brand's own classic reCAPTCHA keys are valid (siteverify)",
     when: (config) => config.captcha?.providers?.recaptcha?.enabled !== false,
     env: [
@@ -918,7 +953,7 @@ const REQUIRES = {
     scopes: ['https://www.googleapis.com/auth/analytics.edit'],
   },
 
-  'search-console': {
+  search: {
     why: 'creates/verifies the sc-domain property and submits sitemaps via the Search Console API',
     when: (config) => config.search?.providers?.searchConsole?.enabled !== false,
     env: GOOGLE_ENV,
@@ -928,7 +963,7 @@ const REQUIRES = {
     ],
   },
 
-  adsense: {
+  advertising: {
     why: 'verifies the domain is present + approved in the AdSense account (read-only API)',
     when: (config) => {
       const provider = config.advertising?.providers?.adsense;
@@ -940,9 +975,8 @@ const REQUIRES = {
 
   monitoring: {
     why: 'creates one Sentry project per enabled target and lands the DSNs',
-    when: (config) => Boolean(config.monitoring)
-      && config.monitoring.enabled !== false
-      && (config.monitoring.provider || 'sentry') === 'sentry',
+    when: (config) => config.monitoring?.enabled !== false
+      && chosenProvider(config.monitoring?.providers) === 'sentry',
     env: [
       {
         name: 'SENTRY_AUTH_TOKEN',
@@ -958,7 +992,7 @@ const REQUIRES = {
   campaigns: {
     why: 'reconciles domain auth, the sender, the list, fields, segments, and the event webhook via the SendGrid API',
     when: (config) => config.marketing?.campaigns?.enabled !== false
-      && (config.marketing?.campaigns?.provider || 'sendgrid') === 'sendgrid',
+      && chosenProvider(config.marketing?.campaigns?.providers) === 'sendgrid',
     env: [
       { name: 'SENDGRID_API_KEY', label: 'SendGrid API key', url: 'https://app.sendgrid.com/settings/api_keys', prompted: true },
     ],
@@ -968,7 +1002,7 @@ const REQUIRES = {
   newsletter: {
     why: 'verifies publication access, fields, segments, and the webhook via the Beehiiv API',
     when: (config) => config.marketing?.newsletter?.enabled !== false
-      && (config.marketing?.newsletter?.provider || 'beehiiv') === 'beehiiv',
+      && chosenProvider(config.marketing?.newsletter?.providers) === 'beehiiv',
     env: [
       { name: 'BEEHIIV_API_KEY', label: 'Beehiiv API key', url: 'https://app.beehiiv.com/settings/workspace/api', prompted: true },
     ],
@@ -1024,8 +1058,8 @@ function templateObject(obj, data) {
 }
 
 module.exports = {
-  APP_DIR_TARGETS,
-  TARGET_APP_DIRS,
+  DIR_TARGETS,
+  TARGET_DIRS,
   TARGET_FRAMEWORKS,
   DEFAULTS,
   SERVICE_ORDER,

@@ -50,7 +50,11 @@ const NASTY = `// Fixture Brand — hand-edited, every comment is load-bearing f
   marketing: {
     campaigns: {
       enabled: true,
-      listId: null, // resolved by the sendgrid service
+      providers: {
+        sendgrid: {
+          listId: null, // resolved by the campaigns service
+        },
+      },
     },
   },
 
@@ -76,10 +80,10 @@ const NASTY = `// Fixture Brand — hand-edited, every comment is load-bearing f
 // ─── Replace ───
 
 test('replace an existing leaf: only the value span changes, every other byte survives', () => {
-  const result = applyConfigEdits(NASTY, { 'marketing.campaigns.listId': 'sg-list-123' });
+  const result = applyConfigEdits(NASTY, { 'marketing.campaigns.providers.sendgrid.listId': 'sg-list-123' });
 
   assert.equal(result, NASTY.replace('listId: null, // resolved', 'listId: "sg-list-123", // resolved'));
-  assert.equal(JSON5.parse(result).marketing.campaigns.listId, 'sg-list-123');
+  assert.equal(JSON5.parse(result).marketing.campaigns.providers.sendgrid.listId, 'sg-list-123');
 });
 
 test('already-equal edits are skipped: output is byte-identical (quote style untouched)', () => {
@@ -144,19 +148,19 @@ test('replacing a leaf with an object serializes a house-style block at the righ
 // ─── Insert ───
 
 test('insert a missing leaf into a multi-line object: lands before the closing brace', () => {
-  const result = applyConfigEdits(NASTY, { 'marketing.campaigns.listName': 'Fixture Brand' });
+  const result = applyConfigEdits(NASTY, { 'marketing.campaigns.providers.sendgrid.listName': 'Fixture Brand' });
 
-  assert.match(result, /listId: null, \/\/ resolved by the sendgrid service\n      listName: "Fixture Brand",\n    \},/);
-  assert.equal(JSON5.parse(result).marketing.campaigns.listName, 'Fixture Brand');
+  assert.match(result, /listId: null, \/\/ resolved by the campaigns service\n          listName: "Fixture Brand",\n        \},/);
+  assert.equal(JSON5.parse(result).marketing.campaigns.providers.sendgrid.listName, 'Fixture Brand');
 });
 
 test('insert a whole missing branch: nested block, one property, correct depth', () => {
-  const result = applyConfigEdits(NASTY, { 'marketing.newsletter.publicationId': 'pub-1' });
+  const result = applyConfigEdits(NASTY, { 'marketing.newsletter.providers.beehiiv.publicationId': 'pub-1' });
 
-  assert.match(result, /    newsletter: \{\n      publicationId: "pub-1",\n    \},\n  \},/);
-  assert.equal(JSON5.parse(result).marketing.newsletter.publicationId, 'pub-1');
+  assert.match(result, /    newsletter: \{\n      providers: \{\n        beehiiv: \{\n          publicationId: "pub-1",\n        \},\n      \},\n    \},\n  \},/);
+  assert.equal(JSON5.parse(result).marketing.newsletter.providers.beehiiv.publicationId, 'pub-1');
   // The sibling campaigns block (and its comments) survives untouched
-  assert.ok(result.includes('listId: null, // resolved by the sendgrid service'));
+  assert.ok(result.includes('listId: null, // resolved by the campaigns service'));
   assert.ok(result.includes('/* marketing — ids resolve at manage time */'));
 });
 
@@ -166,13 +170,17 @@ test('insert at the root: goes before the final brace, previous last entry gains
   theme: { id: 'classy' }
 }
 `;
-  const result = applyConfigEdits(source, { 'monitoring.dsn': 'https://x@sentry.test/1' });
+  const result = applyConfigEdits(source, { 'monitoring.providers.sentry.dsn': 'https://x@sentry.test/1' });
 
   assert.equal(result, `{
   brand: { id: 'a' },
   theme: { id: 'classy' },
   monitoring: {
-    dsn: "https://x@sentry.test/1",
+    providers: {
+      sentry: {
+        dsn: "https://x@sentry.test/1",
+      },
+    },
   },
 }
 `);
@@ -211,7 +219,7 @@ test('insert into a comment-only single-line object keeps the comment', () => {
 test('insert into a multi-line comment-only object lands after the comment', () => {
   const source = `{
   payment: {
-    // processors land here at onboarding
+    // providers land here at onboarding
   },
 }
 `;
@@ -219,7 +227,7 @@ test('insert into a multi-line comment-only object lands after the comment', () 
 
   assert.equal(result, `{
   payment: {
-    // processors land here at onboarding
+    // providers land here at onboarding
     enabled: true,
   },
 }
@@ -252,7 +260,7 @@ test('intermediate non-object, out-of-range array index, and non-numeric array s
   payment: { products: [{ id: 'a' }] },
 }
 `;
-  assert.throws(() => applyConfigEdits(source, { 'marketing.campaigns.listId': 'x' }), /'marketing' is not an object/);
+  assert.throws(() => applyConfigEdits(source, { 'marketing.campaigns.providers.sendgrid.listId': 'x' }), /'marketing' is not an object/);
   assert.throws(() => applyConfigEdits(source, { 'payment.products.3.id': 'x' }), /index 3 is out of range/);
   assert.throws(() => applyConfigEdits(source, { 'payment.products.first.id': 'x' }), /expected a numeric index/);
 });
@@ -268,29 +276,29 @@ test('writeConfigValues edits config/omega.json5 in place and reports applied pa
   cleanup(t, root);
 
   const report = writeConfigValues(root, {
-    'marketing.campaigns.listId': 'sg-9',
-    'marketing.newsletter.publicationId': 'pub-9',
+    'marketing.campaigns.providers.sendgrid.listId': 'sg-9',
+    'marketing.newsletter.providers.beehiiv.publicationId': 'pub-9',
     'brand.id': 'fixture-brand', // already equal — must not count as applied
   });
 
   assert.equal(report.path, path.join(root, 'config', 'omega.json5'));
   assert.equal(report.changed, true);
-  assert.deepEqual(report.applied.sort(), ['marketing.campaigns.listId', 'marketing.newsletter.publicationId']);
+  assert.deepEqual(report.applied.sort(), ['marketing.campaigns.providers.sendgrid.listId', 'marketing.newsletter.providers.beehiiv.publicationId']);
 
   const written = fs.readFileSync(report.path, 'utf8');
-  assert.equal(JSON5.parse(written).marketing.campaigns.listId, 'sg-9');
+  assert.equal(JSON5.parse(written).marketing.campaigns.providers.sendgrid.listId, 'sg-9');
   assert.ok(written.includes('// Fixture Brand — hand-edited'));
 
   // Rerun with the same values: nothing applied, file byte-identical
-  const rerun = writeConfigValues(root, { 'marketing.campaigns.listId': 'sg-9', 'marketing.newsletter.publicationId': 'pub-9' });
+  const rerun = writeConfigValues(root, { 'marketing.campaigns.providers.sendgrid.listId': 'sg-9', 'marketing.newsletter.providers.beehiiv.publicationId': 'pub-9' });
   assert.equal(rerun.changed, false);
   assert.deepEqual(rerun.applied, []);
   assert.equal(fs.readFileSync(report.path, 'utf8'), written);
 });
 
-test('writeConfigValues resolves the app-root location (staged functions/config is never a writeback target) and throws when no config exists', (t) => {
-  // src/dist pillar: a backend app's AUTHORED config is config/omega.json5 at
-  // the app root; functions/config/omega.json5 is staged compose output and
+test('writeConfigValues resolves the target-root location (staged functions/config is never a writeback target) and throws when no config exists', (t) => {
+  // src/dist pillar: a backend target's AUTHORED config is config/omega.json5 at
+  // the target root; functions/config/omega.json5 is staged compose output and
   // must never be edited (the next stage would overwrite it).
   const backend = makeFixture('write-backend', {
     'config/omega.json5': `{\n  brand: { id: 'b' },\n}\n`,
@@ -311,8 +319,8 @@ test('writeConfigValues resolves the app-root location (staged functions/config 
 // ─── The real thing: a scaffold-shaped config takes the full cp59 write set ───
 
 test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with every comment intact', () => {
-  const scaffold = `// Acme — brand-level omega.json5: the shared config layer every app
-// under apps/ inherits. App files override any key per-surface; key presence
+  const scaffold = `// Acme — brand-level omega.json5: the shared config layer every target
+// under targets/ inherits. Local files override any key per-surface; key presence
 // under \`targets\` = this brand supports that target. Secrets NEVER live here —
 // they go in the gitignored .env (the loader hard-fails on secret-shaped keys).
 {
@@ -342,8 +350,8 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
   const commentLines = scaffold.split('\n').filter((line) => line.trim().startsWith('//'));
 
   const result = applyConfigEdits(scaffold, {
-    'marketing.campaigns.listId': 'sg-list-1',
-    'marketing.newsletter.publicationId': 'pub-1',
+    'marketing.campaigns.providers.sendgrid.listId': 'sg-list-1',
+    'marketing.newsletter.providers.beehiiv.publicationId': 'pub-1',
     'cloud.config.apiKey': 'AIza-test',
     'cloud.config.authDomain': 'acme.com',
     'cloud.config.projectId': 'acme-app',
@@ -351,8 +359,8 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
   });
 
   const parsed = JSON5.parse(result);
-  assert.equal(parsed.marketing.campaigns.listId, 'sg-list-1');
-  assert.equal(parsed.marketing.newsletter.publicationId, 'pub-1');
+  assert.equal(parsed.marketing.campaigns.providers.sendgrid.listId, 'sg-list-1');
+  assert.equal(parsed.marketing.newsletter.providers.beehiiv.publicationId, 'pub-1');
   assert.deepEqual(parsed.cloud.config, { apiKey: 'AIza-test', authDomain: 'acme.com', projectId: 'acme-app', appId: '1:123:web:abc' });
 
   for (const line of commentLines) {
@@ -361,8 +369,8 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
 
   // Second application of the same set is a no-op
   assert.equal(applyConfigEdits(result, {
-    'marketing.campaigns.listId': 'sg-list-1',
-    'marketing.newsletter.publicationId': 'pub-1',
+    'marketing.campaigns.providers.sendgrid.listId': 'sg-list-1',
+    'marketing.newsletter.providers.beehiiv.publicationId': 'pub-1',
     'cloud.config.apiKey': 'AIza-test',
     'cloud.config.authDomain': 'acme.com',
     'cloud.config.projectId': 'acme-app',

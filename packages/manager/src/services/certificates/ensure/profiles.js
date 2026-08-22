@@ -46,7 +46,7 @@ module.exports = catchAgreements(async (context) => {
   }
 
   const profilesDir = join(appleDir, 'profiles');
-  const profileCertTypes = brandConfig.certificates.apple?.profiles || [];
+  const profileCertTypes = brandConfig.certificates.providers?.apple?.profiles || [];
   const brandName = brandConfig.brand?.name || brandId;
 
   const existingProfiles = await listProfiles(appleClient);

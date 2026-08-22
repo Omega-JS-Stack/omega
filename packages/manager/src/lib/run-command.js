@@ -2,9 +2,9 @@
  * runCommand — spawn a child in a directory, streaming its output, and
  * resolve a { success, error? } result instead of rejecting. Shared by the
  * update service (npm install / npm run build) and the brand-root test
- * fan-out (per-app `omega test`).
+ * fan-out (per-target `omega test`).
  *
- * Every command runs under the APP'S OWN Node (friction #15): the app
+ * Every command runs under the TARGET'S OWN Node (friction #15): the target
  * root's .nvmrc picks the nvm install whose bin is prepended to PATH — one
  * brand can span Node majors (web 24, backend 22) without a single nvm
  * switch. A pinned-but-missing major fails fast with
@@ -14,7 +14,7 @@
  */
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
-const { resolveAppNode, nodeEnvFor } = require('./node-version.js');
+const { resolveTargetNode, nodeEnvFor } = require('./node-version.js');
 
 function spawnOnce(command, args, cwd, env) {
   return new Promise((resolve) => {
@@ -42,7 +42,7 @@ function spawnOnce(command, args, cwd, env) {
  * @returns {Promise<{ success: boolean, error?: string, code?: number }>}
  */
 async function runCommand(command, args, cwd) {
-  let resolved = resolveAppNode(cwd);
+  let resolved = resolveTargetNode(cwd);
   if (resolved?.error) {
     console.log(`      ${chalk.red('✗')} ${resolved.error}`);
     return { success: false, error: resolved.error };
@@ -60,7 +60,7 @@ async function runCommand(command, args, cwd) {
   // Self-heal: the command may have rewritten the .nvmrc mid-run (EM setup
   // writes the pin BEFORE its own Node check). Re-resolve; a changed pin
   // gets one retry under the newly pinned Node.
-  resolved = resolveAppNode(cwd);
+  resolved = resolveTargetNode(cwd);
   if (!resolved || resolved.error || (resolved.spec || null) === specBefore) {
     return result;
   }

@@ -87,7 +87,7 @@ const DEFAULT_USER = {
       },
     },
     payment: {
-      processor: null,
+      provider: null,
       orderId: null,
       resourceId: null,
       frequency: null,
@@ -296,7 +296,7 @@ const schema = {
         type: 'object',
         required: true,
         properties: {
-          processor: { type: 'string', required: true, nullable: true },
+          provider: { type: 'string', required: true, nullable: true },
           orderId: { type: 'string', required: true, nullable: true },
           resourceId: { type: 'string', required: true, nullable: true },
           frequency: { type: 'string', required: true, nullable: true },

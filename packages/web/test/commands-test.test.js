@@ -14,7 +14,7 @@ const path = require('path');
 
 const { projectTestArgs, frameworkTestRuns } = require('../src/commands/test.js');
 
-const stageApp = () => {
+const stageTarget = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-test-'));
   const passing = `const { test } = require('node:test');\ntest('passes', () => {});\n`;
   fs.mkdirSync(path.join(dir, 'test', 'nested'), { recursive: true });
@@ -34,7 +34,7 @@ const runSuite = (dir, target) => spawnSync(`node --test ${target}`, {
 });
 
 test('the default target discovers top-level and nested tests via node\'s own glob', () => {
-  const dir = stageApp();
+  const dir = stageTarget();
   const result = runSuite(dir, projectTestArgs([]));
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /pass 2/);
@@ -42,7 +42,7 @@ test('the default target discovers top-level and nested tests via node\'s own gl
 });
 
 test('the old bare test/ positional fails on this Node — the defect stays pinned', () => {
-  const dir = stageApp();
+  const dir = stageTarget();
   const result = runSuite(dir, 'test/');
   assert.notEqual(result.status, 0, 'bare test/ unexpectedly worked — revisit #114');
   fs.rmSync(dir, { recursive: true, force: true });

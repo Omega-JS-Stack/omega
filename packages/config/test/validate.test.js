@@ -111,27 +111,127 @@ test('match/enum only run on present values — null/empty ids are silent', () =
   assert.deepStrictEqual(errors, []);
 });
 
-test('translation section: valid shape passes, provider enum + types enforced', () => {
+test('translation section: valid shape passes, providers block + types enforced', () => {
   assert.deepStrictEqual(
     validateConfig({
       ...VALID,
-      translation: { enabled: true, default: 'en', languages: ['es', 'fr'], provider: 'claude', exclude: ['blog'] },
+      translation: { enabled: true, default: 'en', languages: ['es', 'fr'], providers: { claude: {} }, exclude: ['blog'] },
     }).errors,
     [],
   );
 
   const { errors } = validateConfig({
     ...VALID,
-    translation: { languages: 'es', provider: 'gemini' },
+    translation: { languages: 'es', providers: 'chatgpt' },
   });
 
   assert.ok(errors.some((e) => e.includes('config.translation.languages has wrong type')));
-  assert.ok(errors.some((e) => e.includes('config.translation.provider') && e.includes('must be one of [claude, chatgpt]')));
+  assert.ok(errors.some((e) => e.includes('config.translation.providers has wrong type')));
+});
+
+test('the flat provider picks are retired — one providers block per role (#425)', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    translation: { languages: ['es'], provider: 'chatgpt' },
+    domain: { provider: 'namecheap', email: { provider: 'cloudflare' } },
+    devlog: { enabled: true, provider: 'ghostii', orgs: ['x'] },
+    certificates: { apple: { bundleIdPrefix: 'com.acme' } },
+    payment: { processors: { stripe: { publishableKey: 'pk_test_x' } } },
+  });
+
+  for (const [path, replacement] of [
+    ['translation.provider', 'translation.providers.<name>'],
+    ['domain.provider', 'domain.providers.<registrar>'],
+    ['domain.email.provider', 'domain.email.providers.<provider>'],
+    ['devlog.provider', 'devlog.providers.ghostii'],
+    ['devlog.orgs', 'devlog.providers.ghostii.orgs'],
+    ['certificates.apple', 'certificates.providers.apple'],
+    ['payment.processors', 'payment.providers'],
+  ]) {
+    assert.ok(
+      errors.some((e) => e.includes(`config.${path} is retired`) && e.includes(`now "${replacement}"`)),
+      `${path} should bounce with its ${replacement} replacement`,
+    );
+  }
+});
+
+test('every converted monitoring + marketing leaf is retired by its exact path (#425)', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    monitoring: {
+      provider: 'sentry',
+      org: 'acme-co',
+      dsn: 'https://x@sentry.test/1',
+      environment: 'production',
+      sampleRate: 1,
+      tracesSampleRate: 0.1,
+      scrubEmail: true,
+      attachScreenshot: false,
+      bundlePatterns: ['/assets/js/'],
+    },
+    marketing: {
+      campaigns: { provider: 'sendgrid', listId: 'lst_1' },
+      newsletter: { provider: 'beehiiv', publicationId: 'pub_1' },
+    },
+    blog: { provider: 'ghostii' },
+  });
+
+  for (const [path, replacement] of [
+    ['monitoring.provider', 'monitoring.providers.sentry'],
+    ['monitoring.org', 'monitoring.providers.sentry.org'],
+    ['monitoring.dsn', 'monitoring.providers.sentry.dsn'],
+    ['monitoring.environment', 'monitoring.providers.sentry.environment'],
+    ['monitoring.sampleRate', 'monitoring.providers.sentry.sampleRate'],
+    ['monitoring.tracesSampleRate', 'monitoring.providers.sentry.tracesSampleRate'],
+    ['monitoring.scrubEmail', 'monitoring.providers.sentry.scrubEmail'],
+    ['monitoring.attachScreenshot', 'monitoring.providers.sentry.attachScreenshot'],
+    ['monitoring.bundlePatterns', 'monitoring.providers.sentry.bundlePatterns'],
+    ['marketing.campaigns.provider', 'marketing.campaigns.providers.sendgrid'],
+    ['marketing.campaigns.listId', 'marketing.campaigns.providers.sendgrid.listId'],
+    ['marketing.newsletter.provider', 'marketing.newsletter.providers.beehiiv'],
+    ['marketing.newsletter.publicationId', 'marketing.newsletter.providers.beehiiv.publicationId'],
+    ['blog.provider', 'blog.providers.ghostii'],
+  ]) {
+    assert.ok(
+      errors.some((e) => e.includes(`config.${path} is retired`) && e.includes(`now "${replacement}"`)),
+      `${path} should bounce with its ${replacement} replacement`,
+    );
+  }
+});
+
+test('monitoring + marketing in the new shape validate clean, and their role-level keys stay put (#425)', () => {
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      monitoring: {
+        enabled: true,
+        providers: { sentry: { org: 'acme-co', dsn: 'https://x@sentry.test/1', sampleRate: 1, scrubEmail: false, bundlePatterns: ['/assets/js/'] } },
+      },
+      marketing: {
+        campaigns: { enabled: true, providers: { sendgrid: { listId: 'lst_1' } } },
+        newsletter: { enabled: false, providers: { beehiiv: { publicationId: 'pub_1' } }, content: [{ tone: 'practical' }] },
+        prune: { enabled: true },
+      },
+    }).errors,
+    [],
+  );
+
+  // …and the provider-hung leaves are typed, so a wrong shape still fails
+  const { errors } = validateConfig({
+    ...VALID,
+    monitoring: { providers: { sentry: { dsn: 'sentry.test/1', sampleRate: 2 } } },
+    marketing: { campaigns: { enabled: 'yes', providers: { sendgrid: { listId: 42 } } } },
+  });
+
+  assert.ok(errors.some((e) => e.includes('config.monitoring.providers.sentry.dsn') && e.includes('does not match')));
+  assert.ok(errors.some((e) => e.includes('config.monitoring.providers.sentry.sampleRate') && e.includes('above the maximum')));
+  assert.ok(errors.some((e) => e.includes('config.marketing.campaigns.enabled has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.marketing.campaigns.providers.sendgrid.listId has wrong type')));
 });
 
 test('devlog + seo are schema-known optional objects (manager-read sections)', () => {
   assert.deepStrictEqual(
-    validateConfig({ ...VALID, devlog: { enabled: true, orgs: ['x'] }, seo: { github: { content: [] } } }).errors,
+    validateConfig({ ...VALID, devlog: { enabled: true, providers: { ghostii: { orgs: ['x'] } } }, seo: { github: { content: [] } } }).errors,
     [],
   );
 
@@ -151,7 +251,7 @@ test('the six manager-level sections are shared keys: a website-only brand carri
     parent: 'https://itwcreativeworks.com',
     github: { user: 'itw-creative-works', website: 'https://github.com/itw-creative-works/clockii' },
     reviews: { enabled: true, sites: ['trustpilot.com'] },
-    marketing: { campaigns: { enabled: true, platform: 'sendgrid' }, prune: { enabled: true } },
+    marketing: { campaigns: { enabled: true, providers: { sendgrid: { listId: 'lst_1' } } }, prune: { enabled: true } },
     blog: { enabled: false },
     dataRequest: { queries: [] },
   };
@@ -213,10 +313,10 @@ test('an unrecognized top-level key stays unvalidated: the move admits six NAMED
   const { errors } = validateConfig({
     ...VALID,
     bogusSection: { a: 1 },
-    payment: { processors: { stripe: { apiSecret: 'x' } } },
+    payment: { providers: { stripe: { apiSecret: 'x' } } },
   });
   assert.strictEqual(errors.length, 1);
-  assert.ok(errors[0].includes('config.payment.processors.stripe.apiSecret looks like a secret'));
+  assert.ok(errors[0].includes('config.payment.providers.stripe.apiSecret looks like a secret'));
 });
 
 // ─── validateConfig: targets sanity ───
@@ -297,9 +397,9 @@ test('unknown options.target throws (programmer error, not a config error)', () 
 // ─── validateConfig: secrets ───
 
 test('secret-shaped keys are validation errors', () => {
-  const { errors } = validateConfig({ ...VALID, payment: { processors: { stripe: { apiSecret: 'x' } } } });
+  const { errors } = validateConfig({ ...VALID, payment: { providers: { stripe: { apiSecret: 'x' } } } });
 
-  assert.ok(errors.some((e) => e.includes('config.payment.processors.stripe.apiSecret looks like a secret')));
+  assert.ok(errors.some((e) => e.includes('config.payment.providers.stripe.apiSecret looks like a secret')));
 });
 
 // ─── validateConfig: authDomain is the brand's own host (cp268) ───
@@ -347,7 +447,7 @@ test("an instance's own url wins over brand.url for the host comparison", () => 
   };
 
   // The target chain merges the instance entry to the top level, so its `url`
-  // is the resolved brand host for THIS app
+  // is the resolved brand host for THIS target
   assert.deepStrictEqual(validateConfig({ ...base, url: 'https://admin.omegajs.dev' }, { target: 'web' }).errors, []);
   assert.strictEqual(validateConfig(base, { target: 'web' }).errors.length, 1, 'without the instance url it is a mismatch');
 });

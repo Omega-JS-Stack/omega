@@ -123,14 +123,14 @@ POST /omega/marketing/webhook?provider=sendgrid&key=<OMEGA_WEBHOOK_KEY>
 POST /omega/marketing/webhook?provider=beehiiv&key=<OMEGA_WEBHOOK_KEY>
 ```
 
-The dispatcher loads `processors/{provider}.js`, parses the event(s), and for each event:
+The dispatcher loads `providers/{provider}.js`, parses the event(s), and for each event:
 
 1. Checks `isSupported(eventType)` — filters out non-revoke events like `delivered` / `open`.
-2. Calls `handleEvent({ Manager, ctx, parsed })` on the processor.
+2. Calls `handleEvent({ Manager, ctx, parsed })` on the provider.
 
 There is **no idempotency ledger**. Both handler side effects — writing `consent.marketing.status = 'revoked'` and calling `mailer.remove()` — are idempotent, so a provider retry (or a duplicate fan-out from the parent) re-runs to the same end state with no extra side effects. This is the key difference from `payments-webhooks`, where dedup is load-bearing because payment side effects are not idempotent.
 
-Each processor's `handleEvent` does the same shape of work:
+Each provider's `handleEvent` does the same shape of work:
 
 1. Look up the user by `auth.email` in THIS brand's Firestore. Silent skip if not found (the email may belong to a sibling brand — see "Parent forwarder" below).
 2. Write `consent.marketing.status = 'revoked'` with the appropriate `source` ('sendgrid' or 'beehiiv'), preserving `grantedAt` as informational audit history.
@@ -145,7 +145,7 @@ Each processor's `handleEvent` does the same shape of work:
 \* `bounce` and `dropped` only revoke consent when `bounce_classification` is `'Invalid Address'` (hard bounce). Technical bounces (DMARC, TLS, DNS, reputation) are sender-side issues — the recipient's email is still valid, so consent is preserved.
 | Beehiiv | `subscription.unsubscribed`, `subscription.deleted`, `subscription.paused` |
 
-**Beehiiv publication filter.** Each Beehiiv event includes a `publication_id`. The processor compares this against `beehiivProvider.getPublicationId()`, which reads `Manager.config.marketing.newsletter.publicationId` (populated at brand-onboarding time by OMEGA's `beehiiv/ensure/publication.js`). Mismatch → silent skip. This is how shared-publication events (e.g. devbeans shared by 6 brands) get routed correctly — each brand processes only events matching its own publication. Brands without `publicationId` in config silently skip all Beehiiv webhook events. The same convention applies to SendGrid: `marketing.campaigns.listId` is populated by OMEGA's `sendgrid/ensure/list.js`.
+**Beehiiv publication filter.** Each Beehiiv event includes a `publication_id`. The provider compares this against `beehiivProvider.getPublicationId()`, which reads `Manager.config.marketing.newsletter.providers.beehiiv.publicationId` (populated at brand-onboarding time by OMEGA's `newsletter/ensure/publication.js`). Mismatch → silent skip. This is how shared-publication events (e.g. devbeans shared by 6 brands) get routed correctly — each brand processes only events matching its own publication. Brands without `publicationId` in config silently skip all Beehiiv webhook events. The same convention applies to SendGrid: `marketing.campaigns.providers.sendgrid.listId` is populated by OMEGA's `campaigns/ensure/list.js`.
 
 ### 5. Admin contact removal
 
@@ -156,7 +156,7 @@ DELETE /omega/marketing/contact
 Body: { email }
 ```
 
-After removing the contact from all providers, the route mirrors `consent.marketing.status = 'revoked'` to the user doc when the email maps to a user — `revokedAt` from server time with `source: 'admin'`, same write shape as the webhook processors (`grantedAt` preserved as audit history). Without this mirror, the next `sync()` (payment event, admin re-sync) would re-add the contact the admin just removed. Best-effort and silent when no user matches.
+After removing the contact from all providers, the route mirrors `consent.marketing.status = 'revoked'` to the user doc when the email maps to a user — `revokedAt` from server time with `source: 'admin'`, same write shape as the webhook providers (`grantedAt` preserved as audit history). Without this mirror, the next `sync()` (payment event, admin re-sync) would re-add the contact the admin just removed. Best-effort and silent when no user matches.
 
 ## Parent forwarder (Phase E)
 
@@ -210,7 +210,7 @@ The parent @omega.js/backend has its own brand (e.g. `itw-creative-works`) with 
 
 - **Revoked-only skip.** ONLY the literal string `'revoked'` blocks. Missing consent, `null`, or any other value proceeds — legacy users have no `consent` field and must keep syncing.
 - **`sync()`** — after the user doc is resolved (whether passed as a doc or fetched by uid), a revoked doc logs a warn and returns `{ blocked: 'consent', email }` (mirrors the `{ blocked: 'validation', ... }` shape) BEFORE validation and provider calls.
-- **`add()`** — looks up the user doc by email first (same `auth.email` equality query the webhook processors use). Doc found + revoked → `{ blocked: 'consent', email }`. No doc found → proceed (pure newsletter contact). Lookup failure → proceed (fail open, logged) — a rare duplicate add is recoverable; silently dropping contacts is not.
+- **`add()`** — looks up the user doc by email first (same `auth.email` equality query the webhook providers use). Doc found + revoked → `{ blocked: 'consent', email }`. No doc found → proceed (pure newsletter contact). Lookup failure → proceed (fail open, logged) — a rare duplicate add is recoverable; silently dropping contacts is not.
 - **`remove()` is never gated** — removal is always safe.
 
 The signup route ADDITIONALLY gates at its call site (`userRecord.consent.marketing.status === 'granted'` before calling `mailer.sync(uid)`) — that check runs before the route's paid NeverBounce/ZeroBounce mailbox validation, so declined users never trigger a paid check. The library gate is the safety net for everyone else.
@@ -325,7 +325,7 @@ After the migration: optionally run a re-opt-in drip campaign to legally recover
 - [test/helpers/user.test.js](../test/helpers/user.test.js) — 31 tests covering the canonical schema, defaults, granted/revoked states, round-tripping
 - [test/routes/user/signup.test.js](../test/routes/user/signup.test.js) — 3 tests for signup-time consent capture (granted both, marketing declined, missing payload)
 - [test/routes/marketing/email-preferences.test.js](../test/routes/marketing/email-preferences.test.js) — 14 tests for the email-preferences route (anonymous HMAC + authenticated)
-- [test/routes/marketing/webhook.test.js](../test/routes/marketing/webhook.test.js) — 15+ tests covering SendGrid + Beehiiv processors against the emulator
+- [test/routes/marketing/webhook.test.js](../test/routes/marketing/webhook.test.js) — 15+ tests covering SendGrid + Beehiiv providers against the emulator
 - [test/routes/marketing/webhook-forward.test.js](../test/routes/marketing/webhook-forward.test.js) — verifies the forwarder route returns 404 on non-parent BEMs
 - [test/helpers/webhook-forward.test.js](../test/helpers/webhook-forward.test.js) — 12 unit-style tests with mocked admin + fetch, covering fan-out, URL derivation, failure isolation, self-inclusion, edge cases
 - [test/email/marketing/consent-gate.test.js](../test/email/marketing/consent-gate.test.js) — 21 plain-node tests for the library consent gate (revoked-only skip semantics, `{ blocked: 'consent' }` returns from `sync()`/`add()`, by-email lookup query + normalization, fail-open on lookup errors); the tests themselves touch no emulator and no network (the runner still boots its standard harness)

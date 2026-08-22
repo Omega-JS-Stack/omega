@@ -1,6 +1,6 @@
 ---
 name: extension
-description: Use when working on a brand's extension app or on @omega.js/extension itself — the MV3 manifest, background service worker, popup, options, sidepanel, content scripts, cross-context auth, _locales translation, or the package/publish pipeline, in apps/extension or packages/extension/.
+description: Use when working on a brand's extension app or on @omega.js/extension itself — the MV3 manifest, background service worker, popup, options, sidepanel, content scripts, cross-context auth, _locales translation, or the package/publish pipeline, in targets/extension or packages/extension/.
 user-invocable: true
 ---
 

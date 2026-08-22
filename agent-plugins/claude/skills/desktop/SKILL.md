@@ -1,6 +1,6 @@
 ---
 name: desktop
-description: Use when working on a brand's desktop app or on @omega.js/desktop itself — Electron main, renderer or preload, windows, tray, menus, ipc, deep links, the auto-updater, or the sign/notarize/release pipeline, in apps/desktop or packages/desktop/.
+description: Use when working on a brand's desktop app or on @omega.js/desktop itself — Electron main, renderer or preload, windows, tray, menus, ipc, deep links, the auto-updater, or the sign/notarize/release pipeline, in targets/desktop or packages/desktop/.
 user-invocable: true
 ---
 

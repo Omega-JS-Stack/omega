@@ -1,7 +1,7 @@
 /**
  * Refund policy — the ONE home of the brand's refund window.
  *
- * Every refund processor answers the same question ("is this payment recent
+ * Every refund provider answers the same question ("is this payment recent
  * enough for a full refund, or is it prorated by days remaining?") and the
  * answer must be identical across Stripe, PayPal, and Chargebee: a user who
  * paid the same day must not get a different outcome because of which button

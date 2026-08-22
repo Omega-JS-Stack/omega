@@ -4,23 +4,29 @@
  * The Stripe API has no dispute-protection management (Dashboard-only), so
  * this follows the no-API manual-action pattern: print the settings
  * deep-link, confirm interactively, and stay warned until activation is
- * confirmed (`disputesConfirmed` in state). Cannot mutate by construction.
+ * confirmed. A confirmation nothing can re-check is the one kind of
+ * reconcile flag config keeps (#434): it lands at
+ * `payment.providers.stripe.disputesConfirmed`. Cannot mutate by
+ * construction.
  */
 const chalk = require('chalk').default;
 const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt } = require('../../../lib/run-gates.js');
 
+const CONFIG_PATH = 'payment.providers.stripe.disputesConfirmed';
+
 module.exports = async function ensureStripeDisputes(context) {
-  const { stripeApi: api, serviceData, options = {} } = context;
+  const { brandConfig, stripeApi: api, serviceData, options = {} } = context;
 
   if (!api) {
     console.log(`      ${chalk.dim('⊘ Stripe not configured')}`);
     return {};
   }
 
-  if (serviceData.disputesConfirmed === true) {
+  if (brandConfig.payment?.providers?.stripe?.disputesConfirmed === true) {
     console.log(`      ${chalk.green('✓')} Enhanced Dispute Protection confirmed`);
-    return { state: { disputesConfirmed: true } };
+    return {};
   }
 
   const disputesUrl = serviceData.stripeAccountId
@@ -33,8 +39,9 @@ module.exports = async function ensureStripeDisputes(context) {
     await pressEnterToOpen(disputesUrl, 'the Stripe dispute settings');
     const done = await confirm({ message: 'Enhanced Dispute Protection activated in the Dashboard?', default: false });
     if (done) {
+      writeBrandConfig(context, { [CONFIG_PATH]: true });
       console.log(`      ${chalk.green('✓')} Enhanced Dispute Protection confirmed`);
-      return { state: { disputesConfirmed: true } };
+      return {};
     }
   } else {
     console.log(`      ${chalk.dim('→')} Dispute settings: ${chalk.cyan(disputesUrl)}`);
@@ -43,7 +50,6 @@ module.exports = async function ensureStripeDisputes(context) {
 
   return {
     status: 'warned',
-    state: { disputesConfirmed: false },
     output: { stripeDisputes: { disputesUrl } },
   };
 };

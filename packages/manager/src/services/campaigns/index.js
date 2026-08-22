@@ -13,10 +13,12 @@
  * Auth: SENDGRID_API_KEY in the brand .env; the event-webhook operation
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
+const { chosenProvider } = require('@omega.js/config');
+
 const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
-const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
+const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { SendGridAPI } = require('./lib/sendgrid-api.js');
 
@@ -29,9 +31,14 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'marketing.campaigns.enabled = false' };
     }
 
-    const provider = campaigns.provider || 'sendgrid';
+    // The vendor is a KEY under marketing.campaigns.providers (#425) — no
+    // entry means none chosen and this service skips.
+    const provider = chosenProvider(campaigns.providers);
+    if (!provider) {
+      return { skip: true, reason: 'no marketing.campaigns.providers entry' };
+    }
     if (provider !== 'sendgrid') {
-      return { skip: true, reason: `marketing.campaigns.provider = '${provider}'` };
+      return { skip: true, reason: `marketing.campaigns.providers.${provider} is not a known email-marketing provider` };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

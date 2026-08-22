@@ -2,19 +2,19 @@
  * Test: Security primitives (wave-2 B6/B10) — pure functions, called directly.
  *
  * - safeCompare: constant-time secret comparison (admin key, webhook keys)
- * - loadProcessor: processor-name confinement for dynamic require()
+ * - loadProvider: provider-name confinement for dynamic require()
  * - loadTemplate: email-template-id confinement (colon-joined ids → nested folders)
  */
 const path = require('path');
 const safeCompare = require('../../src/manager/helpers/safe-compare.js');
-const loadProcessor = require('../../src/manager/libraries/load-processor.js');
-const { loadTemplate } = loadProcessor;
+const loadProvider = require('../../src/manager/libraries/load-provider.js');
+const { loadTemplate } = loadProvider;
 
-const PROCESSORS_DIR = path.join(__dirname, '../../src/manager/routes/payments/webhook/processors');
+const PROVIDERS_DIR = path.join(__dirname, '../../src/manager/routes/payments/webhook/providers');
 const TEMPLATES_DIR = path.join(__dirname, '../../src/manager/routes/general/email/templates');
 
 module.exports = {
-  description: 'safeCompare + loadProcessor security primitives',
+  description: 'safeCompare + loadProvider security primitives',
   type: 'group',
   timeout: 10000,
 
@@ -44,17 +44,17 @@ module.exports = {
     },
 
     {
-      name: 'load-processor-allows-valid-names',
+      name: 'load-provider-allows-valid-names',
       auth: 'none',
 
       async run({ assert }) {
-        const stripe = loadProcessor(PROCESSORS_DIR, 'stripe');
-        if (!(typeof stripe === 'object' || typeof stripe === 'function')) { assert.fail('stripe processor loads'); }
+        const stripe = loadProvider(PROVIDERS_DIR, 'stripe');
+        if (!(typeof stripe === 'object' || typeof stripe === 'function')) { assert.fail('stripe provider loads'); }
       },
     },
 
     {
-      name: 'load-processor-rejects-traversal-names',
+      name: 'load-provider-rejects-traversal-names',
       auth: 'none',
 
       async run({ assert }) {
@@ -63,7 +63,7 @@ module.exports = {
         for (const name of invalid) {
           let threw = false;
           try {
-            loadProcessor(PROCESSORS_DIR, name);
+            loadProvider(PROVIDERS_DIR, name);
           } catch (e) {
             threw = true;
           }

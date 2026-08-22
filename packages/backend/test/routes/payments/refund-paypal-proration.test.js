@@ -1,5 +1,5 @@
 /**
- * Test: the PayPal refund processor derives its billing period, never guesses it
+ * Test: the PayPal refund provider derives its billing period, never guesses it
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
  * A prorated refund is `days remaining / days in period × amount`. PayPal
@@ -16,7 +16,7 @@
  *
  * Run: npx omega test backend:routes/payments/refund-paypal-proration
  */
-const paypalRefund = require('../../../src/manager/routes/payments/refund/processors/paypal.js');
+const paypalRefund = require('../../../src/manager/routes/payments/refund/providers/paypal.js');
 
 // A stand-in for the PayPal HTTP client — the external boundary. It answers plan
 // lookups from the fixture it was built with and records what was asked for.

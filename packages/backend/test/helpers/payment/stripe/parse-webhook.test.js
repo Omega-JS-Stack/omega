@@ -1,11 +1,11 @@
 /**
  * Test: Stripe parseWebhook()
- * Unit tests for the Stripe webhook processor's event categorization and routing
+ * Unit tests for the Stripe webhook provider's event categorization and routing
  *
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type. Uses real Stripe CLI fixtures where available.
  */
-const stripeProcessor = require('../../../../src/manager/routes/payments/webhook/processors/stripe.js');
+const stripeProvider = require('../../../../src/manager/routes/payments/webhook/providers/stripe.js');
 
 // Real Stripe CLI fixtures
 const FIXTURE_INVOICE_MANUAL = require('../../../fixtures/stripe/invoice-payment-failed.json');
@@ -15,7 +15,7 @@ const FIXTURE_CHECKOUT_PAYMENT = require('../../../fixtures/stripe/checkout-sess
 const FIXTURE_INVOICE_SUB = require('../../../fixtures/stripe/invoice-subscription-payment-failed.json');
 
 function parseWebhook(event) {
-  return stripeProcessor.parseWebhook({ body: event });
+  return stripeProvider.parseWebhook({ body: event });
 }
 
 module.exports = {
@@ -28,43 +28,43 @@ module.exports = {
     {
       name: 'supports-subscription-created',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('customer.subscription.created'), 'Should support customer.subscription.created');
+        assert.ok(stripeProvider.isSupported('customer.subscription.created'), 'Should support customer.subscription.created');
       },
     },
 
     {
       name: 'supports-subscription-updated',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('customer.subscription.updated'), 'Should support customer.subscription.updated');
+        assert.ok(stripeProvider.isSupported('customer.subscription.updated'), 'Should support customer.subscription.updated');
       },
     },
 
     {
       name: 'supports-subscription-deleted',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('customer.subscription.deleted'), 'Should support customer.subscription.deleted');
+        assert.ok(stripeProvider.isSupported('customer.subscription.deleted'), 'Should support customer.subscription.deleted');
       },
     },
 
     {
       name: 'supports-invoice-payment-failed',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('invoice.payment_failed'), 'Should support invoice.payment_failed');
+        assert.ok(stripeProvider.isSupported('invoice.payment_failed'), 'Should support invoice.payment_failed');
       },
     },
 
     {
       name: 'supports-checkout-session-completed',
       async run({ assert }) {
-        assert.ok(stripeProcessor.isSupported('checkout.session.completed'), 'Should support checkout.session.completed');
+        assert.ok(stripeProvider.isSupported('checkout.session.completed'), 'Should support checkout.session.completed');
       },
     },
 
     {
       name: 'rejects-unsupported-event',
       async run({ assert }) {
-        assert.equal(stripeProcessor.isSupported('charge.succeeded'), false, 'Should not support charge.succeeded');
-        assert.equal(stripeProcessor.isSupported('customer.created'), false, 'Should not support customer.created');
+        assert.equal(stripeProvider.isSupported('charge.succeeded'), false, 'Should not support charge.succeeded');
+        assert.equal(stripeProvider.isSupported('customer.created'), false, 'Should not support customer.created');
       },
     },
 

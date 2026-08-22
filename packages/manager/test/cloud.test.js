@@ -40,8 +40,12 @@ const ALL_SERVICES = [
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
+// Every fixture root is a real brand root: the auth redirect confirm and the
+// VAPID paste-back land in config/omega.json5 (#434)
 function tmpRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-fb-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-fb-'));
+  jetpack.write(path.join(root, 'config', 'omega.json5'), `{\n  brand: { id: 'fixture-brand' },\n}\n`);
+  return root;
 }
 
 // ONE cloud home (#23): the provisioning fields, the platform-level org +
@@ -145,14 +149,13 @@ function fakeCf({ zone = ZONE, records = [], certPacks, totalTls } = {}) {
   return api;
 }
 
-function runService(config, { firebase, cloudflare, options = {}, serviceData = {}, brandRoot, apps = [] } = {}) {
+function runService(config, { firebase, cloudflare, options = {}, serviceData = {}, brandRoot, targetDirs = [] } = {}) {
   return service.run({
     brandId: 'fixture-brand',
     brandRoot: brandRoot || tmpRoot(),
     brandConfig: config,
-    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps },
-    brandState: {},
-    apps,
+    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), targetDirs },
+    targetDirs,
     operations: OPERATIONS.cloud,
     options,
     serviceData,
@@ -182,7 +185,7 @@ function handlerContext(config, firebase, extra = {}) {
     domain: DOMAIN,
     apexDomain: DOMAIN,
     isSubdomainProject: false,
-    apps: [],
+    targets: [],
     serviceData: {},
     options: {},
     ...extra,
@@ -342,21 +345,21 @@ test('cloud: fully converged project is a zero-mutation no-op across all 13 oper
     records: [{ id: 'c1', type: 'CNAME', name: `api.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: true }],
   });
 
+  config.cloud.oauthRedirectsConfigured = true;
+  config.cloud.messaging = { vapidKey: 'B'.repeat(87) };
+  process.env.VAPID_PRIVATE_KEY = 'p'.repeat(43);
+
   const result = await runService(config, {
     firebase: api,
     cloudflare: cf,
     brandRoot: stagedRoot(),
-    serviceData: {
-      authentication: { oauthRedirectsConfigured: true },
-      cloudMessaging: { vapidPublicKey: 'B'.repeat(87), vapidPrivateKey: 'p'.repeat(43) },
-    },
   });
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.mutations(), []);
   assert.deepEqual(cf.mutations(), []);
 
-  // Durable IDs accumulated for later services
+  // Values the later operations in this run carry forward
   assert.equal(result.state.serviceAccount.email, SA_EMAIL);
   assert.equal(result.state.sdkConfig.authDomain, DOMAIN);
   assert.equal(result.state.hosting.domains[0].status, 'verified');
@@ -639,18 +642,18 @@ test('service-account: missing key is created and saved to .omega/secrets (the O
   });
 
   const brandRoot = tmpRoot(); // no key staged
-  const backendPath = path.join(brandRoot, 'apps', 'backend');
+  const backendPath = path.join(brandRoot, 'targets', 'backend');
 
   const result = await handler(handlerContext(brandConfig(), api, {
     brandRoot,
-    apps: [{ name: 'backend', dir: 'apps/backend', path: backendPath, target: 'backend' }],
+    targetDirs: [{ name: 'backend', dir: 'targets/backend', path: backendPath, target: 'backend' }],
   }));
 
   assert.equal(result.state.serviceAccount.email, SA_EMAIL);
   assert.equal(api.callsTo('createServiceAccountKey').length, 1);
   assert.equal(api.callsTo('createServiceAccount').length, 0); // account existed
   assert.equal(jetpack.read(path.join(brandRoot, '.omega', 'secrets', 'service-account.json'), 'json').client_email, SA_EMAIL);
-  // No per-app copy: dist/ staging pulls from .omega/secrets at build time
+  // No per-target copy: dist/ staging pulls from .omega/secrets at build time
   assert.equal(jetpack.exists(path.join(backendPath, 'functions', 'service-account.json')), false);
   assert.equal(jetpack.exists(path.join(backendPath, 'service-account.json')), false);
 });
@@ -693,7 +696,7 @@ test('authentication: wrong-project OAuth client is flagged, credentials not sav
   assert.equal(jetpack.exists(path.join(context.brandRoot, '.omega', 'secrets', 'google-oauth.json')), false);
 });
 
-test('authentication: interactive redirect-URI confirm records completion in state', async () => {
+test('authentication: interactive redirect-URI confirm records completion in config (#434)', async () => {
   const handler = require('../src/services/cloud/ensure/authentication.js');
   const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase(convergedResponses());
@@ -705,13 +708,15 @@ test('authentication: interactive redirect-URI confirm records completion in sta
   prompt.openInBrowser = (url) => { opened.push(url); return true; };
 
   try {
-    const run = handler(handlerContext(brandConfig(), api));
+    const context = handlerContext(brandConfig(), api);
+    const run = handler(context);
     await tty.answer('Press Enter to open the OAuth client settings', '\r');
     await tty.answer('Origins + redirect URIs configured in the OAuth client?', 'y\r');
     const result = await run;
 
     assert.equal(result.status, 'success');
-    assert.equal(result.state.authentication.oauthRedirectsConfigured, true);
+    assert.equal(result.output.authentication.oauthRedirectsConfigured, true);
+    assert.match(readConfigSource(context.brandRoot), /oauthRedirectsConfigured: true/);
     assert.equal(opened.length, 1, 'Enter opened the OAuth client settings');
   } finally {
     prompt.openInBrowser = realOpen;
@@ -731,7 +736,7 @@ test('cloud-messaging: missing VAPID key pair warns with console guidance', asyn
   assert.equal(api.mutations().length, 0);
 });
 
-test('cloud-messaging: interactive paste-back validates lengths and lands both keys in state', async () => {
+test('cloud-messaging: interactive paste-back validates lengths and splits the pair across its two homes (#434)', async () => {
   const handler = require('../src/services/cloud/ensure/cloud-messaging.js');
   const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase({ isServiceEnabled: () => true });
@@ -741,7 +746,8 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
   prompt.openInBrowser = () => true;
 
   try {
-    const run = handler(handlerContext(brandConfig(), api));
+    const context = handlerContext(brandConfig(), api);
+    const run = handler(context);
     await tty.answer('Press Enter to open the Cloud Messaging settings', '\r');
     await tty.answer('VAPID public key:', 'too-short\r');
     // \x15 (ctrl-U) clears the rejected line before retyping
@@ -749,10 +755,11 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
     await tty.answer('VAPID private key:', `${'p'.repeat(43)}\r`);
     const result = await run;
 
-    assert.deepEqual(result.state.cloudMessaging, {
-      vapidPublicKey: 'B'.repeat(87),
-      vapidPrivateKey: 'p'.repeat(43),
-    });
+    // Public half → omega.json5 (it ships to every browser); private half →
+    // the gitignored brand .env
+    assert.match(readConfigSource(context.brandRoot), new RegExp(`vapidKey: "${'B'.repeat(87)}"`));
+    assert.match(jetpack.read(path.join(context.brandRoot, '.env')), new RegExp(`VAPID_PRIVATE_KEY="${'p'.repeat(43)}"`));
+    assert.ok(!readConfigSource(context.brandRoot).includes('p'.repeat(43)));
     assert.notEqual(result.status, 'warned');
     assert.equal(api.mutations().length, 0);
   } finally {

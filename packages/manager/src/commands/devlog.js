@@ -1,9 +1,9 @@
 /**
  * `omega-manager devlog` — generate a commit-digest blog post from recent
- * GitHub activity and publish it to the brand's website app.
+ * GitHub activity and publish it to the brand's website target.
  *
  * Flags: --brand=<id> (company workspaces; default = the single brand with
- * devlog.enabled), --days=<n> overrides devlog.lookbackDays for this run,
+ * devlog.enabled), --days=<n> overrides devlog.providers.ghostii.lookbackDays,
  * --dry-run collects + generates only and writes a preview to .omega/devlog/
  * instead of publishing.
  */

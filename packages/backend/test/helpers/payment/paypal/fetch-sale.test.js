@@ -6,7 +6,7 @@
  * resolves to the SALE it reversed. The library knew subscriptions and orders
  * only, so 'sale' fell through to "Unknown resource type" — every real one-time
  * refund took the stale-fallback path and logged the failure as an unreachable
- * processor API, when no fetch had actually been attempted.
+ * provider API, when no fetch had actually been attempted.
  *
  * The HTTP call is the one thing stubbed here: reading a sale back needs live
  * PayPal credentials (real PayPal calls are gated behind extended mode, never
@@ -19,7 +19,7 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-sale
  */
-const PayPal = require('../../../../src/manager/libraries/payment/processors/paypal.js');
+const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
 
 const FIXTURE_SALE_REFUNDED = require('../../../fixtures/paypal/sale-refunded.json');
 

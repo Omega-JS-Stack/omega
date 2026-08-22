@@ -31,7 +31,7 @@ class BaseTest {
 
   /**
    * Re-stage functions/ from the authored tree. Fixes that write STAGED
-   * INPUTS (the app manifest, .env, .nvmrc, service-account.json, config)
+   * INPUTS (the target manifest, .env, .nvmrc, service-account.json, config)
    * call this so the already-staged tree reflects the fix within the same
    * setup run — idempotent and cheap (src/dist pillar).
    */
@@ -41,7 +41,7 @@ class BaseTest {
   }
 
   /**
-   * Reload the APP MANIFEST from disk into the SHARED in-memory object
+   * Reload the TARGET MANIFEST from disk into the SHARED in-memory object
    * (self.package === context.package — one object, every check reads it).
    * npm-driven fixes rewrite the file mid-run, so any fix that WRITES the
    * manifest must start from disk truth: writing the stale snapshot erases
@@ -51,7 +51,7 @@ class BaseTest {
    *
    * @returns {Object} The live manifest object (same identity as self.package)
    */
-  readAppManifest() {
+  readTargetManifest() {
     const jetpack = require('fs-jetpack');
     const fresh = jetpack.read(`${this.self.firebaseProjectPath}/package.json`, 'json') || {};
     const target = this.self.package;
@@ -62,15 +62,15 @@ class BaseTest {
     return target;
   }
 
-  /** Persist the app manifest (call after readAppManifest() + mutation). */
-  writeAppManifest() {
+  /** Persist the target manifest (call after readTargetManifest() + mutation). */
+  writeTargetManifest() {
     const jetpack = require('fs-jetpack');
     jetpack.write(`${this.self.firebaseProjectPath}/package.json`, JSON.stringify(this.self.package, null, 2));
   }
 
   /**
-   * The npm install command a dependency fix runs, at the APP ROOT (runtime
-   * deps live on the app manifest — src/dist pillar). `--ignore-scripts` is
+   * The npm install command a dependency fix runs, at the TARGET ROOT (runtime
+   * deps live on the target manifest — src/dist pillar). `--ignore-scripts` is
    * load-bearing: in a file:-linked brand, a bare install re-runs the LINKED
    * framework's prepare inside the monorepo — re-staging framework dist
    * mid-run and racing the watch/running stacks (cp195 journey catch: the
@@ -98,7 +98,7 @@ class BaseTest {
   }
 
   /**
-   * Install a package at the app root (via safeInstall/Socket Firewall) and
+   * Install a package at the target root (via safeInstall/Socket Firewall) and
    * resync the shared in-memory manifest with what npm wrote.
    */
   async installPkg(name, version, type) {
@@ -108,7 +108,7 @@ class BaseTest {
     console.log('Running ', command);
     await safeInstall(command, { log: true, config: { cwd: this.self.firebaseProjectPath } });
 
-    this.readAppManifest();
+    this.readTargetManifest();
   }
 
   /**

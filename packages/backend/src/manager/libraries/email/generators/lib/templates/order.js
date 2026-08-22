@@ -6,7 +6,7 @@
  * Sections:
  *   _header()      — emoji + title + subtitle
  *   _summary()     — product/price/discount/total table
- *   _details()     — date, processor, frequency, account
+ *   _details()     — date, provider, frequency, account
  *   _explanation() — conditional paragraphs (trial, promo, cancellation, etc.)
  *   _ctaButton()   — dashboard/billing/pricing CTA
  *   _helpText()    — "Questions? Contact support"
@@ -14,7 +14,7 @@
 const { skeleton, logo, cardWrapper, signoff, footer, escape } = require('./base.js');
 const { resolveTheme, safeUrl } = require('./shared-campaign.js');
 
-const PROCESSOR_NAMES = {
+const PROVIDER_NAMES = {
   stripe: 'Stripe',
   paypal: 'PayPal',
   chargebee: 'Chargebee',
@@ -157,7 +157,7 @@ function _summary(event, order, data, theme) {
   }
 
   if (computed.promoCode) {
-    // A code is percent-based or amount-based (the two shapes a processor coupon
+    // A code is percent-based or amount-based (the two shapes a provider coupon
     // comes in) — quote whichever it is, the amount in the same money format the
     // rows around it use ([#239](https://github.com/Omega-JS-Stack/omega/issues/239))
     const promoOff = computed.promoPercent != null
@@ -197,8 +197,8 @@ function _details(event, order, data) {
     rows.push(_detailRow('Date', computed.date));
   }
 
-  const processorName = PROCESSOR_NAMES[order.processor] || PROCESSOR_NAMES[payment.processor] || 'Other';
-  rows.push(_detailRow('Payment', processorName));
+  const providerName = PROVIDER_NAMES[order.provider] || PROVIDER_NAMES[payment.provider] || 'Other';
+  rows.push(_detailRow('Payment', providerName));
 
   if (isSubscription && payment.frequency) {
     const freq = payment.frequency === 'annually' ? 'Annually'

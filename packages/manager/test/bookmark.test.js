@@ -1,6 +1,6 @@
 /**
  * Bookmark service tests — link derivation from new-world config shapes
- * (single monorepo repo, unslugged Stripe, per-app backend API link) and
+ * (single monorepo repo, unslugged Stripe, per-target backend API link) and
  * the WebSocket sync against a REAL ws client standing in for the
  * extension: ack → success, refusal → warned, no-connection timeout →
  * warned, non-interactive → clean skip, dry-run → planned groups with no
@@ -21,7 +21,7 @@ const FULL_CONFIG = {
   cloud: { config: { projectId: 'fixture-project' } },
   analytics: { providers: { google: { accountId: '111', propertyId: '222' } } },
   repo: { providers: { github: { org: 'fixture-org' } } },
-  payment: { processors: { stripe: { publishableKey: 'pk_fixture' } } },
+  payment: { providers: { stripe: { publishableKey: 'pk_fixture' } } },
 };
 
 function runService(context) {
@@ -29,8 +29,7 @@ function runService(context) {
     brandId: context.brandConfig.brand.id,
     brandRoot: context.brandRoot || '/nonexistent',
     brandConfig: context.brandConfig,
-    brandState: context.brandState || {},
-    apps: context.apps || [],
+    targets: context.targets || [],
     operations: OPERATIONS.bookmark,
     options: context.options || {},
     serviceData: {},
@@ -51,8 +50,8 @@ function freePort() {
 // ─── link derivation ─────────────────────────────────────────────────────────
 
 test('bookmark: full config derives every group with new-world shapes', () => {
-  const apps = [{ name: 'backend', target: 'backend' }, { name: 'web', target: 'web' }];
-  const links = generateLinks(FULL_CONFIG, {}, apps, { deployedFunctions: ['omega_api', 'omega_signup'] });
+  const targets = [{ name: 'backend', target: 'backend' }, { name: 'web', target: 'web' }];
+  const links = generateLinks(FULL_CONFIG, targets, { deployedFunctions: ['omega_api', 'omega_signup'] });
 
   assert.deepEqual(Object.keys(links), ['Cloud', 'Firebase', 'Analytics', 'Search', 'Stripe', 'GitHub', 'Live']);
 
@@ -75,18 +74,17 @@ test('bookmark: full config derives every group with new-world shapes', () => {
     'https://github.com/fixture-org/fixture/actions',
   ]);
 
-  // Live: website + API subdomain (backend app present)
+  // Live: website + API subdomain (backend target present)
   assert.deepEqual(links.Live.map((l) => l.url), ['https://fixture.example', 'https://api.fixture.example']);
 });
 
 test('bookmark: groups with unmet inputs are absent', () => {
-  const links = generateLinks({ brand: { id: 'bare', name: 'Bare' } }, {}, []);
+  const links = generateLinks({ brand: { id: 'bare', name: 'Bare' } }, []);
   assert.deepEqual(links, {});
 
-  // github.repo overrides the brand-id repo name; no backend app → no API link
+  // github.repo overrides the brand-id repo name; no backend target → no API link
   const partial = generateLinks(
     { brand: { id: 'p', url: 'https://p.example' }, repo: { providers: { github: { org: 'o', repo: 'custom-repo' } } } },
-    {},
     [{ name: 'web', target: 'web' }],
   );
   assert.deepEqual(Object.keys(partial), ['Search', 'GitHub', 'Live']);
@@ -114,7 +112,7 @@ test('bookmark: non-interactive run skips cleanly without opening a server', asy
 test('bookmark: dry-run reports the planned groups without a server', async () => {
   const result = await runService({
     brandConfig: FULL_CONFIG,
-    apps: [{ name: 'backend', target: 'backend' }],
+    targets: [{ name: 'backend', target: 'backend' }],
     options: { dryRun: true },
   });
 
@@ -131,7 +129,7 @@ test('bookmark: extension ack lands the sync as success', async () => {
 
   const tty = openTtyPrompt();
   try {
-    const running = runService({ brandConfig: config, apps: [] });
+    const running = runService({ brandConfig: config, targets: [] });
 
     // The "extension": connect, receive the sync message, ack it
     const received = await new Promise((resolve, reject) => {

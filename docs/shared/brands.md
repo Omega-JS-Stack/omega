@@ -4,19 +4,19 @@
 
 ## The four brands
 
-### `apps/sandbox-brand` — the synthetic fixture
+### `brands/sandbox-brand` — the synthetic fixture
 
 Fixture for the AUTOMATED corpus/e2e suites: offline, `demo-*` Firebase, deterministic. Test runs may mangle and reset it. Never touches real cloud. It deliberately carries no agent-docs chain — its files are test output, not a workspace an agent should be guided into.
 
-### `apps/omega-playground` — "Paperloom", the standing live test brand
+### `brands/omega-playground` — "OMEGA Playground", the standing live test brand
 
 Renamed from omega-brand (Ian 2026-07-11 — zero ambiguity). Born through the real wizard: id `omega-playground`, url playground.omegajs.dev — a SUBDOMAIN so derived surfaces never claim the real omegajs.dev. Points at the real-but-throwaway Firebase project `omegajs-playground` (ITW-org-owned since 2026-07-11; sanctioned for live proofs — Blaze it, break it, delete it; it is TEST INFRASTRUCTURE, never production).
 
-REBRANDED **Paperloom** (Ian 2026-07-19): a fictional quiet-writing-studio brand — now that the real omegajs.dev exists, the playground stops posing as "here's the OMEGA framework" so drift never reads as a broken copy. Infra identity unchanged; name/copy/color/catalog display are the fiction (forest-ink green, classy theme).
+REBRANDED **OMEGA Playground** (Ian 2026-08-21, [#433](https://github.com/Omega-JS-Stack/omega/issues/433) — REVERSES the 2026-07-19 fiction ruling, whose invented brand read as a real product in the ad and analytics consoles). The doctrine now: the playground is openly the OMEGA test surface — "we can mess around here, nothing live actually matters" — so drift from the real omegajs.dev site reads as a demo doing its job, never as a broken copy. Infra identity unchanged (id, url, green accent, classy theme); name and voice are the only things that moved, and the catalog's display names stay placeholder demo copy. Cloud-side display names (the Meta pixel, the GA property + streams, the GCP project name) are the manager's follow-up.
 
 Secrets live only in `.env`/`.omega/secrets` (gitignored; the config loader hard-fails secret-shaped keys) — the committed omega.json5 carries public-by-design values only.
 
-### `apps/newsflash-brand` — "The Daily Build", the second skin
+### `brands/newsflash-brand` — "The Daily Build", the second skin
 
 Added with Ian 2026-07-17. Id `daily-build`, url dailybuild.omegajs.dev (same subdomain rule). The standing SECOND-SKIN brand: a fictional dev-news publication wearing the newsflash theme permanently, so both first-party skins stay alive in real consumers (classy = playground, newsflash = here). Born by COPY of the playground — the wizard rehearsal is a separate queued exercise. OFFLINE-only (demo-* Firebase, no real cloud/services, never production); website + backend targets only; website dev port pinned 4100 for side-by-side, backend rides N7 bumps.
 

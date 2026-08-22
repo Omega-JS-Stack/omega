@@ -4,7 +4,7 @@
  *
  * No email template exists for a refunded one-time purchase, so the handler's log
  * line IS the operator's record of it. It used to name the order and nothing else:
- * on-write.js resolved the processor's refund details for the subscription
+ * on-write.js resolved the provider's refund details for the subscription
  * transition only, so how much came back was nowhere on the one-time path.
  *
  * The handler is called directly — the dispatch that calls it is fire-and-forget
@@ -43,7 +43,7 @@ module.exports = {
         assert.equal(logs.length, 1, 'The handler should log exactly once');
         assert.match(logs[0], new RegExp(`orderId=${ORDER_ID}`), 'The line should name the order refunded');
         assert.match(logs[0], /amount=9\.99 USD/, 'The line should say how much came back');
-        assert.match(logs[0], /reason=requested_by_customer/, 'The line should carry the processor reason');
+        assert.match(logs[0], /reason=requested_by_customer/, 'The line should carry the provider reason');
         assert.match(logs[0], /product=credits-100/, 'The line should name what was refunded');
       },
     },
@@ -51,7 +51,7 @@ module.exports = {
     {
       name: 'stays-readable-without-refund-details',
       async run({ assert }) {
-        // A processor library with no getRefundDetails() leaves them null — the
+        // A provider library with no getRefundDetails() leaves them null — the
         // record must still say which order was refunded
         const logs = [];
         const ctx = context(logs);

@@ -42,7 +42,7 @@ const MINT_BRIDGE = [
  * identity first, the consumer's own asset layer last (it wins collisions).
  * Sources that don't exist are dropped.
  * @param {object} options
- * @param {string|null} options.brandRoot - brand monorepo root (standalone apps: the app root)
+ * @param {string|null} options.brandRoot - brand monorepo root (standalone projects: the target root)
  * @param {string} options.assetsDir - the consumer's src/assets
  * @param {string} [options.coreDir] - the framework core layer (default: packaged core)
  * @returns {Array<{ src: string, dest: string }>}

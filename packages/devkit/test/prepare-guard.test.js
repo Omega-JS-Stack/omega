@@ -218,15 +218,15 @@ test('an install typed inside the package builds — its root is still the monor
   assert.equal(decision.skip, false);
 });
 
-test('an install from an app INSIDE the monorepo builds — it is a monorepo workflow', (t) => {
+test('an install from a brand INSIDE the monorepo builds — it is a monorepo workflow', (t) => {
   const scratch = makeScratch(t);
   const { packageDir } = writeMonorepo(scratch);
-  const app = path.join(scratch, 'apps', 'sandbox-brand');
-  fs.mkdirSync(app, { recursive: true });
+  const brand = path.join(scratch, 'brands', 'sandbox-brand');
+  fs.mkdirSync(brand, { recursive: true });
 
   const decision = prepareDecision({
     packageDir,
-    env: { npm_command: 'install', npm_config_local_prefix: app, INIT_CWD: app },
+    env: { npm_command: 'install', npm_config_local_prefix: brand, INIT_CWD: brand },
   });
 
   assert.equal(decision.skip, false);

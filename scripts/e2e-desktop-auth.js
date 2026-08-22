@@ -10,7 +10,7 @@
  * emulator user.
  *
  * Proof, in order:
- *   1. The Paperloom backend emulator boots (auth + functions + hosting).
+ *   1. The playground backend emulator boots (auth + functions + hosting).
  *   2. A real user signs up against the AUTH emulator and the backend mints its
  *      sign-in custom token at POST /omega/user/token (the node-side setup —
  *      the same seed the sibling lanes use).
@@ -59,7 +59,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'backend');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
 const DESKTOP = path.join(ROOT, 'packages', 'desktop');
 const DESKTOP_DIST = path.join(DESKTOP, 'dist');
 const FIXTURE = path.join(DESKTOP, 'src', 'test', 'fixtures', 'consumer-app');
@@ -206,7 +206,7 @@ function stageApp({ projectId, apiKey, ports }) {
       provider: 'firebase',
       config: { apiKey, projectId },
     },
-    monitoring: { provider: 'sentry', dsn: '' },
+    monitoring: { providers: { sentry: { dsn: '' } } },
     analytics: { providers: { google: { id: '' } } },
     targets: {
       desktop: {
@@ -380,7 +380,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('Paperloom emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting)', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);

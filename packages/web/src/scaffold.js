@@ -13,7 +13,7 @@
  */
 const path = require('node:path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
-const { composeAppWorkflows } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
 const { collectEnvSecrets, renderSecretsBlock } = require('./github-secrets.js');
 const { PATHS } = require('./paths.js');
@@ -51,24 +51,24 @@ function scaffoldDefaults(options) {
   options = options || {};
 
   // Layer-aware seed (dogfood friction #1, cp121c): inside a brand monorepo
-  // the app carries NO app-layer omega.json5 — the brand file's `targets.*` is
-  // the per-target home and the app file is the STANDALONE escape hatch only,
+  // the target carries NO local-layer omega.json5 — the brand file's `targets.*` is
+  // the per-target home and that file is the STANDALONE escape hatch only,
   // so the template must not scaffold there (the full template's placeholder
   // brand id/name would shadow the brand root, and the old targets-only seed
-  // kept resurrecting a file the app deliberately omits —
+  // kept resurrecting a file the target deliberately omits —
   // [#298](https://github.com/Omega-JS-Stack/omega/issues/298)). Standalone
   // consumers keep the full template + JSON5 merge.
   const fileMap = { ...FILE_MAP };
   const logger = options.logger || console;
 
   // The CI workflow's secrets env block is GENERATED per brand (#189): the
-  // keys of the app's resolved .env cascade, rendered into the template's
+  // keys of the target's resolved .env cascade, rendered into the template's
   // `{{ githubSecrets }}` token. `overwrite: true` means every setup
   // re-renders it, so the block heals like every other scaffolded default.
   const workflow = FILE_MAP['.github/workflows/build.yml'];
   const workflowTokens = {
     ...workflow.template,
-    githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ appDir: options.outputDir }))),
+    githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ targetDir: options.outputDir }))),
   };
   fileMap['.github/workflows/build.yml'] = { ...workflow, template: workflowTokens };
 
@@ -78,20 +78,20 @@ function scaffoldDefaults(options) {
     // Say which mode applied ([#95](https://github.com/Omega-JS-Stack/omega/issues/95)):
     // the branch below rewrites what setup scaffolds, and a silent branch made
     // a missing config template and a missing AGENTS.md read as a bug.
-    logger.log('brand monorepo detected: no app-level config seed; the brand root config and the agent docs cover this app');
+    logger.log('brand monorepo detected: no target-level config seed; the brand root config and the agent docs cover this target');
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home — the per-app AGENTS.md/CLAUDE.md never
+    // BRAND ROOT is the one doc home — the per-target AGENTS.md/CLAUDE.md never
     // scaffold, and existing framework-owned-only copies are swept (retire
-    // rules; consumer content is never destroyed). Standalone apps keep them.
+    // rules; consumer content is never destroyed). Standalone projects keep them.
     fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
-    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-app
+    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
     // .github/workflows/ in a brand monorepo can never fire. It is composed
-    // into the brand root below instead — scoped to this app's path.
+    // into the brand root below instead — scoped to this target's path.
     fileMap['.github/**/*'] = { skip: true };
   } else {
-    logger.log('standalone app — full config template scaffolded; the per-app agent docs land here');
+    logger.log('standalone project — full config template scaffolded; the per-project agent docs land here');
   }
 
   const result = applyDefaults({
@@ -102,9 +102,9 @@ function scaffoldDefaults(options) {
   });
 
   if (!seed.standalone) {
-    composeAppWorkflows({
+    composeTargetWorkflows({
       sourceDir: path.join(defaultsDir, '.github', 'workflows'),
-      appDir: options.outputDir,
+      targetDir: options.outputDir,
       brandRoot: seed.brandRoot,
       transform: (contents) => renderTemplate(contents, workflowTokens),
       logger,

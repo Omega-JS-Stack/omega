@@ -14,7 +14,7 @@
 const { sendDisputeEmail } = require('../../../src/manager/events/firestore/payments-disputes/on-write.js');
 
 const ALERT = {
-  processor: 'stripe',
+  provider: 'stripe',
   alertType: 'chargeback',
   amount: '9.99',
   card: { last4: '4242', brand: 'visa' },

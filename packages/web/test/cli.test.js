@@ -133,37 +133,37 @@ test('FILE_MAP: src/ is consumer-owned after seeding', () => {
   assert.strictEqual(FILE_MAP['.github/workflows/build.yml'].overwrite, true, 'CI workflow re-syncs every setup');
 });
 
-test('scaffold: a brand app gets NO app-level config, a standalone app keeps its seed (#298)', () => {
+test('scaffold: a brand target gets NO local-level config, a standalone project keeps its seed (#298)', () => {
   const root = tmpConsumer();
-  const appDir = path.join(root, 'brand', 'apps', 'website');
-  const appConfig = path.join(appDir, 'config', 'omega.json5');
+  const targetDir = path.join(root, 'brand', 'targets', 'website');
+  const targetConfig = path.join(targetDir, 'config', 'omega.json5');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
-  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(targetDir, { recursive: true });
 
-  // Fresh scaffold AND the reruns setup does: the app config never appears
-  // (the old targets-only seed kept resurrecting a file the app omits).
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(!fs.existsSync(appConfig), 'the brand root config is the app config');
+  // Fresh scaffold AND the reruns setup does: the local config never appears
+  // (the old targets-only seed kept resurrecting a file the target omits).
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.ok(!fs.existsSync(targetConfig), 'the brand root config is the config');
 
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(!fs.existsSync(appConfig), 'a rerun does not re-seed it');
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.ok(!fs.existsSync(targetConfig), 'a rerun does not re-seed it');
 
-  const { config } = loadConfig(appDir, 'web');
-  assert.strictEqual(config.brand.id, 'acme', 'brand root identity resolves for the app');
+  const { config } = loadConfig(targetDir, 'web');
+  assert.strictEqual(config.brand.id, 'acme', 'brand root identity resolves for the target');
   assert.strictEqual(config.brand.name, 'Acme', 'no My Brand shadowing');
 
-  // The app file is the standalone ESCAPE HATCH: authored, it survives setup.
-  fs.mkdirSync(path.dirname(appConfig), { recursive: true });
-  fs.writeFileSync(appConfig, '{ targets: { web: { language: "es" } } }\n');
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.strictEqual(fs.readFileSync(appConfig, 'utf8'), '{ targets: { web: { language: "es" } } }\n', 'an authored app config is never touched');
+  // The local file is the standalone ESCAPE HATCH: authored, it survives setup.
+  fs.mkdirSync(path.dirname(targetConfig), { recursive: true });
+  fs.writeFileSync(targetConfig, '{ targets: { web: { language: "es" } } }\n');
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.strictEqual(fs.readFileSync(targetConfig, 'utf8'), '{ targets: { web: { language: "es" } } }\n', 'an authored local config is never touched');
 
   // No brand config above → the standalone lane still seeds the full template.
   const standalone = path.join(root, 'standalone');
   fs.mkdirSync(standalone, { recursive: true });
   scaffoldDefaults({ outputDir: standalone, logger: quiet });
-  assert.ok(fs.existsSync(path.join(standalone, 'config', 'omega.json5')), 'a standalone app keeps the seed');
+  assert.ok(fs.existsSync(path.join(standalone, 'config', 'omega.json5')), 'a standalone project keeps the seed');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -174,93 +174,93 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   // Standalone: the full template lane
   const standaloneLines = [];
   scaffoldDefaults({ outputDir: root, logger: { ...quiet, log: (m) => standaloneLines.push(m) } });
-  const standaloneMode = standaloneLines.filter((m) => /standalone app/.test(m));
+  const standaloneMode = standaloneLines.filter((m) => /standalone project/.test(m));
   assert.strictEqual(standaloneMode.length, 1, 'exactly one mode line');
-  assert.match(standaloneMode[0], /standalone app/, 'names the mode');
+  assert.match(standaloneMode[0], /standalone project/, 'names the mode');
   assert.match(standaloneMode[0], /full config template/, 'names the consequence');
 
-  // Brand monorepo: the no-app-config lane
-  const appDir = path.join(root, 'brand', 'apps', 'website');
+  // Brand monorepo: the no-target-config lane
+  const targetDir = path.join(root, 'brand', 'targets', 'website');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
-  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(targetDir, { recursive: true });
 
   const brandLines = [];
-  scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, log: (m) => brandLines.push(m) } });
+  scaffoldDefaults({ outputDir: targetDir, logger: { ...quiet, log: (m) => brandLines.push(m) } });
   const brandMode = brandLines.filter((m) => /brand monorepo detected/.test(m));
   assert.strictEqual(brandMode.length, 1, 'exactly one mode line');
   assert.match(brandMode[0], /brand monorepo detected/, 'names the mode');
-  assert.match(brandMode[0], /no app-level config seed/, 'names the consequence');
+  assert.match(brandMode[0], /no target-level config seed/, 'names the consequence');
   assert.match(brandMode[0], /brand root/, 'says where the docs went');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('scaffold: inside a brand monorepo the per-app agent docs never scaffold and framework-owned copies sweep (brand doc unification)', () => {
+test('scaffold: inside a brand monorepo the per-target agent docs never scaffold and framework-owned copies sweep (brand doc unification)', () => {
   const root = tmpConsumer();
-  const appDir = path.join(root, 'brand', 'apps', 'website');
-  fs.mkdirSync(appDir, { recursive: true });
+  const targetDir = path.join(root, 'brand', 'targets', 'website');
+  fs.mkdirSync(targetDir, { recursive: true });
 
-  // Standalone scaffold first (no brand config yet) — the per-app agent docs land.
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(fs.existsSync(path.join(appDir, 'AGENTS.md')), 'standalone apps keep the per-app AGENTS.md');
-  assert.ok(fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'standalone apps keep the per-app CLAUDE.md pointer');
+  // Standalone scaffold first (no brand config yet) — the per-target agent docs land.
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.ok(fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'standalone projects keep the per-project AGENTS.md');
+  assert.ok(fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'standalone projects keep the per-project CLAUDE.md pointer');
 
   // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
-  const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.deepStrictEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CLAUDE.md'], 'framework-owned per-app agent docs are swept');
-  assert.ok(!fs.existsSync(path.join(appDir, 'AGENTS.md')), 'the brand root is the doc home');
-  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'the brand root is the doc home');
+  const swept = scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.deepStrictEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CLAUDE.md'], 'framework-owned per-target agent docs are swept');
+  assert.ok(!fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'the brand root is the doc home');
+  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'the brand root is the doc home');
 
   // Rerun never resurrects them.
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(!fs.existsSync(path.join(appDir, 'AGENTS.md')), 'reruns do not resurrect the per-app doc');
-  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'reruns do not resurrect the per-app pointer');
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+  assert.ok(!fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'reruns do not resurrect the per-target doc');
+  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'reruns do not resurrect the per-target pointer');
 
   // Consumer content is never destroyed: real notes below the Custom marker keep the file.
   const warnings = [];
-  fs.writeFileSync(path.join(appDir, 'AGENTS.md'),
+  fs.writeFileSync(path.join(targetDir, 'AGENTS.md'),
     '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
-  const kept = scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, warn: (m) => warnings.push(m) } });
+  const kept = scaffoldDefaults({ outputDir: targetDir, logger: { ...quiet, warn: (m) => warnings.push(m) } });
   assert.deepStrictEqual(kept.removed, []);
-  assert.match(fs.readFileSync(path.join(appDir, 'AGENTS.md'), 'utf8'), /VPN/, 'consumer content survives');
+  assert.match(fs.readFileSync(path.join(targetDir, 'AGENTS.md'), 'utf8'), /VPN/, 'consumer content survives');
   assert.ok(warnings.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('scaffold: a brand app scaffolds NO per-app .github/ — its CI composes into the brand root (#265)', () => {
+test('scaffold: a brand target scaffolds NO per-target .github/ — its CI composes into the brand root (#265)', () => {
   const root = tmpConsumer();
   const brandRoot = path.join(root, 'brand');
-  const appDir = path.join(brandRoot, 'apps', 'website');
+  const targetDir = path.join(brandRoot, 'targets', 'website');
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
-  fs.mkdirSync(appDir, { recursive: true });
-  fs.writeFileSync(path.join(appDir, '.env'), 'CLOUDFLARE_TOKEN=cf\n');
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.writeFileSync(path.join(targetDir, '.env'), 'CLOUDFLARE_TOKEN=cf\n');
 
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
 
-  // GitHub runs workflows from the repo root ONLY — a per-app copy is dead.
-  assert.ok(!fs.existsSync(path.join(appDir, '.github')), 'no per-app .github/ in a brand monorepo');
+  // GitHub runs workflows from the repo root ONLY — a per-target copy is dead.
+  assert.ok(!fs.existsSync(path.join(targetDir, '.github')), 'no per-target .github/ in a brand monorepo');
 
   const composedPath = path.join(brandRoot, '.github', 'workflows', 'website-build.yml');
-  assert.ok(fs.existsSync(composedPath), 'the app workflow composed into the brand root');
+  assert.ok(fs.existsSync(composedPath), 'the target workflow composed into the brand root');
 
   const composed = fs.readFileSync(composedPath, 'utf8');
   // The scoping MECHANISM is devkit's (`working-directory`, block or per step);
-  // what web owes the brand is that CI runs the app, not the repo root.
-  assert.match(composed, /working-directory: apps\/website/, 'run steps execute in the app dir');
-  assert.match(composed, /^name: .+ \(apps\/website\)$/m, 'the Actions list tells the apps apart');
-  assert.match(composed, /^ {2}group: website-\$\{\{ github\.ref \}\}$/m, 'per-app concurrency — one app never cancels another');
+  // what web owes the brand is that CI runs the target, not the repo root.
+  assert.match(composed, /working-directory: targets\/website/, 'run steps execute in the target dir');
+  assert.match(composed, /^name: .+ \(targets\/website\)$/m, 'the Actions list tells the targets apart');
+  assert.match(composed, /^ {2}group: website-\$\{\{ github\.ref \}\}$/m, 'per-target concurrency — one target never cancels another');
 
   // The scaffold's own token pass still ran: node version + the .env secrets block.
   assert.ok(composed.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'the node version templated');
-  assert.ok(composed.includes('CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'), 'the app .env reached the composed env block');
+  assert.ok(composed.includes('CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'), 'the local .env reached the composed env block');
   assert.ok(!composed.includes('{{ githubSecrets }}'), 'no unrendered token survives');
 
   // Idempotent: a setup rerun rewrites that one file and never adds another.
-  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  scaffoldDefaults({ outputDir: targetDir, logger: quiet });
   assert.deepStrictEqual(fs.readdirSync(path.join(brandRoot, '.github', 'workflows')), ['website-build.yml'], 'one file per app, rerun-stable');
   assert.strictEqual(fs.readFileSync(composedPath, 'utf8'), composed, 'the rerun composed the same bytes');
 

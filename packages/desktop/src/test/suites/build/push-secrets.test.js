@@ -62,7 +62,7 @@ KEY2=v2
       },
     },
     {
-      name: 'effectiveValue: cascade value (process.env) rescues an app-empty key (D15)',
+      name: 'effectiveValue: cascade value (process.env) rescues a target-empty key (D15)',
       run: (ctx) => {
         process.env.EM_TEST_CASCADE_KEY = 'brand-level-value';
         try {
@@ -141,18 +141,18 @@ KEY2=v2
       },
     },
     {
-      name: 'resolveSecretValue: falls back to the brand root when the app-relative path is missing',
+      name: 'resolveSecretValue: falls back to the brand root when the target-relative path is missing',
       run: async (ctx) => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
-        const appRoot = path.join(tmpDir, 'apps', 'desktop');
-        fs.mkdirSync(appRoot, { recursive: true });
+        const targetRoot = path.join(tmpDir, 'targets', 'desktop');
+        fs.mkdirSync(targetRoot, { recursive: true });
         const relName = '.omega/secrets/brand-cert.p8';
         const fullPath = path.join(tmpDir, relName);
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
         fs.writeFileSync(fullPath, Buffer.from('BRAND'));
 
         try {
-          const out = await pushSecrets.resolveSecretValue({ value: relName }, appRoot, tmpDir);
+          const out = await pushSecrets.resolveSecretValue({ value: relName }, targetRoot, tmpDir);
           ctx.expect(out).toBe(Buffer.from('BRAND').toString('base64'));
         } finally {
           fs.rmSync(tmpDir, { recursive: true, force: true });

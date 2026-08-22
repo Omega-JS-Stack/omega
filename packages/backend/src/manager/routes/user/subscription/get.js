@@ -63,7 +63,7 @@ module.exports = async ({ ctx, user, settings, libraries }) => {
         },
       },
       payment: {
-        processor: userData?.subscription?.payment?.processor || null,
+        provider: userData?.subscription?.payment?.provider || null,
         frequency: userData?.subscription?.payment?.frequency || null,
         startDate: {
           timestamp: userData?.subscription?.payment?.startDate?.timestamp || oldDate,

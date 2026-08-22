@@ -2,10 +2,10 @@
  * Config-DERIVED values, handed to consumer code on the runtime config object
  * as `config.resolved.*` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)).
  *
- * A brand app cannot require @omega.js/config — it is a PRIVATE workspace
+ * A brand target cannot require @omega.js/config — it is a PRIVATE workspace
  * package, vendored into each framework's dist at prepare time — so a brand
  * that needed a derived value at runtime had to re-implement the derivation in
- * its own app (the giftly sync-gifts cron did exactly that), and every copy
+ * its own target (the giftly sync-gifts cron did exactly that), and every copy
  * drifts from the real merge rules. The framework calls the recipe; brands read
  * the finished value off the config object they already receive.
  *

@@ -1,9 +1,9 @@
 /**
  * Test: POST /payments/refund
- * Tests rejection cases and a full end-to-end refund flow with the test processor.
+ * Tests rejection cases and a full end-to-end refund flow with the test provider.
  *
  * Refund requires the subscription to be cancelled or pending cancellation.
- * The test processor simulates refund by writing a customer.subscription.deleted
+ * The test provider simulates refund by writing a customer.subscription.deleted
  * webhook which triggers the existing pipeline.
  */
 module.exports = {
@@ -85,33 +85,33 @@ module.exports = {
     },
 
     {
-      name: 'rejects-no-processor-or-resource-id',
+      name: 'rejects-no-provider-or-resource-id',
       async run({ http, assert }) {
-        // refund-no-processor has a cancelled subscription but no processor
-        const response = await http.as('refund-no-processor').post('backend-manager/payments/refund', {
+        // refund-no-provider has a cancelled subscription but no provider
+        const response = await http.as('refund-no-provider').post('backend-manager/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject when no processor or resourceId is set');
+        assert.isError(response, 400, 'Should reject when no provider or resourceId is set');
       },
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       async run({ http, assert }) {
-        // refund-unknown-processor has a cancelled subscription with unknown processor
-        const response = await http.as('refund-unknown-processor').post('backend-manager/payments/refund', {
+        // refund-unknown-provider has a cancelled subscription with unknown provider
+        const response = await http.as('refund-unknown-provider').post('backend-manager/payments/refund', {
           confirmed: true,
           reason: 'Too expensive',
         });
 
-        assert.isError(response, 400, 'Should reject unknown processor');
+        assert.isError(response, 400, 'Should reject unknown provider');
       },
     },
 
     {
-      name: 'succeeds-with-test-processor',
+      name: 'succeeds-with-test-provider',
       async run({ http, assert, config, accounts, firestore, waitFor, skip }) {
         const uid = accounts['route-refund-success'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices?.monthly);
@@ -121,7 +121,7 @@ module.exports = {
 
         // Step 1: Create a test subscription intent to set up a proper paid subscription
         const intentResponse = await http.as('route-refund-success').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -131,7 +131,7 @@ module.exports = {
         // Wait for the auto-webhook to activate the subscription
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${uid}`);
-          return userDoc?.subscription?.payment?.processor === 'test'
+          return userDoc?.subscription?.payment?.provider === 'test'
             && userDoc?.subscription?.payment?.resourceId
             && userDoc?.subscription?.status === 'active';
         }, 15000, 500);
@@ -163,7 +163,7 @@ module.exports = {
         assert.ok(refundResponse.data.success, 'Should return success: true');
         assert.ok(refundResponse.data.refund, 'Should return refund details');
         assert.isType(refundResponse.data.refund.amount, 'number', 'Refund amount should be a number');
-        assert.equal(refundResponse.data.refund.full, true, 'Should be a full refund (test processor)');
+        assert.equal(refundResponse.data.refund.full, true, 'Should be a full refund (test provider)');
 
         // Step 4: Verify subscription is cancelled via the webhook pipeline
         await waitFor(async () => {

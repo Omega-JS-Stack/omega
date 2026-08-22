@@ -46,7 +46,7 @@ module.exports = async function (options) {
   options = options || {};
   const paths = consumerPaths();
 
-  // Tee the whole run to <appRoot>/logs/build.log (#197). `omega test` runs this
+  // Tee the whole run to <targetRoot>/logs/build.log (#197). `omega test` runs this
   // build INSIDE its own logs/test.log tee and passes logFile: false — a second
   // attach would detach that tee and the rest of the run would go uncaptured.
   if (options.logFile !== false) {

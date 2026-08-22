@@ -21,7 +21,7 @@ const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@fir
 const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
 
 // The REAL shipped ruleset, read straight from templates/ — the same file
-// `omega setup` copies into a brand's app root as `database.rules.json`
+// `omega setup` copies into a brand's target root as `database.rules.json`
 // (src/cli/commands/setup.js). No test copy exists to drift out of sync.
 const DATABASE_RULES = path.resolve(__dirname, '..', '..', 'templates', 'database.rules.json');
 

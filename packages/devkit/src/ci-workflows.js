@@ -1,17 +1,17 @@
 /**
  * Brand-monorepo CI composition (#265).
  *
- * Every framework scaffolds `.github/workflows/*.yml` into the app it sets up.
- * That is correct for a STANDALONE app (the app dir is the git root) and dead on
+ * Every framework scaffolds `.github/workflows/*.yml` into the target it sets up.
+ * That is correct for a STANDALONE target (the target dir is the git root) and dead on
  * arrival inside a brand monorepo: GitHub executes workflows from the REPO
- * ROOT's `.github/workflows/` only, so `apps/extension/.github/workflows/publish.yml`
+ * ROOT's `.github/workflows/` only, so `targets/extension/.github/workflows/publish.yml`
  * never runs — CI builds and store publishes silently do not exist.
  *
- * In a monorepo the app's workflow is COMPOSED into the root dir instead: one
- * file per app (`<app>-<workflow>.yml`), every post-checkout `run:` step scoped
- * to the app's path, regenerated from the framework template on every setup — so
- * a re-run updates the app's own file and can never duplicate a job. Each app's
- * runs also get their own concurrency group, so one app's deploy never cancels
+ * In a monorepo the target's workflow is COMPOSED into the root dir instead: one
+ * file per target (`<target>-<workflow>.yml`), every post-checkout `run:` step scoped
+ * to the target's path, regenerated from the framework template on every setup — so
+ * a re-run updates the target's own file and can never duplicate a job. Each target's
+ * runs also get their own concurrency group, so one target's deploy never cancels
  * another's.
  *
  * Scoping is by working directory, not by a `paths:` trigger filter: OMEGA
@@ -19,7 +19,7 @@
  * path filter on a dispatch-only workflow filters nothing. It is declared PER
  * STEP, not as a workflow-level `defaults.run.working-directory`: that would
  * also scope the steps that run before actions/checkout (and the jobs that never
- * check out), where the app dir does not exist yet.
+ * check out), where the target dir does not exist yet.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -43,49 +43,49 @@ const SCOPED_ACTION_INPUTS = {
 };
 
 /**
- * Compose one framework workflow template for an app inside a brand monorepo.
+ * Compose one framework workflow template for a target inside a brand monorepo.
  * Pure: text in, text out.
  * @param {string} contents - The (already rendered) workflow template
  * @param {object} options
- * @param {string} options.appPath - The app's path relative to the repo root (e.g. apps/extension)
- * @param {string} options.appName - The app's short name (e.g. extension)
+ * @param {string} options.targetPath - The target's path relative to the repo root (e.g. targets/extension)
+ * @param {string} options.targetName - The target's short name (e.g. extension)
  * @returns {string} the composed workflow
  */
 function composeWorkflow(contents, options) {
-  const appPath = options.appPath;
-  const appName = options.appName;
+  const targetPath = options.targetPath;
+  const targetName = options.targetName;
 
   let composed = contents;
 
-  // Display name carries the app — two apps' runs are told apart in the
+  // Display name carries the target — two targets' runs are told apart in the
   // Actions list, where only the workflow name shows.
-  composed = composed.replace(/^name:[ \t]*(.*)$/m, (full, value) => `name: ${value.trim()} (${appPath})`);
+  composed = composed.replace(/^name:[ \t]*(.*)$/m, (full, value) => `name: ${value.trim()} (${targetPath})`);
 
-  // Per-app concurrency: `${{ github.ref }}` alone means the website's deploy
+  // Per-target concurrency: `${{ github.ref }}` alone means the website's deploy
   // cancels the extension's.
-  composed = composed.replace(/^(concurrency:\n(?:[ \t]+.*\n)*?[ \t]+group:[ \t]*)(.*)$/m, (full, prefix, value) => `${prefix}${appName}-${value.trim()}`);
+  composed = composed.replace(/^(concurrency:\n(?:[ \t]+.*\n)*?[ \t]+group:[ \t]*)(.*)$/m, (full, prefix, value) => `${prefix}${targetName}-${value.trim()}`);
 
-  // Every `run:` step that follows its job's checkout executes in the app dir
+  // Every `run:` step that follows its job's checkout executes in the target dir
   // (`uses:` actions — checkout and friends — stay at the repo root, which is
   // what they want).
-  composed = scopeRunSteps(composed, appPath);
+  composed = scopeRunSteps(composed, targetPath);
 
-  return `${header(appPath)}${composed}`;
+  return `${header(targetPath)}${composed}`;
 }
 
 /**
- * Compose every workflow a framework ships for one app into the brand root's
- * `.github/workflows/`, and sweep the app's own dead copy.
+ * Compose every workflow a framework ships for one target into the brand root's
+ * `.github/workflows/`, and sweep the target's own dead copy.
  * @param {object} options
  * @param {string} options.sourceDir - The framework's `.github/workflows` defaults dir
- * @param {string} options.appDir - The consumer app dir
+ * @param {string} options.targetDir - The consumer target dir
  * @param {string} options.brandRoot - The brand (repo) root
  * @param {Function} [options.transform] - `(contents, name) => contents`, run before composing
  * @param {object} [options.logger] - Logger with `log`/`warn` (defaults to console)
  * @returns {{ written: string[], skipped: string[], removed: string[] }} brand-root-relative paths
  */
-function composeAppWorkflows(options) {
-  const { sourceDir, appDir, brandRoot } = options;
+function composeTargetWorkflows(options) {
+  const { sourceDir, targetDir, brandRoot } = options;
   const transform = options.transform || null;
   const logger = options.logger || console;
   const result = { written: [], skipped: [], removed: [] };
@@ -94,8 +94,8 @@ function composeAppWorkflows(options) {
     return result;
   }
 
-  const appPath = relativePath(brandRoot, appDir);
-  const appName = path.basename(appDir);
+  const targetPath = relativePath(brandRoot, targetDir);
+  const targetName = path.basename(targetDir);
 
   for (const name of jetpack.list(sourceDir).sort()) {
     const source = path.join(sourceDir, name);
@@ -108,49 +108,49 @@ function composeAppWorkflows(options) {
       rendered = transform(rendered, name);
     }
 
-    const composed = composeWorkflow(rendered, { appPath, appName });
-    const relative = `.github/workflows/${appName}-${name}`;
-    const destination = path.join(brandRoot, '.github', 'workflows', `${appName}-${name}`);
+    const composed = composeWorkflow(rendered, { targetPath, targetName });
+    const relative = `.github/workflows/${targetName}-${name}`;
+    const destination = path.join(brandRoot, '.github', 'workflows', `${targetName}-${name}`);
 
     if (jetpack.exists(destination) && jetpack.read(destination) === composed) {
       result.skipped.push(relative);
     } else {
       jetpack.write(destination, composed);
       result.written.push(relative);
-      logger.log(`Composed → ${relative} (runs ${appPath} from the repo root)`);
+      logger.log(`Composed → ${relative} (runs ${targetPath} from the repo root)`);
     }
 
-    // The app's own copy is dead weight in a monorepo: delete the untouched
+    // The target's own copy is dead weight in a monorepo: delete the untouched
     // framework file, report a differing one rather than destroying it.
-    sweepAppCopy({ appDir, appPath, name, composedName: relative, rendered, logger, result });
+    sweepTargetCopy({ targetDir, targetPath, name, composedName: relative, rendered, logger, result });
   }
 
   return result;
 }
 
 /**
- * The workflow file name to dispatch for an app — composed in a brand monorepo,
+ * The workflow file name to dispatch for a target — composed in a brand monorepo,
  * the framework's own name standalone. The ONE place deploy verbs and the
  * compose step agree on the name.
  * @param {object} options
- * @param {string} options.appDir - The consumer app dir
+ * @param {string} options.targetDir - The consumer target dir
  * @param {string|null} options.brandRoot - The brand root, or null when standalone
  * @param {string} options.workflow - The framework's workflow file name (e.g. publish.yml)
  * @returns {string} the workflow file name
  */
 function composedWorkflowName(options) {
-  if (!options.brandRoot || path.resolve(options.brandRoot) === path.resolve(options.appDir)) {
+  if (!options.brandRoot || path.resolve(options.brandRoot) === path.resolve(options.targetDir)) {
     return options.workflow;
   }
-  return `${path.basename(options.appDir)}-${options.workflow}`;
+  return `${path.basename(options.targetDir)}-${options.workflow}`;
 }
 
-// Scope every `run:` step that executes AFTER its job's checkout to the app dir.
+// Scope every `run:` step that executes AFTER its job's checkout to the target dir.
 // A workflow-level `defaults.run.working-directory` reads cleaner but applies to
 // EVERY run step, including the ones that execute before actions/checkout (the
 // git config step, a matrix-resolving step) and the jobs that never check out at
-// all — the app dir does not exist there yet, and the job dies on step 1.
-function scopeRunSteps(contents, appPath) {
+// all — the target dir does not exist there yet, and the job dies on step 1.
+function scopeRunSteps(contents, targetPath) {
   const lines = contents.split('\n');
   const output = [];
   let insideJobs = false;
@@ -161,7 +161,7 @@ function scopeRunSteps(contents, appPath) {
 
   const flush = () => {
     if (!step) return;
-    output.push(...(checkedOut ? scopeStep(step, itemIndent + 2, appPath) : step));
+    output.push(...(checkedOut ? scopeStep(step, itemIndent + 2, targetPath) : step));
     checkedOut = checkedOut || step.some((line) => /^[ \t]*(?:- )?uses:[ \t]*actions\/checkout/.test(line));
     step = null;
   };
@@ -219,19 +219,19 @@ function scopeRunSteps(contents, appPath) {
   return output.join('\n');
 }
 
-// Scope one post-checkout step to the app: a `run:` step gets a
+// Scope one post-checkout step to the target: a `run:` step gets a
 // `working-directory:`, a `uses:` step gets its path-bearing inputs rewritten
 // (the key is illegal there), and every step's `hashFiles()` patterns are moved
-// into the app dir.
-function scopeStep(step, keyIndent, appPath) {
-  const lines = scopeHashFiles(step, appPath);
+// into the target dir.
+function scopeStep(step, keyIndent, targetPath) {
+  const lines = scopeHashFiles(step, targetPath);
   const action = actionOf(lines, keyIndent);
 
   if (action) {
-    return scopeActionInputs(lines, keyIndent, appPath, SCOPED_ACTION_INPUTS[action]);
+    return scopeActionInputs(lines, keyIndent, targetPath, SCOPED_ACTION_INPUTS[action]);
   }
 
-  return scopeRunStep(lines, keyIndent, appPath);
+  return scopeRunStep(lines, keyIndent, targetPath);
 }
 
 // The action a `uses:` step runs, version stripped (`actions/cache@v4` → `actions/cache`).
@@ -243,19 +243,19 @@ function actionOf(step, keyIndent) {
 }
 
 // `hashFiles()` globs from GITHUB_WORKSPACE wherever it appears — no step key
-// moves it — so a composed app workflow's patterns carry the app path or match
+// moves it — so a composed target workflow's patterns carry the target path or match
 // nothing at all.
-function scopeHashFiles(step, appPath) {
+function scopeHashFiles(step, targetPath) {
   return step.map((line) => line.replace(/hashFiles\(([^)]*)\)/g, (full, args) => {
-    const scoped = args.replace(/(['"])([^'"]+)\1/g, (quoted, quote, pattern) => `${quote}${joinAppPath(pattern, appPath)}${quote}`);
+    const scoped = args.replace(/(['"])([^'"]+)\1/g, (quoted, quote, pattern) => `${quote}${joinTargetPath(pattern, targetPath)}${quote}`);
     return `hashFiles(${scoped})`;
   }));
 }
 
-// Rewrite the named inputs of a `uses:` step's `with:` block to app-relative
+// Rewrite the named inputs of a `uses:` step's `with:` block to target-relative
 // paths. A `|` block scalar (upload-artifact's multi-glob `path:`) is rewritten
 // line by line.
-function scopeActionInputs(step, keyIndent, appPath, inputs) {
+function scopeActionInputs(step, keyIndent, targetPath, inputs) {
   if (!inputs) {
     return step;
   }
@@ -278,7 +278,7 @@ function scopeActionInputs(step, keyIndent, appPath, inputs) {
     }
 
     if (blockIndent >= 0 && indent > blockIndent) {
-      scoped[index] = line.slice(0, indent) + joinAppPath(line.slice(indent), appPath);
+      scoped[index] = line.slice(0, indent) + joinTargetPath(line.slice(indent), targetPath);
       continue;
     }
 
@@ -299,40 +299,40 @@ function scopeActionInputs(step, keyIndent, appPath, inputs) {
       continue;
     }
 
-    scoped[index] = `${entry[1]}${entry[2]}: ${scopeValue(entry[3], appPath)}`;
+    scoped[index] = `${entry[1]}${entry[2]}: ${scopeValue(entry[3], targetPath)}`;
   }
 
   return scoped;
 }
 
-// Prefix a YAML scalar's path with the app path, quotes preserved.
-function scopeValue(value, appPath) {
+// Prefix a YAML scalar's path with the target path, quotes preserved.
+function scopeValue(value, targetPath) {
   const quoted = /^(['"])(.*)\1$/.exec(value.trim());
   if (!quoted) {
-    return joinAppPath(value.trim(), appPath);
+    return joinTargetPath(value.trim(), targetPath);
   }
 
-  return `${quoted[1]}${joinAppPath(quoted[2], appPath)}${quoted[1]}`;
+  return `${quoted[1]}${joinTargetPath(quoted[2], targetPath)}${quoted[1]}`;
 }
 
-// An app-relative path/glob. Absolute paths and expression-built values name
+// A target-relative path/glob. Absolute paths and expression-built values name
 // something other than a file in the checkout — those are left as written.
-function joinAppPath(value, appPath) {
+function joinTargetPath(value, targetPath) {
   const trimmed = value.trim();
   const scoped = trimmed.replace(/^\.\//, '');
 
-  if (!trimmed || trimmed.startsWith('/') || trimmed.startsWith('~') || trimmed.includes('${{') || scoped === appPath || scoped.startsWith(`${appPath}/`)) {
+  if (!trimmed || trimmed.startsWith('/') || trimmed.startsWith('~') || trimmed.includes('${{') || scoped === targetPath || scoped.startsWith(`${targetPath}/`)) {
     return trimmed;
   }
 
-  return `${appPath}/${scoped}`;
+  return `${targetPath}/${scoped}`;
 }
 
 // Declare `working-directory` on one run step's lines — a step that already
 // declares its own is left alone.
-function scopeRunStep(step, keyIndent, appPath) {
+function scopeRunStep(step, keyIndent, targetPath) {
   const pad = ' '.repeat(keyIndent);
-  const declared = `working-directory: ${appPath}`;
+  const declared = `working-directory: ${targetPath}`;
   const alreadyScoped = /^[ \t]*- working-directory:/.test(step[0]) || step.some((line) => line.startsWith(`${pad}working-directory:`));
 
   if (alreadyScoped) {
@@ -355,28 +355,28 @@ function scopeRunStep(step, keyIndent, appPath) {
   return [...step.slice(0, runIndex), `${pad}${declared}`, ...step.slice(runIndex)];
 }
 
-// Delete the app-level copy of a workflow when the framework wrote every line
+// Delete the target-level copy of a workflow when the framework wrote every line
 // of it (framework-owned); keep and report one carrying anything else.
-function sweepAppCopy(context) {
-  const { appDir, appPath, name, composedName, rendered, logger, result } = context;
-  const appCopy = path.join(appDir, '.github', 'workflows', name);
+function sweepTargetCopy(context) {
+  const { targetDir, targetPath, name, composedName, rendered, logger, result } = context;
+  const targetCopy = path.join(targetDir, '.github', 'workflows', name);
 
-  if (jetpack.exists(appCopy) !== 'file') {
+  if (jetpack.exists(targetCopy) !== 'file') {
     return;
   }
 
-  if (isFrameworkGeneration(jetpack.read(appCopy), rendered)) {
-    jetpack.remove(appCopy);
-    pruneEmptyDirs(path.dirname(appCopy), appDir);
+  if (isFrameworkGeneration(jetpack.read(targetCopy), rendered)) {
+    jetpack.remove(targetCopy);
+    pruneEmptyDirs(path.dirname(targetCopy), targetDir);
     result.removed.push(`.github/workflows/${name}`);
-    logger.log(`Removed ${appPath}/.github/workflows/${name} — GitHub only runs workflows from the repo root`);
+    logger.log(`Removed ${targetPath}/.github/workflows/${name} — GitHub only runs workflows from the repo root`);
     return;
   }
 
-  logger.warn(`Kept ${appPath}/.github/workflows/${name} — it differs from the current framework template (your edits, or an older framework version), and GitHub NEVER runs a workflow from an app dir. Compare it against ${composedName}, move anything it still needs, then delete ${appPath}/.github/workflows/${name}`);
+  logger.warn(`Kept ${targetPath}/.github/workflows/${name} — it differs from the current framework template (your edits, or an older framework version), and GitHub NEVER runs a workflow from a target dir. Compare it against ${composedName}, move anything it still needs, then delete ${targetPath}/.github/workflows/${name}`);
 }
 
-// Is every line of the app's copy a line the current template still ships, in
+// Is every line of the target's copy a line the current template still ships, in
 // the template's own order? Then the framework wrote all of it and the copy is
 // safe to delete. An exact match is the trivial case, and a copy a SUPERSEDED
 // template wrote passes too, because templates evolve by GAINING lines (#189
@@ -384,7 +384,7 @@ function sweepAppCopy(context) {
 // same file minus those lines, #334). A line the consumer ADDED or CHANGED is a
 // line no template of this framework ever shipped, so it fails here and the
 // copy is kept. Accepted blind spot: an edit that ONLY deletes lines is still a
-// subsequence and gets swept — bounded, because an app-dir workflow never runs
+// subsequence and gets swept — bounded, because a target-dir workflow never runs
 // and the composed root file is regenerated from the current template.
 function isFrameworkGeneration(existing, rendered) {
   const template = rendered.split('\n');
@@ -412,20 +412,20 @@ function pruneEmptyDirs(dir, rootDir) {
   }
 }
 
-// posix-style app path — this string ends up inside a YAML workflow.
+// posix-style target path — this string ends up inside a YAML workflow.
 function relativePath(from, to) {
   return path.relative(from, to).split(path.sep).join('/');
 }
 
-function header(appPath) {
+function header(targetPath) {
   return [
-    `# GENERATED by \`omega setup\` for ${appPath} — do not edit.`,
-    '# GitHub runs workflows from the repo root only, so this brand\'s per-app CI',
-    `# lives here and every step after the checkout runs in ${appPath}. Change the`,
-    '# app\'s config (or the framework template) and re-run setup; this file is',
+    `# GENERATED by \`omega setup\` for ${targetPath} — do not edit.`,
+    '# GitHub runs workflows from the repo root only, so this brand\'s per-target CI',
+    `# lives here and every step after the checkout runs in ${targetPath}. Change the`,
+    '# target\'s config (or the framework template) and re-run setup; this file is',
     '# rewritten from scratch.',
     '',
   ].join('\n');
 }
 
-module.exports = { composeWorkflow, composeAppWorkflows, composedWorkflowName };
+module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName };

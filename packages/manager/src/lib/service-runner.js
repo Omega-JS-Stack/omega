@@ -77,21 +77,24 @@ function getOperationHandler(serviceDir, operationName, type) {
 }
 
 /**
- * Split a handler return into durable state vs transient output.
+ * Split a handler return into the within-run carry vs transient output.
  *
  * STRICT contract — handler returns MUST be one of:
  *   - undefined / null                              → no-op
- *   - { state: {...} }                              → durable only (lands in .omega/state.json)
+ *   - { state: {...} }                              → carry only (this run's serviceData, never a file)
  *   - { output: {...} }                             → transient only (lands in .omega/runs/{ts}.json)
  *   - { state, output }                             → both
  *   - { status, error?, state?, output? }           → status/error are metadata, allowed alongside state/output
  *
  * Any other top-level key throws. This prevents accidental data leakage into
- * state via an "everything dumps to serviceData" pattern.
+ * the carry via an "everything dumps to serviceData" pattern.
  *
- * Handlers that produce durable IDs (cloud.config.projectId, stripe.productId,
- * agent IDs, etc.) MUST wrap them in `state`. Anything else (counts, success/
- * fail flags, "what happened this run") goes to `output`.
+ * `state` is the LATER-OPERATIONS channel and nothing more (#434 retired
+ * .omega/state.json): a value a following operation in the same service needs
+ * (the zone id, the bundle id, the Sentry project map). A fact that must
+ * OUTLIVE the run belongs in config/omega.json5 via lib/config-write.js — or
+ * in the brand .env via lib/env-secret.js when it is secret-shaped. Anything
+ * else (counts, success/fail flags, "what happened this run") goes to `output`.
  */
 const ALLOWED_KEYS = new Set(['state', 'output', 'status', 'error']);
 
@@ -313,11 +316,10 @@ function createServiceRunner(options = {}) {
       throw new Error('serviceDir must be provided via createServiceRunner options or context');
     }
 
-    // Accumulators: durable state (→ .omega/state.json) vs transient output
-    // (→ .omega/runs/{ts}.json). Setup's serviceData is treated as initial
-    // state. The pre-loaded brandState[service] (from disk) is also initial
-    // state — it's how cross-service reads work (e.g. analytics checking
-    // firebase.sdkConfig).
+    // Accumulators: the within-run carry (→ each later operation's
+    // serviceData) vs transient output (→ .omega/runs/{ts}.json). Setup's
+    // serviceData seeds the carry — that's how a service hands its
+    // operations something it resolved once (the Stripe account id).
     const accumulators = {
       state: {
         ...context.serviceData,

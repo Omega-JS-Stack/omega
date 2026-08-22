@@ -35,21 +35,21 @@ const EMULATOR_READY_TIMEOUT = 240000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Discover the brand's app targets by directory naming convention.
+ * Discover the brand's targets by directory naming convention.
  * Returns { backend, website } with the paths that exist.
  */
 function discoverTargets(brandRoot) {
-  const appsDir = path.join(brandRoot, 'apps');
+  const targetsDir = path.join(brandRoot, 'targets');
   const targets = { backend: null, website: null };
 
-  if (!fs.existsSync(appsDir)) {
+  if (!fs.existsSync(targetsDir)) {
     return targets;
   }
 
-  for (const entry of fs.readdirSync(appsDir, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(targetsDir, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    if (entry.name === 'backend') targets.backend = path.join(appsDir, entry.name);
-    if (entry.name === 'website') targets.website = path.join(appsDir, entry.name);
+    if (entry.name === 'backend') targets.backend = path.join(targetsDir, entry.name);
+    if (entry.name === 'website') targets.website = path.join(targetsDir, entry.name);
   }
 
   return targets;
@@ -222,7 +222,7 @@ class E2eHarness {
     const emulatorLog = path.join(this.logDir, 'emulator.log');
     const logStream = fs.createWriteStream(emulatorLog);
 
-    // Backend commands run from the APP ROOT (src/dist pillar) — the CLI
+    // Backend commands run from the TARGET ROOT (src/dist pillar) — the CLI
     // stages dist/ itself before booting the emulator.
     const child = spawn('npx', ['mgr', 'emulator'], {
       cwd: this.targets.backend,

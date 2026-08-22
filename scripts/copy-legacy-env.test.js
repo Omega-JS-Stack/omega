@@ -73,8 +73,8 @@ test('multi-line values copy as one intact block', () => {
 });
 
 test('parseArgs: defaults + every flag form', () => {
-  const args = parseArgs(['--brand=apps/x', '--force', '--dry-run', '--include=signing', '--source=/tmp/e']);
-  assert.equal(args.brand, 'apps/x');
+  const args = parseArgs(['--brand=brands/x', '--force', '--dry-run', '--include=signing', '--source=/tmp/e']);
+  assert.equal(args.brand, 'brands/x');
   assert.equal(args.force, true);
   assert.equal(args.dryRun, true);
   assert.equal(args.include, 'signing');
@@ -82,7 +82,7 @@ test('parseArgs: defaults + every flag form', () => {
   assert.throws(() => parseArgs(['--nope']), /Unknown argument/);
 
   const defaults = parseArgs([]);
-  assert.equal(defaults.brand, 'apps/omega-playground');
+  assert.equal(defaults.brand, 'brands/omega-playground');
   assert.match(defaults.source, /omega-manager\/\.env$/);
 });
 

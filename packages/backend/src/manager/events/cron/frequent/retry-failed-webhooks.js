@@ -10,9 +10,9 @@ const SWEEP_LIMIT = 100;
 /**
  * Failed payment webhook retry cron job
  *
- * The webhook route answers the processor 200 the moment the event is stored, so a
+ * The webhook route answers the provider 200 the moment the event is stored, so a
  * doc the onWrite trigger marked `failed` is never delivered again: a transient fault
- * (a processor API blip, a lost Firestore write) drops the payment silently.
+ * (a provider API blip, a lost Firestore write) drops the payment silently.
  *
  * This flips those docs back to `pending`, which is exactly what the trigger picks
  * up. Reprocessing is safe — the trigger's staleness guard and its previously-completed
@@ -53,7 +53,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
     }
 
     if (retryCount >= MAX_RETRIES) {
-      ctx.error(`Dead-lettering webhook ${doc.id} after ${retryCount} failed attempts (processor=${data.processor}, event=${data.event?.type || 'unknown'}, owner=${data.owner || 'null'}, orderId=${data.orderId || 'null'}): ${data.error || 'no error recorded'} — it will NOT be retried again and needs manual reconciliation`);
+      ctx.error(`Dead-lettering webhook ${doc.id} after ${retryCount} failed attempts (provider=${data.provider}, event=${data.event?.type || 'unknown'}, owner=${data.owner || 'null'}, orderId=${data.orderId || 'null'}): ${data.error || 'no error recorded'} — it will NOT be retried again and needs manual reconciliation`);
 
       await doc.ref.set({ deadLetter: true }, { merge: true });
       deadLettered++;

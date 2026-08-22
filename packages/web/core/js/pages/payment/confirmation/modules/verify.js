@@ -1,9 +1,9 @@
 // Has the purchase the redirect claims actually LANDED? (#232)
 //
 // Entitlement is granted by the payment webhook, which arrives AFTER the
-// processor has redirected the browser here — usually a second or two later,
+// provider has redirected the browser here — usually a second or two later,
 // sometimes never (a declined charge, an undelivered webhook in local dev). The
-// redirect's URL params are the processor's claim, not proof, so the page asks
+// redirect's URL params are the provider's claim, not proof, so the page asks
 // the account itself before it congratulates anyone.
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';

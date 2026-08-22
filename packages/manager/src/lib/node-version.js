@@ -1,8 +1,8 @@
 /**
- * node-version — resolve which Node an app's commands run under, from its
+ * node-version — resolve which Node a target's commands run under, from its
  * own `.nvmrc` (friction #15: one brand spans Node majors — web pins 24,
- * backend functions pin 22 — so the manager drives each app's commands
- * under THAT app's Node instead of whatever it was launched with).
+ * backend functions pin 22 — so the manager drives each target's commands
+ * under THAT target's Node instead of whatever it was launched with).
  *
  * Ported from legacy omega-manager's update-service resolution: the pinned
  * major is matched against nvm's installed versions ($NVM_DIR/versions/node,
@@ -32,14 +32,14 @@ function parseNvmrcMajor(content) {
 }
 
 /**
- * Find the app's .nvmrc — the app root is the ONE authored home (the
+ * Find the target's .nvmrc — the target root is the ONE authored home (the
  * backend's stage step copies it into dist/ for the Firebase runtime).
  *
- * @param {string} appDir - The app directory commands run in.
+ * @param {string} targetDir - The target directory commands run in.
  * @returns {{ spec: string, file: string }|null} The trimmed spec + its file.
  */
-function findNvmrc(appDir) {
-  const file = path.join(appDir, '.nvmrc');
+function findNvmrc(targetDir) {
+  const file = path.join(targetDir, '.nvmrc');
   const content = jetpack.read(file);
   if (content && content.trim()) {
     return { spec: content.trim(), file };
@@ -73,16 +73,16 @@ function findInstalledNode(major) {
 }
 
 /**
- * Resolve which Node an app's commands should run under.
+ * Resolve which Node a target's commands should run under.
  *
- * @param {string} appDir - The directory the command will run in.
+ * @param {string} targetDir - The directory the command will run in.
  * @returns {null|object} null (no/unparseable .nvmrc: inherited PATH),
  *   { major, spec, file, version, binDir } (binDir null when the current
  *   Node already matches), or { major, spec, file, error } (major not
  *   installed in nvm).
  */
-function resolveAppNode(appDir) {
-  const found = findNvmrc(appDir);
+function resolveTargetNode(targetDir) {
+  const found = findNvmrc(targetDir);
   if (!found) {
     return null;
   }
@@ -111,10 +111,10 @@ function resolveAppNode(appDir) {
 }
 
 /**
- * Env overrides for a spawned command so node/npm/npx resolve to the app's
+ * Env overrides for a spawned command so node/npm/npx resolve to the target's
  * Node ({} when the inherited PATH is already right).
  *
- * @param {object|null} resolved - A resolveAppNode() result.
+ * @param {object|null} resolved - A resolveTargetNode() result.
  * @returns {object} Env override ({ PATH } or {}).
  */
 function nodeEnvFor(resolved) {
@@ -124,4 +124,4 @@ function nodeEnvFor(resolved) {
   return { PATH: `${resolved.binDir}${path.delimiter}${process.env.PATH}` };
 }
 
-module.exports = { parseNvmrcMajor, findInstalledNode, resolveAppNode, nodeEnvFor };
+module.exports = { parseNvmrcMajor, findInstalledNode, resolveTargetNode, nodeEnvFor };

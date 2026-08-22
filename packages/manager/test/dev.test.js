@@ -1,8 +1,8 @@
 // `omega dev` (brand root) — target-selection rules plus the boot SEQUENCE
-// (freshness sweep, manage cycle, then the app legs). The spawn plumbing is composition of
-// tested pieces (discoverApps, resolveAppNode, watch-all's forwarding
+// (freshness sweep, manage cycle, then the target legs). The spawn plumbing is composition of
+// tested pieces (discoverTargets, resolveTargetNode, watch-all's forwarding
 // pattern); the SELECTION is the behavior with rules worth pinning: default
-// set, --only/--except/--all, unknowns, missing apps, backend-first ordering.
+// set, --only/--except/--all, unknowns, missing targets, backend-first ordering.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -85,9 +85,9 @@ require.cache[managePath] = {
 const devCommand = require('../src/commands/dev.js');
 const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
-const ALL_APPS = ['web', 'backend', 'desktop', 'extension'];
+const ALL_TARGETS = ['web', 'backend', 'desktop', 'extension'];
 
-/** Stage a brand monorepo with a single website app. */
+/** Stage a brand monorepo with a single website target. */
 function stageBrand() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
 
@@ -98,12 +98,12 @@ function stageBrand() {
 }
 `);
 
-  const website = path.join(root, 'apps', 'website');
+  const website = path.join(root, 'targets', 'website');
   fs.mkdirSync(website, { recursive: true });
   fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({
     name: 'fixture-website',
     private: true,
-    dependencies: { '@omega.js/web': '*' }, // the app declares its framework, as every real one does
+    dependencies: { '@omega.js/web': '*' }, // the target declares its framework, as every real one does
   }));
 
   return root;
@@ -128,7 +128,7 @@ async function bootDev(cwd, options = {}) {
 }
 
 test('default set is the local web loop — web + backend, GUI targets stay down', () => {
-  const { selected, unknown, missing } = selectDevTargets({ available: ALL_APPS });
+  const { selected, unknown, missing } = selectDevTargets({ available: ALL_TARGETS });
 
   assert.deepStrictEqual(selected, ['backend', 'web'], 'backend boots first (publishes the port map)');
   assert.deepStrictEqual(DEFAULT_TARGETS, ['web', 'backend']);
@@ -138,31 +138,31 @@ test('default set is the local web loop — web + backend, GUI targets stay down
 
 test('--only is the exact set; --except subtracts; --all boots every leg', () => {
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_APPS, only: 'web' }).selected,
+    selectDevTargets({ available: ALL_TARGETS, only: 'web' }).selected,
     ['web'],
   );
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_APPS, only: 'desktop,web' }).selected,
+    selectDevTargets({ available: ALL_TARGETS, only: 'desktop,web' }).selected,
     ['desktop', 'web'],
     '--only can opt GUI targets in',
   );
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_APPS, except: 'backend' }).selected,
+    selectDevTargets({ available: ALL_TARGETS, except: 'backend' }).selected,
     ['web'],
   );
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_APPS, all: true }).selected,
+    selectDevTargets({ available: ALL_TARGETS, all: true }).selected,
     ['backend', 'web', 'desktop', 'extension'],
     'backend still first under --all',
   );
 });
 
-test('unknown targets are reported, not booted; targets without apps go to missing', () => {
+test('unknown targets are reported, not booted; targets without dirs go to missing', () => {
   const result = selectDevTargets({ available: ['web'], only: 'web,backend,mobile' });
 
   assert.deepStrictEqual(result.selected, ['web']);
   assert.deepStrictEqual(result.unknown, ['mobile'], 'no mobile dev leg exists (MAM parked)');
-  assert.deepStrictEqual(result.missing, ['backend'], 'requested but no app in this brand');
+  assert.deepStrictEqual(result.missing, ['backend'], 'requested but no dir in this brand');
 });
 
 test('a web-only brand defaults to just web — no phantom backend leg', () => {
@@ -174,7 +174,7 @@ test('a web-only brand defaults to just web — no phantom backend leg', () => {
 
 // ─── Boot sequence ───────────────────────────────────────────────────────────
 
-test('boot opens with the manage cycle, THEN spawns the app legs — brand asset edits land on restart', async () => {
+test('boot opens with the manage cycle, THEN spawns the target legs — brand asset edits land on restart', async () => {
   boot.length = 0;
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
@@ -183,10 +183,10 @@ test('boot opens with the manage cycle, THEN spawns the app legs — brand asset
 
   assert.strictEqual(outcome, 'running', 'the orchestrator stays alive after booting');
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
-    'the full service walk runs against the brand root before any app leg starts');
+    'the full service walk runs against the brand root before any target leg starts');
 });
 
-test('a manage cycle with errors stops dev boot loudly — no app leg spawns', async () => {
+test('a manage cycle with errors stops dev boot loudly — no target leg spawns', async () => {
   boot.length = 0;
   manageReport = { hasErrors: true, results: {}, brand: {} };
   const root = stageBrand();
@@ -319,7 +319,7 @@ test('omega manage --execute is declared boolean (yargs would otherwise eat the 
 
 // ─── Hoisted freshness sweep (#340) ──────────────────────────────────────────
 
-/** Stage a brand with a website AND a backend app, each declaring its framework. */
+/** Stage a brand with a website AND a backend target, each declaring its framework. */
 function stageFanOutBrand() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
 
@@ -331,9 +331,9 @@ function stageFanOutBrand() {
 `);
 
   for (const [dir, framework] of [['website', '@omega.js/web'], ['backend', '@omega.js/backend']]) {
-    const appPath = path.join(root, 'apps', dir);
-    fs.mkdirSync(appPath, { recursive: true });
-    fs.writeFileSync(path.join(appPath, 'package.json'), JSON.stringify({
+    const targetPath = path.join(root, 'targets', dir);
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
       name: `fixture-${dir}`,
       private: true,
       dependencies: { [framework]: '*' },
@@ -366,7 +366,7 @@ test('the freshness sweep runs ONCE, before the manage cycle and before any leg 
   assert.strictEqual(sweepHosts.length, 1, 'ONE sweep, not one per lane');
 });
 
-test('the sweep is handed each selected lane\'s framework host, resolved from its app (#340)', async () => {
+test('the sweep is handed each selected lane\'s framework host, resolved from its target (#340)', async () => {
   resetRecorders();
   resetSweep();
   manageReport = { hasErrors: false, results: {}, brand: {} };
@@ -375,9 +375,9 @@ test('the sweep is handed each selected lane\'s framework host, resolved from it
   await bootDev(root);
 
   assert.deepStrictEqual(sweepHosts[0], [
-    { packageName: '@omega.js/backend', fromDir: path.join(root, 'apps', 'backend') },
-    { packageName: '@omega.js/web', fromDir: path.join(root, 'apps', 'website') },
-  ], 'each host resolves from the app that declares it — the same chain the lane itself would walk');
+    { packageName: '@omega.js/backend', fromDir: path.join(root, 'targets', 'backend') },
+    { packageName: '@omega.js/web', fromDir: path.join(root, 'targets', 'website') },
+  ], 'each host resolves from the target that declares it — the same chain the lane itself would walk');
 });
 
 test('a lane whose framework is unfiltered out is not swept — --only narrows the pass too (#340)', async () => {

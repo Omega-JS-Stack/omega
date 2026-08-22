@@ -14,7 +14,7 @@ First, provide us with details about your business below:
 - State/Province:
 - ZIP/Postal Code:
 
-Second, you must request from your payment processor’s support for a few pieces of information. To do so, please follow the steps below and send them the email template below.
+Second, you must request from your payment provider’s support for a few pieces of information. To do so, please follow the steps below and send them the email template below.
 
 ""I am enrolling for Discover Ethoca Alerts via my third-party vendor, Chargeblast. I need my 15-Digit Discover SE number. Can you please provide these pieces of information to me ASAP? Let me know if you need any additional info from me. Please feel free to provide me with these pieces of information piecemeal.”
 

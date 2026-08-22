@@ -32,7 +32,7 @@ module.exports = {
 
         // Create subscription via test intent (product A)
         const response = await http.as('journey-payments-plan-change').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: productA.id,
           frequency: state.productA.frequency,
         });
@@ -62,7 +62,7 @@ module.exports = {
         state.eventId = `_test-evt-journey-plan-change-${Date.now()}`;
 
         // Send subscription.updated with product B's Stripe product ID (or test sentinel)
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'customer.subscription.updated',
           data: {
@@ -109,7 +109,7 @@ module.exports = {
         assert.equal(userDoc.subscription.product.id, state.productB.id, `Product should be ${state.productB.id}`);
         assert.equal(userDoc.subscription.product.name, state.productB.name, `Product name should be ${state.productB.name}`);
         assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
-        assert.equal(userDoc.subscription.payment.processor, 'test', 'Processor should be test');
+        assert.equal(userDoc.subscription.payment.provider, 'test', 'Provider should be test');
         assert.equal(userDoc.subscription.payment.frequency, state.productB.frequency, `Frequency should be ${state.productB.frequency}`);
         assert.equal(userDoc.subscription.payment.resourceId, state.subscriptionId, 'Resource ID should be the same subscription');
       },

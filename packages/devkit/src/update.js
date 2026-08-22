@@ -244,9 +244,9 @@ async function fetchPackument(name, options = {}) {
 }
 
 /**
- * Build the full update report for one app's package.json.
+ * Build the full update report for one target's package.json.
  * @param {object} options
- * @param {string} options.dir - app directory (package.json + node_modules climb)
+ * @param {string} options.dir - target directory (package.json + node_modules climb)
  * @param {function} options.lookup - async (name) => { latest, versions, time }
  * @param {number} [options.now] - clock (ms epoch; injectable for tests)
  * @param {number} [options.minAge] - quarantine threshold in days (default 7; 0 disables)
@@ -471,7 +471,7 @@ function formatReport(report, options = {}) {
  * asked. Flags mirror npu: --apply, --major, --min-age N (default 7, 0
  * disables), --force-fresh (alias for --min-age 0).
  * @param {object} [options]
- * @param {string} [options.dir] - app directory (default cwd)
+ * @param {string} [options.dir] - target directory (default cwd)
  * @param {boolean} [options.apply] - install the selected set
  * @param {boolean} [options.major] - allow breaking jumps (with --apply)
  * @param {number} [options.minAge] - quarantine threshold in days

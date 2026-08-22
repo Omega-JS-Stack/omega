@@ -77,7 +77,7 @@ const SUBSCRIBER = {
   subscription: {
     product: { id: 'premium', name: 'Premium' },
     status: 'active',
-    payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+    payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
     expires: { timestampUNIX: HOUR_FROM_NOW },
   },
 };

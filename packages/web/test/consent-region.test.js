@@ -4,10 +4,11 @@
  * told after (opt-out).
  *
  * The zone list has to hold on its own, because getting it wrong in the
- * permissive direction means loading a tracker on someone the GDPR protects.
- * The three shapes that matter: `Europe/*`, the four EEA zones that sit outside
- * that prefix, and everything the runtime cannot place at all — which is opt-in
- * too, on purpose.
+ * permissive direction means loading a tracker on someone the law protects.
+ * The shapes that matter: `Europe/*`, the strict roster's named zones outside
+ * that prefix (the four Atlantic ones, then Brazil, China, South Korea), the
+ * countries deliberately NOT on it, and everything the runtime cannot place at
+ * all — which is opt-in too, on purpose.
  *
  * Browser code behind no aliases, but driven through esbuild like every other
  * core/js suite so the REAL file is what runs.
@@ -67,12 +68,46 @@ test('the four EEA zones outside the Europe/ prefix are opt-in too', async () =>
   }
 });
 
+test('Brazil is opt-in (LGPD), every one of its zones', async () => {
+  const { requiresOptIn } = await load();
+
+  // Brazil spans four offsets and sixteen IANA zones; the roster carries all of
+  // them, because a São Paulo rule that misses Manaus is not a rule.
+  for (const zone of [
+    'America/Sao_Paulo', 'America/Bahia', 'America/Fortaleza', 'America/Recife',
+    'America/Araguaina', 'America/Maceio', 'America/Belem', 'America/Santarem',
+    'America/Campo_Grande', 'America/Cuiaba', 'America/Boa_Vista', 'America/Porto_Velho',
+    'America/Manaus', 'America/Eirunepe', 'America/Rio_Branco', 'America/Noronha',
+  ]) {
+    assert.strictEqual(requiresOptIn(zone), true, `${zone} is Brazil, and the LGPD wants the question first`);
+  }
+});
+
+test('China is opt-in (PIPL)', async () => {
+  const { requiresOptIn } = await load();
+
+  for (const zone of ['Asia/Shanghai', 'Asia/Urumqi']) {
+    assert.strictEqual(requiresOptIn(zone), true, `${zone} is China`);
+  }
+});
+
+test('South Korea is opt-in (PIPA)', async () => {
+  const { requiresOptIn } = await load();
+
+  assert.strictEqual(requiresOptIn('Asia/Seoul'), true, 'Seoul is South Korea');
+});
+
 test('the rest of the world is opt-out', async () => {
   const { requiresOptIn } = await load();
 
-  for (const zone of ['America/New_York', 'America/Los_Angeles', 'America/Sao_Paulo', 'Asia/Tokyo', 'Australia/Sydney', 'Africa/Cairo', 'UTC']) {
+  for (const zone of ['America/New_York', 'America/Los_Angeles', 'America/Toronto', 'Asia/Tokyo', 'Australia/Sydney', 'Africa/Cairo', 'UTC']) {
     assert.strictEqual(requiresOptIn(zone), false, `${zone} loads its scripts and gets the informational banner`);
   }
+
+  // Canada is the roster's clearest "stay out": Quebec's Law 25 is real, but
+  // America/Montreal is an ALIAS of America/Toronto, so an opt-in Quebec would
+  // drag every Ontario visitor in with it — no zone, no entry.
+  assert.strictEqual(requiresOptIn('America/Montreal'), false, 'Quebec cannot be isolated from Toronto');
 });
 
 test('a missing or unplaceable timezone fails toward compliance', async () => {

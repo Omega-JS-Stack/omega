@@ -1,7 +1,7 @@
 /**
- * Devlog publish stage — write the post into the brand's website app and push
- * it live. In the brand-monorepo world the website is an app INSIDE the brand
- * repo (apps/{website}/src), so the commit lands in the brand monorepo itself.
+ * Devlog publish stage — write the post into the brand's website target and
+ * push it live. In the brand-monorepo world the website is a target INSIDE the brand
+ * repo (targets/{website}/src), so the commit lands in the brand monorepo itself.
  * Publishing IS the push — the site auto-builds and deploys on push. Only the
  * post file is committed; unrelated dirty files are untouched.
  */
@@ -53,22 +53,22 @@ function renderPostFile(brandConfig, post) {
 }
 
 /**
- * Write the post into the brand's website app, commit only the post file in
+ * Write the post into the brand's website target, commit only the post file in
  * the brand monorepo, and push.
  *
  * @param {object} params - { brand, post } (brand = lib/brand.js loadBrand shape)
  * @returns {{ postPath: string, url: string }} Written file + eventual live URL
  */
 function publishToWebsite({ brand, post }) {
-  const webApp = brand.apps.find((app) => app.target === 'web');
+  const webTarget = brand.targets.find((entry) => entry.target === 'web');
 
-  if (!webApp) {
-    throw new Error(`Brand ${brand.id} has no website app under apps/ — devlog's 'website' destination needs one`);
+  if (!webTarget) {
+    throw new Error(`Brand ${brand.id} has no website target under targets/ — devlog's 'website' destination needs one`);
   }
 
   const now = new Date();
   const date = localDateStamp(now);
-  const relativePath = join(webApp.dir, 'src', '_posts', String(now.getFullYear()), brand.config.devlog.postPath, `${date}-${post.slug}.md`);
+  const relativePath = join(webTarget.dir, 'src', '_posts', String(now.getFullYear()), brand.config.devlog.providers.ghostii.postPath, `${date}-${post.slug}.md`);
   const postPath = join(brand.root, relativePath);
 
   jetpack.write(postPath, renderPostFile(brand.config, post));

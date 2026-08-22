@@ -78,7 +78,7 @@ function makeClient({ development, storage }) {
       if (client.failRequest) {
         throw new Error('intent route unreachable');
       }
-      return { url: 'https://processor.test/checkout/abc' };
+      return { url: 'https://provider.test/checkout/abc' };
     },
   };
 
@@ -104,7 +104,7 @@ async function createIntent({ development, search = '' }) {
 
   await api.createPaymentIntent({
     state: { product: { id: 'premium' }, frequency: 'monthly', trialEligible: false },
-    processor: 'stripe',
+    provider: 'stripe',
     formData: {},
   });
 

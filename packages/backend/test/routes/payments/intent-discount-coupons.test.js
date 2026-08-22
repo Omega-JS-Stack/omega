@@ -1,5 +1,5 @@
 /**
- * Test: what the REAL processors ask their provider to create for a discount code
+ * Test: what the REAL providers ask their provider to create for a discount code
  * ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)).
  *
  * Stripe coupons come in two shapes — `percent_off` and `amount_off` — and the
@@ -11,15 +11,15 @@
  * The provider SDK/HTTP seam is the ONE thing stubbed — creating a coupon needs a
  * live Stripe/Chargebee account. The discount validation, the id derivation and
  * the coupon params themselves are the real code paths, reached through each
- * processor's real `createIntent()`. Same technique as
+ * provider's real `createIntent()`. Same technique as
  * intent-one-time-metadata.test.js.
  *
  * Run: npx omega test framework:routes/payments/intent-discount-coupons
  */
-const StripeLib = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const ChargebeeLib = require('../../../src/manager/libraries/payment/processors/chargebee.js');
-const stripeIntent = require('../../../src/manager/routes/payments/intent/processors/stripe.js');
-const chargebeeIntent = require('../../../src/manager/routes/payments/intent/processors/chargebee.js');
+const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const stripeIntent = require('../../../src/manager/routes/payments/intent/providers/stripe.js');
+const chargebeeIntent = require('../../../src/manager/routes/payments/intent/providers/chargebee.js');
 const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
 
 const UID = '_test-intent-coupon-uid';
@@ -28,7 +28,7 @@ const ORDER_ID = '2424-6868-1212';
 const PERCENT_CODE = 'WELCOME15';
 const AMOUNT_CODE = 'WELCOME10OFF';
 
-// A subscription product carrying BOTH processors' ids — the fixture is data, not
+// A subscription product carrying BOTH providers' ids — the fixture is data, not
 // a stand-in: every branch it drives is real code
 const PRODUCT = {
   id: 'premium',
@@ -40,7 +40,7 @@ const PRODUCT = {
 };
 
 /**
- * The ctx a processor receives. `Manager` is the runner's REAL one — the coupon
+ * The ctx a provider receives. `Manager` is the runner's REAL one — the coupon
  * builders read the brand's currency off its resolved config.
  */
 function buildCtx(Manager) {
@@ -191,7 +191,7 @@ async function chargebeeCheckout(Manager, code, { couponExists = false } = {}) {
 }
 
 module.exports = {
-  description: 'Payment intent: real-processor coupons for both discount shapes',
+  description: 'Payment intent: real-provider coupons for both discount shapes',
   type: 'group',
   timeout: 15000,
 
@@ -203,7 +203,7 @@ module.exports = {
         const captured = await stripeCheckout(Manager, AMOUNT_CODE);
         const created = captured.created;
 
-        assert.ok(created, 'The processor should have created a coupon');
+        assert.ok(created, 'The provider should have created a coupon');
         assert.equal(created.amount_off, 1000, 'Stripe takes amount_off in CENTS — $10 is 1000');
         assert.equal(created.currency, expectedCurrency(config).toLowerCase(), 'Stripe requires a currency alongside amount_off');
         assert.equal('percent_off' in created, false, 'An amount coupon must not carry percent_off at all');
@@ -262,7 +262,7 @@ module.exports = {
         const captured = await chargebeeCheckout(Manager, AMOUNT_CODE);
         const created = captured.created;
 
-        assert.ok(created, 'The processor should have created a coupon');
+        assert.ok(created, 'The provider should have created a coupon');
         assert.equal(created.discount_type, 'fixed_amount', 'A flat-dollar code is a fixed_amount coupon');
         assert.equal(created.discount_amount, 1000, 'Chargebee takes the amount in the currency\'s minor unit — $10 is 1000');
         assert.equal(created.currency_code, expectedCurrency(config).toUpperCase(), 'A fixed_amount coupon names its currency');

@@ -572,7 +572,7 @@ module.exports = {
  * Writes the Beehiiv response to {runDir}/beehiiv-upload.json for inspection.
  *
  * Required env: BEEHIIV_API_KEY
- * Required config: marketing.newsletter.publicationId (or we fuzzy-match by brand name)
+ * Required config: marketing.newsletter.providers.beehiiv.publicationId (or we fuzzy-match by brand name)
  */
 async function uploadDraftToBeehiiv({ html, structure, config, runDir }) {
   const apiKey = process.env.BEEHIIV_API_KEY;
@@ -586,7 +586,7 @@ async function uploadDraftToBeehiiv({ html, structure, config, runDir }) {
   const headers = { 'Authorization': `Bearer ${apiKey}` };
 
   // Resolve publication ID — config first, then fuzzy-match by brand name
-  let publicationId = config?.marketing?.newsletter?.publicationId;
+  let publicationId = config?.marketing?.newsletter?.providers?.beehiiv?.publicationId;
   const brandName = config?.brand?.name;
 
   if (!publicationId && brandName) {

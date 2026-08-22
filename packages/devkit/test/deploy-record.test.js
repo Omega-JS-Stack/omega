@@ -14,26 +14,26 @@ const { recordDeploy, readDeployRecord, deployKey } = require('../src/deploy-rec
 function makeBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-record-'));
   fs.writeFileSync(path.join(root, 'package.json'), '{"name":"brand"}');
-  fs.mkdirSync(path.join(root, 'apps', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'apps', 'website', 'package.json'), '{"name":"brand-website"}');
+  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), '{"name":"brand-website"}');
   return root;
 }
 
-test('recordDeploy resolves to the brand root from an app dir; readDeployRecord sees it from anywhere', () => {
+test('recordDeploy resolves to the brand root from a target dir; readDeployRecord sees it from anywhere', () => {
   const root = makeBrand();
-  const appDir = path.join(root, 'apps', 'website');
+  const targetDir = path.join(root, 'targets', 'website');
 
-  assert.equal(readDeployRecord({ dir: appDir, target: 'web' }), null);
+  assert.equal(readDeployRecord({ dir: targetDir, target: 'web' }), null);
 
-  const written = recordDeploy({ dir: appDir, target: 'web', detail: { method: 'dispatch' } });
+  const written = recordDeploy({ dir: targetDir, target: 'web', detail: { method: 'dispatch' } });
   assert.ok(written.at, 'stamped');
   assert.equal(written.method, 'dispatch');
 
   const state = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'state.json'), 'utf8'));
-  assert.equal(state.deploy.web.method, 'dispatch', 'record lands at the BRAND root, not the app');
+  assert.equal(state.deploy.web.method, 'dispatch', 'record lands at the BRAND root, not the target');
 
   assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch');
-  assert.equal(readDeployRecord({ dir: appDir, target: 'backend' }), null, 'target-scoped');
+  assert.equal(readDeployRecord({ dir: targetDir, target: 'backend' }), null, 'target-scoped');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -49,7 +49,7 @@ test('instance keys (multi-instance targets): main stays the bare target, other 
   recordDeploy({ dir: root, target: 'web', instance: 'admin', detail: { method: 'direct' } });
 
   const state = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'state.json'), 'utf8'));
-  assert.deepEqual(Object.keys(state.deploy).sort(), ['web', 'web:admin'], 'per-app records, distinct keys');
+  assert.deepEqual(Object.keys(state.deploy).sort(), ['web', 'web:admin'], 'per-target records, distinct keys');
 
   assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch', 'instance-less read = the primary');
   assert.equal(readDeployRecord({ dir: root, target: 'web', instance: 'admin' }).method, 'direct');

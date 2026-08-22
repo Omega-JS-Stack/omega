@@ -28,7 +28,7 @@ const FirestoreIndexesSyncedTest = require('../../src/cli/commands/setup-tests/f
 const StorageLifecyclePolicyTest = require('../../src/cli/commands/setup-tests/storage-lifecycle-policy.js');
 const MarketingCampaignsSeededTest = require('../../src/cli/commands/setup-tests/marketing-campaigns-seeded.js');
 
-// What the app has committed vs what the live project actually carries — one
+// What the target has committed vs what the live project actually carries — one
 // differing index is all the drift the check needs to fail.
 const LOCAL_INDEXES = {
   indexes: [
@@ -80,18 +80,18 @@ function liveIndexRead(command) {
   return '';
 }
 
-// An app root seeded with committed indexes that do NOT match live.
-function seedApp() {
-  const appPath = jetpack.tmpDir({ prefix: 'omega-setup-offline-' }).path();
+// An target root seeded with committed indexes that do NOT match live.
+function seedTarget() {
+  const targetPath = jetpack.tmpDir({ prefix: 'omega-setup-offline-' }).path();
 
-  jetpack.write(path.join(appPath, 'firestore.indexes.json'), JSON.stringify(LOCAL_INDEXES, null, 2));
+  jetpack.write(path.join(targetPath, 'firestore.indexes.json'), JSON.stringify(LOCAL_INDEXES, null, 2));
 
-  return appPath;
+  return targetPath;
 }
 
-function buildIndexesTest(appPath, argv) {
+function buildIndexesTest(targetPath, argv) {
   return new FirestoreIndexesSyncedTest({
-    main: { projectId: 'real-project', argv: argv, firebaseProjectPath: appPath },
+    main: { projectId: 'real-project', argv: argv, firebaseProjectPath: targetPath },
   });
 }
 
@@ -123,8 +123,8 @@ module.exports = {
 
       async run({ assert }) {
         // The bug, pinned: a plain scaffold run reaches `firebase deploy`.
-        const appPath = seedApp();
-        const test = buildIndexesTest(appPath, {});
+        const targetPath = seedTarget();
+        const test = buildIndexesTest(targetPath, {});
 
         await withSpawnTrap(async (spawned) => {
           assert.equal(await test.run(), false, 'drift must fail so the runner calls fix()');
@@ -144,7 +144,7 @@ module.exports = {
           return liveIndexRead(command);
         });
 
-        jetpack.remove(appPath);
+        jetpack.remove(targetPath);
       },
     },
 
@@ -153,8 +153,8 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const appPath = seedApp();
-        const test = buildIndexesTest(appPath, { offline: true });
+        const targetPath = seedTarget();
+        const test = buildIndexesTest(targetPath, { offline: true });
 
         await withSpawnTrap(async (spawned) => {
           // The read-only drift report still runs — the check reports what is
@@ -170,7 +170,7 @@ module.exports = {
 
         assert.match(test.getWarning().join(' '), /--offline/, 'the warning must name the flag that suppressed the deploy');
 
-        jetpack.remove(appPath);
+        jetpack.remove(targetPath);
       },
     },
 
@@ -181,8 +181,8 @@ module.exports = {
       async run({ assert }) {
         // Belt for any direct caller: run() already warns instead of failing,
         // so the runner cannot reach this fix.
-        const appPath = seedApp();
-        const test = buildIndexesTest(appPath, { offline: true });
+        const targetPath = seedTarget();
+        const test = buildIndexesTest(targetPath, { offline: true });
 
         await withSpawnTrap(async (spawned) => {
           await test.fix();
@@ -191,12 +191,12 @@ module.exports = {
         });
 
         assert.deepEqual(
-          JSON.parse(jetpack.read(path.join(appPath, 'firestore.indexes.json'))),
+          JSON.parse(jetpack.read(path.join(targetPath, 'firestore.indexes.json'))),
           LOCAL_INDEXES,
           'the committed index file stays untouched under --offline',
         );
 
-        jetpack.remove(appPath);
+        jetpack.remove(targetPath);
       },
     },
 

@@ -1,18 +1,18 @@
 /**
  * Test: Chargebee parseWebhook()
- * Unit tests for the Chargebee webhook processor's event categorization and routing
+ * Unit tests for the Chargebee webhook provider's event categorization and routing
  *
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type.
  */
-const chargebeeProcessor = require('../../../../src/manager/routes/payments/webhook/processors/chargebee.js');
+const chargebeeProvider = require('../../../../src/manager/routes/payments/webhook/providers/chargebee.js');
 
 // Chargebee webhook fixtures
 const FIXTURE_SUB_CREATED = require('../../../fixtures/chargebee/webhook-subscription-created.json');
 const FIXTURE_PAYMENT_FAILED = require('../../../fixtures/chargebee/webhook-payment-failed.json');
 
 function parseWebhook(event) {
-  return chargebeeProcessor.parseWebhook({ body: event });
+  return chargebeeProvider.parseWebhook({ body: event });
 }
 
 module.exports = {
@@ -25,86 +25,86 @@ module.exports = {
     {
       name: 'supports-subscription-created',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_created'), 'Should support subscription_created');
+        assert.ok(chargebeeProvider.isSupported('subscription_created'), 'Should support subscription_created');
       },
     },
 
     {
       name: 'supports-subscription-cancelled',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_cancelled'), 'Should support subscription_cancelled');
+        assert.ok(chargebeeProvider.isSupported('subscription_cancelled'), 'Should support subscription_cancelled');
       },
     },
 
     {
       name: 'supports-subscription-activated',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_activated'), 'Should support subscription_activated');
+        assert.ok(chargebeeProvider.isSupported('subscription_activated'), 'Should support subscription_activated');
       },
     },
 
     {
       name: 'supports-subscription-changed',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_changed'), 'Should support subscription_changed');
+        assert.ok(chargebeeProvider.isSupported('subscription_changed'), 'Should support subscription_changed');
       },
     },
 
     {
       name: 'supports-subscription-renewed',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_renewed'), 'Should support subscription_renewed');
+        assert.ok(chargebeeProvider.isSupported('subscription_renewed'), 'Should support subscription_renewed');
       },
     },
 
     {
       name: 'supports-subscription-reactivated',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_reactivated'), 'Should support subscription_reactivated');
+        assert.ok(chargebeeProvider.isSupported('subscription_reactivated'), 'Should support subscription_reactivated');
       },
     },
 
     {
       name: 'supports-cancellation-scheduled',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_cancellation_scheduled'), 'Should support subscription_cancellation_scheduled');
+        assert.ok(chargebeeProvider.isSupported('subscription_cancellation_scheduled'), 'Should support subscription_cancellation_scheduled');
       },
     },
 
     {
       name: 'supports-cancellation-removed',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('subscription_scheduled_cancellation_removed'), 'Should support scheduled_cancellation_removed');
+        assert.ok(chargebeeProvider.isSupported('subscription_scheduled_cancellation_removed'), 'Should support scheduled_cancellation_removed');
       },
     },
 
     {
       name: 'supports-payment-failed',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('payment_failed'), 'Should support payment_failed');
+        assert.ok(chargebeeProvider.isSupported('payment_failed'), 'Should support payment_failed');
       },
     },
 
     {
       name: 'supports-payment-refunded',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('payment_refunded'), 'Should support payment_refunded');
+        assert.ok(chargebeeProvider.isSupported('payment_refunded'), 'Should support payment_refunded');
       },
     },
 
     {
       name: 'supports-invoice-generated',
       async run({ assert }) {
-        assert.ok(chargebeeProcessor.isSupported('invoice_generated'), 'Should support invoice_generated');
+        assert.ok(chargebeeProvider.isSupported('invoice_generated'), 'Should support invoice_generated');
       },
     },
 
     {
       name: 'rejects-unsupported-event',
       async run({ assert }) {
-        assert.equal(chargebeeProcessor.isSupported('customer_created'), false, 'Should not support customer_created');
-        assert.equal(chargebeeProcessor.isSupported('coupon_created'), false, 'Should not support coupon_created');
-        assert.equal(chargebeeProcessor.isSupported('subscription_deleted'), false, 'Should not support subscription_deleted');
+        assert.equal(chargebeeProvider.isSupported('customer_created'), false, 'Should not support customer_created');
+        assert.equal(chargebeeProvider.isSupported('coupon_created'), false, 'Should not support coupon_created');
+        assert.equal(chargebeeProvider.isSupported('subscription_deleted'), false, 'Should not support subscription_deleted');
       },
     },
 

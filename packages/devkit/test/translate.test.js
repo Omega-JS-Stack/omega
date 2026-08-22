@@ -235,12 +235,17 @@ test('resolveTranslationSettings: defaults + gating', () => {
   assert.strictEqual(off.provider, 'claude');
   assert.strictEqual(off.default, 'en');
 
-  const on = resolveTranslationSettings({ translation: { languages: ['es'], provider: 'chatgpt', model: 'm', exclude: ['blog'] } });
+  // The engine is a KEY under translation.providers (#425) — presence picks it
+  const on = resolveTranslationSettings({ translation: { languages: ['es'], providers: { chatgpt: {} }, model: 'm', exclude: ['blog'] } });
   assert.strictEqual(on.enabled, true);
   assert.deepStrictEqual(on.languages, ['es']);
   assert.strictEqual(on.provider, 'chatgpt');
   assert.strictEqual(on.model, 'm');
   assert.deepStrictEqual(on.exclude, ['blog']);
+
+  // An empty providers block is no pick at all, so the claude default stands
+  const empty = resolveTranslationSettings({ translation: { languages: ['es'], providers: {} } });
+  assert.strictEqual(empty.provider, 'claude');
 
   const disabled = resolveTranslationSettings({ translation: { enabled: false, languages: ['es'] } });
   assert.strictEqual(disabled.enabled, false);
@@ -249,7 +254,7 @@ test('resolveTranslationSettings: defaults + gating', () => {
 });
 
 test('claude provider fails loud when the Agent SDK is not installed', async () => {
-  // #37: web no longer ships the SDK as a runtime dependency, so an app that
+  // #37: web no longer ships the SDK as a runtime dependency, so a target that
   // enabled translation without installing it must hit a named, actionable
   // error (never a silent skip). The resolution is stubbed, not uninstalled.
   const Module = require('node:module');

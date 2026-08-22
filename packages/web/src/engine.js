@@ -97,7 +97,7 @@ const { deepMerge } = require('./merge.js');
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {object} [options.assetManifest] - js/css manifest from the asset build
- * @param {string} [options.version] - the website app's own package version (site.omega.version → the Configuration block)
+ * @param {string} [options.version] - the website target's own package version (site.omega.version → the Configuration block)
  * @param {string} [options.pathPrefix] - the base path the built site is served under (#355) — default the domain root
  * @param {string} [options.sampleAnchor] - YYYY-MM-DD rolling-date anchor for sample content (default: OMEGA_SAMPLE_ANCHOR env, then today)
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
@@ -177,7 +177,7 @@ function buildConfig(eleventyConfig, options) {
   // The cancel-flow save offer (#268) is RESOLVED here, not in the browser: the
   // framework default (50% off the next cycle) has ONE home in @omega.js/config,
   // and the backend's apply route resolves the same section through the same
-  // function — so the dialog the customer reads and the coupon the processor
+  // function — so the dialog the customer reads and the coupon the provider
   // creates can never name different numbers. The spread leaves site.payment
   // itself alone; templates and the pricing composer read the brand's section.
   if (site.payment) site.client.payment = { ...site.payment, winback: resolveWinbackOffer(site.payment) };
@@ -720,7 +720,7 @@ function buildConfig(eleventyConfig, options) {
     // omega_cachebreak and the omega-cachebreak-img transform. Was 0 (inert)
     // until the central cache-breaker landed.
     cache_breaker: CACHE_TIMESTAMP,
-    // The WEBSITE APP's own package version, read by the caller off the app
+    // The WEBSITE TARGET's own package version, read by the caller off the target
     // root's package.json (the engine only ever sees the src dir). It rides the
     // Configuration block as `version`, which is the release tag every error
     // report carries — `brand.id@version` (#380). null (a caller that hands

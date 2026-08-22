@@ -176,7 +176,7 @@ Manager.prototype.init = function (exporter, options) {
 
   // Config-DERIVED values, on the config object consumer code already reads
   // (#290): `config.resolved.github.repo` and whatever joins it. The recipes
-  // live in @omega.js/config — private, so a brand app cannot call them and
+  // live in @omega.js/config — private, so a brand target cannot call them and
   // used to re-implement them — and the framework runs them once, here, on the
   // composed config.
   self.config.resolved = resolvedConfigValues(self.config);
@@ -187,10 +187,10 @@ Manager.prototype.init = function (exporter, options) {
   Manager.config = self.config;
 
   // Set PAYPAL_CLIENT_ID from config (clientId is public, not a secret — lives in config, not .env)
-  process.env.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || self.config?.payment?.processors?.paypal?.clientId || '';
+  process.env.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || self.config?.payment?.providers?.paypal?.clientId || '';
 
   // Set CHARGEBEE_SITE from config (site is public, not a secret — lives in config, not .env)
-  process.env.CHARGEBEE_SITE = process.env.CHARGEBEE_SITE || self.config?.payment?.processors?.chargebee?.site || '';
+  process.env.CHARGEBEE_SITE = process.env.CHARGEBEE_SITE || self.config?.payment?.providers?.chargebee?.site || '';
 
   // Get brand ID
   const brandId = self.config?.brand?.id;
@@ -425,7 +425,8 @@ Manager.prototype.init = function (exporter, options) {
   }
 
   // Setup sentry — @omega.js/monitoring owns the policy (config resolution from
-  // `monitoring.*`, the release tag, the gates) for every OMEGA target (#380).
+  // `monitoring.providers.sentry.*`, the release tag, the gates) for every OMEGA
+  // target (#380).
   // The gates run at BOOT, not per event: getEnvironment() is env-derived and
   // stable for the life of a process, so a non-production run that would have
   // dropped every event in beforeSend now never loads @sentry/node at all.

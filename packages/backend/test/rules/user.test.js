@@ -244,7 +244,7 @@ module.exports = {
         const db = rules.asAccount('basic');
 
         // Should fail - consent is protected (only signup route + webhook
-        // processors can mutate it server-side; a client write would let a
+        // providers can mutate it server-side; a client write would let a
         // user retroactively forge their own consent record).
         // Use a value that can't match any prior state — earlier tests
         // (email-preferences) may have set marketing.status to 'granted',

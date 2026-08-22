@@ -12,22 +12,26 @@ requires the package directly (`require('@omega.js/monitoring')` in `src/main.js
 
 ```jsonc
 monitoring: {
-  provider:         'sentry',
-  dsn:              'https://...@sentry.io/0',
-  environment:      null,                    // null = auto-detect ('production' if OMEGA_BUILD_MODE=true, else 'development')
-  tracesSampleRate: 0.1,
-  attachScreenshot: false,
+  providers: {
+    sentry: {
+      dsn:              'https://...@sentry.io/0',
+      environment:      null,                // null = auto-detect ('production' if OMEGA_BUILD_MODE=true, else 'development')
+      tracesSampleRate: 0.1,
+      attachScreenshot: false,
+    },
+  },
 }
 ```
 
-Presence-driven: a non-empty `dsn` enables sentry — no separate `enabled` flag (matches the
-@omega.js/backend convention). The `provider` discriminator is stripped before the rest of the
-block feeds `Sentry.init`.
+Presence-driven: a non-empty `dsn` enables sentry — no separate runtime `enabled` flag (matches
+the @omega.js/backend convention). The monitor is a KEY under `providers`
+([#425](https://github.com/Omega-JS-Stack/omega/issues/425)); @omega.js/monitoring reads that
+block and feeds it straight to `Sentry.init`, so nothing role-level ever reaches the SDK.
 
 ## Enable / disable rules
 
 Sentry is **disabled** in any of these cases:
-- `config.monitoring.dsn` is empty
+- `config.monitoring.providers.sentry.dsn` is empty
 - `OMEGA_SENTRY_ENABLED=false` env var
 - Running in development mode (`OMEGA_BUILD_MODE` is not `'true'`) **AND** `OMEGA_SENTRY_FORCE` is not `'true'`
 
@@ -72,7 +76,7 @@ When the user signs in via `client-bridge`, @omega.js/desktop automatically call
 
 The user object is **normalized** before being sent — only `uid`/`id` is kept, and everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 
-The email is **scrubbed by default** (#380). Set `config.monitoring.scrubEmail: false` to opt in to sending it.
+The email is **scrubbed by default** (#380). Set `config.monitoring.providers.sentry.scrubEmail: false` to opt in to sending it.
 
 ## Release tagging
 

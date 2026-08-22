@@ -2,8 +2,8 @@
  * Deploy staging — the two layers that make a functions upload self-contained.
  *
  * stage-functions (src/dist pillar): functions/ is GENERATED from the authored
- * app tree — src copy, derived manifest, composed brand⊕app config (#31), and
- * the app-root files that ride the artifact. Exercised on real temp trees.
+ * target tree — src copy, derived manifest, composed brand⊕local config (#31), and
+ * the target-root files that ride the artifact. Exercised on real temp trees.
  *
  * stage-local-packages: Cloud Build can't follow file: paths outside the
  * functions folder, and its buildpack runs `npm ci` (lockfile required) — such
@@ -232,8 +232,8 @@ module.exports = {
       async run({ assert }) {
         const tmp = makeTmp();
 
-        const appRoot = path.join(tmp, 'app');
-        jetpack.write(path.join(appRoot, 'package.json'), JSON.stringify({
+        const targetRoot = path.join(tmp, 'app');
+        jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({
           name: 'exit-code-backend',
           version: '0.0.1',
           private: true,
@@ -242,13 +242,13 @@ module.exports = {
           // before npm is ever reached, so the exit code is all this measures
           dependencies: { '@omega.js/brokenpkg': 'file:../brokenpkg' },
         }, null, 2));
-        jetpack.write(path.join(appRoot, 'src', 'index.js'), 'module.exports = 1;\n');
-        jetpack.write(path.join(appRoot, 'config', 'omega.json5'), '{ brand: { id: \'exit-code\', name: \'Exit Code\' }, targets: { backend: {} } }');
-        jetpack.write(path.join(appRoot, 'firebase.json'), JSON.stringify({ functions: { source: 'dist' } }, null, 2));
+        jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
+        jetpack.write(path.join(targetRoot, 'config', 'omega.json5'), '{ brand: { id: \'exit-code\', name: \'Exit Code\' }, targets: { backend: {} } }');
+        jetpack.write(path.join(targetRoot, 'firebase.json'), JSON.stringify({ functions: { source: 'dist' } }, null, 2));
         jetpack.dir(path.join(tmp, 'brokenpkg'));
 
         const run = spawnSync(process.execPath, [BACKEND_BIN, 'deploy'], {
-          cwd: appRoot,
+          cwd: targetRoot,
           encoding: 'utf8',
           env: { ...process.env, OMEGA_SKIP_FRESHNESS: '1' },
         });
@@ -265,36 +265,36 @@ module.exports = {
       async run({ assert }) {
         const tmp = makeTmp();
 
-        // Brand monorepo shape under the src/dist pillar: authored app tree
-        // (src/ + app-root manifest), NO app omega.json5 — the brand file's
+        // Brand monorepo shape under the src/dist pillar: authored target tree
+        // (src/ + target-root manifest), NO local omega.json5 — the brand file's
         // targets section is the per-target home (cp121c), and the STAGE step
         // must carry the composed config across the upload boundary (#31).
         const brandRoot = path.join(tmp, 'acme');
-        const appRoot = path.join(brandRoot, 'apps', 'backend');
+        const targetRoot = path.join(brandRoot, 'targets', 'backend');
         jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{
           // brand layer — must cross the upload boundary
           brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
           targets: { backend: { flavor: 'api' }, web: {} },
         }`);
-        jetpack.write(path.join(appRoot, 'package.json'), JSON.stringify({
+        jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({
           name: 'acme-backend',
           private: true,
           engines: { node: '22' },
-          // The relative file: dep is spelled from the APP ROOT — the staged
+          // The relative file: dep is spelled from the TARGET ROOT — the staged
           // manifest must respell it one level deeper (dist/)
           dependencies: { 'firebase-admin': '^13.0.0', '@acme/lib': 'file:../../libs/lib' },
         }, null, 2));
-        jetpack.write(path.join(appRoot, 'src', 'index.js'), 'module.exports = 1;\n');
-        jetpack.write(path.join(appRoot, 'src', 'routes', 'ping', 'get.js'), 'module.exports = 2;\n');
-        jetpack.write(path.join(appRoot, 'src', '.dotrc'), 'dotfiles ride the copy\n');
-        jetpack.write(path.join(appRoot, 'src', 'public', '404.html'), 'CONSUMER 404\n');
-        jetpack.write(path.join(appRoot, '.env'), 'FAKE_KEY="value"\n');
+        jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
+        jetpack.write(path.join(targetRoot, 'src', 'routes', 'ping', 'get.js'), 'module.exports = 2;\n');
+        jetpack.write(path.join(targetRoot, 'src', '.dotrc'), 'dotfiles ride the copy\n');
+        jetpack.write(path.join(targetRoot, 'src', 'public', '404.html'), 'CONSUMER 404\n');
+        jetpack.write(path.join(targetRoot, '.env'), 'FAKE_KEY="value"\n');
         // Runtime artifacts that must SURVIVE a re-stage
-        jetpack.write(path.join(appRoot, 'dist', 'node_modules', 'marker.txt'), 'kept');
-        jetpack.write(path.join(appRoot, 'dist', 'emulator.log'), 'kept');
-        jetpack.write(path.join(appRoot, 'dist', 'stale-old-file.js'), 'wiped');
+        jetpack.write(path.join(targetRoot, 'dist', 'node_modules', 'marker.txt'), 'kept');
+        jetpack.write(path.join(targetRoot, 'dist', 'emulator.log'), 'kept');
+        jetpack.write(path.join(targetRoot, 'dist', 'stale-old-file.js'), 'wiped');
 
-        const { distDir } = stageFunctions({ projectDir: appRoot });
+        const { distDir } = stageFunctions({ projectDir: targetRoot });
 
         // src copied, derived manifest, stale content wiped, artifacts preserved
         assert.equal(jetpack.read(path.join(distDir, 'index.js')), 'module.exports = 1;\n');
@@ -315,7 +315,7 @@ module.exports = {
         assert.equal(manifest.engines.node, '22');
         assert.deepEqual(manifest.dependencies, {
           'firebase-admin': '^13.0.0',
-          '@acme/lib': 'file:../../../libs/lib', // app-root-relative → dist-relative
+          '@acme/lib': 'file:../../../libs/lib', // target-root-relative → dist-relative
         });
         assert.equal(manifest.scripts, undefined, 'scripts never ship in the artifact');
 
@@ -332,12 +332,12 @@ module.exports = {
         assert.equal(uploaded.enabled, true);
 
         // Re-stage after a brand edit: the staged config NEVER feeds back in
-        // as an app layer (the wipe runs before the compose) — no staleness
+        // as a local layer (the wipe runs before the compose) — no staleness
         jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{
           brand: { id: 'acme', name: 'Acme Corp RENAMED', url: 'https://acme.test' },
           targets: { backend: { flavor: 'api' }, web: {} },
         }`);
-        stageFunctions({ projectDir: appRoot });
+        stageFunctions({ projectDir: targetRoot });
         const restaged = loadConfig(distDir, 'backend');
         assert.equal(restaged.config.brand.name, 'Acme Corp RENAMED', 'brand edit reflected on re-stage');
 
@@ -355,14 +355,14 @@ module.exports = {
           try { fn(); return ''; } catch (e) { return e.message; }
         };
 
-        // No package.json at the app root → the manifest moved (clear error)
+        // No package.json at the target root → the manifest moved (clear error)
         jetpack.write(path.join(tmp, 'src', 'index.js'), '// code');
-        assert.ok(/manifest lives at the APP ROOT/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing manifest names the app-root home');
+        assert.ok(/manifest lives at the TARGET ROOT/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing manifest names the target-root home');
 
         // Manifest but no src/ → instruct the src-first move
         jetpack.write(path.join(tmp, 'package.json'), JSON.stringify({ name: 'x', private: true }));
         jetpack.remove(path.join(tmp, 'src'));
-        assert.ok(/backend apps are src-first/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing src/ instructs the src-first move');
+        assert.ok(/backend targets are src-first/.test(messageOf(() => stageFunctions({ projectDir: tmp }))), 'missing src/ instructs the src-first move');
 
         jetpack.remove(tmp);
       },
@@ -374,9 +374,9 @@ module.exports = {
         const tmp = makeTmp();
 
         // The framework package's own shape: a package.json named
-        // @omega.js/backend beside a src/ dir — which is exactly what an app
+        // @omega.js/backend beside a src/ dir — which is exactly what a target
         // root looks like to the stage. `npx omega emulator` from inside the
-        // framework (no app context to dispatch to) walked straight in, wiped
+        // framework (no target context to dispatch to) walked straight in, wiped
         // the framework's OWN dist/ and then died on the missing omega.json5,
         // leaving the CLI unbootable until `npm run prepare` (#308).
         jetpack.write(path.join(tmp, 'package.json'), JSON.stringify({ name: '@omega.js/backend', private: true }));

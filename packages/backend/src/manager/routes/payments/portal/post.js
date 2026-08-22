@@ -1,5 +1,5 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 
 // Where a portal session returns to when the caller names no URL of its own, or
 // names one that is not the brand's — the account page's billing section, the
@@ -29,42 +29,42 @@ module.exports = async ({ ctx, Manager, user, settings }) => {
     return ctx.respond('No paid subscription found', { code: 400 });
   }
 
-  const processor = subscription.payment?.processor;
+  const provider = subscription.payment?.provider;
 
-  if (!processor) {
-    ctx.log(`Portal rejected: uid=${uid}, no processor set`);
-    return ctx.respond('Subscription payment processor not found', { code: 400 });
+  if (!provider) {
+    ctx.log(`Portal rejected: uid=${uid}, no provider set`);
+    return ctx.respond('Subscription payment provider not found', { code: 400 });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Create the portal session via the processor
+  // Create the portal session via the provider
   const email = user.auth?.email || null;
   let result;
   try {
-    result = await processorModule.createPortalSession({ uid, email, returnUrl, ctx });
+    result = await providerModule.createPortalSession({ uid, email, returnUrl, ctx });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to create ${processor} portal session: uid=${uid}, error=${e.message}`);
+    ctx.error(`Failed to create ${provider} portal session: uid=${uid}, error=${e.message}`);
     return ctx.respond('We could not open your billing portal right now. Please try again shortly.', { code: 500 });
   }
 
-  ctx.log(`Portal session created: uid=${uid}, processor=${processor}`);
+  ctx.log(`Portal session created: uid=${uid}, provider=${provider}`);
 
   return ctx.respond({ url: result.url });
 };
 
 /**
- * Resolve the URL the processor sends the user back to.
+ * Resolve the URL the provider sends the user back to.
  *
- * `returnUrl` is client-settable and lands in the processor's hosted page, so an
+ * `returnUrl` is client-settable and lands in the provider's hosted page, so an
  * arbitrary host would make the brand's own billing portal a redirector to
  * anywhere. Only the brand's OWN origins pass — the resolved website URL (which
  * is localhost during a dev/test run) and the configured brand URL. Anything

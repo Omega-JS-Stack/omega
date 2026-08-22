@@ -1,10 +1,10 @@
 /**
  * The manager's own `omega`/`omg`/`mgr` bins (#276). A fresh brand-template
- * clone runs `npx omega onboard` before a single app framework is installed —
+ * clone runs `npx omega onboard` before a single target framework is installed —
  * with no `bin` declared, npx fell through to an unrelated public npm package.
  * @omega.js/manager therefore ships the same three bins the frameworks do,
  * through the same omega-bin dispatcher, so the manager winning npm's hoist
- * link at a brand root is still correct inside an app.
+ * link at a brand root is still correct inside a target.
  *
  * Real processes, real bin files: what npm links is exactly what runs here.
  */
@@ -72,7 +72,7 @@ test('bin: a fresh dir with nothing installed answers with the manager CLI (npx 
   assert.match(stdout, /omega onboard/, 'the verb a stranger with an empty clone needs');
   // The bootstrap note only the dispatcher prints — the bin routes through
   // omega-bin, it is not hard-wired straight to the manager CLI.
-  assert.match(stderr, /no app context found[\s\S]*running @omega\.js\/manager/);
+  assert.match(stderr, /no target context found[\s\S]*running @omega\.js\/manager/);
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });
@@ -92,7 +92,7 @@ test('bin: at a brand root with the manager installed, the bin runs the INSTALLE
   fs.mkdirSync(path.join(scratch, 'config'), { recursive: true });
   fs.writeFileSync(
     path.join(scratch, 'package.json'),
-    JSON.stringify({ name: 'acme', private: true, workspaces: ['apps/*'], devDependencies: { '@omega.js/manager': '*' } })
+    JSON.stringify({ name: 'acme', private: true, workspaces: ['targets/*'], devDependencies: { '@omega.js/manager': '*' } })
   );
   fs.writeFileSync(path.join(scratch, 'config', 'omega.json5'), '{ brand: { id: "acme" } }\n');
   fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
@@ -101,22 +101,22 @@ test('bin: at a brand root with the manager installed, the bin runs the INSTALLE
   const { stdout, stderr } = runBin('omega', [], scratch);
 
   assert.match(stdout, /omega onboard/, 'the manager CLI answered at the brand root');
-  assert.doesNotMatch(stderr, /no app context found/, 'the brand root IS a context');
+  assert.doesNotMatch(stderr, /no target context found/, 'the brand root IS a context');
   assert.doesNotMatch(stderr, /is not installed/, 'and its manager resolved from there');
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-test('bin: inside an app of ANOTHER framework, the manager\'s bin dispatches to that framework', () => {
+test('bin: inside a target of ANOTHER framework, the manager\'s bin dispatches to that framework', () => {
   // Why the manager wires through the dispatcher instead of straight to its own
   // CLI: in a brand monorepo npm hoists all five packages' `omega` bins and one
   // arbitrary winner gets the .bin link. The manager winning must still run the
-  // app's framework.
-  const scratch = scratchRepo('omega-manager-bin-app-');
-  const appDir = path.join(scratch, 'apps', 'site');
-  fs.mkdirSync(appDir, { recursive: true });
+  // target's framework.
+  const scratch = scratchRepo('omega-manager-bin-target-');
+  const targetDir = path.join(scratch, 'targets', 'site');
+  fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(
-    path.join(appDir, 'package.json'),
+    path.join(targetDir, 'package.json'),
     JSON.stringify({ name: 'acme-website', devDependencies: { '@omega.js/web': '*' } })
   );
 
@@ -129,10 +129,10 @@ test('bin: inside an app of ANOTHER framework, the manager\'s bin dispatches to 
   );
   fs.writeFileSync(path.join(fwDir, 'cli.js'), "module.exports = { run() { console.log('WEB-CLI-RAN'); } };");
 
-  const { stdout } = runBin('omega', ['build'], appDir);
+  const { stdout } = runBin('omega', ['build'], targetDir);
 
-  assert.match(stdout, /WEB-CLI-RAN/, 'the app\'s framework ran');
-  assert.doesNotMatch(stdout, /OMEGA — brand orchestration/, 'the manager CLI never fired inside an app');
+  assert.match(stdout, /WEB-CLI-RAN/, 'the target\'s framework ran');
+  assert.doesNotMatch(stdout, /OMEGA — brand orchestration/, 'the manager CLI never fired inside a target');
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });

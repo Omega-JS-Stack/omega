@@ -48,7 +48,7 @@ async function resolveServePorts() {
 
 // Resolve the electron package from the consumer project — it exports the path to
 // the platform binary. Node resolution walks UP from projectRoot, so an npm-workspaces
-// brand that hoists electron to the monorepo root resolves just as well as an app
+// brand that hoists electron to the monorepo root resolves just as well as a target
 // carrying its own copy.
 function resolveElectron(projectRoot) {
   return require(require.resolve('electron', { paths: [projectRoot] }));
@@ -63,7 +63,7 @@ function start(ports, done) {
   try {
     electronBin = resolveElectron(projectRoot);
   } catch (e) {
-    logger.error(`Could not resolve electron from ${projectRoot} — no copy in the app or any parent node_modules.`);
+    logger.error(`Could not resolve electron from ${projectRoot} — no copy in the target or any parent node_modules.`);
     return done(e);
   }
 
@@ -87,7 +87,7 @@ function start(ports, done) {
   });
   // Defensive scrub at the spawn (friction 17c): the gulp boundary strips it,
   // but a path that bypasses the boundary would make require('electron')
-  // return the npm stub inside the app → crash at app.setName.
+  // return the npm stub inside the target → crash at app.setName.
   delete childEnv.ELECTRON_RUN_AS_NODE;
 
   // Pipe stdio (instead of 'inherit') so our parent-process attach-log-file tee can capture

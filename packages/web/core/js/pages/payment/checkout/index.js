@@ -1,8 +1,8 @@
 // Payment Checkout Page
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getProcessors, getProductById } from '__main_assets__/js/libs/payment-config.js';
+import { getProviders, getProductById } from '__main_assets__/js/libs/payment-config.js';
 import { fetchTrialEligibility, warmupServer, createPaymentIntent } from './modules/api.js';
-import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
+import { state, buildBindingsState, resolveProvider, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
@@ -83,7 +83,7 @@ async function initializeCheckout() {
     }
 
     // Read payment config from _config.yml (available instantly via omega.config)
-    state.processors = getProcessors();
+    state.providers = getProviders();
 
     // Find product
     const product = getProductById(productId);
@@ -148,10 +148,10 @@ async function initializeCheckout() {
 
     // Check payment methods are available
     const hasPaymentMethods = !!(
-      state.processors?.stripe?.publishableKey
-      || state.processors?.chargebee?.site
-      || state.processors?.paypal?.clientId
-      || state.processors?.coinbase?.enabled
+      state.providers?.stripe?.publishableKey
+      || state.providers?.chargebee?.site
+      || state.providers?.paypal?.clientId
+      || state.providers?.coinbase?.enabled
     );
 
     if (!hasPaymentMethods) {
@@ -216,20 +216,20 @@ function setupForm() {
     // Track payment info
     trackAddPaymentInfo(state, paymentMethod);
 
-    // Resolve processor (card -> stripe/chargebee, paypal -> paypal, etc.)
-    const processor = resolveProcessor(paymentMethod);
+    // Resolve provider (card -> stripe/chargebee, paypal -> paypal, etc.)
+    const provider = resolveProvider(paymentMethod);
 
     // Create payment intent and redirect
     const response = await createPaymentIntent({
       state,
-      processor,
+      provider,
       formData: formManager.getData(),
     });
 
     // Clear dirty state so FormManager doesn't trigger "leave site" prompt
     formManager.setDirty(false);
 
-    // Redirect to processor checkout
+    // Redirect to provider checkout
     window.location.href = response.url;
 
     // Never resolves -- we're navigating away
@@ -281,7 +281,7 @@ function setupForm() {
       get state() { return JSON.parse(JSON.stringify(state)); },
       get formData() { return formManager.getData(); },
       get bindings() { return buildBindingsState(); },
-      resolveProcessor: (method) => resolveProcessor(method || 'card'),
+      resolveProvider: (method) => resolveProvider(method || 'card'),
     };
     // The tag rides INSIDE the format string here — %c styles only what follows
     // it in the first argument, so a separate tag arg would print a literal %c.

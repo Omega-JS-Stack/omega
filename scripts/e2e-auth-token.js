@@ -43,7 +43,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'backend');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
 const DESKTOP_SRC = path.join(ROOT, 'packages', 'desktop', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'auth-token-e2e');
 
@@ -154,7 +154,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('Paperloom emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting)', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);

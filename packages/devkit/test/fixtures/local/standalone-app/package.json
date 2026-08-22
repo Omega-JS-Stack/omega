@@ -1,7 +1,0 @@
-{
-  "name": "fixture-standalone-app",
-  "private": true,
-  "devDependencies": {
-    "@omega.js/desktop": "^2.0.0"
-  }
-}

@@ -14,12 +14,12 @@ function initFirebase({ firebaseProjectPath, emulator }) {
   // Load the .env cascade so env vars like GCLOUD_PROJECT are available
   require('@omega.js/config').loadEnv(firebaseProjectPath);
 
-  // Resolve firebase-admin the way Node does from the app root — deps live
-  // on the ONE app manifest (src/dist pillar) and hoist to the app/brand/
+  // Resolve firebase-admin the way Node does from the target root — deps live
+  // on the ONE target manifest (src/dist pillar) and hoist to the target/brand/
   // monorepo node_modules; a legacy dist/node_modules still resolves too.
   const { createRequire } = require('node:module');
-  const appRequire = createRequire(path.join(firebaseProjectPath, 'package.json'));
-  const admin = appRequire('firebase-admin');
+  const targetRequire = createRequire(path.join(firebaseProjectPath, 'package.json'));
+  const admin = targetRequire('firebase-admin');
 
   // Already initialized
   if (admin.apps.length > 0) {
@@ -46,12 +46,12 @@ function initFirebase({ firebaseProjectPath, emulator }) {
     return { admin, projectId };
   }
 
-  // Production: use the authored service-account chain (app root → brand secrets)
+  // Production: use the authored service-account chain (target root → brand secrets)
   const { resolveServiceAccountPath } = require('../utils/stage-functions');
   const serviceAccountPath = resolveServiceAccountPath(firebaseProjectPath);
   if (!serviceAccountPath) {
     throw new Error(
-      `Missing service-account.json (app root or the brand's .omega/secrets/)\n`
+      `Missing service-account.json (target root or the brand's .omega/secrets/)\n`
       + `  Download it from Firebase Console > Project Settings > Service Accounts`,
     );
   }

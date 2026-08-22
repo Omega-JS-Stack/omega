@@ -6,7 +6,7 @@
  * re-downloaded. The key's ONE home is the brand's gitignored
  * .omega/secrets/service-account.json — the backend's stage step (`omega
  * build`, src/dist pillar) reads it from there and carries it into the
- * staged dist/ tree; no per-app copy exists anymore.
+ * staged dist/ tree; no per-target copy exists anymore.
  *
  * The IAM role grant diffs the policy first (omega-manager PUT the policy on
  * every run) — a converged account is a zero-mutation no-op.

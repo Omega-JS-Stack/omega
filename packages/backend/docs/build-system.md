@@ -6,7 +6,7 @@
 
 | Stage | Command | What happens |
 |---|---|---|
-| Build | `npx omega build` | Stage `src/` → `dist/` (1:1 copy, derived manifest, composed brand⊕app config, public/ boilerplate, .env/.nvmrc/SA) |
+| Build | `npx omega build` | Stage `src/` → `dist/` (1:1 copy, derived manifest, composed brand⊕local config, public/ boilerplate, .env/.nvmrc/SA) |
 | Local dev | `npx omega emulator` / `npx omega serve` | Auto-stages first, then watches `src/` — re-staging IS the hot reload |
 | Test | `npx omega test` | Auto-stages first, runs suites against the emulator |
 | Ship | `npx omega deploy` | Auto-stages first, then `firebase deploy` on the staged tree |
@@ -16,16 +16,16 @@ Environment behavior is governed by emulator vs production, not a build flag. Se
 ## Consumer project layout
 
 ```
-apps/<brand>/apps/backend/
-  package.json              # THE app manifest: scripts + runtime deps
-  .env                      # app-layer secrets (D15 cascade)
+targets/<brand>/targets/backend/
+  package.json              # THE target manifest: scripts + runtime deps
+  .env                      # local-layer secrets (D15 cascade)
   .nvmrc                    # Node version pin
   src/
     index.js                # Manager.init entry
     routes/** schemas/** hooks/** mcp.js
     public/                 # OPTIONAL: overrides for the hosting boilerplate
-  config/omega.json5        # STANDALONE escape hatch only — brand apps carry none
-  service-account.json      # STANDALONE only — brand apps keep it in the
+  config/omega.json5        # STANDALONE escape hatch only — brand targets carry none
+  service-account.json      # STANDALONE only — brand targets keep it in the
                             # brand's .omega/secrets/ (the key's ONE home)
   test/                     # project tests
   firebase.json  .firebaserc  *.rules  firestore.indexes.json
@@ -37,10 +37,10 @@ apps/<brand>/apps/backend/
 - `src/**` → `dist/**` (1:1 copy, no transforms — CJS as-is; `src/public/` handled separately)
 - `dist/public/` → hosting boilerplate (default `index.html` + `404.html` from templates; consumer `src/public/*` overrides win file-by-file)
 - `package.json` → derived manifest (name/engines/deps only; relative `file:` deps respelled one level deeper for stage-local-packages)
-- `config/omega.json5` → composed via `composeTargetConfig` (brand⊕app flattened for the deploy upload boundary — the runtime cannot walk up past it)
-- `.env` / `.nvmrc` → verbatim copy from the app root
-- `service-account.json` → from the app root (standalone) or the brand's `.omega/secrets/` (brand apps — the firebase manage service mints it there)
-- `firestore.rules` → **compiled** into `dist/firestore.rules`: the app root's file is the brand's source half, the framework half ships in `@omega.js/backend/templates/firestore.framework.rules`, and `firebase.json` points the emulator and `firebase deploy` at the artifact ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)). Every stage recompiles, so a brand-rules edit reaches a running emulator through the stage watch. The brand's own file is never written by the build — setup owns that.
+- `config/omega.json5` → composed via `composeTargetConfig` (brand⊕target flattened for the deploy upload boundary — the runtime cannot walk up past it)
+- `.env` / `.nvmrc` → verbatim copy from the target root
+- `service-account.json` → from the target root (standalone) or the brand's `.omega/secrets/` (brand targets — the firebase manage service mints it there)
+- `firestore.rules` → **compiled** into `dist/firestore.rules`: the target root's file is the brand's source half, the framework half ships in `@omega.js/backend/templates/firestore.framework.rules`, and `firebase.json` points the emulator and `firebase deploy` at the artifact ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)). Every stage recompiles, so a brand-rules edit reaches a running emulator through the stage watch. The brand's own file is never written by the build — setup owns that.
 
 > **Credentials at runtime.** The staged key is for LOCAL scripts that talk to the real project. On any managed runtime — deployed Cloud Functions / Cloud Run (`K_SERVICE`/`FUNCTION_TARGET`), the emulator, or an explicit `GOOGLE_APPLICATION_CREDENTIALS` — `Manager.init` calls `admin.initializeApp()` with NO arguments and authenticates as the runtime's own service identity. When it does fall back to the staged cert, a `project_id` that doesn't match the resolved Firebase `projectId` **throws at boot** rather than warning: a mismatched key authenticates every Firestore call as the wrong identity and surfaces far away as gRPC `UNAUTHENTICATED (16)` on the first read.
 - `node_modules/` preserved across stages (runtime artifacts, never authored)
@@ -50,7 +50,7 @@ apps/<brand>/apps/backend/
 
 The @omega.js/backend library itself has one build step: `npm run prepare` copies `src/` → `dist/` via prepare-package (`npm run prepare:watch` for watch mode). Consumers always require from `dist/`. This mirrors the framework-side prepare step in EM/BXM/UJM.
 
-**The framework package is never a stage target.** Its root looks like an app root to the stage (a `package.json` beside a `src/`), so an `omega` verb run from inside the framework itself — no app context, so the dispatcher runs the host CLI — used to re-stage the framework's OWN `dist/`: prepare-package's output wiped, then a hard stop on the missing `omega.json5`, leaving the CLI unbootable until the next `npm run prepare` ([#308](https://github.com/Omega-JS-Stack/omega/issues/308)). `stageFunctions` now refuses by name BEFORE the wipe (`Refusing to stage <dir>: that is the @omega.js/backend framework package itself…`). The framework self-test is unaffected: `npx omega test` here retargets to the bundled fixture project before anything stages ([test-boot-layer.md](test-boot-layer.md)).
+**The framework package is never a stage target.** Its root looks like a target root to the stage (a `package.json` beside a `src/`), so an `omega` verb run from inside the framework itself — no target context, so the dispatcher runs the host CLI — used to re-stage the framework's OWN `dist/`: prepare-package's output wiped, then a hard stop on the missing `omega.json5`, leaving the CLI unbootable until the next `npm run prepare` ([#308](https://github.com/Omega-JS-Stack/omega/issues/308)). `stageFunctions` now refuses by name BEFORE the wipe (`Refusing to stage <dir>: that is the @omega.js/backend framework package itself…`). The framework self-test is unaffected: `npx omega test` here retargets to the bundled fixture project before anything stages ([test-boot-layer.md](test-boot-layer.md)).
 
 At publish time, a `prepublishOnly` script first removes the self-test fixture's runtime `node_modules` — its `@omega.js/backend` symlink points back at the repo root, which would send prepare-package's publish-time cleanup walk into an infinite cycle. The symlinks are throwaway; the next `npx omega test` self-test regenerates them (see [test-boot-layer.md](test-boot-layer.md)).
 

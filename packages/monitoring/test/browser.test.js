@@ -46,9 +46,12 @@ test('the browser entry never reaches for a host global — it is bundled into a
 });
 
 test('the resolved options carry the release, environment and sampling knobs', () => {
+  // `config` is the SENTRY PROVIDER BLOCK — @omega.js/web's page Configuration
+  // and @omega.js/extension's build map `monitoring.providers.sentry` into the
+  // client's `sentry.config` contract (#425), so nothing role-level arrives here.
   const options = buildInitOptions({
     Sentry: FakeSentry,
-    config: { provider: 'sentry', dsn: DSN, sampleRate: 0.5 },
+    config: { dsn: DSN, sampleRate: 0.5 },
     release: 'paperloom@1755648000000',
     environment: 'production',
   });
@@ -57,7 +60,6 @@ test('the resolved options carry the release, environment and sampling knobs', (
   assert.strictEqual(options.release, 'paperloom@1755648000000');
   assert.strictEqual(options.environment, 'production');
   assert.strictEqual(options.sampleRate, 0.5);
-  assert.strictEqual(options.provider, undefined, 'the role discriminator never reaches Sentry.init');
 });
 
 test('tracing always rides; replay only when a sample rate asks for it', () => {

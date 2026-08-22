@@ -6,7 +6,7 @@ user-invocable: true
 
 # OMEGA — the hub
 
-The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `apps/`, changesets for independent versioning. Start at the repo root `AGENTS.md` — it is the map, and it carries the hard rules (the legacy manager repos are read-only; nothing publishes until the proving checkpoint). This skill orients; every fact belongs to a guide below.
+The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `brands/`, changesets for independent versioning. Start at the repo root `AGENTS.md` — it is the map, and it carries the hard rules (the legacy manager repos are read-only; nothing publishes until the proving checkpoint). This skill orients; every fact belongs to a guide below.
 
 ## The roster
 
@@ -38,9 +38,9 @@ Brand work happens in one of four places — resolve which before touching files
 
 | Brand | What it is |
 |---|---|
-| `apps/sandbox-brand` | Synthetic fixture; test runs mangle and reset it |
-| `apps/omega-playground` | "Paperloom" — the standing live test brand, classy theme |
-| `apps/newsflash-brand` | "The Daily Build" — the second-skin brand, newsflash theme |
+| `brands/sandbox-brand` | Synthetic fixture; test runs mangle and reset it |
+| `brands/omega-playground` | "OMEGA Playground" — the standing live test brand, classy theme |
+| `brands/newsflash-brand` | "The Daily Build" — the second-skin brand, newsflash theme |
 | `../omega-brand` | The REAL brand, omegajs.dev — a sibling repo, LIVE |
 
 Nothing in this monorepo is ever the production brand. Topology, history, and the local-era `file:` dependency contract: `docs/shared/brands.md`. Linking a brand against the local frameworks: `docs/shared/local-dev.md`.

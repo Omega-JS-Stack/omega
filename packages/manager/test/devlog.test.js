@@ -92,7 +92,7 @@ function stageBrandDir(parentDir, dirName, { config } = {}) {
   targets: { web: {} },
 }`);
 
-  const website = path.join(root, 'apps', 'website');
+  const website = path.join(root, 'targets', 'website');
   fs.mkdirSync(website, { recursive: true });
   fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({ name: `${dirName}-website`, private: true }));
 
@@ -104,7 +104,7 @@ function devlogConfig(id, { enabled = true, org = 'fixture-org' } = {}) {
   brand: { id: '${id}', name: '${id} brand', url: 'https://${id}.test' },
   targets: { web: {} },
   repo: { providers: { github: { org: '${org}' } } },
-  devlog: { enabled: ${enabled}, orgs: ['${org}'] },
+  devlog: { enabled: ${enabled}, providers: { ghostii: { orgs: ['${org}'] } } },
 }`;
 }
 
@@ -128,9 +128,11 @@ function stageCompany(brandSpecs) {
 
 test('devlog: DEFAULTS carry the devlog block, disabled with website destination', () => {
   assert.equal(DEFAULTS.devlog.enabled, false);
-  assert.equal(DEFAULTS.devlog.provider, 'ghostii');
-  assert.deepEqual(DEFAULTS.devlog.destinations, ['website']);
-  assert.equal(DEFAULTS.devlog.overrides.research, false);
+  // The writer is a KEY under providers (#425); its settings live inside it
+  assert.deepEqual(Object.keys(DEFAULTS.devlog.providers), ['ghostii']);
+  assert.deepEqual(DEFAULTS.devlog.providers.ghostii.destinations, ['website']);
+  assert.equal(DEFAULTS.devlog.providers.ghostii.overrides.research, false);
+  assert.ok(!('provider' in DEFAULTS.devlog), 'the flat provider pick is retired');
 });
 
 // ─── Project map ─────────────────────────────────────────────────────────────
@@ -241,7 +243,10 @@ test('devlog: collect repairs --paginate concatenated page arrays', () => {
 function brandConfigFor(id, overrides = {}) {
   return {
     brand: { id, name: `${id} brand`, url: `https://${id}.test`, description: 'We build things.' },
-    devlog: { ...DEFAULTS.devlog, enabled: true, orgs: ['fixture-org'], ...overrides },
+    devlog: {
+      enabled: true,
+      providers: { ghostii: { ...DEFAULTS.devlog.providers.ghostii, orgs: ['fixture-org'], ...overrides } },
+    },
     repo: { providers: { github: { org: 'fixture-org' } } },
   };
 }
@@ -273,7 +278,7 @@ test('devlog: generate groups the digest by repo, labels mapped projects, and gr
   assert.ok(captured.description.includes('NEVER discuss, mention, or allude to: secret plans.'));
   assert.ok(captured.description.includes('Voice: We build things.'));
   assert.deepEqual(captured.links, ['https://alpha.test', 'https://mystery.test']);
-  assert.deepEqual(captured.overrides, brandConfigFor('alpha').devlog.overrides);
+  assert.deepEqual(captured.overrides, brandConfigFor('alpha').devlog.providers.ghostii.overrides);
 
   // blocksToPost: title from heading-1, header image extracted, body = the rest
   assert.equal(post.title, 'Auth Round Trips');
@@ -286,9 +291,18 @@ test('devlog: generate groups the digest by repo, labels mapped projects, and gr
 test('devlog: generate rejects unknown providers and title-less responses', async () => {
   const commits = [{ owner: 'o', repo: 'r', homepage: '', message: 'feat: x' }];
 
+  const quillbot = brandConfigFor('a');
+  quillbot.devlog.providers = { quillbot: {} };
   await assert.rejects(
-    generatePost({ brandConfig: brandConfigFor('a', { provider: 'quillbot' }), commits, projectMap: {}, days: 5 }),
-    /Unknown devlog.provider: quillbot/,
+    generatePost({ brandConfig: quillbot, commits, projectMap: {}, days: 5 }),
+    /Unknown devlog writer: quillbot/,
+  );
+
+  const noWriter = brandConfigFor('a');
+  noWriter.devlog.providers = {};
+  await assert.rejects(
+    generatePost({ brandConfig: noWriter, commits, projectMap: {}, days: 5 }),
+    /Unknown devlog writer: null/,
   );
 
   await assert.rejects(
@@ -325,7 +339,7 @@ test('devlog: renderPostFile emits blueprint front matter with the brand author'
   assert.ok(file.endsWith('---\n\nThe body.\n'));
 });
 
-test('devlog: publish writes into the website app, commits ONLY the post file, and pushes', () => {
+test('devlog: publish writes into the website target, commits ONLY the post file, and pushes', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-publish-'));
   const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
 
@@ -345,7 +359,7 @@ test('devlog: publish writes into the website app, commits ONLY the post file, a
   const { postPath, url } = publishToWebsite({ brand, post: POST });
 
   const year = String(new Date().getFullYear());
-  assert.ok(postPath.includes(path.join('apps', 'website', 'src', '_posts', year, 'devlog')));
+  assert.ok(postPath.includes(path.join('targets', 'website', 'src', '_posts', year, 'devlog')));
   assert.ok(postPath.endsWith('-auth-round-trips.md'));
   assert.equal(url, 'https://alpha.test/blog/auth-round-trips');
 
@@ -356,13 +370,13 @@ test('devlog: publish writes into the website app, commits ONLY the post file, a
   assert.ok(git('status --porcelain').includes('scratch.txt'));
 });
 
-test('devlog: publish throws when the brand has no website app', () => {
+test('devlog: publish throws when the brand has no website target', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-noweb-'));
   const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
-  fs.rmSync(path.join(brandRoot, 'apps'), { recursive: true });
+  fs.rmSync(path.join(brandRoot, 'targets'), { recursive: true });
 
   const brand = loadBrand(brandRoot);
-  assert.throws(() => publishToWebsite({ brand, post: POST }), /no website app under apps\//);
+  assert.throws(() => publishToWebsite({ brand, post: POST }), /no website target under targets\//);
 });
 
 // ─── runDevlog resolution + dry-run ──────────────────────────────────────────
@@ -395,7 +409,7 @@ test('devlog: brand-root runs enforce enabled + orgs and reject mismatched --bra
   devlog: { enabled: true },
 }`,
   });
-  await assert.rejects(runDevlog(noOrgs), /No devlog.orgs configured for beta/);
+  await assert.rejects(runDevlog(noOrgs), /No devlog.providers.ghostii.orgs configured for beta/);
 });
 
 test('devlog: an empty window reports published: false without generating', async () => {

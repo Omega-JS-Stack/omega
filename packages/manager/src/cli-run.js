@@ -2,7 +2,7 @@
  * run() — the manager CLI body, reached through the omega-bin brand-root
  * dispatch ('@omega.js/manager/cli'): at a brand root, every framework's
  * `omega` bin hands over here so brand-level commands (`omega test`,
- * `omega manage`) fan out over apps/* instead of guessing one framework.
+ * `omega manage`) fan out over targets/* instead of guessing one framework.
  * The manager ships that bin itself too (bin/omega → src/omega-bin.js, #276),
  * so a fresh clone with no framework installed still lands here — that is
  * where `npx omega onboard` runs. The company orchestrator spawns this file

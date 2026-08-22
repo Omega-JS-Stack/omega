@@ -7,7 +7,7 @@
  * The controls that matter are the ones the page actually reads at init:
  * `product` + `frequency` + `_dev_trialEligible` (index.js), `_dev_recaptcha`
  * (libs/recaptcha.js) and — the one the gear never really offered — the
- * `_dev_cardProcessor` override that modules/state.js resolves a card payment
+ * `_dev_cardProvider` override that modules/state.js resolves a card payment
  * through. The sixth is the decline toggle (#226), which moved here from the
  * palette's built-ins because arming a checkout only means anything on the
  * checkout page, and now rides `_dev_decline` like the rest. All six are read
@@ -153,7 +153,7 @@ test('#234: the checkout section is scoped to the checkout page', async () => {
 test('#234: the section carries every control the gear dropdown offered', async () => {
   const { select } = await build();
 
-  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProcessor', '_dev_recaptcha']) {
+  for (const param of ['product', 'frequency', '_dev_trialEligible', '_dev_cardProvider', '_dev_recaptcha']) {
     assert.ok(select(param), `the ported control for "${param}" is present`);
   }
 
@@ -161,23 +161,23 @@ test('#234: the section carries every control the gear dropdown offered', async 
   const products = select('product').children.map((option) => option.value);
   assert.deepStrictEqual(products, ['premium', 'lifetime'], 'products come from the payment config');
 
-  // The processor override is the reason this section exists as more than the
+  // The provider override is the reason this section exists as more than the
   // decline toggle — state.js resolves a card payment through exactly this.
-  const processors = select('_dev_cardProcessor').children.map((option) => option.value);
-  assert.deepStrictEqual(processors, ['', 'test', 'stripe', 'chargebee'], 'auto plus every processor state.js can force');
+  const providers = select('_dev_cardProvider').children.map((option) => option.value);
+  assert.deepStrictEqual(providers, ['', 'test', 'stripe', 'chargebee'], 'auto plus every provider state.js can force');
 });
 
-test('#234: the processor override applies by navigating with the param set', async () => {
+test('#234: the provider override applies by navigating with the param set', async () => {
   const { select, button, navigations } = await build();
 
-  select('_dev_cardProcessor').value = 'chargebee';
+  select('_dev_cardProvider').value = 'chargebee';
   await button('Apply & reload').click();
 
   assert.strictEqual(navigations.length, 1, 'applying navigates once');
 
   const applied = new URLSearchParams(navigations[0]);
   assert.strictEqual(
-    applied.get('_dev_cardProcessor'),
+    applied.get('_dev_cardProvider'),
     'chargebee',
     'the override rides the URL — that is the only place modules/state.js reads it',
   );
@@ -185,11 +185,11 @@ test('#234: the processor override applies by navigating with the param set', as
 });
 
 test('#234: the controls open showing what the page actually used', async () => {
-  const { select } = await build({ search: '?product=lifetime&frequency=monthly&_dev_cardProcessor=stripe' });
+  const { select } = await build({ search: '?product=lifetime&frequency=monthly&_dev_cardProvider=stripe' });
 
   assert.strictEqual(select('product').value, 'lifetime', 'the product from the URL');
   assert.strictEqual(select('frequency').value, 'monthly', 'the frequency from the URL');
-  assert.strictEqual(select('_dev_cardProcessor').value, 'stripe', 'the forced processor from the URL');
+  assert.strictEqual(select('_dev_cardProvider').value, 'stripe', 'the forced provider from the URL');
   assert.strictEqual(select('_dev_trialEligible').value, '', 'an unset param shows its default option');
 });
 
@@ -233,7 +233,7 @@ test('#234: an unset control is left out of the applied URL entirely', async () 
   await button('Apply & reload').click();
 
   const applied = new URLSearchParams(navigations[0]);
-  assert.strictEqual(applied.has('_dev_cardProcessor'), false, 'auto means no param, not an empty one');
+  assert.strictEqual(applied.has('_dev_cardProvider'), false, 'auto means no param, not an empty one');
   assert.strictEqual(applied.has('_dev_trialEligible'), false, 'and the API answer is left alone');
   assert.strictEqual(applied.get('frequency'), 'annually', 'the frequency select has no empty option — it always applies');
 });

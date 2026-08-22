@@ -12,11 +12,11 @@
  * The whole matrix therefore has to be driven in a PRODUCTION environment: in a
  * testing run every caller is permitted by design, so a testing-run assertion
  * would prove nothing. getEnvironment() reads the env live, so swapping it is
- * the real switch — the same technique webhook-test-processor.test.js uses.
+ * the real switch — the same technique webhook-test-provider.test.js uses.
  *
  * Both verdicts land as a 400 with DIFFERENT text: the age rejection means the
- * guard ran, and "Unknown processor" means the request got past it (the persona
- * carries a deliberately unknown processor so nothing external is ever reached).
+ * guard ran, and "Unknown provider" means the request got past it (the persona
+ * carries a deliberately unknown provider so nothing external is ever reached).
  *
  * Run: npx omega test backend:routes/payments/cancel-skip-guards
  */
@@ -36,8 +36,8 @@ function youngSubscriber(Manager, { uid, admin }) {
       status: 'active',
       cancellation: { pending: false },
       payment: {
-        // Deliberately unknown: getting PAST the age guard must not reach a real processor
-        processor: 'unknown-processor',
+        // Deliberately unknown: getting PAST the age guard must not reach a real provider
+        provider: 'unknown-provider',
         resourceId: 'sub_test_skip_guards',
         startDate: { timestamp: new Date(nowUNIX * 1000).toISOString(), timestampUNIX: nowUNIX },
       },
@@ -82,8 +82,8 @@ module.exports = {
 
         const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(Manager, user));
 
-        assert.equal(sent.code, 400, `An admin should reach the processor lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown processor/i, 'An admin should get PAST the age guard');
+        assert.equal(sent.code, 400, `An admin should reach the provider lookup, got ${sent.code}: ${sent.body}`);
+        assert.match(`${sent.body}`, /Unknown provider/i, 'An admin should get PAST the age guard');
       },
     },
 
@@ -97,8 +97,8 @@ module.exports = {
 
         const sent = await cancel(Manager, user);
 
-        assert.equal(sent.code, 400, `A non-production run should reach the processor lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown processor/i, 'A non-production run should get PAST the age guard');
+        assert.equal(sent.code, 400, `A non-production run should reach the provider lookup, got ${sent.code}: ${sent.body}`);
+        assert.match(`${sent.body}`, /Unknown provider/i, 'A non-production run should get PAST the age guard');
       },
     },
 

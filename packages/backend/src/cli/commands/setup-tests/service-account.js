@@ -37,7 +37,7 @@ class ServiceAccountTest extends BaseTest {
   }
 
   async run() {
-    // Source chain (src/dist pillar): app root (standalone) → brand
+    // Source chain (src/dist pillar): target root (standalone) → brand
     // .omega/secrets/ (the firebase manage service mints it there); the
     // stage step carries whichever exists into dist/
     const serviceAccount = jetpack.read(this.resolveSaPath());
@@ -51,17 +51,17 @@ class ServiceAccountTest extends BaseTest {
     return true;
   }
 
-  /** First existing SA in the source chain; app root as the write default. */
+  /** First existing SA in the source chain; target root as the write default. */
   resolveSaPath() {
     const { findBrandRoot } = require('@omega.js/config');
     const path = require('path');
-    const appRootPath = `${this.self.firebaseProjectPath}/service-account.json`;
+    const targetRootPath = `${this.self.firebaseProjectPath}/service-account.json`;
     const brandRoot = findBrandRoot(this.self.firebaseProjectPath);
     const brandPath = brandRoot ? path.join(brandRoot, '.omega', 'secrets', 'service-account.json') : null;
 
-    if (jetpack.exists(appRootPath)) return appRootPath;
+    if (jetpack.exists(targetRootPath)) return targetRootPath;
     if (brandPath && jetpack.exists(brandPath)) return brandPath;
-    return appRootPath;
+    return targetRootPath;
   }
 
   async fix() {

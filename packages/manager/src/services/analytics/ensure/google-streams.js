@@ -6,8 +6,8 @@
  * missing, rename on displayName drift, enhanced measurement DIFFED before
  * patching (omega-manager blind-PATCHed it every run), and a clean
  * Measurement Protocol secret per stream (no dashes/underscores — regenerated
- * until clean). Streams land in state as `streams.{target}` with the
- * measurementId + apiSecret the frameworks consume per surface.
+ * until clean). Every value is re-resolved from GA on each run — the stream
+ * ids and URIs are pure derivation, so nothing about them is persisted.
  *
  * GA's "User Data Collection Acknowledgement" gate on secret creation has no
  * API — interactive runs open the settings page (Enter-gated, house rule)
@@ -15,10 +15,22 @@
  * job; non-interactive runs warn with the URL and the rerun converges.
  * Acknowledging is per-property, so the first stream's prompt clears the
  * gate for every stream after it.
+ *
+ * The two halves land in their two homes as they resolve. Each stream's
+ * measurement ID goes to CONFIG, at
+ * `targets.{target}.analytics.providers.google.id` — the per-surface
+ * override every framework reads through the merge chain, the same shape the
+ * monitoring service uses for its per-target DSNs (#417). Each stream's
+ * Measurement Protocol secret goes to the brand .env, under
+ * `GOOGLE_ANALYTICS_SECRET_{TARGET}` (#434) — disperse composes it into each
+ * target's own .env as GOOGLE_ANALYTICS_SECRET, so the pair travels together.
  */
 const chalk = require('chalk').default;
 const { pressEnterToOpen } = require('@omega.js/devkit/prompt');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
+const { writeEnvValue } = require('../../../lib/env-secret.js');
+const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 // target → stream URI subdomain (null = the root domain) + display name.
@@ -43,7 +55,7 @@ function isCleanSecret(secret) {
 }
 
 module.exports = async function ensureGoogleStreams(context) {
-  const { analyticsApi: api, propertyId, accountId, domain, brand, brandConfig, brandState, serviceData, options = {} } = context;
+  const { analyticsApi: api, propertyId, accountId, domain, brand, brandConfig, brandRoot, options = {} } = context;
 
   // Config drift check: a propertyId pointing at a deleted/inaccessible
   // property should say so instead of erroring cryptically per stream
@@ -58,11 +70,12 @@ module.exports = async function ensureGoogleStreams(context) {
 
   const enhancedMeasurement = brandConfig.analytics?.providers?.google?.enhancedMeasurement || {};
 
-  const streams = { ...(serviceData.streams || {}) };
+  const streams = {};
   let warned = false;
   const planned = [];
+  const configEdits = {};
 
-  for (const target of brand.targets) {
+  for (const target of brand.enabledTargets) {
     const spec = STREAM_TARGETS[target] || { displayName: target, subdomain: target };
     const uri = spec.subdomain ? `https://${spec.subdomain}.${domain}` : `https://${domain}`;
     const displayName = `${brandConfig.brand.name} - ${spec.displayName}`;
@@ -110,8 +123,10 @@ module.exports = async function ensureGoogleStreams(context) {
       }
     }
 
-    // Measurement Protocol secret
-    let apiSecret = streams[target]?.apiSecret || null;
+    // Measurement Protocol secret — the brand .env holds the last resolved
+    // value, so a failed listing below degrades to it instead of to nothing
+    const secretEnvName = streamSecretEnvName(target);
+    let apiSecret = process.env[secretEnvName] || null;
     try {
       const secrets = await api.listMeasurementProtocolSecrets(propertyId, streamId);
       const found = secrets.find((s) => s.displayName === SECRET_NAME);
@@ -177,19 +192,35 @@ module.exports = async function ensureGoogleStreams(context) {
       }
     }
 
-    streams[target] = {
-      streamId,
-      measurementId: stream.webStreamData?.measurementId || null,
-      apiSecret,
-      uri,
-      displayName: options.dryRun ? stream.displayName : displayName,
-    };
+    const measurementId = stream.webStreamData?.measurementId || null;
+
+    streams[target] = { streamId, measurementId };
+
+    // The resolved measurement id always wins — a hand-set stale value is
+    // drift and gets patched (the monitoring service's DSN rule)
+    if (measurementId && brandConfig.targets?.[target]?.analytics?.providers?.google?.id !== measurementId) {
+      configEdits[`targets.${target}.analytics.providers.google.id`] = measurementId;
+    }
+
+    // The secret's home is the brand .env — written only on drift, so a
+    // converged rerun leaves the file alone
+    if (apiSecret && !options.dryRun && process.env[secretEnvName] !== apiSecret) {
+      writeEnvValue(brandRoot, secretEnvName, apiSecret);
+      process.env[secretEnvName] = apiSecret;
+      console.log(`        ${chalk.green('✓')} .env ← ${chalk.cyan(secretEnvName)}`);
+    }
+  }
+
+  // Only touch omega.json5 when something actually drifted — a converged
+  // brand never opens the file
+  if (Object.keys(configEdits).length > 0) {
+    writeBrandConfig(context, configEdits);
   }
 
   // A Firebase web app measures through its OWN measurementId — if this GA
   // property has no stream carrying it, Firebase is linked to a different
   // property (expected for shared projects, a real misconfig otherwise)
-  const firebaseMeasurementId = brandState.cloud?.sdkConfig?.measurementId;
+  const firebaseMeasurementId = brandConfig.cloud?.config?.measurementId;
   if (firebaseMeasurementId && brandConfig.cloud?.shared !== true) {
     const covered = existing.some((s) => s.webStreamData?.measurementId === firebaseMeasurementId)
       || Object.values(streams).some((s) => s.measurementId === firebaseMeasurementId);
@@ -200,9 +231,9 @@ module.exports = async function ensureGoogleStreams(context) {
     }
   }
 
-  const result = { state: { streams } };
+  const result = { output: { streams: { resolved: streams } } };
   if (planned.length > 0) {
-    result.output = { streams: { planned } };
+    result.output.streams.planned = planned;
   }
   if (warned) {
     result.status = 'warned';

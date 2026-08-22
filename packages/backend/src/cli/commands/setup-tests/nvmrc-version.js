@@ -9,7 +9,7 @@ class NvmrcVersionTest extends BaseTest {
   }
 
   async run() {
-    // Authored at the APP ROOT (src/dist pillar); the stage step carries a
+    // Authored at the TARGET ROOT (src/dist pillar); the stage step carries a
     // copy into functions/ for firebase-tools' runtime detection. Compared
     // against the pinned Cloud Functions runtime (omega.functionsRuntime),
     // NOT engines.node — engines is the dev floor (>=22), not a version.
@@ -27,7 +27,7 @@ class NvmrcVersionTest extends BaseTest {
     this.restage();
 
     // #15: the pin is now correct — the fix IS complete and the run
-    // continues (manage runs spawn setup under the app's own Node; only a
+    // continues (manage runs spawn setup under the target's own Node; only a
     // standalone shell needs the nvm switch, for NEXT time).
     console.log(chalk.yellow(`.nvmrc pinned to v${v}/* — standalone shells: run ${chalk.bold(`nvm use ${v}`)}`));
   }

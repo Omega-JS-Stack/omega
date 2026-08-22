@@ -5,7 +5,7 @@
  * rhythm relative to SAMPLE_EPOCH_UTC, and generation re-anchors that rhythm
  * to "now" (or an explicit anchor), so a virgin blog always looks alive —
  * never "6 months stale". `omega dev` also materializes the generated set
- * under the app's gitignored `.omega/sample-content/` so humans can read and
+ * under the target's gitignored `.omega/sample-content/` so humans can read and
  * copy the files; the tree is machine-owned and regenerated every boot.
  */
 const fs = require('node:fs');
@@ -157,20 +157,20 @@ function hasOwnContent(consumerDir, collectionDir) {
 }
 
 /**
- * Materialize the generated sets under `<appRoot>/.omega/sample-content/` —
+ * Materialize the generated sets under `<targetRoot>/.omega/sample-content/` —
  * the gitignored test path (spec §8). Idempotent: each active collection is
  * rebuilt wholesale, collections the consumer owns are removed, and the tree
  * carries a self-`.gitignore` so it can never be committed regardless of the
- * app's own ignore rules. Never mixed with real brand content.
+ * target's own ignore rules. Never mixed with real brand content.
  * @param {object} options
- * @param {string} options.appRoot - the app root (owns .omega/)
+ * @param {string} options.targetRoot - the target root (owns .omega/)
  * @param {string} options.consumerDir - the site src dir (own-content checks)
  * @param {string} options.defaultsDir - the package defaults/ root
  * @param {string} [options.anchor] - YYYY-MM-DD anchor override
  * @returns {{ root: string, written: string[], removed: string[] }}
  */
 function reconcileSampleContent(options) {
-  const root = path.join(options.appRoot, '.omega', 'sample-content');
+  const root = path.join(options.targetRoot, '.omega', 'sample-content');
   const anchorMs = resolveAnchor(options.anchor);
   const written = [];
   const removed = [];

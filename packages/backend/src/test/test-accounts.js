@@ -23,15 +23,15 @@ function getFirstPaidProduct(config) {
     : { id: 'premium', name: 'Premium' };
 }
 
-// How long each billing cadence runs — the SAME periods the test processor's
-// fabricated subscriptions are given (routes/payments/intent/processors/test.js
+// How long each billing cadence runs — the SAME periods the test provider's
+// fabricated subscriptions are given (routes/payments/intent/providers/test.js
 // FREQUENCY_TO_PERIOD), so a seeded term matches what a real cycle records.
 const CYCLE_DAYS = { daily: 1, weekly: 7, monthly: 30, annually: 365 };
 
 /**
  * Helper to create the expiration date of the billing cycle a live paid
  * subscription is currently in — a real term runs to the end of the cycle it is
- * billed on, never to a date a decade out no processor would ever record.
+ * billed on, never to a date a decade out no provider would ever record.
  * User() checks subscription.expires to determine if subscription is active
  * If expires is in the past (or default 1970), subscription gets downgraded to basic
  *
@@ -52,8 +52,8 @@ const DEFAULT_TRIAL_DAYS = 14;
 
 /**
  * Helper to create the expiration date of a trial that is still RUNNING — a
- * subscription inside its free trial ends when the trial does (the processors
- * bill nothing until then: routes/payments/intent/processors/test.js sets
+ * subscription inside its free trial ends when the trial does (the providers
+ * bill nothing until then: routes/payments/intent/providers/test.js sets
  * `current_period_end` to `trial_end`), so this dates BOTH `trial.expires` and
  * the subscription's own `expires`.
  *
@@ -71,7 +71,7 @@ function getTrialExpires(days) {
  * Resolve what a plan costs and how often it bills, from the brand's own catalog:
  * the cadence it is listed at first and the price carried there. This is the SAME
  * read the unified transforms make (`config.payment.products[].prices[frequency]`
- * — libraries/payment/processors/stripe.js resolvePrice), so a seeded purchase can
+ * — libraries/payment/providers/stripe.js resolvePrice), so a seeded purchase can
  * never quote a number the brand does not sell. No catalog, or a plan with no
  * prices, resolves to nulls — never a hand-typed figure that would drift.
  *
@@ -123,7 +123,7 @@ function resolveSeededSubscription(subscription, config) {
 
   const payment = resolved.payment || {};
   const boughtSomething = resolved.product.id !== 'basic'
-    || Boolean(payment.processor || payment.resourceId || payment.orderId);
+    || Boolean(payment.provider || payment.resourceId || payment.orderId);
 
   if (!boughtSomething) {
     return resolved;
@@ -149,7 +149,7 @@ function resolveSeededSubscription(subscription, config) {
 
   // Only a term that is still running gets re-dated: a lapsed persona's expired
   // term is the state it exists to represent. A cancellation that is still
-  // PENDING takes effect when that term ends — the processors date it at the
+  // PENDING takes effect when that term ends — the providers date it at the
   // period end (stripe.js resolveCancellation) — so it follows the term here
   // rather than being typed onto a persona and drifting away from it.
   const nowUNIX = Math.floor(Date.now() / 1000);
@@ -172,13 +172,13 @@ function resolveSeededSubscription(subscription, config) {
   }
 
   // The event that last wrote this subscription. Only a record that names a
-  // processor gets one — a record with no processor was never written by one —
+  // provider gets one — a record with no provider was never written by one —
   // and the persona's own state says which event it was (getLastWrite). Stamped
   // HERE, after the re-dating above, so the date derivation reads the FINAL
   // term and frequency — stamping earlier read the seeded expires and a payment
   // with no frequency yet, which dated a project persona's write off the wrong
   // cycle entirely.
-  if (resolved.payment.processor && !resolved.payment.updatedBy) {
+  if (resolved.payment.provider && !resolved.payment.updatedBy) {
     resolved.payment.updatedBy = getLastWrite(resolved);
   }
 
@@ -230,9 +230,9 @@ function getHoursAgo(hours) {
 }
 
 /**
- * The processor record a REAL subscription leaves on the user doc, for a persona
- * bought through the TEST processor — the shape the unified transform writes
- * (libraries/payment/processors/stripe.js toUnifiedSubscription, stamped `test`).
+ * The provider record a REAL subscription leaves on the user doc, for a persona
+ * bought through the TEST provider — the shape the unified transform writes
+ * (libraries/payment/providers/stripe.js toUnifiedSubscription, stamped `test`).
  *
  * `frequency` and `price` are deliberately absent: they are the CATALOG's answer,
  * and resolveSeededSubscription fills them from the brand's own prices. A figure
@@ -242,7 +242,7 @@ function getHoursAgo(hours) {
  * subscription follows from the STATE it is in, which resolveSeededSubscription
  * reads off the persona itself (getLastWrite).
  *
- * @param {string} key - The persona key; names the processor resource and its order
+ * @param {string} key - The persona key; names the provider resource and its order
  * @param {object} [options]
  * @param {object} [options.startDate] - When the subscription began (default: a year ago)
  * @param {boolean} [options.order] - Whether a purchase record stands behind it (default: true)
@@ -252,7 +252,7 @@ function getTestPayment(key, options) {
   options = options || {};
 
   return {
-    processor: 'test',
+    provider: 'test',
     ...(options.order === false ? {} : { orderId: `_test-order-${key}` }),
     resourceId: `sub_test_${key.replace(/-/g, '_')}`,
     startDate: options.startDate || getPastExpires(1),
@@ -697,9 +697,9 @@ const STATIC_ACCOUNTS = {
   },
   // The steady-state PAYING subscriber — the persona QA signs in as to see what a
   // customer sees ([#327](https://github.com/Omega-JS-Stack/omega/issues/327)). It
-  // carries the whole processor record a real purchase leaves, because the
+  // carries the whole provider record a real purchase leaves, because the
   // payment-gated surfaces read exactly that: the billing panel's winback pitch is
-  // offered only where the discount can actually be applied (a processor and the
+  // offered only where the discount can actually be applied (a provider and the
   // resource it holds the subscription under — core/js/pages/dashboard/account/
   // sections/billing.js), and a hollow seed skipped it while QA expected the offer.
   // Subscribed a year ago, billed on the cycle it is in now.
@@ -717,8 +717,8 @@ const STATIC_ACCOUNTS = {
   // subscriber INSIDE the free trial the catalog offers on the paid plan —
   // claimed, nothing charged yet, and the term ending exactly when the trial
   // does (the seeder dates both off `trial.days`). Status is `active`, not
-  // "trialing": the unified transforms map a processor's trialing status to
-  // active (libraries/payment/processors/stripe.js resolveStatus) and the trial
+  // "trialing": the unified transforms map a provider's trialing status to
+  // active (libraries/payment/providers/stripe.js resolveStatus) and the trial
   // block carries the trial fact — which is what
   // routes/payments/cancel/_is-trialing.js reads.
   'premium-trialing': {
@@ -744,7 +744,7 @@ const STATIC_ACCOUNTS = {
       subscription: { product: { id: 'premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: getTestPayment('premium-expired', { startDate: getPastExpires(2) }) },
     },
   },
-  // A subscriber whose renewal card failed: the processor suspended the term it
+  // A subscriber whose renewal card failed: the provider suspended the term it
   // had already dated, and the last thing to write the subscription was the
   // failed invoice (getLastWrite).
   'premium-suspended': {
@@ -771,7 +771,7 @@ const STATIC_ACCOUNTS = {
   },
   // Post-refund end state (N6 persona): the refund webhook cancels the subscription —
   // the refund itself lives on the ORDER doc, not the user doc — so what remains is a
-  // cancelled sub on the test processor with no remaining term. "Unauthed" needs no
+  // cancelled sub on the test provider with no remaining term. "Unauthed" needs no
   // persona: that's http.as('none') / a signed-out browser.
   // It deliberately names NO order: buildOrderFixture writes a purchase record whose
   // `requests.refund` is null, and an order claiming nothing was refunded would
@@ -1085,6 +1085,93 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
+  // The discount-amounts suite's purchasers, one per case
+  // ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)): every case
+  // there BUYS a subscription, and the checkout guard refuses a caller who
+  // already holds one, so the cases cannot share an account. They are declared
+  // here for the same reason as the rest — a purchaser is an account, and the
+  // seed is where accounts are born.
+  'intent-discount-percent-url': {
+    id: 'intent-discount-percent-url',
+    uid: '_test-intent-discount-percent-url',
+    email: '_test.intent-discount-percent-url@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-percent-payload': {
+    id: 'intent-discount-percent-payload',
+    uid: '_test-intent-discount-percent-payload',
+    email: '_test.intent-discount-percent-payload@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-percent-invoice': {
+    id: 'intent-discount-percent-invoice',
+    uid: '_test-intent-discount-percent-invoice',
+    email: '_test.intent-discount-percent-invoice@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-one-time': {
+    id: 'intent-discount-one-time',
+    uid: '_test-intent-discount-one-time',
+    email: '_test.intent-discount-one-time@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-none': {
+    id: 'intent-discount-none',
+    uid: '_test-intent-discount-none',
+    email: '_test.intent-discount-none@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-trial': {
+    id: 'intent-discount-trial',
+    uid: '_test-intent-discount-trial',
+    email: '_test.intent-discount-trial@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-amount-url': {
+    id: 'intent-discount-amount-url',
+    uid: '_test-intent-discount-amount-url',
+    email: '_test.intent-discount-amount-url@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-amount-payload': {
+    id: 'intent-discount-amount-payload',
+    uid: '_test-intent-discount-amount-payload',
+    email: '_test.intent-discount-amount-payload@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'intent-discount-amount-trial': {
+    id: 'intent-discount-amount-trial',
+    uid: '_test-intent-discount-amount-trial',
+    email: '_test.intent-discount-amount-trial@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
   'journey-payments-intent-attribution': {
     id: 'journey-payments-intent-attribution',
     uid: '_test-journey-payments-intent-attribution',
@@ -1104,13 +1191,13 @@ const JOURNEY_ACCOUNTS = {
     },
   },
   // Dedicated accounts for cancel validation tests — each needs a distinct, non-conflicting subscription state
-  'cancel-no-processor': {
-    id: 'cancel-no-processor',
-    uid: '_test-cancel-no-processor',
-    email: '_test.cancel-no-processor@{domain}',
+  'cancel-no-provider': {
+    id: 'cancel-no-provider',
+    uid: '_test-cancel-no-provider',
+    email: '_test.cancel-no-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: null, resourceId: null } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { provider: null, resourceId: null } },
     },
   },
   'cancel-already-pending': {
@@ -1119,16 +1206,16 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-already-pending@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { processor: 'stripe', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { provider: 'stripe', resourceId: 'sub_test_fake' } },
     },
   },
-  'cancel-unknown-processor': {
-    id: 'cancel-unknown-processor',
-    uid: '_test-cancel-unknown-processor',
-    email: '_test.cancel-unknown-processor@{domain}',
+  'cancel-unknown-provider': {
+    id: 'cancel-unknown-provider',
+    uid: '_test-cancel-unknown-provider',
+    email: '_test.cancel-unknown-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { provider: 'unknown-provider', resourceId: 'sub_test_fake' } },
     },
   },
   'cancel-too-young': {
@@ -1137,7 +1224,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-too-young@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { provider: 'test', resourceId: 'sub_test_fake', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
     },
   },
   'cancel-suspended': {
@@ -1146,37 +1233,37 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.cancel-suspended@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'suspended', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_suspended', startDate: getPastExpires() } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'suspended', expires: getPastExpires(), cancellation: { pending: false }, payment: { provider: 'test', resourceId: 'sub_test_suspended', startDate: getPastExpires() } },
     },
   },
   // A paid subscriber whose order doc never existed (#210): payment.orderId stays null,
-  // so the cancel processor has to resolve the plan's product from the subscription itself.
+  // so the cancel provider has to resolve the plan's product from the subscription itself.
   'cancel-no-order': {
     id: 'cancel-no-order',
     uid: '_test-cancel-no-order',
     email: '_test.cancel-no-order@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_no_order', startDate: getPastExpires() } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { provider: 'test', resourceId: 'sub_test_no_order', startDate: getPastExpires() } },
     },
   },
   // Dedicated accounts for portal validation tests
-  'portal-no-processor': {
-    id: 'portal-no-processor',
-    uid: '_test-portal-no-processor',
-    email: '_test.portal-no-processor@{domain}',
+  'portal-no-provider': {
+    id: 'portal-no-provider',
+    uid: '_test-portal-no-provider',
+    email: '_test.portal-no-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { processor: null, resourceId: null } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { provider: null, resourceId: null } },
     },
   },
-  'portal-unknown-processor': {
-    id: 'portal-unknown-processor',
-    uid: '_test-portal-unknown-processor',
-    email: '_test.portal-unknown-processor@{domain}',
+  'portal-unknown-provider': {
+    id: 'portal-unknown-provider',
+    uid: '_test-portal-unknown-provider',
+    email: '_test.portal-unknown-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), payment: { provider: 'unknown-provider', resourceId: 'sub_test_fake' } },
     },
   },
   // Dedicated accounts for refund validation tests
@@ -1189,25 +1276,25 @@ const JOURNEY_ACCOUNTS = {
       // A RECENT purchase: this fixture must be refused for having no cancellation,
       // so its payment stays well inside the refund window the guard behind that
       // one would apply.
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: getDaysAgo(3) } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: { provider: 'test', resourceId: 'sub_test_fake', startDate: getDaysAgo(3) } },
     },
   },
-  'refund-no-processor': {
-    id: 'refund-no-processor',
-    uid: '_test-refund-no-processor',
-    email: '_test.refund-no-processor@{domain}',
+  'refund-no-provider': {
+    id: 'refund-no-provider',
+    uid: '_test-refund-no-provider',
+    email: '_test.refund-no-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: null, resourceId: null } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { provider: null, resourceId: null } },
     },
   },
-  'refund-unknown-processor': {
-    id: 'refund-unknown-processor',
-    uid: '_test-refund-unknown-processor',
-    email: '_test.refund-unknown-processor@{domain}',
+  'refund-unknown-provider': {
+    id: 'refund-unknown-provider',
+    uid: '_test-refund-unknown-provider',
+    email: '_test.refund-unknown-provider@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'unknown-processor', resourceId: 'sub_test_fake' } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { provider: 'unknown-provider', resourceId: 'sub_test_fake' } },
     },
   },
   'refund-expired-payment': {
@@ -1216,11 +1303,11 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.refund-expired-payment@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_fake', startDate: getPastExpires() } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { provider: 'test', resourceId: 'sub_test_fake', startDate: getPastExpires() } },
     },
   },
   // A paid subscriber, pending cancellation, whose order doc never existed (#216):
-  // payment.orderId stays null, so the refund processor has to resolve the plan's
+  // payment.orderId stays null, so the refund provider has to resolve the plan's
   // product from the subscription itself.
   'refund-no-order': {
     id: 'refund-no-order',
@@ -1228,7 +1315,7 @@ const JOURNEY_ACCOUNTS = {
     email: '_test.refund-no-order@{domain}',
     properties: {
       roles: {},
-      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { processor: 'test', resourceId: 'sub_test_refund_no_order', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: true }, payment: { provider: 'test', resourceId: 'sub_test_refund_no_order', startDate: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } } },
     },
   },
   'route-refund-success': {
@@ -1250,7 +1337,7 @@ const JOURNEY_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
-  // Journey: one-time purchase refunded end-to-end (buy with the test processor, refund it)
+  // Journey: one-time purchase refunded end-to-end (buy with the test provider, refund it)
   'journey-payments-one-time-refund': {
     id: 'journey-payments-one-time-refund',
     uid: '_test-journey-payments-one-time-refund',
@@ -1275,6 +1362,90 @@ const JOURNEY_ACCOUNTS = {
     id: 'journey-payments-legacy-product',
     uid: '_test-journey-payments-legacy-product',
     email: '_test.journey-payments-legacy-product@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  // ── Suite-exclusive machinery ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)) ──
+  // The accounts these suites used to fabricate mid-test. Any account a test
+  // uses is exclusive to that test, and a HEALTHY one is DECLARED here rather
+  // than minted: the seed is the one home, so everything exists up front and a
+  // suite starts from an account with both halves in sync (auth user + doc)
+  // instead of standing one up itself. Each is named for the suite that drives
+  // it, carries no palette label (machinery is never offered to a human), and
+  // starts free — the state each journey needs is the state IT writes.
+  //
+  // Deliberately BROKEN states stay out: the seed can only make healthy
+  // accounts, so the guard suites that need half a pair (an auth user with no
+  // doc, a doc with no auth user) keep building it themselves.
+  'journey-payments-winback': {
+    id: 'journey-payments-winback',
+    uid: '_test-journey-payments-winback',
+    email: '_test.journey-payments-winback@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Wren', last: 'Winback' } },
+    },
+  },
+  'journey-payments-winback-decline': {
+    id: 'journey-payments-winback-decline',
+    uid: '_test-journey-payments-winback-decline',
+    email: '_test.journey-payments-winback-decline@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Wade', last: 'Decline' } },
+    },
+  },
+  'journey-payments-plan-switch': {
+    id: 'journey-payments-plan-switch',
+    uid: '_test-journey-payments-plan-switch',
+    email: '_test.journey-payments-plan-switch@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Sasha', last: 'Switch' } },
+    },
+  },
+  'journey-payments-plan-switch-trial': {
+    id: 'journey-payments-plan-switch-trial',
+    uid: '_test-journey-payments-plan-switch-trial',
+    email: '_test.journey-payments-plan-switch-trial@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Sage', last: 'Switch' } },
+    },
+  },
+  'journey-payments-uncancel': {
+    id: 'journey-payments-uncancel',
+    uid: '_test-journey-payments-uncancel',
+    email: '_test.journey-payments-uncancel@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Uma', last: 'Uncancel' } },
+    },
+  },
+  // The two webhook suites DELETE this doc before they run: their pipeline
+  // writes the subscriber's doc from scratch, which it only does for a uid this
+  // project has an auth user for ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)).
+  // That auth user is the half the seed owns.
+  'webhook-chargebee-stale-fallback': {
+    id: 'webhook-chargebee-stale-fallback',
+    uid: '_test-webhook-chargebee-stale-fallback',
+    email: '_test.webhook-chargebee-stale-fallback@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'webhook-retry-sweep': {
+    id: 'webhook-retry-sweep',
+    uid: '_test-webhook-retry-sweep',
+    email: '_test.webhook-retry-sweep@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -1365,7 +1536,7 @@ const JOURNEY_ACCOUNTS = {
         status: 'cancelled',
         expires: getPastExpires(),
         cancellation: { pending: false },
-        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_upgrade', orderId: '_test-order-journey-flows-upgrade', startDate: getPastExpires(2) },
+        payment: { provider: 'test', resourceId: 'sub_test_journey_flows_upgrade', orderId: '_test-order-journey-flows-upgrade', startDate: getPastExpires(2) },
       },
       personal: { name: { first: 'Jules', last: 'Upgrade' } },
       flags: { signupProcessed: true },
@@ -1374,10 +1545,10 @@ const JOURNEY_ACCOUNTS = {
   },
   // The one journey that starts PAID: a cancellation needs something to
   // cancel, and the cancel route requires an active paid subscription with
-  // processor details that is older than 24 hours (its age guard), so the
+  // provider details that is older than 24 hours (its age guard), so the
   // start state is seeded rather than bought. `orderId` names the purchase
   // record the flows lane stands up beside this doc — the test cancel
-  // processor reads the plan's processor product id off that order.
+  // provider reads the plan's provider product id off that order.
   'journey-flows-cancel': {
     id: 'journey-flows-cancel',
     uid: '_test-journey-flows-cancel',
@@ -1390,7 +1561,7 @@ const JOURNEY_ACCOUNTS = {
         status: 'active',
         expires: getCycleExpires(),
         cancellation: { pending: false },
-        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_cancel', orderId: '_test-order-journey-flows-cancel', startDate: getPastExpires() },
+        payment: { provider: 'test', resourceId: 'sub_test_journey_flows_cancel', orderId: '_test-order-journey-flows-cancel', startDate: getPastExpires() },
       },
       personal: { name: { first: 'Kit', last: 'Cancel' } },
       flags: { signupProcessed: true },
@@ -1414,7 +1585,7 @@ const JOURNEY_ACCOUNTS = {
         status: 'cancelled',
         expires: getPastExpires(),
         cancellation: { pending: false },
-        payment: { processor: 'test', resourceId: 'sub_test_journey_flows_failure', orderId: '_test-order-journey-flows-failure', startDate: getPastExpires(2) },
+        payment: { provider: 'test', resourceId: 'sub_test_journey_flows_failure', orderId: '_test-order-journey-flows-failure', startDate: getPastExpires(2) },
       },
       personal: { name: { first: 'Robin', last: 'Failure' } },
       flags: { signupProcessed: true },
@@ -2072,7 +2243,7 @@ function buildOrderFixture(key, config, extraAccounts) {
       type: 'subscription',
       owner: account.uid,
       productId: product.id,
-      processor: payment.processor,
+      provider: payment.provider,
       resourceId: payment.resourceId,
       unified: {
         ...subscription,
@@ -2104,8 +2275,8 @@ function buildOrderFixture(key, config, extraAccounts) {
  * that account creation itself never writes. Creating a persona writes a user doc and
  * NOTHING else, so a seeded subscription arrives without the order record every real
  * purchase leaves behind, and three backend surfaces read exactly that record: the test
- * cancel processor (it reads the plan's processor product id off the LIVE order), the
- * test webhook library (it rebuilds a processor subscription from the order's `unified`)
+ * cancel provider (it reads the plan's provider product id off the LIVE order), the
+ * test webhook library (it rebuilds a provider subscription from the order's `unified`)
  * and the per-owner trial-eligibility query (any prior subscription order disqualifies).
  *
  * Only the personas whose seed carries `subscription.payment.orderId` have a purchase
@@ -2136,7 +2307,7 @@ async function seedOrderFixture(admin, key, config, extraAccounts) {
 /**
  * Seed EVERY persona's purchase record — the boot-seed counterpart of the
  * per-persona reset (routes/test/reset-account). A seeded subscription naming an
- * order the emulator never carried is a broken purchase: the cancel processor
+ * order the emulator never carried is a broken purchase: the cancel provider
  * resolves no plan, and trial eligibility answers as if nothing was ever bought.
  *
  * A project's own personas (`test/_init.js` accounts) are seeded on exactly the

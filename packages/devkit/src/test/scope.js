@@ -29,7 +29,7 @@ const FULL_ALIASES = ['full'];
 // Per-framework id prefixes, keyed by package name. The SSOT for "which
 // prefixes does each framework answer to": framework runners pass their own
 // entry as `frameworkAliases`, and the manager's brand-root `test` fan-out
-// routes `web:`/`desktop:`/… targets to the app owning that framework.
+// routes `web:`/`desktop:`/… targets to the target owning that framework.
 // Legacy short ids (ujm/em/bxm) retired with cp262's legacy-name sweep.
 const FRAMEWORK_IDS = {
   '@omega.js/web': ['web'],

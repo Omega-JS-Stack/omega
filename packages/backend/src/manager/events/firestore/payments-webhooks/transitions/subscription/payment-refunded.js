@@ -2,11 +2,11 @@
  * Transition: payment-refunded
  * Triggered when a payment refund webhook is received.
  *
- * Processor-agnostic — refund details are extracted by the processor library's
+ * Provider-agnostic — refund details are extracted by the provider library's
  * getRefundDetails() method and passed as a unified { amount, currency, reason } object.
  *
  * This is webhook-driven so it fires regardless of how the refund originated
- * (admin dashboard, user self-service, or direct processor action).
+ * (admin dashboard, user self-service, or direct provider action).
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 

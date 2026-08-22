@@ -74,7 +74,7 @@ Pro is brand-supplied, never redistributed by the framework. The two
 routes (FA npm token, or an `OMEGA_FONTAWESOME_ROOT` download dir), the
 chain semantics, and the style/family model are documented once at the
 repo hub: **[docs/shared/icons.md](../../../docs/shared/icons.md)**. Desktop-specific
-note: a packaged brand app declares `@fortawesome/fontawesome-pro` as its
+note: a packaged brand target declares `@fortawesome/fontawesome-pro` as its
 own **prod dependency** so the set ships inside the asar.
 
 ## Notes

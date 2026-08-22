@@ -108,16 +108,16 @@ test('the checkout page ships no `_dev_decline` to production (#226)', async () 
   assert.ok(!prodGraph.includes('Decline next checkout'), 'and carries none of the control that sets it');
 });
 
-test('the checkout page ships no `_dev_cardProcessor` to production (#235)', async () => {
-  // resolveProcessor() honoured the param outside any block, so a production
-  // checkout let a visitor point their own payment at another processor. The
+test('the checkout page ships no `_dev_cardProvider` to production (#235)', async () => {
+  // resolveProvider() honoured the param outside any block, so a production
+  // checkout let a visitor point their own payment at another provider. The
   // read belongs behind the same triple gate as the decline arm — this asserts
   // on the real production build, not on the source.
-  const devGraph = await buildPageGraph(true, 'strip-processor-dev-out', 'payment/checkout/index');
-  assert.ok(devGraph.includes('_dev_cardProcessor'), 'the dev build carries the param — otherwise this proves nothing');
+  const devGraph = await buildPageGraph(true, 'strip-provider-dev-out', 'payment/checkout/index');
+  assert.ok(devGraph.includes('_dev_cardProvider'), 'the dev build carries the param — otherwise this proves nothing');
 
-  const prodGraph = await buildPageGraph(false, 'strip-processor-prod-out', 'payment/checkout/index');
-  assert.ok(!prodGraph.includes('_dev_cardProcessor'), 'production never reads the card-processor override');
+  const prodGraph = await buildPageGraph(false, 'strip-provider-prod-out', 'payment/checkout/index');
+  assert.ok(!prodGraph.includes('_dev_cardProvider'), 'production never reads the card-provider override');
 });
 
 test('the checkout page ships no `_dev_trialEligible` to production (#245)', async () => {

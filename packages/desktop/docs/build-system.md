@@ -104,8 +104,8 @@ DefinePlugin replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed con
   - **win**: arch (default `x64`+`ia32`), NSIS oneClick + shortcuts
   - **linux**: arch, optional snap publishing
 - Mode-dependent injections like `mac.extendInfo.LSUIElement: true` when `startup.mode === 'hidden'` (zero-bounce production launches — see [startup.md](startup.md))
-- `electronVersion` pinned from the INSTALLED electron (resolved via the framework's module context — electron-builder refuses semver ranges and can't see a workspace-hoisted electron from the app dir)
-- Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish owner resolves config-first: `releases.owner` → the brand's `repo.providers.github.org` → git-remote discovery (a brand-monorepo app has no git remote of its own; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
+- `electronVersion` pinned from the INSTALLED electron (resolved via the framework's module context — electron-builder refuses semver ranges and can't see a workspace-hoisted electron from the target dir)
+- Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish owner resolves config-first: `releases.owner` → the brand's `repo.providers.github.org` → git-remote discovery (a brand-monorepo target has no git remote of its own; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
 - Optional passthrough: `fileAssociations`, `protocols`
 
 The full per-target reference (every config knob, default value, and what it produces in YAML) lives in **[installer-options.md](installer-options.md)**.

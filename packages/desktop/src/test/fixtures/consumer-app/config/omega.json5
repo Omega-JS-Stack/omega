@@ -12,8 +12,11 @@
     },
   },
   monitoring: {
-    provider: 'sentry',
-    dsn: '',
+    providers: {
+      sentry: {
+        dsn: '',
+      },
+    },
   },
   analytics: {
     providers: {

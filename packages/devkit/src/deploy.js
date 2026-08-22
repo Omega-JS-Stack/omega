@@ -12,7 +12,7 @@
 const path = require('node:path');
 const { execSync, execFileSync } = require('node:child_process');
 
-const { findBrandRoot, discoverApps, frameworkPackagesOf } = require('./local.js');
+const { findBrandRoot, discoverTargets, frameworkPackagesOf } = require('./local.js');
 
 const API_BASE = 'https://api.github.com';
 
@@ -168,8 +168,8 @@ async function deployViaDispatch(options) {
 
 /**
  * Find every `file:` @omega.js spec in the brand tree. npm resolves the
- * WHOLE workspace tree on any install, so one linked sibling app breaks a
- * CI install even when the deploying app is clean (the cp194 lesson —
+ * WHOLE workspace tree on any install, so one linked sibling target breaks a
+ * CI install even when the deploying target is clean (the cp194 lesson —
  * linking is tree-wide, so detection is too). Deploy verbs use this to
  * AUTO-SELECT their local-artifact lane (mirrored rule, Ian 2026-07-20:
  * a linked brand ships the LOCAL framework — build here, ship the artifact;
@@ -182,10 +182,10 @@ function findLocalSpecs(options = {}) {
   const brandRoot = findBrandRoot(options.dir || process.cwd());
   const offenders = [];
 
-  for (const appDir of discoverApps(brandRoot)) {
-    for (const entry of frameworkPackagesOf(appDir)) {
+  for (const targetDir of discoverTargets(brandRoot)) {
+    for (const entry of frameworkPackagesOf(targetDir)) {
       if (entry.spec.startsWith('file:')) {
-        const manifest = path.relative(brandRoot, path.join(appDir, 'package.json')) || 'package.json';
+        const manifest = path.relative(brandRoot, path.join(targetDir, 'package.json')) || 'package.json';
         offenders.push(`${manifest} → ${entry.name}: ${entry.spec}`);
       }
     }
@@ -199,7 +199,7 @@ function findLocalSpecs(options = {}) {
  * no local-artifact fallback where dispatching would only burn a CI run.
  * @param {object} [options]
  * @param {string} [options.dir] - Any directory inside the brand (default cwd).
- * @throws {Error} Listing every file:-spec'd @omega.js dependency, per app.
+ * @throws {Error} Listing every file:-spec'd @omega.js dependency, per target.
  */
 function assertNoLocalSpecs(options = {}) {
   const offenders = findLocalSpecs(options);

@@ -11,7 +11,7 @@
  * in-progress trial, because the switch's webhook carried no trial at all and the
  * unified transform reads `claimed` straight off it. The end date is therefore
  * asserted on the USER DOC after the real pipeline has written it, not on the
- * processor's payload.
+ * provider's payload.
  *
  * The twin without a trial is journey-payments-plan-switch.test.js.
  *
@@ -23,7 +23,10 @@ const { buildUser, callHandler } = require('../../routes/payments/_route-harness
 
 const handler = require('../../../src/manager/routes/payments/plan/post.js');
 
-const UID = '_test-journey-payments-plan-switch-trial';
+// The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
+// exclusive to this suite and declared in the seed roster, so the account it
+// drives exists — auth user and doc in sync — before the run starts.
+const PERSONA = 'journey-payments-plan-switch-trial';
 const RESOURCE_ID = 'sub_test_journey_plan_switch_trial';
 const ORDER_ID = 'TEST-PLAN-TRIAL';
 
@@ -35,7 +38,7 @@ module.exports = {
   tests: [
     {
       name: 'setup-trialing-subscription',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, assert, state, config, skip }) {
         const paidProducts = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (paidProducts.length < 2) {
@@ -54,7 +57,8 @@ module.exports = {
         // The trial the switch must not touch: started a week ago, seven days left
         const trialEndUNIX = nowUNIX + (7 * 86400);
 
-        state.uid = UID;
+        state.uid = accounts[PERSONA].uid;
+        state.email = accounts[PERSONA].email;
         state.trialEndUNIX = trialEndUNIX;
         state.productA = { id: productA.id, name: productA.name || productA.id, frequency: frequencyA };
         state.productB = { id: productB.id, name: productB.name || productB.id, frequency: frequencyB };
@@ -69,7 +73,7 @@ module.exports = {
           },
           cancellation: { pending: false },
           payment: {
-            processor: 'test',
+            provider: 'test',
             orderId: ORDER_ID,
             resourceId: RESOURCE_ID,
             frequency: frequencyA,
@@ -78,8 +82,8 @@ module.exports = {
           },
         };
 
-        await firestore.set(`users/${UID}`, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+        await firestore.set(`users/${state.uid}`, {
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         }, { merge: true });
@@ -87,15 +91,15 @@ module.exports = {
         await firestore.set(`payments-orders/${ORDER_ID}`, {
           id: ORDER_ID,
           type: 'subscription',
-          owner: UID,
+          owner: state.uid,
           productId: productA.id,
-          processor: 'test',
+          provider: 'test',
           resourceId: RESOURCE_ID,
           unified: state.subscription,
           requests: { cancellation: null, refund: null },
         }, { merge: true });
 
-        const userDoc = await firestore.get(`users/${UID}`);
+        const userDoc = await firestore.get(`users/${state.uid}`);
         assert.equal(userDoc.subscription.trial.claimed, true, 'Should start mid-trial');
         assert.equal(userDoc.subscription.trial.expires.timestampUNIX, trialEndUNIX, 'Should start with the original trial end');
       },
@@ -105,7 +109,7 @@ module.exports = {
       name: 'call-plan-endpoint-mid-trial',
       async run({ assert, Manager, state }) {
         const user = buildUser(Manager, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });

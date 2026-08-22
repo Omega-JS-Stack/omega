@@ -54,9 +54,9 @@ function realP12Bytes() {
 // what identifies it to the walk.
 function stageBrand({ cert = null, root = null } = {}) {
   const brandRoot = root || mkdtempSync(join(tmpdir(), 'omega-signing-'));
-  const appRoot = join(brandRoot, 'apps', 'desktop');
+  const targetRoot = join(brandRoot, 'targets', 'desktop');
 
-  jetpack.dir(appRoot);
+  jetpack.dir(targetRoot);
   jetpack.dir(join(brandRoot, '.omega'));
   if (cert === 'real') {
     jetpack.write(join(brandRoot, CERT_REL), realP12Bytes());
@@ -64,7 +64,7 @@ function stageBrand({ cert = null, root = null } = {}) {
     jetpack.write(join(brandRoot, CERT_REL), 'p12-bytes');
   }
 
-  return { brandRoot, appRoot };
+  return { brandRoot, targetRoot };
 }
 
 // Stamp a brand as company-managed — the ONE membership rule
@@ -81,9 +81,9 @@ module.exports = {
     {
       name: 'no cert anywhere → keychain (today\'s default, unchanged)',
       run: (ctx) => {
-        const { appRoot } = stageBrand();
+        const { targetRoot } = stageBrand();
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: {} });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: {} });
 
         ctx.expect(resolved.source).toBe('keychain');
         ctx.expect(resolved.cscLink).toBe(null);
@@ -92,10 +92,10 @@ module.exports = {
     {
       name: 'an explicit CSC_LINK always wins',
       run: (ctx) => {
-        const { appRoot } = stageBrand({ cert: 'real' });
+        const { targetRoot } = stageBrand({ cert: 'real' });
 
         const resolved = resolveSigningCert({
-          projectRoot: appRoot,
+          projectRoot: targetRoot,
           env: { CSC_LINK: 'config/certs/developer-id-application.p12', CSC_KEY_PASSWORD: REAL_PASSWORD },
         });
 
@@ -106,9 +106,9 @@ module.exports = {
     {
       name: 'the brand certificates tree is preferred over the keychain',
       run: (ctx) => {
-        const { brandRoot, appRoot } = stageBrand({ cert: 'real' });
+        const { brandRoot, targetRoot } = stageBrand({ cert: 'real' });
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('certificates');
         ctx.expect(resolved.cscLink).toBe(join(brandRoot, CERT_REL));
@@ -119,12 +119,12 @@ module.exports = {
       run: (ctx) => {
         // No nesting: the company workspace lives beside the brand, and the
         // brand's .omega/company.json is the only thing pointing at it.
-        const { brandRoot, appRoot } = stageBrand();
+        const { brandRoot, targetRoot } = stageBrand();
         const companyRoot = mkdtempSync(join(tmpdir(), 'omega-company-'));
         jetpack.write(join(companyRoot, CERT_REL), realP12Bytes());
         stampCompany(brandRoot, companyRoot);
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('certificates');
         ctx.expect(resolved.cscLink).toBe(join(companyRoot, CERT_REL));
@@ -133,12 +133,12 @@ module.exports = {
     {
       name: 'the brand tree wins over the company tree',
       run: (ctx) => {
-        const { brandRoot, appRoot } = stageBrand({ cert: 'real' });
+        const { brandRoot, targetRoot } = stageBrand({ cert: 'real' });
         const companyRoot = mkdtempSync(join(tmpdir(), 'omega-company-'));
         jetpack.write(join(companyRoot, CERT_REL), realP12Bytes());
         stampCompany(brandRoot, companyRoot);
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.cscLink).toBe(join(brandRoot, CERT_REL));
       },
@@ -146,12 +146,12 @@ module.exports = {
     {
       name: 'an unstamped brand with no tree stays on the keychain — no company is guessed',
       run: (ctx) => {
-        const { appRoot } = stageBrand();
+        const { targetRoot } = stageBrand();
         // A company workspace exists on disk but nothing points at it.
         const companyRoot = mkdtempSync(join(tmpdir(), 'omega-company-'));
         jetpack.write(join(companyRoot, CERT_REL), realP12Bytes());
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('keychain');
         ctx.expect(resolved.cscLink).toBe(null);
@@ -160,10 +160,10 @@ module.exports = {
     {
       name: 'a stamp pointing at a company with no tree stays on the keychain',
       run: (ctx) => {
-        const { brandRoot, appRoot } = stageBrand();
+        const { brandRoot, targetRoot } = stageBrand();
         stampCompany(brandRoot, mkdtempSync(join(tmpdir(), 'omega-company-')));
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('keychain');
       },
@@ -171,9 +171,9 @@ module.exports = {
     {
       name: 'a cert with no CSC_KEY_PASSWORD stays on the keychain — an unopenable .p12 would fail the build',
       run: (ctx) => {
-        const { appRoot } = stageBrand({ cert: 'real' });
+        const { targetRoot } = stageBrand({ cert: 'real' });
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: {} });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: {} });
 
         ctx.expect(resolved.source).toBe('keychain');
         ctx.expect(resolved.cscLink).toBe(null);
@@ -183,9 +183,9 @@ module.exports = {
     {
       name: 'a password that does NOT open the .p12 stays on the keychain',
       run: (ctx) => {
-        const { appRoot } = stageBrand({ cert: 'real' });
+        const { targetRoot } = stageBrand({ cert: 'real' });
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: 'not-the-password' } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: 'not-the-password' } });
 
         ctx.expect(resolved.source).toBe('keychain');
         ctx.expect(resolved.cscLink).toBe(null);
@@ -195,9 +195,9 @@ module.exports = {
     {
       name: 'a file that is not a .p12 at all stays on the keychain',
       run: (ctx) => {
-        const { appRoot } = stageBrand({ cert: 'dummy' });
+        const { targetRoot } = stageBrand({ cert: 'dummy' });
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('keychain');
         ctx.expect(resolved.reason.includes('does not open')).toBe(true);
@@ -206,9 +206,9 @@ module.exports = {
     {
       name: 'an empty CSC_LINK is not an answer — the tree still wins',
       run: (ctx) => {
-        const { brandRoot, appRoot } = stageBrand({ cert: 'real' });
+        const { brandRoot, targetRoot } = stageBrand({ cert: 'real' });
 
-        const resolved = resolveSigningCert({ projectRoot: appRoot, env: { CSC_LINK: '', CSC_KEY_PASSWORD: REAL_PASSWORD } });
+        const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { CSC_LINK: '', CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
         ctx.expect(resolved.source).toBe('certificates');
         ctx.expect(resolved.cscLink).toBe(join(brandRoot, CERT_REL));
@@ -220,12 +220,12 @@ module.exports = {
         // ~/.omega is a real personal overlay on developer machines. A stand-in
         // home carries the tree here; without the bound the walk would take it.
         const fakeHome = mkdtempSync(join(tmpdir(), 'omega-fake-home-'));
-        const appRoot = join(fakeHome, 'brand', 'apps', 'desktop');
-        jetpack.dir(appRoot);
+        const targetRoot = join(fakeHome, 'brand', 'targets', 'desktop');
+        jetpack.dir(targetRoot);
         jetpack.write(join(fakeHome, CERT_REL), realP12Bytes());
 
         const resolved = resolveSigningCert({
-          projectRoot: appRoot,
+          projectRoot: targetRoot,
           env: { CSC_KEY_PASSWORD: REAL_PASSWORD },
           homeDir: fakeHome,
         });
@@ -239,12 +239,12 @@ module.exports = {
       run: (ctx) => {
         const above = mkdtempSync(join(tmpdir(), 'omega-above-home-'));
         const fakeHome = join(above, 'home');
-        const appRoot = join(fakeHome, 'brand', 'apps', 'desktop');
-        jetpack.dir(appRoot);
+        const targetRoot = join(fakeHome, 'brand', 'targets', 'desktop');
+        jetpack.dir(targetRoot);
         jetpack.write(join(above, CERT_REL), realP12Bytes());
 
         const resolved = resolveSigningCert({
-          projectRoot: appRoot,
+          projectRoot: targetRoot,
           env: { CSC_KEY_PASSWORD: REAL_PASSWORD },
           homeDir: fakeHome,
         });
@@ -257,12 +257,12 @@ module.exports = {
       run: (ctx) => {
         const fakeHome = mkdtempSync(join(tmpdir(), 'omega-under-home-'));
         const brandRoot = join(fakeHome, 'Developer', 'brand');
-        const appRoot = join(brandRoot, 'apps', 'desktop');
-        jetpack.dir(appRoot);
+        const targetRoot = join(brandRoot, 'targets', 'desktop');
+        jetpack.dir(targetRoot);
         jetpack.write(join(brandRoot, CERT_REL), realP12Bytes());
 
         const resolved = resolveSigningCert({
-          projectRoot: appRoot,
+          projectRoot: targetRoot,
           env: { CSC_KEY_PASSWORD: REAL_PASSWORD },
           homeDir: fakeHome,
         });
@@ -277,7 +277,7 @@ module.exports = {
         // Stock macOS /usr/bin/openssl is LibreSSL: it rejects the -legacy FLAG
         // but reads legacy containers natively. A stub front presents exactly
         // that behavior, delegating the flagless retry to the system binary.
-        const { brandRoot, appRoot } = stageBrand({ cert: 'real' });
+        const { brandRoot, targetRoot } = stageBrand({ cert: 'real' });
         const stubDir = mkdtempSync(join(tmpdir(), 'omega-libressl-stub-'));
         const stub = join(stubDir, 'openssl');
         jetpack.write(stub, [
@@ -294,7 +294,7 @@ module.exports = {
         const realPath = process.env.PATH;
         process.env.PATH = `${stubDir}:${realPath}`;
         try {
-          const resolved = resolveSigningCert({ projectRoot: appRoot, env: { ...process.env, CSC_KEY_PASSWORD: REAL_PASSWORD } });
+          const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { ...process.env, CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
           ctx.expect(resolved.source).toBe('certificates');
           ctx.expect(resolved.cscLink).toBe(join(brandRoot, CERT_REL));
@@ -306,13 +306,13 @@ module.exports = {
     {
       name: 'no openssl at all names the tooling, not the password, and stays on the keychain',
       run: (ctx) => {
-        const { appRoot } = stageBrand({ cert: 'real' });
+        const { targetRoot } = stageBrand({ cert: 'real' });
         const emptyDir = mkdtempSync(join(tmpdir(), 'omega-no-openssl-'));
 
         const realPath = process.env.PATH;
         process.env.PATH = emptyDir;
         try {
-          const resolved = resolveSigningCert({ projectRoot: appRoot, env: { ...process.env, CSC_KEY_PASSWORD: REAL_PASSWORD } });
+          const resolved = resolveSigningCert({ projectRoot: targetRoot, env: { ...process.env, CSC_KEY_PASSWORD: REAL_PASSWORD } });
 
           ctx.expect(resolved.source).toBe('keychain');
           ctx.expect(resolved.reason.includes('openssl is not available')).toBe(true);

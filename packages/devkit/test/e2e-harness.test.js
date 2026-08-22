@@ -41,26 +41,26 @@ function get(url) {
 
 // ---- discoverTargets
 
-test('discoverTargets finds backend and website app dirs', () => {
-  const root = makeTempBrand(['apps/backend/package.json', 'apps/website/package.json']);
+test('discoverTargets finds the backend and website target dirs', () => {
+  const root = makeTempBrand(['targets/backend/package.json', 'targets/website/package.json']);
   const targets = discoverTargets(root);
-  assert.equal(targets.backend, path.join(root, 'apps', 'backend'));
-  assert.equal(targets.website, path.join(root, 'apps', 'website'));
+  assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
+  assert.equal(targets.website, path.join(root, 'targets', 'website'));
 });
 
-test('discoverTargets returns nulls for missing apps and missing apps dir', () => {
-  const partial = makeTempBrand(['apps/website/package.json']);
+test('discoverTargets returns nulls for missing targets and a missing targets dir', () => {
+  const partial = makeTempBrand(['targets/website/package.json']);
   assert.equal(discoverTargets(partial).backend, null);
-  assert.equal(discoverTargets(partial).website, path.join(partial, 'apps', 'website'));
+  assert.equal(discoverTargets(partial).website, path.join(partial, 'targets', 'website'));
 
   const bare = makeTempBrand([]);
   assert.deepEqual(discoverTargets(bare), { backend: null, website: null });
 });
 
-test('discoverTargets ignores dot-dirs and plain files in apps/', () => {
-  const root = makeTempBrand(['apps/.DS_Store', 'apps/notes.md', 'apps/backend/package.json']);
+test('discoverTargets ignores dot-dirs and plain files in targets/', () => {
+  const root = makeTempBrand(['targets/.DS_Store', 'targets/notes.md', 'targets/backend/package.json']);
   const targets = discoverTargets(root);
-  assert.equal(targets.backend, path.join(root, 'apps', 'backend'));
+  assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
   assert.equal(targets.website, null);
 });
 
@@ -151,8 +151,8 @@ test('exit() adds no preflight line when a step already recorded the failure', a
 // ---- static site server
 
 test('site server serves files, 404s missing paths, and blocks traversal', async () => {
-  const root = makeTempBrand(['apps/website/package.json']);
-  const distDir = path.join(root, 'apps', 'website', 'dist');
+  const root = makeTempBrand(['targets/website/package.json']);
+  const distDir = path.join(root, 'targets', 'website', 'dist');
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(path.join(distDir, 'index.html'), '<h1>harness fixture site</h1>');
   fs.writeFileSync(path.join(distDir, 'app.js'), 'console.log("hi");');
@@ -204,8 +204,8 @@ test('teardown writes page.log (even empty) and closes the site server', async (
 // ---- N7: site-port allocation + resolved-map page injection
 
 test('boot bumps a taken site port via the allocator and serves there', async () => {
-  const root = makeTempBrand(['apps/website/package.json']);
-  const websiteDir = path.join(root, 'apps', 'website');
+  const root = makeTempBrand(['targets/website/package.json']);
+  const websiteDir = path.join(root, 'targets', 'website');
   fs.writeFileSync(path.join(websiteDir, 'build.js'), 'module.exports = async () => {};');
   const distDir = path.join(websiteDir, 'dist');
   fs.mkdirSync(distDir, { recursive: true });

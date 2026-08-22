@@ -45,7 +45,8 @@ function isAutomatedBrowser() {
  *
  * @param {object} params
  * @param {object} params.Sentry - the imported @sentry/browser module
- * @param {object} [params.config] - the resolved `monitoring` blob for this surface
+ * @param {object} [params.config] - the resolved Sentry settings for this surface
+ *   (the build maps `monitoring.providers.sentry` into the client's `sentry.config`)
  * @param {string} [params.release] - the host's release tag (core.releaseTag)
  * @param {string} [params.environment]
  * @param {() => boolean} [params.isDevelopment] - the host's dev signal, read per event
@@ -57,7 +58,6 @@ function buildInitOptions(params) {
   const { Sentry, release, environment, isDevelopment, getUser, getTags } = params || {};
 
   const options = { ...DEFAULTS, ...((params && params.config) || {}) };
-  delete options.provider;
 
   const isFrameworkEvent = createBundleFilter(options.bundlePatterns);
 
@@ -118,7 +118,7 @@ function buildInitOptions(params) {
       };
 
       // PII: the uid is the join key to the account and rides; the email is
-      // scrubbed unless `monitoring.scrubEmail: false` opts in.
+      // scrubbed unless `monitoring.providers.sentry.scrubEmail: false` opts in.
       const user = normalizeUser(getUser ? getUser() : null, options);
       if (user) {
         event.user = { ...event.user, ...user };

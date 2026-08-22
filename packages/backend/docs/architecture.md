@@ -12,7 +12,7 @@ The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and or
 
 The composed config a consumer reads (`Manager.config`, and the same object every
 route/hook/cron receives) carries a `resolved` group of values the FRAMEWORK derives at
-boot ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand app cannot
+boot ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand target cannot
 require `@omega.js/config` — it is a private package, vendored into the framework's dist
 — so a brand that needed a derived value used to re-implement the derivation and drift
 from the real merge rules. The framework runs the recipe once; brands read the answer.

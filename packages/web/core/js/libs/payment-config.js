@@ -1,7 +1,7 @@
 /**
  * Payment Config Library
  *
- * Reads payment configuration (products, processors, prices, limits) from
+ * Reads payment configuration (products, providers, prices, limits) from
  * omega.config.payment — which is populated from _config.yml at build time.
  * This eliminates the need to fetch /omega/brand at runtime.
  */
@@ -13,9 +13,9 @@ export function getPaymentConfig() {
   return omega.config?.payment || {};
 }
 
-// Get payment processors
-export function getProcessors() {
-  return getPaymentConfig().processors || {};
+// Get payment providers
+export function getProviders() {
+  return getPaymentConfig().providers || {};
 }
 
 // Get all products

@@ -58,7 +58,7 @@ class BaseCommand {
   }
 
   /**
-   * Tee THIS process' stdout/stderr to `<appRoot>/logs/<verb>.log` — the
+   * Tee THIS process' stdout/stderr to `<targetRoot>/logs/<verb>.log` — the
    * cross-framework verb-log lane (#197): every framework's dev/build/test
    * writes its own run there, so an agent greps one predictable path.
    *
@@ -108,7 +108,7 @@ class BaseCommand {
 
   /**
   /**
-   * Stage the authored app tree into dist/ (the src/dist pillar's build step).
+   * Stage the authored target tree into dist/ (the src/dist pillar's build step).
    * Every runtime surface calls this before touching dist/ — emulator, serve,
    * test, deploy — so the staged tree is always fresh.
    */
@@ -361,7 +361,7 @@ class BaseCommand {
       || loadEmulatorPorts(projectDir).hosting
       || 5002;
 
-    const forwardUrl = `http://localhost:${hostingPort}/omega/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`;
+    const forwardUrl = `http://localhost:${hostingPort}/omega/payments/webhook?provider=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 
     this.log(chalk.gray(`  Stripe webhook forwarding -> localhost:${hostingPort}\n`));
 

@@ -1,13 +1,13 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
-const isAlreadyGone = require('./_processor-errors.js');
+const isAlreadyGone = require('./_provider-errors.js');
 const isTrialing = require('./_is-trialing.js');
 
 /**
  * POST /payments/cancel
  * Cancels the authenticated user's subscription at the end of the current billing period.
- * Delegates to the processor (e.g., Stripe) to set cancel_at_period_end=true.
+ * Delegates to the provider (e.g., Stripe) to set cancel_at_period_end=true.
  * The resulting webhook triggers the Firestore pipeline which updates subscription state
  * and fires the cancellation-requested transition handler.
  * Stores the cancellation reason/feedback on payments-orders/{orderId}.requests.cancellation.
@@ -70,33 +70,33 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond('Subscription is already pending cancellation', { code: 400 });
   }
 
-  const processor = subscription.payment?.processor;
+  const provider = subscription.payment?.provider;
   const resourceId = subscription.payment?.resourceId;
 
-  if (!processor || !resourceId) {
-    ctx.log(`Cancel rejected: uid=${uid}, missing processor=${processor} or resourceId=${resourceId}`);
+  if (!provider || !resourceId) {
+    ctx.log(`Cancel rejected: uid=${uid}, missing provider=${provider} or resourceId=${resourceId}`);
     return ctx.respond('Subscription payment details not found', { code: 400 });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Cancel at period end via the processor
+  // Cancel at period end via the provider
   try {
-    await processorModule.cancelAtPeriodEnd({ resourceId, uid, subscription, ctx });
+    await providerModule.cancelAtPeriodEnd({ resourceId, uid, subscription, ctx });
   } catch (e) {
-    // A suspended subscription the processor says NO LONGER EXISTS is a dead
+    // A suspended subscription the provider says NO LONGER EXISTS is a dead
     // record on our side alone: reset it directly so the user can re-subscribe.
     // The classification is the whole guard — every transient or unrecognized
     // failure falls through to the caller with NOTHING written, so a network
     // blip can never fabricate a cancellation ([#212]).
     if (subscription.status === 'suspended' && isAlreadyGone(e)) {
-      ctx.log(`Processor reports the suspended subscription is already gone (${e.message}), resetting directly`);
+      ctx.log(`Provider reports the suspended subscription is already gone (${e.message}), resetting directly`);
       const admin = ctx.Manager.libraries.admin;
       const now = powertools.timestamp(new Date(), { output: 'string' });
       const nowUNIX = powertools.timestamp(now, { output: 'unix' });
@@ -113,9 +113,9 @@ module.exports = async ({ ctx, user, settings }) => {
       return ctx.respond({ success: true });
     }
 
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to cancel subscription via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    ctx.error(`Failed to cancel subscription via ${provider}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
     return ctx.respond('We could not cancel your subscription right now. Please try again shortly.', { code: 500 });
   }
 
@@ -143,7 +143,7 @@ module.exports = async ({ ctx, user, settings }) => {
     ctx.log(`Stored cancellation request on payments-orders/${orderId}: reason=${settings.reason}`);
   }
 
-  ctx.log(`Cancel ${trialing ? 'immediate (trialing)' : 'scheduled'}: uid=${uid}, processor=${processor}, sub=${resourceId}, reason=${settings.reason}`);
+  ctx.log(`Cancel ${trialing ? 'immediate (trialing)' : 'scheduled'}: uid=${uid}, provider=${provider}, sub=${resourceId}, reason=${settings.reason}`);
 
   return ctx.respond({ success: true });
 };

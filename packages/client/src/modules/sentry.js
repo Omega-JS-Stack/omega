@@ -28,13 +28,15 @@ class mod {
 
   /**
    * Initialize Sentry error tracking
-   * @param {Object} config - the resolved `monitoring` blob for this surface
+   * @param {Object} config - the resolved Sentry settings for this surface
+   *   (the build maps `monitoring.providers.sentry` into `config.sentry.config`)
    * @returns {Promise} Resolves when initialization is complete
    */
   init(config = {}) {
     // Dynamically imported to keep the SDK out of the initial chunk — and
     // never reached at all when the config carries no DSN (index.js gates on
-    // `config.sentry.enabled`, which the build maps from `monitoring.dsn`).
+    // `config.sentry.enabled`, which the build maps from
+    // `monitoring.providers.sentry.dsn`).
     return import('@sentry/browser')
       .then((sdk) => {
         this.Sentry = sdk;

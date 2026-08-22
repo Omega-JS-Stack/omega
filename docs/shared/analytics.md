@@ -133,11 +133,20 @@ placement valid, every mapping carrying a name and a known kind — already run 
 catalog, so a malformed entry fails without new test code.
 
 **Naming.** Canonical names are snake_case and follow GA4's standard names where one exists
-(`file_download`, not `download`). Action buckets stay buckets — `billing_action`,
-`refund_action`, `account_section_view` carry an `action`/`section` param rather than
-sprawling into an event per button. Two events that look similar are only merged when they
-answer the same question: `newsletter_signup` and `status_subscribe` are deliberately
-distinct.
+(`file_download`, not `download`). A custom name is `{category}_{action}` with the action in
+PRESENT/imperative form — `trial_start`, `subscription_cancel`, `user_delete`, never the past
+tense of the fact ([#416](https://github.com/Omega-JS-Stack/omega/issues/416)) — because that
+is how GA4, Meta and TikTok all name a conversion; a platform's own standard WIRE name stays
+verbatim wherever a mapping uses one (Meta `StartTrial`, TikTok `Subscribe`), but a PascalCase
+wire WE coin for a `custom` mapping obeys the same tense rule as the canonical it carries
+(`SubscriptionCancel`, `Refund`, never the past-tense form). Action buckets
+stay buckets — `user_billing_action`, `user_refund_request`, `user_section_view` carry an
+`action`/`section` param rather than sprawling into an event per button.
+Two events that look similar are only merged when they
+answer the same question: `marketing_newsletter_subscribe` and `status_subscribe` are deliberately
+distinct. A family's names move TOGETHER — the marketing opt-ins and their opt-outs all carry
+the `marketing_` prefix (`marketing_email_subscribe` / `marketing_email_unsubscribe`), while
+`status_subscribe` keeps none because status-page updates are operational, not marketing.
 
 ## The placement rule
 
@@ -146,7 +155,7 @@ BOTH.**
 
 | Placement | Why | Examples |
 |---|---|---|
-| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `start_trial`, `trial_converted`, `trial_lapsed`, `subscription_cancelled`, `subscription_uncancelled`, `plan_changed`, `subscription_renewed`, `payment_recovered`, `user_delete` |
+| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `trial_start`, `trial_convert`, `trial_lapse`, `subscription_cancel`, `subscription_uncancel`, `subscription_plan_change`, `subscription_renew`, `payment_recovered`, `user_delete` |
 | `client` | The event IS the interaction — nothing server-side ever sees it | `view_item`, `add_to_cart`, `begin_checkout`, `add_payment_info`, `page_view`, `file_download`, the exit-popup, consent, notification-permission and account-navigation events |
 | `both` | Ad platforms need the browser signal for retargeting AND the server signal for truth | `sign_up`, `purchase` |
 
@@ -176,11 +185,18 @@ Nothing counts before the visitor's answer is known. Two tiers, chosen by the br
 timezone — no network call, nothing to consent to before consent exists
 (`packages/web/core/js/libs/consent-region.js`):
 
-- **Opt-in regions (EEA + UK)**: no provider script loads until Accept, and the banner is the
-  GATE that asks. Google Consent Mode's `consent default` is queued into `dataLayer` before
-  gtag.js can load (denied), and every change pushes a `consent update`, so the tag itself
-  honors the flags on top of us not loading it. A timezone we cannot place reads as opt-in —
-  the only safe direction.
+- **Opt-in regions — a STRICT ROSTER**: `Europe/*` (the EEA, the UK, and Turkey, which rides
+  the prefix), the four Atlantic zones the EEA reaches outside it (Reykjavik, Canary, Madeira,
+  Azores), Brazil's sixteen zones (LGPD), China (PIPL: Asia/Shanghai, Asia/Urumqi) and South
+  Korea (PIPA: Asia/Seoul). No provider script loads until Accept, and the banner is the GATE
+  that asks. Google Consent Mode's `consent default` is queued into `dataLayer` before gtag.js
+  can load (denied), and every change pushes a `consent update`, so the tag itself honors the
+  flags on top of us not loading it. A timezone we cannot place reads as opt-in — the only safe
+  direction.
+  - **The join rule**: a country joins only when its law genuinely requires opt-in consent for
+    tracking cookies and that is verified; when in doubt it stays out
+    ([#423](https://github.com/Omega-JS-Stack/omega/issues/423)). Quebec's Law 25 qualifies but
+    cannot be expressed — America/Montreal aliases to America/Toronto — so Canada stays out.
 - **Everywhere else**: auto opt-in, scripts load immediately, and a first visit sees **no
   banner at all** ([#391](https://github.com/Omega-JS-Stack/omega/issues/391)) — only the
   small Cookies Settings tab, which reopens the full panel for anyone who wants to turn things
@@ -298,10 +314,10 @@ decides whether to keep doing it.**
 **Exclusion audiences are what a churn event is for.** Neither ad platform can subtract
 revenue and neither optimizes against an event, but both can build an AUDIENCE from a custom
 one ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)). So the two churn moments
-reach them as custom events worth zero: `subscription_cancelled` as `SubscriptionCancelled`,
-`refund` as `Refunded`, both `value: 0` because sending the real amount would ADD to the
+reach them as custom events worth zero: `subscription_cancel` as `SubscriptionCancel`,
+`refund` as `Refund`, both `value: 0` because sending the real amount would ADD to the
 return the ads manager reports. Build the platform's exclusion audience off those two, and
-spend stops chasing people who already left. `trial_lapsed` is deliberately NOT in that lane:
+spend stops chasing people who already left. `trial_lapse` is deliberately NOT in that lane:
 a lapsed trialist is a win-back audience worth RETARGETING, not somebody to hide ads from.
 
 **The Measurement Protocol secret ships inside extension and desktop bundles, and that is an

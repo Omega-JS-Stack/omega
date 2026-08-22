@@ -1,5 +1,5 @@
 /**
- * Testing service tests — per-app local checks and live checks against
+ * Testing service tests — per-target local checks and live checks against
  * recording fetch/exec fakes (injected via options, the same seam runManage
  * exposes), with the check pipeline, retry loop, and version comparison
  * real. Proves the all-green pass set, retry pins on network errors and
@@ -48,44 +48,44 @@ function brandConfig(overrides = {}) {
   };
 }
 
-/** Stage apps/website — optionally with a built dist and a framework dep. */
-function stageWebApp(root, { dist = true, declared = null, installed = null } = {}) {
-  const appPath = join(root, 'apps', 'website');
-  jetpack.write(join(appPath, 'package.json'), {
+/** Stage targets/website — optionally with a built dist and a framework dep. */
+function stageWebTarget(root, { dist = true, declared = null, installed = null } = {}) {
+  const targetPath = join(root, 'targets', 'website');
+  jetpack.write(join(targetPath, 'package.json'), {
     name: 'fixture-website',
     private: true,
     ...(declared ? { dependencies: { '@omega.js/web': declared } } : {}),
   });
   if (dist) {
-    jetpack.write(join(appPath, 'dist', 'index.html'), '<!doctype html><title>fixture</title>');
+    jetpack.write(join(targetPath, 'dist', 'index.html'), '<!doctype html><title>fixture</title>');
   }
   if (installed) {
-    jetpack.write(join(appPath, 'node_modules', '@omega.js/web', 'package.json'), {
+    jetpack.write(join(targetPath, 'node_modules', '@omega.js/web', 'package.json'), {
       name: '@omega.js/web',
       version: installed,
     });
   }
-  return { name: 'website', dir: 'apps/website', path: appPath, target: 'web' };
+  return { name: 'website', dir: 'targets/website', path: targetPath, target: 'web' };
 }
 
-/** Stage apps/backend — src/dist pillar shape: framework dep on the ONE app
+/** Stage targets/backend — src/dist pillar shape: framework dep on the ONE target
  * manifest, staged dist/ as build output. */
-function stageBackendApp(root, { installed = '5.9.0' } = {}) {
-  const appPath = join(root, 'apps', 'backend');
-  jetpack.write(join(appPath, 'package.json'), {
+function stageBackendTarget(root, { installed = '5.9.0' } = {}) {
+  const targetPath = join(root, 'targets', 'backend');
+  jetpack.write(join(targetPath, 'package.json'), {
     name: 'fixture-backend',
     private: true,
     dependencies: { '@omega.js/backend': 'file:../../../../packages/backend' },
   });
-  jetpack.write(join(appPath, 'firebase.json'), {});
-  jetpack.write(join(appPath, 'dist', 'package.json'), { name: 'fixture-backend-functions', private: true });
+  jetpack.write(join(targetPath, 'firebase.json'), {});
+  jetpack.write(join(targetPath, 'dist', 'package.json'), { name: 'fixture-backend-functions', private: true });
   if (installed) {
-    jetpack.write(join(appPath, 'node_modules', '@omega.js/backend', 'package.json'), {
+    jetpack.write(join(targetPath, 'node_modules', '@omega.js/backend', 'package.json'), {
       name: '@omega.js/backend',
       version: installed,
     });
   }
-  return { name: 'backend', dir: 'apps/backend', path: appPath, target: 'backend' };
+  return { name: 'backend', dir: 'targets/backend', path: targetPath, target: 'backend' };
 }
 
 /**
@@ -138,13 +138,12 @@ function fakeExec(responses = {}) {
   return fn;
 }
 
-async function runService(config, { root, apps, fetch, exec, options = {} }) {
+async function runService(config, { root, targets, fetch, exec, options = {} }) {
   return service.run({
     brandId: 'fixture-brand',
     brandRoot: root,
     brandConfig: config,
-    brandState: {},
-    apps,
+    targets,
     operations: OPERATIONS.testing,
     options: { fetch, exec, retryDelayMs: 0, ...options },
     serviceData: {},
@@ -175,20 +174,20 @@ test('compareVersions: numeric x.y.z ordering', () => {
 
 test('installedVersion: resolves through the node_modules climb, null when absent', () => {
   const root = stageBrand();
-  const app = stageWebApp(root, { installed: '1.4.2' });
+  const entry = stageWebTarget(root, { installed: '1.4.2' });
 
-  // From a nested dir inside the app, the climb still finds it
-  assert.equal(installedVersion(join(app.path, 'dist'), '@omega.js/web'), '1.4.2');
-  assert.equal(installedVersion(app.path, 'no-such-package'), null);
+  // From a nested dir inside the target, the climb still finds it
+  assert.equal(installedVersion(join(entry.path, 'dist'), '@omega.js/web'), '1.4.2');
+  assert.equal(installedVersion(entry.path, 'no-such-package'), null);
 });
 
 // ─── Full stack all-green ────────────────────────────────────────────────────
 
 test('testing: web + backend all green — exact pass set, single npm view per package, one fetch per URL', async () => {
   const root = stageBrand();
-  const apps = [
-    stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' }),
-    stageBackendApp(root, { installed: '5.9.0' }),
+  const targets = [
+    stageWebTarget(root, { declared: '^1.0.0', installed: '1.0.0' }),
+    stageBackendTarget(root, { installed: '5.9.0' }),
   ];
   const fetch = fakeFetch({
     [HOMEPAGE]: { status: 200 },
@@ -200,7 +199,7 @@ test('testing: web + backend all green — exact pass set, single npm view per p
     [GIT_CMD]: '',
   });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(report.output, {
@@ -238,11 +237,11 @@ test('testing: web + backend all green — exact pass set, single npm view per p
 
 test('testing: outdated framework → warned with the version delta', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' })];
+  const targets = [stageWebTarget(root, { declared: '^1.0.0', installed: '1.0.0' })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ 'npm view @omega.js/web version': '1.2.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
@@ -252,14 +251,14 @@ test('testing: outdated framework → warned with the version delta', async () =
 
 test('testing: unpublished framework (npm view fails) dims out — no warning, no pass entry', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' })];
+  const targets = [stageWebTarget(root, { declared: '^1.0.0', installed: '1.0.0' })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({
     'npm view @omega.js/web version': new Error('404 Not Found - @omega.js/web'),
     [GIT_CMD]: '',
   });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.ok(!report.output.results.passed.includes('website: @omega.js/web'));
@@ -268,11 +267,11 @@ test('testing: unpublished framework (npm view fails) dims out — no warning, n
 
 test('testing: framework declared via file: but not installed → dim note, npm never consulted', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root, { declared: 'file:../../packages/web' })];
+  const targets = [stageWebTarget(root, { declared: 'file:../../packages/web' })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(exec.calls, [[GIT_CMD, root]]);
@@ -283,11 +282,11 @@ test('testing: framework declared via file: but not installed → dim note, npm 
 test('testing: homepage network error on a DEPLOYED brand retries 3× then fails the service', async () => {
   const root = stageBrand();
   seedDeployRecord(root, 'web');
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: new Error('getaddrinfo ENOTFOUND fixture-brand.test') });
   const exec = fakeExec({ [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(fetch.calls, [HOMEPAGE, HOMEPAGE, HOMEPAGE]);
@@ -299,11 +298,11 @@ test('testing: homepage network error on a DEPLOYED brand retries 3× then fails
 
 test('testing: homepage 500 then 200 — non-2xx retries and recovers', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: [{ status: 500 }, { status: 200 }] });
   const exec = fakeExec({ [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(fetch.calls, [HOMEPAGE, HOMEPAGE]);
@@ -314,11 +313,11 @@ test('testing: homepage 500 then 200 — non-2xx retries and recovers', async ()
 
 test('testing: shared Firebase project → API health dims out, zero fetches', async () => {
   const root = stageBrand();
-  const apps = [stageBackendApp(root)];
+  const targets = [stageBackendTarget(root)];
   const fetch = fakeFetch({});
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ cloud: { shared: true }, targets: { backend: {} } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ cloud: { shared: true }, targets: { backend: {} } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(fetch.calls, []);
@@ -326,11 +325,11 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
 
 test('testing: deployed backend older than npm latest → warned', async () => {
   const root = stageBrand();
-  const apps = [stageBackendApp(root, { installed: '5.9.0' })];
+  const targets = [stageBackendTarget(root, { installed: '5.9.0' })];
   const fetch = fakeFetch({ [API_URL]: { status: 200, body: { backendVersion: '5.0.0' } } });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
@@ -341,11 +340,11 @@ test('testing: deployed backend older than npm latest → warned', async () => {
 test('testing: API returning 503 on a DEPLOYED brand retries 3× then fails', async () => {
   const root = stageBrand();
   seedDeployRecord(root, 'backend');
-  const apps = [stageBackendApp(root, { installed: null })];
+  const targets = [stageBackendTarget(root, { installed: null })];
   const fetch = fakeFetch({ [API_URL]: { status: 503 } });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(fetch.calls, [API_URL, API_URL, API_URL]);
@@ -358,14 +357,14 @@ test('testing: API returning 503 on a DEPLOYED brand retries 3× then fails', as
 
 test('testing: never-deployed brand — live misses NUDGE (warned), never error', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root), stageBackendApp(root)];
+  const targets = [stageWebTarget(root), stageBackendTarget(root)];
   const fetch = fakeFetch({
     [HOMEPAGE]: new Error('getaddrinfo ENOTFOUND fixture-brand.test'),
     [API_URL]: new Error('getaddrinfo ENOTFOUND api.fixture-brand.test'),
   });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.failed, []);
@@ -376,11 +375,11 @@ test('testing: never-deployed brand — live misses NUDGE (warned), never error'
 
 test('testing: record-less brand with a LIVE site passes and ADOPTS the deploy record', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   const state = jetpack.read(join(root, '.omega', 'state.json'), 'json');
@@ -389,13 +388,13 @@ test('testing: record-less brand with a LIVE site passes and ADOPTS the deploy r
 
 test('testing: no brand.url → homepage and API health warn, zero fetches', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root), stageBackendApp(root)];
+  const targets = [stageWebTarget(root), stageBackendTarget(root)];
   const fetch = fakeFetch({});
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const config = brandConfig();
   delete config.brand.url;
-  const report = await runService(config, { root, apps, fetch, exec });
+  const report = await runService(config, { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(fetch.calls, []);
@@ -409,11 +408,11 @@ test('testing: no brand.url → homepage and API health warn, zero fetches', asy
 
 test('testing: dirty working tree → warned with the file count', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ [GIT_CMD]: ' M src/a.js\n?? notes.txt\n' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
@@ -422,13 +421,13 @@ test('testing: dirty working tree → warned with the file count', async () => {
 });
 
 test('testing: porcelain paths parse intact — first line keeps its leading status space', () => {
-  // cp100 live-run regression: ` M apps/omega-brand/config/omega.json5`
+  // cp100 live-run regression: ` M targets/omega-brand/config/omega.json5`
   // displayed as `pps/omega-brand/...` because a whole-stdout trim stripped
   // the first line's leading status column before the fixed-offset slice.
-  const files = parseWorkingTree(' M apps/omega-brand/config/omega.json5\n?? notes.txt\nA  src/new.js\n');
+  const files = parseWorkingTree(' M targets/omega-brand/config/omega.json5\n?? notes.txt\nA  src/new.js\n');
 
   assert.deepEqual(files, [
-    { status: 'M', file: 'apps/omega-brand/config/omega.json5' },
+    { status: 'M', file: 'targets/omega-brand/config/omega.json5' },
     { status: '??', file: 'notes.txt' },
     { status: 'A', file: 'src/new.js' },
   ]);
@@ -436,11 +435,11 @@ test('testing: porcelain paths parse intact — first line keeps its leading sta
 
 test('testing: not a git repository → working tree check silently absent', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ [GIT_CMD]: new Error('fatal: not a git repository') });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   const names = [
@@ -453,14 +452,14 @@ test('testing: not a git repository → working tree check silently absent', asy
 
 test('testing: GitHub Actions success — exact gh command, repo defaults to brandId', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({
     [GIT_CMD]: '',
     [GH_CMD]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.ok(report.output.results.passed.includes('GitHub Actions'));
@@ -469,7 +468,7 @@ test('testing: GitHub Actions success — exact gh command, repo defaults to bra
 
 test('testing: github.repo overrides the repo name in the gh command', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const cmd = 'gh run list --repo sandbox-org/custom-repo --limit 1 --json status,conclusion,name';
   const exec = fakeExec({
@@ -479,7 +478,7 @@ test('testing: github.repo overrides the repo name in the gh command', async () 
 
   const report = await runService(
     brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'custom-repo' } } } }),
-    { root, apps, fetch, exec },
+    { root, targets, fetch, exec },
   );
 
   assert.equal(report.status, 'success');
@@ -488,14 +487,14 @@ test('testing: github.repo overrides the repo name in the gh command', async () 
 
 test('testing: failed GitHub Actions run → error', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({
     [GIT_CMD]: '',
     [GH_CMD]: '[{"status":"completed","conclusion":"failure","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, apps, fetch, exec });
+  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [
@@ -505,11 +504,11 @@ test('testing: failed GitHub Actions run → error', async () => {
 
 test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim, still success', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root)];
+  const targets = [stageWebTarget(root)];
 
   const inProgress = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
     root,
-    apps,
+    targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
     exec: fakeExec({ [GIT_CMD]: '', [GH_CMD]: '[{"status":"in_progress","conclusion":null,"name":"Build"}]' }),
   });
@@ -520,7 +519,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
 
   const unavailable = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
     root,
-    apps,
+    targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
     exec: fakeExec({ [GIT_CMD]: '', [GH_CMD]: new Error('gh: command not found') }),
   });
@@ -531,16 +530,16 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
 
 test('testing: dry-run — zero network, local checks still run', async () => {
   const root = stageBrand();
-  const apps = [
-    stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' }),
-    stageBackendApp(root),
+  const targets = [
+    stageWebTarget(root, { declared: '^1.0.0', installed: '1.0.0' }),
+    stageBackendTarget(root),
   ];
   const fetch = fakeFetch({});
   const exec = fakeExec({ [GIT_CMD]: '' });
 
   const report = await runService(
     brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }),
-    { root, apps, fetch, exec, options: { dryRun: true } },
+    { root, targets, fetch, exec, options: { dryRun: true } },
   );
 
   assert.equal(report.status, 'success');
@@ -559,11 +558,11 @@ test('testing: dry-run — zero network, local checks still run', async () => {
 
 test('testing: missing build output → honest error naming the update service', async () => {
   const root = stageBrand();
-  const apps = [stageWebApp(root, { dist: false })];
+  const targets = [stageWebTarget(root, { dist: false })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({ [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [

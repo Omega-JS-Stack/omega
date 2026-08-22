@@ -3,14 +3,14 @@
  * Simulates: paid product A → POST /payments/plan → plan-changed → paid product B
  *
  * The twin of journey-payments-plan-change.test.js, driven by the OWNED route
- * instead of a hand-sent webhook: the test processor's switchPlan() writes a
+ * instead of a hand-sent webhook: the test provider's switchPlan() writes a
  * Stripe-shaped `customer.subscription.updated` carrying the NEW product, and the
  * existing plan-changed transition fires naturally — the route needs no pipeline
  * work of its own.
  *
- * The caller is built by the shared route harness rather than a persona (see
- * journey-payments-uncancel.test.js for the reasoning); everything downstream of
- * the handler is the real pipeline.
+ * The caller is this suite's own seeded persona, driven through the shared route
+ * harness (see journey-payments-uncancel.test.js for the reasoning); everything
+ * downstream of the handler is the real pipeline.
  *
  * Requires at least two paid subscription products in config.
  *
@@ -20,7 +20,10 @@ const { buildUser, callHandler } = require('../../routes/payments/_route-harness
 
 const handler = require('../../../src/manager/routes/payments/plan/post.js');
 
-const UID = '_test-journey-payments-plan-switch';
+// The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
+// exclusive to this suite and declared in the seed roster, so the account it
+// drives exists — auth user and doc in sync — before the run starts.
+const PERSONA = 'journey-payments-plan-switch';
 const RESOURCE_ID = 'sub_test_journey_plan_switch';
 const ORDER_ID = 'TEST-PLAN-SWTCH';
 
@@ -32,7 +35,7 @@ module.exports = {
   tests: [
     {
       name: 'setup-paid-subscription',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, assert, state, config, skip }) {
         const paidProducts = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (paidProducts.length < 2) {
@@ -48,7 +51,8 @@ module.exports = {
         const periodEndUNIX = nowUNIX + (30 * 86400);
         const startUNIX = nowUNIX - (365 * 86400);
 
-        state.uid = UID;
+        state.uid = accounts[PERSONA].uid;
+        state.email = accounts[PERSONA].email;
         state.productA = { id: productA.id, name: productA.name || productA.id, frequency: frequencyA };
         state.productB = { id: productB.id, name: productB.name || productB.id, frequency: frequencyB };
 
@@ -59,7 +63,7 @@ module.exports = {
           trial: { claimed: false },
           cancellation: { pending: false },
           payment: {
-            processor: 'test',
+            provider: 'test',
             orderId: ORDER_ID,
             resourceId: RESOURCE_ID,
             frequency: frequencyA,
@@ -70,8 +74,8 @@ module.exports = {
 
         // The pipeline reads users/{uid} for its BEFORE state — plan-changed is
         // detected by comparing that product against the incoming one.
-        await firestore.set(`users/${UID}`, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+        await firestore.set(`users/${state.uid}`, {
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         }, { merge: true });
@@ -81,15 +85,15 @@ module.exports = {
         await firestore.set(`payments-orders/${ORDER_ID}`, {
           id: ORDER_ID,
           type: 'subscription',
-          owner: UID,
+          owner: state.uid,
           productId: productA.id,
-          processor: 'test',
+          provider: 'test',
           resourceId: RESOURCE_ID,
           unified: state.subscription,
           requests: { cancellation: null, refund: null },
         }, { merge: true });
 
-        const userDoc = await firestore.get(`users/${UID}`);
+        const userDoc = await firestore.get(`users/${state.uid}`);
         assert.equal(userDoc.subscription.product.id, productA.id, `Should start as ${productA.id}`);
         assert.equal(userDoc.subscription.status, 'active', 'Should be active');
       },
@@ -99,7 +103,7 @@ module.exports = {
       name: 'call-plan-endpoint',
       async run({ assert, Manager, state }) {
         const user = buildUser(Manager, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
@@ -123,10 +127,10 @@ module.exports = {
 
     {
       name: 'plan-changed-transition-detected',
-      async run({ firestore, assert, waitFor }) {
+      async run({ firestore, assert, state, waitFor }) {
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
-            .where('owner', '==', UID)
+            .where('owner', '==', state.uid)
             .where('status', '==', 'completed')
             .limit(1)
             .get();
@@ -152,7 +156,7 @@ module.exports = {
         assert.equal(userDoc.subscription.product.name, state.productB.name, `Product name should be ${state.productB.name}`);
         assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
         assert.equal(userDoc.subscription.cancellation.pending, false, 'Switching plans must not schedule a cancellation');
-        assert.equal(userDoc.subscription.payment.processor, 'test', 'Processor should be test');
+        assert.equal(userDoc.subscription.payment.provider, 'test', 'Provider should be test');
         assert.equal(userDoc.subscription.payment.frequency, state.productB.frequency, `Frequency should be ${state.productB.frequency}`);
         assert.equal(userDoc.subscription.payment.resourceId, RESOURCE_ID, 'Resource ID should be the same subscription');
       },

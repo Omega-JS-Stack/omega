@@ -33,8 +33,8 @@ module.exports = {
       name: 'covers-the-paypal-expiry-cron-query',
       async run({ assert }) {
         // events/cron/daily/expire-paypal-cancellations.js queries users on two
-        // equalities: subscription.payment.processor + subscription.cancellation.pending
-        const index = findIndex('users', ['subscription.payment.processor', 'subscription.cancellation.pending']);
+        // equalities: subscription.payment.provider + subscription.cancellation.pending
+        const index = findIndex('users', ['subscription.payment.provider', 'subscription.cancellation.pending']);
 
         assert.ok(index, 'The PayPal expiry cron query needs a composite index entry');
         assert.equal(index.queryScope, 'COLLECTION', 'The cron queries one collection, not a group');

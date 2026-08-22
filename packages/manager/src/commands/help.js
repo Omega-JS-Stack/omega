@@ -11,10 +11,11 @@ const chalk = require('chalk').default;
 const VERBS = [
   ['omega manage', 'reconcile every service to config/omega.json5 — safe to rerun (`npm run manage`)'],
   ['omega dev', 'boot the local stack: website + backend emulator (`npm start`)'],
-  ['omega deploy', 'publish each app, backend first — deliberate, never automatic (`npm run deploy`)'],
+  ['omega deploy', 'publish each target, backend first — deliberate, never automatic (`npm run deploy`)'],
   ['omega onboard', 'create a NEW brand monorepo from scratch (the wizard)'],
-  ['omega test', "run every app's test suites"],
-  ['omega update', 'dependency-freshness fan-out over the apps'],
+  ['omega company', 'the company workspace: `init` scaffolds one, `adopt <brand>` stamps a brand into it'],
+  ['omega test', "run every target's test suites"],
+  ['omega update', 'dependency-freshness fan-out over the targets'],
   ['omega pipeline', 'the live full-cycle test: manage → deploy → verify'],
   ['omega devlog', "the manager's own development log"],
   ['omega version', 'print the installed version'],
@@ -35,7 +36,7 @@ module.exports = async () => {
   console.log('');
   console.log(chalk.bold('New here?'));
   console.log(`  ${chalk.dim('1.')} ${chalk.cyan('npx omega onboard')}  ${chalk.dim('— scaffold a brand (skip if you already have one)')}`);
-  console.log(`  ${chalk.dim('2.')} ${chalk.cyan('npm install')}        ${chalk.dim('— then `cd apps/<dir> && npx omega setup` per app')}`);
+  console.log(`  ${chalk.dim('2.')} ${chalk.cyan('npm install')}        ${chalk.dim('— then `cd targets/<dir> && npx omega setup` per target')}`);
   console.log(`  ${chalk.dim('3.')} ${chalk.cyan('npm run manage')}     ${chalk.dim('— reconcile everything; it says what it still needs')}`);
   console.log(`  ${chalk.dim('4.')} ${chalk.cyan('npm start')}          ${chalk.dim('— boot the local stack and build')}`);
   console.log('');

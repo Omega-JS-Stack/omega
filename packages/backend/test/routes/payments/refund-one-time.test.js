@@ -10,8 +10,8 @@
  *
  * The guards are the point of this suite, so it calls the handler DIRECTLY: each
  * case gets exactly the order doc it is about, without minting a persona per
- * permutation. The one valid order deliberately carries an unknown processor —
- * reaching "Unknown processor" proves the request got PAST every guard without
+ * permutation. The one valid order deliberately carries an unknown provider —
+ * reaching "Unknown provider" proves the request got PAST every guard without
  * anything external being touched.
  *
  * Run: npx omega test backend:routes/payments/refund-one-time
@@ -40,12 +40,12 @@ function oneTimeOrder(orderId, overrides) {
     type: 'one-time',
     owner: OWNER,
     productId: 'credits-100',
-    processor: 'unknown-processor',
+    provider: 'unknown-provider',
     resourceId: `_test-cs-${orderId}`,
     unified: {
       product: { id: 'credits-100', name: '100 Credits' },
       status: 'completed',
-      payment: { processor: 'unknown-processor', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
+      payment: { provider: 'unknown-provider', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
     },
     requests: { cancellation: null, refund: null },
     metadata: { created: { timestamp: new Date(nowUNIX * 1000).toISOString(), timestampUNIX: nowUNIX } },
@@ -139,21 +139,21 @@ module.exports = {
       name: 'rejects-a-dashboard-refunded-order',
       auth: 'none',
       async run({ assert, Manager, firestore }) {
-        // A refund issued from the processor dashboard arrives by webhook: it
+        // A refund issued from the provider dashboard arrives by webhook: it
         // flips unified.status to 'refunded' but writes NO requests.refund
         const orderId = '_test-order-one-time-dashboard-refunded';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
           unified: {
             product: { id: 'credits-100', name: '100 Credits' },
             status: 'refunded',
-            payment: { processor: 'unknown-processor', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
+            payment: { provider: 'unknown-provider', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
           },
         }));
 
         const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
 
         assert.equal(sent.code, 400, `A dashboard-refunded order should be rejected, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded, not 500 out of the processor');
+        assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded, not 500 out of the provider');
       },
     },
 
@@ -175,7 +175,7 @@ module.exports = {
     },
 
     {
-      name: 'reaches-the-processor-for-a-valid-one-time-order',
+      name: 'reaches-the-provider-for-a-valid-one-time-order',
       auth: 'none',
       async run({ assert, Manager, firestore }) {
         const orderId = '_test-order-one-time-valid';
@@ -183,8 +183,8 @@ module.exports = {
 
         const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
 
-        assert.equal(sent.code, 400, `A valid order should reach the processor lookup, got ${sent.code}: ${sent.body}`);
-        assert.match(`${sent.body}`, /Unknown processor/i, 'A valid one-time order should get PAST every guard');
+        assert.equal(sent.code, 400, `A valid order should reach the provider lookup, got ${sent.code}: ${sent.body}`);
+        assert.match(`${sent.body}`, /Unknown provider/i, 'A valid one-time order should get PAST every guard');
       },
     },
 

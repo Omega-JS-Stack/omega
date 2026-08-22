@@ -4,7 +4,8 @@
 // type — website, backend, extension, desktop), then a `targets` object whose KEY
 // PRESENCE says which targets this brand enables and whose values hold target-scoped
 // settings. Any shared key may also appear inside a target entry to override it for
-// that surface only (e.g. a desktop-specific monitoring.dsn under targets.desktop).
+// that surface only (e.g. a desktop-specific monitoring.providers.sentry.dsn
+// under targets.desktop).
 //
 // Secrets NEVER live here — they live in .env. The validator hard-fails on
 // secret-shaped keys (…Secret, …privateKey).
@@ -22,8 +23,11 @@
   },
 
   monitoring: {
-    provider: 'sentry',
-    dsn: '',
+    providers: {
+      sentry: {
+        dsn: '',
+      },
+    },
   },
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret
@@ -47,7 +51,7 @@
   // freeform so apps can extend per their needs without @omega.js/desktop caring. Leave empty until
   // you're ready to wire payments.
   payment: {
-    processors: {
+    providers: {
       stripe: { publishableKey: '' },
       paypal: { clientId:       '' },
     },

@@ -66,7 +66,7 @@ module.exports = async function (options) {
   if (options.secrets === false) {
     logger.log('Skipping secret publication (--no-secrets)');
   } else {
-    publishEnvSecrets({ appDir: root, logger });
+    publishEnvSecrets({ targetDir: root, logger });
   }
 
   logger.log('Setup complete');

@@ -1,0 +1,474 @@
+// OMEGA Playground (brand id omega-playground) — brand-level omega.json5: the
+// shared config layer every target under targets/ inherits. Local files override any
+// key per-surface; key presence under `targets` = this brand supports that
+// target. Secrets NEVER live here — they go in the gitignored .env (the
+// loader hard-fails on secret-shaped keys). This is the standing live TEST
+// brand and it says so OUT LOUD (Ian 2026-08-21, reversing the 2026-07-19
+// fiction ruling: an invented brand read as a real product in the ad and
+// analytics consoles). The doctrine now: this is the OMEGA test surface —
+// we mess around here, nothing live actually matters, and every account,
+// order, and page is throwaway. Infrastructure identity is UNCHANGED: id
+// omega-playground, subdomain playground.omegajs.dev, Firebase project
+// omegajs-playground — only the NAME and the VOICE moved.
+{
+
+  // Webhook parent topology: a brand names the parent whose central backend
+  // receives account-global webhooks ('self' when this brand IS that parent
+  // of sub-brands). false is CORRECT here (verified 2026-07-13): the SendGrid
+  // account is SHARED with the real ITW brands and its ONE per-account event
+  // webhook points at ITW's production forwarder — 'self' would hijack it.
+  // The real OMEGA brand sets 'self' on its OWN SendGrid account at launch.
+  parent: false,
+  brand: {
+    id: "omega-playground",
+    name: "OMEGA Playground",
+    company: "ITW Creative Works",
+    description: "The live demo surface for the OMEGA stack: every framework, every integration, running for real on data nobody has to keep.",
+    tagline: "See what OMEGA can do.",
+    color: "#166534", // playground green — deliberately distinct from the real brand's ocean blue so the two sites never twin; drives the --omega-accent-* ramps
+    // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
+    // SUBDOMAIN of the real domain, so every derived surface (authDomain,
+    // api.playground.omegajs.dev, canonicals) stays clear of the REAL
+    // omegajs.dev site — which belongs to the future standalone OMEGA brand.
+    url: "https://playground.omegajs.dev",
+    contact: {
+      // Playground subdomain (never the real omegajs.dev): the sendgrid
+      // sender derives offers@<this domain> and auto-verifies off the
+      // subdomain's own domain authentication.
+      email: "support@playground.omegajs.dev",
+    },
+    // PLACEHOLDER address (CAN-SPAM footer) — Ian's real business address at launch.
+    address: {
+      line1: "123 Main St",
+      line2: "Suite 100",
+      city: "City",
+      region: "ST",
+      postalCode: "12345",
+      country: "United States",
+    },
+    images: {
+      // Served by the web build's static channel: the minted set under
+      // .omega/assets is bridged to /assets/images/{favicon,brand} at build.
+      // SITE-RELATIVE on purpose — each surface absolutizes per environment
+      // (dev = localhost, prod = brand.url; emails/external always brand.url)
+      brandmark: "/assets/images/brand/brandmark.png",
+      social: "/assets/images/brand/social.png",
+    },
+  },
+
+  // The parent named by brand.company — ITW Creative Works is the real-world
+  // entity behind this rehearsal brand. Public-by-design; the footer
+  // copyright links the parent name through it.
+  company: {
+    url: "https://itwcreativeworks.com",
+  },
+
+  // Brand repo (github service: repo + Pages; the admin/post CMS routes
+  // commit to the same repo). No `repo` slug — the derivation defaults
+  // resolve it: name = brand.id (omega-playground), owner = org. The repo
+  // exists (gh-pages holds built output); the SOURCE lands on main at arc
+  // close (Ian 2026-07-12) — until then CMS creates fail at the branch
+  // lookup. shared: the org profile belongs to the OMEGA project, not this
+  // rehearsal brand. public: GitHub Pages on a free org needs a public repo
+  // — only built site output lands in it (gh-pages), public by definition.
+  repo: {
+    providers: {
+      github: {
+        org: "Omega-JS-Stack",
+        shared: true,
+        private: false,
+      },
+    },
+  },
+
+  // Registrar of the PARENT omegajs.dev (subdomain project — the domain
+  // service manages the parent's nameservers at Namecheap → Cloudflare).
+  domain: {
+    providers: { namecheap: {} },
+  },
+  edge: {
+    providers: {
+      cloudflare: {
+        zone: "60d8937b328e927aaddb7e27f277c61e",
+      },
+    },
+  },
+
+  // REAL playground project (created 2026-07-11; console:
+  // https://console.firebase.google.com/project/omegajs-playground). Values
+  // are the web-app config verbatim — public by design. To run offline-only,
+  // temporarily set projectId back to the demo-* convention (demo-omega-playground).
+  cloud: {
+    provider: "firebase",
+    // Platform-level resources the manage cycle's project ensures consume
+    // (#23 folded them out of the old `gcp` key — one cloud home).
+    // billingAccount = ITW Main Billing Account (ID only — unusable without
+    // IAM; repo is private). The billing ensure-step links it → Blaze.
+    // organizationId = ITW Creative Works GCP org — projects the manager
+    // creates land inside it (org placement grants the default compute SA
+    // roles; legacy omega-manager hardcoded this id, now it's config).
+    billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
+    organizationId: "1076309192968",
+    config: {
+      apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
+      // Brand host (cp268): first-party sign-in redirects under storage
+      // partitioning — `omega build` self-hosts /__/auth/* so the handler
+      // resolves here (the 2026-07-19 404 was the missing self-hosting).
+      authDomain: "playground.omegajs.dev",
+      projectId: "omegajs-playground",
+      storageBucket: "omegajs-playground.firebasestorage.app",
+      messagingSenderId: "644778453321",
+      appId: "1:644778453321:web:0d4f0f8774385a21671298",
+      databaseURL: "https://omegajs-playground-default-rtdb.firebaseio.com",
+      measurementId: "G-0SGDR7ZPJ9",
+    },
+    oauthRedirectsConfigured: true,
+    messaging: {
+      vapidKey: "BCqp_yZGRNzaUXbhH_3rfu5W33Xwe2xUGR1HykAFcBVw4YYaRwSIPKvE8DlOIYStJHRka7OovhjCRdwaJyE6YKQ",
+    },
+  },
+  captcha: {
+    providers: {
+      recaptcha: {
+        domainsConfirmed: ["playground.omegajs.dev", "www.playground.omegajs.dev"],
+      },
+    },
+  },
+
+  analytics: {
+    providers: {
+      google: { id: null, accountId: "377753992", propertyId: "545069570" },
+      meta: { id: "2285141245555388", accountId: "79317725" },
+      tiktok: { id: "DA4G5FRC77U2AAK83590", accountId: "7271818614041247745" },
+    },
+  },
+
+  monitoring: {
+    providers: {
+      sentry: {
+        dsn: null,
+        org: "itw-creative-works",
+      },
+    },
+  },
+
+  // Shared ITW AdSense account (from legacy omega-manager — one pub id
+  // account-wide). The service reports Google's approval state read-only.
+  // Rekeyed cp268: provider-neutral advertising section (client = ca-pub-…).
+  advertising: {
+    providers: {
+      adsense: {
+        client: "ca-pub-7372939085773564",
+      },
+    },
+  },
+
+  // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
+  // Shapes mirror @omega.js/backend's product schema.
+  payment: {
+    providers: {
+      stripe: { publishableKey: "pk_test_51T32RbReHWMUiO2TIWCU72ATxikGDMo1a3Byl7ZiEOdDHSKsiW9v6JwRyC7BCBK8AvhTJxWpsn3dpppwdZv73lIp00oBCyjnfg" },
+      paypal: { clientId: "BAAjk48TKd_AqC0VqD4dzqif8PfxWULRx6VqwoGd8PV4mJMK_OxBUXYiPhMl1kIPqzVpDgk80nAoaW73Z0" },
+      chargebee: { site: null },
+      coinbase: { enabled: false },
+    },
+    products: [
+      // Demo catalog — ids, limits, prices, and provider ids are the
+      // plumbing the payment lanes exercise (the Stripe/PayPal test products
+      // keep their ids); the display names are placeholder copy, and no tier
+      // here is a real product anyone is meant to buy.
+      {
+        id: "basic",
+        name: "Jotter",
+        type: "subscription",
+        tagline: "best for kicking the tires",
+        limits: { requests: 100 },
+        features: [
+          // definition = the dotted-underline tooltip; author it ONCE per
+          // feature id — the pricing composer backfills every other copy
+          { id: "requests", name: "Saves", icon: "feather", definition: "Notes, clips, and pages you can save per month." },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true, definition: "Web app, writing desk, and browser clipper: one library across all of them." },
+        ],
+      },
+      {
+        id: "premium",
+        name: "Studio",
+        type: "subscription",
+        tagline: "best for daily writers",
+        popular: true,
+        limits: { requests: 10000 },
+        trial: { days: 14 },
+        prices: { monthly: 9.99, annually: 99.99 },
+        features: [
+          { id: "requests", name: "Saves", icon: "feather" },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
+          { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real person first." },
+        ],
+        stripe: { productId: "prod_UscSf6XFplJRS1" },
+        paypal: { productId: "PROD-3SG37836K78792621" },
+        chargebee: { itemId: null, legacyPlanIds: [] },
+      },
+      {
+        // Second paid tier — proves the card grid with more than one priced
+        // plan (no Stripe test product minted for it yet)
+        id: "pro",
+        name: "Press",
+        type: "subscription",
+        tagline: "best for teams publishing together",
+        limits: { requests: -1 },
+        trial: { days: 14 },
+        prices: { monthly: 24.99, annually: 249.99 },
+        features: [
+          { id: "requests", name: "Saves", icon: "feather" },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
+          { id: "support", name: "Priority support", icon: "headset", value: true },
+          { id: "seats", name: "Writers on your team", icon: "users", value: 10, definition: "People who can write in your shared library at the same time." },
+          { id: "review", name: "Draft review & approvals", icon: "pen-nib", value: true, definition: "Send a draft for review, collect comments, publish once it's approved." },
+        ],
+        stripe: { productId: "prod_UzOGM0st0zRSbc" },
+        paypal: { productId: "PROD-1VY66504XX977983J" },
+        chargebee: { itemId: null, legacyPlanIds: [] },
+      },
+      {
+        id: "launch-kit",
+        name: "Starter Library",
+        type: "one-time",
+        tagline: "templates to begin beautifully",
+        prices: { once: 49.99 },
+        features: [
+          { id: "templates", name: "Page templates", icon: "palette", value: 12, definition: "Ready-made page and journal templates included with your license." },
+        ],
+        stripe: { productId: "prod_UscSbPkRMWy3Yr" },
+        chargebee: { itemId: null },
+        paypal: {
+          productId: "PROD-6PE73746WK711780N",
+        },
+      },
+      {
+        // QA tier (Ian 2026-08-17): NO trial by design, so a sandbox
+        // subscription charges the moment it activates — the payments QA
+        // drives need a real PAYMENT.SALE.* sequence, and every public tier
+        // carries a 14-day trial that defers the first sale two weeks. A
+        // proof press is the machine printers pull test prints on — the name
+        // is placeholder copy like the rest of the catalog. Recipe:
+        // packages/backend/docs/paypal-sandbox-qa.md. Deliberately VISIBLE on
+        // the pricing page (Ian 2026-08-19, #348): real checkouts run against
+        // it by hand. The hidden: true mechanism still exists for products
+        // that should stay off /pricing.
+        id: "proof-press",
+        name: "Proof Press",
+        type: "subscription",
+        tagline: "test prints, pulled immediately",
+        limits: { requests: 1 },
+        prices: { monthly: 5.00 },
+        features: [
+          { id: "requests", name: "Saves", icon: "feather" },
+        ],
+        chargebee: { itemId: null, legacyPlanIds: [] },
+        paypal: {
+          productId: "PROD-1VE952820H061592K",
+        },
+        stripe: {
+          productId: "prod_V5odp6Jww1qPyg",
+        },
+      },
+      {
+        // enterprise: true leaves the card grid and renders as its own
+        // full-width row under the cards — priced by conversation
+        id: "enterprise",
+        name: "Bindery",
+        type: "subscription",
+        enterprise: true,
+        tagline: "best for publishing houses and organizations that need their own terms",
+        url: "/contact",
+        features: [
+          { id: "seats", name: "Unlimited writers", icon: "users", value: true },
+          { id: "sso", name: "SSO & provisioning", icon: "key", value: true },
+          { id: "residency", name: "Data residency & retention terms", icon: "shield-halved", value: true },
+          { id: "manager", name: "Named account manager", icon: "headset", value: true },
+        ],
+      },
+    ],
+  },
+  marketing: {
+    campaigns: {
+      providers: {
+        sendgrid: {
+          listId: "daae211b-bc50-4d57-ae5e-8e86f6abb734",
+        },
+      },
+    },
+    // No newsletter for the rehearsal brand (Ian 2026-07-12) — the beehiiv
+    // service skips deliberately instead of asking for a publication.
+    newsletter: {
+      enabled: false,
+    },
+  },
+  search: {
+    providers: {
+      searchConsole: {
+        gaLinked: true,
+      },
+    },
+  },
+
+  // 2b create-on-missing (Ian 2026-07-13/14): the playground mints its OWN
+  // form/agents via the operator SAs — template*Id names ITW's real doc as
+  // the SHAPE DONOR only (read once at mint, never written). The minted ids
+  // land here via comment-preserving writeback; ITW's originals return to
+  // ITW's own convergence entirely (no more cross-brand re-branding).
+  forms: {
+    providers: {
+      slapform: {
+        templateFormId: "UlXJ49Q4C",
+        formId: "POZXbmsFFHOW1I",
+      },
+    },
+  },
+  inbound: {
+    chat: {
+      providers: {
+        chatsy: {
+          // Deliberately ON in the playground (Ian 2026-08-19): the widget must
+          // be seeable in local QA. The client boots it only when enabled AND
+          // an agentId are both set.
+          enabled: true,
+          templateAgentId: "8YIsRlzAAiv03d",
+          agentId: "KJT3xUjlQQVuaC",
+        },
+      },
+    },
+    email: {
+      providers: {
+        replyify: {
+          templateAgentId: "stcbsieo7n1Lrk",
+          agentId: "hkBrbPds9V4U0F",
+        },
+      },
+    },
+  },
+
+  // Apple signing (certificates service): reverse-DNS prefix (ITW is the
+  // real-world parent — Ian 2026-07-14); bundle IDs mint as
+  // <prefix>.<brand id with dashes as dots> →
+  // com.itwcreativeworks.omega.playground. Still playground-scoped by name
+  // (the real brand claims its own at launch).
+  certificates: {
+    providers: {
+      apple: {
+        bundleIdPrefix: "com.itwcreativeworks",
+      },
+    },
+  },
+
+  // Project-owned theme — seeded at onboarding, yours to change.
+  theme: {
+    id: "classy",
+    appearance: "system", // "system" | "light" | "dark"
+  },
+
+  // AI translation (web /{lang}/ copies + extension _locales) — provider
+  // "claude" (default) rides the local Claude Code install; "chatgpt" needs
+  // OPENAI_API_KEY in .env. Per-string cache commits to each target's translations/.
+  translation: {
+    languages: ["es"], // dogfood canary scope — expand at launch
+    // App-shell/auth/transactional pages skip translation (Ian 2026-07-18;
+    // mirrors the real brand) — marketing surface stays translated; system
+    // routes are framework-excluded already.
+    exclude: [
+      "account", "app", "dashboard", "signin", "signup", "login", "register",
+      "forgot", "recover", "reset", "reset-password", "change-password",
+      "token", "join", "cancel", "refund",
+    ],
+  },
+
+  // Download endpoints (site.download[platform][type]) — drive the /download
+  // cards + the detection hero. Playground points at the repo's releases hub
+  // until real release assets exist (releases stay GATED); ios/android are
+  // deliberately absent so the store band demos the notify-me flow.
+  download: {
+    mac: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    windows: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    linux: {
+      debian: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+      snap: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+    },
+  },
+
+  // Key presence = target enabled; the value is that target's type-wide
+  // config (any shared key inside overrides it for that surface). This IS
+  // the per-target override home (Ian 2026-07-13) — local-level omega.json5
+  // files are OPTIONAL (standalone/split-repo escape hatch) and the
+  // playground doesn't carry any (backend's rides the src/dist pillar).
+  targets: {
+    web: {
+      monitoring: {
+        providers: {
+          sentry: {
+            dsn: "https://540bf2f968075df6713fe325c7cb8c1c@o192327.ingest.us.sentry.io/4511736919293952",
+          },
+        },
+      },
+      analytics: {
+        providers: {
+          google: {
+            id: "G-Z29B118MLB",
+          },
+        },
+      },
+    },
+    backend: {
+      monitoring: {
+        providers: {
+          sentry: {
+            dsn: "https://e26b3772587e083a28ee960d632d3e16@o192327.ingest.us.sentry.io/4511736919359488",
+          },
+        },
+      },
+      analytics: {
+        providers: {
+          google: {
+            id: "G-Q7CE7TN3WF",
+          },
+        },
+      },
+    },
+    desktop: {
+      app: {
+        category: "developer-tools",
+      },
+      // #124: download links are opt-in now — the playground keeps them to exercise the derivation.
+      releases: {},
+      monitoring: {
+        providers: {
+          sentry: {
+            dsn: "https://4633c36db8db53a298e05cea9cce611e@o192327.ingest.us.sentry.io/4511736953831424",
+          },
+        },
+      },
+      analytics: {
+        providers: {
+          google: {
+            id: "G-Q4J6Q9PD5K",
+          },
+        },
+      },
+    },
+    extension: {
+      monitoring: {
+        providers: {
+          sentry: {
+            dsn: "https://20e47afec67def6cd86e215dc106cb74@o192327.ingest.us.sentry.io/4511736953896960",
+          },
+        },
+      },
+      analytics: {
+        providers: {
+          google: {
+            id: "G-7RHPLMNJZX",
+          },
+        },
+      },
+    },
+  },
+}

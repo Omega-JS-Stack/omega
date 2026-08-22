@@ -35,7 +35,7 @@ module.exports = {
       name: 'create-intent-with-discount',
       async run({ http, assert, state }) {
         const response = await http.as('journey-payments-intent-discount').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,
           discount: 'WELCOME15',

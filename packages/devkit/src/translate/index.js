@@ -3,8 +3,9 @@
  * SSOT, provider abstraction (claude via local Claude Code / chatgpt via
  * OpenAI), the batch translation engine, and the committed per-string cache.
  * Config contract (shared `translation` section of omega.json5):
- *   { enabled, default, languages, provider, model, exclude }
+ *   { enabled, default, languages, providers: { claude|chatgpt: {} }, model, exclude }
  */
+const { chosenProvider } = require('@omega.js/config');
 const { LANGUAGE_NAMES, LANGUAGE_LOCALES, RTL_LANGUAGES, isRTL, languageName, ogLocale, assertKnownLanguages } = require('./languages.js');
 const { PROVIDERS, DEFAULT_MODELS, resolveProvider } = require('./providers.js');
 const { translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE } = require('./engine.js');
@@ -26,7 +27,9 @@ function resolveTranslationSettings(config) {
     enabled: section.enabled !== false && languages.length > 0,
     default: section.default || 'en',
     languages,
-    provider: section.provider || 'claude',
+    // The engine is a KEY under translation.providers (#425); no block at all
+    // means claude, the no-API-key default.
+    provider: chosenProvider(section.providers) || 'claude',
     model: section.model || null,
     exclude: section.exclude || [],
   };

@@ -17,7 +17,7 @@
  * De-ITW'd from omega-manager: certs lived in the company instance's shared
  * .output/_shared/ tree (one set for all brands) and the bundle-ID prefix
  * was hardcoded to the company — the port keeps everything brand-local and
- * reads certificates.apple.bundleIdPrefix from config. The interactive
+ * reads certificates.providers.apple.bundleIdPrefix from config. The interactive
  * rescue for portal-only certs is restored and upgraded (Ian 2026-07-14,
  * lib/manual-walkthrough.js): the pipeline stages the CSR itself — legacy
  * sent users to Keychain Access — opens the portal create page Enter-gated,

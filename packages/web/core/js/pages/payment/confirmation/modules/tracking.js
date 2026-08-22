@@ -1,7 +1,7 @@
 // The confirmation page's purchase PIXEL — the browser half of a `purchase`
 // ([#386](https://github.com/Omega-JS-Stack/omega/issues/386)).
 //
-// The backend's payment webhook is the TRUTH: it sees what the processor
+// The backend's payment webhook is the TRUTH: it sees what the provider
 // actually charged, and it owns GA4 outright, because GA4 has no cross-source
 // event deduplication. What only a browser can give is the RETARGETING signal —
 // Meta's and TikTok's pixels tie the conversion to the ad click that is sitting
@@ -46,7 +46,7 @@ function trackPurchase(state) {
     value: state.amount,
     currency: state.currency,
     items: buildItems(state),
-    payment_processor: state.paymentMethod,
+    payment_provider: state.paymentMethod,
     payment_frequency: state.frequency,
     is_trial: state.hasFreeTrial,
   }, {

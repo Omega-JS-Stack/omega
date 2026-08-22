@@ -31,7 +31,7 @@ function runPaginatedJson(api, path) {
 
 /**
  * List repos for a GitHub owner — org endpoint first, user endpoint fallback
- * (devlog.orgs may mix orgs and personal accounts).
+ * (devlog.providers.ghostii.orgs may mix orgs and personal accounts).
  *
  * @param {object} api - GitHubAPI client
  * @param {string} owner - Org or user name

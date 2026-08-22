@@ -13,9 +13,9 @@ No way out.
 - **UID:** `t9AeAe7QUhNXAUYRV1vUbOU0QVV2`
 - **Brand:** Somiibo
 
-The user had two stale subscriptions from different processors:
+The user had two stale subscriptions from different providers:
 
-| Field | Processor | Status | Resource ID | Last Webhook |
+| Field | Provider | Status | Resource ID | Last Webhook |
 |---|---|---|---|---|
 | `subscription` | PayPal | `suspended` | `I-Y41DMAGNWGP1` | `BILLING.SUBSCRIPTION.SUSPENDED` (2026-04-19) |
 | `plan` (legacy) | Chargebee | `suspended` | `169xhEU1pYXAt3dsj` | `subscription-profile-fixer` (2024-02-28) |
@@ -58,13 +58,13 @@ if (!subscription || subscription.status !== 'active' || ...)
 if (!subscription || (subscription.status !== 'active' && subscription.status !== 'suspended') || ...)
 ```
 
-### 2. Fallback for dead processor subscriptions
+### 2. Fallback for dead provider subscriptions
 
-When cancelling a `suspended` subscription, the processor API call might fail — the subscription could be expired/deleted on the processor's side while our local state is stale. The cancel endpoint now catches processor errors for suspended subscriptions and directly resets the user doc:
+When cancelling a `suspended` subscription, the provider API call might fail — the subscription could be expired/deleted on the provider's side while our local state is stale. The cancel endpoint now catches provider errors for suspended subscriptions and directly resets the user doc:
 
 ```js
 if (subscription.status === 'suspended') {
-  // Processor rejected — subscription is already dead on their end
+  // Provider rejected — subscription is already dead on their end
   // Directly reset the user doc to cancelled
   await admin.firestore().doc(`users/${uid}`).set({
     subscription: {
@@ -78,7 +78,7 @@ if (subscription.status === 'suspended') {
 
 ### 3. New test coverage
 
-- Test account `cancel-suspended` with `status: 'suspended'` and test processor payment details
+- Test account `cancel-suspended` with `status: 'suspended'` and test provider payment details
 - Test `allows-suspended-subscription` verifying the cancel endpoint accepts and processes suspended subscriptions
 
 ## Status Matrix (after fix)

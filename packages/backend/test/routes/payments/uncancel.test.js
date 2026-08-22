@@ -1,17 +1,17 @@
 /**
- * Test: POST /payments/uncancel — guards and the per-processor capability gate
+ * Test: POST /payments/uncancel — guards and the per-provider capability gate
  * ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
  * Uncancel is an OWNED route next to cancel, cross-provider and capability-gated:
- * a processor that can resume a subscription EXPORTS `uncancel`, one that cannot
+ * a provider that can resume a subscription EXPORTS `uncancel`, one that cannot
  * simply lacks the export, and the route refuses BEFORE dispatch rather than
  * letting the caller discover it as a provider error.
  *
  * Two layers:
  *  - the route, called directly against a real ctx (the _route-harness technique),
- *    so one test can choose a processor and a subscription shape without minting a
+ *    so one test can choose a provider and a subscription shape without minting a
  *    persona per permutation;
- *  - the processor modules themselves, asserted as a capability TABLE — the export
+ *  - the provider modules themselves, asserted as a capability TABLE — the export
  *    list IS the contract the route reads.
  *
  * The full end-to-end pipeline run lives in
@@ -23,14 +23,14 @@ const { buildUser, callHandler, recordingResponse, withEnvironment } = require('
 
 const handler = require('../../../src/manager/routes/payments/uncancel/post.js');
 
-const PROCESSORS = ['stripe', 'chargebee', 'paypal', 'test'];
+const PROVIDERS = ['stripe', 'chargebee', 'paypal', 'test'];
 
-function processorModule(name) {
-  return require(`../../../src/manager/routes/payments/uncancel/processors/${name}.js`);
+function providerModule(name) {
+  return require(`../../../src/manager/routes/payments/uncancel/providers/${name}.js`);
 }
 
 // A subscriber whose cancellation is scheduled — the one state uncancel accepts.
-function pendingSubscriber(Manager, { uid, processor, status, pending, productId, resourceId }) {
+function pendingSubscriber(Manager, { uid, provider, status, pending, productId, resourceId }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
 
   return buildUser(Manager, {
@@ -41,7 +41,7 @@ function pendingSubscriber(Manager, { uid, processor, status, pending, productId
       status: status || 'active',
       cancellation: { pending: pending === undefined ? true : pending },
       payment: {
-        processor: processor === undefined ? 'test' : processor,
+        provider: provider === undefined ? 'test' : provider,
         resourceId: resourceId === undefined ? 'sub_test_uncancel_guard' : resourceId,
         frequency: 'monthly',
         startDate: { timestamp: new Date(lastYearUNIX * 1000).toISOString(), timestampUNIX: lastYearUNIX },
@@ -92,7 +92,7 @@ async function uncancelReadingProperties(Manager, user) {
 }
 
 module.exports = {
-  description: 'Payment uncancel endpoint: guards + processor capability gate',
+  description: 'Payment uncancel endpoint: guards + provider capability gate',
   type: 'group',
   timeout: 15000,
 
@@ -176,23 +176,23 @@ module.exports = {
       name: 'rejects-missing-payment-details',
       auth: 'none',
       async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-no-processor', processor: null, resourceId: null });
+        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-no-provider', provider: null, resourceId: null });
 
         const sent = await uncancel(Manager, user);
 
-        assert.equal(sent.code, 400, `Without a processor there is nothing to call, got ${sent.code}`);
+        assert.equal(sent.code, 400, `Without a provider there is nothing to call, got ${sent.code}`);
       },
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       auth: 'none',
       async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-unknown', processor: 'unknown-processor' });
+        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-unknown', provider: 'unknown-provider' });
 
         const sent = await uncancel(Manager, user);
 
-        assert.equal(sent.code, 400, `An unknown processor must be refused, got ${sent.code}`);
+        assert.equal(sent.code, 400, `An unknown provider must be refused, got ${sent.code}`);
       },
     },
 
@@ -202,7 +202,7 @@ module.exports = {
       name: 'paypal-is-gated-before-any-api-call',
       auth: 'none',
       async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal', processor: 'paypal', resourceId: 'I-TESTUNCANCEL' });
+        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         // PayPal's credentials are stripped: ANY attempt to reach PayPal would
         // throw inside the client and surface as a 500. A 400 is therefore proof
@@ -222,7 +222,7 @@ module.exports = {
         // The client branches on the code, not on the sentence — so the code
         // rides the response's own properties, where every 4xx carries its
         // machine-readable half.
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal-code', processor: 'paypal', resourceId: 'I-TESTUNCANCEL' });
+        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal-code', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         const { sent, properties } = await withEnvironment(
           { PAYPAL_CLIENT_ID: null, PAYPAL_CLIENT_SECRET: null },
@@ -230,18 +230,18 @@ module.exports = {
         );
 
         assert.equal(sent.code, 400, `Expected the capability gate, got ${sent.code}`);
-        assert.equal(properties?.additional?.code, 'not-supported-by-processor', `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`);
+        assert.equal(properties?.additional?.code, 'not-supported-by-provider', `Expected a branchable code on omega-properties, got: ${JSON.stringify(properties?.additional)}`);
       },
     },
 
     // ─── the capability TABLE: the export list IS the contract ───
 
     {
-      name: 'every-processor-module-loads',
+      name: 'every-provider-module-loads',
       auth: 'none',
       async run({ assert }) {
-        PROCESSORS.forEach((name) => {
-          assert.ok(processorModule(name), `routes/payments/uncancel/processors/${name}.js should exist so the route can ask it about the operation`);
+        PROVIDERS.forEach((name) => {
+          assert.ok(providerModule(name), `routes/payments/uncancel/providers/${name}.js should exist so the route can ask it about the operation`);
         });
       },
     },
@@ -251,7 +251,7 @@ module.exports = {
       auth: 'none',
       async run({ assert }) {
         ['stripe', 'chargebee', 'test'].forEach((name) => {
-          assert.equal(typeof processorModule(name).uncancel, 'function', `${name} should export uncancel()`);
+          assert.equal(typeof providerModule(name).uncancel, 'function', `${name} should export uncancel()`);
         });
       },
     },
@@ -262,7 +262,7 @@ module.exports = {
       async run({ assert }) {
         // PayPal's API cannot resume a cancelled subscription — activate only
         // works on a SUSPENDED one. The missing export is the whole gate.
-        assert.equal(typeof processorModule('paypal').uncancel, 'undefined', 'paypal must not export uncancel() — its API cannot resume a cancelled subscription');
+        assert.equal(typeof providerModule('paypal').uncancel, 'undefined', 'paypal must not export uncancel() — its API cannot resume a cancelled subscription');
       },
     },
   ],

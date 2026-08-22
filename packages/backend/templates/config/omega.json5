@@ -43,8 +43,11 @@
     },
   },
   monitoring: {
-    provider: 'sentry',
-    dsn: 'https://d965557418748jd749d837asf00552f@o777489.ingest.sentry.io/8789941',
+    providers: {
+      sentry: {
+        dsn: 'https://d965557418748jd749d837asf00552f@o777489.ingest.sentry.io/8789941',
+      },
+    },
   },
   analytics: {
     providers: {
@@ -61,7 +64,7 @@
   },
   oauth2: {},
   payment: {
-    processors: {
+    providers: {
       stripe: {
         publishableKey: null,
       },
@@ -163,7 +166,8 @@
 
   // ─── Backend target ────────────────────────────────────────────────────────
   // Key presence = this project supports the backend target. Any shared key may
-  // also appear here as a backend-only override (e.g. a per-surface monitoring.dsn).
+  // also appear here as a backend-only override (e.g. a per-surface
+  // monitoring.providers.sentry.dsn).
   targets: {
     backend: {
       // 'self' = this @omega.js/backend is the parent (newsletter-sources provider);
@@ -191,14 +195,21 @@
       marketing: {
         campaigns: {
           enabled: true,
-          provider: 'sendgrid',
-          listId: '',  // SendGrid Marketing list UUID. Populated by OMEGA's sendgrid/ensure/list.js. Skips runtime list-discovery API call.
+          providers: {
+            sendgrid: {
+              listId: '',  // SendGrid Marketing list UUID. Populated by OMEGA's campaigns/ensure/list.js. Skips runtime list-discovery API call.
+            },
+          },
         },
         newsletter: {
           enabled: false,
-          provider: 'beehiiv',
-          publicationId: '',  // Beehiiv publication ID (e.g., 'pub_xxxxx'). Populated by OMEGA's beehiiv/ensure/publication.js. Required for marketing sync to Beehiiv.
-          // Content: single object or array (matches blog config shape). Generator uses the first entry.
+          providers: {
+            beehiiv: {
+              publicationId: '',  // Beehiiv publication ID (e.g., 'pub_xxxxx'). Populated by OMEGA's newsletter/ensure/publication.js. Required for marketing sync to Beehiiv.
+            },
+          },
+          // Content is PIPELINE config, not Beehiiv config, so it stays role-level.
+          // Single object or array (matches blog config shape). Generator uses the first entry.
           content: [
             {
               sources: ['$parent'],    // '$parent' | '$feed:https://...' | '$brand'
@@ -223,15 +234,19 @@
             },
           ],
         },
+        // Monthly contact prune (deletes cold contacts from your mail providers).
+        // OPT-IN: nothing runs unless enabled is true — see @omega.js/backend's
+        // docs/marketing-campaigns.md (Contact Pruning).
         prune: {
-          enabled: true,
+          enabled: false,
         },
       },
       // Standalone blog auto-publisher (daily cron). OPT-IN: disabled by default.
       // Set enabled: true and quantity >= 1 to auto-publish independent blog posts.
       // For newsletter-linked articles, use marketing.newsletter.content.article.enabled instead.
       //
-      // `provider` selects the article-generation provider (only 'ghostii' for now).
+      // The key under `providers` selects the article-generation provider
+      // (only 'ghostii' for now).
       //
       // Source types:
       //   '$brand'                          — generic brand-topic generation
@@ -244,7 +259,9 @@
       // article is never reprocessed. When a feed is unreachable or exhausted, falls back to $brand.
       blog: {
         enabled: false,
-        provider: 'ghostii',
+        providers: {
+          ghostii: {},
+        },
         content: [
           {
             sources: [             // '$brand' | '$feed:https://...' | '$parent'

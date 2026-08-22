@@ -1,9 +1,9 @@
 /**
  * Test: POST /payments/intent
- * Tests intent creation endpoint validation + end-to-end flow via test processor
+ * Tests intent creation endpoint validation + end-to-end flow via test provider
  *
- * Validation tests use processor=stripe (fail at SDK step, proving validation logic)
- * Success tests use processor=test (full intent→webhook→trigger pipeline)
+ * Validation tests use provider=stripe (fail at SDK step, proving validation logic)
+ * Success tests use provider=test (full intent→webhook→trigger pipeline)
  *
  * Product-agnostic: resolves the first paid product from config.payment.products.
  * If the brand has no paid product configured, each test skips — this is a
@@ -25,7 +25,7 @@ module.exports = {
         }
 
         const response = await http.as('none').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -35,7 +35,7 @@ module.exports = {
     },
 
     {
-      name: 'rejects-missing-processor',
+      name: 'rejects-missing-provider',
       async run({ http, assert, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
@@ -47,7 +47,7 @@ module.exports = {
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject missing processor');
+        assert.isError(response, 400, 'Should reject missing provider');
       },
     },
 
@@ -55,7 +55,7 @@ module.exports = {
       name: 'rejects-missing-product-id',
       async run({ http, assert }) {
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           frequency: 'monthly',
         });
 
@@ -72,7 +72,7 @@ module.exports = {
         }
 
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
         });
 
@@ -90,7 +90,7 @@ module.exports = {
         }
 
         const response = await http.as('premium-active').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -109,7 +109,7 @@ module.exports = {
         }
 
         const response = await http.as('premium-suspended').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -128,7 +128,7 @@ module.exports = {
         }
 
         const response = await http.as('premium-cancelling').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -147,7 +147,7 @@ module.exports = {
         }
 
         const response = await http.as('premium-expired').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -160,7 +160,7 @@ module.exports = {
       name: 'rejects-invalid-product',
       async run({ http, assert }) {
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: 'nonexistent-product',
           frequency: 'monthly',
         });
@@ -178,7 +178,7 @@ module.exports = {
         }
 
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
           simulate: 'explode',
@@ -189,7 +189,7 @@ module.exports = {
     },
 
     {
-      name: 'rejects-unknown-processor',
+      name: 'rejects-unknown-provider',
       async run({ http, assert, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
         if (!paidProduct) {
@@ -197,12 +197,12 @@ module.exports = {
         }
 
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'unknown-processor',
+          provider: 'unknown-provider',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
 
-        assert.isError(response, 400, 'Should reject unknown processor');
+        assert.isError(response, 400, 'Should reject unknown provider');
       },
     },
 
@@ -215,7 +215,7 @@ module.exports = {
         }
 
         const response = await http.as('basic').post('backend-manager/payments/intent', {
-          processor: 'stripe',
+          provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
           discount: 'FAKECODE',
@@ -235,7 +235,7 @@ module.exports = {
         const frequency = Object.keys(paidProduct.prices)[0];
 
         const response = await http.as('intent-discount-validation').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency,
           discount: 'FLASH20',
@@ -260,7 +260,7 @@ module.exports = {
       // the client CANNOT send is captured here: the requester's IP and user agent,
       // which is what Meta and TikTok match a server conversion on
       // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)) — the completing
-      // webhook arrives from the processor, so this is the only moment we hear from
+      // webhook arrives from the provider, so this is the only moment we hear from
       // the customer's own browser.
       name: 'saves-attribution-tracking-consent-and-supplemental-to-intent-doc',
       async run({ http, assert, config, firestore, waitFor, skip }) {
@@ -302,7 +302,7 @@ module.exports = {
         };
 
         const response = await http.as('journey-payments-intent-attribution').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency,
           attribution,
@@ -334,7 +334,7 @@ module.exports = {
     },
 
     {
-      name: 'succeeds-with-test-processor',
+      name: 'succeeds-with-test-provider',
       async run({ http, assert, config, firestore, accounts, waitFor, skip }) {
         const uid = accounts['journey-payments-intent'].uid;
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
@@ -343,12 +343,12 @@ module.exports = {
         }
 
         const response = await http.as('journey-payments-intent').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
         });
 
-        assert.isSuccess(response, 'Should succeed with test processor');
+        assert.isSuccess(response, 'Should succeed with test provider');
         assert.ok(response.data.id, 'Should return intent ID');
         assert.ok(response.data.orderId, 'Should return orderId');
         assert.match(response.data.orderId, /^\d{4}-\d{4}-\d{4}$/, 'orderId should be XXXX-XXXX-XXXX format');
@@ -358,7 +358,7 @@ module.exports = {
         const intentDoc = await firestore.get(`payments-intents/${response.data.orderId}`);
         assert.ok(intentDoc, 'Intent doc should exist');
         assert.equal(intentDoc.intentId, response.data.id, 'Intent ID should match response');
-        assert.equal(intentDoc.processor, 'test', 'Processor should be test');
+        assert.equal(intentDoc.provider, 'test', 'Provider should be test');
         assert.equal(intentDoc.productId, paidProduct.id, 'Product should match');
 
         // Wait for auto-webhook to process and activate the subscription
@@ -380,11 +380,11 @@ module.exports = {
         const orderDocPath = `payments-orders/_test-order-history-${uid}`;
 
         // Create fake subscription history so user is ineligible for trial
-        await firestore.set(orderDocPath, { owner: uid, type: 'subscription', processor: 'test', status: 'cancelled' });
+        await firestore.set(orderDocPath, { owner: uid, type: 'subscription', provider: 'test', status: 'cancelled' });
 
         try {
           const response = await http.as('journey-payments-intent-trial').post('backend-manager/payments/intent', {
-            processor: 'test',
+            provider: 'test',
             productId: paidProduct.id,
             frequency: 'monthly',
             trial: true,

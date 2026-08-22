@@ -1,11 +1,11 @@
 /**
  * Verb log files (#197) — `omega build` and `omega test` tee their whole run to
- * <appRoot>/logs/<verb>.log: the terminal keeps its colors, the file is
+ * <targetRoot>/logs/<verb>.log: the terminal keeps its colors, the file is
  * ANSI-stripped and greppable. Driven for REAL — a child process runs the actual
- * command against a temp app, so the assertion is on bytes the verb wrote, not
+ * command against a temp target, so the assertion is on bytes the verb wrote, not
  * on a call being made.
  *
- * The temp app has a valid config but no src/, so each verb logs its real
+ * The temp target has a valid config but no src/, so each verb logs its real
  * startup output and then dies on the missing input — enough of a run to prove
  * the tee is attached from the first line, and cheap.
  */
@@ -18,8 +18,8 @@ const { test } = require('node:test');
 
 const COMMANDS = path.join(__dirname, '..', 'src', 'commands');
 
-// A temp app the web commands can resolve: valid omega.json5, no src/.
-function tmpApp(t) {
+// A temp target the web commands can resolve: valid omega.json5, no src/.
+function tmpTarget(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-verb-logs-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
@@ -30,7 +30,7 @@ function tmpApp(t) {
   return root;
 }
 
-// Run a command module for real in its own process, rooted at the temp app.
+// Run a command module for real in its own process, rooted at the temp target.
 // CI/GITHUB_ACTIONS are stripped because the tee deliberately skips under a
 // runner — this suite is about what it does when it DOESN'T skip. NODE_TEST_*
 // goes for the usual reason (a child inheriting it reports as an IPC child).
@@ -51,7 +51,7 @@ function runVerb(root, verb, marker) {
 }
 
 test('`omega build` tees the run to logs/build.log, ANSI stripped in the file only', (t) => {
-  const root = tmpApp(t);
+  const root = tmpTarget(t);
 
   const result = runVerb(root, 'build', 'BUILD DONE');
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);
@@ -70,7 +70,7 @@ test('`omega build` tees the run to logs/build.log, ANSI stripped in the file on
 });
 
 test('`omega test` keeps its own tee — the build it runs never steals logs/test.log', (t) => {
-  const root = tmpApp(t);
+  const root = tmpTarget(t);
 
   const result = runVerb(root, 'test', 'TEST DONE');
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);

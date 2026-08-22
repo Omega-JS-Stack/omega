@@ -282,14 +282,14 @@ async function copyDefaults(targetDir) {
   // write-only-if-changed.
   const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
-  // Layer-aware config (cp121c/cp122d): brand apps carry NO app-layer
+  // Layer-aware config (cp121c/cp122d): brand targets carry NO local-layer
   // omega.json5 — the brand file's `targets.*` is the per-target home, and
-  // the app file is the STANDALONE escape hatch only. Inside a brand
+  // the local file is the STANDALONE escape hatch only. Inside a brand
   // monorepo the template's config must not scaffold at all (the old
-  // targets-only seed kept resurrecting deleted app files on every setup).
+  // targets-only seed kept resurrecting deleted local files on every setup).
   const outputDir = targetDir || rootPathProject;
   const { resolveSeedMode } = require('@omega.js/config');
-  const isBrandApp = !resolveSeedMode(outputDir).standalone;
+  const isBrandTarget = !resolveSeedMode(outputDir).standalone;
 
   applyDefaults({
     defaultsDir,
@@ -297,7 +297,7 @@ async function copyDefaults(targetDir) {
     fileMap: {
       // Consumers own their files — never overwrite what exists.
       '**/*': { overwrite: false },
-      ...(isBrandApp ? { 'config/omega.json5': { skip: true } } : {}),
+      ...(isBrandTarget ? { 'config/omega.json5': { skip: true } } : {}),
       // Marker-section merges: framework owns the Default section, consumer owns
       // everything below the Custom marker. Re-running `npx omega setup` keeps the
       // framework section live-synced without clobbering the consumer's values.
@@ -308,11 +308,11 @@ async function copyDefaults(targetDir) {
       // missing by the `**/*` rule above, never clobbered.
       'AGENTS.md': { mergeLines: true, template: templateContext },
       // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-      // BRAND ROOT is the one doc home — per-app AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
+      // BRAND ROOT is the one doc home — per-target AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
       // never scaffold, and existing framework-owned-only copies are swept
-      // (retire rules; consumer content is never destroyed). Standalone apps
+      // (retire rules; consumer content is never destroyed). Standalone projects
       // keep them. Last-match-wins: these override the rules above.
-      ...(isBrandApp ? {
+      ...(isBrandTarget ? {
         'AGENTS.md': { retire: true, template: templateContext },
         'CLAUDE.md': { retire: true, template: templateContext },
         'CHANGELOG.md': { retire: true },

@@ -34,9 +34,9 @@ test('an off config never loads an SDK — not @sentry/node, not @sentry/electro
   assert.deepEqual(sentryModulesLoaded(), [], 'nothing is loaded before the first initialize');
 
   quiet(() => {
-    assert.strictEqual(node.initialize({ config: { provider: 'sentry', dsn: '' } }), null, 'the node entry hands back no SDK');
-    main.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } }, getVersion: () => '1.0.0' });
-    preload.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
+    assert.strictEqual(node.initialize({ config: { providers: { sentry: { dsn: '' } } } }), null, 'the node entry hands back no SDK');
+    main.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } }, getVersion: () => '1.0.0' });
+    preload.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } } });
   });
 
   assert.strictEqual(main._enabled, false);
@@ -60,7 +60,7 @@ test('the node entry runs its host gates: a test run reports nothing', () => {
   process.env.OMEGA_TEST_RUNNER = '1';
   try {
     const Sentry = quiet(() => node.initialize({
-      config: { provider: 'sentry', dsn: 'https://key@o1.ingest.sentry.io/1' },
+      config: { providers: { sentry: { dsn: 'https://key@o1.ingest.sentry.io/1' } } },
       isProduction: true,
     }));
     assert.strictEqual(Sentry, null);
@@ -107,7 +107,7 @@ function withStubbedElectronSDK(entry, run) {
 
 test('the electron entries tag the release brand.id@version, the one format every target uses', () => {
   const host = {
-    config:     { brand: { id: 'paperloom' }, monitoring: { provider: 'sentry', dsn: 'https://key@o1.ingest.sentry.io/1' } },
+    config:     { brand: { id: 'paperloom' }, monitoring: { providers: { sentry: { dsn: 'https://key@o1.ingest.sentry.io/1' } } } },
     getVersion: () => '1.4.2',
   };
 

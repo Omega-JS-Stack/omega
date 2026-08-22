@@ -2,7 +2,7 @@
  * Test: Payment Journey - Upgrade
  * Simulates: basic user → test intent → auto-webhook → paid active subscription
  *
- * Uses the test processor to exercise the full intent→webhook→trigger pipeline
+ * Uses the test provider to exercise the full intent→webhook→trigger pipeline
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
 module.exports = {
@@ -40,7 +40,7 @@ module.exports = {
       name: 'create-test-intent',
       async run({ http, assert, state }) {
         const response = await http.as('journey-payments-upgrade').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,
         });
@@ -72,7 +72,7 @@ module.exports = {
 
         assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
         assert.equal(userDoc.subscription.status, 'active', 'Status should be active');
-        assert.equal(userDoc.subscription.payment.processor, 'test', 'Processor should be test');
+        assert.equal(userDoc.subscription.payment.provider, 'test', 'Provider should be test');
         assert.equal(userDoc.subscription.payment.orderId, state.orderId, 'Order ID should match intent');
         assert.ok(userDoc.subscription.payment.resourceId, 'Resource ID should be set');
         assert.equal(userDoc.subscription.payment.frequency, state.product.frequency, 'Frequency should be monthly');
@@ -91,7 +91,7 @@ module.exports = {
         assert.equal(orderDoc.id, state.orderId, 'ID should match orderId');
         assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
         assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.processor, 'test', 'Processor should be test');
+        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
         assert.equal(orderDoc.resourceId, state.subscriptionId, 'Resource ID should match');
         assert.equal(orderDoc.unified.product.id, state.paidProductId, `Product should be ${state.paidProductId}`);
         assert.equal(orderDoc.unified.status, 'active', 'Status should be active');
@@ -123,9 +123,9 @@ module.exports = {
 
         assert.ok(intentDoc, 'Intent doc should exist');
         assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
-        assert.equal(intentDoc.intentId, state.intentId, 'Intent ID should match processor session ID');
+        assert.equal(intentDoc.intentId, state.intentId, 'Intent ID should match provider session ID');
         assert.equal(intentDoc.owner, state.uid, 'Owner should match');
-        assert.equal(intentDoc.processor, 'test', 'Processor should be test');
+        assert.equal(intentDoc.provider, 'test', 'Provider should be test');
         assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after webhook processing');
         assert.equal(intentDoc.productId, state.paidProductId, `Product should be ${state.paidProductId}`);
         assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');

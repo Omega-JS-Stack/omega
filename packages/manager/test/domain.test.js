@@ -29,7 +29,7 @@ function brandConfig({ url = `https://${DOMAIN}`, provider = 'namecheap' } = {})
     domain: structuredClone(DEFAULTS.domain),
     targets: { web: {} },
   };
-  config.domain.provider = provider;
+  config.domain.providers = provider ? { [provider]: {} } : {};
   return config;
 }
 
@@ -73,9 +73,8 @@ function runService(config, { cloudflare, namecheap, options = {} } = {}) {
     brandId: 'fixture-brand',
     brandRoot: '/tmp/omega-manager-domain-unused', // no handler touches disk
     brandConfig: config,
-    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: 'fixture-brand', config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.domain,
     options,
     serviceData: {},
@@ -86,10 +85,10 @@ function runService(config, { cloudflare, namecheap, options = {} } = {}) {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('domain: skips without domain.provider', async () => {
+test('domain: skips without a domain.providers registrar', async () => {
   const result = await runService(brandConfig({ provider: null }));
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /domain\.provider/);
+  assert.match(result.reason, /domain\.providers/);
 });
 
 test('domain: domain.enabled = false skips the service', async () => {

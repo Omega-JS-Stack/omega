@@ -41,9 +41,11 @@ test('monitoring declares every knob the monitoring package resolves (#380)', ()
   const paths = SHARED_SCHEMA.map((entry) => entry.path);
 
   // Undeclared keys pass validation silently, so a typo (scrubemail) would
-  // vanish instead of failing — every documented knob is declared here.
-  for (const key of ['provider', 'org', 'dsn', 'environment', 'sampleRate', 'tracesSampleRate', 'scrubEmail', 'attachScreenshot', 'bundlePatterns']) {
-    assert.ok(paths.includes(`monitoring.${key}`), `missing monitoring.${key}`);
+  // vanish instead of failing — every documented knob is declared here. The
+  // knobs hang off the PROVIDER since #425; only `enabled` is role-level.
+  assert.ok(paths.includes('monitoring.enabled'), 'missing monitoring.enabled');
+  for (const key of ['org', 'dsn', 'environment', 'sampleRate', 'tracesSampleRate', 'scrubEmail', 'attachScreenshot', 'bundlePatterns']) {
+    assert.ok(paths.includes(`monitoring.providers.sentry.${key}`), `missing monitoring.providers.sentry.${key}`);
   }
 });
 

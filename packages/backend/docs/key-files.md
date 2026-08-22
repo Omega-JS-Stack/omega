@@ -29,9 +29,9 @@
 | Webhook processing (on-write) | `src/manager/events/firestore/payments-webhooks/on-write.js` |
 | Payment analytics | `src/manager/events/firestore/payments-webhooks/analytics.js` |
 | Transition detection | `src/manager/events/firestore/payments-webhooks/transitions/index.js` |
-| Payment processor libraries | `src/manager/libraries/payment/processors/` |
-| Stripe library | `src/manager/libraries/payment/processors/stripe.js` |
-| PayPal library | `src/manager/libraries/payment/processors/paypal.js` |
+| Payment provider libraries | `src/manager/libraries/payment/providers/` |
+| Stripe library | `src/manager/libraries/payment/providers/stripe.js` |
+| PayPal library | `src/manager/libraries/payment/providers/paypal.js` |
 | Order ID generator | `src/manager/libraries/payment/order-id.js` |
 | Required Firestore indexes (SSOT) | `src/cli/commands/setup-tests/helpers/required-indexes.js` |
 | Test accounts | `src/test/test-accounts.js` |

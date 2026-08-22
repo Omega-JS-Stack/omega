@@ -8,7 +8,7 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
-const { composeAppWorkflows } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -138,26 +138,26 @@ function scaffoldDefaults(options) {
   options = options || {};
   const outputDir = options.outputDir || path.resolve('./');
 
-  // Layer-aware config (cp121c/cp122d): brand apps carry NO app-layer
+  // Layer-aware config (cp121c/cp122d): brand targets carry NO local-layer
   // omega.json5 — the brand file's `targets.*` is the per-target home, and
-  // the app file is the STANDALONE escape hatch only. Inside a brand
+  // that file is the STANDALONE escape hatch only. Inside a brand
   // monorepo the template's config must not scaffold at all (the old
-  // targets-only seed kept resurrecting deleted app files on every setup).
+  // targets-only seed kept resurrecting deleted local files on every setup).
   const fileMap = { ...FILE_MAP };
   const { resolveSeedMode } = require('@omega.js/config');
   const seed = resolveSeedMode(outputDir);
   if (!seed.standalone) {
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home — per-app AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
+    // BRAND ROOT is the one doc home — per-target AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
     // never scaffold, and existing framework-owned-only copies are swept
-    // (retire rules; consumer content is never destroyed). Standalone apps
+    // (retire rules; consumer content is never destroyed). Standalone projects
     // keep them. Last-match-wins over the `**/*.md` preserve rule.
     fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
-    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-app
+    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
     // .github/workflows/ in a brand monorepo can never fire. It is composed
     // into the brand root below instead — scoped to this app's path.
     fileMap['.github/**/*'] = { skip: true };
@@ -173,9 +173,9 @@ function scaffoldDefaults(options) {
   });
 
   if (!seed.standalone) {
-    composeAppWorkflows({
+    composeTargetWorkflows({
       sourceDir: path.join(rootPathPackage, 'dist', 'defaults', '.github', 'workflows'),
-      appDir: outputDir,
+      targetDir: outputDir,
       brandRoot: seed.brandRoot,
       transform: (contents, name) => siteTokenTransform(contents, { name }),
       logger: workflowLogger,

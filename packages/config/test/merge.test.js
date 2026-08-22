@@ -27,11 +27,11 @@ test('arrays replace whole — payment.products never concatenates', () => {
 
 test('null replaces, undefined is skipped', () => {
   const result = deepMerge(
-    { monitoring: { dsn: 'https://a' }, theme: { id: 'classy' } },
-    { monitoring: { dsn: null }, theme: { id: undefined } },
+    { monitoring: { providers: { sentry: { dsn: 'https://a' } } }, theme: { id: 'classy' } },
+    { monitoring: { providers: { sentry: { dsn: null } } }, theme: { id: undefined } },
   );
 
-  assert.strictEqual(result.monitoring.dsn, null);
+  assert.strictEqual(result.monitoring.providers.sentry.dsn, null);
   assert.strictEqual(result.theme.id, 'classy');
 });
 

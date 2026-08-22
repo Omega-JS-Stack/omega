@@ -1,5 +1,5 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 const { escapeHtml, safeUrl } = require('../../../libraries/email/constants.js');
 
@@ -7,9 +7,9 @@ const { escapeHtml, safeUrl } = require('../../../libraries/email/constants.js')
  * Firestore trigger: payments-disputes/{alertId} onWrite
  *
  * Processes pending dispute alerts:
- * 1. Loads the processor module for the alert's payment processor
- * 2. Searches for the matching charge via processor.searchAndMatch()
- * 3. Issues refund + cancels subscription via processor.processDispute()
+ * 1. Loads the provider module for the alert's payment provider
+ * 2. Searches for the matching charge via provider.searchAndMatch()
+ * 3. Issues refund + cancels subscription via provider.processDispute()
  * 4. Sends email alert to brand contact
  * 5. Updates dispute document with results
  */
@@ -32,20 +32,20 @@ module.exports = async ({ ctx, change, context }) => {
 
   try {
     const alert = dataAfter.alert;
-    const processor = alert.processor || 'stripe';
+    const provider = alert.provider || 'stripe';
 
-    ctx.log(`Processing dispute ${alertId}: processor=${processor}, amount=${alert.amount}, card=****${alert.card.last4}, date=${alert.transactionDate}, chargeId=${alert.chargeId || 'none'}, paymentIntentId=${alert.paymentIntentId || 'none'}`);
+    ctx.log(`Processing dispute ${alertId}: provider=${provider}, amount=${alert.amount}, card=****${alert.card.last4}, date=${alert.transactionDate}, chargeId=${alert.chargeId || 'none'}, paymentIntentId=${alert.paymentIntentId || 'none'}`);
 
-    // Load the processor module
-    let processorModule;
+    // Load the provider module
+    let providerModule;
     try {
-      processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+      providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
     } catch (e) {
-      throw new Error(`Unsupported dispute processor: ${processor}`);
+      throw new Error(`Unsupported dispute provider: ${provider}`);
     }
 
     // Search for the matching charge
-    const match = await processorModule.searchAndMatch(alert, ctx);
+    const match = await providerModule.searchAndMatch(alert, ctx);
 
     // Build timestamps
     const now = powertools.timestamp(new Date(), { output: 'string' });
@@ -84,7 +84,7 @@ module.exports = async ({ ctx, change, context }) => {
     }
 
     // Process refund and cancel
-    const result = await processorModule.processDispute(match, alert, ctx);
+    const result = await providerModule.processDispute(match, alert, ctx);
 
     // Update dispute document with results
     await disputeRef.set({
@@ -162,7 +162,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   const subject = `Dispute Alert: ${matched} — $${alert.amount} on ****${alert.card.last4} [${alertId}]`;
 
   // The alert body is hand-built markup (trustedContent below), so every value that
-  // came off the dispute webhook or the processor match gets escaped on the way in.
+  // came off the dispute webhook or the provider match gets escaped on the way in.
   const messageLines = [];
 
   // Status banner
@@ -184,7 +184,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   messageLines.push(`<li><strong>Card:</strong> ****${escapeHtml(alert.card.last4)} (${escapeHtml(alert.card.brand || 'unknown')})</li>`);
   messageLines.push(`<li><strong>Amount:</strong> $${escapeHtml(alert.amount)}</li>`);
   messageLines.push(`<li><strong>Transaction Date:</strong> ${escapeHtml(alert.transactionDate)}</li>`);
-  messageLines.push(`<li><strong>Processor:</strong> ${escapeHtml(alert.processor)}</li>`);
+  messageLines.push(`<li><strong>Provider:</strong> ${escapeHtml(alert.provider)}</li>`);
   messageLines.push(`<li><strong>Reason:</strong> ${escapeHtml(alert.reasonCode || 'N/A')}</li>`);
   messageLines.push(`<li><strong>Network:</strong> ${escapeHtml(alert.subprovider || 'N/A')}</li>`);
   messageLines.push(`<li><strong>Customer Email:</strong> ${escapeHtml(alert.customerEmail || 'N/A')}</li>`);

@@ -23,6 +23,7 @@ const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTER
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
+const { chosenProvider } = require('./providers.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
@@ -36,7 +37,7 @@ const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = requi
 const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, readSiblingOrigin, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
-const { APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceAppDir, appInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
+const { DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceTargetDir, targetInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
 
 module.exports = {
   // Loading
@@ -51,7 +52,7 @@ module.exports = {
   FILE_NAME,
   CONFIG_LOCATIONS,
 
-  // .env cascade (shell > app .env > brand .env > company .env)
+  // .env cascade (shell > local .env > brand .env > company .env)
   loadEnv,
   resolveEnvChain,
   loadEnvChain,
@@ -67,7 +68,7 @@ module.exports = {
   applyCanonicalOrder,
   CANONICAL_TOP_LEVEL_ORDER,
 
-  // Layer-aware consumer seeding (brand-app = no app-layer config at all)
+  // Layer-aware consumer seeding (brand target = no local-layer config at all)
   resolveSeedMode,
 
   // Owner hooks (config/hooks/<call-site>.js — brand root, then company root)
@@ -106,6 +107,10 @@ module.exports = {
   RETIRED_KEYS,
   RETIRED_PATHS,
 
+  // The one provider shape (#425) — `role.providers.<provider>`, where key
+  // presence is the pick and `false` is the deliberate off switch
+  chosenProvider,
+
   // Merge
   deepMerge,
 
@@ -126,14 +131,14 @@ module.exports = {
 
   // Multi-instance targets (_attic/plans/multi-instance-targets.md): normalization
   // is the ONE iteration mechanism — object form = [{ id: 'main', ...entry }]
-  APP_DIR_TARGETS,
-  TARGET_APP_DIRS,
+  DIR_TARGETS,
+  TARGET_DIRS,
   MAIN_INSTANCE,
   INSTANCE_ID_PATTERN,
   normalizeTargetInstances,
   instanceIdFromDirName,
-  instanceAppDir,
-  appInstance,
+  instanceTargetDir,
+  targetInstance,
   resolveInstanceEntry,
   instancePortOffset,
   resolveInstanceUrl,

@@ -111,6 +111,8 @@ module.exports = {
           cardBrand: 'Visa',
           amount: 29.99,
           transactionDate: '2026-03-07 14:30:00',
+          // Chargeblast's own field name on the wire (#428 leftover) — the
+          // route normalizes it onto `alert.provider`
           processor: 'stripe',
           alertType: 'FRAUD',
           customerEmail: 'test@example.com',
@@ -139,7 +141,7 @@ module.exports = {
         assert.equal(doc.alert.card.brand, 'visa', 'Should lowercase card brand');
         assert.equal(doc.alert.amount, 29.99, 'Amount should be preserved');
         assert.equal(doc.alert.transactionDate, '2026-03-07', 'Should extract date without time');
-        assert.equal(doc.alert.processor, 'stripe', 'Processor should be stripe');
+        assert.equal(doc.alert.provider, 'stripe', 'Provider should be stripe');
 
         // Verify new normalized fields
         assert.equal(doc.alert.alertType, 'FRAUD', 'Alert type should be preserved');
@@ -200,7 +202,7 @@ module.exports = {
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
         assert.equal(doc.alert.card.last4, '9124', 'Should use card as last4');
-        assert.equal(doc.alert.processor, 'stripe', 'Processor should default to stripe');
+        assert.equal(doc.alert.provider, 'stripe', 'Provider should default to stripe');
         assert.equal(doc.alert.chargeId, null, 'Charge ID should be null when not provided');
         assert.equal(doc.alert.paymentIntentId, null, 'Payment intent should be null when not provided');
         assert.equal(doc.alert.customerEmail, null, 'Customer email should be null when not provided');
@@ -229,7 +231,7 @@ module.exports = {
 
         const doc = await firestore.get(`payments-disputes/${alertId}`);
         assert.equal(doc.alert.card.last4, '1234', 'Should use card value as last4 when already 4 digits');
-        assert.equal(doc.alert.processor, 'stripe', 'Processor should default to stripe');
+        assert.equal(doc.alert.provider, 'stripe', 'Provider should default to stripe');
       },
     },
 

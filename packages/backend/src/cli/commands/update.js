@@ -4,7 +4,7 @@
  * --min-age days (default 7) QUARANTINED. `--apply` installs the
  * non-quarantined, non-breaking set (`--major` opts into breaking) through
  * npu when present. The whole verb is the shared devkit implementation;
- * it runs against the APP ROOT's package.json.
+ * it runs against the TARGET ROOT's package.json.
  */
 const BaseCommand = require('./base-command');
 const { runUpdate } = require('@omega.js/devkit/update');

@@ -36,7 +36,7 @@ const { RunSummary } = require('../src/lib/run-summary.js');
 
 const COMPANY_CONFIG = `{
   brand: { name: 'Fixture Co' },
-  monitoring: { provider: 'sentry', dsn: 'https://company@sentry.example/1' },
+  monitoring: { providers: { sentry: { dsn: 'https://company@sentry.example/1' } } },
   brands: { roots: ['./brands'] },
 }`;
 
@@ -52,12 +52,12 @@ function stageBrandDir(parentDir, dirName, { config } = {}) {
   const root = path.join(parentDir, dirName);
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
-    name: dirName, private: true, workspaces: ['apps/*'],
+    name: dirName, private: true, workspaces: ['targets/*'],
   }, null, 2));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), config || brandConfig(dirName));
 
-  const website = path.join(root, 'apps', 'website');
+  const website = path.join(root, 'targets', 'website');
   fs.mkdirSync(website, { recursive: true });
   fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({
     name: `${dirName}-website`, private: true,
@@ -92,7 +92,7 @@ test('company: a config with brands.roots is a company root; a brand is not', ()
 
   assert.deepEqual(resolveManageRoot(root), { root, isCompany: true });
   // From inside a brand under the company, the BRAND is the manage root
-  assert.deepEqual(resolveManageRoot(path.join(brands['brand-a'], 'apps', 'website')), {
+  assert.deepEqual(resolveManageRoot(path.join(brands['brand-a'], 'targets', 'website')), {
     root: brands['brand-a'],
     isCompany: false,
   });
@@ -139,7 +139,7 @@ test('company: loadCompanyConfig strips the brands key and hard-fails on secret-
   const { root } = stageCompany();
   const layer = loadCompanyConfig(root);
 
-  assert.equal(layer.monitoring.dsn, 'https://company@sentry.example/1');
+  assert.equal(layer.monitoring.providers.sentry.dsn, 'https://company@sentry.example/1');
   assert.equal('brands' in layer, false);
 
   const leaky = stageCompany({ config: `{ oauth2: { clientSecret: 'oops' }, brands: { roots: ['./brands'] } }` });
@@ -155,7 +155,7 @@ test('company: loadBrand layers DEFAULTS ← company ← brand off the stamp, br
   stampCompanyMarker(brands['brand-a'], root);
 
   const layered = loadBrand(brands['brand-a']);
-  assert.equal(layered.config.monitoring.dsn, 'https://company@sentry.example/1'); // company fills the gap
+  assert.equal(layered.config.monitoring.providers.sentry.dsn, 'https://company@sentry.example/1'); // company fills the gap
   assert.equal(layered.config.brand.name, 'brand-a brand');     // brand wins over 'Fixture Co'
   assert.equal(layered.config.enabled, true);                   // manager DEFAULTS underneath
 });
@@ -176,7 +176,7 @@ test('company: the manager adds NO company fold of its own — loadBrand equals 
   const direct = loadConfig(brandRoot, undefined, { defaults: DEFAULTS }).config;
 
   // The company layer is genuinely in play (this equality is not vacuous) …
-  assert.equal(viaManager.monitoring.dsn, 'https://company@sentry.example/1');
+  assert.equal(viaManager.monitoring.providers.sentry.dsn, 'https://company@sentry.example/1');
   assert.equal(viaManager.brand.name, 'brand-a brand');
   // … and the manager contributes nothing on top of @omega.js/config's chain:
   // re-adding a manager-side fold at a different rung breaks this equality.
@@ -235,7 +235,7 @@ test('company: a stamped brand layers company config and .env (shell > brand > c
   try {
     const report = await runManage(brands['brand-a'], { service: 'workspace' });
 
-    assert.equal(report.brand.config.monitoring.dsn, 'https://company@sentry.example/1');
+    assert.equal(report.brand.config.monitoring.providers.sentry.dsn, 'https://company@sentry.example/1');
     assert.equal(report.brand.config.brand.name, 'brand-a brand');
     assert.equal(process.env.OMEGA_TEST_A, 'from-brand');
     assert.equal(process.env.OMEGA_TEST_B, 'from-brand');

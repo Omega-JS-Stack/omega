@@ -96,7 +96,7 @@ test('scripts op: heals a legacy brand root (deploy + the start/manage migration
   const root = tmpBrand({
     name: 'omegajs.dev',
     private: true,
-    workspaces: ['apps/*'],
+    workspaces: ['targets/*'],
     scripts: {
       start: 'omega',
       dev: 'omega dev',
@@ -120,7 +120,7 @@ test('scripts op: heals a legacy brand root (deploy + the start/manage migration
   });
   // Everything else survives verbatim
   assert.equal(pkg.name, 'omegajs.dev');
-  assert.deepEqual(pkg.workspaces, ['apps/*']);
+  assert.deepEqual(pkg.workspaces, ['targets/*']);
   assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': '*' });
 });
 

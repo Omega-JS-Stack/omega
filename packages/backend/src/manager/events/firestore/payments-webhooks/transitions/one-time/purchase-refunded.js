@@ -4,9 +4,9 @@
  * subscription and no invoice).
  *
  * Webhook-driven, so it fires however the refund originated — the refund
- * endpoint, an admin dashboard, or a direct processor action.
+ * endpoint, an admin dashboard, or a direct provider action.
  *
- * Processor-agnostic — refund details are extracted by the processor library's
+ * Provider-agnostic — refund details are extracted by the provider library's
  * getRefundDetails() and passed as a unified { amount, currency, reason } object,
  * the same ones on-write.js records on the order.
  *

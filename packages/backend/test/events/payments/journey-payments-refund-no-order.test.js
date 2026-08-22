@@ -2,14 +2,14 @@
  * Test: Payment Journey - Refund with no order doc ([#216](https://github.com/Omega-JS-Stack/omega/issues/216))
  * Simulates: paid, pending cancellation, WITHOUT an order doc → POST /payments/refund → cancelled, product intact
  *
- * The same hole #210 fixed in the cancel processor: the refund test processor
+ * The same hole #210 fixed in the cancel provider: the refund test provider
  * resolved the plan's product from the payments-orders doc only, so a paid user
  * with no order got a webhook carrying plan.product = null — the pipeline
  * resolved that to Basic and downgraded the user mid-refund instead of recording
  * a cancelled paid subscription. The product falls back to the subscription's own.
  *
  * The refund-no-order persona is seeded paid + pending cancellation on the test
- * processor with payment.orderId null. Product-agnostic: the persona's 'premium'
+ * provider with payment.orderId null. Product-agnostic: the persona's 'premium'
  * is remapped to the brand's first paid product at seed time, and the assertions
  * compare against whatever the user doc starts with.
  */
@@ -31,7 +31,7 @@ module.exports = {
         assert.notEqual(userDoc.subscription?.product?.id, 'basic', 'Persona should start on a paid product');
         assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
         assert.equal(userDoc.subscription?.cancellation?.pending, true, 'Refund requires a pending cancellation');
-        assert.equal(userDoc.subscription?.payment?.processor, 'test', 'Should be on the test processor');
+        assert.equal(userDoc.subscription?.payment?.provider, 'test', 'Should be on the test provider');
         assert.equal(userDoc.subscription?.payment?.orderId, null, 'The bug scenario needs no order doc');
 
         state.paidProductId = userDoc.subscription.product.id;
@@ -41,7 +41,7 @@ module.exports = {
     {
       name: 'call-refund-endpoint',
       async run({ http, assert }) {
-        // The test processor writes a payments-webhooks doc directly, triggering the
+        // The test provider writes a payments-webhooks doc directly, triggering the
         // on-write pipeline automatically — no manual webhook needed.
         const response = await http.as('refund-no-order').post('backend-manager/payments/refund', {
           confirmed: true,

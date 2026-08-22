@@ -5,7 +5,7 @@
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  * Mirrors stripe/to-unified-one-time.js for consistent coverage
  */
-const PayPal = require('../../../../src/manager/libraries/payment/processors/paypal.js');
+const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
@@ -153,10 +153,10 @@ module.exports = {
     // ─── Payment metadata ───
 
     {
-      name: 'payment-processor-always-paypal',
+      name: 'payment-provider-always-paypal',
       async run({ assert }) {
         const result = toUnifiedOneTime({});
-        assert.equal(result.payment.processor, 'paypal', 'Processor should always be paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider should always be paypal');
       },
     },
 
@@ -251,7 +251,7 @@ module.exports = {
 
         assert.equal(result.product.id, 'credits-100', 'Product should be credits-100');
         assert.equal(result.status, 'completed', 'Status should be completed');
-        assert.equal(result.payment.processor, 'paypal', 'Processor should be paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider should be paypal');
         assert.equal(result.payment.resourceId, 'PAYID-FULL', 'Resource ID should match');
         assert.equal(result.payment.orderId, '1234-5678-9012', 'orderId should match');
         assert.equal(result.payment.price, 9.99, 'Price should be resolved');
@@ -266,7 +266,7 @@ module.exports = {
 
         assert.equal(result.product.id, 'unknown', 'Empty → unknown product');
         assert.equal(result.status, 'unknown', 'Empty → unknown status');
-        assert.equal(result.payment.processor, 'paypal', 'Empty → still paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Empty → still paypal');
         assert.equal(result.payment.orderId, null, 'Empty → null orderId');
         assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
         assert.equal(result.payment.price, 0, 'Empty → price 0');
@@ -337,7 +337,7 @@ module.exports = {
         const result = toUnifiedOneTime(FIXTURE_ORDER_COMPLETED);
 
         assert.equal(result.status, 'completed', 'COMPLETED fixture → completed');
-        assert.equal(result.payment.processor, 'paypal', 'Processor is paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider is paypal');
         assert.equal(result.payment.resourceId, '5UX02069M9686893E', 'Resource ID from fixture');
         assert.equal(result.payment.orderId, 'ord-test-456', 'orderId from purchase_units custom_id');
         assert.equal(result.product.id, 'credits-100', 'Product resolved from purchase_units custom_id');
@@ -368,7 +368,7 @@ module.exports = {
           assert.ok(result.product, `Fixture ${i}: should have product`);
           assert.ok(result.status, `Fixture ${i}: should have status`);
           assert.ok(result.payment, `Fixture ${i}: should have payment`);
-          assert.equal(result.payment.processor, 'paypal', `Fixture ${i}: processor is paypal`);
+          assert.equal(result.payment.provider, 'paypal', `Fixture ${i}: provider is paypal`);
           assert.isType(result.payment.updatedBy.date.timestamp, 'string', `Fixture ${i}: updatedBy.date.timestamp is string`);
           assert.isType(result.payment.updatedBy.date.timestampUNIX, 'number', `Fixture ${i}: updatedBy.date.timestampUNIX is number`);
           // One-time payments should NOT have subscription fields

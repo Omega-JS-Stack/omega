@@ -424,8 +424,8 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.deepStrictEqual(omega.analytics, { providers: { google: { id: 'G-TEST123' }, tiktok: { id: 'TIKTOK1' } } }, 'flat analytics → providers; empty provider dropped');
   assert.strictEqual(omega.cloud.provider, 'firebase', 'cloud role gets its provider discriminator');
   assert.strictEqual(omega.cloud.config.apiKey, 'AIza-TEST', 'firebase app config extracted');
-  assert.strictEqual(omega.payment.processors.chargebee.site, 'sample');
-  assert.strictEqual(omega.payment.processors.stripe.publishableKey, undefined, 'publishableKey: false dropped');
+  assert.strictEqual(omega.payment.providers.chargebee.site, 'sample');
+  assert.strictEqual(omega.payment.providers.stripe.publishableKey, undefined, 'publishableKey: false dropped');
   assert.strictEqual(omega.oauth2.discord.enabled, true);
 
   const web = omega.targets.web;
@@ -590,49 +590,49 @@ test('e2e: real migration converts config, rewrites templates, removes legacy fi
 // A consumer migrated in the FLEET-STANDARD order (#297): the brand root's
 // omega.json5 exists and the app's UJM configs are already gone before
 // `omega migrate` runs, so only the codemods are left to do.
-function stagePreConvertedBrandApp() {
+function stagePreConvertedBrandTarget() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-preconverted-'));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
 
-  const appDir = path.join(root, 'apps', 'website');
-  fs.mkdirSync(path.join(appDir, 'src', 'pages'), { recursive: true });
-  fs.writeFileSync(path.join(appDir, 'src', 'pages', 'index.html'), [
+  const targetDir = path.join(root, 'targets', 'website');
+  fs.mkdirSync(path.join(targetDir, 'src', 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(targetDir, 'src', 'pages', 'index.html'), [
     '---',
     'layout: themes/[ site.theme.id ]/frontend/core/base',
     '---',
     '<h1>{{ page.resolved.meta.title }}</h1>',
   ].join('\n'));
-  fs.writeFileSync(path.join(appDir, 'Gemfile'), "source 'https://rubygems.org'\n");
-  return { root, appDir };
+  fs.writeFileSync(path.join(targetDir, 'Gemfile'), "source 'https://rubygems.org'\n");
+  return { root, targetDir };
 }
 
 test('e2e: a pre-converted app (brand config above, no legacy configs) succeeds and still codemods (#297)', () => {
-  const { root, appDir } = stagePreConvertedBrandApp();
+  const { root, targetDir } = stagePreConvertedBrandTarget();
   try {
-    const report = runMigration(appDir, {});
+    const report = runMigration(targetDir, {});
 
     assert.deepStrictEqual(report.errors, [], 'a converted config is not a failure');
     assert.strictEqual(report.config.skipped, true, 'the config step reports itself already done');
     assert.strictEqual(report.config.path, path.join('..', '..', 'config', 'omega.json5'), 'names the config the loader resolves');
 
-    const page = fs.readFileSync(path.join(appDir, 'src', 'pages', 'index.html'), 'utf8');
+    const page = fs.readFileSync(path.join(targetDir, 'src', 'pages', 'index.html'), 'utf8');
     assert.ok(page.includes('{{ resolved.meta.title }}'), 'the codemods still ran');
     assert.ok(page.includes('layout: frontend/core/base'), 'bracket layout rewritten');
-    assert.ok(!fs.existsSync(path.join(appDir, 'Gemfile')), 'legacy hygiene still ran');
+    assert.ok(!fs.existsSync(path.join(targetDir, 'Gemfile')), 'legacy hygiene still ran');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('e2e: a pre-converted app whose config does NOT load fails loudly instead of claiming success', () => {
-  const { root, appDir } = stagePreConvertedBrandApp();
+  const { root, targetDir } = stagePreConvertedBrandTarget();
   try {
-    // The brand file above the app is unparseable — the app has nothing legacy
+    // The brand file above the target is unparseable — the target has nothing legacy
     // left, so "already converted" is the branch that must catch this.
     fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme',\n");
 
-    const report = runMigration(appDir, {});
+    const report = runMigration(targetDir, {});
 
     assert.strictEqual(report.config.skipped, true, 'still the skip branch');
     assert.ok(report.errors.some((error) => error.includes('Failed to parse')), 'a config that will not load is a migration error, not exit 0');
@@ -830,7 +830,7 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
   const siteData = {
     ...JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8')),
     cloud: { provider: 'firebase', config: { apiKey: 'AIza-COMPOSE', projectId: 'compose-test' } },
-    payment: { processors: { chargebee: { site: 'compose' } }, products: [{ id: 'basic', name: 'Basic' }] },
+    payment: { providers: { chargebee: { site: 'compose' } }, products: [{ id: 'basic', name: 'Basic' }] },
     analytics: { providers: { google: { id: 'G-COMPOSE1' } } },
   };
 

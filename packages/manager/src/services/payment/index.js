@@ -1,23 +1,23 @@
 /**
- * Payment service — reconciles the brand's payment processors to
+ * Payment service — reconciles the brand's payment providers to
  * payment.products: Stripe (account settings, products + prices, webhook,
  * plus manual-guidance Radar/dispute checks), PayPal (catalog products +
  * billing plans, webhook), and Chargebee (item family → items → item prices,
  * webhook). Product IDs are written back to omega.json5
  * (payment.products[id=…] — comment-preserving) and mirrored in state.
  *
- * Auth is per processor, from config + the brand .env:
+ * Auth is per provider, from config + the brand .env:
  *   - Stripe:    STRIPE_SECRET_KEY
- *   - PayPal:    payment.processors.paypal.clientId + PAYPAL_CLIENT_SECRET
- *   - Chargebee: payment.processors.chargebee.site + CHARGEBEE_API_KEY
- * When an enabled processor's credentials are missing, interactive runs
- * offer the setup flow (lib/processor-setup.js — dashboard browser open,
+ *   - PayPal:    payment.providers.paypal.clientId + PAYPAL_CLIENT_SECRET
+ *   - Chargebee: payment.providers.chargebee.site + CHARGEBEE_API_KEY
+ * When an enabled provider's credentials are missing, interactive runs
+ * offer the setup flow (lib/provider-setup.js — dashboard browser open,
  * public keys land in omega.json5, secrets in the brand .env); otherwise
- * the processor is skipped per-operation with a dim note. The service only
- * skips when NO processor is configured. The webhook operations
+ * the provider is skipped per-operation with a dim note. The service only
+ * skips when NO provider is configured. The webhook operations
  * additionally need OMEGA_WEBHOOK_KEY.
  *
- * --processor=stripe|paypal|chargebee narrows the run to one processor's
+ * --provider=stripe|paypal|chargebee narrows the run to one provider's
  * operations (omega-manager's flag, unchanged).
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
@@ -25,9 +25,9 @@ const { StripeAPI } = require('./lib/stripe-api.js');
 const { PayPalAPI } = require('./lib/paypal-api.js');
 const { ChargebeeAPI } = require('./lib/chargebee-api.js');
 const { paidProducts } = require('./lib/payment-utils.js');
-const { processorSetupFlow } = require('./lib/processor-setup.js');
+const { providerSetupFlow } = require('./lib/provider-setup.js');
 
-const PROCESSORS = ['paypal', 'stripe', 'chargebee'];
+const PROVIDERS = ['paypal', 'stripe', 'chargebee'];
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -47,47 +47,47 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no paid products in payment.products' };
     }
 
-    const processorFilter = context.options?.processor || null;
-    if (processorFilter && !PROCESSORS.includes(processorFilter)) {
-      return { skip: true, reason: `unknown --processor "${processorFilter}" (paypal | stripe | chargebee)` };
+    const providerFilter = context.options?.provider || null;
+    if (providerFilter && !PROVIDERS.includes(providerFilter)) {
+      return { skip: true, reason: `unknown --provider "${providerFilter}" (paypal | stripe | chargebee)` };
     }
-    const wanted = (name) => !processorFilter || processorFilter === name;
+    const wanted = (name) => !providerFilter || providerFilter === name;
 
-    // Resolve each processor; when an enabled one is missing credentials,
+    // Resolve each provider; when an enabled one is missing credentials,
     // interactive runs offer the setup flow (which lands them in
     // omega.json5 + the brand .env + process.env) before giving up.
     // Unconfigured ones stay null and their operations print a dim note.
     // Tests inject fake clients via context.stripeApi / paypalApi /
     // chargebeeApi (injected clients never trigger the flow).
-    const processors = () => context.brandConfig.payment.processors || {};
+    const providers = () => context.brandConfig.payment.providers || {};
 
     let stripeApi = null;
-    if (wanted('stripe') && processors().stripe !== false) {
-      if (!context.stripeApi && (!process.env.STRIPE_SECRET_KEY || !processors().stripe?.publishableKey)) {
-        await processorSetupFlow(context, 'stripe');
+    if (wanted('stripe') && providers().stripe !== false) {
+      if (!context.stripeApi && (!process.env.STRIPE_SECRET_KEY || !providers().stripe?.publishableKey)) {
+        await providerSetupFlow(context, 'stripe');
       }
-      if (processors().stripe !== false) {
+      if (providers().stripe !== false) {
         stripeApi = context.stripeApi
           || (process.env.STRIPE_SECRET_KEY ? new StripeAPI(process.env.STRIPE_SECRET_KEY) : null);
       }
     }
 
     let paypalApi = null;
-    if (wanted('paypal') && processors().paypal !== false) {
-      if (!context.paypalApi && (!processors().paypal?.clientId || !process.env.PAYPAL_CLIENT_SECRET)) {
-        await processorSetupFlow(context, 'paypal');
+    if (wanted('paypal') && providers().paypal !== false) {
+      if (!context.paypalApi && (!providers().paypal?.clientId || !process.env.PAYPAL_CLIENT_SECRET)) {
+        await providerSetupFlow(context, 'paypal');
       }
-      const clientId = processors().paypal !== false ? processors().paypal?.clientId : null;
+      const clientId = providers().paypal !== false ? providers().paypal?.clientId : null;
       paypalApi = context.paypalApi
         || (clientId && process.env.PAYPAL_CLIENT_SECRET ? new PayPalAPI(clientId, process.env.PAYPAL_CLIENT_SECRET) : null);
     }
 
     let chargebeeApi = null;
-    if (wanted('chargebee') && processors().chargebee !== false) {
-      if (!context.chargebeeApi && (!processors().chargebee?.site || !process.env.CHARGEBEE_API_KEY)) {
-        await processorSetupFlow(context, 'chargebee');
+    if (wanted('chargebee') && providers().chargebee !== false) {
+      if (!context.chargebeeApi && (!providers().chargebee?.site || !process.env.CHARGEBEE_API_KEY)) {
+        await providerSetupFlow(context, 'chargebee');
       }
-      const site = processors().chargebee !== false ? processors().chargebee?.site : null;
+      const site = providers().chargebee !== false ? providers().chargebee?.site : null;
       chargebeeApi = context.chargebeeApi
         || (site && process.env.CHARGEBEE_API_KEY ? new ChargebeeAPI(site, process.env.CHARGEBEE_API_KEY) : null);
     }
@@ -95,9 +95,9 @@ module.exports.run = createServiceRunner({
     if (!stripeApi && !paypalApi && !chargebeeApi) {
       return {
         skip: true,
-        reason: processorFilter
-          ? `processor "${processorFilter}" not configured`
-          : 'no payment processor configured (STRIPE_SECRET_KEY, paypal.clientId + PAYPAL_CLIENT_SECRET, or chargebee.site + CHARGEBEE_API_KEY)',
+        reason: providerFilter
+          ? `provider "${providerFilter}" not configured`
+          : 'no payment provider configured (STRIPE_SECRET_KEY, paypal.clientId + PAYPAL_CLIENT_SECRET, or chargebee.site + CHARGEBEE_API_KEY)',
       };
     }
 
@@ -113,10 +113,10 @@ module.exports.run = createServiceRunner({
       }
     }
 
-    // Narrow operations to the filtered processor (operation names are prefixed)
+    // Narrow operations to the filtered provider (operation names are prefixed)
     let operations;
-    if (processorFilter) {
-      operations = context.operations.filter((op) => op.name.startsWith(processorFilter));
+    if (providerFilter) {
+      operations = context.operations.filter((op) => op.name.startsWith(providerFilter));
     }
 
     return {

@@ -1,12 +1,12 @@
 /**
  * Devlog — auto-generated commit-digest blog posts: collect recent commits
  * across GitHub orgs + brand repos → have Ghostii write a first-person devlog
- * article → publish to the brand's website app (syndication platforms later).
+ * article → publish to the brand's website target (syndication platforms later).
  *
  * Standalone command, not a service: publishing a new post every run is not
  * idempotent reconciliation, so devlog never runs during manage. Stateless by
  * design — every run computes `since = now − lookbackDays` and fetches fresh;
- * nothing is read from or written to .omega/state.json or runs/. Running
+ * nothing is read from or written to .omega/runs/. Running
  * twice in one window writes two posts about the same commits — the cadence
  * is owned by whoever runs it.
  *
@@ -19,13 +19,13 @@ const { join } = require('node:path');
 
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { loadEnvChain } = require('@omega.js/config');
+const { loadEnvChain, chosenProvider } = require('@omega.js/config');
 
 const { resolveBrandRoot, loadBrand } = require('../lib/brand.js');
 const {
   isCompanyRoot, discoverBrands, readCompanyMarker,
 } = require('../lib/company.js');
-const { GitHubAPI } = require('../services/github/lib/github-api.js');
+const { GitHubAPI } = require('../services/repo/lib/github-api.js');
 const { collectCommits } = require('./lib/collect-commits.js');
 const { buildProjectMap, buildBrandRepos } = require('./lib/project-map.js');
 const { generatePost } = require('./lib/generate-post.js');
@@ -136,13 +136,21 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   console.log('');
 
   const { brand, brands, companyRoot } = resolveContext(startDir, options.brand);
-  const settings = brand.config.devlog;
 
-  if (!settings.enabled) {
+  if (!brand.config.devlog.enabled) {
     throw new Error(`Devlog is disabled for ${brand.id} — set devlog.enabled: true`);
   }
+
+  // The writer is a KEY under devlog.providers (#425) and its settings live
+  // inside it — the role level carries only `enabled`.
+  const writer = chosenProvider(brand.config.devlog.providers);
+  if (!writer) {
+    throw new Error(`No devlog writer configured for ${brand.id} — add devlog.providers.ghostii`);
+  }
+  const settings = brand.config.devlog.providers[writer];
+
   if (!settings.orgs.length) {
-    throw new Error(`No devlog.orgs configured for ${brand.id}`);
+    throw new Error(`No devlog.providers.${writer}.orgs configured for ${brand.id}`);
   }
 
   // Secrets chain: shell env > brand .env > company .env — the shared
@@ -186,7 +194,7 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   console.log(`${chalk.green('✓')} Collected ${commits.length} commits across ${repos.length} repos`);
 
   // 3. Generate the post
-  console.log(`${chalk.dim('→')} Generating post via ${settings.provider}...`);
+  console.log(`${chalk.dim('→')} Generating post via ${writer}...`);
   const generate = deps.generatePost || generatePost;
   const post = await generate({ brandConfig: brand.config, commits, projectMap, days });
   console.log(`${chalk.green('✓')} Generated: ${chalk.cyan(post.title)}`);

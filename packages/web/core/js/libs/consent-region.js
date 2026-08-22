@@ -8,9 +8,15 @@
  * everywhere else gets opt-out (scripts load, the banner informs, Customize
  * still turns them off).
  *
- * The zone list is the EEA plus the UK, which is exactly `Europe/*` plus the
- * four Atlantic zones the EEA reaches outside it: Iceland (Reykjavik), Spain's
- * Canaries, and Portugal's Madeira and Azores.
+ * The opt-in tier is a STRICT ROSTER, not a continent. A country joins only
+ * when its law GENUINELY requires opt-in consent for tracking cookies and we
+ * have verified that; when in doubt, it stays out and gets opt-out. The roster
+ * is `Europe/*` — the EEA, the UK, and Turkey (Europe/Istanbul, KVKK), which
+ * rides the prefix for free — plus the named zones below.
+ *
+ * Some countries cannot be expressed at all: Quebec's Law 25 is real, but
+ * America/Montreal is an ALIAS of America/Toronto, so opting Quebec in would
+ * opt Ontario in too. No zone of its own, no entry.
  *
  * A timezone we cannot place is opt-in. That is the only safe direction: a
  * wrong "opt-out" loads a tracker on someone the law protects, while a wrong
@@ -20,15 +26,45 @@
  * browser (and so a dev override can force a region).
  */
 
-// EEA/UK zones outside the `Europe/` prefix. Lowercased, because zone names are
-// matched case-INSENSITIVELY: `Intl` accepts `europe/berlin`, so a
-// case-sensitive prefix test would read a real European zone as unplaceable —
-// and here that is the expensive direction to be wrong in.
+// The roster's zones outside the `Europe/` prefix, grouped by the country (and
+// the law) that puts them here. Lowercased, because zone names are matched
+// case-INSENSITIVELY: `Intl` accepts `europe/berlin`, so a case-sensitive
+// prefix test would read a real European zone as unplaceable — and here that is
+// the expensive direction to be wrong in.
 const OPT_IN_ZONES = new Set([
+  // EEA reach outside Europe/: Iceland, Spain's Canaries, Portugal's islands.
   'atlantic/reykjavik', // Iceland (EEA)
   'atlantic/canary',    // Spain
   'atlantic/madeira',   // Portugal
   'atlantic/azores',    // Portugal
+
+  // Brazil — LGPD + ANPD cookie guidance: prior explicit consent for
+  // non-essential cookies. All sixteen zones, because the law is national.
+  'america/sao_paulo',
+  'america/bahia',
+  'america/fortaleza',
+  'america/recife',
+  'america/araguaina',
+  'america/maceio',
+  'america/belem',
+  'america/santarem',
+  'america/campo_grande',
+  'america/cuiaba',
+  'america/boa_vista',
+  'america/porto_velho',
+  'america/manaus',
+  'america/eirunepe',
+  'america/rio_branco',
+  'america/noronha',
+
+  // China — PIPL: opt-in consent is the default legal basis for tracking,
+  // analytics and ads cookies.
+  'asia/shanghai',
+  'asia/urumqi',
+
+  // South Korea — PIPA: prior specific consent for behavioral/identifiable
+  // cookies; letting someone opt out after the cookie is set is not enough.
+  'asia/seoul',
 ]);
 
 const OPT_IN_PREFIX = 'europe/';
@@ -65,7 +101,7 @@ function isKnownZone(timeZone) {
 /**
  * Does this visitor need to opt IN before any provider script loads?
  * @param {string} [timeZone] - IANA timezone; defaults to the browser's own
- * @returns {boolean} true for EEA/UK and for anything unplaceable
+ * @returns {boolean} true for the strict roster and for anything unplaceable
  */
 export function requiresOptIn(timeZone = detectTimeZone()) {
   if (typeof timeZone !== 'string' || !timeZone.trim()) {

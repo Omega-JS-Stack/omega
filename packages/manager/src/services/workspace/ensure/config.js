@@ -2,14 +2,14 @@
  * Ensure omega.json5 health. The brand file is the manager's input — a brand
  * config that fails to load (parse error, secret-shaped keys, legacy targets
  * array) or fails schema validation is an ERROR: there is nothing sound to
- * reconcile services against. App-level findings are warnings — each
+ * reconcile services against. Target-level findings are warnings — each
  * framework's own setup/audit is the hard gate for its surface.
  */
 const chalk = require('chalk').default;
 
 const { loadConfig, hasOmegaConfig } = require('@omega.js/config');
 
-module.exports = async ({ brand, apps }) => {
+module.exports = async ({ brand, targets }) => {
   // Brand config failed to LOAD (thrown by @omega.js/config — secrets, parse, targets array)
   if (brand.configError) {
     console.log(`      ${chalk.red('✗')} ${brand.configError}`);
@@ -26,20 +26,20 @@ module.exports = async ({ brand, apps }) => {
 
   console.log(`      ${chalk.green('✓')} brand config valid ${chalk.dim(`(${brand.files?.app || 'config/omega.json5'})`)}`);
 
-  // Per-app validation for apps that carry their own config and map to a target
+  // Per-target validation for dirs that carry their own config and map to a target
   const findings = [];
-  for (const app of apps) {
-    if (!app.target || !hasOmegaConfig(app.path)) continue;
+  for (const entry of targets) {
+    if (!entry.target || !hasOmegaConfig(entry.path)) continue;
 
     try {
-      const { errors } = loadConfig(app.path, app.target);
+      const { errors } = loadConfig(entry.path, entry.target);
       for (const error of errors) {
-        findings.push(`${app.name}: ${error}`);
+        findings.push(`${entry.name}: ${error}`);
       }
     } catch (error) {
-      // App config that cannot load at all (secrets, parse) is still a hard stop
-      console.log(`      ${chalk.red('✗')} ${app.name}: ${error.message}`);
-      return { status: 'error', error: `${app.name}: ${error.message}` };
+      // A target config that cannot load at all (secrets, parse) is still a hard stop
+      console.log(`      ${chalk.red('✗')} ${entry.name}: ${error.message}`);
+      return { status: 'error', error: `${entry.name}: ${error.message}` };
     }
   }
 

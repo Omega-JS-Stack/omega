@@ -6,6 +6,7 @@
  */
 
 const chalk = require('chalk').default;
+const { chosenProvider } = require('@omega.js/config');
 
 const { writeArticle, blocksToPost, MAX_DESCRIPTION_LENGTH, MAX_SOURCE_CONTENT_LENGTH } = require('./ghostii.js');
 
@@ -96,7 +97,8 @@ function collectProjectLinks(commits, projectMap) {
  * @returns {string} Brief within Ghostii's description cap
  */
 function buildBrief({ brandConfig, days }) {
-  const { brand, devlog } = brandConfig;
+  const { brand } = brandConfig;
+  const ghostii = brandConfig.devlog?.providers?.ghostii || {};
   // Voice: the newsletter generator's instructions blob when the brand's
   // omega.json5 carries one (it's @omega.js/backend data, not manager config — presence is
   // genuinely uncertain), else the brand description.
@@ -108,8 +110,8 @@ function buildBrief({ brandConfig, days }) {
 
 Title style: short, punchy, and specific — like a git commit summary of the period's most interesting work (e.g. "Auth Round Trips and Quieter Cron Jobs"). Max ~8 words. NEVER use time-window phrasing ("Five Days of...", "A Week of...") — the post is dated already.`;
 
-  const blocklist = devlog.excludeTopics.length
-    ? `NEVER discuss, mention, or allude to: ${devlog.excludeTopics.join('; ')}.`
+  const blocklist = ghostii.excludeTopics.length
+    ? `NEVER discuss, mention, or allude to: ${ghostii.excludeTopics.join('; ')}.`
     : '';
 
   // Project URLs go through Ghostii's `links` param (its allocator assigns them
@@ -138,11 +140,13 @@ Title style: short, punchy, and specific — like a git commit summary of the pe
  * @returns {Promise<{title, slug, description, tags, categories, body, headerImageUrl}>}
  */
 async function generatePost({ brandConfig, commits, projectMap, days, write = writeArticle }) {
-  const { devlog } = brandConfig;
+  const writer = chosenProvider(brandConfig.devlog?.providers);
 
-  if (devlog.provider !== 'ghostii') {
-    throw new Error(`Unknown devlog.provider: ${devlog.provider} (only 'ghostii' is supported)`);
+  if (writer !== 'ghostii') {
+    throw new Error(`Unknown devlog writer: ${writer} (only 'ghostii' is supported — set devlog.providers.ghostii)`);
   }
+
+  const ghostii = brandConfig.devlog.providers.ghostii;
 
   const digest = buildDigest(commits, projectMap);
   const projectLinks = collectProjectLinks(commits, projectMap);
@@ -157,7 +161,7 @@ async function generatePost({ brandConfig, commits, projectMap, days, write = wr
     description: brief,
     links: projectLinks.map((p) => p.url),
     sourceContent: digest,
-    overrides: devlog.overrides,
+    overrides: ghostii.overrides,
   });
 
   // Prefer the structured blocks (clean title/body separation); fall back to

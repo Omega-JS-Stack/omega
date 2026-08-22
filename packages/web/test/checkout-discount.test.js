@@ -207,7 +207,7 @@ test('discount: a once code discounts today and leaves the renewal at list price
 test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)', async () => {
   // The trial terms line names the charge that lands when the trial ends, and
   // that charge IS the first invoice — the one the `once` coupon is attached to
-  // (intent/processors/stripe.js sends `discounts: [{ coupon }]` alongside
+  // (intent/providers/stripe.js sends `discounts: [{ coupon }]` alongside
   // `trial_period_days`). Quoting list price there promised a bigger first
   // charge than the card will actually see, which is the #254 mistake pointing
   // the other way.

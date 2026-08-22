@@ -87,64 +87,64 @@ module.exports = {
       },
     },
     {
-      name: 'brand app scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; app file = standalone escape hatch)',
+      name: 'brand target scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; local file = standalone escape hatch)',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'desktop');
+        jetpack.dir(targetDir);
 
-        // Fresh scaffold AND reruns: the app config never appears (the old
-        // targets-only seed kept resurrecting deleted app files)
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
+        // Fresh scaffold AND reruns: the local config never appears (the old
+        // targets-only seed kept resurrecting deleted local files)
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'config', 'omega.json5'))).toBe(false);
 
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'config', 'omega.json5'))).toBe(false);
       },
     },
     {
-      name: 'brand app scaffolds NO per-app docs (brand doc unification: the brand root is the doc home)',
+      name: 'brand target scaffolds NO per-target docs (brand doc unification: the brand root is the doc home)',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'desktop');
+        jetpack.dir(targetDir);
 
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CHANGELOG.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
         // The non-doc defaults still land.
-        ctx.expect(jetpack.exists(path.join(appDir, '.env'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, '.env'))).toBeTruthy();
       },
     },
     {
-      name: 'brand setup sweeps framework-owned per-app docs, preserves consumer content with a warning',
+      name: 'brand setup sweeps framework-owned per-target docs, preserves consumer content with a warning',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
-        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'desktop');
+        jetpack.dir(targetDir);
 
-        // Standalone scaffold first (no brand config yet) — per-app docs land.
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBeTruthy();
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBeTruthy();
+        // Standalone scaffold first (no brand config yet) — per-target docs land.
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBeTruthy();
 
         // Wrap it in a brand monorepo: the next setup sweeps the untouched docs.
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CHANGELOG.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
 
         // Consumer content is never destroyed: real notes below the Custom marker keep the file.
-        jetpack.write(path.join(appDir, 'AGENTS.md'),
+        jetpack.write(path.join(targetDir, 'AGENTS.md'),
           `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
-        await copyDefaults(appDir);
-        ctx.expect(jetpack.read(path.join(appDir, 'AGENTS.md'))).toContain('VPN');
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.read(path.join(targetDir, 'AGENTS.md'))).toContain('VPN');
       },
     },
   ],

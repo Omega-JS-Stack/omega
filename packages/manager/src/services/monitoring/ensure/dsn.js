@@ -1,5 +1,6 @@
 /**
- * Land each target project's DSN in targets.<type>.monitoring.dsn — the
+ * Land each target project's DSN in
+ * targets.<type>.monitoring.providers.sentry.dsn (#425) — the
  * per-surface override every framework reads through the config merge
  * chain. DSNs are public by design (schema-pinned), so config is their
  * home; the writeback is comment-preserving and a converged rerun leaves
@@ -37,13 +38,13 @@ module.exports = async function ensureDsn(context) {
     const dsn = active.dsn.public;
     dsns[target] = dsn;
 
-    const current = brandConfig.targets?.[target]?.monitoring?.dsn;
+    const current = brandConfig.targets?.[target]?.monitoring?.providers?.sentry?.dsn;
     if (current === dsn) {
       console.log(`      ${chalk.green('✓')} ${chalk.cyan(target)} DSN in place`);
       continue;
     }
 
-    edits[`targets.${target}.monitoring.dsn`] = dsn;
+    edits[`targets.${target}.monitoring.providers.sentry.dsn`] = dsn;
     console.log(`      ${chalk.yellow('↻')} ${chalk.cyan(target)} DSN ${current ? 'drifted — updating' : 'landing'}`);
   }
 

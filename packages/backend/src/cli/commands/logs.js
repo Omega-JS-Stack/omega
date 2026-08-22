@@ -319,7 +319,7 @@ class LogsCommand extends BaseCommand {
   resolveProject() {
     const projectDir = this.firebaseProjectPath;
 
-    // Try the authored service-account chain first (app root → brand
+    // Try the authored service-account chain first (target root → brand
     // secrets — most reliable for production; no stage required)
     const { resolveServiceAccountPath } = require('../utils/stage-functions');
     const serviceAccountPath = resolveServiceAccountPath(projectDir);

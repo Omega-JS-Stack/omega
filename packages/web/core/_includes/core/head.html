@@ -52,6 +52,8 @@
      the brand default — `default:` only sees the raw string (footer.html pattern) -->
 {% assign page-title = page-title | strip %}
 {% if page-title == '' or page-title == 'null' %}{% assign page-title = site.brand.name %}{% endif %}
+{% assign page-description = page-description | strip %}
+{% if page-description == '' or page-description == 'null' %}{% assign page-description = site.brand.description %}{% endif %}
 {% assign page-image = page-image | strip %}
 {% if page-image == '' or page-image == 'null' %}{% assign page-image = site.brand.images.social | default: site.brand.images.brandmark %}{% endif %}
 

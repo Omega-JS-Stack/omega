@@ -10,7 +10,7 @@
  * - Folds legacy `attribution.utm` → `attribution.first` + `attribution.last`
  *
  * No schema validation: an order's shape is owned by the payments webhook
- * pipeline (processor payloads, refunds, discounts) — this migration touches
+ * pipeline (provider payloads, refunds, discounts) — this migration touches
  * attribution only and has no business declaring the rest.
  */
 const { runMigration } = require('../lib/migration-runner.js');

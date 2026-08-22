@@ -1,24 +1,25 @@
 /**
- * Compose the .env files that must PHYSICALLY exist per app — everything
+ * Compose the .env files that must PHYSICALLY exist per target — everything
  * else resolves through the runtime cascade (D15).
  *
  * Brand-wide values (GH_TOKEN, store/signing credentials, API keys) live
- * ONCE in the brand .env and reach every app at runtime/build through
- * @omega.js/config's env cascade (shell > app .env > brand .env > company
+ * ONCE in the brand .env and reach every target at runtime/build through
+ * @omega.js/config's env cascade (shell > target .env > brand .env > company
  * .env), so disperse no longer copies them around. What still gets written:
  *
- *   backend  — the FULL curated composition into the app-root .env (the ONE
+ *   backend  — the FULL curated composition into the target-root .env (the ONE
  *              authored home since the src/dist pillar; `omega build` stages
  *              a copy into dist/.env so the Firebase deploy artifact —
  *              which can't walk up to a brand layer — stays self-contained).
  *              Composed from brand-level process.env (manage.js already
  *              layered shell > brand > company); empty values are never
  *              written, leaving template placeholders.
- *   stream   — each app's own GA4 Measurement Protocol secret from
- *              analytics state (streams.{target}.apiSecret) — per-app
- *              derived data that exists nowhere else.
+ *   stream   — each target's own GA4 Measurement Protocol secret, from the
+ *              brand .env's per-target GOOGLE_ANALYTICS_SECRET_{TARGET}
+ *              (the analytics service writes it there; #434). The target-level
+ *              name is target-less because a target only ever has one stream.
  *   certPath — desktop signing file paths (CSC_LINK, APPLE_API_KEY),
- *              app-relative and stamped ONLY when the certs operation
+ *              target-relative and stamped ONLY when the certs operation
  *              actually placed the file (a path to nothing would break
  *              electron-builder louder than no path at all).
  *
@@ -34,19 +35,21 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
+const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
+
 const CUSTOM_MARKER = '# ========== Custom Values ==========';
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 
-// Per-target composition spec. `file` is app-relative — the app-root .env
+// Per-target composition spec. `file` is target-relative — the target-root .env
 // for EVERY target now (the backend's staged-tree exception died with the
-// src/dist pillar: the stage step copies the app .env into dist/).
+// src/dist pillar: the stage step copies the target .env into dist/).
 // `env` names pass through from brand-level process.env (backend ONLY — its
 // .env ships with the deploy artifact; every other target reads brand values
 // through the runtime cascade); `streamSecret` names the var that receives
-// the app's own analytics stream secret; `certPaths` are stamped only when
+// the target's own analytics stream secret; `certPaths` are stamped only when
 // the file exists (see header). web has nothing to materialize. Deliberately
 // NOT composed: per-listing store IDs (CHROME_EXTENSION_ID,
-// FIREFOX_EXTENSION_ID, EDGE_PRODUCT_ID — user-managed per app) and
+// FIREFOX_EXTENSION_ID, EDGE_PRODUCT_ID — user-managed per target) and
 // developer tooling credentials (CLAUDE_CODE_OAUTH_TOKEN). Mobile gets
 // certs only — no .env contract yet.
 const ENV_MAP = {
@@ -183,7 +186,7 @@ function updateEnvContent(content, updates) {
   };
 }
 
-/** Fresh .env for an app the framework's `mgr setup` hasn't templated yet. */
+/** Fresh .env for a target the framework's `mgr setup` hasn't templated yet. */
 function freshEnvContent(updates) {
   return [
     DEFAULT_MARKER,
@@ -198,24 +201,24 @@ function freshEnvContent(updates) {
 }
 
 module.exports = async (context) => {
-  const { targetApps, brandState, options = {} } = context;
+  const { mappedTargets, options = {} } = context;
 
-  const envApps = targetApps.filter((app) => ENV_MAP[app.target]);
-  if (envApps.length === 0) {
-    console.log(`      ${chalk.dim('⊘ no apps with a composed .env')}`);
-    return { output: { env: { reason: 'no apps with a composed .env' } } };
+  const envTargets = mappedTargets.filter((entry) => ENV_MAP[entry.target]);
+  if (envTargets.length === 0) {
+    console.log(`      ${chalk.dim('⊘ no targets with a composed .env')}`);
+    return { output: { env: { reason: 'no targets with a composed .env' } } };
   }
 
   const files = {};
   let updated = 0;
   let currentCount = 0;
 
-  for (const app of envApps) {
-    const spec = ENV_MAP[app.target];
-    const envRel = `${app.dir}/${spec.file}`;
-    const envPath = join(app.path, spec.file);
+  for (const entry of envTargets) {
+    const spec = ENV_MAP[entry.target];
+    const envRel = `${entry.dir}/${spec.file}`;
+    const envPath = join(entry.path, spec.file);
 
-    // ─── Resolve this app's values ────────────────────────────────────────
+    // ─── Resolve this target's values ─────────────────────────────────────
     const updates = {};
 
     for (const name of spec.env || []) {
@@ -224,13 +227,13 @@ module.exports = async (context) => {
     }
 
     if (spec.streamSecret) {
-      const secret = brandState?.analytics?.streams?.[app.target]?.apiSecret;
+      const secret = process.env[streamSecretEnvName(entry.target)];
       if (secret) updates[spec.streamSecret] = secret;
     }
 
     for (const [name, template] of Object.entries(spec.certPaths || {})) {
       const resolved = template.replace(/\{env\.([^}]+)\}/g, (match, key) => process.env[key] || '');
-      if (!resolved.includes('{') && jetpack.exists(join(app.path, resolved))) {
+      if (!resolved.includes('{') && jetpack.exists(join(entry.path, resolved))) {
         updates[name] = resolved;
       }
     }

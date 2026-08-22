@@ -41,7 +41,7 @@ npx omega test pages           # project scope, filtered to test/pages*
    - the build produced at least one HTML page,
    - `dist/404.html` exists (the guaranteed default page — consumers own their home page) **and** contains `data-theme-id`, proving it rendered through the theme root layout,
    - the asset manifest's `js.main` bundle exists on disk in `dist/`.
-3. **Your suite** — `node --test` over `test/` at the app root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
+3. **Your suite** — `node --test` over `test/` at the target root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
 
 ### What framework scope runs
 
@@ -69,11 +69,11 @@ One grammar across every framework (parser: [`@omega.js/devkit/test/scope`](../.
 - Filters are **path prefixes expanded by the shell**: a project filter becomes `test/<filter>*`, a framework filter becomes `test/<filter>*.test.js`. A filter matching nothing is a hard error, not a silent no-op (the shell hands node the unexpanded literal).
 - Unknown prefixes (`framwork:x`) warn — `Unknown test scope prefix ignored` — and are dropped; if every target was invalid, the run falls back to project scope.
 - Multiple targets union their sources; each path binds to its own source.
-- At a **brand root** (not an app dir) `omega` hands over to `@omega.js/manager`, which fans the same targets out over every app — `web:` routes to the web app only. Table: [docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b).
+- At a **brand root** (not a target dir) `omega` hands over to `@omega.js/manager`, which fans the same targets out over every target — `web:` routes to the web target only. Table: [docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b).
 
 ## Writing consumer tests
 
-Put plain `node --test` files at your app root under `test/`, one file per concern:
+Put plain `node --test` files at your target root under `test/`, one file per concern:
 
 ```js
 // test/sitemap.test.js

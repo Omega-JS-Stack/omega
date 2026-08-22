@@ -1,5 +1,5 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
@@ -35,10 +35,10 @@ module.exports = async ({ ctx, Manager, libraries }) => {
   // Determine alert provider (default: chargeblast)
   const provider = query.provider || 'chargeblast';
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
     return ctx.respond(`Unknown alert provider: ${provider}`, { code: 400 });
   }
@@ -48,8 +48,8 @@ module.exports = async ({ ctx, Manager, libraries }) => {
   // so a provider that ships a signing scheme verifies strictly once its secret
   // is configured; without it the route stays on the key-only path and says so.
   // Nothing is normalized or stored before this passes ([#212]).
-  if (processorModule.verifySignature) {
-    const verification = processorModule.verifySignature(ctx.ref.req);
+  if (providerModule.verifySignature) {
+    const verification = providerModule.verifySignature(ctx.ref.req);
 
     if (verification.status === 'invalid') {
       ctx.error(`Rejected ${provider} dispute alert: signature verification failed (${verification.reason})`);
@@ -62,17 +62,17 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     }
   }
 
-  // Normalize the payload using the processor
+  // Normalize the payload using the provider
   let alert;
   try {
-    alert = processorModule.normalize(body);
+    alert = providerModule.normalize(body);
   } catch (e) {
     return ctx.respond(`Failed to normalize alert: ${e.message}`, { code: 400 });
   }
 
   const alertId = alert.id;
 
-  ctx.log(`Parsed dispute alert: id=${alertId}, provider=${provider}, processor=${alert.processor}, amount=${alert.amount}, card=****${alert.card.last4}`);
+  ctx.log(`Parsed dispute alert: id=${alertId}, alertProvider=${provider}, paymentProvider=${alert.provider}, amount=${alert.amount}, card=****${alert.card.last4}`);
 
   // Build timestamps
   const now = powertools.timestamp(new Date(), { output: 'string' });
@@ -134,7 +134,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     ctx.log(`Retrying previously failed dispute alert ${alertId}`);
   }
 
-  ctx.log(`Saved payments-disputes/${alertId}: provider=${provider}, processor=${alert.processor}`);
+  ctx.log(`Saved payments-disputes/${alertId}: alertProvider=${provider}, paymentProvider=${alert.provider}`);
 
   // Return 200 immediately — async processing via Firestore trigger
   return ctx.respond({ received: true });

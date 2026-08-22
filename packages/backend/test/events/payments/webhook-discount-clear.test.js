@@ -49,7 +49,7 @@ function subscriberSeed(discount, resourceId) {
       subscription: {
         product: { id: 'premium', name: 'Premium' },
         status: 'active',
-        payment: { processor: 'test', orderId: ORDER_ID, resourceId: resourceId },
+        payment: { provider: 'test', orderId: ORDER_ID, resourceId: resourceId },
         ...(discount ? { discount: discount } : {}),
       },
     },

@@ -11,7 +11,7 @@
  * behaves IDENTICALLY everywhere (standalone / nested / loose sibling) — the
  * company layer only changes what defaults it inherits:
  *
- *   manager DEFAULTS ← company omega.json5 ← brand ← app …  (config)
+ *   manager DEFAULTS ← company omega.json5 ← brand ← local …  (config)
  *   company .env ← brand .env ← shell env                    (secrets)
  *
  * The reverse link without nesting: company runs idempotently stamp

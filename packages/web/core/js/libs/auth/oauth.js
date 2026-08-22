@@ -1,6 +1,6 @@
 // OAuth provider flows: redirect-first sign-in (popup only for iframes and
 // the ?authPopup=true override), the
-// returning-redirect result processor, and the accidental-signup reversal
+// returning-redirect result provider, and the accidental-signup reversal
 // (Google auto-creates accounts during signin attempts).
 
 // Libraries

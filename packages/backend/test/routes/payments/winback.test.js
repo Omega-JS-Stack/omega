@@ -11,9 +11,9 @@
  * Two layers, the same split cancel.test.js and plan.test.js use:
  *  - the wire guards and the happy path over `http.as(...)`, which is what
  *    proves the route is registered, auth-gated and schema-validated at all;
- *  - the per-subscription guards and the processor capability gate through
+ *  - the per-subscription guards and the provider capability gate through
  *    DIRECT handler calls (the _route-harness technique), so one test can choose
- *    a processor and a subscription shape without minting a persona each.
+ *    a provider and a subscription shape without minting a persona each.
  *
  * The offer is claimed ONCE: the claim lives on
  * payments-orders/{orderId}.requests.winback, so the second call is refused
@@ -32,8 +32,8 @@ const winback = require('../../../src/manager/libraries/payment/winback.js');
 
 const handler = require('../../../src/manager/routes/payments/winback/post.js');
 
-function processorModule(name) {
-  return require(`../../../src/manager/routes/payments/winback/processors/${name}.js`);
+function providerModule(name) {
+  return require(`../../../src/manager/routes/payments/winback/providers/${name}.js`);
 }
 
 const YEAR = 365 * 24 * 60 * 60;
@@ -42,9 +42,9 @@ const YEAR = 365 * 24 * 60 * 60;
  * A paying subscriber the offer can be made to.
  *
  * @param {object} Manager - The @omega.js/backend Manager
- * @param {object} options - uid, product, processor, resourceId, and the state overrides
+ * @param {object} options - uid, product, provider, resourceId, and the state overrides
  */
-function subscriber(Manager, { uid, product, processor, resourceId, orderId, pending, trial, status }) {
+function subscriber(Manager, { uid, product, provider, resourceId, orderId, pending, trial, status }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - YEAR;
   const nextMonthUNIX = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
@@ -62,7 +62,7 @@ function subscriber(Manager, { uid, product, processor, resourceId, orderId, pen
         ? { trial: { claimed: true, expires: { timestamp: new Date(nextMonthUNIX * 1000).toISOString(), timestampUNIX: nextMonthUNIX } } }
         : {}),
       payment: {
-        processor: processor === undefined ? 'test' : processor,
+        provider: provider === undefined ? 'test' : provider,
         resourceId: resourceId === undefined ? 'sub_test_winback_guard' : resourceId,
         orderId: orderId === undefined ? null : orderId,
         frequency: 'monthly',
@@ -291,23 +291,23 @@ module.exports = {
       name: 'refuses-missing-payment-details',
       async run({ Manager, assert, config, skip }) {
         // An ADMIN-GRANTED or imported subscription is paid and active with no
-        // processor details on it at all, and the client pitches what it can
+        // provider details on it at all, and the client pitches what it can
         // read — so this refusal needs a code as much as the capability gate
         // does ([#311]): without one, accepting shows an error toast and leaves
         // the dialog armed for a retry that can never succeed. HALF the details
         // is the same dead end, so each half is proven on its own.
         const product = paidProduct(config, skip);
         const halves = [
-          { what: 'processor', processor: null, resourceId: 'sub_test_winback_guard' },
-          { what: 'resourceId', processor: 'test', resourceId: null },
-          { what: 'both', processor: null, resourceId: null },
+          { what: 'provider', provider: null, resourceId: 'sub_test_winback_guard' },
+          { what: 'resourceId', provider: 'test', resourceId: null },
+          { what: 'both', provider: null, resourceId: null },
         ];
 
-        for (const { what, processor, resourceId } of halves) {
-          const user = subscriber(Manager, { uid: `_test-winback-no-${what}`, product, processor, resourceId });
+        for (const { what, provider, resourceId } of halves) {
+          const user = subscriber(Manager, { uid: `_test-winback-no-${what}`, product, provider, resourceId });
           const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
-          assert.equal(sent.code, 400, `missing ${what}: Should refuse a subscription the route cannot reach a processor with`);
+          assert.equal(sent.code, 400, `missing ${what}: Should refuse a subscription the route cannot reach a provider with`);
           assert.equal(
             properties?.additional?.code,
             'missing-payment-details',
@@ -318,17 +318,17 @@ module.exports = {
     },
 
     {
-      name: 'refuses-an-unknown-processor',
+      name: 'refuses-an-unknown-provider',
       async run({ Manager, assert, config, skip }) {
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-unknown', product, processor: 'not-a-processor' });
+        const user = subscriber(Manager, { uid: '_test-winback-unknown', product, provider: 'not-a-provider' });
 
         const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
-        assert.equal(sent.code, 400, 'Should refuse a processor that does not exist');
+        assert.equal(sent.code, 400, 'Should refuse a provider that does not exist');
         assert.equal(
           properties?.additional?.code,
-          'unknown-processor',
+          'unknown-provider',
           'the refusal carries a code the billing card can branch on',
         );
       },
@@ -344,11 +344,11 @@ module.exports = {
         // every cancel dialog — each accept re-couponing the subscription.
         const product = paidProduct(config, skip);
         const user = subscriber(Manager, { uid: '_test-winback-no-order', product });
-        const processor = processorModule('test');
+        const provider = providerModule('test');
         const applied = [];
-        const realApplyOffer = processor.applyOffer;
+        const realApplyOffer = provider.applyOffer;
 
-        processor.applyOffer = async (options) => applied.push(options);
+        provider.applyOffer = async (options) => applied.push(options);
 
         try {
           const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
@@ -359,9 +359,9 @@ module.exports = {
             'offer-not-claimable',
             'the refusal carries a code the billing card can branch on',
           );
-          assert.equal(applied.length, 0, 'and nothing reached the processor');
+          assert.equal(applied.length, 0, 'and nothing reached the provider');
         } finally {
-          processor.applyOffer = realApplyOffer;
+          provider.applyOffer = realApplyOffer;
         }
       },
     },
@@ -377,9 +377,9 @@ module.exports = {
         const product = paidProduct(config, skip);
         const orderId = '_test-winback-claimed-order';
         const user = subscriber(Manager, { uid: '_test-winback-claimed', product, orderId });
-        const processor = processorModule('test');
+        const provider = providerModule('test');
         const applied = [];
-        const realApplyOffer = processor.applyOffer;
+        const realApplyOffer = provider.applyOffer;
 
         // The first claim, written where the route records it
         await firestore.set(`payments-orders/${orderId}`, {
@@ -391,7 +391,7 @@ module.exports = {
           },
         }, { merge: true });
 
-        processor.applyOffer = async (options) => applied.push(options);
+        provider.applyOffer = async (options) => applied.push(options);
 
         try {
           const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
@@ -402,9 +402,9 @@ module.exports = {
             'offer-already-claimed',
             'the refusal carries a code the billing card can branch on',
           );
-          assert.equal(applied.length, 0, 'and the processor is never asked to discount twice');
+          assert.equal(applied.length, 0, 'and the provider is never asked to discount twice');
         } finally {
-          processor.applyOffer = realApplyOffer;
+          provider.applyOffer = realApplyOffer;
           await firestore.delete(`payments-orders/${orderId}`);
         }
       },
@@ -425,17 +425,17 @@ module.exports = {
         const uid = '_test-winback-account';
         const orderId = '_test-winback-account-order';
         const user = subscriber(Manager, { uid, product, orderId });
-        const processor = processorModule('test');
-        const realApplyOffer = processor.applyOffer;
+        const provider = providerModule('test');
+        const realApplyOffer = provider.applyOffer;
         const applied = [];
 
-        processor.applyOffer = async (options) => applied.push(options);
+        provider.applyOffer = async (options) => applied.push(options);
 
         try {
           const { sent } = await acceptOfferReadingProperties(Manager, user);
 
           assert.equal(sent.code, 200, 'Should apply the save offer');
-          assert.equal(applied.length, 1, 'and the processor discounted the live subscription once');
+          assert.equal(applied.length, 1, 'and the provider discounted the live subscription once');
 
           const userDoc = await firestore.get(`users/${uid}`);
           const discount = userDoc?.subscription?.discount;
@@ -483,50 +483,50 @@ module.exports = {
 
           assert.equal(second.code, 400, 'Should refuse a second claim');
           assert.equal(properties?.additional?.code, 'offer-already-claimed', 'with the branchable code');
-          assert.equal(applied.length, 1, 'the processor is never asked twice');
+          assert.equal(applied.length, 1, 'the provider is never asked twice');
 
           const after = (await firestore.get(`users/${uid}`))?.subscription?.discount;
 
           assert.deepEqual(after, discount, 'and the account carries exactly the one discount it already had');
         } finally {
-          processor.applyOffer = realApplyOffer;
+          provider.applyOffer = realApplyOffer;
           await firestore.delete(`payments-orders/${orderId}`);
           await firestore.delete(`users/${uid}`);
         }
       },
     },
 
-    // ─── the processor capability gate ───
+    // ─── the provider capability gate ───
 
     {
-      name: 'declares-which-processors-can-apply-the-offer',
+      name: 'declares-which-providers-can-apply-the-offer',
       async run({ assert }) {
         // The export IS the declaration. Stripe rides the coupon plumbing the
-        // checkout already uses; the test processor mirrors it. PayPal has no
+        // checkout already uses; the test provider mirrors it. PayPal has no
         // discount object at all, and Chargebee has coupons but no way to reach
         // a LIVE subscription with one through plumbing that exists here — both
         // say so by exporting nothing.
-        assert.equal(typeof processorModule('stripe').applyOffer, 'function', 'Stripe applies the offer');
-        assert.equal(typeof processorModule('test').applyOffer, 'function', 'the test processor applies the offer');
-        assert.equal(typeof processorModule('paypal').applyOffer, 'undefined', 'PayPal declares it cannot');
-        assert.equal(typeof processorModule('chargebee').applyOffer, 'undefined', 'Chargebee declares it cannot');
+        assert.equal(typeof providerModule('stripe').applyOffer, 'function', 'Stripe applies the offer');
+        assert.equal(typeof providerModule('test').applyOffer, 'function', 'the test provider applies the offer');
+        assert.equal(typeof providerModule('paypal').applyOffer, 'undefined', 'PayPal declares it cannot');
+        assert.equal(typeof providerModule('chargebee').applyOffer, 'undefined', 'Chargebee declares it cannot');
       },
     },
 
     {
-      name: 'refuses-a-processor-that-cannot-discount-with-a-branchable-code',
+      name: 'refuses-a-provider-that-cannot-discount-with-a-branchable-code',
       async run({ Manager, assert, config, skip }) {
         const product = paidProduct(config, skip);
 
-        for (const processor of ['paypal', 'chargebee']) {
-          const user = subscriber(Manager, { uid: `_test-winback-${processor}`, product, processor, resourceId: `sub_${processor}_winback` });
+        for (const provider of ['paypal', 'chargebee']) {
+          const user = subscriber(Manager, { uid: `_test-winback-${provider}`, product, provider, resourceId: `sub_${provider}_winback` });
           const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
 
-          assert.equal(sent.code, 400, `${processor}: Should refuse before dispatch`);
+          assert.equal(sent.code, 400, `${provider}: Should refuse before dispatch`);
           assert.equal(
             properties?.additional?.code,
-            'not-supported-by-processor',
-            `${processor}: the refusal carries the code the billing card branches on`,
+            'not-supported-by-provider',
+            `${provider}: the refusal carries the code the billing card branches on`,
           );
         }
       },
@@ -540,9 +540,9 @@ module.exports = {
         const uid = accounts['route-winback-success'].uid;
         const product = paidProduct(config, skip);
 
-        // Step 1: a real paid subscription on the test processor
+        // Step 1: a real paid subscription on the test provider
         const intentResponse = await http.as('route-winback-success').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: product.id,
           frequency: 'monthly',
         });
@@ -552,7 +552,7 @@ module.exports = {
         // Step 2: the auto-webhook activates it
         await waitFor(async () => {
           const userDoc = await firestore.get(`users/${uid}`);
-          return userDoc?.subscription?.payment?.processor === 'test'
+          return userDoc?.subscription?.payment?.provider === 'test'
             && userDoc?.subscription?.payment?.resourceId
             && userDoc?.subscription?.status === 'active';
         }, 15000, 500);

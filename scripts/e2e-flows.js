@@ -16,7 +16,7 @@
  *      both children bumps past them onto fresh ports. A classic port that is
  *      already busy is somebody else's stack: the hold fails, the allocator
  *      bumps around it exactly the same, and nothing of theirs is touched.
- *   2. The Paperloom backend's full emulator suite (auth, functions, firestore,
+ *   2. The playground backend's full emulator suite (auth, functions, firestore,
  *      database, hosting, pubsub) WITH persona seeding — the lane signs in as
  *      seeded personas only, never a hand-made account.
  *   3. The website's REAL `omega dev` — not a static server: the #156 auth
@@ -31,7 +31,7 @@
  * declined renewal, a trial converting — each on its OWN dedicated seeded
  * persona, so no journey can inherit another's subscription state. It also
  * talks to the emulator's Firestore directly (firebase-admin, host-side
- * only): reading the processor ids a journey's webhook needs, and writing the
+ * only): reading the provider ids a journey's webhook needs, and writing the
  * purchase records persona seeding cannot.
  *
  * The browser is headless and refuses every host but the local stack and the
@@ -54,17 +54,17 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'backend');
-const PLAYGROUND_WEBSITE = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'website');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const PLAYGROUND_WEBSITE = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'website');
 const LOG_DIR = path.join(ROOT, '.temp', 'flows-e2e');
 const SHOT_DIR = path.join(LOG_DIR, 'screenshots');
 
 const { CLASSIC_PORTS, readPortsFile, resolvePorts, composeTargetConfig, loadEnv } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
 
-// The billing journeys hand-build the processor webhooks no UI can produce (a
+// The billing journeys hand-build the provider webhooks no UI can produce (a
 // declined renewal, a trial converting), and the webhook route authenticates
-// them with the SAME shared key the backend's own test processor uses — it
+// them with the SAME shared key the backend's own test provider uses — it
 // lives in the brand's .env cascade, never in this file. Loaded inside main()
 // AFTER the children's environment is snapshotted: loadEnv mutates this
 // process's env, and the children resolve their own cascade already.
@@ -509,7 +509,7 @@ async function readAccountPage(page, siteUrl) {
 /**
  * Re-read the account page until its rendered billing state agrees with
  * `predicate`. Every billing journey ends on an ASYNCHRONOUS pipeline
- * (processor webhook → Firestore trigger → the page's auth listener), so a
+ * (provider webhook → Firestore trigger → the page's auth listener), so a
  * journey's verdict is the first render that agrees — not the first render.
  * @param {object} page - puppeteer page
  * @param {string} siteUrl - the dev site origin
@@ -550,7 +550,7 @@ async function signInWithPassword(page, siteUrl, email) {
 }
 
 /**
- * Buy a plan on the TEST card processor and wait for the confirmation
+ * Buy a plan on the TEST card provider and wait for the confirmation
  * surface. `params` carries the journey's own checkout knobs on top of the
  * monthly test-card defaults (the trial journey forces its own eligibility).
  * @param {object} page - puppeteer page
@@ -559,7 +559,7 @@ async function signInWithPassword(page, siteUrl, email) {
  * @returns {Promise<string>} the orderId the confirmation URL carries
  */
 async function payWithTestCard(page, siteUrl, params) {
-  const query = new URLSearchParams({ frequency: 'monthly', _dev_cardProcessor: 'test', ...params });
+  const query = new URLSearchParams({ frequency: 'monthly', _dev_cardProvider: 'test', ...params });
   await page.goto(`${siteUrl}/payment/checkout?${query}`, { waitUntil: 'networkidle2' });
   await page.waitForSelector('#checkout-form[data-form-state="ready"]', { timeout: 60000 });
 
@@ -589,7 +589,7 @@ async function payWithTestCard(page, siteUrl, params) {
 }
 
 /**
- * POST a hand-built processor webhook at the backend exactly as a processor
+ * POST a hand-built provider webhook at the backend exactly as a provider
  * would. Two of the four journeys' end states — a declined renewal, a trial
  * converting — have NO user-facing surface that can produce them; a webhook
  * is the only way they ever arrive, in production or here.
@@ -597,7 +597,7 @@ async function payWithTestCard(page, siteUrl, params) {
  * @param {object} event - the Stripe-shaped event body
  */
 async function postTestWebhook(apiUrl, event) {
-  const response = await fetch(`${apiUrl}/omega/payments/webhook?processor=test&key=${WEBHOOK_KEY}`, {
+  const response = await fetch(`${apiUrl}/omega/payments/webhook?provider=test&key=${WEBHOOK_KEY}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(event),
@@ -636,9 +636,9 @@ async function main() {
   const brandId = backendConfig.brand?.id;
   // The billing journeys' paid tier — the same product the checkout area buys
   const paidProduct = (backendConfig.payment?.products || []).find((product) => product.id === 'premium');
-  // The id a processor puts on the plan. Brands with no real Stripe product
+  // The id a provider puts on the plan. Brands with no real Stripe product
   // carry the `_test_<id>` sentinel the resolver maps back (see the backend's
-  // test intent processor) — either way the pipeline resolves the same plan.
+  // test intent provider) — either way the pipeline resolves the same plan.
   const planProductId = paidProduct?.stripe?.productId || `_test_${paidProduct?.id}`;
 
   let hold = null;
@@ -681,7 +681,7 @@ async function main() {
       throw new Error('OMEGA_WEBHOOK_KEY is missing from the playground backend\'s .env cascade — the billing journeys cannot post their webhooks');
     }
 
-    await step('the Paperloom emulator boots + personas seed', async () => {
+    await step('the playground emulator boots + personas seed', async () => {
       emulator = startChild({
         bin: path.join(ROOT, 'node_modules', '.bin', 'mgr'),
         args: ['emulator'],
@@ -698,7 +698,7 @@ async function main() {
       }
       assert.notEqual(ports.auth, CLASSIC_PORTS.auth, 'the emulator must not take the classic auth port');
       // Hosting rewrites /omega/** at the api function — the origin the
-      // billing journeys post their processor webhooks to.
+      // billing journeys post their provider webhooks to.
       apiUrl = `http://127.0.0.1:${ports.hosting}`;
       firestorePort = ports.firestore;
       return `auth :${ports.auth}, hosting :${ports.hosting}, functions :${ports.functions}`;
@@ -885,10 +885,10 @@ async function main() {
       await clickElement(checkoutPage, 'button[data-provider="email"]:not(.d-none)');
       await waitForLanding(checkoutPage);
 
-      // `_dev_cardProcessor=test` routes the card button at @omega.js/backend's
-      // TEST processor: a Stripe-shaped session that auto-fires its own
-      // webhook and hands back the confirmation URL — no live processor, ever.
-      await checkoutPage.goto(`${siteUrl}/payment/checkout?product=premium&frequency=monthly&_dev_cardProcessor=test`, { waitUntil: 'networkidle2' });
+      // `_dev_cardProvider=test` routes the card button at @omega.js/backend's
+      // TEST provider: a Stripe-shaped session that auto-fires its own
+      // webhook and hands back the confirmation URL — no live provider, ever.
+      await checkoutPage.goto(`${siteUrl}/payment/checkout?product=premium&frequency=monthly&_dev_cardProvider=test`, { waitUntil: 'networkidle2' });
       await checkoutPage.waitForSelector('#checkout-form[data-form-state="ready"]', { timeout: 60000 });
 
       const bound = await checkoutPage.evaluate(() => ({
@@ -1086,8 +1086,8 @@ async function main() {
     // page — the surface a customer judges their plan by.
     //
     // Two of the four end states have no UI that reaches them: a renewal is
-    // declined, and a trial ends, on the PROCESSOR's clock. Those legs post a
-    // hand-built test webhook at the backend exactly as a processor would —
+    // declined, and a trial ends, on the PROVIDER's clock. Those legs post a
+    // hand-built test webhook at the backend exactly as a provider would —
     // the same shape @omega.js/backend's own payment journeys send.
 
     console.log('\n  Billing journeys');
@@ -1116,7 +1116,7 @@ async function main() {
       // record from ONE definition — each persona's status mirrors its seeded
       // subscription's.
       //
-      // Surface 1 — the test cancel processor reads the plan's processor
+      // Surface 1 — the test cancel provider reads the plan's provider
       // product id off the LIVE order. Without it the cancellation webhook
       // would name no plan and the pipeline would resolve the persona down to
       // Basic mid-cancel, which is not what cancelling does.
@@ -1219,14 +1219,14 @@ async function main() {
       assert.equal(paid.trialing, false, 'the renewal being declined must belong to a payer, not a trial');
 
       // A month later the renewal charge is declined. Nothing a user can
-      // drive produces that — the processor's invoice event is the only door.
+      // drive produces that — the provider's invoice event is the only door.
       // Reading the subscription id only AFTER the page showed the purchase
       // matters: the seed carries a lapsed subscription id of its own, and
       // the purchase overwrites it in the same write that flipped the plan.
       const seed = personaSeed('journey-flows-failure');
       const userDoc = await db.doc(`users/${seed.uid}`).get();
       const resourceId = userDoc.data()?.subscription?.payment?.resourceId;
-      assert.ok(resourceId, 'the purchase should have left a processor subscription id on the user doc');
+      assert.ok(resourceId, 'the purchase should have left a provider subscription id on the user doc');
 
       await postTestWebhook(apiUrl, {
         id: `_test-evt-flows-failure-${Date.now()}`,
@@ -1264,7 +1264,7 @@ async function main() {
     });
 
     // The trial is TWO journeys' worth of state on one persona — claiming it,
-    // then the processor converting it — so it keeps one page across both.
+    // then the provider converting it — so it keeps one page across both.
     const trialPage = await newPage(browser, 'journey-trial', consoleLog);
     let trialOrderId = null;
     let trialResourceId = null;
@@ -1298,14 +1298,14 @@ async function main() {
 
     await step('JOURNEY trial: the trial converts and the persona keeps the plan as a payer', async () => {
       activePage = trialPage;
-      assert.ok(trialResourceId, 'the trial leg must have left a processor subscription id to convert');
+      assert.ok(trialResourceId, 'the trial leg must have left a provider subscription id to convert');
 
       const seed = personaSeed('journey-flows-trial');
       const nowUNIX = Math.floor(Date.now() / 1000);
       const periodEnd = new Date();
       periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-      // The trial ending is the processor's clock: it converts by updating
+      // The trial ending is the provider's clock: it converts by updating
       // the subscription with its trial window now CLOSED. Same status, same
       // product — what changes is that the customer is paying.
       await postTestWebhook(apiUrl, {

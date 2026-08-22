@@ -2,7 +2,7 @@
  * Brand-root `omega update` fan-out — real execution over a staged fixture
  * brand (deploy-command.test.js pattern): fake framework packages whose
  * `omega` bins record every invocation, so fan-out, flag forwarding,
- * filtering, and the independent-apps failure model (no bail — unlike
+ * filtering, and the independent-targets failure model (no bail — unlike
  * deploy) are asserted from what actually got spawned.
  */
 const test = require('node:test');
@@ -38,13 +38,13 @@ function write(filePath, content) {
   fs.writeFileSync(filePath, content);
 }
 
-/** Stage a brand monorepo with a web app + backend app and fake framework bins. */
+/** Stage a brand monorepo with a web target + backend target and fake framework bins. */
 function stageBrand() {
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-update-cmd-')));
   const brand = path.join(scratch, 'brand');
 
   write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['apps/*'],
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
@@ -52,15 +52,15 @@ function stageBrand() {
 }
 `);
 
-  write(path.join(brand, 'apps', 'website', 'package.json'), JSON.stringify({
+  write(path.join(brand, 'targets', 'website', 'package.json'), JSON.stringify({
     name: 'website', private: true, devDependencies: { '@omega.js/web': '*' },
   }));
-  write(path.join(brand, 'apps', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
+  write(path.join(brand, 'targets', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
-  write(path.join(brand, 'apps', 'backend', 'package.json'), JSON.stringify({
+  write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
   }));
-  write(path.join(brand, 'apps', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
+  write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
   for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
@@ -94,7 +94,7 @@ async function runUpdateCommand(cwd, options = {}) {
 
 // ─── Execution over the staged brand ─────────────────────────────────────────
 
-test('bare run fans out to every app, each spawned `update` in its own cwd', async () => {
+test('bare run fans out to every target, each spawned `update` in its own cwd', async () => {
   const { brand } = stageBrand();
   const code = await runUpdateCommand(brand);
 
@@ -102,12 +102,12 @@ test('bare run fans out to every app, each spawned `update` in its own cwd', asy
   assert.equal(calls.length, 2);
   assert.deepEqual(calls.map((c) => c.name).sort(), ['backend', 'web']);
   for (const call of calls) {
-    assert.deepEqual(call.argv, ['update'], 'bare per-app: only the update command, no flags');
+    assert.deepEqual(call.argv, ['update'], 'bare per-target: only the update command, no flags');
   }
   const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
-  assert.equal(byName.backend.cwd, path.join(brand, 'apps', 'backend'));
-  assert.equal(byName.web.cwd, path.join(brand, 'apps', 'website'));
-  assert.equal(code, undefined, 'all apps green → no error exit code');
+  assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
+  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'website'));
+  assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
 test('flags forward verbatim (--apply, --major, --min-age); --only is consumed here', async () => {
@@ -133,7 +133,7 @@ test('a filter matching nothing errors with zero spawns', async () => {
   assert.equal(code, 1);
 });
 
-test('apps are INDEPENDENT: a failing app never blocks the rest, still exit 1', async () => {
+test('targets are INDEPENDENT: a failing target never blocks the rest, still exit 1', async () => {
   const { brand } = stageBrand();
   fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
   const code = await runUpdateCommand(brand);

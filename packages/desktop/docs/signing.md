@@ -32,7 +32,7 @@ gulp boundary):
 1. **`CSC_LINK`** in the environment — an explicit answer always wins.
 2. **The brand's signing tree** —
    `<brandRoot>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12`,
-   where the brand root is the nearest directory at or above the app carrying a `.omega/`.
+   where the brand root is the nearest directory at or above the target carrying a `.omega/`.
    This is the portable/CI path: `@omega.js/manager`'s certificates service produces the
    tree ([the manager guide](../../../docs/manager/index.md)).
 3. **The company's tree**, when the brand is company-managed. A brand is NEVER physically

@@ -43,6 +43,7 @@ module.exports = async (options) => {
       limit: options.limit,
       ids: options.ids,
       resetAssets: options.resetAssets,
+      force: options.force,
     });
   }
 

@@ -1,14 +1,14 @@
 /**
- * Copy signing artifacts into desktop/mobile apps.
+ * Copy signing artifacts into desktop/mobile targets.
  *
  * Sources are the certificates service's outputs under the signing tree —
  * {companyRoot||brandRoot}/.omega/certificates/apple/ (company-managed
  * brands share the company workspace's material); destinations are each
- * app's certs dir (desktop: config/certs/ per EM v1.4.1+, mobile:
+ * target's certs dir (desktop: config/certs/ per EM v1.4.1+, mobile:
  * build/certs/). Copies
  * are byte-compared first so a converged run rewrites nothing. Every certs
  * dir gets a self-protecting .gitignore (`*`) so signing material can never
- * be committed, even in an app the framework's `mgr setup` hasn't touched.
+ * be committed, even in a target the framework's `mgr setup` hasn't touched.
  *
  * Optional rules skip silently when the source is missing; required rules
  * warn (the desktop/mobile build would be unsigned). A brand with no Apple
@@ -20,7 +20,7 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 // Paths: source relative to .omega/certificates/apple/, dest relative to the
-// app dir. `{env.VAR}` and `{brand.id}` placeholders supported on both sides.
+// target dir. `{env.VAR}` and `{brand.id}` placeholders supported on both sides.
 const CERT_FILE_MAP = {
   desktop: [
     // macOS code signing — Developer ID Application (.p12 with private key)
@@ -102,7 +102,7 @@ function ensureCertsIgnore(destDir) {
 }
 
 module.exports = async (context) => {
-  const { brandRoot, companyRoot, brandConfig, targetApps, options = {} } = context;
+  const { brandRoot, companyRoot, brandConfig, mappedTargets, options = {} } = context;
 
   const certConfig = brandConfig.certificates;
   if (certConfig === false || certConfig?.enabled === false) {
@@ -110,10 +110,10 @@ module.exports = async (context) => {
     return { output: { certs: { reason: 'certificates.enabled = false' } } };
   }
 
-  const certApps = targetApps.filter((app) => CERT_FILE_MAP[app.target]);
-  if (certApps.length === 0) {
-    console.log(`      ${chalk.dim('⊘ no desktop or mobile apps')}`);
-    return { output: { certs: { reason: 'no desktop or mobile apps' } } };
+  const certTargets = mappedTargets.filter((entry) => CERT_FILE_MAP[entry.target]);
+  if (certTargets.length === 0) {
+    console.log(`      ${chalk.dim('⊘ no desktop or mobile targets')}`);
+    return { output: { certs: { reason: 'no desktop or mobile targets' } } };
   }
 
   // The certificates service's signing tree — company-shared when the brand
@@ -131,10 +131,10 @@ module.exports = async (context) => {
   let warned = 0;
   let planned = 0;
 
-  for (const app of certApps) {
-    console.log(`      ${chalk.cyan(app.dir)}:`);
+  for (const entry of certTargets) {
+    console.log(`      ${chalk.cyan(entry.dir)}:`);
 
-    for (const rule of CERT_FILE_MAP[app.target]) {
+    for (const rule of CERT_FILE_MAP[entry.target]) {
       const sourceRel = resolveTemplate(rule.source, brand);
       const destRel = sourceRel === null ? rule.dest : resolveTemplate(rule.dest, brand);
 
@@ -152,7 +152,7 @@ module.exports = async (context) => {
       }
 
       const sourcePath = join(appleDir, sourceRel);
-      const destPath = join(app.path, destRel);
+      const destPath = join(entry.path, destRel);
 
       if (!jetpack.exists(sourcePath)) {
         if (rule.optional) {

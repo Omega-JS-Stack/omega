@@ -49,7 +49,7 @@ async function initializeConfirmation() {
     }, { once: true });
   });
 
-  // The redirect is the processor's CLAIM; entitlement is granted by the
+  // The redirect is the provider's CLAIM; entitlement is granted by the
   // webhook, which lands after the browser does — or never (#232). Hold the
   // page in `processing` until the account itself carries the purchase. A
   // purchase that opened already answered has no poll to wait on and nothing to

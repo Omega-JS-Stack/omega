@@ -51,7 +51,7 @@ const USER_SCHEMA = {
       // How the trial ENDED: 'converted' | 'lapsed' | null (still running, or never
       // answered). `claimed` says only that a trial happened — a converted trial and a
       // lapsed one carry identical dates — so this is the one stored conversion signal.
-      // Stamped by the trial-lapse sweep once the processor confirms which it was.
+      // Stamped by the trial-lapse sweep once the provider confirms which it was.
       outcome: { type: 'string', default: null, nullable: true },
     },
     cancellation: {
@@ -59,7 +59,7 @@ const USER_SCHEMA = {
       date: '$timestamp',
     },
     payment: {
-      processor: { type: 'string', default: null, nullable: true },
+      provider: { type: 'string', default: null, nullable: true },
       orderId: { type: 'string', default: null, nullable: true },
       resourceId: { type: 'string', default: null, nullable: true },
       frequency: { type: 'string', default: null, nullable: true },

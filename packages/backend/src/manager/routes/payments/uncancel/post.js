@@ -1,17 +1,17 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 
 /**
  * POST /payments/uncancel
  * Withdraws a scheduled cancellation, so the authenticated user's subscription
  * renews as normal instead of ending at the close of the current billing period.
- * Delegates to the processor (e.g., Stripe) to clear cancel_at_period_end.
+ * Delegates to the provider (e.g., Stripe) to clear cancel_at_period_end.
  * The resulting webhook triggers the Firestore pipeline which updates subscription
  * state — this route writes no subscription state of its own, exactly like cancel.
  * Clears the cancellation request on payments-orders/{orderId}.requests.cancellation.
  * Requires authentication.
  *
- * Cross-provider and CAPABILITY-GATED: a processor that can resume a subscription
+ * Cross-provider and CAPABILITY-GATED: a provider that can resume a subscription
  * exports uncancel(), one that cannot simply lacks the export, and the route
  * refuses before dispatch rather than letting the caller discover it as a provider
  * error ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
@@ -45,41 +45,41 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond('Your subscription is not scheduled to cancel', { code: 400 });
   }
 
-  const processor = subscription.payment?.processor;
+  const provider = subscription.payment?.provider;
   const resourceId = subscription.payment?.resourceId;
 
-  if (!processor || !resourceId) {
-    ctx.log(`Uncancel rejected: uid=${uid}, missing processor=${processor} or resourceId=${resourceId}`);
+  if (!provider || !resourceId) {
+    ctx.log(`Uncancel rejected: uid=${uid}, missing provider=${provider} or resourceId=${resourceId}`);
     return ctx.respond('Subscription payment details not found', { code: 400 });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // The capability gate. A missing export is the processor saying it cannot do
+  // The capability gate. A missing export is the provider saying it cannot do
   // this at all — a CLIENT fault to be branched on, not an outage to retry, so
   // the code rides the response properties where every 4xx carries its
   // machine-readable half, and the sentence points at the fallback that works.
-  if (typeof processorModule.uncancel !== 'function') {
-    ctx.log(`Uncancel not supported: uid=${uid}, processor=${processor}`);
+  if (typeof providerModule.uncancel !== 'function') {
+    ctx.log(`Uncancel not supported: uid=${uid}, provider=${provider}`);
     return ctx.respond('Your payment provider cannot resume a cancelled subscription. Please use the billing portal to manage your subscription.', {
       code: 400,
-      additional: { code: 'not-supported-by-processor' },
+      additional: { code: 'not-supported-by-provider' },
     });
   }
 
-  // Clear the scheduled cancellation via the processor
+  // Clear the scheduled cancellation via the provider
   try {
-    await processorModule.uncancel({ resourceId, uid, subscription, ctx });
+    await providerModule.uncancel({ resourceId, uid, subscription, ctx });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to resume subscription via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    ctx.error(`Failed to resume subscription via ${provider}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
     return ctx.respond('We could not resume your subscription right now. Please try again shortly.', { code: 500 });
   }
 
@@ -100,7 +100,7 @@ module.exports = async ({ ctx, user, settings }) => {
     ctx.log(`Cleared cancellation request on payments-orders/${orderId}`);
   }
 
-  ctx.log(`Cancellation withdrawn: uid=${uid}, processor=${processor}, sub=${resourceId}`);
+  ctx.log(`Cancellation withdrawn: uid=${uid}, provider=${provider}, sub=${resourceId}`);
 
   return ctx.respond({ success: true });
 };

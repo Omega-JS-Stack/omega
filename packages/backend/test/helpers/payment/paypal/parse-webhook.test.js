@@ -1,11 +1,11 @@
 /**
  * Test: PayPal parseWebhook()
- * Unit tests for the PayPal webhook processor's event categorization and routing
+ * Unit tests for the PayPal webhook provider's event categorization and routing
  *
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type. Mirrors stripe-parse-webhook.js for consistent coverage.
  */
-const paypalProcessor = require('../../../../src/manager/routes/payments/webhook/processors/paypal.js');
+const paypalProvider = require('../../../../src/manager/routes/payments/webhook/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
@@ -13,7 +13,7 @@ const FIXTURE_SUBSCRIPTION_ACTIVE = require('../../../fixtures/paypal/subscripti
 const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
 
 function parseWebhook(event) {
-  return paypalProcessor.parseWebhook({ body: event });
+  return paypalProvider.parseWebhook({ body: event });
 }
 
 module.exports = {
@@ -26,70 +26,70 @@ module.exports = {
     {
       name: 'supports-subscription-activated',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.ACTIVATED'), 'Should support BILLING.SUBSCRIPTION.ACTIVATED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.ACTIVATED'), 'Should support BILLING.SUBSCRIPTION.ACTIVATED');
       },
     },
 
     {
       name: 'supports-subscription-updated',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.UPDATED'), 'Should support BILLING.SUBSCRIPTION.UPDATED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.UPDATED'), 'Should support BILLING.SUBSCRIPTION.UPDATED');
       },
     },
 
     {
       name: 'supports-subscription-cancelled',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.CANCELLED'), 'Should support BILLING.SUBSCRIPTION.CANCELLED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.CANCELLED'), 'Should support BILLING.SUBSCRIPTION.CANCELLED');
       },
     },
 
     {
       name: 'supports-subscription-suspended',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.SUSPENDED'), 'Should support BILLING.SUBSCRIPTION.SUSPENDED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.SUSPENDED'), 'Should support BILLING.SUBSCRIPTION.SUSPENDED');
       },
     },
 
     {
       name: 'supports-subscription-expired',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.EXPIRED'), 'Should support BILLING.SUBSCRIPTION.EXPIRED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.EXPIRED'), 'Should support BILLING.SUBSCRIPTION.EXPIRED');
       },
     },
 
     {
       name: 'supports-subscription-reactivated',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('BILLING.SUBSCRIPTION.RE-ACTIVATED'), 'Should support BILLING.SUBSCRIPTION.RE-ACTIVATED');
+        assert.ok(paypalProvider.isSupported('BILLING.SUBSCRIPTION.RE-ACTIVATED'), 'Should support BILLING.SUBSCRIPTION.RE-ACTIVATED');
       },
     },
 
     {
       name: 'supports-payment-sale-completed',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('PAYMENT.SALE.COMPLETED'), 'Should support PAYMENT.SALE.COMPLETED');
+        assert.ok(paypalProvider.isSupported('PAYMENT.SALE.COMPLETED'), 'Should support PAYMENT.SALE.COMPLETED');
       },
     },
 
     {
       name: 'supports-payment-sale-denied',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('PAYMENT.SALE.DENIED'), 'Should support PAYMENT.SALE.DENIED');
+        assert.ok(paypalProvider.isSupported('PAYMENT.SALE.DENIED'), 'Should support PAYMENT.SALE.DENIED');
       },
     },
 
     {
       name: 'supports-payment-sale-refunded',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('PAYMENT.SALE.REFUNDED'), 'Should support PAYMENT.SALE.REFUNDED');
+        assert.ok(paypalProvider.isSupported('PAYMENT.SALE.REFUNDED'), 'Should support PAYMENT.SALE.REFUNDED');
       },
     },
 
     {
       name: 'supports-checkout-order-approved',
       async run({ assert }) {
-        assert.ok(paypalProcessor.isSupported('CHECKOUT.ORDER.APPROVED'), 'Should support CHECKOUT.ORDER.APPROVED');
+        assert.ok(paypalProvider.isSupported('CHECKOUT.ORDER.APPROVED'), 'Should support CHECKOUT.ORDER.APPROVED');
       },
     },
 
@@ -101,7 +101,7 @@ module.exports = {
         // PAYMENT.SALE.REFUNDED the accepted list stopped at. Dropping it meant
         // a refund of a modern PayPal purchase never entered the pipeline at
         // all ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
-        assert.ok(paypalProcessor.isSupported('PAYMENT.CAPTURE.REFUNDED'), 'Should support PAYMENT.CAPTURE.REFUNDED');
+        assert.ok(paypalProvider.isSupported('PAYMENT.CAPTURE.REFUNDED'), 'Should support PAYMENT.CAPTURE.REFUNDED');
       },
     },
 
@@ -115,7 +115,7 @@ module.exports = {
         // ever exercised it here — it needs its own payload and its own issue
         // rather than a guess folded into this one.
         for (const eventType of ['PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.PENDING', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.REVERSED']) {
-          assert.equal(paypalProcessor.isSupported(eventType), false, `${eventType} should not be accepted yet`);
+          assert.equal(paypalProvider.isSupported(eventType), false, `${eventType} should not be accepted yet`);
         }
       },
     },
@@ -123,8 +123,8 @@ module.exports = {
     {
       name: 'rejects-unsupported-event',
       async run({ assert }) {
-        assert.equal(paypalProcessor.isSupported('PAYMENT.ORDER.CREATED'), false, 'Should not support PAYMENT.ORDER.CREATED');
-        assert.equal(paypalProcessor.isSupported('CUSTOMER.CREATED'), false, 'Should not support CUSTOMER.CREATED');
+        assert.equal(paypalProvider.isSupported('PAYMENT.ORDER.CREATED'), false, 'Should not support PAYMENT.ORDER.CREATED');
+        assert.equal(paypalProvider.isSupported('CUSTOMER.CREATED'), false, 'Should not support CUSTOMER.CREATED');
       },
     },
 

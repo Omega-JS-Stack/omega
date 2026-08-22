@@ -219,7 +219,7 @@ function showRequestForm() {
 
 // Tracking
 function trackDataRequest(action) {
-  event('data_request', {
+  event('user_data_request', {
     action: action,
   });
 }

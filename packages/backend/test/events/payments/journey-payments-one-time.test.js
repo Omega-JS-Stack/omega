@@ -2,7 +2,7 @@
  * Test: Payment Journey - One-Time Purchase
  * Simulates: user → test intent (one-time product) → auto-webhook → purchase-completed
  *
- * Uses the test processor to exercise the full intent→webhook→trigger pipeline
+ * Uses the test provider to exercise the full intent→webhook→trigger pipeline
  * for one-time payments. Unlike subscriptions, one-time payments only write to
  * payments-orders/{orderId} — they do NOT modify users/{uid}.subscription.
  *
@@ -43,7 +43,7 @@ module.exports = {
       name: 'create-one-time-intent',
       async run({ http, assert, state }) {
         const response = await http.as('journey-payments-one-time').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.productId,
         });
 
@@ -87,9 +87,9 @@ module.exports = {
         assert.equal(orderDoc.id, state.orderId, 'ID should match orderId');
         assert.equal(orderDoc.type, 'one-time', 'Type should be one-time');
         assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.processor, 'test', 'Processor should be test');
+        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
         assert.equal(orderDoc.unified.product.id, state.productId, `Product should be ${state.productId}`);
-        assert.equal(orderDoc.unified.payment.processor, 'test', 'Unified processor should be test');
+        assert.equal(orderDoc.unified.payment.provider, 'test', 'Unified provider should be test');
         assert.equal(orderDoc.unified.payment.orderId, state.orderId, 'Unified orderId should match');
         assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
         assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
@@ -121,12 +121,12 @@ module.exports = {
       name: 'webhook-without-metadata-resolves-from-the-order',
       async run({ http, firestore, assert, state, config, waitFor }) {
         // A redelivery that carries no metadata (no uid, no orderId) — the shape a
-        // processor sends when the checkout's metadata never made it onto the event.
-        // The test processor answers it the way a real API would: from the order the
+        // provider sends when the checkout's metadata never made it onto the event.
+        // The test provider answers it the way a real API would: from the order the
         // first webhook already wrote, matched on its resourceId.
         state.bareEventId = `_test-evt-one-time-bare-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.bareEventId,
           type: 'checkout.session.completed',
           data: {
@@ -161,9 +161,9 @@ module.exports = {
 
         assert.ok(intentDoc, 'Intent doc should exist');
         assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
-        assert.equal(intentDoc.intentId, state.intentId, 'Intent ID should match processor session ID');
+        assert.equal(intentDoc.intentId, state.intentId, 'Intent ID should match provider session ID');
         assert.equal(intentDoc.owner, state.uid, 'Owner should match');
-        assert.equal(intentDoc.processor, 'test', 'Processor should be test');
+        assert.equal(intentDoc.provider, 'test', 'Provider should be test');
         assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after webhook processing');
         assert.equal(intentDoc.productId, state.productId, `Product should be ${state.productId}`);
         assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');

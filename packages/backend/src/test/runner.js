@@ -385,7 +385,7 @@ class TestRunner {
 
     try {
       const searchPaths = [
-        // The app root + its install — deps live on the ONE app manifest
+        // The target root + its install — deps live on the ONE target manifest
         // (src/dist pillar); dist/node_modules covers legacy installs
         this.options.projectDir,
         path.join(this.options.projectDir, 'node_modules'),

@@ -4,7 +4,8 @@
 // type — website, backend, extension, desktop), then a `targets` object whose KEY
 // PRESENCE says which targets this brand enables and whose values hold target-scoped
 // settings. Any shared key may also appear inside a target entry to override it for
-// that surface only (e.g. an extension-specific monitoring.dsn under targets.extension).
+// that surface only (e.g. an extension-specific monitoring.providers.sentry.dsn
+// under targets.extension).
 //
 // Secrets NEVER live here — they live in .env. The validator hard-fails on
 // secret-shaped keys (…Secret, …privateKey).
@@ -19,8 +20,11 @@
   },
 
   monitoring: {
-    provider: 'sentry',
-    dsn: '',
+    providers: {
+      sentry: {
+        dsn: '',
+      },
+    },
   },
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret

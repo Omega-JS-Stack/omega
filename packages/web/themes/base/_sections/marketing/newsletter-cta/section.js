@@ -70,7 +70,7 @@ export default (el) => {
 
 // Tracking (the guarded helper no-ops per provider when its global is absent)
 function trackNewsletterSignup() {
-  event('newsletter_signup', {
+  event('marketing_newsletter_subscribe', {
     method: 'newsletter-cta',
   });
 }

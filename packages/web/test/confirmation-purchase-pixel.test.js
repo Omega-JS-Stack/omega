@@ -108,7 +108,7 @@ function clearPage() {
   }
 }
 
-/** The state the page parses out of the processor's redirect. */
+/** The state the page parses out of the provider's redirect. */
 function purchaseState(overrides = {}) {
   return {
     orderId: 'ORD-1',

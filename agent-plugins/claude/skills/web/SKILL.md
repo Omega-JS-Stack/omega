@@ -1,6 +1,6 @@
 ---
 name: web
-description: Use when working on a brand's website app or on @omega.js/web itself — Eleventy and Liquid templates, sections and components, themes, blueprints and default pages, the asset pipeline, or the omega CLI, in apps/website or packages/web/.
+description: Use when working on a brand's website app or on @omega.js/web itself — Eleventy and Liquid templates, sections and components, themes, blueprints and default pages, the asset pipeline, or the omega CLI, in targets/website or packages/web/.
 user-invocable: true
 ---
 

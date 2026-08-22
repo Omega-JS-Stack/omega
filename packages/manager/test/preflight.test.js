@@ -90,13 +90,13 @@ function stageTokenStore(tokens) {
 
 // ─── checkService: when-gates + env + scopes ────────────────────────────────
 
-test('preflight: service when-gate false → no finding (disabled cloudflare)', () => {
-  const finding = checkService('cloudflare', REQUIRES.cloudflare, { edge: { providers: { cloudflare: { enabled: false } } } }, EMPTY_STORE);
+test('preflight: service when-gate false → no finding (disabled edge)', () => {
+  const finding = checkService('edge', REQUIRES.edge, { edge: { providers: { cloudflare: { enabled: false } } } }, EMPTY_STORE);
   assert.equal(finding, null);
 });
 
 test('preflight: missing env → finding naming the exact vars', () => {
-  const finding = checkService('cloudflare', REQUIRES.cloudflare, {}, EMPTY_STORE);
+  const finding = checkService('edge', REQUIRES.edge, {}, EMPTY_STORE);
   assert.ok(finding);
   assert.deepEqual(finding.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN']);
   assert.equal(finding.missingScopes.length, 0);
@@ -106,17 +106,17 @@ test('preflight: missing env → finding naming the exact vars', () => {
 test('preflight: env present → no finding', () => {
   process.env.CLOUDFLARE_TOKEN = SECRET_VALUE;
   try {
-    assert.equal(checkService('cloudflare', REQUIRES.cloudflare, {}, EMPTY_STORE), null);
+    assert.equal(checkService('edge', REQUIRES.edge, {}, EMPTY_STORE), null);
   } finally {
     delete process.env.CLOUDFLARE_TOKEN;
   }
 });
 
 test('preflight: entry-level when — namecheap creds only for namecheap brands', () => {
-  const squarespace = checkService('domain', REQUIRES.domain, { domain: { provider: 'squarespace' } }, EMPTY_STORE);
+  const squarespace = checkService('domain', REQUIRES.domain, { domain: { providers: { squarespace: {} } } }, EMPTY_STORE);
   assert.deepEqual(squarespace.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN']);
 
-  const namecheap = checkService('domain', REQUIRES.domain, { domain: { provider: 'namecheap' } }, EMPTY_STORE);
+  const namecheap = checkService('domain', REQUIRES.domain, { domain: { providers: { namecheap: {} } } }, EMPTY_STORE);
   assert.deepEqual(namecheap.missingEnv.map((entry) => entry.name), ['CLOUDFLARE_TOKEN', 'NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY']);
 
   // No provider chosen → the service skips itself; preflight stays quiet
@@ -127,7 +127,7 @@ test('preflight: scopes — no token store → noConsent', () => {
   process.env.GOOGLE_CLIENT_ID = 'id';
   process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
   try {
-    const finding = checkService('search-console', REQUIRES['search-console'], {}, EMPTY_STORE);
+    const finding = checkService('search', REQUIRES.search, {}, EMPTY_STORE);
     assert.ok(finding);
     assert.equal(finding.noConsent, true);
     assert.equal(finding.missingEnv.length, 0);
@@ -147,11 +147,11 @@ test('preflight: scopes — store missing a required scope → missingScopes; su
       accountEmail: 'ops@example.test',
       storePath: '/x/google-tokens.json',
     };
-    const finding = checkService('search-console', REQUIRES['search-console'], {}, partial);
+    const finding = checkService('search', REQUIRES.search, {}, partial);
     assert.deepEqual(finding.missingScopes, ['https://www.googleapis.com/auth/siteverification']);
 
     const full = { ...partial, scopes: [...partial.scopes, 'https://www.googleapis.com/auth/siteverification'] };
-    assert.equal(checkService('search-console', REQUIRES['search-console'], {}, full), null);
+    assert.equal(checkService('search', REQUIRES.search, {}, full), null);
   } finally {
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
@@ -337,10 +337,10 @@ test('preflight walkthrough: scope gap names the acting identity + both remedies
     const root = stageTokenStore({ access_token: 'tok', scopes: ['https://www.googleapis.com/auth/webmasters'], account_email: 'ops@example.test' });
 
     const log = captureLog(() => {
-      withStreams(false, () => runPreflight({ services: ['search-console'], brandConfig: {}, brandRoot: root, options: {} }));
+      withStreams(false, () => runPreflight({ services: ['search'], brandConfig: {}, brandRoot: root, options: {} }));
     });
 
-    assert.match(log, /search-console/);
+    assert.match(log, /search/);
     assert.match(log, /scope:siteverification/);           // what's missing, short form
     assert.match(log, /ops@example\.test/);                // acting identity (cp236)
     assert.match(log, /google-tokens\.json/);              // the token store path
@@ -374,7 +374,7 @@ function stageBrand() {
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
     name: 'preflight-brand',
     private: true,
-    workspaces: ['apps/*'],
+    workspaces: ['targets/*'],
   }, null, 2));
   fs.mkdirSync(path.join(root, 'config'));
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
@@ -387,15 +387,15 @@ function stageBrand() {
     web: {},
   },
 }`);
-  // A no-dep website app whose build writes dist/index.html — the update
+  // A no-dep website target whose build writes dist/index.html — the update
   // service must pass so the loop provably continues PAST preflight skips
-  fs.mkdirSync(path.join(root, 'apps', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'apps', 'website', 'package.json'), JSON.stringify({
+  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), JSON.stringify({
     name: 'preflight-website',
     private: true,
     scripts: { build: 'node build.js' },
   }, null, 2));
-  fs.writeFileSync(path.join(root, 'apps', 'website', 'build.js'), `const fs = require('node:fs');
+  fs.writeFileSync(path.join(root, 'targets', 'website', 'build.js'), `const fs = require('node:fs');
 const path = require('node:path');
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(__dirname, 'dist', 'index.html'), '<!doctype html><title>preflight</title>');
@@ -405,43 +405,43 @@ fs.writeFileSync(path.join(__dirname, 'dist', 'index.html'), '<!doctype html><ti
 
 test('runManage: preflight-failing service skips with the walkthrough reason and missingEnv', async () => {
   const root = stageBrand();
-  const report = await withStreams(false, () => runManage(root, { service: 'cloudflare' }));
+  const report = await withStreams(false, () => runManage(root, { service: 'edge' }));
 
   assert.equal(report.hasErrors, false);
-  assert.equal(report.results.cloudflare.status, 'skipped');
-  assert.match(report.results.cloudflare.reason, /^preflight: /);
-  assert.match(report.results.cloudflare.reason, /CLOUDFLARE_TOKEN/);
-  assert.deepEqual(report.results.cloudflare.missingEnv, ['CLOUDFLARE_TOKEN']);
+  assert.equal(report.results.edge.status, 'skipped');
+  assert.match(report.results.edge.reason, /^preflight: /);
+  assert.match(report.results.edge.reason, /CLOUDFLARE_TOKEN/);
+  assert.deepEqual(report.results.edge.missingEnv, ['CLOUDFLARE_TOKEN']);
 });
 
 test('runManage: --strict turns the preflight failure into a hard error', async () => {
   const root = stageBrand();
-  const report = await withStreams(false, () => runManage(root, { service: 'cloudflare', strict: true }));
+  const report = await withStreams(false, () => runManage(root, { service: 'edge', strict: true }));
 
   assert.equal(report.hasErrors, true);
-  assert.equal(report.results.cloudflare.status, 'error');
-  assert.match(report.results.cloudflare.error, /^preflight: /);
-  assert.match(report.results.cloudflare.error, /CLOUDFLARE_TOKEN/);
+  assert.equal(report.results.edge.status, 'error');
+  assert.match(report.results.edge.error, /^preflight: /);
+  assert.match(report.results.edge.error, /CLOUDFLARE_TOKEN/);
 });
 
 test('runManage: a consent-gated preflight skip is NAMED in the ⚑ pending list, with its rerun hint (#228)', async () => {
   const root = stageBrand();
 
-  const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search-console' })));
+  const log = await captureLogAsync(() => withStreams(false, () => runManage(root, { service: 'search' })));
 
   assert.match(log, /⚑ Skipped — needs an interactive run/,
     'a consent gap belongs in the pending aggregate, not only in the walkthrough scroll-back');
-  assert.match(log, /search-console\/preflight/, 'the ⚑ line names the service');
-  assert.match(log, /npm run manage -- --service=search-console/);
+  assert.match(log, /search\/preflight/, 'the ⚑ line names the service');
+  assert.match(log, /npm run manage -- --service=search/);
 });
 
 test('runManage: the cycle continues past preflight skips (absorb, never crash)', async () => {
   const root = stageBrand();
   const report = await withStreams(false, () => runManage(root, {}));
 
-  // cloudflare (and friends) skipped by preflight…
-  assert.equal(report.results.cloudflare.status, 'skipped');
-  assert.match(report.results.cloudflare.reason, /^preflight: /);
+  // edge (and friends) skipped by preflight…
+  assert.equal(report.results.edge.status, 'skipped');
+  assert.match(report.results.edge.reason, /^preflight: /);
   // …while later services still ran — the loop never stopped
   assert.ok(report.results.testing, 'testing service should still have run');
   assert.ok(report.results.workspace, 'workspace service should still have run');

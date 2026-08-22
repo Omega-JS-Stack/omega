@@ -203,7 +203,7 @@ module.exports = {
             && query.field === 'auth.email'
             && query.op === '=='
             && query.value === 'revoked.user@gmail.com',
-          `add() must look up users by auth.email (the webhook-processor query), got ${JSON.stringify(query)}`,
+          `add() must look up users by auth.email (the webhook-provider query), got ${JSON.stringify(query)}`,
         );
       },
     },

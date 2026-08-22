@@ -13,8 +13,8 @@
  *    it by sending `skipGuards`, which is a privileged request, not something a
  *    real trialer can send.
  *  - `_is-trialing.js` is the ONE definition of "still inside the trial", shared
- *    by the route and all four cancel processors. It was three copies before,
- *    which is how the route came to disagree with the processors it calls.
+ *    by the route and all four cancel providers. It was three copies before,
+ *    which is how the route came to disagree with the providers it calls.
  *
  * Three layers, each proving what it can:
  *  - the classifier as a pure function (zero I/O — the framework's one exception
@@ -22,15 +22,15 @@
  *    actually writes;
  *  - the route against the real emulator: a trialing subscription minutes old
  *    gets PAST the guard, and a paid one exactly as young still does not;
- *  - every cancel PROCESSOR, one case per provider: the branch has to reach the
+ *  - every cancel PROVIDER, one case per provider: the branch has to reach the
  *    provider's own immediate-cancel verb, not merely log that it meant to. The
  *    provider SDK/HTTP seam is the one thing stood in for (creating and
  *    cancelling a live subscription needs a real account), exactly as
- *    intent-discount-coupons.test.js does it; the test processor writes to the
+ *    intent-discount-coupons.test.js does it; the test provider writes to the
  *    real emulator instead, since its "provider" IS Firestore.
  *
- * The route cases carry a deliberately unknown processor, so getting past the
- * guard lands on "Unknown processor" and nothing external is ever reached — the
+ * The route cases carry a deliberately unknown provider, so getting past the
+ * guard lands on "Unknown provider" and nothing external is ever reached — the
  * technique cancel-skip-guards.test.js established. Both verdicts are a 400 with
  * DIFFERENT text, which is what separates "the guard ran" from "the guard did
  * not".
@@ -39,7 +39,7 @@
  * immediacy is enforced in the unified transform instead (a subscription inside
  * its trial window gets no remaining period). The transform half is pinned in
  * helpers/payment/paypal/to-unified-subscription.test.js; what belongs here is
- * that the processor calls the cancel endpoint and says which cancel it was.
+ * that the provider calls the cancel endpoint and says which cancel it was.
  *
  * Run: npx omega test backend:routes/payments/cancel-trialing
  */
@@ -48,14 +48,14 @@ const { buildUser, callHandler, withEnvironment, PRODUCTION_ENVIRONMENT } = requ
 const handler = require('../../../src/manager/routes/payments/cancel/post.js');
 const isTrialing = require('../../../src/manager/routes/payments/cancel/_is-trialing.js');
 
-const StripeLib = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const ChargebeeLib = require('../../../src/manager/libraries/payment/processors/chargebee.js');
-const PayPalLib = require('../../../src/manager/libraries/payment/processors/paypal.js');
+const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const PayPalLib = require('../../../src/manager/libraries/payment/providers/paypal.js');
 
-const stripeCancel = require('../../../src/manager/routes/payments/cancel/processors/stripe.js');
-const chargebeeCancel = require('../../../src/manager/routes/payments/cancel/processors/chargebee.js');
-const paypalCancel = require('../../../src/manager/routes/payments/cancel/processors/paypal.js');
-const testCancel = require('../../../src/manager/routes/payments/cancel/processors/test.js');
+const stripeCancel = require('../../../src/manager/routes/payments/cancel/providers/stripe.js');
+const chargebeeCancel = require('../../../src/manager/routes/payments/cancel/providers/chargebee.js');
+const paypalCancel = require('../../../src/manager/routes/payments/cancel/providers/paypal.js');
+const testCancel = require('../../../src/manager/routes/payments/cancel/providers/test.js');
 
 const DAY = 24 * 60 * 60;
 
@@ -83,8 +83,8 @@ function youngSubscriber(Manager, { uid, trialing }) {
         ? { claimed: true, expires: stamp(trialEndUNIX) }
         : { claimed: false },
       payment: {
-        // Deliberately unknown: getting PAST the age guard must not reach a real processor
-        processor: 'unknown-processor',
+        // Deliberately unknown: getting PAST the age guard must not reach a real provider
+        provider: 'unknown-provider',
         resourceId: 'sub_test_trial_cancel',
         startDate: stamp(nowUNIX),
       },
@@ -114,10 +114,10 @@ function cancelInProduction(Manager, user) {
 const nowUNIX = Math.floor(Date.now() / 1000);
 const at = (unix) => ({ timestamp: new Date(unix * 1000).toISOString(), timestampUNIX: unix });
 
-// ─── the processors ──────────────────────────────────────────────────────────
+// ─── the providers ──────────────────────────────────────────────────────────
 
 /**
- * The subscription each processor is handed, in the two states that decide its
+ * The subscription each provider is handed, in the two states that decide its
  * branch. A live trial expires WITH its trial; a paid one runs to its period end.
  */
 function subscriptionInState(trialing) {
@@ -135,10 +135,10 @@ function subscriptionInState(trialing) {
   };
 }
 
-// A ctx that records the log line, which is how each processor names the cancel
-// it performed. Everything else the processors touch is the REAL ctx — the
+// A ctx that records the log line, which is how each provider names the cancel
+// it performed. Everything else the providers touch is the REAL ctx — the
 // recorder delegates to it (rather than copying it, which would drop every
-// method the processors call, `isProduction()` and `Manager` among them).
+// method the providers call, `isProduction()` and `Manager` among them).
 function recordingCtx(ctx) {
   const logs = [];
   const recorder = Object.create(ctx);
@@ -161,11 +161,11 @@ async function withStub(library, method, replacement, fn) {
   }
 }
 
-/** Cancel through a processor, in the trialing or the paid state. */
-async function cancelVia(processor, { trialing, ctx }) {
+/** Cancel through a provider, in the trialing or the paid state. */
+async function cancelVia(provider, { trialing, ctx }) {
   const recorder = recordingCtx(ctx);
 
-  await processor.cancelAtPeriodEnd({
+  await provider.cancelAtPeriodEnd({
     resourceId: 'sub_test_immediacy',
     uid: '_test-cancel-immediacy',
     subscription: subscriptionInState(trialing),
@@ -191,12 +191,12 @@ module.exports = {
 
         const sent = await cancelInProduction(Manager, user);
 
-        assert.equal(sent.code, 400, `Expected the request to reach the processor lookup, got ${sent.code}: ${sent.body}`);
+        assert.equal(sent.code, 400, `Expected the request to reach the provider lookup, got ${sent.code}: ${sent.body}`);
         assert.ok(
           !/still being set up/i.test(`${sent.body}`),
           `A trial must never be told it is still being set up, got: ${sent.body}`,
         );
-        assert.match(`${sent.body}`, /Unknown processor/i, 'The trial cancel should get PAST the age guard');
+        assert.match(`${sent.body}`, /Unknown provider/i, 'The trial cancel should get PAST the age guard');
       },
     },
 
@@ -307,7 +307,7 @@ module.exports = {
       },
     },
 
-    // ─── the processors ───
+    // ─── the providers ───
 
     {
       name: 'stripe-cancels-a-trial-now-and-a-paid-subscription-at-period-end',
@@ -394,16 +394,16 @@ module.exports = {
     },
 
     {
-      name: 'the-test-processor-fabricates-the-immediate-cancel-event',
+      name: 'the-test-provider-fabricates-the-immediate-cancel-event',
       auth: 'none',
       async run({ assert, ctx, firestore }) {
-        // The test processor's "provider" is Firestore, so this one runs for
+        // The test provider's "provider" is Firestore, so this one runs for
         // real: the webhook doc it writes IS the cancel, and the pipeline folds
         // it exactly as a Stripe delivery.
         const trialLogs = await cancelVia(testCancel, { trialing: true, ctx });
         const trialEventId = trialLogs.join('\n').match(/payments-webhooks\/([\w-]+)/)?.[1];
 
-        assert.ok(trialEventId, `The processor should name the event it wrote, got: ${trialLogs.join('\n')}`);
+        assert.ok(trialEventId, `The provider should name the event it wrote, got: ${trialLogs.join('\n')}`);
 
         const trialEvent = await firestore.get(`payments-webhooks/${trialEventId}`);
         const trialSubscription = trialEvent.raw.data.object;

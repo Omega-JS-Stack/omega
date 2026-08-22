@@ -4,7 +4,7 @@
 //
 //   1. OMEGA_FONTAWESOME_ROOT — a fontawesome.com download dir
 //      (contains svgs/ + metadata/); no npm token needed.
-//   2. @fortawesome/fontawesome-pro — installed by the BRAND app with its
+//   2. @fortawesome/fontawesome-pro — installed by the BRAND target with its
 //      own FA npm token (a prod dependency there, so it ships in the asar).
 //      Never a dependency of @omega.js/desktop itself — license.
 //   3. @fortawesome/fontawesome-free — the declared-dependency floor

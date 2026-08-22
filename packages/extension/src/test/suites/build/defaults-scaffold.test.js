@@ -104,100 +104,100 @@ module.exports = {
       },
     },
     {
-      name: 'brand app scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; app file = standalone escape hatch)',
+      name: 'brand target scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; local file = standalone escape hatch)',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const appDir = path.join(tmp, 'brand', 'apps', 'extension');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'extension');
+        jetpack.dir(targetDir);
 
-        // Fresh scaffold AND every-build reruns: the app config never appears
-        // (the old targets-only seed kept resurrecting deleted app files)
-        scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
+        // Fresh scaffold AND every-build reruns: the local config never appears
+        // (the old targets-only seed kept resurrecting deleted local files)
+        scaffoldDefaults({ outputDir: targetDir });
+        ctx.expect(jetpack.exists(path.join(targetDir, 'config', 'omega.json5'))).toBe(false);
 
-        scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
+        scaffoldDefaults({ outputDir: targetDir });
+        ctx.expect(jetpack.exists(path.join(targetDir, 'config', 'omega.json5'))).toBe(false);
       },
     },
     {
-      name: 'brand app scaffolds NO per-app docs (brand doc unification: the brand root is the doc home)',
+      name: 'brand target scaffolds NO per-target docs (brand doc unification: the brand root is the doc home)',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const appDir = path.join(tmp, 'brand', 'apps', 'extension');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'extension');
+        jetpack.dir(targetDir);
 
-        scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+        scaffoldDefaults({ outputDir: targetDir });
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CHANGELOG.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
         // The non-doc defaults still land.
-        ctx.expect(jetpack.exists(path.join(appDir, '.env'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, '.env'))).toBeTruthy();
       },
     },
     {
-      name: 'brand setup sweeps framework-owned per-app docs, preserves consumer content with a warning',
+      name: 'brand setup sweeps framework-owned per-target docs, preserves consumer content with a warning',
       run: (ctx) => {
         const DEFAULT_MARKER = '# ========== Default Values ==========';
         const CUSTOM_MARKER = '# ========== Custom Values ==========';
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
-        const appDir = path.join(tmp, 'brand', 'apps', 'extension');
-        jetpack.dir(appDir);
+        const targetDir = path.join(tmp, 'brand', 'targets', 'extension');
+        jetpack.dir(targetDir);
 
-        // Standalone scaffold first (no brand config yet) — per-app docs land.
-        scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBeTruthy();
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBeTruthy();
+        // Standalone scaffold first (no brand config yet) — per-target docs land.
+        scaffoldDefaults({ outputDir: targetDir });
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBeTruthy();
 
         // Wrap it in a brand monorepo: the next scaffold sweeps the untouched docs.
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const swept = scaffoldDefaults({ outputDir: appDir });
+        const swept = scaffoldDefaults({ outputDir: targetDir });
         ctx.expect(swept.removed.slice().sort().join(',')).toBe('AGENTS.md,CHANGELOG.md,CLAUDE.md,docs/README.md');
-        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
-        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
 
         // Consumer content is never destroyed: real notes below the Custom marker keep the file.
-        jetpack.write(path.join(appDir, 'AGENTS.md'),
+        jetpack.write(path.join(targetDir, 'AGENTS.md'),
           `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
-        scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.read(path.join(appDir, 'AGENTS.md'))).toContain('VPN');
+        scaffoldDefaults({ outputDir: targetDir });
+        ctx.expect(jetpack.read(path.join(targetDir, 'AGENTS.md'))).toContain('VPN');
       },
     },
     {
-      // GitHub runs workflows from the repo root ONLY, so the per-app copy a
+      // GitHub runs workflows from the repo root ONLY, so the per-target copy a
       // brand monorepo used to get never fired: no CI build, no store publish (#265).
-      name: 'brand app scaffolds NO per-app .github/ — its CI composes into the brand root',
+      name: 'brand target scaffolds NO per-target .github/ — its CI composes into the brand root',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         const brandRoot = path.join(tmp, 'brand');
         jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
-        const appDir = path.join(brandRoot, 'apps', 'extension');
-        jetpack.dir(appDir);
+        const targetDir = path.join(brandRoot, 'targets', 'extension');
+        jetpack.dir(targetDir);
 
-        scaffoldDefaults({ outputDir: appDir });
+        scaffoldDefaults({ outputDir: targetDir });
 
-        ctx.expect(jetpack.exists(path.join(appDir, '.github'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(targetDir, '.github'))).toBe(false);
 
         const composed = path.join(brandRoot, '.github', 'workflows', 'extension-publish.yml');
         ctx.expect(jetpack.exists(composed)).toBe('file');
 
         const contents = jetpack.read(composed);
-        // Runs from the repo root, scoped to this app
-        ctx.expect(contents).toContain('working-directory: apps/extension');
+        // Runs from the repo root, scoped to this target
+        ctx.expect(contents).toContain('working-directory: targets/extension');
         // The site-token pass still renders (the pinned consumer Node version)
         ctx.expect(contents).toContain(`NODE_VERSION: '22'`);
         ctx.expect(contents.includes('[versions.node]')).toBe(false);
 
         // Idempotent: a setup rerun updates that one file, never adds another
-        scaffoldDefaults({ outputDir: appDir });
+        scaffoldDefaults({ outputDir: targetDir });
         ctx.expect(jetpack.list(path.join(brandRoot, '.github', 'workflows'))).toEqual(['extension-publish.yml']);
       },
     },
     {
-      name: 'standalone app keeps its own .github/workflows (its app dir IS the repo root)',
+      name: 'standalone project keeps its own .github/workflows (its target dir IS the repo root)',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
 

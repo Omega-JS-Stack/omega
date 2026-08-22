@@ -97,7 +97,7 @@ module.exports = {
       run({ assert }) {
         // `omega emulator` defaults HTTPS on: hosting moves to an internal plain
         // port and the mkcert proxy takes the classic one. The runner has no CA
-        // for that cert — handed the TLS port it would send the test processor's
+        // for that cert — handed the TLS port it would send the test provider's
         // auto-webhook through the proxy and fail on the handshake, so it gets
         // hosting's INTERNAL port and nothing else.
         const command = buildCommand({

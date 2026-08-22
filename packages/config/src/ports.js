@@ -218,10 +218,10 @@ function clearPortsFile(projectDir) {
 }
 
 /**
- * Merge the live ports files of the sibling apps in the same brand — a
+ * Merge the live ports files of the sibling targets in the same brand — a
  * running backend's resolved emulator map, as the website/desktop/extension
- * app beside it sees it. Dead-pid leftovers are ignored by readPortsFile; the
- * caller's OWN app dir is skipped (a previous run of the same process).
+ * target beside it sees it. Dead-pid leftovers are ignored by readPortsFile; the
+ * caller's OWN target dir is skipped (a previous run of the same process).
  *
  * Read at USE time, never once at boot: the ports file is pid-stamped and
  * deleted on shutdown, so a boot-time read races the sibling that has not
@@ -230,13 +230,13 @@ function clearPortsFile(projectDir) {
  *
  * No brand root (standalone consumer) → empty map, and the caller falls back
  * to the classic ports.
- * @param {string} appDir - The reading app's root (its own file is skipped).
+ * @param {string} targetDir - The reading target's root (its own file is skipped).
  * @returns {object} Merged name → port map.
  */
-function readSiblingPorts(appDir) {
+function readSiblingPorts(targetDir) {
   const merged = {};
 
-  for (const dir of siblingAppDirs(appDir)) {
+  for (const dir of siblingTargetDirs(targetDir)) {
     Object.assign(merged, readPortsFile(dir) || {});
   }
 
@@ -244,7 +244,7 @@ function readSiblingPorts(appDir) {
 }
 
 /**
- * The resolved dev WEBSITE ORIGIN a sibling app of the same brand published —
+ * The resolved dev WEBSITE ORIGIN a sibling target of the same brand published —
  * protocol and port together, because a port alone cannot say whether the dev
  * server speaks TLS (mkcert is the default) and every client that links to the
  * website in dev needs the whole origin
@@ -252,11 +252,11 @@ function readSiblingPorts(appDir) {
  *
  * Read at USE time like readSiblingPorts, and null when no sibling is live —
  * the caller falls back to the classic assumption and says so.
- * @param {string} appDir - The reading app's root (its own file is skipped).
+ * @param {string} targetDir - The reading target's root (its own file is skipped).
  * @returns {string|null} The published origin, or null.
  */
-function readSiblingOrigin(appDir) {
-  for (const dir of siblingAppDirs(appDir)) {
+function readSiblingOrigin(targetDir) {
+  for (const dir of siblingTargetDirs(targetDir)) {
     const origin = readPortsData(dir)?.origin;
     if (origin) {
       return origin;
@@ -267,26 +267,26 @@ function readSiblingOrigin(appDir) {
 }
 
 /**
- * The sibling app dirs of the app that asks: every `apps/<name>` of the same
- * brand except its own. No brand root (standalone consumer) → none.
- * @param {string} appDir - The reading app's root.
- * @returns {string[]} Absolute sibling app dirs.
+ * The sibling target dirs of the target that asks: every `targets/<name>` of
+ * the same brand except its own. No brand root (standalone consumer) → none.
+ * @param {string} targetDir - The reading target's root.
+ * @returns {string[]} Absolute sibling target dirs.
  */
-function siblingAppDirs(appDir) {
-  const brandRoot = findBrandRoot(appDir);
+function siblingTargetDirs(targetDir) {
+  const brandRoot = findBrandRoot(targetDir);
   if (!brandRoot) {
     return [];
   }
 
-  const appsDir = path.join(brandRoot, 'apps');
+  const targetsDir = path.join(brandRoot, 'targets');
   const dirs = [];
 
-  for (const entry of fs.existsSync(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }) : []) {
+  for (const entry of fs.existsSync(targetsDir) ? fs.readdirSync(targetsDir, { withFileTypes: true }) : []) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) {
       continue;
     }
-    const dir = path.join(appsDir, entry.name);
-    if (path.resolve(dir) === path.resolve(appDir)) {
+    const dir = path.join(targetsDir, entry.name);
+    if (path.resolve(dir) === path.resolve(targetDir)) {
       continue;
     }
     dirs.push(dir);

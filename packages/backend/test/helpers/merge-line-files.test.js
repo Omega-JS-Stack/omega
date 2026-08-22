@@ -29,7 +29,7 @@ const TEMPLATE = [
   'OPENAI_API_KEY=""',
   'ANTHROPIC_API_KEY=""',
   '',
-  '# Payment Processors',
+  '# Payment Providers',
   'PAYPAL_CLIENT_SECRET=""',
   'STRIPE_SECRET_KEY=""',
   '',
@@ -100,7 +100,7 @@ module.exports = {
           '# AI',
           'OPENAI_API_KEY="sk-real"',
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET="pp_real"',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,
@@ -133,8 +133,8 @@ module.exports = {
 
         assert.equal(headerAboveKey(merged, 'OPENAI_API_KEY'), '# AI', 'OPENAI under # AI');
         assert.equal(headerAboveKey(merged, 'ANTHROPIC_API_KEY'), '# AI', 'ANTHROPIC under # AI');
-        assert.equal(headerAboveKey(merged, 'PAYPAL_CLIENT_SECRET'), '# Payment Processors', 'PAYPAL under # Payment Processors');
-        assert.equal(headerAboveKey(merged, 'STRIPE_SECRET_KEY'), '# Payment Processors', 'STRIPE under # Payment Processors');
+        assert.equal(headerAboveKey(merged, 'PAYPAL_CLIENT_SECRET'), '# Payment Providers', 'PAYPAL under # Payment Providers');
+        assert.equal(headerAboveKey(merged, 'STRIPE_SECRET_KEY'), '# Payment Providers', 'STRIPE under # Payment Providers');
         assert.equal(headerAboveKey(merged, 'GH_TOKEN'), '# GitHub', 'GH_TOKEN under # GitHub');
 
         // Values still attached to the right keys.
@@ -155,7 +155,7 @@ module.exports = {
           '# AI',
           'OPENAI_API_KEY=""',
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET=""',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,
@@ -183,7 +183,7 @@ module.exports = {
           '# AI',
           'OPENAI_API_KEY=""',
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET=""',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,
@@ -207,7 +207,7 @@ module.exports = {
           '# AI',
           'OPENAI_API_KEY=""',
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET=""',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,
@@ -233,7 +233,7 @@ module.exports = {
           '# AI',
           "OPENAI_API_KEY='single'",
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET=""',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,
@@ -255,7 +255,7 @@ module.exports = {
           '# AI',
           'OPENAI_API_KEY="sk"',
           'ANTHROPIC_API_KEY=""',
-          '# Payment Processors',
+          '# Payment Providers',
           'PAYPAL_CLIENT_SECRET=""',
           'STRIPE_SECRET_KEY=""',
           CUSTOM_MARKER,

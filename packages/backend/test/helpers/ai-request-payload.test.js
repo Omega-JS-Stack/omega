@@ -329,7 +329,7 @@ module.exports = {
 
         const out = normalizeOptions({
           prompt: [
-            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'OMEGA Playground' } },
             { role: 'developer', content: 'operator config' },
           ],
           message: { content: 'hello' },
@@ -339,7 +339,7 @@ module.exports = {
         assert.equal(out.prompt.length, 3, 'rules segment + the two caller segments');
         assert.equal(out.prompt[0].role, 'system', 'rules ride as a leading system segment');
         assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules content');
-        assert.equal(out.prompt[1].content, 'House style for Paperloom.', 'caller segment file read and templated here');
+        assert.equal(out.prompt[1].content, 'House style for OMEGA Playground.', 'caller segment file read and templated here');
         assert.equal(out.prompt[1].path, undefined, 'the path is consumed at the one load point');
         assert.equal(out.prompt[2].role, 'developer', 'caller segment role preserved');
         assert.equal(out.prompt[2].content, 'operator config', 'caller segment content preserved');
@@ -354,7 +354,7 @@ module.exports = {
 
         const out = normalizeOptions({
           prompt: [
-            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'OMEGA Playground' } },
             { role: 'developer', path: OPERATOR_PATH },
           ],
         });
@@ -366,7 +366,7 @@ module.exports = {
         assert.equal(loaded.length, 3, 'rules + both file-backed segments');
         assert.equal(loaded.some((s) => s.content instanceof Error), false, 'no segment failed to load');
         assert.equal(loaded[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules segment loaded');
-        assert.equal(loaded[1].content, 'House style for Paperloom.', 'system prompt file read and templated');
+        assert.equal(loaded[1].content, 'House style for OMEGA Playground.', 'system prompt file read and templated');
         assert.equal(loaded[2].role, 'developer', 'developer role preserved through loading');
         assert.equal(loaded[2].content, 'Operator config.', 'developer prompt file read');
       },
@@ -417,7 +417,7 @@ module.exports = {
         ensureFixtures();
 
         const out = normalizeOptions({
-          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'OMEGA Playground' } },
           message: { content: 'hello' },
         });
 
@@ -425,7 +425,7 @@ module.exports = {
         assert.equal(out.prompt.length, 2, 'rules segment + the caller segment');
         assert.equal(out.prompt[0].content.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'rules lead');
         assert.equal(out.prompt[1].role, 'system', 'the object form is one implicit system segment');
-        assert.equal(out.prompt[1].content, 'House style for Paperloom.', 'prompt file read and templated here');
+        assert.equal(out.prompt[1].content, 'House style for OMEGA Playground.', 'prompt file read and templated here');
       },
     },
 
@@ -540,7 +540,7 @@ module.exports = {
 
         const out = normalizeOptions({
           prompt: [
-            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+            { role: 'system',    path: HOUSE_STYLE_PATH, settings: { brand: 'OMEGA Playground' } },
             { role: 'developer', content: 'operator config' },
           ],
           message: { content: 'hello' },
@@ -549,7 +549,7 @@ module.exports = {
 
         assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'first universal rule reaches Claude');
         assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[1]), true, 'second universal rule reaches Claude');
-        assert.equal(system.includes('House style for Paperloom.'), true, 'prompt-file segment loaded and templated');
+        assert.equal(system.includes('House style for OMEGA Playground.'), true, 'prompt-file segment loaded and templated');
         assert.equal(system.includes('operator config'), true, 'developer segment folded into the system prompt');
         assert.deepEqual(messages, [{ role: 'user', content: 'hello' }], 'the message is the only turn');
       },
@@ -561,7 +561,7 @@ module.exports = {
         ensureFixtures();
 
         const out = normalizeOptions({
-          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'Paperloom' } },
+          prompt: { path: HOUSE_STYLE_PATH, settings: { brand: 'OMEGA Playground' } },
           message: { content: 'hello' },
         });
         const { system } = format.buildMessages(out);
@@ -571,7 +571,7 @@ module.exports = {
         // `content` slot inside a provider any more
         assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[0]), true, 'first universal rule survives the object form');
         assert.equal(system.includes(SYSTEM_PROMPT_INJECTIONS[1]), true, 'second universal rule survives the object form');
-        assert.equal(system.includes('House style for Paperloom.'), true, 'object-form prompt file loaded and templated');
+        assert.equal(system.includes('House style for OMEGA Playground.'), true, 'object-form prompt file loaded and templated');
       },
     },
 

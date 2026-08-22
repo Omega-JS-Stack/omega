@@ -1,7 +1,7 @@
 /**
  * Test: cli/commands/setup-tests manifest discipline (cp195 journey catches)
  *
- * 1. Fixes that WRITE the app manifest fresh-read it first — an npm-driven
+ * 1. Fixes that WRITE the target manifest fresh-read it first — an npm-driven
  *    fix earlier in the run rewrote the file, and writing the boot-time
  *    snapshot erased those installs (the project-scripts fix clobbered
  *    firebase-admin/firebase-functions; the next setup's re-install then
@@ -18,7 +18,7 @@ const BaseTest = require('../../src/cli/commands/setup-tests/base-test.js');
 const NpmProjectScriptsTest = require('../../src/cli/commands/setup-tests/npm-project-scripts.js');
 const frameworkPackage = require('../../package.json');
 
-// A minimal instance around a temp app dir: `stale` is the boot-time
+// A minimal instance around a temp target dir: `stale` is the boot-time
 // in-memory manifest; the DISK manifest then diverges (npm added a dep)
 function makeInstance(TestClass, dir, stale) {
   const context = { main: { package: stale, firebaseProjectPath: dir }, package: stale };
@@ -74,14 +74,14 @@ module.exports = {
     },
 
     {
-      name: 'readAppManifest-refreshes-in-place-keeping-object-identity',
+      name: 'readTargetManifest-refreshes-in-place-keeping-object-identity',
       async run({ assert }) {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-sync-'));
         fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fresh', dependencies: { x: '1' } }));
 
         const stale = { name: 'stale', scripts: { gone: 'yes' } };
         const instance = makeInstance(BaseTest, dir, stale);
-        const returned = instance.readAppManifest();
+        const returned = instance.readTargetManifest();
 
         assert.equal(returned === stale, true, 'same object identity — every context view stays live');
         assert.equal(stale.name, 'fresh', 'contents come from disk');

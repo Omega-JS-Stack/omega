@@ -1,6 +1,6 @@
 const path = require('path');
 const powertools = require('node-powertools');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const winback = require('../../../libraries/payment/winback.js');
 const isTrialing = require('../cancel/_is-trialing.js');
 
@@ -11,7 +11,7 @@ const isTrialing = require('../cancel/_is-trialing.js');
  * ([#268](https://github.com/Omega-JS-Stack/omega/issues/268)).
  *
  * The offer is the brand's (`payment.winback` in omega.json5 — 50% off the next
- * cycle by default) and it reaches the processor as a discount, through the same
+ * cycle by default) and it reaches the provider as a discount, through the same
  * coupon plumbing a checkout discount code rides. The subscription itself does
  * not change: the customer keeps the plan, the cadence and the renewal date they
  * already had, and the next invoice is the only thing that moves — so the only
@@ -25,7 +25,7 @@ const isTrialing = require('../cancel/_is-trialing.js');
  * A subscription with no order doc has nowhere to record it, so it is refused
  * (`offer-not-claimable`) rather than handed an offer with no memory.
  *
- * Cross-provider and CAPABILITY-GATED, the same shape uncancel uses: a processor
+ * Cross-provider and CAPABILITY-GATED, the same shape uncancel uses: a provider
  * that can discount a live subscription exports applyOffer(), one that cannot
  * simply lacks the export, and the route refuses before dispatch rather than
  * letting the caller discover it as a provider error
@@ -35,13 +35,13 @@ const isTrialing = require('../cancel/_is-trialing.js');
  * (`additional.code`), not just the capability gate's
  * ([#311](https://github.com/Omega-JS-Stack/omega/issues/311)): the client
  * pitches the offer off the ACCOUNT alone, so a state it cannot see — an
- * admin-granted subscription with no processor details, a brand that turned the
+ * admin-granted subscription with no provider details, a brand that turned the
  * offer off since the page loaded — reaches accept, and a refusal it cannot name
  * leaves the customer in a dialog arming a retry that can never succeed. The
  * codes, in the order they are refused: `confirmation-required`,
  * `offer-disabled`, `no-active-subscription`, `trial-not-eligible`,
- * `cancellation-pending`, `missing-payment-details`, `unknown-processor`,
- * `not-supported-by-processor`, `offer-not-claimable`, `offer-already-claimed`.
+ * `cancellation-pending`, `missing-payment-details`, `unknown-provider`,
+ * `not-supported-by-provider`, `offer-not-claimable`, `offer-already-claimed`.
  * All but the first are dead ends for that account: the billing card retires the
  * offer on them and opens the questionnaire the customer came for.
  * Requires authentication.
@@ -109,43 +109,43 @@ module.exports = async ({ ctx, user, settings }) => {
     });
   }
 
-  const processor = subscription.payment?.processor;
+  const provider = subscription.payment?.provider;
   const resourceId = subscription.payment?.resourceId;
 
-  // A paid, active subscription can still carry NO processor details at all —
+  // A paid, active subscription can still carry NO provider details at all —
   // granted by an admin, imported, a webhook backfill that never landed — and
   // the client pitches what the account says, which is "paid and active". There
   // is nothing to send a discount to, and no retry adds the details, so the
   // refusal is a dead end the billing card retires the offer on ([#311]).
-  if (!processor || !resourceId) {
-    ctx.log(`Winback rejected: uid=${uid}, missing processor=${processor} or resourceId=${resourceId}`);
+  if (!provider || !resourceId) {
+    ctx.log(`Winback rejected: uid=${uid}, missing provider=${provider} or resourceId=${resourceId}`);
     return ctx.respond('Subscription payment details not found', {
       code: 400,
       additional: { code: 'missing-payment-details' },
     });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, {
+    return ctx.respond(`Unknown provider: ${provider}`, {
       code: 400,
-      additional: { code: 'unknown-processor' },
+      additional: { code: 'unknown-provider' },
     });
   }
 
-  // The capability gate. A missing export is the processor saying it cannot
+  // The capability gate. A missing export is the provider saying it cannot
   // discount a live subscription at all — a CLIENT fault to be branched on, not
   // an outage to retry, so the code rides the response properties where every
   // 4xx carries its machine-readable half, and the billing card retires the
   // offer and lets the cancel through on it.
-  if (typeof processorModule.applyOffer !== 'function') {
-    ctx.log(`Winback not supported: uid=${uid}, processor=${processor}`);
+  if (typeof providerModule.applyOffer !== 'function') {
+    ctx.log(`Winback not supported: uid=${uid}, provider=${provider}`);
     return ctx.respond('Your payment provider cannot apply this offer. Please use the billing portal to manage your subscription.', {
       code: 400,
-      additional: { code: 'not-supported-by-processor' },
+      additional: { code: 'not-supported-by-provider' },
     });
   }
 
@@ -155,11 +155,11 @@ module.exports = async ({ ctx, user, settings }) => {
   // No order doc, no claim — and an offer whose claim cannot be RECORDED is an
   // offer takeable every time the cancel dialog opens, each accept re-couponing
   // the subscription. A subscription can reach here without one (created in the
-  // processor's dashboard, imported, a metadata backfill that never landed), so
+  // provider's dashboard, imported, a metadata backfill that never landed), so
   // it is refused before dispatch rather than handed an offer this route cannot
   // remember. The code rides the response properties the capability gate's does,
   // so the billing card branches on it and lets the cancel through. It is read
-  // AFTER that gate: a processor that cannot discount at all is the more
+  // AFTER that gate: a provider that cannot discount at all is the more
   // permanent answer, and it costs no read.
   const orderId = subscription.payment?.orderId;
 
@@ -193,11 +193,11 @@ module.exports = async ({ ctx, user, settings }) => {
   const discount = winback.toDiscount(offer);
 
   try {
-    await processorModule.applyOffer({ resourceId, uid, subscription, discount, ctx });
+    await providerModule.applyOffer({ resourceId, uid, subscription, discount, ctx });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to apply the winback offer via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    ctx.error(`Failed to apply the winback offer via ${provider}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
     return ctx.respond('We could not apply your discount right now. Please try again shortly.', { code: 500 });
   }
 
@@ -265,12 +265,12 @@ module.exports = async ({ ctx, user, settings }) => {
     percent: discount.percent || null,
     amount: discount.amount || null,
     duration: discount.duration,
-    payment_processor: processor,
+    payment_provider: provider,
     product_id: subscription.product?.id || null,
     payment_frequency: subscription.payment?.frequency || null,
   });
 
-  ctx.log(`Winback offer applied: uid=${uid}, processor=${processor}, sub=${resourceId}, code=${discount.code}, duration=${discount.duration}`);
+  ctx.log(`Winback offer applied: uid=${uid}, provider=${provider}, sub=${resourceId}, code=${discount.code}, duration=${discount.duration}`);
 
   return ctx.respond({ success: true, discount: discount });
 };

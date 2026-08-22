@@ -2,7 +2,7 @@
  * Test: the backend's log lanes ([#197](https://github.com/Omega-JS-Stack/omega/issues/197)).
  *
  * Two lanes, two homes, and they must not be confused:
- *   - `attachVerbLog(verb)` tees THIS process to `<appRoot>/logs/<verb>.log` —
+ *   - `attachVerbLog(verb)` tees THIS process to `<targetRoot>/logs/<verb>.log` —
  *     the cross-framework lane every framework's dev/build/test writes.
  *   - `getLogsPath()` is `dist/`, where the firebase CHILD processes' output
  *     lands beside firebase-tools' own *-debug.log files. `sweepStaleLogs()`
@@ -10,7 +10,7 @@
  *     and must leave firebase-tools' debug logs alone, since a crashed run is
  *     diagnosed from them.
  *
- * Real files in a real temp app root; no emulator needed.
+ * Real files in a real temp target root; no emulator needed.
  *
  * Run: npx omega test backend:cli/verb-logs
  */
@@ -22,7 +22,7 @@ const jetpack = require('fs-jetpack');
 const BaseCommand = require('../../src/cli/commands/base-command.js');
 const attachLogFile = require('../../src/cli/utils/attach-log-file.js');
 
-// A command bound to a throwaway app root — BaseCommand reads its paths off main.
+// A command bound to a throwaway target root — BaseCommand reads its paths off main.
 function commandInTempApp() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-verb-logs-'));
   return { root, command: new BaseCommand({ firebaseProjectPath: root, argv: {}, options: {} }) };
@@ -44,12 +44,12 @@ function withoutCiEnv(run) {
 }
 
 module.exports = {
-  description: 'log lanes — the verb tee at the app root, the sweep in dist/',
+  description: 'log lanes — the verb tee at the target root, the sweep in dist/',
   type: 'group',
 
   tests: [
     {
-      name: 'attach-verb-log-tees-this-process-to-app-root-logs',
+      name: 'attach-verb-log-tees-this-process-to-target-root-logs',
       async run({ assert }) {
         const { root, command } = commandInTempApp();
 
@@ -60,7 +60,7 @@ module.exports = {
           return resolved;
         });
 
-        assert.equal(logPath, path.join(root, 'logs', 'test.log'), 'the verb log lives at <appRoot>/logs/');
+        assert.equal(logPath, path.join(root, 'logs', 'test.log'), 'the verb log lives at <targetRoot>/logs/');
 
         const contents = fs.readFileSync(logPath, 'utf8');
         assert.ok(contents.includes('verb log line'), 'the run lands in the file');

@@ -20,7 +20,7 @@ One brand fact, one home: `omega.json5`. Everything a page says about the brand 
 2. **The two required fields exist.** `brand.id` (a URL-scheme-safe slug) and `brand.name` are the only universally required config fields — everything else is optional and has a resolution path, so a missing value is a config question, not a place to inline a default in a template.
 3. **A brand URL comes from the resolution order**, not from a guess: an instance entry's `url`, else the instance's `brand.url`, else the shared `brand.url`. Multi-instance brands (admin, subdomains) are exactly where a typed URL goes wrong.
 4. **One hex, and it lives in config.** `brand.color` drives the light and dark accent ramps; markup and scss read `var(--omega-accent…)` and the neutral/status tokens. A second brand hex anywhere in scss or markup means two sources for one color.
-5. **Read the RESOLVED config, not one file.** The chain is `defaults ← company ← brand shared ← brand targets.<type> ← app shared ← app targets.<type>`; a value that looks wrong in the app config is often set — or overridden — a layer away.
+5. **Read the RESOLVED config, not one file.** The chain is `defaults ← company ← brand shared ← brand targets.<type> ← local shared ← local targets.<type>`; a value that looks wrong in the local config is often set — or overridden — a layer away.
 6. **No secrets in config.** `.env` only; the validator hard-fails secret-shaped keys in omega.json5. An API key arriving as a "brand" value is the same bug wearing a different name.
 7. **Copy stays fork-portable.** Defaults, demo args, and sample content show the `{{ site.brand.name }}` tokens a consumer would see, so a fork lands its own name at fork time with nothing to find and replace.
 

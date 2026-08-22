@@ -1,11 +1,11 @@
 // Push secrets from local .env to GitHub Actions repo secrets.
 //
-// The app .env's Default section names the framework's secret KEYS; the
-// VALUES push from the composed .env cascade (company ← brand ← app, shell
+// The local .env's Default section names the framework's secret KEYS; the
+// VALUES push from the composed .env cascade (company ← brand ← local, shell
 // wins — D15), so a key whose value lives at the brand or company level
 // still reaches the repo secrets. Each value is encrypted with the repo's
 // libsodium public key and pushed via Octokit. For env vars whose value is a
-// path to an existing file (e.g. CSC_LINK=config/certs/dev-id.p12 — app-root
+// path to an existing file (e.g. CSC_LINK=config/certs/dev-id.p12 — target-root
 // relative, falling back to the brand root), the secret value is the
 // base64-encoded file contents — the workflow then decodes back to a temp
 // file at job start.
@@ -35,7 +35,7 @@ module.exports = async function (options) {
   }
   // Also resolve the .env cascade into process.env — both for the GH_TOKEN we
   // push WITH and for the values we push (they may live at the brand or
-  // company level rather than in the app file).
+  // company level rather than in the local file).
   const { loadEnv, findBrandRoot } = require('@omega.js/config');
   loadEnv(projectRoot);
   const brandRoot = findBrandRoot(projectRoot);
@@ -58,7 +58,7 @@ module.exports = async function (options) {
     entries = entries.filter((e) => only.includes(e.key));
   }
 
-  // D15: overlay the composed cascade — an app-empty key whose value lives in
+  // D15: overlay the composed cascade — a target-empty key whose value lives in
   // the brand/company .env is still a secret the workflow needs. Runs BEFORE
   // the skip-empty filter so cascade-supplied values rescue app-empty keys.
   entries = entries.map((entry) => ({ ...entry, value: effectiveValue(entry) }));
@@ -145,8 +145,8 @@ function parseEnv(content) {
 }
 
 // The effective value of a Default-section key: the composed .env cascade
-// (already resolved into process.env by loadEnv — company ← brand ← app,
-// shell wins) when it carries a non-empty value, else the app-file literal.
+// (already resolved into process.env by loadEnv — company ← brand ← local,
+// shell wins) when it carries a non-empty value, else the local-file literal.
 function effectiveValue(entry) {
   const composed = process.env[entry.key];
   return composed && composed.trim() ? composed : entry.value;
@@ -154,7 +154,7 @@ function effectiveValue(entry) {
 
 // Determine the secret value to push:
 //   - If value looks like a path AND the file exists → base64-encoded file contents
-//     (app-root relative first; brand-root fallback for brand-level cert values)
+//     (target-root relative first; brand-root fallback for brand-level cert values)
 //   - Otherwise → value as-is
 async function resolveSecretValue(entry, projectRoot, brandRoot) {
   const v = entry.value;

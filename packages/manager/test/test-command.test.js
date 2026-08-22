@@ -38,8 +38,8 @@ function write(filePath, content) {
 }
 
 /**
- * Stage a brand monorepo with a web app (dep in its own package.json) and a
- * backend app (functions/ layout), plus fake @omega.js/web + @omega.js/backend
+ * Stage a brand monorepo with a web target (dep in its own package.json) and a
+ * backend target (functions/ layout), plus fake @omega.js/web + @omega.js/backend
  * packages hoisted to the brand root.
  */
 function stageBrand() {
@@ -49,7 +49,7 @@ function stageBrand() {
   const brand = path.join(scratch, 'brand');
 
   write(path.join(brand, 'package.json'), JSON.stringify({
-    name: 'fixture-brand', private: true, workspaces: ['apps/*'],
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
@@ -57,17 +57,17 @@ function stageBrand() {
 }
 `);
 
-  write(path.join(brand, 'apps', 'website', 'package.json'), JSON.stringify({
+  write(path.join(brand, 'targets', 'website', 'package.json'), JSON.stringify({
     name: 'website', private: true, devDependencies: { '@omega.js/web': '*' },
   }));
-  write(path.join(brand, 'apps', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
+  write(path.join(brand, 'targets', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
-  // App-root manifest (src/dist pillar): the backend's framework dep is a
-  // RUNTIME dependency on the ONE app package.json — no functions/ manifest.
-  write(path.join(brand, 'apps', 'backend', 'package.json'), JSON.stringify({
+  // Target-root manifest (src/dist pillar): the backend's framework dep is a
+  // RUNTIME dependency on the ONE target package.json — no functions/ manifest.
+  write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
   }));
-  write(path.join(brand, 'apps', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
+  write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
   for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
@@ -101,7 +101,7 @@ async function runTestCommand(cwd, targets) {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test('bare run fans out to every app: each spawned bare, in its own cwd', async () => {
+test('bare run fans out to every target: each spawned bare, in its own cwd', async () => {
   const { brand } = stageBrand();
   const code = await runTestCommand(brand, []);
 
@@ -109,15 +109,15 @@ test('bare run fans out to every app: each spawned bare, in its own cwd', async 
   assert.equal(calls.length, 2);
   assert.deepEqual(new Set(calls.map((c) => c.name)), new Set(['web', 'backend']));
   for (const call of calls) {
-    assert.deepEqual(call.argv, ['test'], 'bare per-app: only the test command, no targets');
+    assert.deepEqual(call.argv, ['test'], 'bare per-target: only the test command, no ids');
   }
   const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
-  assert.equal(byName.web.cwd, path.join(brand, 'apps', 'website'));
-  assert.equal(byName.backend.cwd, path.join(brand, 'apps', 'backend'));
-  assert.equal(code, undefined, 'all apps green → no error exit code');
+  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'website'));
+  assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
+  assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
-test('per-framework id routes ONLY to the owning app, target forwarded verbatim', async () => {
+test('per-framework id routes ONLY to the owning target, id forwarded verbatim', async () => {
   const { brand } = stageBrand();
   await runTestCommand(brand, ['web:pages/']);
 
@@ -127,7 +127,7 @@ test('per-framework id routes ONLY to the owning app, target forwarded verbatim'
   assert.deepEqual(calls[0].argv, ['test', 'web:pages/']);
 });
 
-test('universal framework: forwards to every app', async () => {
+test('universal framework: forwards to every target', async () => {
   const { brand } = stageBrand();
   await runTestCommand(brand, ['framework:']);
 
@@ -138,7 +138,7 @@ test('universal framework: forwards to every app', async () => {
   }
 });
 
-test('mixed targets: shared paths to every app, id-scoped only to its owner', async () => {
+test('mixed ids: shared paths to every target, id-scoped only to its owner', async () => {
   const { brand } = stageBrand();
   await runTestCommand(brand, ['backend:routes/x', 'checkout']);
 
@@ -147,7 +147,7 @@ test('mixed targets: shared paths to every app, id-scoped only to its owner', as
   assert.deepEqual(byName.web.argv, ['test', 'checkout']);
 });
 
-test('id with no matching app: warns, runs nothing, exits clean (app-level filter parity)', async () => {
+test('id with no matching target: warns, runs nothing, exits clean (target-level filter parity)', async () => {
   const { brand } = stageBrand();
   const code = await runTestCommand(brand, ['desktop:']);
 
@@ -166,7 +166,7 @@ test('only-invalid targets fall back to bare-everywhere (scope.js parity)', asyn
   }
 });
 
-test('a failing app fails the run, but every app still runs (sequential, no bail)', async () => {
+test('a failing target fails the run, but every target still runs (sequential, no bail)', async () => {
   const { brand } = stageBrand();
   fs.writeFileSync(path.join(brand, 'FAIL-backend'), '');
   const code = await runTestCommand(brand, []);

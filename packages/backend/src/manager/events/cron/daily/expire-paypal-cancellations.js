@@ -95,7 +95,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         ctx.warn(`expire ${uid}: subscription carries no orderId — nothing mirrors this expiry on the order side, and the order-level staleness guard cannot run`);
       }
 
-      ctx.log(`expire ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, processor=${sub.payment?.processor}, orderId=${orderId || 'null'}`);
+      ctx.log(`expire ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, provider=${sub.payment?.provider}, orderId=${orderId || 'null'}`);
 
       // Snapshot the before state for transition detection
       const before = { ...sub };
@@ -158,7 +158,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
           id: orderId,
           type: 'subscription',
           owner: uid,
-          processor: 'paypal',
+          provider: 'paypal',
           resourceId: sub.payment?.resourceId || null,
           unified: after,
         };
@@ -180,7 +180,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
   }, {
     collection: 'users',
     where: [
-      { field: 'subscription.payment.processor', operator: '==', value: 'paypal' },
+      { field: 'subscription.payment.provider', operator: '==', value: 'paypal' },
       { field: 'subscription.cancellation.pending', operator: '==', value: true },
     ],
     batchSize: 5000,

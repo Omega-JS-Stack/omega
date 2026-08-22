@@ -91,7 +91,7 @@ function paidAccount(subscription) {
   return {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: HOUR_FROM_NOW },
       ...subscription,
     },
@@ -153,7 +153,7 @@ test('billing buttons: only a live subscription scheduled to end offers undo', a
     {
       // Change is NOT offered here: the backend refuses a switch under a
       // scheduled cancellation (`cancellation-pending`, #237), because the
-      // processors swap the price and leave the schedule standing. Undo
+      // providers swap the price and leave the schedule standing. Undo
       // cancellation is the honest button.
       what: 'a cancelling subscription',
       account: paidAccount({ status: 'active', cancellation: { pending: true, date: { timestampUNIX: HOUR_FROM_NOW } } }),
@@ -183,7 +183,7 @@ test('billing buttons: only a live subscription scheduled to end offers undo', a
       // BOTH gates read the raw cancellation.pending flag, not
       // resolveSubscription().cancelling (which is `pending && !trialing`).
       // A trialing subscription CAN carry a scheduled cancellation — the
-      // processor's own billing portal schedules one — and reading the derived
+      // provider's own billing portal schedules one — and reading the derived
       // flag offered this account neither Change nor Undo: a dead end.
       what: 'a trial with a cancellation requested',
       account: paidAccount({
@@ -263,12 +263,12 @@ test('billing details: every paid state shows all three slots — price, cadence
     },
     {
       what: 'a subscription with no recorded price places the amount, never prints undefined',
-      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { processor: 'stripe' } }),
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { provider: 'stripe' } }),
       details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '', cadence: '' }),
     },
     {
       what: 'a price with no recorded cadence places the cadence alone',
-      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 10, processor: 'stripe' } }),
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 10, provider: 'stripe' } }),
       details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '$10.00', cadence: '' }),
     },
     {
@@ -276,7 +276,7 @@ test('billing details: every paid state shows all three slots — price, cadence
       // subscription whose doc carries neither price nor frequency. Two of the
       // three slots used to vanish, leaving one date beside a blank half-row.
       what: 'the hollow persona places BOTH unknown slots and still dates the renewal',
-      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 0, frequency: null, processor: 'test' } }),
+      account: paidAccount({ status: 'active', expires: { timestampUNIX: TERM_END }, payment: { price: 0, frequency: null, provider: 'test' } }),
       details: row({ dateLabel: 'Renews', date: shown(TERM_END), amount: '', cadence: '' }),
     },
     {
@@ -301,7 +301,7 @@ test('billing details: every paid state shows all three slots — price, cadence
 });
 
 test('#325: an applied discount is announced on the card, in words', async () => {
-  // Accepting the save offer applies a real discount at the processor, and the
+  // Accepting the save offer applies a real discount at the provider, and the
   // card said nothing about it at all (Ian's QA) — a customer had no way to see
   // what they had just been given. Both halves are TEXT: what comes off, and
   // which bills it comes off, in the cadence the subscription is billed at.
@@ -318,7 +318,7 @@ test('#325: an applied discount is announced on the card, in words', async () =>
     },
     {
       what: 'an annual subscription is told about its next YEAR',
-      account: paidAccount({ status: 'active', payment: { frequency: 'annually', price: 100, processor: 'stripe' }, discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once' } }),
+      account: paidAccount({ status: 'active', payment: { frequency: 'annually', price: 100, provider: 'stripe' }, discount: { valid: true, code: 'WINBACK50', percent: 50, duration: 'once' } }),
       discount: { show: true, label: '50% off', when: 'Applied to your next year' },
     },
     {

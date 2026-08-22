@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Stripe = require('../../../../src/manager/libraries/payment/processors/stripe.js');
+const Stripe = require('../../../../src/manager/libraries/payment/providers/stripe.js');
 
 // Real Stripe CLI fixtures (generated via `stripe trigger`)
 const FIXTURE_SESSION = require('../../../fixtures/stripe/checkout-session-completed.json');
@@ -114,10 +114,10 @@ module.exports = {
     // ─── Payment metadata ───
 
     {
-      name: 'payment-processor-always-stripe',
+      name: 'payment-provider-always-stripe',
       async run({ assert }) {
         const result = toUnifiedOneTime({});
-        assert.equal(result.payment.processor, 'stripe', 'Processor should always be stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider should always be stripe');
       },
     },
 
@@ -212,7 +212,7 @@ module.exports = {
 
         assert.equal(result.product.id, 'credits-100', 'Product should be credits-100');
         assert.equal(result.status, 'completed', 'Status should be completed');
-        assert.equal(result.payment.processor, 'stripe', 'Processor should be stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider should be stripe');
         assert.equal(result.payment.resourceId, 'cs_test_full', 'Resource ID should match');
         assert.equal(result.payment.orderId, '1234-5678-9012', 'orderId should match');
         assert.equal(result.payment.price, 9.99, 'Price should be resolved');
@@ -227,7 +227,7 @@ module.exports = {
 
         assert.equal(result.product.id, 'unknown', 'Empty → unknown product');
         assert.equal(result.status, 'unknown', 'Empty → unknown status');
-        assert.equal(result.payment.processor, 'stripe', 'Empty → still stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Empty → still stripe');
         assert.equal(result.payment.orderId, null, 'Empty → null orderId');
         assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
         assert.equal(result.payment.price, 0, 'Empty → price 0');
@@ -254,7 +254,7 @@ module.exports = {
 
         assert.ok(result.product, 'Should have product');
         assert.equal(result.status, 'completed', 'Real session fixture → completed');
-        assert.equal(result.payment.processor, 'stripe', 'Processor is stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider is stripe');
         assert.equal(result.payment.resourceId, FIXTURE_SESSION.id, 'resourceId matches fixture ID');
       },
     },
@@ -276,7 +276,7 @@ module.exports = {
 
         assert.ok(result.product, 'Should have product');
         assert.equal(result.status, 'open', 'Failed invoice fixture → open');
-        assert.equal(result.payment.processor, 'stripe', 'Processor is stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider is stripe');
         assert.equal(result.payment.resourceId, FIXTURE_INVOICE_FAILED.id, 'resourceId matches fixture ID');
       },
     },
@@ -296,7 +296,7 @@ module.exports = {
           assert.ok(result.product.name, `${label}: should have product.name`);
           assert.isType(result.status, 'string', `${label}: status should be string`);
           assert.ok(result.payment, `${label}: should have payment`);
-          assert.equal(result.payment.processor, 'stripe', `${label}: processor should be stripe`);
+          assert.equal(result.payment.provider, 'stripe', `${label}: provider should be stripe`);
           assert.ok(result.payment.updatedBy, `${label}: should have updatedBy`);
           assert.ok(result.payment.updatedBy.date, `${label}: should have updatedBy.date`);
         }

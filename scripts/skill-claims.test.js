@@ -17,10 +17,10 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SKILLS_DIR = path.join(ROOT, 'agent-plugins', 'claude', 'skills');
-const APPS_DIR = path.join(ROOT, 'apps');
+const BRANDS_DIR = path.join(ROOT, 'brands');
 
 // The repo-relative prefixes a skill may name. Anything else is prose.
-const PATH_ROOTS = 'docs|packages|apps|scripts|agent-plugins';
+const PATH_ROOTS = 'docs|packages|brands|targets|scripts|agent-plugins';
 
 const PATTERNS = {
   repoPath: new RegExp(`(?<![\\w/@.-])(?:${PATH_ROOTS})/[^\\s\`"'|]+`, 'g'),
@@ -124,9 +124,9 @@ function cliVerbs() {
 // --- the checker ---
 
 /**
- * Does a repo-relative path claim hold? An `apps/<target>` token is the
- * consumer world's app layout (`apps/website`, `apps/backend`), which resolves
- * inside any brand under apps/ rather than at the repo root.
+ * Does a repo-relative path claim hold? A `targets/<target>` token is the
+ * consumer world's app layout (`targets/website`, `targets/backend`), which resolves
+ * inside any brand under brands/ rather than at the repo root.
  *
  * @param {string} claimed - Repo-relative path from a skill
  * @returns {boolean} True when something on disk answers to it
@@ -134,12 +134,12 @@ function cliVerbs() {
 function pathExists(claimed) {
   if (fs.existsSync(path.join(ROOT, claimed))) return true;
 
-  const consumerApp = claimed.match(/^apps\/(.+)$/);
+  const consumerApp = claimed.match(/^targets\/(.+)$/);
   if (!consumerApp) return false;
 
-  return fs.readdirSync(APPS_DIR, { withFileTypes: true })
+  return fs.readdirSync(BRANDS_DIR, { withFileTypes: true })
     .filter((item) => item.isDirectory())
-    .some((brand) => fs.existsSync(path.join(APPS_DIR, brand.name, 'apps', consumerApp[1])));
+    .some((brand) => fs.existsSync(path.join(BRANDS_DIR, brand.name, 'targets', consumerApp[1])));
 }
 
 /**

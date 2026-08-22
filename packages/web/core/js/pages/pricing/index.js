@@ -361,7 +361,7 @@ function setupCurrentPlanIndicator() {
     }
 
     // A subscription with a cancellation already scheduled cannot switch at
-    // all — the processors swap the price and leave the schedule standing, so
+    // all — the providers swap the price and leave the schedule standing, so
     // the backend refuses it and the billing page hides its Change button
     // ([#237]). Offering "Switch to this plan" here would promise a move that
     // ends in a modal that will not open: those buttons keep the CTA they were

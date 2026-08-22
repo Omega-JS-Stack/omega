@@ -5,7 +5,7 @@
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  * Mirrors stripe/to-unified-subscription.js for consistent coverage
  */
-const PayPal = require('../../../../src/manager/libraries/payment/processors/paypal.js');
+const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ACTIVE = require('../../../fixtures/paypal/subscription-active.json');
@@ -427,10 +427,10 @@ module.exports = {
     // ─── Payment metadata ───
 
     {
-      name: 'payment-processor-always-paypal',
+      name: 'payment-provider-always-paypal',
       async run({ assert }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.processor, 'paypal', 'Processor should always be paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider should always be paypal');
       },
     },
 
@@ -588,7 +588,7 @@ module.exports = {
         assert.equal(result.status, 'active', 'Status should be active');
         assert.equal(result.trial.claimed, false, 'Trial should not be claimed');
         assert.equal(result.cancellation.pending, false, 'Should not be pending cancellation');
-        assert.equal(result.payment.processor, 'paypal', 'Processor should be paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider should be paypal');
         assert.equal(result.payment.resourceId, 'I-FULL-TEST', 'Resource ID should match');
         assert.equal(result.payment.frequency, 'monthly', 'Frequency should be monthly');
         assert.equal(result.payment.orderId, 'ord-full', 'Order ID should match');
@@ -605,7 +605,7 @@ module.exports = {
         assert.equal(result.status, 'cancelled', 'Empty → cancelled (no status field)');
         assert.equal(result.trial.claimed, false, 'Empty → trial not claimed');
         assert.equal(result.cancellation.pending, false, 'Empty → not pending');
-        assert.equal(result.payment.processor, 'paypal', 'Empty → still paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Empty → still paypal');
         assert.equal(result.payment.orderId, null, 'Empty → null orderId');
         assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
         assert.equal(result.payment.frequency, null, 'Empty → null frequency');
@@ -811,7 +811,7 @@ module.exports = {
         assert.ok(result.cancellation.date, 'cancellation.date exists');
 
         // Payment shape
-        assert.equal(result.payment.processor, 'paypal', 'payment.processor');
+        assert.equal(result.payment.provider, 'paypal', 'payment.provider');
         assert.ok('orderId' in result.payment, 'payment.orderId exists');
         assert.ok('resourceId' in result.payment, 'payment.resourceId exists');
         assert.ok('frequency' in result.payment, 'payment.frequency exists');
@@ -831,7 +831,7 @@ module.exports = {
         const result = toUnifiedSubscription(FIXTURE_ACTIVE);
 
         assert.equal(result.status, 'active', 'ACTIVE fixture → active');
-        assert.equal(result.payment.processor, 'paypal', 'Processor is paypal');
+        assert.equal(result.payment.provider, 'paypal', 'Provider is paypal');
         assert.equal(result.payment.resourceId, 'I-MTPRX0B9LV4R', 'Resource ID from fixture');
         assert.equal(result.payment.orderId, 'ord-sub-123', 'orderId from custom_id');
         assert.isType(result.expires.timestamp, 'string', 'expires.timestamp is string');

@@ -52,7 +52,7 @@ module.exports = {
           assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid add should succeed');
         }
 
-        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.publicationId) {
+        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
           assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
           assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv add should succeed');
         }
@@ -87,7 +87,7 @@ module.exports = {
           assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid sync should succeed');
         }
 
-        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.publicationId) {
+        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
           assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
           assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv sync should succeed');
         }
@@ -112,7 +112,7 @@ module.exports = {
           assert.propertyEquals(response, 'data.providers.campaigns.success', true, 'SendGrid remove should succeed');
         }
 
-        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.publicationId) {
+        if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
           assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
           assert.propertyEquals(response, 'data.providers.newsletter.success', true, 'Beehiiv remove should succeed');
         }

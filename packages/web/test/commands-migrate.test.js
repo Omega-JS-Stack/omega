@@ -68,7 +68,7 @@ test('no flags means a REAL migration — config written, legacy files gone', as
   assert.match(fs.readFileSync(path.join(root, 'src', 'pages', 'index.html'), 'utf8'), /\{\{ resolved\.meta\.title \}\}/);
 });
 
-test('a pre-converted app exits ZERO so scripted pipelines survive (#297)', (t) => {
+test('a pre-converted target exits ZERO so scripted pipelines survive (#297)', (t) => {
   // The fleet-standard order: the brand root config landed first and the UJM
   // configs are already gone, so only the codemods are left.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-converted-'));

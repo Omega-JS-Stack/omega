@@ -147,6 +147,47 @@ function landValue(context, path, value) {
 }
 
 /**
+ * The uniform Yes / Skip / Disable gate every config-landing flow leads
+ * with — the ONE place that wording lives, so a flow built by hand
+ * (the pixel provisioning's token ask) opens exactly like resolveConfigValue.
+ * "Disable" lands `false` at disablePath (the tri-state opt-out) and says
+ * where to delete it.
+ *
+ * @param {Object} context - Service context
+ * @param {Object} spec
+ * @param {string} spec.label - Human name ("Meta Pixel", "GA4 property")
+ * @param {string[]} [spec.instructions] - Numbered guidance lines
+ * @param {string} spec.disablePath - Where Disable writes `false`
+ * @returns {Promise<boolean>} - true only when the user said Yes
+ */
+async function confirmSetup(context, spec) {
+  const { label, instructions, disablePath } = spec;
+  const brandName = context.brandConfig.brand?.name || context.brandId;
+
+  console.log(`    ${chalk.yellow('!')} ${label} not configured for ${chalk.cyan(brandName)}`);
+  for (const line of instructions || []) {
+    console.log(`        ${line}`);
+  }
+
+  const action = await select({
+    message: 'Set up now?',
+    choices: [
+      { name: 'Yes', value: 'yes' },
+      { name: 'Skip for now', value: 'skip' },
+      { name: 'Disable (stop prompting)', value: 'disable' },
+    ],
+    default: 'yes',
+  });
+
+  if (action === 'disable') {
+    landValue(context, disablePath, false);
+    console.log(`    ${chalk.yellow('!')} ${label} disabled in omega.json5 (${disablePath}: false — delete the line to be asked again)`);
+  }
+
+  return action === 'yes';
+}
+
+/**
  * Selection flow: list items from the API, pick one (or create new via
  * API handler / browser + refresh). Returns the picked value or null.
  */
@@ -268,29 +309,12 @@ async function resolveConfigValue(context, spec) {
   }
 
   if (spec.gate !== false) {
-    const brandName = context.brandConfig.brand?.name || context.brandId;
-    console.log(`    ${chalk.yellow('!')} ${label} not configured for ${chalk.cyan(brandName)}`);
-    for (const line of spec.instructions || []) {
-      console.log(`        ${line}`);
-    }
-
-    const action = await select({
-      message: 'Set up now?',
-      choices: [
-        { name: 'Yes', value: 'yes' },
-        { name: 'Skip for now', value: 'skip' },
-        { name: 'Disable (stop prompting)', value: 'disable' },
-      ],
-      default: 'yes',
+    const proceed = await confirmSetup(context, {
+      label,
+      instructions: spec.instructions,
+      disablePath,
     });
-
-    if (action === 'skip') {
-      return null;
-    }
-
-    if (action === 'disable') {
-      landValue(context, disablePath, false);
-      console.log(`    ${chalk.yellow('!')} ${label} disabled in omega.json5 (${disablePath}: false — delete the line to be asked again)`);
+    if (!proceed) {
       return null;
     }
   }
@@ -315,6 +339,8 @@ async function resolveConfigValue(context, spec) {
 
 module.exports = {
   resolveConfigValue,
+  confirmSetup,
+  readTriState,
   sortChoicesForBrand,
   setAtPath,
   landValue,

@@ -1,7 +1,7 @@
 /**
- * Test: processor fetchResource() stale fallback
+ * Test: provider fetchResource() stale fallback
  *
- * Every processor library prefers the API's answer and falls back to the payload
+ * Every provider library prefers the API's answer and falls back to the payload
  * the webhook carried when that call fails. The fallback used to be indistinguishable
  * from a fresh fetch — the API error was swallowed whole and the caller logged the
  * stale payload as "Fetched resource".
@@ -10,9 +10,9 @@
  * know: the throw happens inside the same try/catch a failed API call lands in, so
  * the fallback path runs for real without a network call or a live credential.
  */
-const Stripe = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const PayPal = require('../../../src/manager/libraries/payment/processors/paypal.js');
-const Chargebee = require('../../../src/manager/libraries/payment/processors/chargebee.js');
+const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../src/manager/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
 
 // The payload a webhook carried — what a failed fetch falls back to
 function webhookPayload() {
@@ -20,7 +20,7 @@ function webhookPayload() {
 }
 
 module.exports = {
-  description: 'Processor fetchResource() stale fallback flagging',
+  description: 'Provider fetchResource() stale fallback flagging',
   type: 'group',
 
   tests: [

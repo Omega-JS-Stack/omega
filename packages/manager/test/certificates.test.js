@@ -37,8 +37,8 @@ const BRAND_NAME = 'Fixture Brand';
 const PREFIX = 'com.fixture';
 // composeBundleId: brand-id dashes become dots (Android-safe segments)
 const BUNDLE_IDENTIFIER = 'com.fixture.fixture.brand';
-const ALL_TYPES = DEFAULTS.certificates.apple.certificates.map((c) => c.type);
-const AUTOMATED_TYPES = DEFAULTS.certificates.apple.certificates.filter((c) => !c.manual).map((c) => c.type);
+const ALL_TYPES = DEFAULTS.certificates.providers.apple.certificates.map((c) => c.type);
+const AUTOMATED_TYPES = DEFAULTS.certificates.providers.apple.certificates.filter((c) => !c.manual).map((c) => c.type);
 const FUTURE = new Date(Date.now() + 300 * 24 * 3600 * 1000).toISOString();
 
 // ─── Real openssl fixture material (one key, self-signed DER cert, CSR) ─────
@@ -82,7 +82,7 @@ function brandConfig({ certificates = {}, apple = {}, targets = { desktop: {} } 
     certificates: certificates === false ? false : {
       ...structuredClone(DEFAULTS.certificates),
       ...certificates,
-      apple: { ...structuredClone(DEFAULTS.certificates.apple), bundleIdPrefix: PREFIX, ...apple },
+      providers: { apple: { ...structuredClone(DEFAULTS.certificates.providers.apple), bundleIdPrefix: PREFIX, ...apple } },
     },
   };
 }
@@ -173,9 +173,8 @@ function runService(config, { root, client, options = {}, keychain, secrets, ope
     brandRoot: root,
     companyRoot,
     brandConfig: config,
-    brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: BRAND_ID, config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations,
     options,
     serviceData,
@@ -199,10 +198,10 @@ test('certificates: registered after assets with the four apple operations', () 
 
 test('certificates: defaults pin — no company bundle prefix, G2-only manual types', () => {
   assert.equal(DEFAULTS.certificates.enabled, true);
-  assert.equal(DEFAULTS.certificates.apple.bundleIdPrefix, null);
-  assert.deepEqual(DEFAULTS.certificates.apple.capabilities, ['APPLE_ID_AUTH']);
-  assert.deepEqual(DEFAULTS.certificates.apple.profiles, ['IOS_DISTRIBUTION', 'MAC_APP_DISTRIBUTION', 'DEVELOPER_ID_APPLICATION_G2']);
-  assert.deepEqual(DEFAULTS.certificates.apple.certificates, [
+  assert.equal(DEFAULTS.certificates.providers.apple.bundleIdPrefix, null);
+  assert.deepEqual(DEFAULTS.certificates.providers.apple.capabilities, ['APPLE_ID_AUTH']);
+  assert.deepEqual(DEFAULTS.certificates.providers.apple.profiles, ['IOS_DISTRIBUTION', 'MAC_APP_DISTRIBUTION', 'DEVELOPER_ID_APPLICATION_G2']);
+  assert.deepEqual(DEFAULTS.certificates.providers.apple.certificates, [
     { type: 'DEVELOPMENT' },
     { type: 'IOS_DISTRIBUTION' },
     { type: 'MAC_INSTALLER_DISTRIBUTION' },

@@ -2,7 +2,7 @@
  * Brand .env writeback — persist a secret so every future run (and CI)
  * sees the same value. Used for machine-generated secrets that only have
  * to stay stable (CSC_KEY_PASSWORD, ACCOUNT_PASSWORD_SEED) and for
- * interactively-entered ones (the payment processor-setup flows). Replaces
+ * interactively-entered ones (the payment provider-setup flows). Replaces
  * the variable's line in place when it already exists, appends otherwise —
  * then applies the canonical ordering (env-order.js, cp137), the same way
  * writeConfigValues applies the omega.json5 canonical order on every

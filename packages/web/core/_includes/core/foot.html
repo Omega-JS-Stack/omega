@@ -104,13 +104,13 @@
     // Canonical providers shape straight through (C4 cp106a — no flatten
     // bridge; secrets never ride: omega.json5 carries ids only)
     analytics: {{ resolved.analytics | jsonify }},
-    // omega.json5 `monitoring` → the client's sentry contract (#380). DSN
-    // presence IS the switch, and the blob feeds @omega.js/monitoring, which
-    // strips the `provider` discriminator and applies the shared defaults.
-    // Emitted BEFORE the client loop so an explicit `client.sentry` still wins
-    // — the same precedence @omega.js/extension's webpack mapping gives it.
-    {% assign monitoring = resolved.monitoring %}
-    sentry: { enabled: {% if monitoring.dsn %}true{% else %}false{% endif %}, config: {% if monitoring %}{{ monitoring | jsonify }}{% else %}{}{% endif %} },
+    // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
+    // (#380, reshaped #425). DSN presence IS the switch, and the provider block
+    // feeds @omega.js/monitoring, which applies the shared defaults. Emitted
+    // BEFORE the client loop so an explicit `client.sentry` still wins — the
+    // same precedence @omega.js/extension's webpack mapping gives it.
+    {% assign sentryConfig = resolved.monitoring.providers.sentry %}
+    sentry: { enabled: {% if sentryConfig.dsn %}true{% else %}false{% endif %}, config: {% if sentryConfig %}{{ sentryConfig | jsonify }}{% else %}{}{% endif %} },
     {% for item in resolved.client %}
       {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
     {% endfor %}

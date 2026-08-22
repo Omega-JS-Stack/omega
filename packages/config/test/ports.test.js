@@ -218,15 +218,15 @@ test('ports file: absent and malformed both read as null', () => {
   assert.equal(readPortsFile(dir), null);
 });
 
-// ---- sibling ports (the map an app hands its browser code)
+// ---- sibling ports (the map a target hands its browser code)
 
-test('readSiblingPorts: merges live sibling maps, skips own app dir and dead pids, empty without brand root', () => {
-  // Brand layout: <root>/config/omega.json5 + apps/{backend,website}
+test('readSiblingPorts: merges live sibling maps, skips own target dir and dead pids, empty without brand root', () => {
+  // Brand layout: <root>/config/omega.json5 + targets/{backend,website}
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'ports-test-brand-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{}');
-  const backend = path.join(brand, 'apps', 'backend');
-  const website = path.join(brand, 'apps', 'website');
+  const backend = path.join(brand, 'targets', 'backend');
+  const website = path.join(brand, 'targets', 'website');
   fs.mkdirSync(path.join(backend, '.temp'), { recursive: true });
   fs.mkdirSync(path.join(website, '.temp'), { recursive: true });
 
@@ -234,7 +234,7 @@ test('readSiblingPorts: merges live sibling maps, skips own app dir and dead pid
   fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
     ports: { hosting: 5003, auth: 9099 }, pid: process.pid, startedAt: 'x',
   }));
-  // Own app's file must be skipped even with a live pid (a previous run of THIS server)
+  // Own target's file must be skipped even with a live pid (a previous run of THIS server)
   fs.writeFileSync(path.join(website, '.temp', 'ports.json'), JSON.stringify({
     ports: { website: 4999 }, pid: process.pid, startedAt: 'x',
   }));

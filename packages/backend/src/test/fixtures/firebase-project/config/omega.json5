@@ -19,7 +19,7 @@
   // consumer) so the FULL framework suite — payment journeys + intent/
   // cancel/refund routes — passes against the fixture, not just boot.
   payment: {
-    processors: {
+    providers: {
       stripe: {
         publishableKey: null,
       },

@@ -2,15 +2,20 @@
  * Report the desired Stripe Radar rules.
  *
  * Stripe has no Radar rules API (Dashboard-only), so this follows the
- * no-API manual-action pattern (search-console ga-link): print the desired
+ * no-API manual-action pattern (the search service's ga-link): print the desired
  * rules + the Dashboard deep-link, confirm interactively, and stay warned
- * until confirmed (`radarConfirmed` in state). Rules come from
- * payment.processors.stripe.radar — manager defaults with per-brand
+ * until confirmed. A confirmation nothing can re-check is the one kind of
+ * reconcile flag config keeps (#434): it lands at
+ * `payment.providers.stripe.radarConfirmed`. Rules come from
+ * payment.providers.stripe.radar — manager defaults with per-brand
  * override. Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
 const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt } = require('../../../lib/run-gates.js');
+
+const CONFIG_PATH = 'payment.providers.stripe.radarConfirmed';
 
 module.exports = async function ensureStripeRadar(context) {
   const { brandConfig, stripeApi: api, serviceData, options = {} } = context;
@@ -20,15 +25,15 @@ module.exports = async function ensureStripeRadar(context) {
     return {};
   }
 
-  const desiredRules = brandConfig.payment?.processors?.stripe?.radar || [];
+  const desiredRules = brandConfig.payment?.providers?.stripe?.radar || [];
   if (desiredRules.length === 0) {
     console.log(`      ${chalk.dim('⊘ No Radar rules configured')}`);
     return {};
   }
 
-  if (serviceData.radarConfirmed === true) {
+  if (brandConfig.payment?.providers?.stripe?.radarConfirmed === true) {
     console.log(`      ${chalk.green('✓')} Radar rules confirmed (${desiredRules.length} rules)`);
-    return { state: { radarConfirmed: true } };
+    return {};
   }
 
   const radarUrl = serviceData.stripeAccountId
@@ -52,8 +57,9 @@ module.exports = async function ensureStripeRadar(context) {
     await pressEnterToOpen(radarUrl, 'the Stripe Radar rules page');
     const done = await confirm({ message: 'Radar rules added in the Dashboard?', default: false });
     if (done) {
+      writeBrandConfig(context, { [CONFIG_PATH]: true });
       console.log(`      ${chalk.green('✓')} Radar rules confirmed (${desiredRules.length} rules)`);
-      return { state: { radarConfirmed: true } };
+      return {};
     }
   } else {
     console.log(`      ${chalk.dim('→')} Radar rules: ${chalk.cyan(radarUrl)}`);
@@ -62,7 +68,6 @@ module.exports = async function ensureStripeRadar(context) {
 
   return {
     status: 'warned',
-    state: { radarConfirmed: false },
     output: { stripeRadar: { rules: desiredRules.length, radarUrl } },
   };
 };

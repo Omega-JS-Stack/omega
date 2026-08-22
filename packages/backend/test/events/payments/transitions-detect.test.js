@@ -4,8 +4,8 @@
  * before/after unified subscription plus the webhook's event type.
  *
  * Covers the two things the event type alone decides:
- *   1. Refund detection, which must know EVERY processor's refund event string
- *      (the strings are pinned against each processor's own webhook parser here,
+ *   1. Refund detection, which must know EVERY provider's refund event string
+ *      (the strings are pinned against each provider's own webhook parser here,
  *      so a parser that renames one fails this test instead of silently dropping
  *      the customer's refund email)
  *   2. Refund idempotency — a webhook doc that already completed once must not
@@ -21,9 +21,9 @@
 const fs = require('fs');
 const path = require('path');
 const transitions = require('../../../src/manager/events/firestore/payments-webhooks/transitions/index.js');
-const stripeProcessor = require('../../../src/manager/routes/payments/webhook/processors/stripe.js');
-const paypalProcessor = require('../../../src/manager/routes/payments/webhook/processors/paypal.js');
-const chargebeeProcessor = require('../../../src/manager/routes/payments/webhook/processors/chargebee.js');
+const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
+const paypalProvider = require('../../../src/manager/routes/payments/webhook/providers/paypal.js');
+const chargebeeProvider = require('../../../src/manager/routes/payments/webhook/providers/chargebee.js');
 
 // Every transition name the detector can return, and the category whose folder
 // holds its handler file
@@ -280,7 +280,7 @@ module.exports = {
       },
     },
 
-    // ─── Refund event strings, per processor ───
+    // ─── Refund event strings, per provider ───
 
     {
       name: 'detects-stripe-refund',
@@ -288,7 +288,7 @@ module.exports = {
         const detected = transitions.detectSubscriptionTransition(paidSubscription(), paidSubscription(), 'charge.refunded');
 
         assert.equal(detected, 'payment-refunded', 'charge.refunded should detect payment-refunded');
-        assert.ok(stripeProcessor.isSupported('charge.refunded'), 'Stripe processor should accept the same event string');
+        assert.ok(stripeProvider.isSupported('charge.refunded'), 'Stripe provider should accept the same event string');
       },
     },
 
@@ -298,7 +298,7 @@ module.exports = {
         const detected = transitions.detectSubscriptionTransition(paidSubscription(), paidSubscription(), 'PAYMENT.SALE.REFUNDED');
 
         assert.equal(detected, 'payment-refunded', 'PAYMENT.SALE.REFUNDED should detect payment-refunded');
-        assert.ok(paypalProcessor.isSupported('PAYMENT.SALE.REFUNDED'), 'PayPal processor should accept the same event string');
+        assert.ok(paypalProvider.isSupported('PAYMENT.SALE.REFUNDED'), 'PayPal provider should accept the same event string');
       },
     },
 
@@ -308,7 +308,7 @@ module.exports = {
         const detected = transitions.detectSubscriptionTransition(paidSubscription(), paidSubscription(), 'payment_refunded');
 
         assert.equal(detected, 'payment-refunded', 'payment_refunded should detect payment-refunded');
-        assert.ok(chargebeeProcessor.isSupported('payment_refunded'), 'Chargebee processor should accept the same event string');
+        assert.ok(chargebeeProvider.isSupported('payment_refunded'), 'Chargebee provider should accept the same event string');
       },
     },
 
@@ -316,13 +316,13 @@ module.exports = {
       name: 'every-refund-event-is-a-parsed-event',
       async run({ assert }) {
         // Each refund string must be one a webhook parser actually delivers —
-        // an event no processor reports could never fire the transition
+        // an event no provider reports could never fire the transition
         for (const eventType of transitions.REFUND_EVENTS) {
-          const supported = stripeProcessor.isSupported(eventType)
-            || paypalProcessor.isSupported(eventType)
-            || chargebeeProcessor.isSupported(eventType);
+          const supported = stripeProvider.isSupported(eventType)
+            || paypalProvider.isSupported(eventType)
+            || chargebeeProvider.isSupported(eventType);
 
-          assert.ok(supported, `Refund event ${eventType} should be supported by a webhook processor`);
+          assert.ok(supported, `Refund event ${eventType} should be supported by a webhook provider`);
         }
       },
     },
@@ -341,7 +341,7 @@ module.exports = {
     {
       name: 'every-refund-event-detects-on-the-one-time-side',
       async run({ assert }) {
-        // The one-time side reads the same processor strings the subscription
+        // The one-time side reads the same provider strings the subscription
         // side does — a refund is a refund whichever thing was bought
         for (const eventType of transitions.REFUND_EVENTS) {
           assert.equal(

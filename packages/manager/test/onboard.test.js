@@ -57,7 +57,7 @@ function readConfig(root) {
   return JSON5.parse(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'));
 }
 
-// Scaffolded app package.jsons declare their framework (`*`); stub the
+// Scaffolded target package.jsons declare their framework (`*`); stub the
 // packages at the brand root so the update service's resolution climb passes
 // without the registry (pre-publish, and tests must never install).
 function stubFrameworks(root, names) {
@@ -134,11 +134,11 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     '.env',
     '.gitignore',
     'README.md',
-    'apps/backend/package.json',
-    'apps/desktop/package.json',
-    'apps/website/package.json',
     'config/omega.json5',
     'package.json',
+    'targets/backend/package.json',
+    'targets/desktop/package.json',
+    'targets/website/package.json',
   ]);
   assert.deepEqual(report.kept, []);
 
@@ -154,14 +154,14 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.deepEqual(config.theme, { id: 'classy', appearance: 'system' });
   assert.deepEqual(Object.keys(config.targets), ['web', 'backend', 'desktop']);
   // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
-  assert.deepEqual(config.certificates, { apple: { bundleIdPrefix: 'io.acme' } });
+  assert.deepEqual(config.certificates, { providers: { apple: { bundleIdPrefix: 'io.acme' } } });
   // `targets` is the LAST top-level key in the seeded config (canonical order)
   assert.equal(Object.keys(config).at(-1), 'targets');
 
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.name, 'acme');
   assert.equal(pkg.private, true);
-  assert.deepEqual(pkg.workspaces, ['apps/*']);
+  assert.deepEqual(pkg.workspaces, ['targets/*']);
   // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
   // the scaffold must declare it or nothing installs it outside the monorepo
   // (cp195 journey catch)
@@ -178,15 +178,15 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.ok(readmeText.includes('npx omega'));
   assert.ok(!readmeText.includes('omega-manager'), 'README never mentions the retired bin name');
 
-  const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
-  assert.equal(appPkg.name, 'acme-website');
+  const targetPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8'));
+  assert.equal(targetPkg.name, 'acme-website');
 
-  // cp95a seeds: framework dep per app — the backend's is a RUNTIME
-  // dependency on its ONE app manifest (src/dist pillar: the stage derives
+  // cp95a seeds: framework dep per target — the backend's is a RUNTIME
+  // dependency on its ONE target manifest (src/dist pillar: the stage derives
   // dist/package.json from it), every other target's is a devDependency —
   // plus a bootable demo-* cloud project and the starter catalog as a comment
-  assert.deepEqual(appPkg.devDependencies, { '@omega.js/web': '*' });
-  const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'package.json'), 'utf8'));
+  assert.deepEqual(targetPkg.devDependencies, { '@omega.js/web': '*' });
+  const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'));
   assert.deepEqual(backendPkg.dependencies, { '@omega.js/backend': '*' });
   assert.equal(backendPkg.devDependencies, undefined, 'backend framework is a runtime dep, not dev');
   assert.deepEqual(config.cloud, { provider: 'firebase', config: { projectId: 'demo-acme' } });
@@ -335,7 +335,7 @@ test('interactive: dry-run never prompts, even with a TTY, and writes nothing', 
 
 test('rerun converges: second onboard keeps every file, existing files are never overwritten', async () => {
   const root = tempDir();
-  const custom = '{\n  "name": "hand-tuned",\n  "private": true,\n  "workspaces": ["apps/*"]\n}\n';
+  const custom = '{\n  "name": "hand-tuned",\n  "private": true,\n  "workspaces": ["targets/*"]\n}\n';
   fs.writeFileSync(path.join(root, 'package.json'), custom);
 
   const first = await runOnboard(root, { id: 'keeper', manage: false });
@@ -355,11 +355,11 @@ test('resume from inside an existing brand: answers come from its config, only g
     brand: { id: 'existing', name: 'Existing Brand', url: 'https://existing.test' },
     targets: { web: {} },
   }`);
-  fs.mkdirSync(path.join(root, 'apps', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'apps', 'website', 'package.json'), '{ "name": "existing-website" }\n');
+  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), '{ "name": "existing-website" }\n');
 
-  // From INSIDE the app dir — the brand root resolves by walk-up
-  const report = await runOnboard(path.join(root, 'apps', 'website'), { manage: false });
+  // From INSIDE the target dir — the brand root resolves by walk-up
+  const report = await runOnboard(path.join(root, 'targets', 'website'), { manage: false });
 
   assert.equal(report.mode, 'resume');
   assert.equal(report.brandRoot, root);
@@ -379,7 +379,7 @@ test('company mode: the new brand lands under brands.roots[0] and gets the compa
   fs.mkdirSync(path.join(companyRoot, 'config'));
   fs.writeFileSync(path.join(companyRoot, 'config', 'omega.json5'), `{
     brand: { name: 'My Co' },
-    monitoring: { provider: 'sentry', dsn: 'https://co@sentry.example/1' },
+    monitoring: { providers: { sentry: { dsn: 'https://co@sentry.example/1' } } },
     brands: { roots: ['./brands'] },
   }`);
   fs.mkdirSync(path.join(companyRoot, 'brands'));
@@ -421,7 +421,7 @@ test('full manage on a fresh brand: services skip cleanly, testing honestly nudg
   const root = tempDir();
   await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false });
   // Both declared frameworks stubbed (the backend's is a runtime dep on its
-  // app manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
+  // target manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
   stubFrameworks(root, ['@omega.js/web', '@omega.js/backend']);
 
   const report = await runManage(root, { ...FAKE_FETCH_200 });
@@ -437,7 +437,7 @@ test('full manage on a fresh brand: services skip cleanly, testing honestly nudg
     }
   }
 
-  // …and testing names exactly what's missing: the apps' framework internals
+  // …and testing names exactly what's missing: the targets' framework internals
   assert.equal(report.hasErrors, true);
   assert.equal(report.results.testing.status, 'error');
   assert.match(report.results.testing.error, /build output/);

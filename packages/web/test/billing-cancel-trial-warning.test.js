@@ -90,7 +90,7 @@ function trialingAccount(subscription) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
       ...subscription,
@@ -104,7 +104,7 @@ function paidAccount(subscription) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
@@ -578,7 +578,7 @@ test('#267: a state that cannot cancel is never gated', async () => {
 test('#267: the gate never disagrees with the button it guards', async () => {
   // A TRIALING subscription carrying a scheduled cancellation still offers the
   // cancel button — `resolved.cancelling` is `pending && !trialing`, and the
-  // processor's own portal can schedule one (#226). Cancelling from there still
+  // provider's own portal can schedule one (#226). Cancelling from there still
   // ends the trial immediately, so the warning has to ride along with it.
   const account = trialingAccount({ cancellation: { pending: true, date: { timestampUNIX: WEEK_FROM_NOW } } });
   const state = await billingStateFor(account);

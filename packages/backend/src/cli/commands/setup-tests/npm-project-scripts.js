@@ -27,15 +27,15 @@ class NpmProjectScriptsTest extends BaseTest {
     // Fresh-read first: npm-driven fixes rewrote the manifest earlier in
     // this run — writing the boot-time snapshot would clobber their installs
     // (cp195 journey catch: this exact fix erased firebase-admin/functions)
-    const app = this.readAppManifest();
-    app.scripts = app.scripts || {};
+    const manifest = this.readTargetManifest();
+    manifest.scripts = manifest.scripts || {};
 
     // Copy all projectScripts to consumer
     for (const [name, command] of Object.entries(projectScripts)) {
-      app.scripts[name] = command;
+      manifest.scripts[name] = command;
     }
 
-    this.writeAppManifest();
+    this.writeTargetManifest();
   }
 }
 

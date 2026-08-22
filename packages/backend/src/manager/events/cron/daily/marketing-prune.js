@@ -33,7 +33,10 @@
  * never spend a consent it can't give back.
  *
  * Segment keys are resolved to provider-specific IDs at runtime.
- * Runs unless marketing.prune.enabled = false in config/omega.json5 (default ON).
+ *
+ * OPT-IN ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)): nothing
+ * here runs without an explicit marketing.prune.enabled = true — see
+ * docs/marketing-campaigns.md § Contact Pruning for the contract.
  *
  * Runs on omega_cronDaily.
  */
@@ -64,8 +67,8 @@ module.exports = async ({ Manager, ctx, libraries }) => {
     return;
   }
 
-  if (Manager.config?.marketing?.prune?.enabled === false) {
-    ctx.log('Marketing prune: disabled');
+  if (Manager.config?.marketing?.prune?.enabled !== true) {
+    ctx.log('Marketing prune: disabled (set marketing.prune.enabled to true to opt in)');
     return;
   }
 

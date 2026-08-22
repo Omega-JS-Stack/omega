@@ -8,7 +8,7 @@
  * file owns is the boot: resolve, guard, init, hand back the SDK.
  *
  * The SDK is required ONLY when the resolved config says to report, so a brand
- * with no `monitoring.dsn` never loads @sentry/node at all.
+ * with no `monitoring.providers.sentry.dsn` never loads @sentry/node at all.
  */
 
 const { resolveConfig, releaseTag, normalizeUser } = require('./core.js');

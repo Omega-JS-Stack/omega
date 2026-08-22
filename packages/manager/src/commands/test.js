@@ -1,35 +1,35 @@
 /**
  * `omega test` at a brand root — C5's brand layer: fan the test run out over
- * the brand's apps, each in its own framework's hands.
+ * the brand's targets, each in its own framework's hands.
  *
- *   omega test                → every app's PROJECT tests (bare per app)
- *   omega test framework:     → every app's framework suite
- *   omega test full:          → both sources, every app
- *   omega test routes/x       → project filter, forwarded to every app
- *                               (apps with no matching tests no-op)
- *   omega test web:pages/     → ONLY the web app — its framework suite, scoped
- *   omega test desktop:       → ONLY the desktop app's framework suite
+ *   omega test                → every target's PROJECT tests (bare per target)
+ *   omega test framework:     → every target's framework suite
+ *   omega test full:          → both sources, every target
+ *   omega test routes/x       → project filter, forwarded to every target
+ *                               (targets with no matching tests no-op)
+ *   omega test web:pages/     → ONLY the web target — its framework suite, scoped
+ *   omega test desktop:       → ONLY the desktop target's framework suite
  *
  * Universal targets (bare paths, `framework:`/`omega:`/`mgr:`, `full:`,
- * `project:`/`brand:`) forward to every app verbatim; per-framework ids
+ * `project:`/`brand:`) forward to every target verbatim; per-framework ids
  * (FRAMEWORK_IDS: `web:`, `backend:`, `desktop:`, `extension:`) route to
- * the app owning that framework — the legacy short ids are retired. Unknown
- * prefixes warn and are dropped; if nothing valid remains, every app runs
+ * the target owning that framework — the legacy short ids are retired. Unknown
+ * prefixes warn and are dropped; if nothing valid remains, every target runs
  * bare (scope.js parity). Flags are NOT fanned out — flagged runs
- * (--layer, --extended) are app-level invocations; run them from the app.
+ * (--layer, --extended) are target-level invocations; run them from the target.
  *
- * Apps run sequentially with streamed output; any failing app → exit 1.
+ * Targets run sequentially with streamed output; any failing target → exit 1.
  */
 const path = require('node:path');
 const chalk = require('chalk').default;
 
 const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
-const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
+const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveFrameworkBin } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 
-// Prefixes forwarded to every app as-is (each app's own C5 parser interprets them)
+// Prefixes forwarded to every target as-is (each target's own C5 parser interprets them)
 const UNIVERSAL_PREFIXES = new Set([
   ...UNIVERSAL_FRAMEWORK_ALIASES,
   ...PROJECT_ALIASES,
@@ -42,8 +42,8 @@ const ID_TO_FRAMEWORK = Object.fromEntries(
 );
 
 /**
- * Split raw targets into per-app routing: `shared` goes to every app,
- * `perFramework[pkg]` only to the app owning that framework, `invalid`
+ * Split raw targets into per-target routing: `shared` goes to every target,
+ * `perFramework[pkg]` only to the target owning that framework, `invalid`
  * is warned and dropped.
  */
 function partitionTargets(rawTargets) {
@@ -76,7 +76,7 @@ function partitionTargets(rawTargets) {
 module.exports = async (options) => {
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside an app for that app\'s tests.'));
+    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s tests.'));
     process.exitCode = 1;
     return;
   }
@@ -91,66 +91,66 @@ module.exports = async (options) => {
     console.log(chalk.yellow(`  ⚠ Unknown test scope prefix ignored: ${bad}`));
   }
 
-  // Nothing valid → every app runs bare (its project tests), scope.js parity.
+  // Nothing valid → every target runs bare (its project tests), scope.js parity.
   const runAllBare = shared.length === 0 && Object.keys(perFramework).length === 0;
 
-  const apps = discoverApps(brandRoot).filter((app) => app.target);
-  if (apps.length === 0) {
-    console.log(chalk.yellow('⚠ No target-mapped apps under apps/ — nothing to test.'));
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target);
+  if (targets.length === 0) {
+    console.log(chalk.yellow('⚠ No target-mapped dirs under targets/ — nothing to test.'));
     return;
   }
 
   console.log(chalk.bold(`\nOMEGA brand tests — ${path.basename(brandRoot)}`));
 
-  // ─── Plan: which apps run, with which forwarded targets ───────────────────
+  // ─── Plan: which targets run, with which forwarded ids ────────────────────
   const runs = [];
 
-  for (const app of apps) {
-    const target = findTarget(app.path);
+  for (const entry of targets) {
+    const target = findTarget(entry.path);
 
     if (!target || target.kind !== 'framework') {
-      // Only an error if this app was (or would be) addressed
+      // Only an error if this target was (or would be) addressed
       if (runAllBare || shared.length > 0) {
-        runs.push({ app, error: 'no framework dependency detected (app-root package.json)' });
+        runs.push({ entry, error: 'no framework dependency detected (target-root package.json)' });
       }
       continue;
     }
 
     const args = [...shared, ...(perFramework[target.name] || [])];
-    if (!runAllBare && args.length === 0) continue; // targeted run, not addressed to this app
+    if (!runAllBare && args.length === 0) continue; // targeted run, not addressed to this target
 
     const binPath = resolveFrameworkBin(target.dir, target.name);
     if (!binPath) {
-      runs.push({ app, error: `${target.name} is not installed (node_modules climb from ${target.dir} found no bin)` });
+      runs.push({ entry, error: `${target.name} is not installed (node_modules climb from ${target.dir} found no bin)` });
       continue;
     }
 
-    runs.push({ app, framework: target.name, binPath, args });
+    runs.push({ entry, framework: target.name, binPath, args });
   }
 
   if (runs.length === 0) {
-    console.log(chalk.yellow('⚠ No app matches the requested scope — nothing ran.'));
+    console.log(chalk.yellow('⚠ No target matches the requested scope — nothing ran.'));
     return;
   }
 
-  // ─── Execute sequentially, streaming each app's output ────────────────────
+  // ─── Execute sequentially, streaming each target's output ─────────────────
   const summary = [];
   let failed = false;
 
   for (const [index, run] of runs.entries()) {
-    const label = `[${index + 1}/${runs.length}] ${run.app.name}`;
+    const label = `[${index + 1}/${runs.length}] ${run.entry.name}`;
 
     if (run.error) {
       console.log(chalk.red(`\n✗ ${label}: ${run.error}`));
-      summary.push({ name: run.app.name, ok: false, detail: run.error });
+      summary.push({ name: run.entry.name, ok: false, detail: run.error });
       failed = true;
       continue;
     }
 
     console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — omega test ${run.args.join(' ')}`.trimEnd()} ───`));
-    const result = await runCommand(process.execPath, [run.binPath, 'test', ...run.args], run.app.path);
+    const result = await runCommand(process.execPath, [run.binPath, 'test', ...run.args], run.entry.path);
 
-    summary.push({ name: run.app.name, ok: result.success, detail: result.error });
+    summary.push({ name: run.entry.name, ok: result.success, detail: result.error });
     if (!result.success) failed = true;
   }
 

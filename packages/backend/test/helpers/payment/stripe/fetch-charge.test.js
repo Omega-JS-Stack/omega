@@ -14,7 +14,7 @@
  *
  * Run: npx omega test backend:helpers/payment/stripe/fetch-charge
  */
-const Stripe = require('../../../../src/manager/libraries/payment/processors/stripe.js');
+const Stripe = require('../../../../src/manager/libraries/payment/providers/stripe.js');
 
 const CHARGE_ID = 'ch_test_fetch_charge';
 

@@ -11,7 +11,7 @@
  * That default lives HERE and nowhere else. The backend's apply route resolves
  * `Manager.config.payment` through this function, and the web build bakes the
  * SAME call into the client blob it emits — so the dialog the customer reads and
- * the coupon the processor creates can never disagree about the number.
+ * the coupon the provider creates can never disagree about the number.
  *
  * The offer's shape mirrors a discount code exactly (see the backend's
  * libraries/payment/discount-codes.js): percent-based OR amount-based, never
@@ -29,7 +29,7 @@
 // cycle only; 'forever' is the brand asking for a permanent price cut.
 const WINBACK_OFFER_DEFAULTS = { enabled: true, percent: 50, duration: 'once' };
 
-// The durations a coupon can be built for on every processor that supports the
+// The durations a coupon can be built for on every provider that supports the
 // offer. Stripe's third option ('repeating') needs a duration_in_months beside
 // it, which is provider surface nothing here asks for.
 const WINBACK_DURATIONS = ['once', 'forever'];
@@ -45,7 +45,7 @@ function resolveWinbackOffer(payment) {
 
   // A brand naming an amount is making an amount offer, and it carries no
   // percent at all — not even the default one, which would otherwise ride along
-  // and give a processor two shapes to choose between.
+  // and give a provider two shapes to choose between.
   const shape = typeof configured.amount === 'number'
     ? { amount: configured.amount }
     : { percent: typeof configured.percent === 'number' ? configured.percent : WINBACK_OFFER_DEFAULTS.percent };

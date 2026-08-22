@@ -4,25 +4,27 @@
 
 ## What you are working in
 
-A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one app per enabled target under `apps/`. The `@omega.js/*` frameworks do the heavy lifting — apps stay thin (config + content + custom routes/pages).
+A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one dir per enabled target under `targets/`. The `@omega.js/*` frameworks do the heavy lifting — targets stay thin (config + content + custom routes/pages).
 
-| App dir | Target | Framework | Required reading |
+| Target dir | Target | Framework | Required reading |
 |---|---|---|---|
-| `apps/website/` | web | `@omega.js/web` | the `omega:web` skill → `docs/web/index.md` |
-| `apps/backend/` | backend | `@omega.js/backend` | the `omega:backend` skill → `docs/backend/index.md` |
-| `apps/desktop/` | desktop | `@omega.js/desktop` | the `omega:desktop` skill → `docs/desktop/index.md` |
-| `apps/extension/` | extension | `@omega.js/extension` | the `omega:extension` skill → `docs/extension/index.md` |
+| `targets/website/` | web | `@omega.js/web` | the `omega:web` skill → `docs/web/index.md` |
+| `targets/backend/` | backend | `@omega.js/backend` | the `omega:backend` skill → `docs/backend/index.md` |
+| `targets/desktop/` | desktop | `@omega.js/desktop` | the `omega:desktop` skill → `docs/desktop/index.md` |
+| `targets/extension/` | extension | `@omega.js/extension` | the `omega:extension` skill → `docs/extension/index.md` |
 
-**Before doing ANY work inside an app, read its framework's guide** — the omega plugin's inject hook loads the matching skill automatically in that app, and the skill points at the guide; architecture, conventions, APIs, and gotchas live there, not here.
+**Before doing ANY work inside a target, read its framework's guide** — the omega plugin's inject hook loads the matching skill automatically in that target, and the skill points at the guide; architecture, conventions, APIs, and gotchas live there, not here.
 
 ## Brand root anatomy
 
-- `config/omega.json5` — THE brand config (shared sections + `targets.<type>`; key presence = target enabled). Apps in a brand carry NO config file of their own.
+- `config/omega.json5` — THE brand config (shared sections + `targets.<type>`; key presence = target enabled). Targets in a brand carry NO config file of their own.
 - `.env` — secrets, ALWAYS (the config loader hard-fails secret-shaped keys in omega.json5). Gitignored.
-- `.omega/` — durable state, secrets store, run output. Gitignored; never commit it.
-- `apps/<target>/` — one workspace per enabled target (see table above).
+- `.omega/` — the secrets store, run output, caches, and the per-machine deploy record. Gitignored; never commit it. No durable state file: every provisioned fact the manage cycle resolves lands in `config/omega.json5`, every secret in `.env` ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)).
+- `targets/<target>/` — one workspace per enabled target (see table above). A brand still carrying the old `apps/` folder is fixed ONCE, by hand — `npx omega manage --migration=targets-rename --execute` (bare = the audit, moving nothing) renames the folder and flips the root `workspaces` glob with it; re-run `npm install` afterwards so npm re-links the workspaces. Nothing heals it inside a run: every other verb fails loud on the old shape and names that command. Both folders at once is a half-done migration and fails loudly rather than guessing ([../shared/breaking-changes.md](../shared/breaking-changes.md#one-vocabulary--a-brands-surfaces-live-in-targets-443)).
 - `logs/` — the brand-level run logs: `logs/manage.log` (the manage cycle) and `logs/dev.log` (`npm start`'s dev fan-out). Gitignored, truncated on every launch.
 - `AGENTS.md` / `CLAUDE.md` — the doc chain: `CLAUDE.md` is a one-line `@AGENTS.md` pointer; `AGENTS.md`'s first line imports the framework guide; everything below the import is the brand's own.
+
+One file inside `.omega/` is not derived data: `.omega/company.json`, present only in a brand that belongs to a **company workspace**. It is the stamp that makes this brand inherit the company's config layer, its `.env` (under this brand's own), and its shared Apple signing tree — written by `omega company adopt` (or by `omega onboard` inside a company) and re-stamped by company-wide runs. Nothing else about the brand changes. What a company workspace is, and the two commands that own it: [company.md](company.md).
 
 ## Verbs (the whole interface)
 
@@ -31,24 +33,24 @@ Run from the **brand root**:
 ```bash
 npm start                           # local dev stack (website + backend by default; `npm run dev` is the same)
 npm run manage                      # manage: reconcile EVERY service to omega.json5 (idempotent)
-npm run manage -- --service=<name>  # reconcile one service (workspace, github, cloud, cloudflare, …)
-npm run deploy                      # DELIBERATE publish fan-out: each app's own deploy, backend first
+npm run manage -- --service=<name>  # reconcile one service (workspace, repo, cloud, edge, …)
+npm run deploy                      # DELIBERATE publish fan-out: each target's own deploy, backend first
 ```
 
 The scripts are the named verbs (`omega manage`, `omega dev`, `omega deploy`) — a bare `omega` prints help and runs nothing. `npm start`'s boot reconciles the LOCAL lane only (workspace, assets, disperse); `npm run manage` is the full setup.
 
-Run from an **app root** (`apps/<target>/`):
+Run from a **target root** (`targets/<target>/`):
 
 ```bash
 npx omega setup      # validate config + scaffold/heal framework-owned files
-npx omega dev        # this app's dev server/build watch
-npx omega test       # the app's test suites
+npx omega dev        # this target's dev server/build watch
+npx omega test       # the target's test suites
 npx omega deploy     # DELIBERATE publish for this target (commits never auto-deploy)
 npx omega i local    # link the local framework monorepo (ONE-TIME — the link is durable; rerun only to heal, never per change)
 npx omega i live     # restore published registry versions
 ```
 
-`omega`, `omg`, and `mgr` are the same context-aware dispatcher — the nearest app names the framework that runs.
+`omega`, `omg`, and `mgr` are the same context-aware dispatcher — the nearest target names the framework that runs.
 
 Tests follow the layered doctrine in each framework's own `docs/test-framework.md` (unit for functions, integration for in-package systems, e2e only across framework boundaries; never mock what you can test real). Bare `npx omega test` runs are PROJECT-only — the framework corpus needs an explicit `framework:` or `full:` target.
 
@@ -59,13 +61,13 @@ Every verb tees its whole run to a file: truncated on each launch, ANSI-stripped
 | Where | Files |
 |---|---|
 | brand root | `logs/manage.log` — the manage cycle · `logs/dev.log` — `npm start`'s dev fan-out across every leg (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
-| any app | `apps/<target>/logs/dev.log`, `logs/build.log`, `logs/test.log` |
-| backend, extra | `apps/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, `dist/test.log` — beside firebase-tools' `*-debug.log` |
-| desktop, extra | `apps/desktop/logs/runtime.log` — the running app itself (packaged builds: the OS log dir) |
+| any target | `targets/<target>/logs/dev.log`, `logs/build.log`, `logs/test.log` |
+| backend, extra | `targets/backend/dist/emulator.log` (the emulator's own traffic), `dist/dev.log`, `dist/test.log` — beside firebase-tools' `*-debug.log` |
+| desktop, extra | `targets/desktop/logs/runtime.log` — the running app itself (packaged builds: the OS log dir) |
 
 ```bash
-tail -50 apps/website/logs/dev.log            # is the dev server up, what did it last build
-grep -i error apps/backend/dist/emulator.log  # what the emulator actually served
+tail -50 targets/website/logs/dev.log            # is the dev server up, what did it last build
+grep -i error targets/backend/dist/emulator.log  # what the emulator actually served
 ```
 
 The mechanism, the retention rule, and the complete path table: [../shared/logging.md](../shared/logging.md).
@@ -81,4 +83,4 @@ When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` 
 - **Secrets never enter omega.json5** — `.env` / `.omega/secrets/` only.
 - **Deploys are deliberate**: only `omega deploy` publishes. Commits and pushes never auto-publish.
 - **Don't start long-running dev processes the user may already be running** (`npm run dev`, emulators) — assume theirs is up and GREP THE LOGS; every surface already wrote its output to disk.
-- **Framework-owned file sections** (marked `Default Values` / `OMEGA Rules` blocks) are rewritten by `omega setup` — put customizations in the marked custom sections only. One exception, by design: a backend app's `firestore.rules` is YOURS end to end — it is compiled with the framework half into `dist/firestore.rules` (never edit that), and a match block you write whose path names a framework block's is MERGED into it (your condition ANDs onto the framework's, for every op you both name), which is how the brand tightens a framework rule. See [docs/backend/index.md](../backend/index.md) § Firestore rules.
+- **Framework-owned file sections** (marked `Default Values` / `OMEGA Rules` blocks) are rewritten by `omega setup` — put customizations in the marked custom sections only. One exception, by design: a backend target's `firestore.rules` is YOURS end to end — it is compiled with the framework half into `dist/firestore.rules` (never edit that), and a match block you write whose path names a framework block's is MERGED into it (your condition ANDs onto the framework's, for every op you both name), which is how the brand tightens a framework rule. See [docs/backend/index.md](../backend/index.md) § Firestore rules.

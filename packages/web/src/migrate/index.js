@@ -105,14 +105,14 @@ function runMigration(root, options = {}) {
   if (!jekyll && !ujm) {
     // Pre-converted is the fleet-standard order, not a failure
     // ([#297](https://github.com/Omega-JS-Stack/omega/issues/297)): the brand
-    // root's omega.json5 lands first and the app's UJM configs are gone before
+    // root's omega.json5 lands first and the target's UJM configs are gone before
     // migrate ever runs, so the config step is DONE and the codemods below are
     // the rest of the job. Only a root with neither legacy configs NOR a
     // resolvable omega.json5 is genuinely broken.
     //
     // The omega.json5 the loadConfig contract resolves for this root: its own
-    // file, else its brand root's (an app inside a brand monorepo rides the
-    // brand config alone — the app-layer file is optional there).
+    // file, else its brand root's (a target inside a brand monorepo rides the
+    // brand config alone — the local-layer file is optional there).
     const converted = resolveConfigPath(root) || findBrandConfigPath(root);
     if (converted) {
       report.config = { skipped: true, path: path.relative(root, converted) };

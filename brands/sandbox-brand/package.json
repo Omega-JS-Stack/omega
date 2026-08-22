@@ -1,0 +1,16 @@
+{
+  "name": "sandbox-brand",
+  "private": true,
+  "description": "Permanent dogfood consumer for the Omega monorepo — a fresh brand monorepo, nothing copied from existing brands",
+  "workspaces": [
+    "targets/*"
+  ],
+  "scripts": {
+    "test": "node e2e/run.js",
+    "test:backend": "cd targets/backend && npm run test:offline"
+  },
+  "devDependencies": {
+    "@omega.js/manager": "file:../../packages/manager",
+    "puppeteer": "^24.43.1"
+  }
+}

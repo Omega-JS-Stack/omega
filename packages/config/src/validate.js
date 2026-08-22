@@ -237,7 +237,7 @@ function validateConfig(config, options) {
       const entry = targets[key];
 
       // Multi-instance array form: every entry MUST carry a unique dir-safe
-      // id (it names the apps/<canonical>-<id> dir). Backend stays single-
+      // id (it names the targets/<canonical>-<id> dir). Backend stays single-
       // instance in practice — >1 is a warning, not an error (spec v1).
       if (Array.isArray(entry)) {
         if (entry.length === 0) {
@@ -252,7 +252,7 @@ function validateConfig(config, options) {
             return;
           }
           if (typeof instance.id !== 'string' || !INSTANCE_ID_PATTERN.test(instance.id)) {
-            errors.push(`config.targets.${key}[${index}] must carry a dir-safe id (lowercase, starts with a letter, alnum/-) — it names apps/<dir>-<id>`);
+            errors.push(`config.targets.${key}[${index}] must carry a dir-safe id (lowercase, starts with a letter, alnum/-) — it names targets/<dir>-<id>`);
             return;
           }
           if (seen.has(instance.id)) {
@@ -279,7 +279,7 @@ function validateConfig(config, options) {
   // ─── the winback offer is ONE shape (#268) ─────────────────────────────
   // A coupon is percent-based or amount-based everywhere in the payment stack,
   // and the schema walker checks fields one at a time, so the pair rule lives
-  // here. Two shapes on one offer has no honest reading — a processor would
+  // here. Two shapes on one offer has no honest reading — a provider would
   // have to pick — so it fails the config instead.
   const winback = config ? getPath(config, 'payment.winback') : undefined;
   if (isPlainObject(winback) && typeof winback.percent === 'number' && typeof winback.amount === 'number') {

@@ -2,14 +2,15 @@
  * Test: Payment Journey - Uncancel
  * Simulates: paid active + cancellation pending → POST /payments/uncancel → cancellation cleared
  *
- * The test processor's uncancel() writes a Stripe-shaped `customer.subscription.updated`
+ * The test provider's uncancel() writes a Stripe-shaped `customer.subscription.updated`
  * doc directly to payments-webhooks/{eventId}, triggering the full on-write pipeline
  * automatically — the route itself writes no subscription state, exactly like cancel.
  *
- * The caller is built by the shared route harness rather than a persona: the
- * starting state (a scheduled cancellation on the test processor) is a SHAPE, and
- * the harness exists so one test can choose a shape without minting a persona for
- * it. Everything downstream of the handler — the webhook doc, the on-write trigger,
+ * The caller is this suite's own seeded persona, driven through the shared route
+ * harness: the ACCOUNT is declared in the seed roster (#406) and the starting
+ * state (a scheduled cancellation on the test provider) is a SHAPE this suite
+ * writes onto it, because the seed only makes healthy steady-state accounts.
+ * Everything downstream of the handler — the webhook doc, the on-write trigger,
  * the transition detection, the user-doc write — is the real pipeline.
  *
  * Product-agnostic: resolves the first paid product from config.payment.products
@@ -20,7 +21,10 @@ const { buildUser, callHandler } = require('../../routes/payments/_route-harness
 
 const handler = require('../../../src/manager/routes/payments/uncancel/post.js');
 
-const UID = '_test-journey-payments-uncancel';
+// The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
+// exclusive to this suite and declared in the seed roster, so the account it
+// drives exists — auth user and doc in sync — before the run starts.
+const PERSONA = 'journey-payments-uncancel';
 const RESOURCE_ID = 'sub_test_journey_uncancel';
 
 module.exports = {
@@ -31,7 +35,7 @@ module.exports = {
   tests: [
     {
       name: 'setup-cancelled-pending-subscription',
-      async run({ firestore, assert, state, config, skip }) {
+      async run({ accounts, firestore, assert, state, config, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -43,7 +47,8 @@ module.exports = {
         const periodEndUNIX = nowUNIX + (30 * 86400);
         const startUNIX = nowUNIX - (365 * 86400);
 
-        state.uid = UID;
+        state.uid = accounts[PERSONA].uid;
+        state.email = accounts[PERSONA].email;
         state.productId = paidProduct.id;
         state.productName = paidProduct.name || paidProduct.id;
         state.frequency = frequency;
@@ -60,7 +65,7 @@ module.exports = {
             date: { timestamp: new Date(periodEndUNIX * 1000).toISOString(), timestampUNIX: periodEndUNIX },
           },
           payment: {
-            processor: 'test',
+            provider: 'test',
             orderId: null,
             resourceId: RESOURCE_ID,
             frequency: frequency,
@@ -70,13 +75,13 @@ module.exports = {
 
         // The pipeline reads users/{uid} for its BEFORE state, so the doc has to
         // be the real record the transition is detected against.
-        await firestore.set(`users/${UID}`, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+        await firestore.set(`users/${state.uid}`, {
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         }, { merge: true });
 
-        const userDoc = await firestore.get(`users/${UID}`);
+        const userDoc = await firestore.get(`users/${state.uid}`);
         assert.equal(userDoc.subscription.status, 'active', 'Should start active');
         assert.equal(userDoc.subscription.cancellation.pending, true, 'Should start pending cancellation');
       },
@@ -86,7 +91,7 @@ module.exports = {
       name: 'call-uncancel-endpoint',
       async run({ assert, Manager, state }) {
         const user = buildUser(Manager, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
@@ -124,11 +129,11 @@ module.exports = {
 
     {
       name: 'webhook-completed-with-cancellation-removed',
-      async run({ firestore, assert, waitFor }) {
+      async run({ firestore, assert, state, waitFor }) {
         // The uncancel webhook reaches the pipeline and completes...
         const snapshot = await waitFor(async () => {
           const query = await firestore.collection('payments-webhooks')
-            .where('owner', '==', UID)
+            .where('owner', '==', state.uid)
             .where('status', '==', 'completed')
             .limit(1)
             .get();

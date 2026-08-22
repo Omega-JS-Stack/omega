@@ -20,7 +20,7 @@
  *   features   - display list [{ id, name, icon, definition, value }];
  *                value falls back to limits[id], -1 renders as Unlimited
  *   hidden     - presentation-only exclusion (#348): the product is still
- *                created on every processor and purchasable by id (QA tiers,
+ *                created on every provider and purchasable by id (QA tiers,
  *                grandfathered plans), but the composer drops it before any
  *                lane reads the catalog — no card, no comparison row, no vote
  *                on the page's universal numbers

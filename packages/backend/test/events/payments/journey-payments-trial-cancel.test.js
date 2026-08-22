@@ -5,7 +5,7 @@
  * When a user cancels during a free trial, the subscription should be cancelled immediately
  * (not scheduled for period end) to avoid giving free premium access for the remainder of the trial.
  *
- * Uses the test processor for initial trial, then cancel endpoint for cancellation.
+ * Uses the test provider for initial trial, then cancel endpoint for cancellation.
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
 module.exports = {
@@ -42,7 +42,7 @@ module.exports = {
       name: 'create-trial-intent',
       async run({ http, assert, state }) {
         const response = await http.as('journey-payments-trial-cancel').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,
           trial: true,
@@ -80,7 +80,7 @@ module.exports = {
     {
       name: 'cancel-during-trial',
       async run({ http, assert }) {
-        // Cancel via endpoint — test processor should detect trial and simulate immediate cancel.
+        // Cancel via endpoint — test provider should detect trial and simulate immediate cancel.
         // skipGuards bypasses the 24-hour subscription-age guard.
         const response = await http.as('journey-payments-trial-cancel').post('backend-manager/payments/cancel', {
           confirmed: true,

@@ -6,7 +6,7 @@
  * `payments-intents/{orderId}` (`intent/post.js`, the `discount:` field). Firestore
  * refuses a document containing an `undefined` value and firebase-admin throws
  * SYNCHRONOUSLY when it validates the data, with no `ignoreUndefinedProperties`
- * set anywhere in this framework. That throw lands AFTER the processor has already
+ * set anywhere in this framework. That throw lands AFTER the provider has already
  * created the real checkout session, so a single undefined-valued key on the result
  * turns every discounted checkout into a 500 with a live session stranded behind it.
  *
@@ -114,7 +114,7 @@ module.exports = {
     {
       name: 'every-table-entry-declares-exactly-one-shape',
       async run({ assert }) {
-        // The readers downstream branch on the shape (the processors' coupon
+        // The readers downstream branch on the shape (the providers' coupon
         // params, the order email's promo line) — a code carrying both, or
         // neither, has no defined meaning at any of them.
         for (const [code, entry] of Object.entries(DISCOUNT_CODES)) {

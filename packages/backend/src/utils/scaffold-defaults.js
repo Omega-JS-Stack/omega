@@ -11,9 +11,9 @@ const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 //   - everything copies on first setup only (consumer files are never clobbered)
 //   - AGENTS.md / .gitignore / .env live-sync their Default section on every
 //     setup via the marker-section merge (the Custom section is the
-//     consumer's, preserved verbatim). All three live at the APP ROOT — the
+//     consumer's, preserved verbatim). All three live at the TARGET ROOT — the
 //     .env moved up from functions/ with the src/dist pillar (functions/ is
-//     staged output; the stage step copies the app .env into it).
+//     staged output; the stage step copies the local .env into it).
 // Patterns match the RAW defaults-tree path (before the `_.` strip), so the
 // mergeLines rules name `_.gitignore` / `_.env`, not their outputs.
 const FILE_MAP = {
@@ -39,9 +39,9 @@ function scaffoldDefaults(options) {
   options = options || {};
 
   // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the BRAND
-  // ROOT is the one doc home — per-app AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
+  // ROOT is the one doc home — per-target AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
   // never scaffold, and existing framework-owned-only copies are swept (retire
-  // rules; consumer content is never destroyed). Standalone apps keep them.
+  // rules; consumer content is never destroyed). Standalone projects keep them.
   const fileMap = { ...FILE_MAP };
   const { resolveSeedMode } = require('@omega.js/config');
   if (!resolveSeedMode(options.outputDir).standalone) {

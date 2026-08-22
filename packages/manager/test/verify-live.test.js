@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 const { resolveVerifySurface, checkSite, checkDomain, checkCloudflare, runVerifyLegs, VERIFY_LEGS } = require('../src/lib/verify-live.js');
 
-const HTML = `<!doctype html><html><head><title>Paperloom</title></head><body>${'x'.repeat(600)}</body></html>`;
+const HTML = `<!doctype html><html><head><title>OMEGA Playground</title></head><body>${'x'.repeat(600)}</body></html>`;
 
 /** Fake fetch returning one canned response; records the URLs it saw. */
 function fakeFetch({ status = 200, headers = { 'content-type': 'text/html; charset=utf-8' }, body = HTML, throws = null } = {}) {

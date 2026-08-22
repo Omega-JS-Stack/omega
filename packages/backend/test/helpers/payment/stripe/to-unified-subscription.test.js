@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Stripe = require('../../../../src/manager/libraries/payment/processors/stripe.js');
+const Stripe = require('../../../../src/manager/libraries/payment/providers/stripe.js');
 
 // Real Stripe CLI fixtures (generated via `stripe trigger`)
 const FIXTURE_ACTIVE = require('../../../fixtures/stripe/subscription-active.json');
@@ -349,10 +349,10 @@ module.exports = {
     // ─── Payment metadata ───
 
     {
-      name: 'payment-processor-always-stripe',
+      name: 'payment-provider-always-stripe',
       async run({ assert }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.processor, 'stripe', 'Processor should always be stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider should always be stripe');
       },
     },
 
@@ -438,7 +438,7 @@ module.exports = {
         assert.equal(result.status, 'active', 'Status should be active');
         assert.equal(result.trial.claimed, false, 'Trial should not be claimed');
         assert.equal(result.cancellation.pending, false, 'Should not be pending cancellation');
-        assert.equal(result.payment.processor, 'stripe', 'Processor should be stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider should be stripe');
         assert.equal(result.payment.resourceId, 'sub_full_test', 'Resource ID should match');
         assert.equal(result.payment.frequency, 'monthly', 'Frequency should be monthly');
         assert.equal(result.payment.updatedBy.event.name, 'customer.subscription.updated', 'Event name should match');
@@ -454,7 +454,7 @@ module.exports = {
         assert.equal(result.status, 'cancelled', 'Empty → cancelled (no status field)');
         assert.equal(result.trial.claimed, false, 'Empty → trial not claimed');
         assert.equal(result.cancellation.pending, false, 'Empty → not pending');
-        assert.equal(result.payment.processor, 'stripe', 'Empty → still stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Empty → still stripe');
         assert.equal(result.payment.orderId, null, 'Empty → null orderId');
         assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
         assert.equal(result.payment.frequency, null, 'Empty → null frequency');
@@ -468,7 +468,7 @@ module.exports = {
       async run({ assert }) {
         const result = toUnifiedSubscription(FIXTURE_ACTIVE);
         assert.equal(result.status, 'active', 'Real active fixture → active');
-        assert.equal(result.payment.processor, 'stripe', 'Processor is stripe');
+        assert.equal(result.payment.provider, 'stripe', 'Provider is stripe');
         assert.equal(result.payment.resourceId, FIXTURE_ACTIVE.id, 'resourceId matches fixture ID');
       },
     },
@@ -560,7 +560,7 @@ module.exports = {
           assert.ok(result.trial, `${label}: should have trial`);
           assert.ok(result.cancellation, `${label}: should have cancellation`);
           assert.ok(result.payment, `${label}: should have payment`);
-          assert.equal(result.payment.processor, 'stripe', `${label}: processor should be stripe`);
+          assert.equal(result.payment.provider, 'stripe', `${label}: provider should be stripe`);
           assert.ok(result.payment.updatedBy, `${label}: should have updatedBy`);
           assert.ok(result.payment.updatedBy.date, `${label}: should have updatedBy.date`);
         }

@@ -31,7 +31,7 @@ const DEFAULT_PAGES_HOST = /(^|\.)github\.io$/i;
  * reasons from. Parsed by hand, not through `new URL()`, because brand.url is
  * allowed to arrive without a scheme.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {{ host: string, path: string }} '' each when brand.url is unset.
  */
 function brandUrlParts(config) {
@@ -55,7 +55,7 @@ function brandUrlParts(config) {
  * `<owner>.github.io`, the build mounted at `/`, and every asset 404ing at the
  * address the deploy actually publishes to.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @returns {string} Bare host ('' when brand.url is unset or names a Pages address).
  */
 function pagesHost(config) {
@@ -72,7 +72,7 @@ function pagesHost(config) {
  * cloned without a slug in its config still knows which repo it is). CI derives
  * without a tree and stops at GITHUB_REPOSITORY.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @param {object} env - Environment to read.
  * @param {string} [cwd] - Working tree whose origin remote may name it (omitted → no git probe).
  * @returns {{ owner: string, name: string }} '' for whatever never resolved.
@@ -124,7 +124,7 @@ function resolveRepoSlug(config, env, cwd) {
  * set renders as an empty string, and that must not suppress the autofill.
  * Normalization is #355's (src/path-prefix.js), never a second copy.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @param {object} [env] - Environment to read (defaults to process.env).
  * @param {string} [cwd] - Working tree whose origin remote may name the repo
  *   (the direct lane passes its own; CI derives without one).
@@ -153,16 +153,16 @@ function deployPathPrefix(config, env, cwd) {
 }
 
 /**
- * `deployPathPrefix` for an app dir, loading that app's composed config —
+ * `deployPathPrefix` for a target dir, loading that target's composed config —
  * the entry point for callers holding no config yet. The scaffolded CI
- * workflow runs exactly this (`@omega.js/web/deploy`) from the app dir, so
+ * workflow runs exactly this (`@omega.js/web/deploy`) from the target dir, so
  * the dispatch lane and the direct lane derive through ONE function.
  *
- * @param {string} [dir] - The consumer app dir (defaults to cwd).
+ * @param {string} [dir] - The consumer target dir (defaults to cwd).
  * @param {object} [env] - Environment to read (defaults to process.env).
  * @returns {string} '/' or '/<name>/'.
  */
-function appPathPrefix(dir, env) {
+function targetPathPrefix(dir, env) {
   const { loadConfig } = require('@omega.js/config');
   const { config } = loadConfig(dir || process.cwd(), 'web');
 
@@ -170,7 +170,7 @@ function appPathPrefix(dir, env) {
 }
 
 /**
- * The direct-deploy plan from the app's composed config: the brand repo
+ * The direct-deploy plan from the target's composed config: the brand repo
  * (resolveRepoSlug), the Pages custom domain (brand.url's host), the address
  * the deploy will serve at, and the base path its build mounts under.
  *
@@ -182,7 +182,7 @@ function appPathPrefix(dir, env) {
  * through the CI dispatch lane. A project site's brand.url names its PAGES
  * address (#355/#366), which keeps the project shape rather than switching it.
  *
- * @param {object} config - Composed omega config (brand + app layers).
+ * @param {object} config - Composed omega config (brand + local layers).
  * @param {object} [options]
  * @param {object} [options.env] - Environment to read (defaults to process.env).
  * @param {string} [options.cwd] - Working tree to resolve the repo from (defaults to cwd).
@@ -286,10 +286,10 @@ function deployDirect({ dryRun }) {
     fs.rmSync(path.join(dist, '.git'), { recursive: true, force: true });
   }
 
-  // Records key per instance (multi-instance targets): this app deploys ITS
-  // instance, so apps/website-admin lands under web:admin, main stays web
-  const { appInstance } = require('@omega.js/config');
-  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: appInstance(process.cwd(), 'web'), detail: { method: 'direct' } });
+  // Records key per instance (multi-instance targets): this target deploys ITS
+  // instance, so targets/website-admin lands under web:admin, main stays web
+  const { targetInstance } = require('@omega.js/config');
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: targetInstance(process.cwd(), 'web'), detail: { method: 'direct' } });
   logger.log(`Deployed — ${plan.url} serves once Pages picks up the push.`);
   return purgeAfterPublish(config);
 }
@@ -319,10 +319,10 @@ module.exports = async function (options) {
   const dryRun = options.dryRun || options['dry-run'];
   const project = require(path.join(process.cwd(), 'package.json'));
 
-  // Inside a brand monorepo the app's CI lives in the BRAND ROOT's workflows
-  // dir under a per-app name (#265) — dispatch what setup actually composed.
+  // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
+  // dir under a per-target name (#265) — dispatch what setup actually composed.
   const WORKFLOW = composedWorkflowName({
-    appDir: process.cwd(),
+    targetDir: process.cwd(),
     brandRoot: require('@omega.js/config').resolveSeedMode(process.cwd()).brandRoot,
     workflow: 'build.yml',
   });
@@ -341,7 +341,7 @@ module.exports = async function (options) {
   }
 
   // Linked local packages (tree-wide @omega.js file: specs — cp194: one
-  // linked SIBLING breaks the CI install — or any file: dep in THIS app) →
+  // linked SIBLING breaks the CI install — or any file: dep in THIS target) →
   // the DIRECT lane automatically. Mirrored rule (Ian 2026-07-20): a linked
   // brand ships the LOCAL framework — build here, push output; CI dispatch
   // is only for registry-clean trees.
@@ -359,8 +359,8 @@ module.exports = async function (options) {
   const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
 
   if (dispatched) {
-    const { appInstance } = require('@omega.js/config');
-    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: appInstance(process.cwd(), 'web'), detail: { method: 'dispatch' } });
+    const { targetInstance } = require('@omega.js/config');
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: targetInstance(process.cwd(), 'web'), detail: { method: 'dispatch' } });
     logger.log(`Dispatched ${WORKFLOW} — CI builds and publishes this deploy.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {
@@ -374,4 +374,4 @@ module.exports = async function (options) {
 module.exports.buildDirectPlan = buildDirectPlan;
 module.exports.pagesHost = pagesHost;
 module.exports.deployPathPrefix = deployPathPrefix;
-module.exports.appPathPrefix = appPathPrefix;
+module.exports.targetPathPrefix = targetPathPrefix;

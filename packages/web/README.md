@@ -181,7 +181,7 @@ see the harness README for the honest before/after numbers.
   "6 months stale". The anchor pins via `options.sampleAnchor` /
   `OMEGA_SAMPLE_ANCHOR` — the test harness pins the epoch, making
   generation an identity transform for fixtures and goldens. `omega dev`
-  also materializes the generated set under the app's
+  also materializes the generated set under the target's
   `.omega/sample-content/` (self-`.gitignore`d, regenerated every boot,
   removed per collection once the consumer owns it) so the filler can be
   read and copied — never committed, never mixed with real content. The
@@ -246,7 +246,7 @@ the path IT carries is the mount → `/<name>/` ([#366](../../issues/366));
 `https://<owner>.github.io/<name>/` → `/<name>/`, from the same repo slug the
 deploy plan resolves. `--direct` sets it around the build it runs itself; the
 scaffolded CI workflow derives it remotely through the same function
-(`@omega.js/web/deploy`'s `appPathPrefix()`, with `GITHUB_REPOSITORY` naming
+(`@omega.js/web/deploy`'s `targetPathPrefix()`, with `GITHUB_REPOSITORY` naming
 the repo when the config carries no slug). An explicitly exported value always
 wins, and `omega dev` / a bare `omega build` stay at the root.
 

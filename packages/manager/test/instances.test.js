@@ -1,6 +1,6 @@
 /**
  * Multi-instance targets in the manager (_attic/plans/multi-instance-targets.md):
- * the workspace structure op's per-instance app-dir expectations (enabled
+ * the workspace structure op's per-instance target-dir expectations (enabled
  * instance without its dir = the same create-this-dir error as today) and
  * the testing service's per-instance live-URL checks + per-instance deploy
  * records — real brand fixtures, recording fetch/exec fakes on the same
@@ -33,18 +33,18 @@ const TWO_INSTANCE_CONFIG = `{
 
 function stageBrand({ config = TWO_INSTANCE_CONFIG, dirs = ['website', 'website-admin'] } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'omega-instances-'));
-  jetpack.write(join(root, 'package.json'), { name: 'fixture-brand', private: true, workspaces: ['apps/*'] });
+  jetpack.write(join(root, 'package.json'), { name: 'fixture-brand', private: true, workspaces: ['targets/*'] });
   jetpack.write(join(root, 'config', 'omega.json5'), config);
   for (const dir of dirs) {
-    jetpack.write(join(root, 'apps', dir, 'package.json'), { name: `fixture-${dir}`, private: true });
-    jetpack.write(join(root, 'apps', dir, 'dist', 'index.html'), '<!doctype html><title>fixture</title>');
+    jetpack.write(join(root, 'targets', dir, 'package.json'), { name: `fixture-${dir}`, private: true });
+    jetpack.write(join(root, 'targets', dir, 'dist', 'index.html'), '<!doctype html><title>fixture</title>');
   }
   return root;
 }
 
 async function runStructure(root) {
   const brand = loadBrand(root);
-  return structure({ brandRoot: root, brand, apps: brand.apps });
+  return structure({ brandRoot: root, brand, targets: brand.targets });
 }
 
 // Same recording fakes as testing.test.js — reusable Error = network failure
@@ -67,21 +67,20 @@ async function runTesting(root, { fetch }) {
     brandId: 'fixture-brand',
     brandRoot: root,
     brandConfig: brand.config,
-    brandState: {},
-    apps: brand.apps,
+    targets: brand.targets,
     operations: OPERATIONS.testing,
     options: { fetch, exec: () => { throw new Error('no exec in this test'); }, retryDelayMs: 0 },
     serviceData: {},
   });
 }
 
-// ─── App discovery + structure op ────────────────────────────────────────────
+// ─── Target discovery + structure op ─────────────────────────────────────────
 
-test('discoverApps maps instance dirs to their target; loadBrand keeps the array form intact', () => {
+test('discoverTargets maps instance dirs to their target; loadBrand keeps the array form intact', () => {
   const root = stageBrand();
   const brand = loadBrand(root);
 
-  const byName = Object.fromEntries(brand.apps.map((app) => [app.name, app.target]));
+  const byName = Object.fromEntries(brand.targets.map((entry) => [entry.name, entry.target]));
   assert.equal(byName['website'], 'web');
   assert.equal(byName['website-admin'], 'web');
   assert.ok(Array.isArray(brand.config.targets.web), 'the whole-file merge preserves the instances array');
@@ -92,10 +91,10 @@ test('structure: enabled instance without its dir is the create-this-dir error (
 
   const result = await runStructure(root);
   assert.equal(result.status, 'error');
-  assert.match(result.error, /enabled target "web" instance "admin" has no app — create apps\/website-admin\//);
+  assert.match(result.error, /enabled target "web" instance "admin" has no dir — create targets\/website-admin\//);
 
   // Creating the dir heals it
-  jetpack.write(join(root, 'apps', 'website-admin', 'package.json'), { name: 'fixture-website-admin', private: true });
+  jetpack.write(join(root, 'targets', 'website-admin', 'package.json'), { name: 'fixture-website-admin', private: true });
   const healed = await runStructure(root);
   assert.notEqual(healed.status, 'error');
 });
@@ -105,10 +104,10 @@ test('structure: the main instance of an array-form target expects the canonical
 
   const result = await runStructure(root);
   assert.equal(result.status, 'error');
-  assert.match(result.error, /instance "main" has no app — create apps\/website\//);
+  assert.match(result.error, /instance "main" has no dir — create targets\/website\//);
 });
 
-test('structure: single-object form keeps today\'s any-app-of-the-type check (zero breaking change)', async () => {
+test('structure: single-object form keeps today\'s any-dir-of-the-type check (zero breaking change)', async () => {
   const root = stageBrand({
     config: `{
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: '${MAIN_URL}' },

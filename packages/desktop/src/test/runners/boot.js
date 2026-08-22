@@ -6,7 +6,7 @@
 //   - boot.js spawns electron with the consumer's built `main.bundle.js` (the real production
 //     boot path), then injects `harness/boot-entry.js` via --require to drive inspection.
 //
-// The build + boot happen in a STAGED app root (`<project>/.omega/test-app`), never the
+// The build + boot happen in a STAGED target root (`<project>/.omega/test-app`), never the
 // project's own dist/ (#110) — a concurrent `npm start` watcher writes dist/, and two
 // writers on one tree means either side can load a half-written bundle. See stageTestApp().
 //
@@ -67,7 +67,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 
-  // Stage the boot-test app root and record the project's real dist/ before anything
+  // Stage the boot-test target root and record the project's real dist/ before anything
   // builds — the boot layer asserts that fingerprint is unchanged afterwards (#110).
   const testApp = stageTestApp(effectiveRoot);
   const distSnapshotBefore = distSnapshot(path.join(effectiveRoot, 'dist'));
@@ -139,7 +139,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   delete childEnv.ELECTRON_RUN_AS_NODE;
 
   // Args passed to electron:
-  //   testApp.appRoot — the staged app root (package.json#main = dist/main.bundle.js,
+  //   testApp.appRoot — the staged target root (package.json#main = dist/main.bundle.js,
   //   its dist/ being the isolated test build). Electron loads it exactly the way it
   //   loads a real project dir, so packaged-app semantics — app name/version from
   //   package.json, appRoot-relative view/preload/icon lookups — are unchanged.
@@ -246,15 +246,15 @@ function runGulpBuild(projectRoot, outputRoot) {
   return result.status == null ? 1 : result.status;
 }
 
-// Stage the app root the boot tests build into and boot from: `<project>/.omega/test-app`
-// (gitignored). It is a real Electron app dir, not a bare output folder:
+// Stage the target root the boot tests build into and boot from: `<project>/.omega/test-app`
+// (gitignored). It is a real Electron target dir, not a bare output folder:
 //   - package.json — the project's own, verbatim except `main`, which is pinned at the
 //     test build's bundle. Electron derives the app name, version and therefore the
 //     userData path from it, so booting the staged root resolves exactly what booting
 //     the project does.
 //   - src / config — symlinks back to the project's. Runtime lookups resolved against
 //     `app.getAppPath()` (src/integrations/*, the unbundled config fallback) keep finding
-//     the consumer's real files even though the app dir moved.
+//     the consumer's real files even though the target dir moved.
 //   - dist/ — the isolated build output (OMEGA_BUILD_OUTPUT), so `<appRoot>/dist/views`,
 //     `<appRoot>/dist/preload.bundle.js` and the tray's icon lookup need no runtime change.
 // package.json and the symlinks are rewritten on every run; dist/ is cleared by the

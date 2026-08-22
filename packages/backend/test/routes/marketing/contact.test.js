@@ -76,7 +76,7 @@ module.exports = {
             }
           }
 
-          if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.publicationId) {
+          if (process.env.BEEHIIV_API_KEY && config.marketing?.newsletter?.providers?.beehiiv?.publicationId) {
             assert.hasProperty(response, 'data.providers.newsletter', 'Should have Beehiiv result');
             if (providers.newsletter?.success) {
               state.beehiivAdded = true;

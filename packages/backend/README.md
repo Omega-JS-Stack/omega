@@ -123,8 +123,11 @@ Create `config/omega.json5` in your functions directory (`npx omega setup` scaff
     },
   },
   monitoring: {
-    provider: 'sentry',
-    dsn: 'https://xxx@xxx.ingest.sentry.io/xxx',
+    providers: {
+      sentry: {
+        dsn: 'https://xxx@xxx.ingest.sentry.io/xxx',
+      },
+    },
   },
   analytics: {
     providers: {
@@ -154,7 +157,7 @@ Create `config/omega.json5` in your functions directory (`npx omega setup` scaff
 }
 ```
 
-In a brand monorepo (`{brand}/apps/backend`), shared sections can live in the brand root's `config/omega.json5` instead — the loader merges `brand shared → brand targets.backend → app shared → app targets.backend`, and any shared key inside `targets.backend` acts as a backend-only override.
+In a brand monorepo (`{brand}/targets/backend`), shared sections can live in the brand root's `config/omega.json5` instead — the loader merges `brand shared → brand targets.backend → local shared → local targets.backend`, and any shared key inside `targets.backend` acts as a backend-only override.
 
 ## Creating Custom Functions
 
@@ -459,7 +462,7 @@ const userProps = Manager.User(existingData, { defaults: true }).properties;
     trial: { claimed, expires: {...} },
     cancellation: { pending, date: {...} },
     limits: {},
-    payment: { processor, resourceId, frequency, startDate, updatedBy }
+    payment: { provider, resourceId, frequency, startDate, updatedBy }
   },
   roles: { admin, betaTester, developer },
   affiliate: { code, referrals, referrer },
@@ -947,7 +950,7 @@ See [docs/test-framework.md](docs/test-framework.md) for complete test API docum
 
 ### Product Configuration
 
-Products are defined in `config.payment.products` with flat prices and per-processor IDs:
+Products are defined in `config.payment.products` with flat prices and per-provider IDs:
 
 ```javascript
 payment: {
@@ -990,7 +993,7 @@ subscription: {
     date: { timestamp, timestampUNIX },
   },
   payment: {
-    processor: null,               // 'stripe' | 'paypal' | etc.
+    provider: null,               // 'stripe' | 'paypal' | etc.
     resourceId: null,              // provider subscription ID (e.g., 'sub_xxx')
     frequency: null,               // 'monthly' | 'annually' | 'weekly' | 'daily'
     startDate: { timestamp, timestampUNIX },
@@ -1046,7 +1049,7 @@ If you are still having difficulty, open an issue in the OMEGA monorepo. It is m
 
 [Somiibo](https://somiibo.com/): A Social Media Bot with an open-source module library.
 [JekyllUp](https://jekyllup.com/): A website devoted to sharing the best Jekyll themes.
-[Slapform](https://slapform.com/): A backend processor for your HTML forms on static sites.
+[Slapform](https://slapform.com/): A backend provider for your HTML forms on static sites.
 [SoundGrail Music App](https://app.soundgrail.com/): A resource for producers, musicians, and DJs.
 [Hammock Report](https://hammockreport.com/): An API for exploring and listing backyard products.
 

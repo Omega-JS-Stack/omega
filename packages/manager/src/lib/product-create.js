@@ -1,6 +1,6 @@
 /**
- * Create-on-missing for the ITW product services — slapform (contact form),
- * chatsy (chat agent), replyify (email agent). When a brand configures no
+ * Create-on-missing for the ITW product services — forms (Slapform contact
+ * form), chat (Chatsy agent), email (Replyify agent). When a brand configures no
  * asset id, the OPERATOR service account mints a brand-OWNED asset instead
  * of the brand borrowing another brand's (2b, Ian 2026-07-13: "this shit
  * was supposed to create new accounts for the brand"):

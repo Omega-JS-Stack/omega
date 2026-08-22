@@ -7,7 +7,7 @@
  * back hours later — nobody could say which step failed (#196's blind spot).
  * This writes one line per step into `<dir>/steps.log`:
  *
- *   PASS  the Paperloom emulator boots (port 5002)
+ *   PASS  the playground emulator boots (port 5002)
  *   FAIL  the popup reaches the background SW — timed out after 30s
  *   FAIL  preflight — a playground emulator stack is already running
  *

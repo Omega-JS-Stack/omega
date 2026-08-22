@@ -30,7 +30,7 @@ function resolveOffer(config) {
  * The offer as a discount-codes validate() result.
  *
  * The synthetic code names the offer for every downstream reader — it is what
- * the processors derive their deterministic coupon id from, so two brands on the
+ * the providers derive their deterministic coupon id from, so two brands on the
  * same percentage share one coupon and a brand that changes its mind gets a new
  * one instead of silently reusing the old number.
  *

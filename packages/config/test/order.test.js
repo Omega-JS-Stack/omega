@@ -16,7 +16,7 @@ const { writeConfigValues } = require('../src/edit.js');
 const SCRAMBLED = `// File header — stays at the very top.
 {
   marketing: {
-    campaigns: { listId: "lst_1" },
+    campaigns: { providers: { sendgrid: { listId: "lst_1" } } },
   },
 
   // Brand identity block — this comment must travel with 'brand'.
@@ -29,7 +29,7 @@ const SCRAMBLED = `// File header — stays at the very top.
   // Parent topology note.
   parent: false,
   domain: {
-    provider: "namecheap",
+    providers: { namecheap: {} },
   },
 }
 `;
@@ -104,7 +104,7 @@ test('writeConfigValues normalizes key order on every writeback', () => {
   fs.mkdirSync(path.join(root, 'config'));
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), SCRAMBLED);
 
-  const { changed } = writeConfigValues(root, { 'marketing.campaigns.listId': 'lst_2' });
+  const { changed } = writeConfigValues(root, { 'marketing.campaigns.providers.sendgrid.listId': 'lst_2' });
   assert.strictEqual(changed, true);
 
   const written = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
@@ -119,9 +119,9 @@ test('canonical list sanity: no duplicates', () => {
   assert.strictEqual(new Set(CANONICAL_TOP_LEVEL_ORDER).size, CANONICAL_TOP_LEVEL_ORDER.length);
 });
 
-test('loadConfig: an app with no omega.json5 of its own rides the brand file alone', () => {
+test('loadConfig: a target with no omega.json5 of its own rides the brand file alone', () => {
   const { loadConfig } = require('../src/load.js');
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-optional-app-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-optional-target-'));
   fs.mkdirSync(path.join(root, 'config'));
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: "demo", name: "Demo" },
@@ -130,14 +130,14 @@ test('loadConfig: an app with no omega.json5 of its own rides the brand file alo
   },
 }
 `);
-  const appDir = path.join(root, 'apps', 'website');
-  fs.mkdirSync(appDir, { recursive: true });
+  const targetDir = path.join(root, 'targets', 'website');
+  fs.mkdirSync(targetDir, { recursive: true });
 
-  const { config, enabled, files } = loadConfig(appDir, 'web');
+  const { config, enabled, files } = loadConfig(targetDir, 'web');
   assert.strictEqual(config.brand.name, 'Demo', 'brand layer resolves');
   assert.strictEqual(config.theme.id, 'classy', 'brand target overlay resolves');
   assert.strictEqual(enabled, true);
-  assert.strictEqual(files.app, null, 'no app-layer file — and that is fine');
+  assert.strictEqual(files.local, null, 'no local-layer file — and that is fine');
   assert.ok(files.brand.endsWith('config/omega.json5'));
 
   // Standalone (no brand above) still requires its own file

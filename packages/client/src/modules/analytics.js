@@ -38,6 +38,10 @@ const SUPPORTED_RUNTIMES = ['browser-extension', 'electron', 'web'];
 // Raw per-install device id (a plain UUID) — client_id derives from it
 const DEVICE_ID_KEY = '_omega_device_id';
 
+// The GA4 session cache: one id per visit, rolled after 30 minutes of inactivity
+const SESSION_KEY = '_ga_session_id';
+const SESSION_TIMEOUT = 30 * 60 * 1000;
+
 class Analytics {
   constructor(manager) {
     this.manager = manager;
@@ -51,6 +55,7 @@ class Analytics {
     this.projectId = null;
     this.namespace = null;
     this.clientId = null;
+    this.session = null;
     this.userId = null;
     this.userProperties = {};
     this.authed = false;
@@ -64,6 +69,23 @@ class Analytics {
   // Web's transport is the page's own pixels, never the Measurement Protocol
   _isWeb() {
     return this.runtime === 'web';
+  }
+
+  // A popup / options page / sidepanel — a fresh top-level context every open,
+  // which is why the session cache cannot live in sessionStorage here (#412)
+  _isExtension() {
+    return this.runtime === 'browser-extension';
+  }
+
+  // Get extension storage API — the same seam `device` persists through
+  _getExtensionStorage() {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      return chrome.storage.local;
+    }
+    if (typeof browser !== 'undefined' && browser.storage?.local) {
+      return browser.storage.local;
+    }
+    return null;
   }
 
   // Inside desktop's renderer, where the host injected the preload's IPC bridge
@@ -165,13 +187,29 @@ class Analytics {
     // Mark as initialized
     this.initialized = true;
 
+    // An extension's session cache lives in chrome.storage (#412) — the only
+    // storage a popup close does not wipe. That read is async while
+    // `_getSessionId()` must stay synchronous for the payload, so it hydrates
+    // ONCE here into the in-memory mirror the getter reads, and every later
+    // update writes through. Null when there is no extension storage to read.
+    const storage = this._isExtension() ? this._getExtensionStorage() : null;
+    const hydrating = storage ? this._loadSessionFromExtensionStorage(storage) : null;
+
     // Send initial pageview, never on web: the page's own gtag config
     // already fired one and a second would double-count. Nor from a bridged
     // renderer: main fires the launch events for the whole app (app_launch,
     // once per launch), and a per-window page_view here would be its own
     // decision to make, not a side effect of wiring the bridge.
+    //
+    // It waits for the hydrate above, because the launch event of a reopened
+    // popup is exactly the one that must carry the session it is rejoining —
+    // minting a new id here is the bug (#412), not a detail.
     if (!this._isWeb() && !this._isBridged()) {
-      this.event('page_view');
+      if (hydrating) {
+        hydrating.then(() => this.event('page_view'));
+      } else {
+        this.event('page_view');
+      }
     }
   }
 
@@ -327,42 +365,87 @@ class Analytics {
 
   // Get or generate session ID
   _getSessionId() {
-    const storageKey = '_ga_session_id';
-    const sessionTimeout = 30 * 60 * 1000; // 30 minutes
-
-    let sessionData = null;
-    try {
-      sessionData = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-    } catch (e) {
-      // sessionStorage not available
-    }
-
     const now = Date.now();
+    const session = this._readSession();
 
     // Check if session is still valid
-    if (sessionData && (now - sessionData.lastActive) < sessionTimeout) {
-      sessionData.lastActive = now;
-      try {
-        sessionStorage.setItem(storageKey, JSON.stringify(sessionData));
-      } catch (e) {
-        // sessionStorage not available
-      }
-      return sessionData.id;
+    if (session && (now - session.lastActive) < SESSION_TIMEOUT) {
+      this._writeSession({ ...session, lastActive: now });
+      return session.id;
     }
 
     // Create new session
     const newSession = {
-      id: `${Date.now()}`,
+      id: `${now}`,
       lastActive: now,
     };
 
+    this._writeSession(newSession);
+
+    return newSession.id;
+  }
+
+  // The session cache's two backings. An extension reads the in-memory mirror
+  // hydrated at init, since chrome.storage is async and this is not; every
+  // other runtime reads sessionStorage, which outlives nothing but its own
+  // page — exactly what a web session is.
+  _readSession() {
+    if (this._isExtension()) {
+      return this.session;
+    }
+
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify(newSession));
+      return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+    } catch (e) {
+      // sessionStorage not available
+      return null;
+    }
+  }
+
+  _writeSession(session) {
+    if (this._isExtension()) {
+      this.session = session;
+
+      const storage = this._getExtensionStorage();
+      if (storage) {
+        // Write-through, fire and forget: the mirror already carries the value
+        // the event being built is about to send
+        this._saveSessionToExtensionStorage(storage, session);
+      }
+
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     } catch (e) {
       // sessionStorage not available
     }
+  }
 
-    return newSession.id;
+  // Load the session from extension storage (async)
+  async _loadSessionFromExtensionStorage(storage) {
+    try {
+      const result = await storage.get(SESSION_KEY);
+      const stored = result?.[SESSION_KEY];
+
+      // A session minted while this read was in flight belongs to THIS context
+      // and already rode an event — hydrating over it would rewind a sent id
+      if (!this.session && stored && typeof stored === 'object' && stored.id) {
+        this.session = stored;
+      }
+    } catch (e) {
+      logger.warn('Failed to load session from extension storage:', e);
+    }
+  }
+
+  // Save the session to extension storage (async)
+  async _saveSessionToExtensionStorage(storage, session) {
+    try {
+      await storage.set({ [SESSION_KEY]: session });
+    } catch (e) {
+      logger.warn('Failed to save session to extension storage:', e);
+    }
   }
 
   // Set user properties — GA4 wraps each value as { value } — merged into

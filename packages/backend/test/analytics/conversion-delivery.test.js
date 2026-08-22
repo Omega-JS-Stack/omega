@@ -78,7 +78,7 @@ const PURCHASE_PARAMS = {
   value: 9.99,
   currency: 'USD',
   items: [{ item_id: 'premium', item_name: 'Premium', price: 9.99, quantity: 1 }],
-  payment_processor: 'stripe',
+  payment_provider: 'stripe',
   payment_frequency: 'monthly',
   is_trial: false,
   is_recurring: false,
@@ -447,7 +447,7 @@ module.exports = {
 
       async run({ assert, ctx, Manager }) {
         // A typo in a canonical name used to be SILENT: every adapter returned
-        // null, and the fire read exactly like `plan_changed` on Meta — a
+        // null, and the fire read exactly like `subscription_plan_change` on Meta — a
         // deliberate non-mapping. So a webhook could stop reporting revenue and the logs
         // would say nothing was wrong. The outcome is now its own word, and the
         // walk still cannot take the webhook down with it.
@@ -481,12 +481,12 @@ module.exports = {
       async run({ assert, ctx, Manager }) {
         // The catalog maps none of these on Meta or TikTok — an unmapped provider
         // is a decision, and the adapter skips rather than inventing an event.
-        // `trial_lapsed` is the deliberate omission of the exclusion lane below
+        // `trial_lapse` is the deliberate omission of the exclusion lane below
         // ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)): a lapsed
         // trialist is a win-back audience to retarget, not one to hide ads from.
         // The other two are [#407](https://github.com/Omega-JS-Stack/omega/issues/407)'s
         // lifecycle additions, dark to an ad platform because no money moved.
-        for (const event of ['subscription_uncancelled', 'plan_changed', 'trial_lapsed']) {
+        for (const event of ['subscription_uncancel', 'subscription_plan_change', 'trial_lapse']) {
           const results = deliver({ ctx, Manager, event });
 
           assert.equal(descriptorFor(results, 'ga4').name, event, `${event} resolves on GA4 under its own name`);
@@ -508,7 +508,7 @@ module.exports = {
         // each webhook fire that already reaches GA4 now resolves on the two
         // platforms as well — at value ZERO, because a refund carrying its
         // amount would ADD to the return their ads manager reports.
-        for (const [event, native] of [['subscription_cancelled', 'SubscriptionCancelled'], ['refund', 'Refunded']]) {
+        for (const [event, native] of [['subscription_cancel', 'SubscriptionCancel'], ['refund', 'Refund']]) {
           const results = deliver({ ctx, Manager, event });
 
           const google = descriptorFor(results, 'ga4');
@@ -554,7 +554,7 @@ module.exports = {
         const results = deliver({
           ctx,
           Manager,
-          event: 'trial_converted',
+          event: 'trial_convert',
           params: { ...PURCHASE_PARAMS, is_trial: true, is_recurring: false },
         });
 

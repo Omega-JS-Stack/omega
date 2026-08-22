@@ -182,7 +182,7 @@ test('inject: the monorepo root asks for omega:main', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('inject: a backend app with @omega.js/backend only in functions/ still matches', () => {
+test('inject: a backend target with @omega.js/backend only in functions/ still matches', () => {
   const dir = project({ name: 'a-brand', version: '1.0.0' });
   fs.mkdirSync(path.join(dir, 'functions'));
   fs.writeFileSync(

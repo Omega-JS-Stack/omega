@@ -3,7 +3,7 @@
 //   1. CSC_LINK in the environment — an explicit answer always wins.
 //   2. The BRAND's gitignored signing tree:
 //      <brandRoot>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12
-//      The brand root is the nearest directory at or above the app carrying a
+//      The brand root is the nearest directory at or above the target carrying a
 //      `.omega/`. The manager's disperse service also copies this material into
 //      each app's config/certs/; this lookup is the portable/CI path that needs
 //      no dispersal first.
@@ -40,7 +40,7 @@ const OMEGA_DIR = '.omega';
 const CERT_REL = join(OMEGA_DIR, 'certificates', 'apple', 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12');
 
 /**
- * The brand root an app belongs to: the nearest directory at or above it
+ * The brand root a target belongs to: the nearest directory at or above it
  * carrying a `.omega/`. Stops below the home directory.
  *
  * @param {string} from - Directory to start walking up from

@@ -66,8 +66,8 @@ class SetupCommand extends BaseCommand {
   async loadConfig() {
     const self = this.main;
 
-    // Load the .env cascade from the app root (app ← brand ← company; the
-    // staged functions/.env is a copy of the app layer, so this is the same
+    // Load the .env cascade from the target root (local ← brand ← company; the
+    // staged functions/.env is a copy of the local layer, so this is the same
     // resolution the deployed runtime sees)
     require('@omega.js/config').loadEnv(self.firebaseProjectPath);
   }
@@ -86,13 +86,13 @@ class SetupCommand extends BaseCommand {
     // Initial load — returns {} for missing files so scaffold checks can run.
     this.loadFiles();
 
-    // The app manifest lives at the APP ROOT (src/dist pillar): scripts +
+    // The target manifest lives at the TARGET ROOT (src/dist pillar): scripts +
     // runtime deps in one package.json; functions/ is staged output. The CLI
-    // entry normalizes a functions/ cwd up to the app root, so muscle-memory
+    // entry normalizes a functions/ cwd up to the target root, so muscle-memory
     // `cd functions` invocations still land here.
     if (!hasContent(self.package)) {
-      ui.status('fail', `Missing ${chalk.bold('package.json')} at the app root`);
-      ui.note(`Run ${chalk.bold('npx omega setup')} from a backend app root (a package.json with the ${chalk.bold('@omega.js/backend')} dependency).`);
+      ui.status('fail', `Missing ${chalk.bold('package.json')} at the target root`);
+      ui.note(`Run ${chalk.bold('npx omega setup')} from a backend target root (a package.json with the ${chalk.bold('@omega.js/backend')} dependency).`);
       process.exit(1);
     }
 
@@ -209,20 +209,20 @@ class SetupCommand extends BaseCommand {
 
   loadFiles() {
     const self = this.main;
-    // THE app manifest (app root — scripts + runtime deps; the staged
+    // THE target manifest (target root — scripts + runtime deps; the staged
     // functions/package.json derives from it at stage time)
     self.package = loadJSON(`${self.firebaseProjectPath}/package.json`);
     self.firebaseJSON = loadJSON(`${self.firebaseProjectPath}/firebase.json`);
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
-    // App root — where setup-tests/remoteconfig-template-file.js writes it.
+    // Target root — where setup-tests/remoteconfig-template-file.js writes it.
     // The old `functions/` spelling is the pre-src/dist layout and always
     // read {}.
     self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/remoteconfig.template.json`);
     self.projectPackage = self.package;
-    // Resolved through @omega.js/config (app ← brand root, no framework-defaults
+    // Resolved through @omega.js/config (local ← brand root, no framework-defaults
     // layer). Throws on secrets/parse errors (setup IS the audit — hard
     // failures are correct here). The omega-config setup test validates the
-    // resolved config against the shared schema (friction #5). A brand app
+    // resolved config against the shared schema (friction #5). A brand target
     // carries no file of its own — the brand root's config resolves alone.
     self.omegaConfigJSON = (omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
       || omegaConfig.findBrandRoot(self.firebaseProjectPath))
@@ -235,7 +235,7 @@ class SetupCommand extends BaseCommand {
     const self = this.main;
     const ui = this.ui;
 
-    // engines.node on the APP manifest — the stage step carries it into the
+    // engines.node on the TARGET manifest — the stage step carries it into the
     // derived functions/package.json (Cloud Functions runtime detection).
     // Derived from the FRAMEWORK's pinned runtime, never the ambient node:
     // setup must produce the same app under any shell (cp195 journey catch —
@@ -257,15 +257,15 @@ class SetupCommand extends BaseCommand {
     let touched = 0;
 
     // Config FIRST (friction #11: config → derived artifacts, so .firebaserc
-    // below can read cloud.config.projectId). Inside a brand monorepo the app
+    // below can read cloud.config.projectId). Inside a brand monorepo the target
     // carries NO omega.json5 at all — brand `targets.*` is the per-target home
     // (cp121c/cp122) and the stage step composes the runtime file. Standalone
-    // consumers (no brand root above) get the full template at the APP ROOT —
+    // consumers (no brand root above) get the full template at the TARGET ROOT —
     // the same escape hatch every other target uses.
     if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
       && !omegaConfig.findBrandRoot(self.firebaseProjectPath)) {
       jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), `${self.firebaseProjectPath}/config/omega.json5`);
-      ui.status('add', `Created ${chalk.cyan('config/omega.json5')} (standalone app)`, { level: 2 });
+      ui.status('add', `Created ${chalk.cyan('config/omega.json5')} (standalone project)`, { level: 2 });
       touched++;
     }
 
@@ -317,7 +317,7 @@ class SetupCommand extends BaseCommand {
     }
 
     // firestore.rules — the brand's SOURCE half (#255). Seeded HERE, before
-    // the stage below compiles it, so a virgin app's first stage already has a
+    // the stage below compiles it, so a virgin target's first stage already has a
     // real source to splice the framework half into. Migration off a legacy
     // marker block + the hook lint belong to the firestore-rules-file check.
     const firestoreRulesPath = `${self.firebaseProjectPath}/firestore.rules`;

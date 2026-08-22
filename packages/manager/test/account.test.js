@@ -57,7 +57,9 @@ function brandConfig({ account, admins, products, cloud, url } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: url !== undefined ? url : `https://${DOMAIN}` },
     targets: { web: {}, backend: {} },
-    cloud: cloud || { shared: false },
+    // The Firebase web API key comes from config now (#434) — the cloud
+    // service's sdk-config writeback is what puts it there
+    cloud: cloud || { shared: false, config: { apiKey: 'fixture-api-key' } },
     payment: {
       products: products !== undefined ? products : [
         { id: 'basic', name: 'Basic' },
@@ -120,7 +122,7 @@ function convergedClients() {
   };
 }
 
-async function runService(config, { root, auth, firestore, backend, options = {}, seed = SEED, brandState } = {}) {
+async function runService(config, { root, auth, firestore, backend, options = {}, seed = SEED } = {}) {
   const previousSeed = process.env.ACCOUNT_PASSWORD_SEED;
   if (seed === null) {
     delete process.env.ACCOUNT_PASSWORD_SEED;
@@ -133,7 +135,6 @@ async function runService(config, { root, auth, firestore, backend, options = {}
       brandId: 'fixture-brand',
       brandRoot: root || stageBrand(),
       brandConfig: config,
-      brandState: brandState !== undefined ? brandState : { cloud: { sdkConfig: { apiKey: 'fixture-api-key' } } },
       operations: OPERATIONS.account,
       options,
       serviceData: {},
@@ -468,7 +469,8 @@ test('account: creation without a Firebase API key warns and skips the signup ca
   const firestore = fakeFirestore({ getDoc: null, patchDoc: undefined, runQuery: [{ id: 'uid-new', data: {} }] });
   const backend = fakeBackend({});
 
-  const result = await runService(brandConfig(), { auth, firestore, backend, brandState: {} });
+  // No cloud.config.apiKey → password verification and backend calls degrade
+  const result = await runService(brandConfig({ cloud: { shared: false } }), { auth, firestore, backend });
 
   assert.equal(result.status, 'warned');
   assert.equal(backend.of('signup').length, 0);

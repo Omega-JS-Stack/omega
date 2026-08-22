@@ -1,10 +1,10 @@
 /**
  * Root `npm run test:verts` — verts (verts) step 6: the COMPANY-MODE PROOF
- * (docs/web/ads-system.md, sequencing 6: "Paperloom serves, a second in-repo
+ * (docs/web/ads-system.md, sequencing 6: "OMEGA Playground serves, a second in-repo
  * brand consumes"). Runs in root `npm test` between the sandbox e2e and the
  * wizard journey. Fully offline: local emulators only, nothing cloud.
  *
- * Serving side — the playground backend ("Paperloom") boots its real
+ * Serving side — the OMEGA Playground backend boots its real
  * emulator stack (`npx mgr emulator --no-seed`, mirroring the devkit e2e
  * harness) and its Firestore `verts` collection is seeded with a small varied
  * inventory (tags, weights, one whitelist-scoped vert).
@@ -25,7 +25,7 @@
  * company.url), fed to the REAL @omega.js/client singleton (node globals per
  * the client test setup), and the verts module's resolveSource() +
  * VertUnit.buildServeUrl() produce the URL that is then ACTUALLY fetched
- * against the Paperloom emulator — the consumer-resolved request lands on
+ * against the playground emulator — the consumer-resolved request lands on
  * the parent's inventory. In development the api derivation resolves through
  * the provided dev port map (window.__OMEGA_DEV_PORTS__ — the same channel
  * the devkit e2e harness injects); the production derivation
@@ -47,8 +47,8 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'backend');
-const NEWSFLASH_WEBSITE = path.join(ROOT, 'apps', 'newsflash-brand', 'apps', 'website');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const NEWSFLASH_WEBSITE = path.join(ROOT, 'brands', 'newsflash-brand', 'targets', 'website');
 const CLIENT_SRC = path.join(ROOT, 'packages', 'client', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'verts-e2e');
 
@@ -69,14 +69,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // assertion has a deterministic parent (backend serve-suite convention).
 const VERTS = [
   {
-    id: 'paperloom-desk',
+    id: 'playground-kit',
     enabled: true,
-    title: 'The Paperloom Desk Kit',
-    description: 'Everything a quiet writing desk needs.',
+    title: 'The OMEGA Playground Kit',
+    description: 'Everything the demo stack is built on, in one box.',
     button: 'Browse the kit',
-    link: 'https://desk.paperloom-partners.example/kit',
+    link: 'https://kit.omega-playground.example/kit',
     image: '',
-    footer: 'Sponsored by Paperloom Partners',
+    footer: 'Sponsored by OMEGA Playground',
     weight: 5,
     targeting: { sites: [], categories: ['writing'], keywords: ['notes'] },
     whitelist: [],
@@ -202,7 +202,7 @@ async function stopEmulator(child) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('\nAds company-mode e2e (Paperloom serves, The Daily Build consumes)\n');
+  console.log('\nAds company-mode e2e (OMEGA Playground serves, The Daily Build consumes)\n');
 
   let emulator = null;
   let ports = null;
@@ -216,7 +216,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('Paperloom emulator boots (functions, firestore, hosting)', async () => {
+    await step('playground emulator boots (functions, firestore, hosting)', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);
@@ -254,7 +254,7 @@ async function main() {
       return `${VERTS.length} verts (project ${projectId})`;
     });
 
-    // -- 1. Paperloom serves (route level) --------------------------------
+    // -- 1. OMEGA Playground serves (route level) -------------------------
 
     await step('eligible vert serves as the self-contained HTML unit', async () => {
       const response = await fetch(`${base}/omega/verts/serve?parent=${CONSUMER_HOST}&tags=writing,notes`);
@@ -262,17 +262,17 @@ async function main() {
 
       assert.equal(response.status, 200, `serve should 200 (got ${response.status})`);
       assert.match(response.headers.get('content-type') || '', /text\/html/, 'response should be HTML');
-      assert.ok(body.includes('The Paperloom Desk Kit'), 'tag-matched vert title should render');
+      assert.ok(body.includes('The OMEGA Playground Kit'), 'tag-matched vert title should render');
       assert.ok(body.includes('omega-vert:set-dimensions'), 'unit should report dimensions via postMessage');
       assert.ok(body.includes('omega-vert:click'), 'unit should forward clicks via postMessage');
-      assert.ok(body.includes('/omega/verts/redirect?id=paperloom-desk'), 'click link should ride the redirect route');
+      assert.ok(body.includes('/omega/verts/redirect?id=playground-kit'), 'click link should ride the redirect route');
       assert.ok(body.includes('"http://localhost:4100"'), 'postMessage target origin should preserve the dev port');
       assert.ok(!body.includes('<script src') && !body.includes('<link'), 'unit must be self-contained');
       assert.ok(!body.includes('setInterval') && !body.includes('setTimeout'), 'unit must have no self-refresh timers');
     });
 
     await step('contextual scoring beats raw weight (5 of 5 rounds)', async () => {
-      // devnews-digest (weight 1) scores 2 on these tags; paperloom-desk
+      // devnews-digest (weight 1) scores 2 on these tags; playground-kit
       // (weight 5) scores 0 — the top scorer must win every time
       for (let i = 0; i < 5; i++) {
         const response = await fetch(`${base}/omega/verts/serve?parent=${CONSUMER_HOST}&tags=dev-news,ci`);

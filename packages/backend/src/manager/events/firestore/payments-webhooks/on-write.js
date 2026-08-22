@@ -2,7 +2,7 @@ const path = require('path');
 const powertools = require('node-powertools');
 const transitions = require('./transitions/index.js');
 const { trackPayment } = require('./analytics.js');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const { hasAuthUser } = require('../../../libraries/auth-user.js');
 const User = require('../../../helpers/user.js');
 
@@ -10,8 +10,8 @@ const User = require('../../../helpers/user.js');
  * Firestore trigger: payments-webhooks/{eventId} onWrite
  *
  * Processes pending webhook events:
- * 1. Loads the processor library
- * 2. Fetches the latest resource from the processor API (not the stale webhook payload)
+ * 1. Loads the provider library
+ * 2. Fetches the latest resource from the provider API (not the stale webhook payload)
  * 3. Branches on event.category to transform + write:
  *    - subscription → toUnifiedSubscription → users/{uid}.subscription + payments-orders/{orderId}
  *    - one-time    → toUnifiedOneTime → payments-orders/{orderId}
@@ -46,7 +46,7 @@ module.exports = async ({ ctx, change, context }) => {
   let library = null;
 
   try {
-    const processor = dataAfter.processor;
+    const provider = dataAfter.provider;
     let uid = dataAfter.owner;
     const raw = dataAfter.raw;
     const eventType = dataAfter.event?.type;
@@ -54,27 +54,27 @@ module.exports = async ({ ctx, change, context }) => {
     const resourceType = dataAfter.event?.resourceType;
     const resourceId = dataAfter.event?.resourceId;
 
-    ctx.log(`Processing webhook ${eventId}: processor=${processor}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
+    ctx.log(`Processing webhook ${eventId}: provider=${provider}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
 
     // Validate category
     if (!category) {
       throw new Error(`Webhook event has no category — cannot process`);
     }
 
-    // Load the shared library for this processor
+    // Load the shared library for this provider
     try {
-      library = loadProcessor(path.join(__dirname, '../../../libraries/payment/processors'), processor);
+      library = loadProvider(path.join(__dirname, '../../../libraries/payment/providers'), provider);
     } catch (e) {
-      throw new Error(`Unknown processor library: ${processor}`);
+      throw new Error(`Unknown provider library: ${provider}`);
     }
 
-    // Fetch the latest resource from the processor API
+    // Fetch the latest resource from the provider API
     // This ensures we always work with the most current state, not stale webhook data
     const rawFallback = extractRawResource(library, raw) || {};
     const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, ctx, eventType, config: Manager.config });
 
     // A flagged resource is the webhook's own payload, not the API's answer — say which
-    const source = resource._stale ? 'stale-fallback (webhook payload, processor API unreachable)' : 'processor API';
+    const source = resource._stale ? 'stale-fallback (webhook payload, provider API unreachable)' : 'provider API';
 
     // v2 resources spell the field `status`, v1 sale resources spell it `state` —
     // reading only the first reported `status=unknown` on a fetch that plainly
@@ -88,7 +88,7 @@ module.exports = async ({ ctx, change, context }) => {
     // but the parent subscription (fetched via fetchResource) does
     if (!uid && library.getUid) {
       uid = library.getUid(resource);
-      ctx.log(`UID resolved from fetched resource: uid=${uid || 'null'}, processor=${processor}, resourceType=${resourceType}`);
+      ctx.log(`UID resolved from fetched resource: uid=${uid || 'null'}, provider=${provider}, resourceType=${resourceType}`);
 
       // Update the webhook doc with the resolved UID so it's persisted for debugging
       if (uid) {
@@ -130,7 +130,7 @@ module.exports = async ({ ctx, change, context }) => {
     const nowUNIX = powertools.timestamp(now, { output: 'unix' });
     const webhookReceivedUNIX = dataAfter.metadata?.created?.timestampUNIX || nowUNIX;
 
-    // Extract orderId from resource (processor-agnostic)
+    // Extract orderId from resource (provider-agnostic)
     // Falls back to pass_thru_content orderId when meta_data wasn't available on the resource
     orderId = library.getOrderId(resource) || passThruOrderId;
 
@@ -139,7 +139,7 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
+    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
 
     // Mark webhook as completed (include transition name + any refusal for auditing/testing).
     // Both are written on EVERY pass, so a reprocess that now finds its order clears
@@ -176,7 +176,7 @@ module.exports = async ({ ctx, change, context }) => {
 
     // A throw before the orderId was resolved (a fetchResource failure, an
     // unresolvable UID) would otherwise leave the intent pending forever — resolve
-    // it from what IS available: the webhook doc, or the raw payload the processor
+    // it from what IS available: the webhook doc, or the raw payload the provider
     // library can read an orderId out of.
     if (!orderId) {
       orderId = resolveOrderIdAfterFailure({ dataAfter, library, ctx }) || passThruOrderId;
@@ -207,16 +207,16 @@ module.exports = async ({ ctx, change, context }) => {
 /**
  * Read the resource out of a webhook envelope
  *
- * Every processor nests it somewhere else — Stripe at data.object, Chargebee at
+ * Every provider nests it somewhere else — Stripe at data.object, Chargebee at
  * content.<type>, PayPal at resource — so each library names its own shape. Reading
- * Stripe's here degraded every other processor's stale fallback to nothing, and a
+ * Stripe's here degraded every other provider's stale fallback to nothing, and a
  * Chargebee API re-fetch failure threw instead of falling back at all.
  *
  * The Stripe-shaped default below serves the null-library case only (the library
- * failed to load); every processor library, test included, exports extractResource().
+ * failed to load); every provider library, test included, exports extractResource().
  *
- * @param {object|null} library - Processor library (null when loading it was what failed)
- * @param {object} raw - The raw webhook payload the processor sent
+ * @param {object|null} library - Provider library (null when loading it was what failed)
+ * @param {object} raw - The raw webhook payload the provider sent
  * @returns {object|null}
  */
 function extractRawResource(library, raw) {
@@ -232,7 +232,7 @@ function extractRawResource(library, raw) {
  *
  * @param {object} options
  * @param {object} options.dataAfter - The webhook doc's data
- * @param {object|null} options.library - Processor library (null when loading it was what failed)
+ * @param {object|null} options.library - Provider library (null when loading it was what failed)
  * @param {object} options.ctx - Assistant instance
  * @returns {string|null}
  */
@@ -253,7 +253,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
   try {
     return library.getOrderId(rawObject) || null;
   } catch (e) {
-    ctx.error(`resolveOrderIdAfterFailure(): ${dataAfter.processor} getOrderId() threw on the webhook payload: ${e.message}`, e);
+    ctx.error(`resolveOrderIdAfterFailure(): ${dataAfter.provider} getOrderId() threw on the webhook payload: ${e.message}`, e);
     return null;
   }
 }
@@ -272,7 +272,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  *   caller stamps back on the event doc: the transition detected, and the refusal
  *   when the pipeline declined to act on the event at all.
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
+async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
   const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
@@ -293,11 +293,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   } else {
     // The guard keys on the order — without one, an out-of-order delivery cannot be
     // detected at all. Processing continues, but the unguarded window is visible.
-    ctx.warn(`Webhook ${eventId} has no orderId (processor=${processor}, ${resourceType} ${resourceId}) — the staleness guard cannot run, so an out-of-order delivery for this resource would be applied as-is`);
+    ctx.warn(`Webhook ${eventId} has no orderId (provider=${provider}, ${resourceType} ${resourceId}) — the staleness guard cannot run, so an out-of-order delivery for this resource would be applied as-is`);
   }
 
-  // Unified refund details from the processor library (keeps the order record and
-  // the transition handlers processor-agnostic). Every refund path needs them: the
+  // Unified refund details from the provider library (keeps the order record and
+  // the transition handlers provider-agnostic). Every refund path needs them: the
   // subscription email's amount, the one-time refund's record on the order, and
   // the refusal below.
   const isRefund = transitions.REFUND_EVENTS.includes(eventType);
@@ -318,7 +318,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   if (!isSubscription && isRefund && !existingOrder?.unified) {
     return {
       transition: null,
-      refusal: refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId }),
+      refusal: refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, provider, resourceType, resourceId, uid, orderId }),
     };
   }
 
@@ -342,11 +342,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   if (!userDoc.exists && !(await hasAuthUser(admin, uid))) {
     return {
       transition: null,
-      refusal: refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderId }),
+      refusal: refuseUserWithoutAuth({ ctx, eventId, eventType, provider, uid, orderId }),
     };
   }
 
-  // Auto-fill user name from payment processor if not already set
+  // Auto-fill user name from payment provider if not already set
   if (!userData?.personal?.name?.first) {
     const customerName = extractCustomerName(resource, resourceType);
     if (customerName?.first) {
@@ -364,7 +364,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     : library.toUnifiedOneTime(resource, transformOptions);
 
   // Override: immediately suspend on payment denial
-  // Processors keep the sub active while retrying, but we revoke access right away.
+  // Providers keep the sub active while retrying, but we revoke access right away.
   // If the retry succeeds (e.g. PAYMENT.SALE.COMPLETED), it will restore active status.
   // PayPal: PAYMENT.SALE.DENIED, Stripe: invoice.payment_failed, Chargebee: payment_failed
   const PAYMENT_DENIED_EVENTS = ['PAYMENT.SALE.DENIED', 'invoice.payment_failed', 'payment_failed'];
@@ -403,7 +403,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     type: category,
     owner: uid,
     productId: unified.product.id,
-    processor: processor,
+    provider: provider,
     // A refund event names the charge that reversed the payment, never the
     // checkout resource the purchase was made through — keep the purchase's own
     resourceId: isOneTimeRefund ? (existingOrder.resourceId || resourceId) : resourceId,
@@ -413,7 +413,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     // The requester's IP + user agent, captured when the intent was created —
     // what Meta and TikTok match a server conversion to the browsing session on
     // ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)). A webhook's
-    // own request is the PROCESSOR's, never the customer's, so this can only
+    // own request is the PROVIDER's, never the customer's, so this can only
     // come from the intent.
     request: intentData.request || null,
     discount: intentData.discount || null,
@@ -462,7 +462,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // needs the plan it came from, and a trial's outcome is only legible against the prior term
   // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
   if (shouldRunHandlers) {
-    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, processor, ctx });
+    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, provider, ctx });
   }
 
   // A persisted discount belongs to the subscription it was applied to, and to
@@ -629,21 +629,21 @@ function applyRefundToPurchase(purchase, derived, { refundDetails, now, nowUNIX 
  *
  * @param {object} options
  * @param {object} options.ctx - Assistant instance
- * @param {object} options.resource - The refund resource fetched from the processor
+ * @param {object} options.resource - The refund resource fetched from the provider
  * @param {object|null} options.refundDetails - The library's { amount, currency, reason }
- * @param {string} options.eventId - The webhook doc id (the processor's event id)
- * @param {string} options.eventType - The processor's event name
- * @param {string} options.processor - The processor that sent it
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
  * @param {string} options.resourceType - The parsed event's resource type
  * @param {string} options.resourceId - The refund's own id
  * @param {string} options.uid - The owner the event resolved to
  * @param {string|null} options.orderId - The order the refund named, which does not exist
  * @returns {{ reason: string, captureId: string|null }} The refusal stamp for the event doc
  */
-function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, processor, resourceType, resourceId, uid, orderId }) {
+function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, eventType, provider, resourceType, resourceId, uid, orderId }) {
   const captureId = extractParentResourceId(resource);
 
-  ctx.error(`REFUND WITHOUT ORDER: ${eventType} (${processor}) reversed ${resourceType} ${resourceId} but payments-orders/${orderId || 'null'} does not exist — refusing to mint an order from a refund (owner=${uid}, capture=${captureId || 'unknown'}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}). Stamped on payments-webhooks/${eventId} as refusal.reason=refund-without-order: the purchase behind this refund never wrote an order and needs manual reconciliation`);
+  ctx.error(`REFUND WITHOUT ORDER: ${eventType} (${provider}) reversed ${resourceType} ${resourceId} but payments-orders/${orderId || 'null'} does not exist — refusing to mint an order from a refund (owner=${uid}, capture=${captureId || 'unknown'}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}). Stamped on payments-webhooks/${eventId} as refusal.reason=refund-without-order: the purchase behind this refund never wrote an order and needs manual reconciliation`);
 
   return {
     reason: 'refund-without-order',
@@ -655,22 +655,22 @@ function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, event
  * Refuse to create a user doc for a uid this project has no auth user for
  *
  * The event is acknowledged — the route answered 2xx when it stored it, and the
- * doc is completed rather than failed, so the processor stops redelivering an
+ * doc is completed rather than failed, so the provider stops redelivering an
  * event nothing here will ever act on. What a human needs to see it is the
  * warning plus the stamp on the event's own doc, which already carries the
  * payload as delivered ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)).
  *
  * @param {object} options
  * @param {object} options.ctx - Assistant instance
- * @param {string} options.eventId - The webhook doc id (the processor's event id)
- * @param {string} options.eventType - The processor's event name
- * @param {string} options.processor - The processor that sent it
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
  * @param {string} options.uid - The owner the event resolved to
  * @param {string|null} options.orderId - The order the event named, if any
  * @returns {{ reason: string }} The refusal stamp for the event doc
  */
-function refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderId }) {
-  ctx.warn(`USER WITHOUT AUTH: ${eventType} (${processor}) resolved to uid=${uid}, which has no auth user in this project and no user doc — refusing to create one from a payment event (event=${eventId}, order=${orderId || 'null'}). Stamped on payments-webhooks/${eventId} as refusal.reason=user-without-auth: the checkout behind this event belongs to another project, typically a local QA run against the emulator with real test-mode keys`);
+function refuseUserWithoutAuth({ ctx, eventId, eventType, provider, uid, orderId }) {
+  ctx.warn(`USER WITHOUT AUTH: ${eventType} (${provider}) resolved to uid=${uid}, which has no auth user in this project and no user doc — refusing to create one from a payment event (event=${eventId}, order=${orderId || 'null'}). Stamped on payments-webhooks/${eventId} as refusal.reason=user-without-auth: the checkout behind this event belongs to another project, typically a local QA run against the emulator with real test-mode keys`);
 
   // The stamp is the record; this is the alarm. A log line in Cloud Logging is
   // only ever read by someone already looking, and the whole point of the guard
@@ -687,7 +687,7 @@ function refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderI
     level: 'warning',
     tags: {
       refusal: 'user-without-auth',
-      processor: processor,
+      provider: provider,
     },
     user: {
       id: uid,
@@ -697,7 +697,7 @@ function refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderI
       uid: uid,
       eventId: eventId,
       eventType: eventType,
-      processor: processor,
+      provider: provider,
       orderId: orderId || null,
     },
   });
@@ -711,11 +711,11 @@ function refuseUserWithoutAuth({ ctx, eventId, eventType, processor, uid, orderI
  * The id of the resource a refund reversed, read off the payload's `up` link
  *
  * PayPal points a refund at the capture it reversed with a HATEOAS link whose
- * `rel` is `up`, and the id is that URL's last segment. Processors that ship no
+ * `rel` is `up`, and the id is that URL's last segment. Providers that ship no
  * such links answer null, which the refusal stamp carries honestly rather than
  * guessing at a capture.
  *
- * @param {object} resource - The refund resource fetched from the processor
+ * @param {object} resource - The refund resource fetched from the provider
  * @returns {string|null}
  */
 function extractParentResourceId(resource) {
@@ -729,9 +729,9 @@ function extractParentResourceId(resource) {
 }
 
 /**
- * Extract customer name from a raw payment processor resource
+ * Extract customer name from a raw payment provider resource
  *
- * @param {object} resource - Raw processor resource (Stripe subscription, session, invoice)
+ * @param {object} resource - Raw provider resource (Stripe subscription, session, invoice)
  * @param {string} resourceType - 'subscription' | 'session' | 'invoice'
  * @returns {{ first: string, last: string }|null}
  */

@@ -4,12 +4,12 @@
  * Receives cross-provider unsubscribe webhooks (SendGrid + Beehiiv) and:
  *   1. Authenticates via ?key= query param (OMEGA_WEBHOOK_KEY env)
  *   2. Optionally rejects mismatched brand via ?brand= filter
- *   3. Loads the matching processor module from ./processors/{provider}.js
+ *   3. Loads the matching provider module from ./providers/{provider}.js
  *   4. Parses the webhook payload into one or more normalized events
- *   5. For each supported event: dispatch to the processor's handler
+ *   5. For each supported event: dispatch to the provider's handler
  *   6. Returns 200 immediately so the provider doesn't retry
  *
- * Each processor module defines:
+ * Each provider module defines:
  *   - parseWebhook(req)   — returns Array<{ eventId, eventType, email, timestamp, raw, ... }>
  *   - isSupported(parsed) — returns true if this parsed event should be processed
  *   - handleEvent(ctx)    — does the work for one event (user doc + cross-provider sync)
@@ -19,7 +19,7 @@
  * end state with no extra side effects, so duplicate suppression buys nothing.
  */
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
 module.exports = async ({ ctx, Manager }) => {
@@ -49,19 +49,19 @@ module.exports = async ({ ctx, Manager }) => {
     return ctx.respond({ received: true, ignored: true });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    ctx.error(`marketing webhook: failed to load processor "${provider}":`, e);
+    ctx.error(`marketing webhook: failed to load provider "${provider}":`, e);
     return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
   // Parse the webhook body into events
   let events;
   try {
-    events = processorModule.parseWebhook(ctx.ref.req);
+    events = providerModule.parseWebhook(ctx.ref.req);
   } catch (e) {
     ctx.error(`marketing webhook: parse failed for ${provider}:`, e);
     return ctx.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
@@ -78,7 +78,7 @@ module.exports = async ({ ctx, Manager }) => {
   // Use Promise.allSettled so we return success only after all events have been
   // attempted.
   const results = await Promise.allSettled(
-    events.map((event) => processOneEvent({ Manager, ctx, provider, event, processorModule }))
+    events.map((event) => processOneEvent({ Manager, ctx, provider, event, providerModule }))
   );
 
   let processed = 0;
@@ -100,20 +100,20 @@ module.exports = async ({ ctx, Manager }) => {
 };
 
 /**
- * Process a single event: support check, then dispatch to the processor's handler.
+ * Process a single event: support check, then dispatch to the provider's handler.
  * Handlers are idempotent, so provider retries re-run safely with no dedup ledger.
  * Returns { processed: bool, skipped?: string, error?: any }.
  */
-async function processOneEvent({ Manager, ctx, provider, event, processorModule }) {
+async function processOneEvent({ Manager, ctx, provider, event, providerModule }) {
   const { eventType } = event;
 
   // Filter by supported event types
-  if (processorModule.isSupported && !processorModule.isSupported(event)) {
+  if (providerModule.isSupported && !providerModule.isSupported(event)) {
     return { processed: false, skipped: 'unsupported-event-type' };
   }
 
   try {
-    await processorModule.handleEvent({ Manager, ctx, parsed: event });
+    await providerModule.handleEvent({ Manager, ctx, parsed: event });
     return { processed: true };
   } catch (e) {
     ctx.error(`marketing webhook: handler failed for ${provider} event ${event.eventId} (${eventType}):`, e);

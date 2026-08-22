@@ -4,7 +4,7 @@ One shared implementation (`@omega.js/devkit/update`) behind every framework's `
 
 ## The report (default — no flags)
 
-For each dependency of the app's `package.json` (prod + dev, grouped):
+For each dependency of the target's `package.json` (prod + dev, grouped):
 
 | Column | Meaning |
 |---|---|
@@ -30,7 +30,7 @@ Only rows needing attention print; a fully-current tree reports one line. Rows s
 
 ## Brand root
 
-`omega update` at a brand root (manager) fans out over the brand's apps — cp251's deploy fan-out shape: same app discovery, same `--only <target|dir>` / `--except` filter, every other flag forwarded verbatim, each app answering through its own framework's `update` verb. Unlike deploy, apps are **independent**: one failing app never blocks the rest (any failure still exits 1). The brand-root shell `package.json` is not scanned — apps own their deps.
+`omega update` at a brand root (manager) fans out over the brand's targets — cp251's deploy fan-out shape: same target discovery, same `--only <target|dir>` / `--except` filter, every other flag forwarded verbatim, each target answering through its own framework's `update` verb. Unlike deploy, targets are **independent**: one failing target never blocks the rest (any failure still exits 1). The brand-root shell `package.json` is not scanned — targets own their deps.
 
 ## Testing
 

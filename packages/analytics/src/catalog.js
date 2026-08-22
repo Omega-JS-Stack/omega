@@ -124,7 +124,7 @@ function ga4Recurring(params) {
 }
 
 // The canonical commerce param contract, shared by every money event.
-const COMMERCE_PARAMS = ['transaction_id', 'value', 'currency', 'items', 'is_trial', 'is_recurring', 'payment_processor', 'payment_frequency'];
+const COMMERCE_PARAMS = ['transaction_id', 'value', 'currency', 'items', 'is_trial', 'is_recurring', 'payment_provider', 'payment_frequency'];
 
 // A plan change is the one money event with a BEFORE: `items` is the plan the
 // subscriber moved to, and these carry the one they came from, so the direction
@@ -288,12 +288,12 @@ const CATALOG = {
     },
   },
 
-  start_trial: {
+  trial_start: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
-      // GA4 has no start_trial in its standard set — an explicit custom event.
-      ga4: { name: 'start_trial', kind: 'custom' },
+      // GA4 has no trial_start in its standard set — an explicit custom event.
+      ga4: { name: 'trial_start', kind: 'custom' },
       meta: { name: 'StartTrial', kind: 'standard', map: metaCommerce },
       tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
     },
@@ -309,7 +309,7 @@ const CATALOG = {
   // is still countable on its own. The ad platforms already heard
   // `StartTrial`/`Subscribe` at trial start, and this is that subscription
   // starting to pay — their own standard Subscribe.
-  trial_converted: {
+  trial_convert: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
@@ -325,63 +325,63 @@ const CATALOG = {
   // lapsed trialist is a win-back audience worth RETARGETING, not somebody to
   // stop showing ads to. An ad platform optimizes toward conversions, so the
   // failure itself buys nothing either.
-  trial_lapsed: {
+  trial_lapse: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
-      ga4: { name: 'trial_lapsed', kind: 'custom' },
+      ga4: { name: 'trial_lapse', kind: 'custom' },
     },
   },
 
   // GA4's own refund event, fired by the payment webhook's refund transitions.
-  // The ad platforms hear a zero-value custom `Refunded` — an audience to stop
+  // The ad platforms hear a zero-value custom `Refund` — an audience to stop
   // paying to reach, and the one thing they can do with a churn moment.
   refund: {
     params: ['transaction_id', 'value', 'currency', 'items'],
     placement: 'server',
     providers: {
       ga4: { name: 'refund', kind: 'standard' },
-      meta: { name: 'Refunded', kind: 'custom', map: metaAudienceSignal },
-      tiktok: { name: 'Refunded', kind: 'custom', map: tiktokAudienceSignal },
+      meta: { name: 'Refund', kind: 'custom', map: metaAudienceSignal },
+      tiktok: { name: 'Refund', kind: 'custom', map: tiktokAudienceSignal },
     },
   },
 
   // The cancellation that TOOK EFFECT. Cancellation-REQUESTED stays event-less by
   // design: a schedule changed, nothing ended, no money moved, and the
   // subscription may never cancel at all.
-  subscription_cancelled: {
+  subscription_cancel: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
-      ga4: { name: 'subscription_cancelled', kind: 'custom' },
-      meta: { name: 'SubscriptionCancelled', kind: 'custom', map: metaAudienceSignal },
-      tiktok: { name: 'SubscriptionCancelled', kind: 'custom', map: tiktokAudienceSignal },
+      ga4: { name: 'subscription_cancel', kind: 'custom' },
+      meta: { name: 'SubscriptionCancel', kind: 'custom', map: metaAudienceSignal },
+      tiktok: { name: 'SubscriptionCancel', kind: 'custom', map: tiktokAudienceSignal },
     },
   },
 
   // The uncancel — a scheduled cancellation withdrawn. The request had no event
   // to be the pair of, which is the point: a retention win is an outcome, and it
   // was completely dark before [#407].
-  subscription_uncancelled: {
+  subscription_uncancel: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
-      ga4: { name: 'subscription_uncancelled', kind: 'custom' },
+      ga4: { name: 'subscription_uncancel', kind: 'custom' },
     },
   },
 
   // An upgrade or downgrade between two paid plans. GA4-only: no money moves at
   // the switch itself, and firing a platform's Subscribe here would count a
   // second subscription for a customer who already has one.
-  plan_changed: {
+  subscription_plan_change: {
     params: PLAN_CHANGE_PARAMS,
     placement: 'server',
     providers: {
-      ga4: { name: 'plan_changed', kind: 'custom' },
+      ga4: { name: 'subscription_plan_change', kind: 'custom' },
     },
   },
 
-  subscription_renewed: {
+  subscription_renew: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
@@ -445,11 +445,11 @@ const CATALOG = {
     },
   },
 
-  feedback_submitted: {
+  feedback_submit: {
     params: ['feedback_rating'],
     placement: 'client',
     providers: {
-      ga4: { name: 'feedback_submitted', kind: 'custom' },
+      ga4: { name: 'feedback_submit', kind: 'custom' },
       meta: { name: 'SubmitApplication', kind: 'standard' },
       tiktok: { name: 'SubmitForm', kind: 'standard' },
     },
@@ -466,11 +466,11 @@ const CATALOG = {
   },
 
   // The prompt half of the review pair — ours to read, no ad signal in it.
-  review_prompt_shown: {
+  review_prompt_show: {
     params: ['review_url'],
     placement: 'client',
     providers: {
-      ga4: { name: 'review_prompt_shown', kind: 'custom' },
+      ga4: { name: 'review_prompt_show', kind: 'custom' },
     },
   },
 
@@ -506,11 +506,11 @@ const CATALOG = {
     },
   },
 
-  newsletter_signup: {
+  marketing_newsletter_subscribe: {
     params: ['method'],
     placement: 'client',
     providers: {
-      ga4: { name: 'newsletter_signup', kind: 'custom' },
+      ga4: { name: 'marketing_newsletter_subscribe', kind: 'custom' },
       meta: { name: 'Lead', kind: 'standard' },
       tiktok: { name: 'Subscribe', kind: 'standard' },
     },
@@ -605,79 +605,79 @@ const CATALOG = {
   // Action buckets: one event with an `action`/`section_name` param, never a
   // per-action event sprawl (the inventory ruling).
 
-  account_section_view: {
+  user_section_view: {
     params: ['section_name'],
     placement: 'client',
     providers: {
-      ga4: { name: 'account_section_view', kind: 'custom' },
+      ga4: { name: 'user_section_view', kind: 'custom' },
     },
   },
 
-  billing_action: {
+  user_billing_action: {
     params: ['action'],
     placement: 'client',
     providers: {
-      ga4: { name: 'billing_action', kind: 'custom' },
+      ga4: { name: 'user_billing_action', kind: 'custom' },
     },
   },
 
-  refund_action: {
+  user_refund_request: {
     params: ['action'],
     placement: 'client',
     providers: {
-      ga4: { name: 'refund_action', kind: 'custom' },
+      ga4: { name: 'user_refund_request', kind: 'custom' },
     },
   },
 
-  data_request: {
+  user_data_request: {
     params: ['action'],
     placement: 'client',
     providers: {
-      ga4: { name: 'data_request', kind: 'custom' },
+      ga4: { name: 'user_data_request', kind: 'custom' },
     },
   },
 
-  email_subscribe: {
+  marketing_email_subscribe: {
     params: ['content_type'],
     placement: 'client',
     providers: {
-      ga4: { name: 'email_subscribe', kind: 'custom' },
+      ga4: { name: 'marketing_email_subscribe', kind: 'custom' },
       meta: { name: 'EmailSubscribe', kind: 'custom' },
     },
   },
 
-  email_unsubscribe: {
+  marketing_email_unsubscribe: {
     params: ['content_type'],
     placement: 'client',
     providers: {
-      ga4: { name: 'email_unsubscribe', kind: 'custom' },
+      ga4: { name: 'marketing_email_unsubscribe', kind: 'custom' },
       meta: { name: 'EmailUnsubscribe', kind: 'custom' },
     },
   },
 
   // ─── Notifications ───
 
-  notification_permission_requested: {
+  notification_permission_request: {
     params: [],
     placement: 'client',
     providers: {
-      ga4: { name: 'notification_permission_requested', kind: 'custom' },
+      ga4: { name: 'notification_permission_request', kind: 'custom' },
     },
   },
 
-  notification_permission_granted: {
+  notification_permission_grant: {
     params: [],
     placement: 'client',
     providers: {
-      ga4: { name: 'notification_permission_granted', kind: 'custom' },
+      ga4: { name: 'notification_permission_grant', kind: 'custom' },
     },
   },
 
-  notification_permission_denied: {
+  notification_permission_deny: {
     params: [],
     placement: 'client',
     providers: {
-      ga4: { name: 'notification_permission_denied', kind: 'custom' },
+      ga4: { name: 'notification_permission_deny', kind: 'custom' },
     },
   },
 

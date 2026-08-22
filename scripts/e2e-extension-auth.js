@@ -9,11 +9,11 @@
  * from node.
  *
  * Proof, in order:
- *   1. The Paperloom extension app BUILDS (real gulp pipeline) as a TESTING
+ *   1. The playground extension app BUILDS (real gulp pipeline) as a TESTING
  *      build — `omega.environment: 'testing'`, which is what makes the SW's
  *      Firebase auth talk to the local auth emulator and getApiUrl() resolve
  *      to the local hosting emulator.
- *   2. The Paperloom backend emulator boots (auth + functions + hosting).
+ *   2. The playground backend emulator boots (auth + functions + hosting).
  *   3. A real user signs up against the AUTH emulator and a custom token is
  *      minted for it at POST /omega/user/token (the node-side setup).
  *   4. Chrome loads the built extension unpacked. A tab lands on the brand host
@@ -54,8 +54,8 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'backend');
-const EXTENSION_APP = path.join(ROOT, 'apps', 'omega-playground', 'apps', 'extension');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const EXTENSION_APP = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'extension');
 const PACKAGED_DIR = path.join(EXTENSION_APP, 'packaged', 'chromium', 'raw');
 const LOG_DIR = path.join(ROOT, '.temp', 'extension-auth-e2e');
 const EXTENSION_DIR = path.join(LOG_DIR, 'extension');
@@ -242,7 +242,7 @@ async function main() {
 
     let buildConfig = null;
 
-    await step('the Paperloom extension builds as a TESTING build', async () => {
+    await step('the playground extension builds as a TESTING build', async () => {
       await buildExtension();
 
       const manifestPath = path.join(PACKAGED_DIR, 'manifest.json');
@@ -277,7 +277,7 @@ async function main() {
       return path.relative(ROOT, EXTENSION_DIR);
     });
 
-    await step('Paperloom emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting)', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);

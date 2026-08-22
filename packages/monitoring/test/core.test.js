@@ -16,6 +16,10 @@ const core = require('../src/core.js');
 
 const DSN = 'https://key@o1.ingest.sentry.io/1';
 
+// A `monitoring` role section carrying these Sentry settings (#425): the knobs
+// hang off the provider, so every resolveConfig fixture goes through here.
+const section = (settings) => ({ providers: { sentry: settings } });
+
 // A stack-frame event shaped the way the SDK builds one.
 function eventWithFrames(...filenames) {
   return { exception: { values: [{ stacktrace: { frames: filenames.map((filename) => ({ filename })) } }] } };
@@ -28,7 +32,17 @@ test('core touches no host global — it is safe inside a page bundle', () => {
 });
 
 test('no dsn = fully off, whatever the gates say', () => {
-  for (const section of [undefined, {}, { provider: 'sentry' }, { dsn: '' }, { dsn: null }]) {
+  const sections = [
+    undefined,
+    {},
+    { providers: {} },
+    { providers: { sentry: false } },          // deliberately disabled (#425)
+    { providers: { sentry: {} } },
+    { providers: { sentry: { dsn: '' } } },
+    { providers: { sentry: { dsn: null } } },
+    { enabled: true, dsn: DSN },               // the RETIRED flat shape reads as nothing
+  ];
+  for (const section of sections) {
     const result = core.resolveConfig(section, { isProduction: true });
     assert.strictEqual(result.shouldEnable, false, `${JSON.stringify(section)} stays off`);
     assert.match(result.reason, /dsn/);
@@ -36,34 +50,35 @@ test('no dsn = fully off, whatever the gates say', () => {
 });
 
 test('a kill switch beats a perfectly good config', () => {
-  const result = core.resolveConfig({ dsn: DSN }, { isProduction: true, killed: true, killedReason: 'test run' });
+  const result = core.resolveConfig(section({ dsn: DSN }), { isProduction: true, killed: true, killedReason: 'test run' });
   assert.strictEqual(result.shouldEnable, false);
   assert.strictEqual(result.reason, 'test run');
 });
 
 test('a non-production run stays off unless the host allows dev', () => {
-  const off = core.resolveConfig({ dsn: DSN }, { isProduction: false });
+  const off = core.resolveConfig(section({ dsn: DSN }), { isProduction: false });
   assert.strictEqual(off.shouldEnable, false);
   assert.match(off.reason, /production/);
 
-  const on = core.resolveConfig({ dsn: DSN }, { isProduction: false, allowInDev: true });
+  const on = core.resolveConfig(section({ dsn: DSN }), { isProduction: false, allowInDev: true });
   assert.strictEqual(on.shouldEnable, true);
   assert.strictEqual(on.options.environment, 'development', 'a dev-allowed run tags itself development');
 });
 
-test('a production run resolves the init options, with the role discriminator stripped', () => {
-  const result = core.resolveConfig({ provider: 'sentry', dsn: DSN, sampleRate: 0.25 }, { isProduction: true });
+test('a production run resolves the init options out of the provider block (#425)', () => {
+  const result = core.resolveConfig({ enabled: true, providers: { sentry: { dsn: DSN, sampleRate: 0.25 } } }, { isProduction: true });
   assert.strictEqual(result.shouldEnable, true);
   assert.strictEqual(result.reason, null);
   assert.strictEqual(result.options.dsn, DSN);
   assert.strictEqual(result.options.environment, 'production');
   assert.strictEqual(result.options.sampleRate, 0.25, 'the sampling knob overrides the default');
   assert.strictEqual(result.options.tracesSampleRate, core.DEFAULTS.tracesSampleRate);
-  assert.strictEqual(result.options.provider, undefined, 'provider never reaches Sentry.init');
+  assert.strictEqual(result.options.enabled, undefined, 'the role level never reaches Sentry.init');
+  assert.strictEqual(result.options.providers, undefined, 'the providers block never reaches Sentry.init');
 });
 
 test('an explicit environment survives the gate that would have named it', () => {
-  const result = core.resolveConfig({ dsn: DSN, environment: 'staging' }, { isProduction: true });
+  const result = core.resolveConfig(section({ dsn: DSN, environment: 'staging' }), { isProduction: true });
   assert.strictEqual(result.options.environment, 'staging');
 });
 

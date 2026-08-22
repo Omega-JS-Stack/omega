@@ -10,7 +10,7 @@ class ServeCommand extends BaseCommand {
     const self = this.main;
     const projectDir = self.firebaseProjectPath;
 
-    // The backend's dev loop → <appRoot>/logs/dev.log (#197). A SUPERSET of the
+    // The backend's dev loop → <targetRoot>/logs/dev.log (#197). A SUPERSET of the
     // firebase CHILD's dist/dev.log wired further down: our own output (port
     // allocation, proxy, watcher) PLUS every child chunk, because we mirror the
     // child to our stdout and this tee catches it there. dist/dev.log is the

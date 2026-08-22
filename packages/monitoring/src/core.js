@@ -8,8 +8,9 @@
  * of that seam.
  *
  * Policy it owns, once for every target:
- *   - config resolution from omega.json5's `monitoring` role section, DSN
- *     presence being the enable signal (no separate `enabled` flag — matches
+ *   - config resolution from omega.json5's `monitoring` role section — the
+ *     settings live under `monitoring.providers.sentry` (#425) and DSN presence
+ *     is the enable signal (no separate `enabled` flag — matches
  *     @omega.js/backend convention: a config block's credentials are its switch)
  *   - the release tag, from the host's own version identity
  *   - user normalization with the email SCRUBBED BY DEFAULT (the uid stays —
@@ -42,10 +43,24 @@ function disabled(options, reason) {
 }
 
 /**
+ * The Sentry settings inside a `monitoring` role section (#425). The role level
+ * carries only `enabled`; every SDK-facing key hangs off the provider, so this
+ * is the one place that knows the nesting. `{ sentry: false }` (deliberately
+ * disabled) and a missing block both resolve to nothing — no dsn, no boot.
+ *
+ * @param {object} [section] - the `monitoring` config block (target-resolved)
+ * @returns {object} the provider's settings, or {} when there are none
+ */
+function providerOptions(section) {
+  const settings = section && section.providers && section.providers.sentry;
+  return settings && typeof settings === 'object' ? settings : {};
+}
+
+/**
  * Resolve the runtime config and decide whether reporting should boot.
  *
- * Reads omega.json5's `monitoring` role section; the `provider` discriminator is
- * stripped so the remaining keys feed the SDK's init directly.
+ * Reads omega.json5's `monitoring` role section: the SDK-facing keys come from
+ * `monitoring.providers.sentry`, so the resolved options feed init directly.
  *
  * @param {object} section - the `monitoring` config block (target-resolved)
  * @param {object} [gates] - the host's environment signals
@@ -58,8 +73,7 @@ function disabled(options, reason) {
 function resolveConfig(section, gates) {
   gates = gates || {};
 
-  const options = { ...DEFAULTS, ...(section || {}) };
-  delete options.provider;
+  const options = { ...DEFAULTS, ...providerOptions(section) };
 
   if (gates.killed) {
     return disabled(options, gates.killedReason || 'disabled by the host');
@@ -81,7 +95,7 @@ function resolveConfig(section, gates) {
 /**
  * Normalize a @omega.js/client / firebase / admin user into the minimal shape
  * the SDK wants. The email is PII: it rides ONLY when the host explicitly opts
- * in with `monitoring.scrubEmail: false`.
+ * in with `monitoring.providers.sentry.scrubEmail: false`.
  *
  * @param {object} user - a user-ish object carrying uid/id and maybe email
  * @param {object} [options] - the resolved monitoring options
@@ -157,6 +171,7 @@ function createBundleFilter(patterns) {
 
 module.exports = {
   DEFAULTS,
+  providerOptions,
   resolveConfig,
   normalizeUser,
   releaseTag,

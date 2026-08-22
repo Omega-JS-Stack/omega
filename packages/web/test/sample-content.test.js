@@ -104,25 +104,25 @@ test('a shifted anchor rolls every date uniformly — order, slugs, bodies untou
 });
 
 test('reconcileSampleContent: materialize, self-gitignore, step aside per collection, idempotent', () => {
-  const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sample-app-'));
-  const consumerDir = path.join(appRoot, 'src');
+  const targetRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sample-app-'));
+  const consumerDir = path.join(targetRoot, 'src');
   fs.mkdirSync(consumerDir, { recursive: true });
   try {
-    const first = reconcileSampleContent({ appRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
-    const root = path.join(appRoot, '.omega', 'sample-content');
+    const first = reconcileSampleContent({ targetRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
+    const root = path.join(targetRoot, '.omega', 'sample-content');
     assert.strictEqual(first.root, root);
     assert.strictEqual(first.written.length, 19, 'all three sets materialize (11 posts + 4 team + 4 updates)');
     assert.strictEqual(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), '*\n', 'self-.gitignore makes the tree uncommittable');
     assert.deepStrictEqual(fs.readdirSync(path.join(root, '_posts')).sort(), authoredNames('sample-posts'), 'epoch anchor materializes authored names');
 
     // Idempotent: same inputs → same tree, same accounting
-    const second = reconcileSampleContent({ appRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
+    const second = reconcileSampleContent({ targetRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
     assert.deepStrictEqual(second.written, first.written, 'rerun rewrites the same set');
 
     // The consumer takes over posts → the posts dir is removed, others stay
     fs.mkdirSync(path.join(consumerDir, '_posts'));
     fs.writeFileSync(path.join(consumerDir, '_posts', 'real.md'), '---\ntitle: Real\n---\nReal.\n');
-    const third = reconcileSampleContent({ appRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
+    const third = reconcileSampleContent({ targetRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
     assert.deepStrictEqual(third.removed, ['_posts'], 'owned collection reported removed');
     assert.ok(!fs.existsSync(path.join(root, '_posts')), 'owned collection leaves the tree');
     assert.ok(fs.existsSync(path.join(root, '_team')), 'unowned collections stay');
@@ -132,10 +132,10 @@ test('reconcileSampleContent: materialize, self-gitignore, step aside per collec
       fs.mkdirSync(path.join(consumerDir, dir));
       fs.writeFileSync(path.join(consumerDir, dir, 'real.md'), '---\ntitle: Real\n---\nReal.\n');
     }
-    reconcileSampleContent({ appRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
+    reconcileSampleContent({ targetRoot, consumerDir, defaultsDir: PATHS.defaults, anchor: EPOCH_DAY });
     assert.ok(!fs.existsSync(root), 'nothing to materialize → no .omega/sample-content at all');
   } finally {
-    fs.rmSync(appRoot, { recursive: true, force: true });
+    fs.rmSync(targetRoot, { recursive: true, force: true });
   }
 });
 

@@ -1,7 +1,7 @@
 /**
  * The per-brand deploy record — `deploy.<target>` in `.omega/state.json`
  * (the brand's durable derived-state file; gitignored, per-machine).
- * Multi-instance targets key per app: the primary stays `deploy.<target>`,
+ * Multi-instance targets key per target: the primary stays `deploy.<target>`,
  * other instances record under `deploy.<target>:<id>` (see deployKey).
  *
  * Written by every framework's deploy verb on success; read by the
@@ -25,7 +25,7 @@ function stateFile(dir) {
  * Record key for a target's instance (multi-instance targets): the primary
  * keeps today's bare target key (zero breaking change — existing records
  * stay valid); any other instance keys `<target>:<id>`, matching the
- * per-app deploy model (each app deploys its own instance).
+ * per-target deploy model (each target deploys its own instance).
  * @param {string} target - Target key (web/backend/desktop/extension)
  * @param {string} [instance] - Instance id ('main' or absent = the primary)
  * @returns {string} The deploy-record key
@@ -82,10 +82,10 @@ function withStateLock(file, fn) {
  * Record a successful deploy for a target.
  *
  * @param {Object} options
- * @param {string} options.dir - Any directory inside the brand (app or root)
+ * @param {string} options.dir - Any directory inside the brand (target or root)
  * @param {string} options.target - Target key (web/backend/desktop/extension)
  * @param {string} [options.instance] - Instance id; non-main instances record
- *   under their own `<target>:<id>` key (per-app deploy records)
+ *   under their own `<target>:<id>` key (per-target deploy records)
  * @param {Object} [options.detail] - Extra fields (method, adopted, …)
  * @returns {Object} The written record
  */

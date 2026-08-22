@@ -91,7 +91,7 @@ function paidAccount(subscription) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
@@ -104,7 +104,7 @@ function trialingAccount() {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
     },
@@ -112,7 +112,7 @@ function trialingAccount() {
 }
 
 /**
- * A paid cancel the save offer cannot be made to: no processor details for the
+ * A paid cancel the save offer cannot be made to: no provider details for the
  * apply route to reach ([#311]). Paid, active, cancellable, and the state the
  * flow used to say nothing at all to.
  */

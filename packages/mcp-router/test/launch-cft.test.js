@@ -98,9 +98,9 @@ test('the base argv drives an isolated throwaway Chrome at the found executable'
 });
 
 test('OMEGA_EXTENSION_PATH adds the load-extension pair', () => {
-  const args = buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/brand/apps/extension/dist' });
+  const args = buildArgs('/cft/chrome', { OMEGA_EXTENSION_PATH: '/brand/targets/extension/dist' });
   assert.deepEqual(args.slice(-3), [
-    '--chromeArg=--load-extension=/brand/apps/extension/dist',
+    '--chromeArg=--load-extension=/brand/targets/extension/dist',
     '--ignoreDefaultChromeArg=--disable-extensions',
     '--categoryExtensions',
   ]);

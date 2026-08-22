@@ -19,10 +19,10 @@ module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
 
-  // Inside a brand monorepo the app's CI lives in the BRAND ROOT's workflows
-  // dir under a per-app name (#265) — dispatch what setup actually composed.
+  // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
+  // dir under a per-target name (#265) — dispatch what setup actually composed.
   const WORKFLOW = composedWorkflowName({
-    appDir: process.cwd(),
+    targetDir: process.cwd(),
     brandRoot: resolveSeedMode(process.cwd()).brandRoot,
     workflow: 'publish.yml',
   });

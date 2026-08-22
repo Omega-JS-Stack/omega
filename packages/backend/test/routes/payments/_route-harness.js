@@ -8,7 +8,7 @@
  * stand-in — the external sink respond() writes to, per the no-mock doctrine.
  *
  * Direct calls are the honest layer for these cases: they let one test choose a
- * processor and a subscription shape without minting a persona per permutation,
+ * provider and a subscription shape without minting a persona per permutation,
  * and they can run two handlers CONCURRENTLY in one process, which is the only
  * way to prove a same-instant duplicate delivery.
  *
@@ -59,7 +59,7 @@ function buildUser(Manager, doc) {
 
 /**
  * Run the thunk with `vars` applied to process.env (null deletes), restoring
- * every key afterwards. The route/processor code reads the environment live on
+ * every key afterwards. The route/provider code reads the environment live on
  * every call, so swapping it is the real switch.
  *
  * @param {object} vars - { NAME: 'value' | null }

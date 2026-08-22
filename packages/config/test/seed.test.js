@@ -1,6 +1,6 @@
 /**
  * Layer-aware seeding tests — the seed-mode resolution the four framework
- * setups branch on (friction #1: a brand app scaffolds NO app-layer config).
+ * setups branch on (friction #1: a brand target scaffolds NO local-layer config).
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -22,21 +22,21 @@ function makeFixture(name, files) {
   return root;
 }
 
-test('resolveSeedMode: brand app → brand mode; standalone dir → standalone; functions/ normalizes', (t) => {
+test('resolveSeedMode: brand target → brand mode; standalone dir → standalone; functions/ normalizes', (t) => {
   const root = makeFixture('seed-mode', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
-    'brand/apps/site/package.json': '{}',
-    'brand/apps/backend/functions/package.json': '{}',
+    'brand/targets/site/package.json': '{}',
+    'brand/targets/backend/functions/package.json': '{}',
     'standalone/package.json': '{}',
   });
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   const brandRoot = path.join(root, 'brand');
 
-  const inBrand = resolveSeedMode(path.join(brandRoot, 'apps', 'site'));
+  const inBrand = resolveSeedMode(path.join(brandRoot, 'targets', 'site'));
   assert.deepStrictEqual(inBrand, { standalone: false, brandRoot });
 
-  const fromFunctions = resolveSeedMode(path.join(brandRoot, 'apps', 'backend', 'functions'));
+  const fromFunctions = resolveSeedMode(path.join(brandRoot, 'targets', 'backend', 'functions'));
   assert.deepStrictEqual(fromFunctions, { standalone: false, brandRoot });
 
   const standalone = resolveSeedMode(path.join(root, 'standalone'));

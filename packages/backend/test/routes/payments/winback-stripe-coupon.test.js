@@ -1,9 +1,9 @@
 /**
- * Test: what the Stripe winback processor asks Stripe to do with the save offer
+ * Test: what the Stripe winback provider asks Stripe to do with the save offer
  * ([#268](https://github.com/Omega-JS-Stack/omega/issues/268)).
  *
  * The route suite proves the guards and the claim; this proves the one call that
- * actually discounts somebody's next invoice. Stripe is the only real processor
+ * actually discounts somebody's next invoice. Stripe is the only real provider
  * that applies the offer, and it does it by attaching a coupon to a LIVE
  * subscription — a coupon id derived from the offer, and an update whose
  * `discounts` array REPLACES whatever discounts the subscription already had.
@@ -17,15 +17,15 @@
  *
  * Run: npx omega test framework:routes/payments/winback-stripe-coupon
  */
-const StripeLib = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const stripeWinback = require('../../../src/manager/routes/payments/winback/processors/stripe.js');
+const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const stripeWinback = require('../../../src/manager/routes/payments/winback/providers/stripe.js');
 const winback = require('../../../src/manager/libraries/payment/winback.js');
 
 const UID = '_test-winback-coupon-uid';
 const RESOURCE_ID = 'sub_test_winback_coupon';
 
 /**
- * The ctx a processor receives. `Manager` is the runner's REAL one — the coupon
+ * The ctx a provider receives. `Manager` is the runner's REAL one — the coupon
  * builder reads the brand's currency off its resolved config.
  */
 function buildCtx(Manager) {
@@ -84,7 +84,7 @@ async function applyOffer(Manager, discount) {
   await withStripeSdk(sdkCapturing(captured), () => stripeWinback.applyOffer({
     resourceId: RESOURCE_ID,
     uid: UID,
-    subscription: { product: { id: 'premium' }, payment: { processor: 'stripe', resourceId: RESOURCE_ID } },
+    subscription: { product: { id: 'premium' }, payment: { provider: 'stripe', resourceId: RESOURCE_ID } },
     discount: discount,
     ctx: buildCtx(Manager),
   }));

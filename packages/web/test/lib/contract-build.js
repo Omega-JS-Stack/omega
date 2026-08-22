@@ -18,8 +18,8 @@ const { fork } = require('node:child_process');
 const PKG = path.resolve(__dirname, '..', '..');
 const ROOT = path.resolve(PKG, '..', '..');
 const SITE = path.join(PKG, 'test', 'fixtures', 'contract-site');
-// The fixture app's own package version — what `omega build`/`omega dev` read
-// from the app root's package.json and hand to buildSite. It rides into the
+// The fixture target's own package version — what `omega build`/`omega dev` read
+// from the target root's package.json and hand to buildSite. It rides into the
 // Configuration block as `version` (the client's release-tag half, #380).
 const FIXTURE_VERSION = '7.7.7';
 

@@ -2,17 +2,17 @@
  * omega-bin — the context-aware dispatcher behind every framework's `omega`/`omg` bin.
  *
  * Problem: every OMEGA framework ships the same bin names (`omega`, `omg`, `mgr`).
- * In a brand monorepo with several apps, npm hoists all of them to the brand root
+ * In a brand monorepo with several targets, npm hoists all of them to the brand root
  * and only ONE framework's file wins the node_modules/.bin link — so the bin that
  * actually runs is arbitrary. This module makes any winner correct: it resolves
  * the context that owns the CALLER'S cwd — nearest first, walking up — and runs
  * THAT context's CLI:
  *
- *   - an APP (nearest package.json declaring a framework, including the
+ *   - a TARGET (nearest package.json declaring a framework, including the
  *     backend's functions/ layout) → that framework's CLI
  *   - a BRAND ROOT (config/omega.json5 with no framework declared nearer)
  *     → @omega.js/manager's CLI, so `omega test` at a brand root fans out
- *     over the brand's apps instead of guessing one framework
+ *     over the brand's targets instead of guessing one framework
  *
  * Contract: every dispatch target exposes `exports['./cli']` → a module with
  * `run()` that parses process.argv itself. Framework bin shims call
@@ -36,12 +36,12 @@ const FRAMEWORKS = [
 
 const MANAGER = '@omega.js/manager';
 
-// Dirs that are a VIEW of the app one level up, never a context of their own:
+// Dirs that are a VIEW of the target one level up, never a context of their own:
 // a backend's runtime cwd (functions/) and its staged build output (dist/,
 // which carries a COMPOSED config/omega.json5 that would otherwise read as a
-// brand root). Stdlib twin of @omega.js/config's APP_SUBDIRS — that module is
+// brand root). Stdlib twin of @omega.js/config's TARGET_SUBDIRS — that module is
 // the canonical list ([#307](https://github.com/Omega-JS-Stack/omega/issues/307)).
-const APP_SUBDIRS = ['functions', 'dist'];
+const TARGET_SUBDIRS = ['functions', 'dist'];
 
 function readPackage(dir) {
   try {
@@ -59,21 +59,21 @@ function frameworksOf(pkg) {
 
 /**
  * Is `dir` a brand-monorepo root? Carries a config/omega.json5 that is not
- * itself an APP_SUBDIR view (functions/, dist/) and not an APP of a brand above
- * it (directly under an apps/ dir whose parent also carries a brand config).
+ * itself a TARGET_SUBDIR view (functions/, dist/) and not a TARGET of a brand above
+ * it (directly under a targets/ dir whose parent also carries a brand config).
  * Stdlib twin of @omega.js/config's resolveBrandRoot rule — that module is the
  * canonical definition; this copy exists because the dispatcher cannot depend
  * on @omega.js/config.
  */
 function isBrandRoot(dir) {
-  if (APP_SUBDIRS.includes(path.basename(path.resolve(dir)))) return false;
+  if (TARGET_SUBDIRS.includes(path.basename(path.resolve(dir)))) return false;
   if (!fs.existsSync(path.join(dir, 'config', 'omega.json5'))) return false;
 
   const parent = path.dirname(dir);
-  const isAppOfBrand = path.basename(parent) === 'apps'
+  const isTargetOfBrand = path.basename(parent) === 'targets'
     && fs.existsSync(path.join(path.dirname(parent), 'config', 'omega.json5'));
 
-  return !isAppOfBrand;
+  return !isTargetOfBrand;
 }
 
 /**
@@ -81,8 +81,8 @@ function isBrandRoot(dir) {
  * order: the dir's own package.json declaring a framework, then
  * brand-root-ness. Framework checks come first so a standalone consumer
  * (framework dep AND its own config/omega.json5 in one dir) dispatches as
- * an app, not a brand. The CLI entry normalizes a functions/ cwd up to the
- * app root (muscle-memory `cd functions` still works).
+ * a target, not a brand. The CLI entry normalizes a functions/ cwd up to the
+ * target root (muscle-memory `cd functions` still works).
  *
  * The walk is BOUNDED at the nearest `.git` (that directory is still checked
  * first): past the repo boundary is somebody else's tree, never this dir's
@@ -98,7 +98,7 @@ function findTarget(startDir) {
   while (true) {
     const matches = frameworksOf(readPackage(dir));
     if (matches.length > 1) {
-      // Apps are one-framework-per-app by design — a multi-framework
+      // Targets are one-framework-per-target by design — a multi-framework
       // manifest dispatches by FRAMEWORKS order, which must never be silent.
       console.error(`omega: ${dir} declares ${matches.length} frameworks (${matches.join(', ')}) — dispatching ${matches[0]}`);
     }
@@ -152,18 +152,18 @@ async function run({ hostName, hostRun }) {
   // like the pre-dispatcher bins did, and say which one so a hoist-winner at a
   // brand root is never a silent mystery.
   if (!target) {
-    console.error(`omega: no app context found from ${process.cwd()} — running ${hostName}`);
+    console.error(`omega: no target context found from ${process.cwd()} — running ${hostName}`);
     return hostRun();
   }
 
   // A brand root — the manager owns brand-level commands (`omega test` fans
-  // out over apps/*). Resolve it from the brand root and hand over.
+  // out over targets/*). Resolve it from the brand root and hand over.
   if (target.kind === 'brand') {
     const { cliPath } = tryResolveCli(MANAGER, target.dir);
 
     // Brand-SHAPED is not always a brand: `omega setup` scaffolds
-    // config/omega.json5 into a standalone app before its framework dep lands
-    // in package.json, so the walk classifies a fresh app as a brand root. With
+    // config/omega.json5 into a standalone project before its framework dep lands
+    // in package.json, so the walk classifies a fresh target as a brand root. With
     // no manager installed there is no brand-level CLI to hand over to — fall
     // back to the host framework rather than dead-ending (#194). A real brand
     // root still dispatches to the manager the moment it exists.
@@ -181,16 +181,16 @@ async function run({ hostName, hostRun }) {
     return require(cliPath).run();
   }
 
-  // The bin that won npm's .bin link belongs to this app's framework — run it directly.
+  // The bin that won npm's .bin link belongs to this target's framework — run it directly.
   if (target.name === hostName) {
     return hostRun();
   }
 
-  // The app belongs to a DIFFERENT framework — resolve its CLI from where the
+  // The target belongs to a DIFFERENT framework — resolve its CLI from where the
   // dependency is declared and hand over.
   const cliPath = resolveCli(target.name, target.dir,
     'Is the framework installed? Try npm install, or `mgr i local` for a monorepo link.');
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, APP_SUBDIRS, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, isBrandRoot, TARGET_SUBDIRS, FRAMEWORKS, MANAGER };

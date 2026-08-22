@@ -2,11 +2,11 @@
  * Test: Payment Journey - Trial
  * Simulates: basic user → trial activation via test intent → trial ends → active paid
  *
- * Uses the test processor for initial trial, then manual webhook for trial-to-active
+ * Uses the test provider for initial trial, then manual webhook for trial-to-active
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
 module.exports = {
-  description: 'Payment journey: basic → trial → active paid via test processor',
+  description: 'Payment journey: basic → trial → active paid via test provider',
   type: 'suite',
   timeout: 30000,
 
@@ -21,7 +21,7 @@ module.exports = {
         assert.equal(userDoc.subscription?.product?.id, 'basic', 'Should start as basic');
         assert.equal(userDoc.subscription?.trial?.claimed, false, 'Trial should not be claimed');
 
-        // Resolve first paid product WITH a trial from config. The test processor
+        // Resolve first paid product WITH a trial from config. The test provider
         // only creates a trialing subscription when product.trial.days > 0, so a
         // brand whose paid products all have trial.days: 0 (e.g. trials disabled)
         // has nothing to exercise here — skip the journey. This is a config-gap,
@@ -41,7 +41,7 @@ module.exports = {
       name: 'create-trial-intent',
       async run({ http, assert, state }) {
         const response = await http.as('journey-payments-trial').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,
           trial: true,
@@ -122,7 +122,7 @@ module.exports = {
 
         state.eventId2 = `_test-evt-journey-trial-active-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId2,
           type: 'customer.subscription.updated',
           data: {

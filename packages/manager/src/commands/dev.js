@@ -1,7 +1,7 @@
 /**
  * `omega dev` (brand root) — ONE command boots the local stack: the website
  * dev server AND the backend emulator suite together, each spawned in its
- * own app with its own Node (web/backend pin different majors), output
+ * own target with its own Node (web/backend pin different majors), output
  * line-prefixed per target, one Ctrl-C killing everything.
  *
  * Target selection (Ian 2026-07-16): the default set is web + backend — the
@@ -34,10 +34,10 @@ const { freshnessSweep } = require('@omega.js/devkit/local');
 
 // Local
 const { runManage } = require('../manage.js');
-const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
-const { resolveAppNode, nodeEnvFor } = require('../lib/node-version.js');
+const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
+const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
 
-// Target → the npm leg that IS local dev for that app
+// Target → the npm leg that IS local dev for that target
 const DEV_LEGS = {
   web: ['npm', 'run', 'start'], // omega dev — watch + serve (:4000)
   backend: ['npm', 'run', 'emulator'], // omega emulator — FULL suite + seeded personas
@@ -51,7 +51,7 @@ const DEFAULT_TARGETS = ['web', 'backend'];
 /**
  * Pure target selection — which legs boot for a given flag set.
  * @param {object} input
- * @param {string[]} input.available - targets that have an app in this brand
+ * @param {string[]} input.available - targets that have a dir in this brand
  * @param {string} [input.only] - comma list: exact set to boot
  * @param {string} [input.except] - comma list: subtract from the set
  * @param {boolean} [input.all] - start every target with a dev leg
@@ -132,9 +132,9 @@ module.exports = async (options = {}) => {
   // with it, and the two are read for different questions (#231).
   attachLogFile(path.join(brandRoot, 'logs', 'dev.log'));
 
-  const apps = discoverApps(brandRoot).filter((app) => app.target && DEV_LEGS[app.target]);
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target && DEV_LEGS[entry.target]);
   const { selected, unknown, missing } = selectDevTargets({
-    available: apps.map((app) => app.target),
+    available: targets.map((entry) => entry.target),
     only: options.only,
     except: options.except,
     all: options.all,
@@ -144,11 +144,11 @@ module.exports = async (options = {}) => {
     console.log(chalk.yellow(`⊘ unknown dev target "${target}" (know: ${Object.keys(DEV_LEGS).join(', ')})`));
   });
   missing.forEach((target) => {
-    console.log(chalk.yellow(`⊘ ${target}: no app in this brand — skipped`));
+    console.log(chalk.yellow(`⊘ ${target}: no dir in this brand — skipped`));
   });
 
   if (selected.length === 0) {
-    console.error(chalk.red('✖ omega dev: nothing to boot (no selected target has an app here)'));
+    console.error(chalk.red('✖ omega dev: nothing to boot (no selected target has a dir here)'));
     process.exit(1);
   }
 
@@ -166,8 +166,8 @@ module.exports = async (options = {}) => {
   // lane's own check is a no-op.
   const hosts = [];
   for (const target of selected) {
-    const app = apps.find((entry) => entry.target === target);
-    const found = findTarget(app.path);
+    const entry = targets.find((item) => item.target === target);
+    const found = findTarget(entry.path);
     if (found && found.kind === 'framework') {
       hosts.push({ packageName: found.name, fromDir: found.dir });
     }
@@ -187,9 +187,9 @@ module.exports = async (options = {}) => {
     throw new Error(`omega dev: ${sweep.healFailed.map((entry) => entry.packageName).join(', ')} — see above; nothing booted`);
   }
 
-  // Boot opens with a full manage cycle (#44): the app watchers see only
-  // their own app, so brand-level sources — assets/logo/brandmark.svg, .env,
-  // certs — reach the apps ONLY through the service walk. Without this, a
+  // Boot opens with a full manage cycle (#44): the target watchers see only
+  // their own target, so brand-level sources — assets/logo/brandmark.svg, .env,
+  // certs — reach the targets ONLY through the service walk. Without this, a
   // brand edit sits invisible until someone remembers to run `npm run manage`.
   // A broken brand fails the boot instead of serving stale output.
   // …and it never blocks on a human (#228): the boot walk runs headless, so
@@ -243,17 +243,17 @@ module.exports = async (options = {}) => {
   };
 
   for (const target of selected) {
-    const app = apps.find((entry) => entry.target === target);
+    const entry = targets.find((item) => item.target === target);
     const leg = DEV_LEGS[target];
-    const node = resolveAppNode(app.path);
+    const node = resolveTargetNode(entry.path);
     if (node?.error) {
       console.log(chalk.yellow(`   ⚠ ${target}: ${node.error} — using the inherited node`));
     }
 
-    console.log(chalk.dim(`   ${target.padEnd(pad)} → ${leg.join(' ')} in ${app.dir}${node ? ` (node ${node.major})` : ''}`));
+    console.log(chalk.dim(`   ${target.padEnd(pad)} → ${leg.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
 
     const child = spawn(leg[0], leg.slice(1), {
-      cwd: app.path,
+      cwd: entry.path,
       stdio: ['ignore', 'pipe', 'pipe'],
       // Legs pipe their output — keep chalk colors when the parent's terminal
       // has them (the log tee strips ANSI either way)

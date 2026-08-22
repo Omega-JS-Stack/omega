@@ -555,3 +555,69 @@ describe('Analytics rides the shared catalog (#328 stage E)', () => {
     }
   });
 });
+
+describe('Analytics session id in an extension context (#412)', () => {
+
+  it('a reopened popup rejoins the live session, and rotates after 30 idle minutes', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    // chrome.storage.local survives a popup close; sessionStorage does not —
+    // that difference IS the bug, so the stub keeps one store for the whole test
+    const store = {};
+    global.chrome = {
+      storage: {
+        local: {
+          get: async (key) => (key in store ? { [key]: store[key] } : {}),
+          set: async (entries) => { Object.assign(store, entries); },
+        },
+      },
+    };
+
+    const bodies = [];
+    const realFetch = global.fetch;
+    global.fetch = (url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return Promise.resolve({ ok: true });
+    };
+
+    // Every open is a fresh top-level context: a new client, an empty
+    // sessionStorage, and the launch page_view fired once the cache has loaded
+    const openPopup = async () => {
+      global.sessionStorage.clear();
+
+      const popup = new Analytics({
+        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        isDevelopment: () => false,
+      });
+      popup.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      return popup;
+    };
+
+    try {
+      const first = await openPopup();
+      const firstId = first._getSessionId();
+      assert.ok(store._ga_session_id, 'the session cache lands in chrome.storage, not sessionStorage');
+      assert.strictEqual(sessionStorage.getItem('_ga_session_id'), null, 'an extension never writes the storage a popup close wipes');
+
+      // Reopened seconds later — same session, because GA4 counts one visit
+      const second = await openPopup();
+      assert.strictEqual(second._getSessionId(), firstId, 'a reopened popup rejoins the session it left');
+
+      const launch = bodies.at(-1);
+      assert.strictEqual(launch.events[0].name, 'page_view', 'the reopen fires its launch page_view');
+      assert.strictEqual(launch.events[0].params.session_id, firstId, 'and it rides the SAME session id');
+
+      // 31 minutes idle: GA4's window has closed, so the next open is a new visit
+      store._ga_session_id = { ...store._ga_session_id, lastActive: Date.now() - (31 * 60 * 1000) };
+
+      const third = await openPopup();
+      assert.notStrictEqual(third._getSessionId(), firstId, 'a session idle past 30 minutes rotates');
+    } finally {
+      global.fetch = realFetch;
+      global.sessionStorage.clear();
+      delete global.chrome;
+    }
+  });
+});

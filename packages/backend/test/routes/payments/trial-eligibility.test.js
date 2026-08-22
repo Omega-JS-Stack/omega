@@ -35,7 +35,7 @@ module.exports = {
         const orderDocPath = `payments-orders/_test-trial-eligibility-${uid}`;
 
         // Create fake subscription order history
-        await firestore.set(orderDocPath, { owner: uid, type: 'subscription', processor: 'test', status: 'cancelled' });
+        await firestore.set(orderDocPath, { owner: uid, type: 'subscription', provider: 'test', status: 'cancelled' });
 
         try {
           const response = await http.as('basic').get('backend-manager/payments/trial-eligibility');
@@ -55,7 +55,7 @@ module.exports = {
         const orderDocPath = `payments-orders/_test-trial-eligibility-onetime-${uid}`;
 
         // Create a non-subscription order (one-time purchase)
-        await firestore.set(orderDocPath, { owner: uid, type: 'one-time', processor: 'test', status: 'completed' });
+        await firestore.set(orderDocPath, { owner: uid, type: 'one-time', provider: 'test', status: 'completed' });
 
         try {
           const response = await http.as('basic').get('backend-manager/payments/trial-eligibility');

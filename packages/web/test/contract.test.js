@@ -170,10 +170,11 @@ test('#380: omega.json5 `monitoring` reaches the client as its sentry contract',
     const config = new Function(`return ${source[1]}`)();
     assert.strictEqual(config.sentry.enabled, true, `${theme}: a configured DSN is the enable signal`);
     assert.strictEqual(config.sentry.config.dsn, 'https://key@o1.ingest.sentry.io/1', `${theme}: the DSN rides`);
-    assert.strictEqual(config.sentry.config.provider, 'sentry', `${theme}: the raw role block rides — @omega.js/monitoring strips the discriminator`);
+    assert.strictEqual(config.sentry.config.org, 'contract-org', `${theme}: the whole sentry PROVIDER block rides (#425), never the role level around it`);
+    assert.strictEqual(config.sentry.config.providers, undefined, `${theme}: and the providers wrapper never does`);
     // The release tag's version half: the WEBSITE APP's own package version, so
     // every host tags `brand.id@version` instead of falling back to buildTime.
-    assert.strictEqual(config.version, FIXTURE_VERSION, `${theme}: the app's own version rides the Configuration block`);
+    assert.strictEqual(config.version, FIXTURE_VERSION, `${theme}: the target's own version rides the Configuration block`);
   }
 });
 

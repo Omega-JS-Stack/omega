@@ -2,8 +2,8 @@
  * The `.env` → GitHub Actions secrets pair (#189), UJM's setup capability
  * rebuilt on the OMEGA cascade:
  *
- *   1. COLLECT — every key in the app's resolved `.env` cascade
- *      (shell > app .env > brand .env > company .env, D15), filtered exactly
+ *   1. COLLECT — every key in the target's resolved `.env` cascade
+ *      (shell > local .env > brand .env > company .env, D15), filtered exactly
  *      the way UJM's `publishSecrets()` filtered (see FILTER below).
  *   2. PUBLISH — each collected key becomes a repo Actions secret, via
  *      devkit's `gh` boundary (values on stdin, never logged).
@@ -78,27 +78,27 @@ function parseEnvFile(contents) {
 }
 
 /**
- * Collect the publishable secrets for an app from its `.env` cascade.
+ * Collect the publishable secrets for a target from its `.env` cascade.
  *
  * Precedence is the cascade's (`@omega.js/config`): strongest layer with a
- * NON-EMPTY value wins — app .env over brand .env over company .env — and the
+ * NON-EMPTY value wins — local .env over brand .env over company .env — and the
  * shell overrides any of them for a key the files declare. A key that exists
  * only in the shell is never collected: `.env` names the key set, the cascade
  * supplies the value (D15).
  *
  * @param {object} options
- * @param {string} options.appDir - The app root (its .env is the app layer)
+ * @param {string} options.targetDir - The target root (its .env is the local layer)
  * @param {object} [options.env] - Shell env map (default: process.env)
  * @returns {Object<string, string>} key → value, ready to publish
  */
 function collectEnvSecrets(options) {
   options = options || {};
-  const chain = resolveEnvChain(options.appDir);
+  const chain = resolveEnvChain(options.targetDir);
   const env = options.env || process.env;
 
   const secrets = {};
   // Weakest first, so a stronger layer's value overwrites.
-  for (const envPath of [chain.company, chain.brand, chain.app]) {
+  for (const envPath of [chain.company, chain.brand, chain.local]) {
     if (!envPath || !fs.existsSync(envPath)) continue;
     Object.assign(secrets, parseEnvFile(fs.readFileSync(envPath, 'utf8')));
   }
@@ -135,13 +135,13 @@ function renderSecretsBlock(keys) {
  * falling back to brand.id). Null when the config declares nothing usable or
  * doesn't load.
  *
- * @param {string} appDir - The app root
+ * @param {string} targetDir - The target root
  * @returns {string|null}
  */
-function declaredBrandRepo(appDir) {
+function declaredBrandRepo(targetDir) {
   try {
     const { loadConfig, brandRepoOwner, brandRepoName } = require('@omega.js/config');
-    const { config } = loadConfig(appDir, 'web');
+    const { config } = loadConfig(targetDir, 'web');
     if (!config) return null;
 
     const owner = brandRepoOwner(config);
@@ -153,7 +153,7 @@ function declaredBrandRepo(appDir) {
 }
 
 /**
- * The `omega setup` step: publish the app's collected `.env` values as repo
+ * The `omega setup` step: publish the target's collected `.env` values as repo
  * Actions secrets. Skips LOUDLY (a log line, never silence) when there is
  * nothing to publish, no GitHub remote, the enclosing checkout is not the
  * brand's own repo, or the run is CI itself.
@@ -162,7 +162,7 @@ function declaredBrandRepo(appDir) {
  * (install, `gh auth login`, or `omega setup --no-secrets`).
  *
  * @param {object} options
- * @param {string} options.appDir - The app root
+ * @param {string} options.targetDir - The target root
  * @param {object} options.logger - `{ log, warn, error }`
  * @param {object} [options.env] - Env map (default: process.env)
  * @param {function} [options.execFn] - Injectable `gh` exec (tests)
@@ -171,7 +171,7 @@ function declaredBrandRepo(appDir) {
  */
 function publishEnvSecrets(options) {
   options = options || {};
-  const { appDir, logger } = options;
+  const { targetDir, logger } = options;
   const env = options.env || process.env;
 
   // CI runs `npx omega setup` as its build step (the scaffolded workflow) —
@@ -181,7 +181,7 @@ function publishEnvSecrets(options) {
     return { skipped: 'ci' };
   }
 
-  const secrets = collectEnvSecrets({ appDir, env });
+  const secrets = collectEnvSecrets({ targetDir, env });
   const keys = Object.keys(secrets);
   if (!keys.length) {
     logger.warn('Skipping secret publication — no .env values found in the cascade (app/brand/company)');
@@ -190,7 +190,7 @@ function publishEnvSecrets(options) {
 
   let repo;
   try {
-    const { owner, repo: name } = resolveRepo({ cwd: appDir, execFn: options.gitExecFn });
+    const { owner, repo: name } = resolveRepo({ cwd: targetDir, execFn: options.gitExecFn });
     repo = `${owner}/${name}`;
   } catch (e) {
     logger.warn(`Skipping secret publication — no GitHub remote here (${e.message})`);
@@ -199,12 +199,12 @@ function publishEnvSecrets(options) {
 
   // Secrets belong to the repo whose Actions run the workflow — and the ONLY
   // acceptable proof of which repo that is, is the brand's own config
-  // (repo.providers.github). An inferred git remote is not proof: an app
+  // (repo.providers.github). An inferred git remote is not proof: a target
   // vendored into a framework/test monorepo, a cloned starter whose origin
   // still points at the template author, or any fork would publish this
   // brand's .env to a stranger's Actions. The legacy this ports from took an
   // explicit target too, never an inferred remote.
-  const declared = declaredBrandRepo(appDir);
+  const declared = declaredBrandRepo(targetDir);
   if (!declared) {
     logger.warn('Skipping secret publication — this brand names no GitHub repo in config (repo.providers.github). Set it, then re-run setup.');
     return { skipped: 'no-declared-repo' };

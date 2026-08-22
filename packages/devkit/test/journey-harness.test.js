@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { JourneyRun, scrubCredentialEnv, latestRunFile, discoverBrandApps } = require('../src/test/journey-harness.js');
+const { JourneyRun, scrubCredentialEnv, latestRunFile, discoverBrandTargets } = require('../src/test/journey-harness.js');
 
 /** A run bound to a throwaway log dir — no brand, no children, just the recorder. */
 function runInTempLogDir() {
@@ -68,18 +68,18 @@ test('latestRunFile picks the newest .omega/runs entry; null without one', () =>
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('discoverBrandApps returns package.json-bearing apps in journey order', () => {
+test('discoverBrandTargets returns package.json-bearing target dirs in journey order', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'journey-unit-'));
-  assert.deepEqual(discoverBrandApps(root), []); // no apps/ at all
+  assert.deepEqual(discoverBrandTargets(root), []); // no targets/ at all
 
   for (const name of ['extension', 'backend', 'website', 'desktop', 'website-docs']) {
-    fs.mkdirSync(path.join(root, 'apps', name), { recursive: true });
-    fs.writeFileSync(path.join(root, 'apps', name, 'package.json'), '{}');
+    fs.mkdirSync(path.join(root, 'targets', name), { recursive: true });
+    fs.writeFileSync(path.join(root, 'targets', name, 'package.json'), '{}');
   }
-  fs.mkdirSync(path.join(root, 'apps', 'no-manifest')); // skipped: no package.json
+  fs.mkdirSync(path.join(root, 'targets', 'no-manifest')); // skipped: no package.json
 
   assert.deepEqual(
-    discoverBrandApps(root).map((dir) => path.basename(dir)),
+    discoverBrandTargets(root).map((dir) => path.basename(dir)),
     ['website', 'backend', 'desktop', 'extension', 'website-docs'],
   );
 

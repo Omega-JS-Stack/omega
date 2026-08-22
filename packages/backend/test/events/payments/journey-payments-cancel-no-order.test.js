@@ -2,12 +2,12 @@
  * Test: Payment Journey - Cancel with no order doc ([#210](https://github.com/Omega-JS-Stack/omega/issues/210))
  * Simulates: paid active WITHOUT an order doc → POST /payments/cancel → cancellation pending
  *
- * The cancel test processor resolved the plan's product from the payments-orders doc only,
+ * The cancel test provider resolved the plan's product from the payments-orders doc only,
  * so a paid user with no order got a webhook carrying plan.product = null — the pipeline
  * resolved that to Basic and downgraded the user mid-cancel instead of scheduling the
  * cancellation. The product falls back to the subscription's own product.
  *
- * The cancel-no-order persona is seeded paid on the test processor with payment.orderId null.
+ * The cancel-no-order persona is seeded paid on the test provider with payment.orderId null.
  * Product-agnostic: the persona's 'premium' is remapped to the brand's first paid product at
  * seed time, and the assertions compare against whatever the user doc starts with.
  */
@@ -29,7 +29,7 @@ module.exports = {
         assert.notEqual(userDoc.subscription?.product?.id, 'basic', 'Persona should start on a paid product');
         assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
         assert.equal(userDoc.subscription?.cancellation?.pending, false, 'Should not be pending cancellation');
-        assert.equal(userDoc.subscription?.payment?.processor, 'test', 'Should be on the test processor');
+        assert.equal(userDoc.subscription?.payment?.provider, 'test', 'Should be on the test provider');
         assert.equal(userDoc.subscription?.payment?.orderId, null, 'The bug scenario needs no order doc');
 
         state.paidProductId = userDoc.subscription.product.id;
@@ -39,7 +39,7 @@ module.exports = {
     {
       name: 'call-cancel-endpoint',
       async run({ http, assert }) {
-        // The test processor writes a payments-webhooks doc directly, triggering the
+        // The test provider writes a payments-webhooks doc directly, triggering the
         // on-write pipeline automatically — no manual webhook needed.
         const response = await http.as('cancel-no-order').post('backend-manager/payments/cancel', {
           confirmed: true,

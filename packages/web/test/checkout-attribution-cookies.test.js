@@ -82,7 +82,7 @@ async function createIntent({ cookie = '', attribution = STORED_ATTRIBUTION } = 
     }),
     request: async (url, options) => {
       requests.push({ url, options });
-      return { url: 'https://processor.test/checkout/abc' };
+      return { url: 'https://provider.test/checkout/abc' };
     },
   };
 
@@ -93,7 +93,7 @@ async function createIntent({ cookie = '', attribution = STORED_ATTRIBUTION } = 
 
   await api.createPaymentIntent({
     state: { product: { id: 'premium' }, frequency: 'monthly', trialEligible: false },
-    processor: 'stripe',
+    provider: 'stripe',
     formData: {},
   });
 

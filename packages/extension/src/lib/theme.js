@@ -15,7 +15,7 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-// The extension's default theme — the fallback, and what an app with no
+// The extension's default theme — the fallback, and what a target with no
 // theme.id builds with.
 const DEFAULT_THEME_ID = 'classy';
 

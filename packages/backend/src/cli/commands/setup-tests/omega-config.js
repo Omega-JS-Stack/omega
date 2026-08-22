@@ -4,8 +4,8 @@ const chalk = require('chalk').default;
 const path = require('path');
 const { loadConfig, hasOmegaConfig, findBrandRoot } = require('@omega.js/config');
 
-// The framework template seeds STANDALONE consumers at the app root; brand
-// apps carry NO app-layer file at all — brand `targets.*` is the per-target
+// The framework template seeds STANDALONE consumers at the target root; brand
+// targets carry NO local-layer file at all — brand `targets.*` is the per-target
 // home and the stage step composes the runtime file (src/dist pillar).
 const TEMPLATES_DIR = path.resolve(__dirname, '../../../../templates');
 
@@ -16,17 +16,17 @@ class OmegaConfigTest extends BaseTest {
 
   /**
    * The shared schema is the required-key oracle (dogfood friction #5): the
-   * RESOLVED config (app ← brand root ← defaults, targets overlaid) must load
+   * RESOLVED config (local ← brand root ← defaults, targets overlaid) must load
    * and validate. The template stopped being a requirements list — its every
    * leaf demanded keys (brand.address, brand.images, …) the canonical schema
-   * calls optional, and a brand app resolves shared sections from the brand
+   * calls optional, and a brand target resolves shared sections from the brand
    * root that a raw file walk can never see.
    */
   async run() {
-    // A brand app legitimately has no file of its own — the brand root's
+    // A brand target legitimately has no file of its own — the brand root's
     // omega.json5 is the config (loadConfig rides it alone since cp121c)
     if (!hasOmegaConfig(this.self.firebaseProjectPath) && !findBrandRoot(this.self.firebaseProjectPath)) {
-      this.errors = ['config/omega.json5 is missing (standalone apps carry config/omega.json5 at the app root)'];
+      this.errors = ['config/omega.json5 is missing (standalone projects carry config/omega.json5 at the target root)'];
       return false;
     }
 
@@ -43,8 +43,8 @@ class OmegaConfigTest extends BaseTest {
   async fix() {
     const ui = require('../../utils/ui');
 
-    // STANDALONE app with a missing/empty config → seed the full template at
-    // the app root (the same escape hatch every target uses). Brand apps have
+    // STANDALONE project with a missing/empty config → seed the full template at
+    // the target root (the same escape hatch every target uses). Brand targets have
     // nothing to seed — their config IS the brand file.
     if (!this.context.hasContent(this.self.omegaConfigJSON)
       && !findBrandRoot(this.self.firebaseProjectPath)) {
@@ -61,7 +61,7 @@ class OmegaConfigTest extends BaseTest {
       }
     }
 
-    ui.note(`Fix ${chalk.bold('config/omega.json5')} — the resolved config (app ← brand root) fails the shared schema:`, 3);
+    ui.note(`Fix ${chalk.bold('config/omega.json5')} — the resolved config (local ← brand root) fails the shared schema:`, 3);
     for (const message of this.errors) {
       console.log(`${ui.indent(4)}${chalk.red('•')} ${message}`);
     }

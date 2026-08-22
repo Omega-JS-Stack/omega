@@ -167,6 +167,8 @@ Per-brand subusers provide full contact/segment/field isolation under one billin
 
 ## Contact Pruning
 
+**Pruning is OPT-IN, and this is the one place that default lives** ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)): nothing runs unless the brand sets `marketing.prune.enabled: true`. Any other shape — no `marketing` block, a `marketing` block with no `prune` key, `prune: {}`, `enabled: false` — logs the skip and deletes nothing. A framework that deletes a consumer's contacts unless told not to is the wrong default; the per-provider safety floors below reduce that blast radius, they do not remove it.
+
 `cron/daily/marketing-prune.js` — runs 1st of each month. Pruning is strictly PER-PROVIDER: each provider's own engagement decides that provider's removals, so a reader who opens every newsletter but ignores offer mail is never deleted from the newsletter on a SendGrid-only signal ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)). Three stages:
 1. **Re-engagement**: send email to `engagement_inactive_5m` (excluding `engagement_inactive_6m`). Each provider resolves the segment key against its own engagement tracking.
 2. **Prune (SendGrid)**: export `engagement_inactive_6m` contacts, bulk delete from SendGrid only. Never prunes paying customers: the `subscription_paid` segment is excluded from the delete list.
@@ -232,13 +234,16 @@ Existing classic-shape templates (`clean`, `editorial`) share their schema via `
 
 Set `TEST_EXTENDED_MODE=1` to switch to the full AI pipeline against real sources from the parent server. That mode requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OMEGA_ADMIN_KEY`, and a parent URL.
 
-Per-brand customization lives under `marketing.newsletter.content` — nested under `newsletter` because the newsletter role owns the content pipeline. The whole pipeline is gated by `marketing.newsletter.enabled`. Each role specifies its provider via a `provider` key (e.g. `provider: 'beehiiv'`):
+Per-brand customization lives under `marketing.newsletter.content` — nested under `newsletter` because the newsletter role owns the content pipeline. The whole pipeline is gated by `marketing.newsletter.enabled`. Each role names its vendor as a KEY under `providers` ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)); provider-hung facts (the publication id) live inside it, while `enabled` and `content` stay role-level — `content` is generator config, not Beehiiv config:
 
 ```js
 marketing.newsletter = {
   enabled: true,
-  provider: 'beehiiv',
-  publicationId: 'pub_xxxxx',
+  providers: {
+    beehiiv: {
+      publicationId: 'pub_xxxxx',
+    },
+  },
   content: {
     categories: ['social-media', 'marketing'],
     instructions: '...',           // free-form text for the AI
@@ -353,11 +358,10 @@ Checked by `npx omega setup` every run (missing or drifted seeds are reported as
 
 ```javascript
 marketing: {
-  campaigns: { enabled: true, provider: 'sendgrid' },
+  campaigns: { enabled: true, providers: { sendgrid: { listId: '' } } },
   newsletter: {
     enabled: false,
-    provider: 'beehiiv',
-    publicationId: 'pub_xxxxx',
+    providers: { beehiiv: { publicationId: 'pub_xxxxx' } },
     content: {
       categories: ['social-media', 'marketing'],
       instructions: '',                     // free-form AI instructions
@@ -371,7 +375,7 @@ marketing: {
       sponsorships: [ ... ],
     },
   },
-  prune: { enabled: true },
+  prune: { enabled: false },              // opt-in — true is the ONLY shape that prunes (see Contact Pruning)
 }
 ```
 

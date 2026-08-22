@@ -39,7 +39,7 @@ module.exports = {
 
         // Send invoice.payment_failed with a non-subscription billing reason
         // This routes to category: 'one-time' in the webhook parser
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'invoice.payment_failed',
           data: {
@@ -87,7 +87,7 @@ module.exports = {
         assert.ok(orderDoc, 'Order doc should exist');
         assert.equal(orderDoc.type, 'one-time', 'Type should be one-time');
         assert.equal(orderDoc.owner, state.uid, 'Owner should match');
-        assert.equal(orderDoc.processor, 'test', 'Processor should be test');
+        assert.equal(orderDoc.provider, 'test', 'Provider should be test');
         assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
         assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
         assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');

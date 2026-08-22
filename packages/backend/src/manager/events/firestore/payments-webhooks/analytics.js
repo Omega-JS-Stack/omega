@@ -16,22 +16,22 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * Two independent concerns:
  *   1. Transition events (mutually exclusive, one per webhook):
  *      new-subscription (no trial)            → purchase
- *      new-subscription (trial)               → start_trial
+ *      new-subscription (trial)               → trial_start
  *      subscription-winback                   → purchase
  *      payment-recovered                      → payment_recovered
- *      subscription-cancelled (paid)          → subscription_cancelled
- *      subscription-cancelled (in trial)      → trial_lapsed
+ *      subscription-cancelled (paid)          → subscription_cancel
+ *      subscription-cancelled (in trial)      → trial_lapse
  *      subscription-cancelled (after a lapse) → nothing
- *      cancellation-removed                   → subscription_uncancelled
- *      plan-changed                           → plan_changed
- *      payment-failed (in trial)              → trial_lapsed
+ *      cancellation-removed                   → subscription_uncancel
+ *      plan-changed                           → subscription_plan_change
+ *      payment-failed (in trial)              → trial_lapse
  *      payment-refunded                       → refund
  *      purchase-completed                     → purchase (one-time)
  *      purchase-refunded                      → refund (one-time)
  *
  *   2. Payment events (fire whenever money changes hands, including renewals):
- *      first charge after a trial  → trial_converted
- *      subscription renewal        → subscription_renewed
+ *      first charge after a trial  → trial_convert
+ *      subscription renewal        → subscription_renew
  *
  * ONE LIMIT OF THE TRIAL EVENTS, deliberate. This resolver reads the subscription's
  * TERM, never an invoice amount (the same reason PayPal's transform refuses to read
@@ -39,22 +39,22 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * billing period, docs/payment-system.md), so a real charge taken INSIDE the trial
  * term books nothing at all.
  *
- * `trial_lapsed` covers EVERY way a trial ends without paying, in whatever shape the
- * processor announces it: the failed charge that suspends the subscription, and the
+ * `trial_lapse` covers EVERY way a trial ends without paying, in whatever shape the
+ * provider announces it: the failed charge that suspends the subscription, and the
  * cancellation that ends it outright. Chargebee cancels a trial with no card on
- * file, and a subscriber on any processor may simply quit mid-trial. The check reads
+ * file, and a subscriber on any provider may simply quit mid-trial. The check reads
  * the unified term, never a provider name, so the two arrive as one story
  * ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). And a trial that
  * already lapsed is not told twice: the cancellation that ends a dunning suspension
  * whose trial never converted books nothing, because the decline that suspended it
  * already reported the outcome.
  *
- * Which leaves `subscription_cancelled` to the cancellations a trial does not
+ * Which leaves `subscription_cancel` to the cancellations a trial does not
  * explain: a subscriber who left their trial behind, and one who never had a trial
  * at all. It is no longer where a never-paid trialist lands, which is the claim this
  * file can actually stand behind.
  *
- * This file covers the outcomes a PROCESSOR announces. The ones it never announces
+ * This file covers the outcomes a PROVIDER announces. The ones it never announces
  * — most of all PayPal's, which fires no trial-end event at all — are reported by
  * the daily trial-lapse sweep (`events/cron/daily/trial-lapse-sweep.js`) at the
  * moment it stamps `trial.outcome`, through the same delivery path and keyed on the
@@ -66,7 +66,7 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * why the pair is not symmetric: keeping a subscriber is an outcome
  * ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
  *
- * A `payment-failed` outside a trial stays event-less too: the processor is still
+ * A `payment-failed` outside a trial stays event-less too: the provider is still
  * retrying, and dunning is not yet an outcome. Only `subscription-cancelled` and
  * `payment-recovered` say how it ended.
  */
@@ -77,17 +77,17 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * @param {object} options
  * @param {string} options.category - 'subscription' | 'one-time'
  * @param {string|null} options.transitionName - The detected transition
- * @param {string} options.eventType - The processor's webhook event name
+ * @param {string} options.eventType - The provider's webhook event name
  * @param {object} options.unified - The unified subscription/purchase object
  * @param {object} options.order - The order doc about to be written (attribution, request, consent)
  * @param {object} [options.userDoc] - The owner's user doc — the email/phone the match data hashes
  * @param {object|null} [options.refundDetails] - The library's { amount, currency, reason }
  * @param {object|null} [options.before] - The subscription as it stood BEFORE this event
  * @param {string} options.uid - The owner
- * @param {string} options.processor - The processor that sent the webhook
+ * @param {string} options.provider - The provider that sent the webhook
  * @param {object} options.ctx - The event context
  */
-function trackPayment({ category, transitionName, eventType, unified, order, userDoc, refundDetails, before, uid, processor, ctx }) {
+function trackPayment({ category, transitionName, eventType, unified, order, userDoc, refundDetails, before, uid, provider, ctx }) {
   const Manager = ctx.Manager;
   const config = Manager.config;
 
@@ -102,11 +102,11 @@ function trackPayment({ category, transitionName, eventType, unified, order, use
 
     const currency = config.payment?.currency || 'USD';
 
-    ctx.log(`trackPayment: event=${resolved.event}, reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, processor=${processor}`);
+    ctx.log(`trackPayment: event=${resolved.event}, reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, provider=${provider}`);
 
     deliverConversion({
       event: resolved.event,
-      params: buildParams({ resolved, currency, processor }),
+      params: buildParams({ resolved, currency, provider }),
       attribution: buildAttributionContext(order?.attribution),
       identity: buildIdentity({
         uid,
@@ -128,7 +128,7 @@ function trackPayment({ category, transitionName, eventType, unified, order, use
  * The canonical commerce params every money event carries.
  * GA4's vocabulary IS the canonical one; Meta and TikTok reshape it in the catalog.
  */
-function buildParams({ resolved, currency, processor }) {
+function buildParams({ resolved, currency, provider }) {
   return {
     transaction_id: resolved.resourceId,
     value: resolved.value,
@@ -139,7 +139,7 @@ function buildParams({ resolved, currency, processor }) {
       price: resolved.value,
       quantity: 1,
     }],
-    payment_processor: processor,
+    payment_provider: provider,
     payment_frequency: resolved.frequency,
     is_trial: resolved.isTrial,
     is_recurring: resolved.isRecurring,
@@ -178,12 +178,12 @@ function resolveEventId(resolved, order) {
   }
 
   // A trial has exactly ONE outcome, and two different paths can be the one to see
-  // it: this webhook when the processor announces it, and the trial-lapse sweep
+  // it: this webhook when the provider announces it, and the trial-lapse sweep
   // when no webhook ever comes (PayPal fires no trial-end event at all). Keying
   // both on the SUBSCRIPTION means a race between them is one conversion to every
   // platform that deduplicates, never two
   // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
-  if (resolved.event === 'trial_converted' || resolved.event === 'trial_lapsed') {
+  if (resolved.event === 'trial_convert' || resolved.event === 'trial_lapse') {
     return `${resolved.event}.${resolved.resourceId}`;
   }
 
@@ -203,7 +203,7 @@ function resolveEventId(resolved, order) {
  *
  * @param {string} category - 'subscription' | 'one-time'
  * @param {string|null} transitionName - The detected transition
- * @param {string} eventType - The processor's webhook event name
+ * @param {string} eventType - The provider's webhook event name
  * @param {object} unified - The unified subscription/purchase object
  * @param {object} order - The order doc
  * @param {object|null} [refundDetails] - The library's { amount, currency, reason }
@@ -232,7 +232,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
       ...base,
       event: 'refund',
       reason: 'refund',
-      // What actually went back to the customer — the processor's own number,
+      // What actually went back to the customer — the provider's own number,
       // and only the price as a last resort (a partial refund reported as the
       // full price would overstate the reversal).
       value: resolveRefundValue(refundDetails, unified, price),
@@ -243,7 +243,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
   // --- Subscription transitions ---
   if (category === 'subscription') {
     if (transitionName === 'new-subscription' && isTrial) {
-      return { ...base, event: 'start_trial', reason: 'trial-started', value: 0, isRecurring: false };
+      return { ...base, event: 'trial_start', reason: 'trial-started', value: 0, isRecurring: false };
     }
 
     if (transitionName === 'new-subscription') {
@@ -266,7 +266,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     // cost, and what an ad platform optimizing away from churn needs to see.
     //
     // Inside the trial term it is no churn at all: nobody who never paid can be lost
-    // revenue. It is the trial's own outcome, and it reaches here on every processor.
+    // revenue. It is the trial's own outcome, and it reaches here on every provider.
     // Chargebee ends a no-card trial by cancelling it (booked as paid churn until
     // [#414]), and a Stripe or PayPal subscriber may simply quit mid-trial. The PRIOR
     // state's term is what says which of the two this is, exactly as it does for the
@@ -277,7 +277,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     // the cancelled payload's own evidence overrules it: a term that outlived the
     // trial's end belongs to somebody who paid, whatever the record on file lost.
     //
-    // And a trial that already lapsed says nothing a second time. The processor
+    // And a trial that already lapsed says nothing a second time. The provider
     // suspends the subscription at the failed charge (reported there, as the lapse),
     // then exhausts dunning and cancels what it was holding: one outcome, two
     // webhooks, and booking this one too put paid-churn revenue and an ad-platform
@@ -286,31 +286,31 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
       const outlived = outlivedItsTrial(unified, before);
 
       if (!outlived && isInsideTrial(before)) {
-        return { ...base, event: 'trial_lapsed', reason: 'trial-cancelled', value: price, isRecurring: false };
+        return { ...base, event: 'trial_lapse', reason: 'trial-cancelled', value: price, isRecurring: false };
       }
 
       if (!outlived && isLapsedTrialSuspension(before)) {
         return null;
       }
 
-      return { ...base, event: 'subscription_cancelled', reason: 'subscription-cancelled', value: price, isRecurring: false };
+      return { ...base, event: 'subscription_cancel', reason: 'subscription-cancelled', value: price, isRecurring: false };
     }
 
     // The scheduled cancellation the subscriber took back. No money moves, so the
     // value is the subscription that was KEPT — what the retention win is worth,
     // and the mirror of the churn number the cancellation above reports.
     if (transitionName === 'cancellation-removed') {
-      return { ...base, event: 'subscription_uncancelled', reason: 'cancellation-removed', value: price, isRecurring: false };
+      return { ...base, event: 'subscription_uncancel', reason: 'cancellation-removed', value: price, isRecurring: false };
     }
 
     // An upgrade or a downgrade. No money moves at the switch itself (the
-    // processor prorates on its own schedule), so the value is what the customer
+    // provider prorates on its own schedule), so the value is what the customer
     // now pays — and the plan they came from rides along, which is the only way
     // the direction is readable without a second event.
     if (transitionName === 'plan-changed') {
       return {
         ...base,
-        event: 'plan_changed',
+        event: 'subscription_plan_change',
         reason: 'plan-changed',
         value: price,
         isRecurring: false,
@@ -327,7 +327,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     // apart: only a subscription still inside its trial had been charged nothing at
     // all. The value is the subscription that never started paying.
     if (transitionName === 'payment-failed' && isInsideTrial(before)) {
-      return { ...base, event: 'trial_lapsed', reason: 'trial-lapsed', value: price, isRecurring: false };
+      return { ...base, event: 'trial_lapse', reason: 'trial-lapsed', value: price, isRecurring: false };
     }
 
     // The first REAL charge after a trial. It arrives exactly like a renewal — no
@@ -341,7 +341,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     if (!transitionName && isPaymentEvent(eventType) && price > 0 && isInsideTrial(before) && !isInsideTrial(unified, before)) {
       return {
         ...base,
-        event: 'trial_converted',
+        event: 'trial_convert',
         reason: 'trial-converted',
         // A checkout discount lands on exactly this invoice — the trial's own $0
         // is behind us, so this is the one charge it can apply to.
@@ -361,7 +361,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     // why the payload it reads is weighed against the term the subscription already
     // had ([#414]): a thin delivery must not read as a trial and swallow a renewal.
     if (!transitionName && isPaymentEvent(eventType) && price > 0 && !isInsideTrial(unified, before)) {
-      return { ...base, event: 'subscription_renewed', reason: 'renewal', value: price, isRecurring: true };
+      return { ...base, event: 'subscription_renew', reason: 'renewal', value: price, isRecurring: true };
     }
 
     return null;
@@ -404,7 +404,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
  *
  * And the widening is BOUNDED by the state the subscription arrived from, when the
  * caller has one. A degraded payload carries no term either: the stale fallback
- * hands over the webhook's own body when the processor API is unreachable
+ * hands over the webhook's own body when the provider API is unreachable
  * ([#222](https://github.com/Omega-JS-Stack/omega/issues/222)), and an active PAID
  * subscription in that body is shaped exactly like a Chargebee trial, with the same
  * claimed trial and the same epoch expiry. Nothing in the payload can tell them
@@ -421,7 +421,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
  *
  * @param {object|null} [subscription] - A subscription object
  * @param {object|null} [before] - The state it arrived FROM, when the question is
- *   about a payload a processor just delivered. Omitted, the widening is unbounded,
+ *   about a payload a provider just delivered. Omitted, the widening is unbounded,
  *   which is what the trial-lapse sweep wants: it asks about a STORED subscription,
  *   which has no delivery behind it to be degraded.
  * @returns {boolean}
@@ -447,15 +447,15 @@ function isInsideTrial(subscription, before) {
  * The trial rules read the prior state, and the prior state is a stored delivery
  * like any other, and a degraded one lost its term, which reads as a trial
  * ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). This is the evidence
- * that overrules it, taken from the payload the processor just sent: a term reaching
+ * that overrules it, taken from the payload the provider just sent: a term reaching
  * PAST the trial's end can only have been paid for. It says nothing when either date
  * is missing, which is the honest answer: an absent term proves nothing either way.
  *
- * A cancelled trial never trips it, on any processor: Stripe cancels one with the
+ * A cancelled trial never trips it, on any provider: Stripe cancels one with the
  * period still set to the trial's own end (equal, not past), and Chargebee cancels
  * one with no term at all (`test/fixtures/chargebee/subscription-in-trial.json`).
  *
- * @param {object|null} [subscription] - The payload the processor just delivered
+ * @param {object|null} [subscription] - The payload the provider just delivered
  * @param {object|null} [before] - The state it arrived FROM
  * @returns {boolean}
  */
@@ -477,7 +477,7 @@ function outlivedItsTrial(subscription, before) {
  * This is not `isInsideTrial` with another status: that one answers "is the trial
  * still running", delegates to the cancel flow's shared predicate for it, and is read
  * by the trial-lapse sweep. This answers "did the trial end unpaid, and has the
- * processor been sitting on it since" — which is the question a cancellation arriving
+ * provider been sitting on it since" — which is the question a cancellation arriving
  * after dunning asks ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)).
  *
  * @param {object|null} [subscription] - A subscription object
@@ -512,7 +512,7 @@ function resolveActualValue(price, isTrial, discount) {
 }
 
 /**
- * What a refund actually reversed: the processor's amount, then the amount the
+ * What a refund actually reversed: the provider's amount, then the amount the
  * order fold already recorded, then the price as the last resort.
  */
 function resolveRefundValue(refundDetails, unified, price) {

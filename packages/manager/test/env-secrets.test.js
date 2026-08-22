@@ -148,9 +148,9 @@ test('run-summary: skipped-for-secrets services aggregate into the 🔑 section'
   const { RunSummary } = require('../src/lib/run-summary.js');
 
   const summary = new RunSummary();
-  summary.add('brand-a', 'Brand A', 'cloudflare', { status: 'skipped', reason: 'missing CLOUDFLARE_TOKEN', missingEnv: ['CLOUDFLARE_TOKEN'] });
+  summary.add('brand-a', 'Brand A', 'edge', { status: 'skipped', reason: 'missing CLOUDFLARE_TOKEN', missingEnv: ['CLOUDFLARE_TOKEN'] });
   summary.add('brand-a', 'Brand A', 'domain', { status: 'skipped', reason: 'missing NAMECHEAP…', missingEnv: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] });
-  summary.add('brand-a', 'Brand A', 'github', { status: 'success' });
+  summary.add('brand-a', 'Brand A', 'repo', { status: 'success' });
 
   const lines = [];
   const original = console.log;
@@ -163,8 +163,8 @@ test('run-summary: skipped-for-secrets services aggregate into the 🔑 section'
 
   const text = lines.join('\n');
   assert.match(text, /Missing secrets/);
-  assert.match(text, /cloudflare: CLOUDFLARE_TOKEN/);
+  assert.match(text, /edge: CLOUDFLARE_TOKEN/);
   assert.match(text, /domain: NAMECHEAP_USERNAME, NAMECHEAP_API_KEY/);
-  assert.match(text, /--service=cloudflare/);
+  assert.match(text, /--service=edge/);
   assert.match(text, /--service=domain/);
 });

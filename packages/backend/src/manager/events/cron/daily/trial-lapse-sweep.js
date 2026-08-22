@@ -1,7 +1,7 @@
 const path = require('path');
 const powertools = require('node-powertools');
-const loadProcessor = require('../../../libraries/load-processor.js');
-const isAlreadyGone = require('../../../routes/payments/cancel/_processor-errors.js');
+const loadProvider = require('../../../libraries/load-provider.js');
+const isAlreadyGone = require('../../../routes/payments/cancel/_provider-errors.js');
 const { deliverConversion } = require('../../../libraries/analytics/conversions.js');
 const { buildAttributionContext, buildIdentity } = require('../../../libraries/analytics/match-data.js');
 // The payment webhook's analytics module owns what "still inside the trial" means
@@ -9,14 +9,14 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
 // both read the one predicate rather than keeping a copy each ([#407]).
 const { isInsideTrial } = require('../../firestore/payments-webhooks/analytics.js');
 
-const PROCESSORS_DIR = path.join(__dirname, '../../../libraries/payment/processors');
+const PROVIDERS_DIR = path.join(__dirname, '../../../libraries/payment/providers');
 
 // The candidate window, at both edges.
 //
 // GRACE — a trial that ended within the last 24 hours is left alone. Webhook lag at
 // trial end is normal, and PayPal's stored trial expiry is a COMPUTED ESTIMATE
 // (PayPal fires no trial-end event), so acting the minute the stored date passes
-// would cancel subscriptions the processor is about to confirm.
+// would cancel subscriptions the provider is about to confirm.
 //
 // FLOOR — a trial that ended more than 30 days ago ages out of the sweep. This is a
 // BACKSTOP for missed webhooks, not the primary path (Stripe and Chargebee fire real
@@ -31,22 +31,22 @@ const SWEEP_LIMIT = 200;
 /**
  * Trial lapse sweep
  *
- * A trial that ends without converting should leave the user on basic. The processors
+ * A trial that ends without converting should leave the user on basic. The providers
  * say so with a webhook — and when that webhook is missed or never fires, the user
  * keeps a paid product they never paid for. Nothing else notices: `trial.claimed`
  * means "this subscription HAD a trial", never "it converted", so a lapsed trial and
  * a converted one are indistinguishable on the user doc alone.
  *
- * So this asks the processor. Every candidate is CONFIRMED against live processor
+ * So this asks the provider. Every candidate is CONFIRMED against live provider
  * state before anything is written — the sweep never infers a lapse from dates.
  *
  * Flow:
  * 1. Query users whose claimed trial expired inside the window and who are still active
- * 2. Skip the ones already stamped, on basic, or with no processor to ask
- * 3. Fetch the live subscription from the processor
- * 4. Processor says active  → the trial CONVERTED: stamp `trial.outcome` and nothing else
- *    Processor says gone or cancelled → the trial LAPSED: reset to basic + stamp
- *    Anything else (dunning) → leave it; the processor still has it
+ * 2. Skip the ones already stamped, on basic, or with no provider to ask
+ * 3. Fetch the live subscription from the provider
+ * 4. Provider says active  → the trial CONVERTED: stamp `trial.outcome` and nothing else
+ *    Provider says gone or cancelled → the trial LAPSED: reset to basic + stamp
+ *    Anything else (dunning) → leave it; the provider still has it
  * 5. Re-read before writing so a webhook that landed since the query is never clobbered
  * 6. Report the outcome to analytics — but ONLY when this sweep is the one that saw it
  *
@@ -99,7 +99,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
     const uid = doc.id;
 
     // Per-candidate isolation, like the runner's per-job isolation: one user whose
-    // processor is unreachable must not cost every user behind them in the batch.
+    // provider is unreachable must not cost every user behind them in the batch.
     try {
       const sub = doc.data().subscription || {};
 
@@ -117,11 +117,11 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         continue;
       }
 
-      const processor = sub.payment?.processor;
+      const provider = sub.payment?.provider;
       const resourceId = sub.payment?.resourceId;
 
-      if (!processor || !resourceId) {
-        ctx.log(`skip ${uid}: no processor to confirm with (processor=${processor || 'null'}, resourceId=${resourceId || 'null'})`);
+      if (!provider || !resourceId) {
+        ctx.log(`skip ${uid}: no provider to confirm with (provider=${provider || 'null'}, resourceId=${resourceId || 'null'})`);
         skipped++;
         continue;
       }
@@ -129,14 +129,14 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
       let library;
 
       try {
-        library = loadProcessor(PROCESSORS_DIR, processor);
+        library = loadProvider(PROVIDERS_DIR, provider);
       } catch (e) {
-        ctx.warn(`skip ${uid}: unknown processor library '${processor}' — nothing can confirm this trial`);
+        ctx.warn(`skip ${uid}: unknown provider library '${provider}' — nothing can confirm this trial`);
         skipped++;
         continue;
       }
 
-      // Ask the processor. The empty fallback is deliberate: a stale webhook payload
+      // Ask the provider. The empty fallback is deliberate: a stale webhook payload
       // is exactly what this sweep must NOT act on, so a fetch that cannot answer
       // throws instead of handing back the payload we already have.
       let live = null;
@@ -144,17 +144,17 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
       try {
         live = await library.fetchResource('subscription', resourceId, {}, { admin, ctx, config: Manager.config });
       } catch (e) {
-        // A processor that cannot answer is not a processor saying "cancelled". Only
+        // A provider that cannot answer is not a provider saying "cancelled". Only
         // "no such subscription" means gone; everything else is transient and waits
         // for the next run rather than fabricating a cancellation.
         if (!isAlreadyGone(e)) {
-          ctx.warn(`skip ${uid}: processor ${processor} could not confirm ${resourceId} (${e.message}) — retrying next run`);
+          ctx.warn(`skip ${uid}: provider ${provider} could not confirm ${resourceId} (${e.message}) — retrying next run`);
           skipped++;
           continue;
         }
       }
 
-      // No resource, or one with no status, is the processor saying it is gone
+      // No resource, or one with no status, is the provider saying it is gone
       const gone = !live || !live.status;
       const liveStatus = gone ? null : library.toUnifiedSubscription(live, { config: Manager.config }).status;
 
@@ -165,10 +165,10 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
       } else if (gone || liveStatus === 'cancelled') {
         outcome = 'lapsed';
       } else {
-        // Dunning (suspended): the processor still holds the subscription and is still
+        // Dunning (suspended): the provider still holds the subscription and is still
         // trying. Neither outcome is true yet, so nothing is stamped and the next run
         // asks again.
-        ctx.log(`skip ${uid}: processor ${processor} reports ${liveStatus} — no outcome yet`);
+        ctx.log(`skip ${uid}: provider ${provider} reports ${liveStatus} — no outcome yet`);
         skipped++;
         continue;
       }
@@ -197,14 +197,14 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         // NOTHING else — the subscription the user is paying for is correct as it is.
         await doc.ref.set({ subscription: { trial: { outcome: 'converted' } } }, { merge: true });
 
-        ctx.log(`convert ${uid}: processor ${processor} reports the subscription is active, trial.outcome=converted`);
+        ctx.log(`convert ${uid}: provider ${provider} reports the subscription is active, trial.outcome=converted`);
         trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
         converted++;
         continue;
       }
 
       // The trial lapsed. Same end state the cancel route writes for a subscription the
-      // processor no longer has: cancelled, back on basic, nothing pending.
+      // provider no longer has: cancelled, back on basic, nothing pending.
       await doc.ref.set({
         subscription: {
           status: 'cancelled',
@@ -214,7 +214,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         },
       }, { merge: true });
 
-      ctx.log(`lapse ${uid}: processor ${processor} reports ${gone ? 'the subscription is gone' : liveStatus}, reset to basic, trial.outcome=lapsed`);
+      ctx.log(`lapse ${uid}: provider ${provider} reports ${gone ? 'the subscription is gone' : liveStatus}, reset to basic, trial.outcome=lapsed`);
       trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
       lapsed++;
     } catch (e) {
@@ -253,8 +253,8 @@ function resolveTrialOutcomeConversion(sub, outcome, currency) {
     return null;
   }
 
-  const event = outcome === 'converted' ? 'trial_converted' : 'trial_lapsed';
-  // The full price: a conversion the processor made without telling us leaves no
+  const event = outcome === 'converted' ? 'trial_convert' : 'trial_lapse';
+  // The full price: a conversion the provider made without telling us leaves no
   // invoice here to read a discount off, and the plan price is the honest number
   // this path can actually stand behind.
   const price = parseFloat(sub.payment?.price || 0);
@@ -272,7 +272,7 @@ function resolveTrialOutcomeConversion(sub, outcome, currency) {
         price: price,
         quantity: 1,
       }],
-      payment_processor: sub.payment?.processor,
+      payment_provider: sub.payment?.provider,
       payment_frequency: sub.payment?.frequency || null,
       is_trial: true,
       is_recurring: false,

@@ -5,7 +5,7 @@
  * printed instructions, and only while the zone is still pending — an active
  * zone proves the nameservers are already set.
  *
- * The email half of `domain` config (email.provider, email.forwarding) is
+ * The email half of `domain` config (email.providers, email.forwarding) is
  * consumed by the cloudflare service (dns-records MX/SPF + email-routing);
  * this service owns only the registrar side.
  *
@@ -17,10 +17,10 @@ const chalk = require('chalk').default;
 const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
-const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
+const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { NamecheapAPI } = require('./lib/namecheap-api.js');
-const { API_PROVIDERS } = require('./lib/registrars.js');
+const { API_PROVIDERS, resolveRegistrar } = require('./lib/registrars.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -31,9 +31,9 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'domain.enabled = false' };
     }
 
-    const provider = domainConfig.provider;
+    const provider = resolveRegistrar(context.brandConfig);
     if (!provider) {
-      return { skip: true, reason: 'no domain.provider configured' };
+      return { skip: true, reason: 'no domain.providers.<registrar> configured' };
     }
 
     const url = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '');

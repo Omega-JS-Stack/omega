@@ -18,7 +18,7 @@
 const { callHandler, withEnvironment } = require('./_route-harness.js');
 
 const handler = require('../../../src/manager/routes/payments/webhook/post.js');
-const stripeProcessor = require('../../../src/manager/routes/payments/webhook/processors/stripe.js');
+const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
@@ -53,7 +53,7 @@ function deliver(Manager, event) {
     handler,
     functionName: 'payments-webhook',
     req: {
-      query: { processor: 'stripe', key: VALID_KEY() },
+      query: { provider: 'stripe', key: VALID_KEY() },
       body: event,
       rawBody: Buffer.from(JSON.stringify(event)),
     },
@@ -70,7 +70,7 @@ module.exports = {
       name: 'maps-a-one-time-charge-refund-as-one-time',
       auth: 'none',
       async run({ assert }) {
-        const parsed = stripeProcessor.parseWebhook({ body: refundEvent('_test-evt-one-time-refund-parse', oneTimeRefundedCharge()) });
+        const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-one-time-refund-parse', oneTimeRefundedCharge()) });
 
         assert.equal(parsed.category, 'one-time', 'A charge with no subscription and no invoice is a one-time refund');
         assert.equal(parsed.resourceType, 'charge', 'The charge is the only resource the event carries');
@@ -85,7 +85,7 @@ module.exports = {
       async run({ assert }) {
         const charge = { ...oneTimeRefundedCharge(), subscription: 'sub_test_refund' };
 
-        const parsed = stripeProcessor.parseWebhook({ body: refundEvent('_test-evt-sub-refund-parse', charge) });
+        const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-sub-refund-parse', charge) });
 
         assert.equal(parsed.category, 'subscription', 'A charge naming a subscription stays a subscription refund');
         assert.equal(parsed.resourceType, 'subscription', 'The pipeline must re-fetch the subscription');
@@ -99,7 +99,7 @@ module.exports = {
       async run({ assert }) {
         const charge = { ...oneTimeRefundedCharge(), invoice: 'in_test_refund' };
 
-        const parsed = stripeProcessor.parseWebhook({ body: refundEvent('_test-evt-invoice-refund-parse', charge) });
+        const parsed = stripeProvider.parseWebhook({ body: refundEvent('_test-evt-invoice-refund-parse', charge) });
 
         assert.equal(parsed.category, 'subscription', 'A charge carrying an invoice stays on the subscription path');
         assert.equal(parsed.resourceType, 'invoice', 'The invoice resolves the subscription downstream');

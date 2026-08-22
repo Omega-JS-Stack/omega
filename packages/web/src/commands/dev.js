@@ -11,7 +11,7 @@
  * Port (N7): the website convention is 4000, resolved through the allocator —
  * taken ports bump +1. Multi-instance web brands offset deterministically:
  * each instance wants 4000 + its position in the instances array, so
- * apps/website and apps/website-admin dev side-by-side. `omega dev
+ * targets/website and targets/website-admin dev side-by-side. `omega dev
  * --port=4001` (or a config `ports.website` entry) PINS the port instead:
  * busy = hard error, never a silent bump. The
  * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
@@ -67,7 +67,7 @@ const REARM_POLL_MS = 200;
 module.exports = async function (options) {
   options = options || {};
 
-  // Tee the whole run to <appRoot>/logs/dev.log — first statement of the verb
+  // Tee the whole run to <targetRoot>/logs/dev.log — first statement of the verb
   // so a crash on the way up is already in the file (#197).
   attachLogFile(path.join(consumerPaths().root, 'logs', 'dev.log'));
 
@@ -77,7 +77,7 @@ module.exports = async function (options) {
 
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
-  // The app's own package version — read ONCE and handed to both consumers: the
+  // The target's own package version — read ONCE and handed to both consumers: the
   // build manifest and the page chrome's Configuration block (the client's
   // release tag, #380).
   const version = jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version;
@@ -121,7 +121,7 @@ module.exports = async function (options) {
   // machine-owned, regenerated every boot, gone per-collection once the
   // consumer owns that collection.
   const samples = reconcileSampleContent({
-    appRoot: paths.root,
+    targetRoot: paths.root,
     consumerDir: paths.src,
     defaultsDir: PATHS.defaults,
   });
@@ -300,7 +300,7 @@ module.exports = async function (options) {
  * `<consumerDir>/themes/<id>` for a consumer-local theme, and EVERY other
  * caller — the engine, the production build, customize, the override map —
  * passes the Eleventy input dir, so a consumer-local theme lives at
- * `src/themes/<id>`. Resolving the asset lane from the app ROOT instead made
+ * `src/themes/<id>`. Resolving the asset lane from the target ROOT instead made
  * that theme invisible to the scss/js build AND to the asset watcher (both
  * derive from this list), so a brand's own theme silently rendered with the
  * packaged theme's styles.
@@ -862,7 +862,7 @@ async function resolveWebsitePort(root, flagPort) {
 
 /**
  * The wanted (pre-allocator) website port: OMEGA_WEBSITE_PORT (a parent that
- * already allocated) or the classic 4000, plus this app's deterministic
+ * already allocated) or the classic 4000, plus this target's deterministic
  * instance offset (multi-instance targets: an instance wants base + its
  * position in the instances array, so N instances dev side-by-side off the
  * same base). Lenient like loadPortPins — no config means no offset.
@@ -908,7 +908,7 @@ function loadPortPins(root) {
  * The website ORIGIN rides the same map (#262): a page knows its own origin,
  * but a desktop/extension surface reading this chrome does not, and protocol is
  * not derivable from a port number.
- * @param {string} root - this app's root (its own ports file is skipped)
+ * @param {string} root - this target's root (its own ports file is skipped)
  * @param {number} port - the resolved website port
  * @param {string} origin - the resolved website origin (devWebsiteOrigin)
  * @returns {function} () => the dev chrome object
@@ -923,7 +923,7 @@ function devPortsOption(root, port, origin) {
 
 /**
  * `--local` prelude: file:-install every @omega.js framework used anywhere in
- * this brand (all apps, walked up from cwd) from the local Omega monorepo,
+ * this brand (all targets, walked up from cwd) from the local Omega monorepo,
  * then start the monorepo's src→dist watch as a session-scoped child.
  */
 // Exposed for tests (the command function stays the main export)
@@ -944,8 +944,8 @@ async function linkBrandToMonorepo() {
   const brandRoot = local.findBrandRoot(process.cwd());
   logger.log(`Local mode: linking @omega.js packages from ${monorepoRoot}`);
 
-  for (const appDir of local.discoverApps(brandRoot)) {
-    await local.linkLocalPackages({ dir: appDir, monorepoRoot, logger });
+  for (const targetDir of local.discoverTargets(brandRoot)) {
+    await local.linkLocalPackages({ dir: targetDir, monorepoRoot, logger });
   }
 
   const watch = local.startMonorepoWatch({ monorepoRoot, logger });

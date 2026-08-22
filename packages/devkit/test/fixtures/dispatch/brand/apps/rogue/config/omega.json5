@@ -1,7 +1,0 @@
-// Malformed app: carries a config but declares no framework — the dispatcher
-// must skip it (app-of-brand) and resolve the brand root above.
-{
-  targets: {
-    web: {},
-  },
-}

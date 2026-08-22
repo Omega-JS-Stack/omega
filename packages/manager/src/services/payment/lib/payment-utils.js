@@ -1,6 +1,6 @@
 /**
  * Shared helpers for the payment operations — the paid-product filter, the
- * processor-facing product identity (display name + image), the backend
+ * provider-facing product identity (display name + image), the backend
  * webhook URL, and the event-set diff. omega-manager duplicated these across
  * the stripe/paypal/chargebee handlers (and hardcoded the company CDN for
  * product images — the image is brand.images.brandmark config now).
@@ -8,8 +8,8 @@
 const { absoluteBrandImage } = require('../../../lib/brand.js');
 
 /**
- * Products the processors manage: priced and not archived. Free tiers have
- * no prices; archived products keep their processor objects but stop being
+ * Products the providers manage: priced and not archived. Free tiers have
+ * no prices; archived products keep their provider objects but stop being
  * reconciled.
  *
  * @param {Object} brandConfig - Merged brand config
@@ -20,7 +20,7 @@ function paidProducts(brandConfig) {
 }
 
 /**
- * The processor-facing product name: "{Brand} - {Product}".
+ * The provider-facing product name: "{Brand} - {Product}".
  *
  * @param {Object} brandConfig - Merged brand config
  * @param {Object} product - Product entry from payment.products
@@ -32,7 +32,7 @@ function productDisplayName(brandConfig, product) {
 
 /**
  * The product image URL — brand.images.brandmark when configured, else null
- * (processors keep whatever image they have; the diff skips images entirely).
+ * (providers keep whatever image they have; the diff skips images entirely).
  *
  * @param {Object} brandConfig - Merged brand config
  * @returns {string|null} Image URL or null
@@ -42,20 +42,20 @@ function productImage(brandConfig) {
 }
 
 /**
- * The brand backend's payment webhook URL for a processor.
+ * The brand backend's payment webhook URL for a provider.
  * Requires OMEGA_WEBHOOK_KEY in the brand .env.
  *
  * @param {Object} brandConfig - Merged brand config
- * @param {string} processor - 'stripe' | 'paypal' | 'chargebee'
+ * @param {string} provider - 'stripe' | 'paypal' | 'chargebee'
  * @param {string} [brandId] - Included as &brand= (chargebee only)
  * @returns {string} Webhook URL
  */
-function buildWebhookUrl(brandConfig, processor, brandId) {
+function buildWebhookUrl(brandConfig, provider, brandId) {
   const domain = brandConfig.brand.url.replace(/^https?:\/\//, '');
   const key = process.env.OMEGA_WEBHOOK_KEY;
   const brandParam = brandId ? `&brand=${brandId}` : '';
 
-  return `https://api.${domain}/omega/payments/webhook?processor=${processor}${brandParam}&key=${key}`;
+  return `https://api.${domain}/omega/payments/webhook?provider=${provider}${brandParam}&key=${key}`;
 }
 
 /**

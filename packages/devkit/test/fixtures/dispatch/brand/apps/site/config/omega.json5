@@ -1,6 +1,0 @@
-// App layer — targets only; the brand root's config carries the identity.
-{
-  targets: {
-    web: {},
-  },
-}

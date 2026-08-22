@@ -2,7 +2,7 @@
  * Test: a webhook for a uid with no auth user never creates a user doc
  *
  * A local QA checkout runs against the emulator with real test-mode keys, and the
- * processor delivers the resulting webhooks to the DEPLOYED backend (the emulator
+ * provider delivers the resulting webhooks to the DEPLOYED backend (the emulator
  * has no webhook path). `customer.subscription.created` then resolved an
  * emulator-only uid and minted a LIVE users/{uid} carrying nothing but a
  * subscription block — an orphan the users migration later had to clean up
@@ -75,7 +75,7 @@ module.exports = {
         const event = store.get(`payments-webhooks/${EVENT_ID}`);
 
         assert.equal(event.refusal?.reason, 'user-without-auth', 'the stamp names what is wrong');
-        assert.equal(event.status, 'completed', 'the event reached a decision — the processor must not redeliver it forever');
+        assert.equal(event.status, 'completed', 'the event reached a decision — the provider must not redeliver it forever');
         assert.equal(event.transition, null, 'nothing happened to a subscription, so the trail must not say it did');
         assert.equal(event.owner, UID, 'the uid it resolved to stays on the record');
       },
@@ -107,7 +107,7 @@ module.exports = {
         assert.equal(capture.level, 'warning', 'a refusal is a warning, not a server fault');
         assert.match(capture.message, /user without auth/i, 'the message says what happened');
         assert.equal(capture.extra.uid, UID, 'the uid is the join key back to the account');
-        assert.equal(capture.extra.eventId, EVENT_ID, 'the event is nameable in the processor dashboard');
+        assert.equal(capture.extra.eventId, EVENT_ID, 'the event is nameable in the provider dashboard');
         assert.equal(capture.extra.reason, 'user-without-auth', 'the refusal reason matches the stamp on the doc');
         assert.equal(capture.user?.id, UID, 'the uid rides as the user id');
         assert.ok(!JSON.stringify(capture).includes('@'), 'no email is ever assembled into the report');

@@ -66,7 +66,7 @@ module.exports = {
     },
 
     // A live term runs to the end of the cycle it is being billed on — not to a
-    // date a decade away no real processor would ever record.
+    // date a decade away no real provider would ever record.
     {
       name: 'live-terms-end-with-the-billing-cycle',
       async run({ assert, config }) {
@@ -97,7 +97,7 @@ module.exports = {
     },
 
     // The orderId on a seeded subscription names a purchase record the backend
-    // reads back (the test cancel processor's plan lookup, the test webhook
+    // reads back (the test cancel provider's plan lookup, the test webhook
     // library's resource rebuild, the per-owner trial-eligibility query). Every
     // one of them must have a fixture behind it.
     {
@@ -165,7 +165,7 @@ module.exports = {
               subscription: {
                 product: { id: plan.id, name: plan.name },
                 status: 'active',
-                payment: { processor: 'test', resourceId: 'sub_test_project', orderId: '_test-order-project-subscriber' },
+                payment: { provider: 'test', resourceId: 'sub_test_project', orderId: '_test-order-project-subscriber' },
               },
             },
           },
@@ -197,7 +197,7 @@ module.exports = {
               subscription: {
                 product: { id: '_test-unsold-plan', name: 'Unsold' },
                 status: 'active',
-                payment: { processor: 'test', resourceId: 'sub_test_unpriced' },
+                payment: { provider: 'test', resourceId: 'sub_test_unpriced' },
               },
             },
           },
@@ -206,7 +206,7 @@ module.exports = {
         const definition = getAccountDefinitions('example.com', config, extraAccounts)['project-unpriced'];
         const payment = definition.properties.subscription.payment;
 
-        assert.equal(payment.processor, 'test', 'The seeded payment record is left as written');
+        assert.equal(payment.provider, 'test', 'The seeded payment record is left as written');
         assert.equal(payment.frequency, undefined, 'A plan with no catalog price gets no cadence written onto it');
         assert.equal(payment.price, undefined, 'A plan with no catalog price gets no price written onto it');
       },
@@ -225,6 +225,30 @@ module.exports = {
 
           assert.equal(subscription.product.id, 'basic', `Persona '${key}' is a free account`);
           assert.equal(subscription.payment, undefined, `Persona '${key}' never bought anything, so it carries no payment record`);
+          assert.equal(buildOrderFixture(key, config), null, `Persona '${key}' must have no order behind it`);
+        }
+      },
+    },
+
+    // The suite-exclusive purchasers ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
+    // the discount suites' cases each BUY a subscription, which is why they get
+    // one account apiece. Every one of them has to ARRIVE owning nothing — the
+    // checkout guard refuses a caller already holding a paid plan, and the trial
+    // cases read eligibility off a per-owner order query that any seeded
+    // purchase record would answer for them.
+    {
+      name: 'the-discount-suites-purchasers-arrive-owning-nothing',
+      async run({ assert, config }) {
+        const definitions = getAccountDefinitions('example.com', config);
+        const purchasers = Object.keys(TEST_ACCOUNTS).filter((key) => key.startsWith('intent-discount-'));
+
+        assert.ok(purchasers.length > 0, 'The seeder must declare the discount suites their own purchasers');
+
+        for (const key of purchasers) {
+          const subscription = definitions[key].properties.subscription;
+
+          assert.equal(subscription.product.id, 'basic', `Persona '${key}' must arrive on the free tier`);
+          assert.equal(subscription.payment, undefined, `Persona '${key}' has bought nothing yet, so it carries no payment record`);
           assert.equal(buildOrderFixture(key, config), null, `Persona '${key}' must have no order behind it`);
         }
       },
@@ -250,7 +274,7 @@ module.exports = {
         const subscription = definition.properties.subscription;
 
         assert.equal(subscription.product.id, plan.id, 'The trialing persona holds the catalog\'s paid plan');
-        assert.equal(subscription.status, 'active', 'A live trial IS an active subscription — the processors\' trialing status maps to active');
+        assert.equal(subscription.status, 'active', 'A live trial IS an active subscription — the providers\' trialing status maps to active');
         assert.equal(subscription.trial.claimed, true, 'The trial has been claimed');
         assert.equal(subscription.trial.outcome, null, 'A trial that is still running has not ended in anything yet');
         assert.equal(
@@ -357,8 +381,17 @@ module.exports = {
 
         // The machinery an automated suite drives is never offered to somebody
         // mid-suite: a deletion fixture, a signup the suite has to perform
-        // itself, a consent state a lifecycle test establishes.
-        for (const key of ['delete', 'delete-by-admin', 'signup-merge', 'consent-granted']) {
+        // itself, a consent state a lifecycle test establishes, and — since
+        // [#406](https://github.com/Omega-JS-Stack/omega/issues/406) — the
+        // suite-exclusive accounts that used to be minted mid-test.
+        for (const key of [
+          'delete', 'delete-by-admin', 'signup-merge', 'consent-granted',
+          'journey-payments-winback', 'journey-payments-winback-decline',
+          'journey-payments-plan-switch', 'journey-payments-plan-switch-trial',
+          'journey-payments-uncancel',
+          'webhook-chargebee-stale-fallback', 'webhook-retry-sweep',
+          'intent-discount-percent-url', 'intent-discount-amount-trial',
+        ]) {
           assert.equal(TEST_ACCOUNTS[key].palette, undefined, `Persona '${key}' is machinery, so the palette must not offer it`);
         }
 
@@ -409,26 +442,26 @@ module.exports = {
       },
     },
 
-    // A persona bought through the TEST processor carries what that processor
+    // A persona bought through the TEST provider carries what that provider
     // writes. The negative-path fixtures are excluded by construction, not by an
-    // exemption list: they name a null or unknown processor, which is the whole
+    // exemption list: they name a null or unknown provider, which is the whole
     // point of them.
     {
-      name: 'test-processor-personas-carry-the-record-it-writes',
+      name: 'test-provider-personas-carry-the-record-it-writes',
       async run({ assert, config, skip }) {
         if (!paidPlan(config)) {
           skip('No paid subscription product configured in this brand');
         }
 
         const definitions = getAccountDefinitions('example.com', config);
-        const bought = Object.entries(definitions).filter(([, definition]) => definition.properties.subscription?.payment?.processor === 'test');
+        const bought = Object.entries(definitions).filter(([, definition]) => definition.properties.subscription?.payment?.provider === 'test');
 
-        assert.ok(bought.length > 0, 'The seeder must define personas bought through the test processor');
+        assert.ok(bought.length > 0, 'The seeder must define personas bought through the test provider');
 
         for (const [key, definition] of bought) {
           const payment = definition.properties.subscription.payment;
 
-          assert.ok(payment.resourceId, `Persona '${key}' must name the resource the processor holds its subscription under`);
+          assert.ok(payment.resourceId, `Persona '${key}' must name the resource the provider holds its subscription under`);
           assert.ok(payment.startDate?.timestampUNIX > 0, `Persona '${key}' must record when its subscription began`);
           assert.ok(payment.updatedBy?.event?.name, `Persona '${key}' must name the event that last wrote its subscription`);
           assert.ok(payment.updatedBy?.date?.timestampUNIX > 0, `Persona '${key}' must record when that event landed`);
@@ -448,9 +481,9 @@ module.exports = {
     },
 
     // The reported break (#327): the dev palette's Premium persona had a resolved
-    // plan and no processor record, so every payment-gated surface skipped it —
+    // plan and no provider record, so every payment-gated surface skipped it —
     // the billing panel offers the winback discount only where it can actually be
-    // applied (a processor and its resource: core/js/pages/dashboard/account/
+    // applied (a provider and its resource: core/js/pages/dashboard/account/
     // sections/billing.js), and QA read the missing pitch as a product bug.
     {
       name: 'the-premium-persona-is-a-real-subscriber',
@@ -467,8 +500,8 @@ module.exports = {
         assert.equal(subscription.cancellation.pending, false, 'Nothing has been cancelled — this is the steady-state subscriber');
 
         // The winback pitch's own gate, asserted as the gate reads it.
-        assert.ok(payment.processor && payment.resourceId, 'A payment-gated surface must be able to reach this persona at its processor');
-        assert.equal(payment.processor, 'test', 'The persona is held at the TEST processor — demo-safe, never a live one');
+        assert.ok(payment.provider && payment.resourceId, 'A payment-gated surface must be able to reach this persona at its provider');
+        assert.equal(payment.provider, 'test', 'The persona is held at the TEST provider — demo-safe, never a live one');
 
         assert.ok(payment.startDate.timestampUNIX < Math.floor(Date.now() / 1000), 'The persona subscribed in the past, not this instant');
         assert.ok(payment.price > 0, 'The persona pays what the catalog charges');
@@ -759,7 +792,7 @@ function otherPaidPlan(config) {
 
 /**
  * A seeded subscription represents a purchase when it holds a paid plan, or when
- * it carries the record of one it has since lapsed from (a processor, a resource,
+ * it carries the record of one it has since lapsed from (a provider, a resource,
  * an order).
  */
 function isPurchase(subscription) {
@@ -770,7 +803,7 @@ function isPurchase(subscription) {
   const payment = subscription.payment || {};
 
   return subscription.product?.id !== 'basic'
-    || Boolean(payment.processor || payment.resourceId || payment.orderId);
+    || Boolean(payment.provider || payment.resourceId || payment.orderId);
 }
 
 /**

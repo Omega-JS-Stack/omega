@@ -96,26 +96,26 @@ surface attaches it at its entry point.
 
 ## Where every log lives
 
-`<appRoot>` is an app dir in a brand (`apps/website`, `apps/backend`, …);
+`<targetRoot>` is a target dir in a brand (`targets/website`, `targets/backend`, …);
 `<brandRoot>` is the brand monorepo root.
 
 | Surface | File | What's in it |
 |---|---|---|
-| **Per app** — every framework, same three names | | |
-| `omega dev` (web) · `omega serve` / `omega emulator` (backend) · `npm start` (desktop, extension) | `<appRoot>/logs/dev.log` | the whole dev run: boot, ports, watcher rebuilds, the crash — plus every child chunk the verb mirrored (see below) |
-| `omega build` (web, backend) · production gulp build (desktop, extension) | `<appRoot>/logs/build.log` | the whole production build |
-| `omega test` | `<appRoot>/logs/test.log` | suite names, pass/fail, harness boot lines |
+| **Per target** — every framework, same three names | | |
+| `omega dev` (web) · `omega serve` / `omega emulator` (backend) · `npm start` (desktop, extension) | `<targetRoot>/logs/dev.log` | the whole dev run: boot, ports, watcher rebuilds, the crash — plus every child chunk the verb mirrored (see below) |
+| `omega build` (web, backend) · production gulp build (desktop, extension) | `<targetRoot>/logs/build.log` | the whole production build |
+| `omega test` | `<targetRoot>/logs/test.log` | suite names, pass/fail, harness boot lines |
 | **Backend children** — firebase's own processes, beside firebase-tools' debug logs. The verb mirrors every child chunk to its own terminal, so the `logs/<verb>.log` above is a SUPERSET of these; a child file is the child-ONLY view (and the one that `roll()`s mid-run) | | |
-| the firebase emulator child | `<appRoot>/dist/emulator.log` | emulator traffic: function invocations, Firestore/auth calls |
-| the `firebase serve` child | `<appRoot>/dist/dev.log` | serve output; rolls on each reload |
-| the test runner child | `<appRoot>/dist/test.log` | the runner's own output under `omega test` |
-| `omega deploy` | `<appRoot>/dist/deploy.log` | the deploy transcript |
-| `omega logs` | `<appRoot>/dist/production.log` | the Cloud Logging tail |
-| firebase-tools itself | `<appRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
+| the firebase emulator child | `<targetRoot>/dist/emulator.log` | emulator traffic: function invocations, Firestore/auth calls |
+| the `firebase serve` child | `<targetRoot>/dist/dev.log` | serve output; rolls on each reload |
+| the test runner child | `<targetRoot>/dist/test.log` | the runner's own output under `omega test` |
+| `omega deploy` | `<targetRoot>/dist/deploy.log` | the deploy transcript |
+| `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
+| firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
 | **Desktop extras** | | |
-| the running app itself (main + preload + renderer converge) | `<appRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines — `packages/desktop/docs/logging.md` |
-| `npm run release` | `<appRoot>/logs/ci.log` | the GH Actions release run, streamed locally |
-| Windows code-signing | `<appRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
+| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines — `packages/desktop/docs/logging.md` |
+| `npm run release` | `<targetRoot>/logs/ci.log` | the GH Actions release run, streamed locally |
+| Windows code-signing | `<targetRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
 | **Brand root** | | |
 | `omega manage` (the service walk) | `<brandRoot>/logs/manage.log` | the whole service walk |
 | `omega dev` (the fan-out) | `<brandRoot>/logs/dev.log` | the boot walk, then every dev leg's prefixed output (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
@@ -137,7 +137,7 @@ Every e2e runner writes its verdicts incrementally
 harness alike), so a SIGKILLed lane still names the step it died on:
 
 ```
-PASS  the Paperloom emulator boots (hosting :5002, auth :9099)
+PASS  the playground emulator boots (hosting :5002, auth :9099)
 FAIL  the popup reaches the background SW — timed out after 30s
 FAIL  preflight — a playground emulator stack is already running (hosting :5002)
 ```
@@ -146,7 +146,7 @@ FAIL  preflight — a playground emulator stack is already running (hosting :500
 harness throw on the way up. One line, same shape, so one grep finds every failure:
 
 ```bash
-grep '^FAIL' .temp/*/steps.log apps/*/e2e/.logs/steps.log
+grep '^FAIL' .temp/*/steps.log brands/*/e2e/.logs/steps.log
 ```
 
 ### Retention (ruled 2026-08-05)
@@ -165,8 +165,8 @@ emulator or watcher belongs to the user: never restart one, and never re-run a s
 just to see output.
 
 ```bash
-tail -50 apps/website/logs/dev.log            # is the dev server up, what did it last build
-grep -i error apps/backend/dist/emulator.log  # what the emulator actually served
+tail -50 targets/website/logs/dev.log            # is the dev server up, what did it last build
+grep -i error targets/backend/dist/emulator.log  # what the emulator actually served
 grep '^FAIL' .temp/*/steps.log                # which e2e step broke
 tail -100 .temp/logs/test-packages.log        # what the last lane printed
 ```

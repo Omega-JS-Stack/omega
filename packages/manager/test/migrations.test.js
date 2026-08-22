@@ -1,6 +1,7 @@
 /**
- * Migrations service tests — the notifications, users, orders and
- * payments-intents migrations against a method-level recording fake of the
+ * Migrations service tests — the notifications, users, orders,
+ * payments-intents and payment-provider (#428) migrations against a
+ * method-level recording fake of the
  * FirestoreREST client (and the auth admin for orphan detection), with the
  * fix pipeline, conflict resolution, and REST patch construction real.
  * Proves the --migration gating (flag, name filter, shared-project and
@@ -104,7 +105,6 @@ async function runService(config, { root, auth, firestore, options } = {}) {
     brandId: 'fixture-brand',
     brandRoot: root || stageBrand(),
     brandConfig: config,
-    brandState: {},
     operations: OPERATIONS.migrations,
     options: options !== undefined ? options : { migration: true },
     serviceData: {},
@@ -189,7 +189,10 @@ test('migrations: registered after account, before bookmark, with every collecti
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('account') + 1], 'migrations');
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('migrations') + 1], 'bookmark');
   assert.deepEqual(OPERATIONS.migrations.map((o) => o.name),
-    ['notifications', 'users', 'orders', 'payments-intents']);
+    ['targets-rename', 'notifications', 'users', 'orders', 'payments-intents', 'payment-provider', 'state-retirement']);
+  // the two LOCAL migrations — the brand's own files, not Firestore
+  assert.deepEqual(OPERATIONS.migrations.filter((o) => o.local).map((o) => o.name),
+    ['targets-rename', 'state-retirement']);
 });
 
 test('migrations: FieldValue.delete() is a stable identity sentinel', () => {
@@ -870,6 +873,128 @@ test('payments-intents: trackingConsent is never synthesized by the fold', async
   assert.equal(fieldPaths.includes('trackingConsent'), false);
 });
 
+// ─── payment-provider migration (#428) ───────────────────────────────────────
+
+/** A doc in any payment-touching collection, carrying whatever provider shape. */
+function providerDoc(collection, id, fields) {
+  return {
+    id,
+    createTime: '2024-02-02T00:00:00.000000Z',
+    updateTime: '2024-02-02T00:00:00.000000Z',
+    data: { id, ...fields },
+  };
+}
+
+/** Run ONLY the payment-provider migration, with one collection stocked. */
+async function runProviderMigration(docsByCollection, options = {}) {
+  const firestore = fakeFirestore({
+    countDocs: (collection) => (docsByCollection[collection] || []).length,
+    listDocs: (collection) => ({ docs: docsByCollection[collection] || [], nextPageToken: null }),
+    patchDoc: {},
+  });
+
+  const result = await runService(brandConfig(), {
+    ...options,
+    auth: fakeAuth({}),
+    firestore,
+    options: { migration: 'payment-provider', ...(options.options || {}) },
+  });
+
+  return { result, firestore };
+}
+
+test('payment-provider: the stored word moves on every collection, at that collection’s own path', async () => {
+  const { result, firestore } = await runProviderMigration({
+    users: [providerDoc('users', 'uid-1', { subscription: { payment: { processor: 'stripe', resourceId: 'sub_1' } } })],
+    'payments-orders': [providerDoc('payments-orders', 'order-1', { processor: 'paypal' })],
+    'payments-intents': [providerDoc('payments-intents', 'intent-1', { processor: 'chargebee' })],
+    'payments-webhooks': [providerDoc('payments-webhooks', 'evt-1', { processor: 'stripe' })],
+    'payments-disputes': [providerDoc('payments-disputes', 'alert-1', { provider: 'chargeblast', alert: { processor: 'stripe' } })],
+  }, { options: { execute: true } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(firestore.of('patchDoc').map((c) => c.args), [
+    ['users/uid-1', { subscription: { payment: { provider: 'stripe' } } }, ['subscription.payment.provider', 'subscription.payment.processor']],
+    ['payments-orders/order-1', { provider: 'paypal' }, ['provider', 'processor']],
+    ['payments-intents/intent-1', { provider: 'chargebee' }, ['provider', 'processor']],
+    ['payments-webhooks/evt-1', { provider: 'stripe' }, ['provider', 'processor']],
+    ['payments-disputes/alert-1', { alert: { provider: 'stripe' } }, ['alert.provider', 'alert.processor']],
+  ]);
+
+  // The dispute doc's own top-level `provider` (the ALERT source, chargeblast)
+  // is a different field and is never in the mask
+  assert.equal(firestore.of('patchDoc')[4].args[1].provider, undefined);
+
+  for (const collection of ['users', 'payments-orders', 'payments-intents', 'payments-webhooks', 'payments-disputes']) {
+    assert.equal(result.output[`payment-provider:${collection}`].docsFixed, 1, `${collection} fixed one doc`);
+  }
+});
+
+test('payment-provider: a null value still moves — the retired key never survives', async () => {
+  const { firestore } = await runProviderMigration({
+    users: [providerDoc('users', 'uid-free', { subscription: { payment: { processor: null } } })],
+  }, { options: { execute: true } });
+
+  assert.deepEqual(firestore.of('patchDoc')[0].args, [
+    'users/uid-free',
+    { subscription: { payment: { provider: null } } },
+    ['subscription.payment.provider', 'subscription.payment.processor'],
+  ]);
+});
+
+test('payment-provider: a doc carrying BOTH keeps `provider` and drops only the leftover', async () => {
+  const { firestore } = await runProviderMigration({
+    'payments-orders': [providerDoc('payments-orders', 'order-both', { provider: 'stripe', processor: 'paypal' })],
+  }, { options: { execute: true } });
+
+  assert.deepEqual(firestore.of('patchDoc')[0].args, ['payments-orders/order-both', {}, ['processor']]);
+});
+
+test('payment-provider: a converged brand is a zero-mutation no-op on every collection', async () => {
+  const { result, firestore } = await runProviderMigration({
+    users: [providerDoc('users', 'uid-1', { subscription: { payment: { provider: 'stripe' } } })],
+    'payments-orders': [providerDoc('payments-orders', 'order-1', { provider: 'paypal' })],
+    'payments-intents': [providerDoc('payments-intents', 'intent-1', { provider: 'chargebee' })],
+    'payments-webhooks': [providerDoc('payments-webhooks', 'evt-1', { provider: 'stripe' })],
+    'payments-disputes': [providerDoc('payments-disputes', 'alert-1', { provider: 'chargeblast', alert: { provider: 'stripe' } })],
+  }, { options: { execute: true } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(firestore.mutations(), []);
+  assert.equal(result.output['payment-provider:users'].totalDocs, 1);
+  assert.equal(result.output['payment-provider:users'].docsFixed, 0);
+});
+
+test('payment-provider: a doc with no payment field at all is untouched', async () => {
+  const { result, firestore } = await runProviderMigration({
+    users: [providerDoc('users', 'uid-bare', { subscription: {} })],
+  }, { options: { execute: true } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(firestore.mutations(), []);
+  assert.equal(result.output['payment-provider:users'].docsFixed, 0);
+});
+
+test('payment-provider: the default pass is the audit — counted and snapshotted, nothing written', async () => {
+  const root = stageBrand();
+  const { result, firestore } = await runProviderMigration({
+    'payments-orders': [
+      providerDoc('payments-orders', 'order-1', { processor: 'stripe' }),
+      providerDoc('payments-orders', 'order-new', { provider: 'stripe' }),
+    ],
+  }, { root });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(firestore.mutations(), [], 'the audit writes nothing');
+  assert.equal(result.output['payment-provider:payments-orders'].totalDocs, 2);
+  assert.equal(result.output['payment-provider:payments-orders'].docsFixed, 1, 'and still counts what it WOULD change');
+
+  const summaryPath = jetpack.find(join(root, '.omega', 'migrations', 'payments-orders'), { matching: '_summary.json' })[0];
+  const summary = jetpack.read(summaryPath, 'json');
+  assert.equal(summary.execute, false);
+  assert.equal(summary.stats.docsFixed, 1);
+});
+
 // ─── Runner mechanics: --migration (all), --ids, --limit, pagination ─────────
 
 test('migrations: bare --migration runs every registered migration in order', async () => {
@@ -878,6 +1003,8 @@ test('migrations: bare --migration runs every registered migration in order', as
     users: convergedUser(),
     'payments-orders': paymentDoc('order-new', { first: foldedTouch(), last: foldedTouch() }),
     'payments-intents': paymentDoc('intent-new', { first: foldedTouch(), last: foldedTouch() }),
+    'payments-webhooks': providerDoc('payments-webhooks', 'evt-new', { provider: 'stripe' }),
+    'payments-disputes': providerDoc('payments-disputes', 'alert-new', { alert: { provider: 'stripe' } }),
   };
   const firestore = fakeFirestore({
     countDocs: 1,
@@ -889,11 +1016,21 @@ test('migrations: bare --migration runs every registered migration in order', as
   });
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(firestore.of('countDocs').map((c) => c.args),
-    [['notifications'], ['users'], ['payments-orders'], ['payments-intents']]);
+  assert.deepEqual(firestore.of('countDocs').map((c) => c.args), [
+    ['notifications'], ['users'], ['payments-orders'], ['payments-intents'],
+    // then payment-provider's own sweep of all five payment-touching collections
+    ['users'], ['payments-orders'], ['payments-intents'], ['payments-webhooks'], ['payments-disputes'],
+  ]);
   assert.deepEqual(firestore.mutations(), []);
-  assert.deepEqual(Object.keys(result.output),
-    ['notifications', 'users', 'payments-orders', 'payments-intents']);
+  assert.deepEqual(Object.keys(result.output), [
+    // The folder shape comes first: nothing to rename under the fixture root
+    'targetsRename',
+    'notifications', 'users', 'payments-orders', 'payments-intents',
+    'payment-provider:users', 'payment-provider:payments-orders', 'payment-provider:payments-intents',
+    'payment-provider:payments-webhooks', 'payment-provider:payments-disputes',
+    // The one local migration: no .omega/state.json under the fixture root
+    'stateRetirement',
+  ]);
 });
 
 test('migrations: --ids fetches exactly those docs and warns on missing ones', async () => {
@@ -945,4 +1082,279 @@ test('migrations: pagination follows nextPageToken across pages', async () => {
     ['notifications', { pageSize: 500, pageToken: 'page-2' }],
   ]);
   assert.equal(result.output.notifications.totalDocs, 2);
+});
+
+// ─── state-retirement (#434): the LOCAL migration ────────────────────────────
+
+const stateRetirement = require('../src/services/migrations/ensure/state-retirement.js');
+
+const FIXTURE_STATE = {
+  edge: { zoneId: 'zone-abc' },
+  repo: { repo: { fullName: 'org/fixture', htmlUrl: 'https://github.com/org/fixture', private: false } },
+  search: { propertyUrl: 'sc-domain:fixture-brand.test', permissionLevel: 'siteOwner', gaLinked: true },
+  analytics: {
+    streams: {
+      web: { streamId: '111', measurementId: 'G-WEB', apiSecret: 'web-secret', uri: 'https://fixture-brand.test' },
+      backend: { streamId: '222', measurementId: 'G-API', apiSecret: 'api-secret', uri: 'https://api.fixture-brand.test' },
+    },
+    firebaseLink: { propertyId: '999', linked: true },
+  },
+  payment: {
+    stripeAccountId: 'acct_1',
+    radarConfirmed: true,
+    disputesConfirmed: false,
+    stripeProducts: { premium: 'prod_1' },
+    paypalProducts: { premium: 'PROD-1' },
+  },
+  cloud: {
+    sdkConfig: { apiKey: 'key-1', projectId: 'fixture-project', measurementId: '' },
+    authentication: { oauthRedirectsConfigured: true },
+    cloudMessaging: { vapidPublicKey: 'B-public', vapidPrivateKey: 'private-half' },
+    billing: { enabled: true },
+  },
+  campaigns: { listId: 'list-1', listName: 'Fixture Brand' },
+  newsletter: { publicationId: 'pub-1' },
+  monitoring: { org: 'fixture-org', projectMap: { web: { id: '1', slug: 'fixture-web' } } },
+  captcha: { domainsConfirmed: ['fixture-brand.test', 'www.fixture-brand.test'] },
+};
+
+const RETIREMENT_CONFIG_SOURCE = [
+  '{',
+  '  brand: {',
+  '    id: "fixture-brand",',
+  '  },',
+  '  payment: {',
+  '    products: [',
+  '      { id: "premium", name: "Premium" },',
+  '    ],',
+  '  },',
+  '}',
+  '',
+].join('\n');
+
+// The same catalog the source above authors — planMoves reads it to know a
+// [id=…] edit path has something to address
+const RETIREMENT_CONFIG = { payment: { products: [{ id: 'premium', name: 'Premium' }] } };
+
+function stageRetirementBrand({ state = FIXTURE_STATE } = {}) {
+  const root = stageBrand();
+  jetpack.write(join(root, 'config', 'omega.json5'), RETIREMENT_CONFIG_SOURCE);
+  if (state) {
+    jetpack.write(join(root, '.omega', 'state.json'), state, { jsonIndent: 2 });
+  }
+  return root;
+}
+
+function runRetirement(root, options = {}) {
+  return stateRetirement({ brandRoot: root, brandConfig: RETIREMENT_CONFIG, options });
+}
+
+test('state-retirement: every state key is either moved to a named home or explicitly dropped', () => {
+  const moves = stateRetirement.planMoves(FIXTURE_STATE, RETIREMENT_CONFIG);
+  const by = (from) => moves.find((move) => move.from === from);
+
+  // Public ids + confirmations → config, in the #425 provider shape
+  assert.deepEqual(by('edge.zoneId'), { from: 'edge.zoneId', config: 'edge.providers.cloudflare.zone', value: 'zone-abc' });
+  assert.equal(by('search.gaLinked').config, 'search.providers.searchConsole.gaLinked');
+  assert.equal(by('analytics.streams.backend.measurementId').config, 'targets.backend.analytics.providers.google.id');
+  assert.equal(by('payment.radarConfirmed').config, 'payment.providers.stripe.radarConfirmed');
+  assert.equal(by('payment.stripeProducts.premium').config, 'payment.products[id=premium].stripe.productId');
+  assert.equal(by('payment.paypalProducts.premium').config, 'payment.products[id=premium].paypal.productId');
+  assert.equal(by('cloud.sdkConfig.apiKey').config, 'cloud.config.apiKey');
+  assert.equal(by('cloud.authentication.oauthRedirectsConfigured').config, 'cloud.oauthRedirectsConfigured');
+  assert.equal(by('cloud.cloudMessaging.vapidPublicKey').config, 'cloud.messaging.vapidKey');
+  assert.equal(by('campaigns.listId').config, 'marketing.campaigns.providers.sendgrid.listId');
+  assert.equal(by('newsletter.publicationId').config, 'marketing.newsletter.providers.beehiiv.publicationId');
+  assert.equal(by('monitoring.org').config, 'monitoring.providers.sentry.org');
+  assert.deepEqual(by('captcha.domainsConfirmed').value, ['fixture-brand.test', 'www.fixture-brand.test']);
+
+  // Secrets → the brand .env, per target, NEVER config (the loader hard-fails
+  // secret-shaped keys)
+  assert.equal(by('analytics.streams.web.apiSecret').env, 'GOOGLE_ANALYTICS_SECRET_WEB');
+  assert.equal(by('analytics.streams.backend.apiSecret').env, 'GOOGLE_ANALYTICS_SECRET_BACKEND');
+  assert.equal(by('cloud.cloudMessaging.vapidPrivateKey').env, 'VAPID_PRIVATE_KEY');
+  assert.ok(moves.every((move) => !move.config || !/secret$|privateKey$/i.test(move.config.split('.').pop())));
+
+  // A false confirmation is the ABSENCE of a fact, and an empty string would
+  // erase a real config value
+  assert.equal(by('payment.disputesConfirmed'), undefined);
+  assert.equal(by('cloud.sdkConfig.measurementId'), undefined);
+
+  // Re-derived on the next run: nothing claims a home for them
+  for (const derived of [
+    'repo.repo.fullName', 'search.propertyUrl', 'analytics.streams.web.streamId',
+    'analytics.firebaseLink.linked', 'payment.stripeAccountId', 'cloud.billing.enabled',
+    'campaigns.listName', 'monitoring.projectMap.web.slug',
+  ]) {
+    assert.equal(by(derived), undefined, `${derived} should not be moved`);
+  }
+});
+
+test('state-retirement: an audit run reports the plan and writes nothing', async () => {
+  const root = stageRetirementBrand();
+  const configBefore = jetpack.read(join(root, 'config', 'omega.json5'));
+
+  const result = await runRetirement(root);
+
+  assert.equal(result.output.stateRetirement.audit, true);
+  assert.ok(result.output.stateRetirement.config.includes('edge.providers.cloudflare.zone'));
+  assert.deepEqual(result.output.stateRetirement.env,
+    ['GOOGLE_ANALYTICS_SECRET_WEB', 'GOOGLE_ANALYTICS_SECRET_BACKEND', 'VAPID_PRIVATE_KEY']);
+  assert.ok(result.output.stateRetirement.dropped.includes('payment.stripeAccountId'));
+
+  assert.equal(jetpack.read(join(root, 'config', 'omega.json5')), configBefore);
+  assert.equal(jetpack.exists(join(root, '.env')), false);
+  assert.ok(jetpack.exists(join(root, '.omega', 'state.json')));
+});
+
+test('state-retirement: --execute lands both homes, deletes the file, and re-runs clean', async () => {
+  const root = stageRetirementBrand();
+  delete process.env.GOOGLE_ANALYTICS_SECRET_WEB;
+  delete process.env.GOOGLE_ANALYTICS_SECRET_BACKEND;
+  delete process.env.VAPID_PRIVATE_KEY;
+
+  const result = await runRetirement(root, { execute: true });
+
+  const config = jetpack.read(join(root, 'config', 'omega.json5'));
+  assert.match(config, /zone: "zone-abc"/);
+  assert.match(config, /gaLinked: true/);
+  assert.match(config, /radarConfirmed: true/);
+  assert.match(config, /oauthRedirectsConfigured: true/);
+  assert.match(config, /vapidKey: "B-public"/);
+  assert.match(config, /org: "fixture-org"/);
+  // Secrets are NOT in config
+  assert.ok(!config.includes('web-secret'));
+  assert.ok(!config.includes('private-half'));
+
+  const env = jetpack.read(join(root, '.env'));
+  assert.match(env, /GOOGLE_ANALYTICS_SECRET_WEB="web-secret"/);
+  assert.match(env, /GOOGLE_ANALYTICS_SECRET_BACKEND="api-secret"/);
+  assert.match(env, /VAPID_PRIVATE_KEY="private-half"/);
+
+  assert.equal(jetpack.exists(join(root, '.omega', 'state.json')), false);
+  assert.equal(result.output.stateRetirement.audit, undefined);
+
+  // Idempotent: the second run has nothing to do
+  const again = await runRetirement(root, { execute: true });
+  assert.deepEqual(again.output.stateRetirement, { retired: true });
+});
+
+test('state-retirement: the devkit deploy record survives — the file is trimmed, not deleted', async () => {
+  const deploy = { web: { at: '2026-07-17T00:00:00.000Z', method: 'direct' } };
+  const root = stageRetirementBrand({ state: { ...FIXTURE_STATE, deploy } });
+
+  const result = await runRetirement(root, { execute: true });
+
+  assert.deepEqual(jetpack.read(join(root, '.omega', 'state.json'), 'json'), { deploy });
+  assert.deepEqual(result.output.stateRetirement.kept, ['deploy']);
+  // and it is never reported as a dropped fact
+  assert.ok(result.output.stateRetirement.dropped.every((path) => !path.startsWith('deploy')));
+
+  // A trimmed file is already retired — the re-run leaves it alone
+  const again = await runRetirement(root, { execute: true });
+  assert.deepEqual(again.output.stateRetirement, { retired: true, kept: ['deploy'] });
+  assert.deepEqual(jetpack.read(join(root, '.omega', 'state.json'), 'json'), { deploy });
+});
+
+// ─── targets-rename (#443): the other LOCAL migration ────────────────────────
+
+const targetsRename = require('../src/services/migrations/ensure/targets-rename.js');
+
+/**
+ * A brand monorepo on disk: a root manifest with the given workspaces globs,
+ * and target dirs under `apps/`, `targets/`, or both.
+ */
+function stageRenameBrand({ apps = null, targets = null, workspaces = ['apps/*'] } = {}) {
+  const root = stageBrand();
+
+  jetpack.write(join(root, 'package.json'), `${JSON.stringify({ name: 'fixture-brand', private: true, workspaces }, null, 2)}\n`);
+
+  for (const [dir, names] of [['apps', apps], ['targets', targets]]) {
+    for (const name of names || []) {
+      jetpack.write(join(root, dir, name, 'package.json'), `${JSON.stringify({ name })}
+`);
+    }
+  }
+
+  return root;
+}
+
+const readManifest = (root) => jetpack.read(join(root, 'package.json'), 'json');
+
+const runRename = (root, options = {}) => targetsRename({ brandRoot: root, options });
+
+test('targets-rename: the default run audits — the plan is reported, nothing moves', async () => {
+  const root = stageRenameBrand({ apps: ['website', 'backend'] });
+  const before = jetpack.read(join(root, 'package.json'));
+
+  const result = await runRename(root);
+
+  assert.equal(result.output.targetsRename.audit, true);
+  assert.equal(result.output.targetsRename.folder, true);
+  assert.equal(result.output.targetsRename.workspaces, true);
+  assert.deepEqual(result.output.targetsRename.targets.sort(), ['backend', 'website']);
+
+  assert.equal(jetpack.exists(join(root, 'apps', 'website')), 'dir', 'the folder is untouched');
+  assert.equal(jetpack.exists(join(root, 'targets')), false, 'nothing is created');
+  assert.equal(jetpack.read(join(root, 'package.json')), before, 'the manifest is byte-identical');
+});
+
+test('targets-rename: --execute renames apps/ → targets/ once, contents and other globs intact', async () => {
+  const root = stageRenameBrand({ apps: ['website', 'backend'], workspaces: ['apps/*', 'tools/*'] });
+
+  const result = await runRename(root, { execute: true });
+
+  assert.equal(result.output.targetsRename.migrated, true);
+  assert.equal(jetpack.exists(join(root, 'apps')), false, 'apps/ is gone');
+  assert.deepEqual(jetpack.list(join(root, 'targets')).sort(), ['backend', 'website']);
+  assert.equal(
+    jetpack.read(join(root, 'targets', 'website', 'package.json'), 'json').name,
+    'website',
+    'target contents travel with the folder',
+  );
+  assert.deepEqual(readManifest(root).workspaces, ['targets/*', 'tools/*'], 'the glob flips, every other entry survives');
+});
+
+test('targets-rename: idempotent — a migrated brand re-runs as a clean no-op', async () => {
+  const root = stageRenameBrand({ apps: ['website'] });
+
+  await runRename(root, { execute: true });
+  const after = jetpack.read(join(root, 'package.json'));
+
+  const again = await runRename(root, { execute: true });
+
+  assert.deepEqual(again.output.targetsRename, { migrated: false });
+  assert.equal(jetpack.read(join(root, 'package.json')), after, 'the manifest is untouched');
+  assert.deepEqual(jetpack.list(join(root, 'targets')), ['website']);
+});
+
+test('targets-rename: a brand born on targets/ is never touched', async () => {
+  const root = stageRenameBrand({ targets: ['website'], workspaces: ['targets/*'] });
+
+  const result = await runRename(root, { execute: true });
+
+  assert.deepEqual(result.output.targetsRename, { migrated: false });
+  assert.deepEqual(readManifest(root).workspaces, ['targets/*']);
+});
+
+test('targets-rename: a hand-renamed folder still heals the workspaces glob', async () => {
+  const root = stageRenameBrand({ targets: ['website'], workspaces: ['apps/*'] });
+
+  const audit = await runRename(root);
+  assert.deepEqual(audit.output.targetsRename, { audit: true, folder: false, workspaces: true, targets: [] });
+  assert.deepEqual(readManifest(root).workspaces, ['apps/*'], 'the audit writes nothing');
+
+  const result = await runRename(root, { execute: true });
+
+  assert.equal(result.output.targetsRename.migrated, true);
+  assert.deepEqual(readManifest(root).workspaces, ['targets/*']);
+});
+
+test('targets-rename: BOTH folders fails loudly instead of guessing', async () => {
+  const root = stageRenameBrand({ apps: ['website'], targets: ['website'] });
+
+  await assert.rejects(() => runRename(root, { execute: true }), /carries BOTH apps\/ and targets\//);
+
+  assert.equal(jetpack.exists(join(root, 'apps', 'website')), 'dir', 'nothing is moved');
+  assert.deepEqual(readManifest(root).workspaces, ['apps/*'], 'nothing is rewritten');
 });

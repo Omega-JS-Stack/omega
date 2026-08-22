@@ -96,13 +96,13 @@ module.exports = [
   },
 
   // PayPal expiry cron — pending cancellations whose paid period has ended
-  // Query: .where('subscription.payment.processor', '==', 'paypal')
+  // Query: .where('subscription.payment.provider', '==', 'paypal')
   //        .where('subscription.cancellation.pending', '==', true)
   {
     collectionGroup: 'users',
     queryScope: 'COLLECTION',
     fields: [
-      { fieldPath: 'subscription.payment.processor', order: 'ASCENDING' },
+      { fieldPath: 'subscription.payment.provider', order: 'ASCENDING' },
       { fieldPath: 'subscription.cancellation.pending', order: 'ASCENDING' },
     ],
   },

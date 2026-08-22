@@ -47,7 +47,7 @@ const CLIENT_ICON_RENDERER = 'export function createIconRenderer() { return { st
 /**
  * A minimal site whose ONLY interesting input is the client: one asset layer
  * with a main.js that boots the client, and a fixture `@omega.js/client`
- * package dist the build aliases to — the client tree lives outside the app
+ * package dist the build aliases to — the client tree lives outside the target
  * root, exactly as a real (linked or installed) one does.
  */
 function app(t) {
@@ -61,17 +61,17 @@ function app(t) {
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
   };
-  const writeApp = write(root);
+  const writeTarget = write(root);
   const writeClient = write(clientDist);
 
-  writeApp('assets/js/main.js', [
+  writeTarget('assets/js/main.js', [
     "import omega from '@omega.js/client';",
     'export default () => omega.initialize();',
   ].join('\n'));
   // The core layer the boot runtime's dev-mode dynamic import reaches through
   // the __main_assets__ alias — a stub, since the real core lib is not what
   // this suite is about.
-  writeApp('core/js/libs/dev.js', 'export default {};');
+  writeTarget('core/js/libs/dev.js', 'export default {};');
 
   writeClient('index.js', clientEntry('CLIENT-BEFORE'));
   writeClient('modules/icon-renderer.js', CLIENT_ICON_RENDERER);

@@ -1,6 +1,6 @@
 /**
  * Test provider — a deterministic, first-class AI provider for test suites
- * (the `test` payment-processor precedent: a real implementation of the
+ * (the `test` payment-provider precedent: a real implementation of the
  * provider seam, not a mock injected into callers).
  *
  * REFUSES to run in production — only development/testing environments.

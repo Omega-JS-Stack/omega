@@ -3,7 +3,7 @@
  * the purchase actually EXISTS ([#232](https://github.com/Omega-JS-Stack/omega/issues/232)).
  *
  * The bug this pins: entitlement is granted by the payment WEBHOOK, which lands
- * after the processor has already redirected the browser here. The page read
+ * after the provider has already redirected the browser here. The page read
  * the redirect's own URL params and rendered "You're in" off them — so a
  * checkout with no webhook delivery (local dev), and a checkout the backend
  * DECLINED (Ian's QA repro: `checkout-declined` fired, the account was
@@ -265,7 +265,7 @@ test('#232: a DECLINED checkout never renders success', async () => {
   const modules = await loadModules();
 
   // The live repro: the backend declined, `checkout-declined` suspended the
-  // account, and the test processor still returned the normal confirmation URL.
+  // account, and the test provider still returned the normal confirmation URL.
   const { outcome } = await runPoll(modules, [SUSPENDED]);
 
   assert.strictEqual(outcome, 'timeout', 'a suspended account is not a completed purchase');

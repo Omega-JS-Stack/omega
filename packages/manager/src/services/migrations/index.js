@@ -1,18 +1,28 @@
 /**
- * Migrations service — runs data migrations on the brand's Firestore
- * collections. Only runs when the --migration flag is set (bare = all
- * migrations, --migration=<name> = just that one), so a normal manage run
- * never touches collection data. Even then the run is an AUDIT: it prints
- * what every fix WOULD do and writes nothing until `--execute`.
+ * Migrations service — runs migrations on the brand's Firestore collections
+ * and (`local: true` operations) on the brand's own files. Only runs when the
+ * --migration flag is set (bare = all migrations, --migration=<name> = just
+ * that one), so a normal manage run never touches collection data. Even then
+ * the run is an AUDIT: it prints what every fix WOULD do and writes nothing
+ * until `--execute`.
  *
  * The framework (runner, validator, snapshots) plus the two canonical
  * @omega.js/backend-schema migrations (notifications, users) are ported from
  * omega-manager; its other 25 registered migrations are company-instance
- * one-offs (per-app data repairs) and stay there. firebase-admin is
+ * one-offs (per-target data repairs) and stay there. firebase-admin is
  * replaced by the shared Identity Toolkit + FirestoreREST clients over the
  * brand's own service account. The orders and payments-intents migrations are
  * native to OMEGA: they carry the same #384 attribution fold as users and
- * notifications onto the two payment collections.
+ * notifications onto the two payment collections. payment-provider is native
+ * too — the #428 word rename's data half, sweeping the stored `processor`
+ * field to `provider` across all five payment-touching collections.
+ * Two are `local: true` — they work on the brand's own files, so they need
+ * neither a backend target nor a service account: state-retirement moves the
+ * retired .omega/state.json into config + .env (#434), and targets-rename
+ * moves a pre-#443 brand's apps/ folder to targets/. The rename is also the
+ * one migration a walk never reaches on the brand it fixes (discovery fails
+ * loud on the old shape), so `--migration=targets-rename` runs it alone from
+ * runManage; here it only ever re-checks a converged brand.
  *
  * Add new migrations by creating handlers in ensure/ and registering them
  * in config.js OPERATIONS.migrations.
@@ -36,18 +46,6 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: '--migration flag not set' };
     }
 
-    const targets = context.brandConfig.targets || {};
-    if (!targets.backend) {
-      return { skip: true, reason: 'no backend target' };
-    }
-
-    // Skip for shared Firebase projects — migrations iterate whole collections,
-    // so the owning brand's run covers the project; per-shared-brand runs would
-    // just repeat the same migration against the same Firestore
-    if (context.brandConfig.cloud?.shared === true) {
-      return { skip: true, reason: 'shared Firebase project (owning brand runs migrations)' };
-    }
-
     // Filter to a specific migration if a name was provided (--migration=users)
     const migrationName = typeof options.migration === 'string' ? options.migration : null;
     const filteredOperations = migrationName
@@ -67,10 +65,27 @@ module.exports.run = createServiceRunner({
       }
     }
 
+    // Firestore gates apply only to the migrations that actually touch it —
+    // a `local: true` migration works on the brand's own files, so it runs on
+    // a brand with no backend at all
+    const needsFirestore = filteredOperations.some((op) => !op.local);
+
+    const targets = context.brandConfig.targets || {};
+    if (needsFirestore && !targets.backend) {
+      return { skip: true, reason: 'no backend target' };
+    }
+
+    // Skip for shared Firebase projects — migrations iterate whole collections,
+    // so the owning brand's run covers the project; per-shared-brand runs would
+    // just repeat the same migration against the same Firestore
+    if (needsFirestore && context.brandConfig.cloud?.shared === true) {
+      return { skip: true, reason: 'shared Firebase project (owning brand runs migrations)' };
+    }
+
     // Tests inject fakes via context
     let authAdmin = context.authAdmin;
     let firestore = context.firestore;
-    if (!authAdmin) {
+    if (needsFirestore && !authAdmin) {
       if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_PATH))) {
         return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the cloud service first)` };
       }

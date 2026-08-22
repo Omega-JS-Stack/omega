@@ -14,14 +14,14 @@ translation: {
   enabled: true,          // optional master switch (default true)
   default: 'en',          // source language (default 'en')
   languages: ['es', 'fr'],// target codes — EMPTY/ABSENT = translation off
-  provider: 'claude',     // 'claude' (default) | 'chatgpt'
-  model: null,            // optional override (claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano')
+  providers: { claude: {} },// the engine is a KEY (#425): claude | chatgpt. Absent block = claude
+  model: null,            // optional override for the chosen engine (claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano')
   exclude: [],            // web only: extra page routes/folders to skip
 }
 ```
 
 Shared section (typically brand-level; `SHARED_SECTIONS` includes it, so
-disperse copies it and every app inherits through the cascade). Language codes
+disperse copies it and every target inherits through the cascade). Language codes
 validate against the SSOT in `@omega.js/devkit/translate` (`LANGUAGE_NAMES`,
 ~32 codes) — an unknown code is a hard config error naming the supported set.
 The same SSOT carries `LANGUAGE_LOCALES` + `ogLocale(code)`, the one code →
@@ -43,7 +43,7 @@ even though the text arrived).
 
 **Enabling translation on web means installing the SDK (#37).** `@omega.js/web`
 does NOT ship `@anthropic-ai/claude-agent-sdk`: translation is opt-in and the
-SDK is heavy, so a web brand that turns it on installs it in the app itself
+SDK is heavy, so a web brand that turns it on installs it in the target itself
 (`npm install @anthropic-ai/claude-agent-sdk`); `@omega.js/extension` still
 declares it. The SDK is lazy-required at the first claude call, so a brand
 without translation never pays for it, and a brand that enabled translation
@@ -60,9 +60,9 @@ read from the installed web package), followed by one `npm install` at the
 brand root. Converge-to-config, so: already declared (in `dependencies` or
 `devDependencies`) = zero-mutation no-op that never overwrites a
 consumer-chosen spec, `--dry-run` plans without writing, translation off or
-provider `chatgpt` leaves the app untouched, and turning translation back OFF
+provider `chatgpt` leaves the target untouched, and turning translation back OFF
 never REMOVES the dep (uninstalling on a config flip is riskier than leaving
-it). Only web apps are provisioned, since backend and extension declare the
+it). Only web targets are provisioned, since backend and extension declare the
 SDK as a real dependency of the framework. The loud error above stays the backstop
 for hand-managed brands (`packages/manager/src/services/workspace/ensure/translation-sdk.js`,
 pinned by `packages/manager/test/workspace-translation-sdk.test.js`).
@@ -196,5 +196,5 @@ list in `gulp/config/locales.js` is gone (only the CWS `limits` remain there).
 - extension `build/translate.test.js` — compose + description marker glue.
 - Live canary (cp96, local Claude): omega-brand `/about` → es (102 strings,
   rerun 0 calls) and the extension's 4 messages (2 unique) + 2,703-char
-  description → es, both idempotent; artifacts committed under each app's
+  description → es, both idempotent; artifacts committed under each target's
   `translations/`.

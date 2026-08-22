@@ -511,7 +511,7 @@ test('#270 follow-up: an enterprise-only catalog never skips a heading level', a
   });
 });
 
-// #348 — the QA tier is a real product: created on every processor and
+// #348 — the QA tier is a real product: created on every provider and
 // purchasable by id, but never a card on the pricing page. `hidden: true` is
 // presentation-only, so the composer drops it before any lane reads the
 // catalog (including the numbers the page speaks).

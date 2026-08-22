@@ -17,7 +17,7 @@ its quality hook fires on every `omega.json5` edit.
 | Every project type (default) | `config/omega.json5` |
 | Standalone backend repo | `functions/config/omega.json5` |
 | Brand monorepo — brand level | `{brand}/config/omega.json5` |
-| Brand monorepo — app level | `{brand}/apps/{app}/config/omega.json5` |
+| Brand monorepo — local level | `{brand}/targets/{target}/config/omega.json5` |
 
 JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 
@@ -38,11 +38,11 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
                     email: { providers: { replyify: { enabled, agentId, templateAgentId, updateAgentInfo, plan, discount } } } },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
   advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
-  payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
-  monitoring:     { provider: 'sentry', org, dsn, environment, sampleRate, tracesSampleRate, scrubEmail, attachScreenshot, bundlePatterns: [] },   // dsn presence IS the enable signal; environment unset = the host's gate names it; scrubEmail defaults true (email OFF), attachScreenshot is desktop-only, bundlePatterns browser-only. docs/shared/monitoring.md
+  payment:        { providers: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
+  monitoring:     { enabled, providers: { sentry: { org, dsn, environment, sampleRate, tracesSampleRate, scrubEmail, attachScreenshot, bundlePatterns: [] } } },   // #425: the monitor is a KEY under `providers`. dsn presence IS the runtime enable signal; environment unset = the host's gate names it; scrubEmail defaults true (email OFF), attachScreenshot is desktop-only, bundlePatterns browser-only. docs/shared/monitoring.md
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
-  translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/shared/translation.md
+  translation:    { enabled, default, languages: [], providers: { claude: {} } | { chatgpt: {} }, model, exclude: [] }, // presence picks the engine; absent = claude. docs/shared/translation.md
 
   // MANAGER-read brand-level sections (#277). Schema-known at the TOP level: the
   // manager loads the brand config unfolded, and a website-only brand has no
@@ -51,7 +51,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   parent:         'self' | 'https://parent.example.com' | false,   // webhook parent topology; false = shared webhook account owned elsewhere
   github:         { user, website },             // GitHub identity for the brand (content identity; repo.providers.github is the source-hosting home)
   reviews:        { enabled, sites: [] },
-  marketing:      { campaigns: {…}, newsletter: {…}, prune: {…} },   // campaigns/newsletter/prune, the manager's marketing automation
+  marketing:      { campaigns: { enabled, providers: { sendgrid: { listId } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is OPT-IN: packages/backend/docs/marketing-campaigns.md § Contact Pruning
   blog:           { /* AI blog-content settings (Ghostii pipeline) */ },
   dataRequest:    { /* GDPR/CCPA data-request query definitions */ },
   directory:      { enabled },                   // opt in to the manager's directory PUSH — this brand's entry into `parent`'s brands collection (#246); default off, public facts only. docs/manager/directory.md
@@ -77,25 +77,25 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 `loadConfig(projectDir, target, { defaults })` produces ONE resolved object per target:
 
 ```
-framework defaults ← company ← brand shared ← brand targets[target] ← app shared ← app targets[target]
+framework defaults ← company ← brand shared ← brand targets[target] ← local shared ← local targets[target]
 ```
 
-- "shared" = the file minus its `targets` key. In a standalone repo only the app layers exist.
+- "shared" = the file minus its `targets` key. In a standalone repo only the local layers exist.
 - **The company layer** is the company workspace's own `config/omega.json5`, found through the
   brand's `.omega/company.json` stamp (the same marker the `.env` cascade and owner hooks read —
   see below). It layers exactly like the brand file (company shared ← company `targets[target]`)
   minus its `brands` key, which is company plumbing and never inherits. An unstamped brand has no
   company layer; the resolved result reports the file it used as `files.company`.
-- **`projectDir` may be one of an app's SUBDIRS** — `functions/` (@omega.js/backend's runtime cwd)
+- **`projectDir` may be one of a target's SUBDIRS** — `functions/` (@omega.js/backend's runtime cwd)
   or `dist/` (its staged build output, the view `omega test` loads): every walk (brand root,
-  company marker, app-layer fallback, instance id, compose, `resolveBrandRoot`) treats the app root
+  company marker, local-layer fallback, instance id, compose, `resolveBrandRoot`) treats the target root
   as one level up, so `loadConfig(functionsDir, 'backend')`, `loadConfig(distDir, 'backend')` and
-  `loadConfig(appRoot, 'backend')` resolve identically. A staged `config/omega.json5` inside either
-  subdir is the deployed runtime's own view, never an authored app layer.
+  `loadConfig(targetRoot, 'backend')` resolve identically. A staged `config/omega.json5` inside either
+  subdir is the deployed runtime's own view, never an authored local layer.
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
   `config.platforms`; frameworks never read through `config.targets.<type>.…`.
 - **Any shared key inside a target entry overrides it for that surface** — a desktop-only
-  Sentry DSN is just `targets.desktop.monitoring.dsn`; disabling any integration per-surface is
+  Sentry DSN is just `targets.desktop.monitoring.providers.sentry.dsn`; disabling any integration per-surface is
   uniformly `<key>: { enabled: false }`. One agnostic deep merge everywhere (objects merge,
   arrays/scalars replace, `null` replaces, `undefined` is skipped).
 - The merged `targets` map rides along on the resolved config so enabled-target enumeration
@@ -114,8 +114,8 @@ instances** ([_attic/plans/multi-instance-targets.md](../../_attic/plans/multi-i
 targets: {
   backend: { /* single instance — today's shape, unchanged */ },
   web: [
-    { id: 'main' },                                     // the primary — apps/website
-    { id: 'admin', url: 'https://admin.acme.com',       // apps/website-admin
+    { id: 'main' },                                     // the primary — targets/website
+    { id: 'admin', url: 'https://admin.acme.com',       // targets/website-admin
       brand: { name: 'Acme Admin' } },                  // overrides brand shared for admin ONLY
   ],
 }
@@ -124,21 +124,21 @@ targets: {
 - **Normalization is the whole mechanism** (`normalizeTargetInstances`): a single object is
   `[{ id: 'main', ...entry }]` internally — every consumer iterates instances and the
   single-instance world is just length 1. Zero breaking change for existing brands.
-- **App-dir mapping**: `main` → `apps/<canonical dir>` (unchanged); any other id →
-  `apps/<canonical dir>-<id>`. The inverse walk names the instance from the dir
+- **Target-dir mapping**: `main` → `targets/<canonical dir>` (unchanged); any other id →
+  `targets/<canonical dir>-<id>`. The inverse walk names the instance from the dir
   (`website-admin` → web/admin), and `loadConfig`/`composeTargetConfig` slot THAT instance's
-  entry into the merge chain: `defaults ← brand shared ← instance entry ← app shared ← app
+  entry into the merge chain: `defaults ← brand shared ← instance entry ← local shared ← local
   targets.<type>`. The instance `id` key is bookkeeping — stripped, never config. The result
   carries `instance` (the resolved id).
 - **Validator rules**: array entries MUST carry a dir-safe `id`, unique per type; an empty
   array is an error; **>1 backend instance is a WARNING** (`warnings` on the result) — backend
   stays single-instance in practice (one Cloud Functions surface per brand).
-- **Scoping rules**: the single-object form applies to EVERY app of the type (today's
-  behavior, suffixed dirs included); the array form is exact-id — an app dir with no matching
+- **Scoping rules**: the single-object form applies to EVERY target of the type (today's
+  behavior, suffixed dirs included); the array form is exact-id — a target dir with no matching
   id rides shared config alone. The workspace structure op expects every instance's exact dir
   (missing = the same create-this-dir error as today).
 - **Per-instance surfaces**: dev ports offset by array position (docs/shared/local-dev.md), deploy
-  records key per app (docs/shared/deploys.md), the manager's live-URL checks use each instance's
+  records key per target (docs/shared/deploys.md), the manager's live-URL checks use each instance's
   `url` (instance entry `url` → instance `brand.url` → brand shared `brand.url`).
 - **Legacy `brand.subdomains` conversion rule**: each subdomain becomes a web instance —
   `["admin", "cdn"]` → `web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.<domain>' },
@@ -161,17 +161,17 @@ targets: {
 Secrets mirror the config hierarchy (`src/env.js`), weakest → strongest:
 
 ```
-company .env ← brand .env ← app .env ← shell env
+company .env ← brand .env ← local .env ← shell env
 ```
 
-- **Same walk as the config cascade**: `{brand}/apps/{app}` layers the brand root's `.env`
-  under the app's; a brand stamped with `.omega/company.json` (written idempotently by
+- **Same walk as the config cascade**: `{brand}/targets/{target}` layers the brand root's `.env`
+  under the target's; a brand stamped with `.omega/company.json` (written idempotently by
   company manage runs) layers its company root's `.env` underneath that. `findBrandRoot`
   in `load.js` is the ONE definition of the walk — both cascades use it.
 - **Precedence via dotenv's no-override semantics**: files load strongest-first and never
-  overwrite keys already set, so the shell always wins and app beats brand beats company.
+  overwrite keys already set, so the shell always wins and local beats brand beats company.
 - **Empty file values never claim a key (cp95a, friction #20)**: `KEY=` / `KEY=""` in any
-  `.env` FILE means "documented here, value supplied by another layer" — a scaffolded app
+  `.env` FILE means "documented here, value supplied by another layer" — a scaffolded local
   file full of placeholders can't shadow the brand root's real values. Only the shell can
   deliberately set a key to empty. The framework `_.env` templates ship `# KEY=` commented
   placeholders (the merge protocol keeps set values on their line, converges empties to
@@ -181,7 +181,7 @@ company .env ← brand .env ← app .env ← shell env
   (`loadEnv(process.cwd())` in the web/desktop/extension CLIs + gulp pipelines,
   `loadEnv(functionsDir)` in the @omega.js/backend CLI and runtime). Nothing is copied
   between `.env` files just to be visible.
-- **Backend's app layer is `functions/.env`** — it physically rides the Firebase deploy
+- **Backend's local layer is `functions/.env`** — it physically rides the Firebase deploy
   artifact (the cloud can't walk up), so omega-manager's disperse composes that ONE file
   from the resolved chain. In the cloud the walk finds no brand/company and behavior is
   identical to plain dotenv.
@@ -241,9 +241,9 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   the e2e harness) read it; cleared on clean shutdown. `facts` publishes the resolved
   NON-port facts beside the map — today `origin`, the website's dev origin
   ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
-- **Sibling map** — `readSiblingPorts(appDir)` merges every OTHER app's live ports file
-  in the same brand (a running backend's emulator map) for the app that asks;
-  `readSiblingOrigin(appDir)` reads the published dev website origin the same way. Read
+- **Sibling map** — `readSiblingPorts(targetDir)` merges every OTHER target's live ports file
+  in the same brand (a running backend's emulator map) for the target that asks;
+  `readSiblingOrigin(targetDir)` reads the published dev website origin the same way. Read
   at USE time, never cached: the file appears when the backend boots and changes when it
   restarts.
 - **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
@@ -286,7 +286,7 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
 - **Website port (cp89)** — `omega dev` allocates through the same model: classic
   **4000** (pre-N7 it defaulted to 8080, colliding with the SAME brand's firestore
   emulator), bump when taken, `--port` flag or config `ports.website` pins; publishes
-  its own ports file in the website app dir.
+  its own ports file in the website target dir.
 - **Serve + per-target ports (cp90)** — `mgr serve` allocates through the same model
   (`--port` pins, taken bumps — the old kill-the-incumbent check is gone) and PUBLISHES
   its map: `https` (the mkcert proxy) + `hosting` (the internal plain-http
@@ -330,7 +330,7 @@ passes, and `demo-*` (emulator-only) projects are exempt.
 
 When a customer starts cancelling a PAID subscription, the billing card pitches a
 discount on the next cycle before it asks them why they are leaving. Accepting applies
-the discount through the processor's own coupon plumbing, calls the cancel off, and
+the discount through the provider's own coupon plumbing, calls the cancel off, and
 leaves the saving on the card (what comes off, and which bills it comes off — #325);
 declining opens the cancellation questionnaire unchanged.
 
@@ -361,7 +361,7 @@ changes) leaves the saving exactly as claimed. A node with no stamp predates it 
 nothing can prove it belongs to an older subscription, so it is read as riding the one it
 is found on and stamped there: no live discount is taken away on a guess, and it clears
 on the next resubscribe like any other. CONSUMPTION is not cleared: a spent `once` coupon
-still reads as applied until the subscription changes, because no processor's unified
+still reads as applied until the subscription changes, because no provider's unified
 shape reports whether the coupon is still attached (#333).
 
 The offer is the brand's, and **a brand that writes nothing gets one anyway**: 50% off
@@ -381,13 +381,13 @@ reading.
 `resolveWinbackOffer(payment)` is the ONE home of these defaults. The backend's
 `POST /payments/winback` route resolves the brand's section through it, and the web
 build bakes the same call into the client blob (`site.client.payment.winback`), so the
-dialog the customer reads and the coupon the processor creates can never name different
+dialog the customer reads and the coupon the provider creates can never name different
 numbers — the browser never applies a default of its own.
 
-Not every processor can discount a subscription that is already running. Stripe can
+Not every provider can discount a subscription that is already running. Stripe can
 (the coupon plumbing the checkout already uses); PayPal has no discount object at all
 and Chargebee has no way to reach a live subscription with one through existing
-plumbing. Those two refuse with `not-supported-by-processor`, and the billing card
+plumbing. Those two refuse with `not-supported-by-provider`, and the billing card
 retires the offer for the session and opens the questionnaire — a subscriber can always
 still cancel.
 
@@ -425,8 +425,8 @@ targets: {
 
 Two things are deliberately NOT config:
 
-- **The regime.** The visitor's browser timezone picks it — EEA/UK (plus an unplaceable
-  timezone) gets opt-in, where no provider script loads until they accept; everywhere
+- **The regime.** The visitor's browser timezone picks it — the strict opt-in roster (plus an
+  unplaceable timezone) gets opt-in, where no provider script loads until they accept; everywhere
   else gets opt-out, where the scripts load and a first visit sees only the Cookies Settings
   tab ([#391](https://github.com/Omega-JS-Stack/omega/issues/391)). There is no key that
   forces one, because the answer is legal, not stylistic.
@@ -501,9 +501,9 @@ Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolut
 always applies.
 
 **Derived values reach brands as VALUES, never as a recipe to re-run**
-([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand app cannot require
+([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand target cannot require
 this private package at runtime, so a framework that owns a derivation publishes its
-ANSWER on the runtime config object the app already holds, under `resolved.*`: the
+ANSWER on the runtime config object the target already holds, under `resolved.*`: the
 backend's `Manager.config.resolved.github` carries `{ owner, name, repo }` — the brand
 repo derivation (`repo.providers.github` overlaid by `targets.backend.github`, slug or
 bare name) as one finished value, `repo` being the `owner/name` slug. The derivations
@@ -544,8 +544,8 @@ dry-run gate + logging.
 No framework reads the legacy files anymore. Convert once, delete the old file. General
 recipe: shared-looking sections move to the TOP LEVEL (brand, analytics, payment, theme,
 oauth2 verbatim; `firebaseConfig` becomes `cloud: { provider: 'firebase', config: {…} }` and
-`sentry` becomes `monitoring: { provider: 'sentry', … }` — D12 provider-discriminated role
-keys); everything framework-specific moves under `targets.<type>`.
+`sentry` becomes `monitoring: { providers: { sentry: {…} } }`); everything framework-specific
+moves under `targets.<type>`.
 
 **Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142)):
 a name that was renamed OUTRIGHT is a validation error wherever it sits — shared level,
@@ -574,6 +574,26 @@ entry matches ONE exact path from the root:
 | `advertising.providers.google-adsense` | **`advertising.providers.adsense`** + camelCase slots |
 | `github` | **`repo.providers.github`** — the ONE row with no guard: the brand's own `github` (content identity, unchanged; a shared key since [#277](https://github.com/Omega-JS-Stack/omega/issues/277)) lives at the top level, so a name test would false-positive. This table is its only guide |
 
+The one-provider-shape normalization ([#425](https://github.com/Omega-JS-Stack/omega/issues/425))
+adds its own rows to the same `RETIRED_PATHS` half — every role names its vendors
+`role.providers.<provider>` now, so the flat picks, the bare vendor key and payment's
+fourth word are all retired. Key PRESENCE is the pick; `false` is the deliberate off
+switch; no entry at all is "none chosen" (what a null provider meant). `cloud` stays the
+ratified exception. Full rationale + the by-hand step per row:
+[breaking-changes.md](breaking-changes.md#one-provider-shape--roleprovidersprovider-425).
+
+| Retired path | New home |
+|---|---|
+| `payment.providers` | **`payment.providers`** — contents identical. The SINGULAR `provider` (Firestore document fields, the intent schema, the payments route params, the email merge field, `libraries/payment/providers/`) is a live data contract and is unchanged |
+| `certificates.apple` | **`certificates.providers.apple`** — no bare vendor keys; Windows signing sits beside it later |
+| `domain.provider` | **`domain.providers.<registrar>`** — `{ namecheap: {} }` / `{ squarespace: {} }` |
+| `domain.email.provider` | **`domain.email.providers.<provider>`** — `domain.email.forwarding` stays role-level (provider-agnostic) |
+| `translation.provider` | **`translation.providers.<name>`** — `{ claude: {} }` / `{ chatgpt: {} }`; an absent block still means claude. `translation.model` stays role-level |
+| `devlog.provider` + `devlog.{lookbackDays,orgs,excludeRepos,excludeCommits,excludeTopics,includePrivate,postPath,destinations,overrides}` | **`devlog.providers.ghostii.<same key>`** — the writer is the KEY, its settings live inside it. `devlog.enabled` stays role-level |
+| `monitoring.provider` + `monitoring.{org,dsn,environment,sampleRate,tracesSampleRate,scrubEmail,attachScreenshot,bundlePatterns}` | **`monitoring.providers.sentry.<same key>`** — the monitor is the KEY, every SDK-facing knob lives inside it. `monitoring.enabled` stays role-level, and per-surface DSNs are `targets.<type>.monitoring.providers.sentry.dsn` |
+| `marketing.campaigns.provider` + `marketing.campaigns.listId` | **`marketing.campaigns.providers.sendgrid.listId`** — `marketing.campaigns.enabled` stays role-level |
+| `marketing.newsletter.provider` + `marketing.newsletter.publicationId` | **`marketing.newsletter.providers.beehiiv.publicationId`** — `marketing.newsletter.enabled` AND `marketing.newsletter.content` stay role-level: content configures @omega.js/backend's newsletter generator, not Beehiiv |
+
 The
 `omega migrate` converter is unaffected: it READS legacy files as input and emits the new
 names, and only its output is validated.
@@ -584,7 +604,7 @@ names, and only its output is validated.
 |---|---|
 | `brand`, `analytics`, `payment`, `theme` | top level, unchanged |
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
-| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
+| `sentry` | **`monitoring: { providers: { sentry: { dsn } } }`** ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) |
 | `app` | `targets.desktop.app` |
 | `targets.mac` / `targets.win` / `targets.linux` (per-OS) | `targets.desktop.platforms.mac` / `.win` / `.linux` |
 | `autoUpdate`, `startup`, `releases`, `downloads`, `remoteConfig`, `restartManager` | `targets.desktop.<same key>` |
@@ -599,7 +619,7 @@ names, and only its output is validated.
 |---|---|
 | `brand`, `analytics`, `payment`, `oauth2` | top level, unchanged |
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
-| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
+| `sentry` | **`monitoring: { providers: { sentry: { dsn } } }`** ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) |
 | custom keys (`omega`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | top level, unchanged ([#277](https://github.com/Omega-JS-Stack/omega/issues/277)): shared keys the manager reads brand-level, so a website-only brand has a home for them; `targets.backend.<same key>` still overrides |
 
@@ -607,8 +627,8 @@ Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.j
 the same loader and passed as `options.defaults`; `Manager.init()`'s
 `backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
 schema findings, `npx omega setup` is the hard audit. The sandbox brand dogfoods the full
-hierarchy: shared sections live in `apps/sandbox-brand/config/omega.json5` (brand level),
-the backend app file carries only `targets.backend`.
+hierarchy: shared sections live in `brands/sandbox-brand/config/omega.json5` (brand level),
+the backend target's local file carries only `targets.backend`.
 
 ### browser-extension-manager (`config/browser-extension-manager.json` → `config/omega.json5`) — DONE (checkpoint 20)
 
@@ -616,7 +636,7 @@ the backend app file carries only `targets.backend`.
 |---|---|
 | `brand`, `analytics`, `theme` | top level, unchanged |
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
-| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
+| `sentry` | **`monitoring: { providers: { sentry: { dsn } } }`** ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) |
 | custom keys (`liveReloadPort`, …) | top level, unchanged |
 | `analytics.providers.google.secret` | **`.env` → `GOOGLE_ANALYTICS_SECRET`** (secrets never in omega.json5; loader hard-fails) |
 | *(no extension-specific keys yet)* | `targets.extension: {}` — presence = enabled; extension-specific settings land here |
@@ -672,15 +692,15 @@ its Phase-3 cutover (enumerating `SHARED_SECTIONS`, per-surface values into
 ```js
 const {
   loadConfig,          // (projectDir, target?, { defaults }?) → { config, errors, warnings, enabled, instance, files }
-  composeTargetConfig, // (projectDir, target) → { config, files } — company+brand+app frozen into ONE self-contained file (deploy upload boundary, #31)
+  composeTargetConfig, // (projectDir, target) → { config, files } — company+brand+local frozen into ONE self-contained file (deploy upload boundary, #31)
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]
-  findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one app dir (THE hierarchy rule)
-  findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file an app with no app-layer file rides
+  findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one target dir (THE hierarchy rule)
+  findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file a target with no local-layer file rides
   resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself), bounded at the nearest .git
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
-  resolveEnvChain,     // (startDir) → { app, brand, company } .env paths (no loading)
+  resolveEnvChain,     // (startDir) → { local, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip
   readCompanyRoot,     // (brandRoot) → company root | null (.omega/company.json)
   COMPANY_MARKER,      // '.omega/company.json'
@@ -691,18 +711,19 @@ const {
   formatErrors,        // errors → numbered block
   findSecretKeys,      // (object) → dot-paths of secret-shaped keys
   findRetiredKeys,     // (object) → [{ path, key, replacement, why }] — renamed-outright keys (#142)
+  chosenProvider,      // (role.providers) → the picked provider name | null — presence is the pick, `false` the off switch (#425)
   applyConfigEdits,    // (source, edits) → edited source — comment-preserving (see Writeback)
   writeConfigValues,   // (projectDir, edits, { dryRun }?) → { path, changed, applied }
   deepMerge,           // agnostic layer merge
   // Multi-instance targets (instances.js — the ONE iteration mechanism)
   normalizeTargetInstances, // (targets.<type> value) → [{ id, … }] (object form = [{ id: 'main', …entry }])
   instanceIdFromDirName,    // ('website-admin', 'web') → 'admin'; canonical/unconventional dirs → 'main'
-  instanceAppDir,           // ('web', 'admin') → 'website-admin'; main → the canonical dir
-  appInstance,              // (projectDir, target) → this app dir's instance id (brand apps only; standalone → 'main')
+  instanceTargetDir,        // ('web', 'admin') → 'website-admin'; main → the canonical dir
+  targetInstance,           // (projectDir, target) → this target dir's instance id (brand targets only; standalone → 'main')
   resolveInstanceEntry,     // (entry, id) → the instance's merge layer (id stripped) | null
   instancePortOffset,       // (entry, id) → position in the instances array (dev-port offsets)
   resolveInstanceUrl,       // (entry, id, config) → instance url → instance brand.url → brand.url | null
-  APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, // the app-dir mapping SSOT (manager re-exports)
+  DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE, // the target-dir mapping SSOT (manager re-exports)
   TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS,
 } = require('@omega.js/config');
 ```

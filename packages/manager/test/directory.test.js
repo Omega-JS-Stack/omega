@@ -78,9 +78,8 @@ function runService(config, { db, options = {} } = {}) {
     brandId: BRAND.id,
     brandRoot: '/tmp/omega-manager-directory-unused', // no handler touches disk
     brandConfig: config,
-    brand: { id: BRAND.id, config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: BRAND.id, config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.directory,
     options,
     serviceData: {},

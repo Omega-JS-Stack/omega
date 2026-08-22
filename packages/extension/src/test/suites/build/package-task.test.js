@@ -133,24 +133,24 @@ module.exports = {
       name: 'build.js bakes the sibling backend\'s resolved emulator ports, and never in production (#300)',
       run: async (ctx) => {
         // An extension context has no env and no filesystem — the bake is its
-        // ONLY channel to a bumped emulator. Stage the app inside a real brand
+        // ONLY channel to a bumped emulator. Stage the target inside a real brand
         // with a live backend ports file beside it.
         const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-ports-brand-'));
         fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
         fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
-        fs.mkdirSync(path.join(brand, 'apps', 'backend', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'apps', 'backend', '.temp', 'ports.json'), JSON.stringify({
+        fs.mkdirSync(path.join(brand, 'targets', 'backend', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'targets', 'backend', '.temp', 'ports.json'), JSON.stringify({
           ports: { auth: 9100, firestore: 8081, hosting: 5003 }, pid: process.pid, startedAt: 'x',
         }));
 
         // …and a live WEBSITE publishing its resolved origin beside its port —
         // bumped AND https, the pair a port number alone can never express (#262)
-        fs.mkdirSync(path.join(brand, 'apps', 'website', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'apps', 'website', '.temp', 'ports.json'), JSON.stringify({
+        fs.mkdirSync(path.join(brand, 'targets', 'website', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'targets', 'website', '.temp', 'ports.json'), JSON.stringify({
           ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
         }));
 
-        const app = path.join(brand, 'apps', 'extension');
+        const app = path.join(brand, 'targets', 'extension');
         fs.mkdirSync(app, { recursive: true });
         fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
 
@@ -199,12 +199,12 @@ module.exports = {
         const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-origin-brand-'));
         fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
         fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
-        fs.mkdirSync(path.join(brand, 'apps', 'website', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'apps', 'website', '.temp', 'ports.json'), JSON.stringify({
+        fs.mkdirSync(path.join(brand, 'targets', 'website', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'targets', 'website', '.temp', 'ports.json'), JSON.stringify({
           ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
         }));
 
-        const app = path.join(brand, 'apps', 'extension');
+        const app = path.join(brand, 'targets', 'extension');
         fs.mkdirSync(path.join(app, 'dist'), { recursive: true });
         fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
         fs.writeFileSync(path.join(app, 'dist', 'manifest.json'), MANIFEST(`description: 'no externally_connectable anywhere'`));

@@ -1,10 +1,10 @@
 /**
- * Test: POST /payments/webhook — per-processor native signature verification
+ * Test: POST /payments/webhook — per-provider native signature verification
  * ([#213](https://github.com/Omega-JS-Stack/omega/issues/213)).
  *
  * The `?key=OMEGA_WEBHOOK_KEY` compare is a defense layer, not the boundary: a
- * processor that ships a signing scheme verifies its own signature over the RAW
- * request bytes the moment its secret is configured. Stripe is that processor
+ * provider that ships a signing scheme verifies its own signature over the RAW
+ * request bytes the moment its secret is configured. Stripe is that provider
  * today (`STRIPE_WEBHOOK_SECRET`); `test`, `paypal`, and `chargebee` stay
  * key-only, so their events must keep flowing unsigned.
  *
@@ -110,7 +110,7 @@ function signatureFor(event, secret) {
   });
 }
 
-// An event type no processor supports — accepted events answer `ignored`, so the
+// An event type no provider supports — accepted events answer `ignored`, so the
 // response separates "passed the gate" from "rejected at the gate" with no write.
 const stripeEvent = (id) => ({ id: id, type: 'ping.unsupported', data: { object: {} } });
 const paypalEvent = (id) => ({ id: id, event_type: 'PING.UNSUPPORTED', resource: {} });
@@ -119,7 +119,7 @@ const chargebeeEvent = (id) => ({ id: id, event_type: 'ping_unsupported', conten
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
 module.exports = {
-  description: 'Payment webhook processor signature verification',
+  description: 'Payment webhook provider signature verification',
   type: 'group',
   timeout: 30000,
 
@@ -132,7 +132,7 @@ module.exports = {
 
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: event,
           signature: signatureFor(event),
         }));
@@ -148,7 +148,7 @@ module.exports = {
       async run({ assert, Manager }) {
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: stripeEvent('_test-evt-sig-missing'),
         }));
 
@@ -166,7 +166,7 @@ module.exports = {
 
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: stripeEvent('_test-evt-sig-tampered'),
           signature: signature,
         }));
@@ -183,7 +183,7 @@ module.exports = {
 
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: event,
           signature: signatureFor(event, 'whsec_a-different-secret'),
         }));
@@ -201,7 +201,7 @@ module.exports = {
 
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: event,
           signature: signatureFor(event),
           omitRawBody: true,
@@ -217,7 +217,7 @@ module.exports = {
       async run({ assert, Manager }) {
         const sent = await withStripeWebhookSecret(null, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: VALID_KEY() },
+          query: { provider: 'stripe', key: VALID_KEY() },
           event: stripeEvent('_test-evt-sig-unconfigured'),
         }));
 
@@ -234,7 +234,7 @@ module.exports = {
 
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'stripe', key: 'wrong-key' },
+          query: { provider: 'stripe', key: 'wrong-key' },
           event: event,
           signature: signatureFor(event),
         }));
@@ -245,17 +245,17 @@ module.exports = {
     },
 
     {
-      name: 'test-processor-events-are-never-signature-gated',
+      name: 'test-provider-events-are-never-signature-gated',
       auth: 'none',
       async run({ assert, Manager }) {
-        // The test processor fabricates Stripe-SHAPED events locally and signs nothing.
+        // The test provider fabricates Stripe-SHAPED events locally and signs nothing.
         const sent = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'test', key: VALID_KEY() },
-          event: stripeEvent('_test-evt-sig-test-processor'),
+          query: { provider: 'test', key: VALID_KEY() },
+          event: stripeEvent('_test-evt-sig-test-provider'),
         }));
 
-        assert.equal(sent.code, 200, `Test processor events should flow unsigned, got ${sent.code}: ${sent.body}`);
+        assert.equal(sent.code, 200, `Test provider events should flow unsigned, got ${sent.code}: ${sent.body}`);
         assert.equal(sent.body.ignored, true, 'Unsupported event should be ignored past the gate');
       },
     },
@@ -267,7 +267,7 @@ module.exports = {
         // Neither carries a verifier yet — a stripe secret must not gate them.
         const paypal = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'paypal', key: VALID_KEY() },
+          query: { provider: 'paypal', key: VALID_KEY() },
           event: paypalEvent('_test-evt-sig-paypal'),
         }));
 
@@ -276,7 +276,7 @@ module.exports = {
 
         const chargebee = await withStripeWebhookSecret(SUITE_SECRET, () => callWebhook({
           Manager,
-          query: { processor: 'chargebee', key: VALID_KEY() },
+          query: { provider: 'chargebee', key: VALID_KEY() },
           event: chargebeeEvent('_test-evt-sig-chargebee'),
         }));
 

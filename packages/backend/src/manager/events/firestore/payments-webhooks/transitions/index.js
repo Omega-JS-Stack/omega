@@ -7,11 +7,11 @@
  */
 const path = require('path');
 
-// Webhook event types that mean "money went back to the customer", per processor:
+// Webhook event types that mean "money went back to the customer", per provider:
 // PayPal PAYMENT.SALE.REFUNDED (v1 sales) and PAYMENT.CAPTURE.REFUNDED (v2
 // captures — the shape this framework's own one-time purchases refund as,
 // [#240](https://github.com/Omega-JS-Stack/omega/issues/240)), Stripe
-// charge.refunded, Chargebee payment_refunded (each string is the processor's
+// charge.refunded, Chargebee payment_refunded (each string is the provider's
 // own, as its webhook parser reports it).
 const REFUND_EVENTS = ['PAYMENT.SALE.REFUNDED', 'PAYMENT.CAPTURE.REFUNDED', 'charge.refunded', 'payment_refunded'];
 
@@ -169,7 +169,7 @@ function detectOneTimeTransition(eventType, options) {
 
   // Refunds first, and by event type alone — a one-time purchase has no
   // before/after state to diff, the event IS the transition. The strings are the
-  // same processor strings the subscription side reads
+  // same provider strings the subscription side reads
   // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
   if (REFUND_EVENTS.includes(eventType)) {
     return 'purchase-refunded';

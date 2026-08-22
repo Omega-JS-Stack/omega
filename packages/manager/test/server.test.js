@@ -73,9 +73,8 @@ function runService(config, { db, options = {} } = {}) {
     brandId: BRAND.id,
     brandRoot: '/tmp/omega-manager-server-unused', // no handler touches disk
     brandConfig: config,
-    brand: { id: BRAND.id, config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: BRAND.id, config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.server,
     options,
     serviceData: {},
@@ -85,8 +84,8 @@ function runService(config, { db, options = {} } = {}) {
 
 // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('server: registered after replyify with the brands operation', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('replyify') + 1], 'server');
+test('server: registered after email with the brands operation', () => {
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('email') + 1], 'server');
   assert.deepEqual(OPERATIONS.server.map((o) => o.name), ['brands']);
 });
 

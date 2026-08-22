@@ -43,11 +43,14 @@ module.exports = {
   async run({ assert, config, Manager, ctx, skip }) {
     const env = process.env;
     const blogConfig = Manager.config.blog;
+    // Same tri-state read the auto-publisher uses: the enabled key under
+    // blog.providers names the article provider
+    const providerName = Object.keys(blogConfig?.providers || {}).find((key) => blogConfig.providers[key]) || 'ghostii';
 
     // --- Default mode: config validation ---
     if (!env.TEST_EXTENDED_MODE) {
       assert.ok(blogConfig, 'blog config exists');
-      assert.ok(blogConfig.provider, 'blog.provider is set');
+      assert.ok(blogConfig.providers?.ghostii, 'blog.providers.ghostii is set');
       assert.equal(typeof blogConfig.enabled, 'boolean', 'blog.enabled is a boolean');
 
       const contentArray = powertools.arrayify(blogConfig.content);
@@ -68,11 +71,11 @@ module.exports = {
       }
 
       // Verify provider exists
-      const providerPath = path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${blogConfig.provider}.js`);
-      assert.ok(jetpack.exists(providerPath), `provider "${blogConfig.provider}" exists at ${providerPath}`);
+      const providerPath = path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${providerName}.js`);
+      assert.ok(jetpack.exists(providerPath), `provider "${providerName}" exists at ${providerPath}`);
 
       console.log(`\n[blog-generate] Config OK:`);
-      console.log(`  provider: ${blogConfig.provider}`);
+      console.log(`  provider: ${providerName}`);
       console.log(`  enabled: ${blogConfig.enabled}`);
       console.log(`  entries: ${contentArray.length}`);
       console.log(`  sources: ${entry.sources.join(', ')}`);
@@ -112,14 +115,14 @@ module.exports = {
     jetpack.dir(outDir);
 
     console.log(`\n[blog-generate] Extended mode — full AI pipeline`);
-    console.log(`  provider: ${blogConfig.provider}`);
+    console.log(`  provider: ${providerName}`);
     console.log(`  sources: ${content[0].sources.join(', ')}`);
     console.log(`  publish: ${env.BLOG_NO_PUBLISH ? 'NO (BLOG_NO_PUBLISH=1)' : 'YES'}`);
     console.log(`  output: ${outDir}`);
 
     // Intercept publishArticle if BLOG_NO_PUBLISH is set
     if (env.BLOG_NO_PUBLISH) {
-      const provider = require(path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${blogConfig.provider}.js`));
+      const provider = require(path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${providerName}.js`));
       const originalPublish = provider.publishArticle;
       provider.publishArticle = async (ast, args) => {
         console.log(`[blog-generate] SKIPPED publishArticle (BLOG_NO_PUBLISH=1)`);
@@ -142,7 +145,7 @@ module.exports = {
     // Write metadata
     jetpack.write(path.join(outDir, 'metadata.json'), JSON.stringify({
       mode: 'extended',
-      provider: blogConfig.provider,
+      provider: providerName,
       sources: content[0].sources,
       published: !env.BLOG_NO_PUBLISH,
       timestamp: new Date().toISOString(),

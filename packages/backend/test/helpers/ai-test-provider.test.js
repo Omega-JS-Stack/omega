@@ -1,7 +1,7 @@
 /**
  * Test: deterministic AI test provider (libraries/ai/providers/test.js)
  *
- * The test provider is a first-class provider (the `test` payment-processor
+ * The test provider is a first-class provider (the `test` payment-provider
  * precedent) that consumer suites drive with directives embedded in the last
  * user message. These tests exercise the full request() surface directly —
  * no network involved by design.

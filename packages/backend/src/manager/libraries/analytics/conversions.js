@@ -16,7 +16,7 @@
  * browser facade walks:
  *   1. consent — the order's/user's `trackingConsent` snapshot gates the category
  *   2. adapter — the catalog mapping, or null when the provider has none
- *      (`plan_changed` and `trial_lapsed` are GA4-only by catalog design)
+ *      (`subscription_plan_change` and `trial_lapse` are GA4-only by catalog design)
  *   3. transport — the platform's HTTP API, fire-and-forget, errors isolated
  *
  * Delivery is NON-BLOCKING and never throws at its caller: a payment webhook or
@@ -97,10 +97,11 @@ function deliverConversion({ event, params = {}, attribution = {}, identity = {}
 
   // A name the catalog does not know reaches every adapter and resolves to null
   // in each — indistinguishable, per-provider, from a real event a provider
-  // deliberately does not map (`plan_changed` on Meta). So a typo in a canonical name
-  // would stop reporting revenue and say nothing about it. It gets its OWN
-  // outcome and one loud line, and it still never throws: a webhook that has
-  // already taken the customer's money must not die on a misspelling.
+  // deliberately does not map (`subscription_plan_change` on Meta). So a typo
+  // in a canonical name would stop reporting revenue and say nothing about it.
+  // It gets its OWN outcome and one loud line, and it still never throws: a
+  // webhook that has already taken the customer's money must not die on a
+  // misspelling.
   if (!entryFor(event)) {
     ctx.error(`deliverConversion: [unknown canonical event] ${event} — not in the catalog; nothing sent (event_id=${eventId})`);
 

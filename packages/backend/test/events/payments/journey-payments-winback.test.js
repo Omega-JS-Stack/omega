@@ -8,10 +8,11 @@
  * analytics resolver read the payment event as a renewal
  * ([#218](https://github.com/Omega-JS-Stack/omega/issues/218)).
  *
- * The caller is built by the shared route harness rather than a persona: the
- * starting state (a cancelled subscription) is a SHAPE, and the harness lets one
- * test choose a shape without minting a persona for it. Everything downstream of
- * the handler — the test processor's checkout, the webhook doc, the on-write
+ * The caller is this suite's own seeded persona, driven through the shared route
+ * harness: the ACCOUNT is declared in the seed roster (#406) and the starting
+ * state (a cancelled subscription) is a SHAPE this suite writes onto it, because
+ * the seed only makes healthy steady-state accounts. Everything downstream of
+ * the handler — the test provider's checkout, the webhook doc, the on-write
  * trigger, the transition detection, the user-doc write — is the real pipeline.
  *
  * Product-agnostic: resolves the first paid product from config.payment.products
@@ -19,12 +20,14 @@
  * Run: npx omega test framework:events/payments/journey-payments-winback
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
-const { ensureAuthUser } = require('../../_helpers/auth-user.js');
 const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
 
 const handler = require('../../../src/manager/routes/payments/intent/post.js');
 
-const UID = '_test-journey-payments-winback';
+// The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
+// exclusive to this suite and declared in the seed roster, so the account it
+// drives exists — auth user and doc in sync — before the run starts.
+const PERSONA = 'journey-payments-winback';
 const RESOURCE_ID = 'sub_test_journey_winback_cancelled';
 
 module.exports = {
@@ -35,7 +38,7 @@ module.exports = {
   tests: [
     {
       name: 'setup-cancelled-subscriber',
-      async run({ firestore, assert, state, config, skip, Manager }) {
+      async run({ accounts, firestore, assert, state, config, skip }) {
         const paidProduct = (config.payment?.products || []).find((p) => p.id !== 'basic' && p.type === 'subscription' && p.prices);
 
         if (!paidProduct) {
@@ -47,7 +50,8 @@ module.exports = {
         const cancelledUNIX = nowUNIX - (7 * 86400);
         const startUNIX = nowUNIX - (365 * 86400);
 
-        state.uid = UID;
+        state.uid = accounts[PERSONA].uid;
+        state.email = accounts[PERSONA].email;
         state.productId = paidProduct.id;
         state.frequency = frequency;
 
@@ -63,7 +67,7 @@ module.exports = {
             date: { timestamp: new Date(cancelledUNIX * 1000).toISOString(), timestampUNIX: cancelledUNIX },
           },
           payment: {
-            processor: 'test',
+            provider: 'test',
             orderId: null,
             resourceId: RESOURCE_ID,
             frequency: frequency,
@@ -72,19 +76,15 @@ module.exports = {
           },
         };
 
-        // A checkout verifies the purchaser is one of ours before it starts, so the
-        // fabricated subscriber needs the auth user a real one has ([#399])
-        await ensureAuthUser(Manager, UID);
-
         // The pipeline reads users/{uid} for its BEFORE state, so the doc has to be
         // the real record the transition is detected against.
-        await firestore.set(`users/${UID}`, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+        await firestore.set(`users/${state.uid}`, {
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         }, { merge: true });
 
-        const userDoc = await firestore.get(`users/${UID}`);
+        const userDoc = await firestore.get(`users/${state.uid}`);
         assert.equal(userDoc.subscription.status, 'cancelled', 'Should start cancelled');
         assert.equal(userDoc.subscription.product.id, state.productId, 'Should still carry the paid product id');
       },
@@ -94,7 +94,7 @@ module.exports = {
       name: 'resubscribe-through-checkout',
       async run({ assert, Manager, state }) {
         const user = buildUser(Manager, {
-          auth: { uid: UID, email: `${UID}@example.com` },
+          auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
@@ -108,7 +108,7 @@ module.exports = {
           // to — the handler receives settings already defaulted, and writes them
           // onto the intent doc as-is.
           settings: {
-            processor: 'test',
+            provider: 'test',
             productId: state.productId,
             frequency: state.frequency,
             trial: false,

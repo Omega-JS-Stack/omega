@@ -1,9 +1,9 @@
 /**
  * Payment service tests — all 11 operations against method-level recording
  * fakes for Stripe, PayPal, and Chargebee. Proves skip semantics (enabled
- * flag, paid-product gate, per-processor credentials, --processor filter,
+ * flag, paid-product gate, per-provider credentials, --provider filter,
  * config `false` disables), the converged zero-mutation no-op across all
- * three processors, product resolution self-heal (Stripe by metadata,
+ * three providers, product resolution self-heal (Stripe by metadata,
  * PayPal by exact name, Chargebee by deterministic ID), price/plan drift
  * reconciliation, webhook create/diff/re-enable with exact payloads, the
  * no-API manual-guidance ops (radar/disputes warned until confirmed), and
@@ -30,9 +30,9 @@ const BRAND_DESC = 'A fixture brand';
 const CONTACT_EMAIL = `support@${DOMAIN}`;
 const BRANDMARK = `${BRAND_URL}/brandmark.png`;
 const WEBHOOK_KEY = 'fixture-webhook-key';
-const STRIPE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=stripe&key=${WEBHOOK_KEY}`;
-const PAYPAL_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=paypal&key=${WEBHOOK_KEY}`;
-const CHARGEBEE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
+const STRIPE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provider=stripe&key=${WEBHOOK_KEY}`;
+const PAYPAL_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provider=paypal&key=${WEBHOOK_KEY}`;
+const CHARGEBEE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provider=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
 
 // Mirrors of the handlers' event lists (pins the desired sets)
 const STRIPE_EVENTS = [
@@ -65,7 +65,7 @@ const CHARGEBEE_EVENTS = [
 /**
  * Product set: a free tier (no prices — never reconciled), a subscription
  * with a trial, a one-time product, and an archived leftover (never
- * reconciled). Per-processor IDs are injected per test via `ids`.
+ * reconciled). Per-provider IDs are injected per test via `ids`.
  */
 function makeProducts({ ids = {} } = {}) {
   return [
@@ -104,7 +104,7 @@ function brandConfig({ url = BRAND_URL, products = makeProducts(), payment = {},
     payment: {
       ...paymentDefaults,
       ...payment,
-      processors: { ...paymentDefaults.processors, ...(payment.processors || {}) },
+      providers: { ...paymentDefaults.providers, ...(payment.providers || {}) },
       products,
     },
     targets: { web: {}, backend: {} },
@@ -228,7 +228,7 @@ function chargebeeConverged() {
   };
 }
 
-// Config where every processor already knows its product IDs
+// Config where every provider already knows its product IDs
 const CONVERGED_IDS = {
   plus: { stripe: { productId: 'prod_plus' }, paypal: { productId: 'PROD-PLUS' } },
   credits: { stripe: { productId: 'prod_credits' }, paypal: { productId: 'PROD-CREDITS' } },
@@ -242,23 +242,45 @@ function writebackSource(config) {
   return `// Payment fixture — comments must survive product-id writeback\n{\n  payment: {\n    products: [\n${rows}\n    ],\n  },\n}\n`;
 }
 
-function runService(config, { stripe = null, paypal = null, chargebee = null, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
+/**
+ * The two Dashboard-only confirmations live in config now (#434), so a
+ * fixture brand that has already stamped them says so there.
+ * true = both, 'radar' / 'disputes' = just that one.
+ */
+function withConfirmed(config, confirmed) {
+  if (!confirmed) {
+    return config;
+  }
+
+  const stripe = {
+    ...config.payment?.providers?.stripe,
+    ...(confirmed === true || confirmed === 'radar' ? { radarConfirmed: true } : {}),
+    ...(confirmed === true || confirmed === 'disputes' ? { disputesConfirmed: true } : {}),
+  };
+
+  return {
+    ...config,
+    payment: { ...config.payment, providers: { ...config.payment?.providers, stripe } },
+  };
+}
+
+function runService(rawConfig, { stripe = null, paypal = null, chargebee = null, options = {}, confirmed = false, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
     process.env.OMEGA_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
     delete process.env.OMEGA_WEBHOOK_KEY;
   }
 
+  const config = withConfirmed(rawConfig, confirmed);
+
   return service.run({
     brandId: BRAND_ID,
     brandRoot: brandRoot || makeBrandRoot(writebackSource(config)), // product ops write into config/omega.json5 here
     brandConfig: config,
-    brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: BRAND_ID, config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.payment,
     options,
-    serviceData,
     stripeApi: stripe,
     paypalApi: paypal,
     chargebeeApi: chargebee,
@@ -269,16 +291,16 @@ function runService(config, { stripe = null, paypal = null, chargebee = null, op
 
 test('payment: manager defaults — enabled, null public keys, radar rules, NO company organizationId', () => {
   assert.equal(DEFAULTS.payment.enabled, true);
-  assert.equal(DEFAULTS.payment.processors.stripe.publishableKey, null);
-  assert.equal(DEFAULTS.payment.processors.stripe.updateAccountInfo, true);
-  assert.equal(DEFAULTS.payment.processors.stripe.radar.length, 9);
-  assert.equal(DEFAULTS.payment.processors.paypal.clientId, null);
-  assert.equal(DEFAULTS.payment.processors.chargebee.site, null);
-  assert.equal(DEFAULTS.payment.processors.coinbase.enabled, false);
+  assert.equal(DEFAULTS.payment.providers.stripe.publishableKey, null);
+  assert.equal(DEFAULTS.payment.providers.stripe.updateAccountInfo, true);
+  assert.equal(DEFAULTS.payment.providers.stripe.radar.length, 9);
+  assert.equal(DEFAULTS.payment.providers.paypal.clientId, null);
+  assert.equal(DEFAULTS.payment.providers.chargebee.site, null);
+  assert.equal(DEFAULTS.payment.providers.coinbase.enabled, false);
   assert.deepEqual(DEFAULTS.payment.products, []);
   // De-ITW pins: no company Stripe org ID; product images come from
   // brand.images.brandmark, not a hardcoded company CDN
-  assert.ok(!('organizationId' in DEFAULTS.payment.processors.stripe));
+  assert.ok(!('organizationId' in DEFAULTS.payment.providers.stripe));
 });
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
@@ -305,7 +327,7 @@ test('payment: skips when no product has prices (free/archived only)', async () 
   assert.match(result.reason, /no paid products/);
 });
 
-test('payment: skips without any processor credentials, naming all three', async () => {
+test('payment: skips without any provider credentials, naming all three', async () => {
   const result = await runService(brandConfig()); // no injected apis, env scrubbed
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /STRIPE_SECRET_KEY/);
@@ -313,30 +335,30 @@ test('payment: skips without any processor credentials, naming all three', async
   assert.match(result.reason, /CHARGEBEE_API_KEY/);
 });
 
-test('payment: --processor filter narrows to that processor and ignores the others’ clients', async () => {
+test('payment: --provider filter narrows to that provider and ignores the others’ clients', async () => {
   const stripe = fakeStripe();
   const paypal = fakePaypal(paypalConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, { stripe, paypal, options: { processor: 'paypal' } });
+  const result = await runService(config, { stripe, paypal, options: { provider: 'paypal' } });
 
   assert.equal(result.status, 'success');
   assert.equal(stripe.calls.length, 0); // filtered out — never touched, not even getAccount
   assert.ok(paypal.calls.length > 0);
 });
 
-test('payment: unknown --processor skips with guidance', async () => {
-  const result = await runService(brandConfig(), { stripe: fakeStripe(), options: { processor: 'venmo' } });
+test('payment: unknown --provider skips with guidance', async () => {
+  const result = await runService(brandConfig(), { stripe: fakeStripe(), options: { provider: 'venmo' } });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /unknown --processor "venmo"/);
+  assert.match(result.reason, /unknown --provider "venmo"/);
 });
 
-test('payment: processors.stripe = false disables Stripe even with credentials present', async () => {
+test('payment: providers.stripe = false disables Stripe even with credentials present', async () => {
   const stripe = fakeStripe();
   const paypal = fakePaypal(paypalConverged());
   const config = brandConfig({
     products: makeProducts({ ids: CONVERGED_IDS }),
-    payment: { processors: { stripe: false, chargebee: false } },
+    payment: { providers: { stripe: false, chargebee: false } },
   });
 
   const result = await runService(config, { stripe, paypal });
@@ -348,7 +370,7 @@ test('payment: processors.stripe = false disables Stripe even with credentials p
 
 // ─── The flagship: converged account = zero mutations ────────────────────────
 
-test('payment: fully converged across all three processors — reads only, zero mutations', async () => {
+test('payment: fully converged across all three providers — reads only, zero mutations', async () => {
   const stripe = fakeStripe(stripeConverged());
   const paypal = fakePaypal(paypalConverged());
   const chargebee = fakeChargebee(chargebeeConverged());
@@ -356,7 +378,7 @@ test('payment: fully converged across all three processors — reads only, zero 
 
   const result = await runService(config, {
     stripe, paypal, chargebee,
-    serviceData: { radarConfirmed: true, disputesConfirmed: true },
+    confirmed: true,
   });
 
   assert.equal(result.status, 'success');
@@ -364,10 +386,8 @@ test('payment: fully converged across all three processors — reads only, zero 
   assert.deepEqual(paypal.mutations(), []);
   assert.deepEqual(chargebee.mutations(), []);
 
-  // Setup captured the account ID into state; manual-action confirms persist
+  // Setup resolves the account ID fresh and carries it to the deep-links
   assert.equal(result.state.stripeAccountId, 'acct_1');
-  assert.equal(result.state.radarConfirmed, true);
-  assert.equal(result.state.disputesConfirmed, true);
 
   // Free + archived products were never reconciled anywhere
   const stripeProductIds = stripe.callsTo('getProduct').map((c) => c.args[0]);
@@ -382,12 +402,11 @@ test('stripe-radar: warned with rules + account deep-link until confirmed', asyn
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, { stripe, serviceData: { disputesConfirmed: true } });
+  const result = await runService(config, { stripe, confirmed: 'disputes' });
 
   assert.equal(result.status, 'warned');
   assert.equal(result.output.stripeRadar.rules, 9);
   assert.equal(result.output.stripeRadar.radarUrl, 'https://dashboard.stripe.com/acct_1/radar/rules');
-  assert.equal(result.state.radarConfirmed, false);
   assert.deepEqual(stripe.mutations(), []);
 });
 
@@ -395,19 +414,18 @@ test('stripe-disputes: warned with settings deep-link until confirmed', async ()
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, { stripe, serviceData: { radarConfirmed: true } });
+  const result = await runService(config, { stripe, confirmed: 'radar' });
 
   assert.equal(result.status, 'warned');
   assert.equal(result.output.stripeDisputes.disputesUrl, 'https://dashboard.stripe.com/acct_1/settings/disputes');
-  assert.equal(result.state.disputesConfirmed, false);
   assert.deepEqual(stripe.mutations(), []);
 });
 
 test('stripe-radar + disputes: Enter-gated opens + interactive confirms stamp both flags, service passes', async () => {
   const stripe = fakeStripe(stripeConverged());
-  // paypal/chargebee disabled — enabled-but-unconfigured processors would
+  // paypal/chargebee disabled — enabled-but-unconfigured providers would
   // offer their credential-entry flow first in an interactive run
-  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { providers: { paypal: false, chargebee: false } } });
 
   // pressEnterToOpen launches via prompt's openInBrowser — stub it
   const promptModule = require('@omega.js/devkit/prompt');
@@ -415,9 +433,10 @@ test('stripe-radar + disputes: Enter-gated opens + interactive confirms stamp bo
   const realOpen = promptModule.openInBrowser;
   promptModule.openInBrowser = (url) => { opened.push(url); return true; };
   const tty = openTtyPrompt();
+  const brandRoot = makeBrandRoot(writebackSource(config));
 
   try {
-    const run = runService(config, { stripe });
+    const run = runService(config, { stripe, brandRoot });
     await tty.answer('Press Enter to open the Stripe Radar rules page', '\r');
     await tty.answer('Radar rules added in the Dashboard?', 'y\r');
     await tty.answer('Press Enter to open the Stripe dispute settings', '\r');
@@ -425,8 +444,11 @@ test('stripe-radar + disputes: Enter-gated opens + interactive confirms stamp bo
     const result = await run;
 
     assert.equal(result.status, 'success');
-    assert.equal(result.state.radarConfirmed, true);
-    assert.equal(result.state.disputesConfirmed, true);
+    // Both confirms stamp their home in omega.json5 (#434) — nothing else
+    // can re-check them, so the next run believes the file
+    const written = readConfigSource(brandRoot);
+    assert.match(written, /radarConfirmed: true/);
+    assert.match(written, /disputesConfirmed: true/);
     assert.deepEqual(opened, [
       'https://dashboard.stripe.com/acct_1/radar/rules',
       'https://dashboard.stripe.com/acct_1/settings/disputes',
@@ -440,21 +462,22 @@ test('stripe-radar + disputes: Enter-gated opens + interactive confirms stamp bo
 
 test('stripe-radar: interactive decline stays warned and unstamped', async () => {
   const stripe = fakeStripe(stripeConverged());
-  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { providers: { paypal: false, chargebee: false } } });
 
   const promptModule = require('@omega.js/devkit/prompt');
   const realOpen = promptModule.openInBrowser;
   promptModule.openInBrowser = () => true;
   const tty = openTtyPrompt();
+  const brandRoot = makeBrandRoot(writebackSource(config));
 
   try {
-    const run = runService(config, { stripe, serviceData: { disputesConfirmed: true } });
+    const run = runService(config, { stripe, confirmed: 'disputes', brandRoot });
     await tty.answer('Press Enter to open the Stripe Radar rules page', '\r');
     await tty.answer('Radar rules added in the Dashboard?', 'n\r');
     const result = await run;
 
     assert.equal(result.status, 'warned');
-    assert.equal(result.state.radarConfirmed, false);
+    assert.ok(!readConfigSource(brandRoot).includes('radarConfirmed'));
   } finally {
     promptModule.openInBrowser = realOpen;
     tty.close();
@@ -465,15 +488,16 @@ test('stripe-radar: dry-run never prompts, even with a TTY', async () => {
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
   const tty = openTtyPrompt();
+  const brandRoot = makeBrandRoot(writebackSource(config));
 
   try {
     // No tty.answer — if the handler wrongly prompted, this would time out
     const result = await runService(config, {
-      stripe, serviceData: { disputesConfirmed: true }, options: { dryRun: true },
+      stripe, confirmed: 'disputes', options: { dryRun: true }, brandRoot,
     });
 
     assert.equal(result.status, 'warned');
-    assert.equal(result.state.radarConfirmed, false);
+    assert.ok(!readConfigSource(brandRoot).includes('radarConfirmed'));
   } finally {
     tty.close();
   }
@@ -489,14 +513,14 @@ test('stripe-account: business profile drift → minimal update payload', async 
   const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true } });
+  await runService(config, { stripe, confirmed: true });
 
   assert.deepEqual(stripe.callsTo('updateAccount').map((c) => c.args), [
     ['acct_1', { business_profile: { name: BRAND_NAME } }],
   ]);
 });
 
-test('stripe-products: missing everywhere → exact create payloads + prices + state', async () => {
+test('stripe-products: missing everywhere → exact create payloads + prices + config writeback', async () => {
   const products = [
     { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 } },
   ];
@@ -510,7 +534,7 @@ test('stripe-products: missing everywhere → exact create payloads + prices + s
   const config = brandConfig({ products });
   const brandRoot = makeBrandRoot(writebackSource(config));
   const result = await runService(config, {
-    stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot,
+    stripe, confirmed: true, brandRoot,
   });
 
   assert.deepEqual(stripe.callsTo('createProduct').map((c) => c.args), [[{
@@ -525,14 +549,12 @@ test('stripe-products: missing everywhere → exact create payloads + prices + s
     ['prod_new', 10, 'monthly'],
     ['prod_new', 100, 'annually'],
   ]);
-  assert.deepEqual(result.state.stripeProducts, { plus: 'prod_new' });
-
   const written = readConfigSource(brandRoot);
   assert.ok(written.includes(`{ id: 'plus', stripe: { productId: "prod_new" } }, // Plus`));
   assert.ok(written.includes('// Payment fixture — comments must survive product-id writeback'));
 });
 
-test('stripe-products: lost state self-heals by metadata match — no create', async () => {
+test('stripe-products: an unconfigured id self-heals by metadata match — no create', async () => {
   const products = [
     { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 } },
   ];
@@ -540,13 +562,13 @@ test('stripe-products: lost state self-heals by metadata match — no create', a
   responses.listAllProducts = [structuredClone(responses.getProduct('prod_plus'))];
   const stripe = fakeStripe(responses);
 
-  const result = await runService(brandConfig({ products }), {
-    stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true },
-  });
+  const config = brandConfig({ products });
+  const brandRoot = makeBrandRoot(writebackSource(config));
+  await runService(config, { stripe, confirmed: true, brandRoot });
 
   assert.equal(stripe.callsTo('createProduct').length, 0);
   assert.equal(stripe.callsTo('getProduct').length, 0); // list objects are full — no refetch
-  assert.deepEqual(result.state.stripeProducts, { plus: 'prod_plus' });
+  assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', stripe: { productId: "prod_plus" } }, // Plus`));
 });
 
 test('stripe-products: a self-healed id is also written back into omega.json5', async () => {
@@ -559,7 +581,7 @@ test('stripe-products: a self-healed id is also written back into omega.json5', 
   const brandRoot = makeBrandRoot(writebackSource(config));
 
   await runService(config, {
-    stripe: fakeStripe(responses), serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot,
+    stripe: fakeStripe(responses), confirmed: true, brandRoot,
   });
 
   assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', stripe: { productId: "prod_plus" } }, // Plus`));
@@ -578,7 +600,7 @@ test('stripe-products: price drift → stale actives archived, correct price cre
   const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true } });
+  await runService(config, { stripe, confirmed: true });
 
   assert.deepEqual(stripe.callsTo('archivePrice').map((c) => c.args), [['price_m_old']]);
   assert.deepEqual(stripe.callsTo('createRecurringPrice').map((c) => c.args), [['prod_plus', 10, 'monthly']]);
@@ -591,7 +613,7 @@ test('stripe-webhook: missing → created with exact URL + events', async () => 
   const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true } });
+  await runService(config, { stripe, confirmed: true });
 
   assert.deepEqual(stripe.callsTo('createWebhookEndpoint').map((c) => c.args), [
     [STRIPE_WEBHOOK_URL, STRIPE_EVENTS],
@@ -607,7 +629,7 @@ test('stripe-webhook: event drift → single enabled_events update', async () =>
   const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true } });
+  await runService(config, { stripe, confirmed: true });
 
   assert.deepEqual(stripe.callsTo('updateWebhookEndpoint').map((c) => c.args), [
     ['we_1', { enabled_events: STRIPE_EVENTS }],
@@ -623,7 +645,7 @@ test('stripe-webhook: disabled endpoint → re-enabled (events already converged
   const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true } });
+  await runService(config, { stripe, confirmed: true });
 
   assert.deepEqual(stripe.callsTo('updateWebhookEndpoint').map((c) => c.args), [
     ['we_1', { disabled: false }],
@@ -636,7 +658,7 @@ test('payment: missing OMEGA_WEBHOOK_KEY → warned, webhooks never listed', asy
 
   const result = await runService(config, {
     stripe, webhookKey: false,
-    serviceData: { radarConfirmed: true, disputesConfirmed: true },
+    confirmed: true,
   });
 
   assert.equal(result.status, 'warned');
@@ -650,7 +672,7 @@ test('payment: firebase.shared brand → webhook operations skip without touchin
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), firebase: { shared: true } });
 
   const result = await runService(config, {
-    stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true },
+    stripe, confirmed: true,
   });
 
   assert.equal(result.status, 'success');
@@ -664,7 +686,7 @@ test('paypal-account: reports environment + app ID', async () => {
   const paypal = fakePaypal(paypalConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, { paypal, options: { processor: 'paypal' } });
+  const result = await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.equal(result.status, 'success');
   assert.deepEqual(result.output.paypalAccount, { authenticated: true, environment: 'live', appId: 'APP-1' });
@@ -679,14 +701,14 @@ test('paypal-account: auth failure → warned, then the webhook operation fails 
   const paypal = fakePaypal(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, { paypal, options: { processor: 'paypal' } });
+  const result = await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.equal(result.status, 'error');
   assert.equal(result.output.paypalAccount.authenticated, false);
   assert.deepEqual(paypal.mutations(), []);
 });
 
-test('paypal-products: missing everywhere → exact product + plan create payloads + state', async () => {
+test('paypal-products: missing everywhere → exact product + plan create payloads + config writeback', async () => {
   const products = [
     { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 } },
   ];
@@ -699,7 +721,7 @@ test('paypal-products: missing everywhere → exact product + plan create payloa
 
   const config = brandConfig({ products });
   const brandRoot = makeBrandRoot(writebackSource(config));
-  const result = await runService(config, { paypal, options: { processor: 'paypal' }, brandRoot });
+  const result = await runService(config, { paypal, options: { provider: 'paypal' }, brandRoot });
 
   assert.deepEqual(paypal.callsTo('createProduct').map((c) => c.args), [[{
     name: `${BRAND_NAME} - Plus`,
@@ -712,11 +734,10 @@ test('paypal-products: missing everywhere → exact product + plan create payloa
     [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Monthly)`, interval: 'monthly', amount: 10, trialDays: 14 }],
     [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Annually)`, interval: 'annually', amount: 100, trialDays: 14 }],
   ]);
-  assert.deepEqual(result.state.paypalProducts, { plus: 'PROD-NEW' });
   assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', paypal: { productId: "PROD-NEW" } }, // Plus`));
 });
 
-test('paypal-products: lost state self-heals by exact name match — no create', async () => {
+test('paypal-products: an unconfigured id self-heals by exact name match — no create', async () => {
   const products = [
     { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 } },
   ];
@@ -726,11 +747,10 @@ test('paypal-products: lost state self-heals by exact name match — no create',
 
   const config = brandConfig({ products });
   const brandRoot = makeBrandRoot(writebackSource(config));
-  const result = await runService(config, { paypal, options: { processor: 'paypal' }, brandRoot });
+  const result = await runService(config, { paypal, options: { provider: 'paypal' }, brandRoot });
 
   assert.equal(paypal.callsTo('createProduct').length, 0);
   assert.equal(paypal.callsTo('getProduct').length, 1); // list is summarized — full fetch before diffing
-  assert.deepEqual(result.state.paypalProducts, { plus: 'PROD-PLUS' });
   assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', paypal: { productId: "PROD-PLUS" } }, // Plus`));
 });
 
@@ -748,7 +768,7 @@ test('paypal-products: plan drift → stale + duplicate deactivated, correct pla
   const paypal = fakePaypal(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { paypal, options: { processor: 'paypal' } });
+  await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.deepEqual(paypal.callsTo('deactivatePlan').map((c) => c.args).sort(), [['P-M-STALE'], ['P-Y-DUP']]);
   assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
@@ -768,15 +788,15 @@ test('paypal-products: legacy product plans are deactivated', async () => {
   const paypal = fakePaypal(responses);
   const config = brandConfig({ products: makeProducts({ ids }) });
 
-  await runService(config, { paypal, options: { processor: 'paypal' } });
+  await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.deepEqual(paypal.callsTo('deactivatePlan').map((c) => c.args), [['P-LEGACY']]);
 });
 
 // #348 — `hidden: true` is a PRESENTATION flag the web pricing composer
 // honors; the walk must keep reconciling the product, or the QA tier the
-// payments drives buy by id would have no processor objects to buy.
-test('payment: a hidden product is presentation-only — the walk still ensures its processor objects (#348)', async () => {
+// payments drives buy by id would have no provider objects to buy.
+test('payment: a hidden product is presentation-only — the walk still ensures its provider objects (#348)', async () => {
   const products = [
     { id: 'proof-press', name: 'Proof Press', type: 'subscription', hidden: true, prices: { monthly: 5 } },
   ];
@@ -789,7 +809,7 @@ test('payment: a hidden product is presentation-only — the walk still ensures 
   const paypal = fakePaypal(paypalResponses);
   const paypalConfig = brandConfig({ products });
   const paypalRoot = makeBrandRoot(writebackSource(paypalConfig));
-  const paypalResult = await runService(paypalConfig, { paypal, options: { processor: 'paypal' }, brandRoot: paypalRoot });
+  await runService(paypalConfig, { paypal, options: { provider: 'paypal' }, brandRoot: paypalRoot });
 
   assert.deepEqual(paypal.callsTo('createProduct').map((c) => c.args), [[{
     name: `${BRAND_NAME} - Proof Press`,
@@ -801,7 +821,6 @@ test('payment: a hidden product is presentation-only — the walk still ensures 
   assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
     [{ productId: 'PROD-QA', name: `${BRAND_NAME} - Proof Press (Monthly)`, interval: 'monthly', amount: 5, trialDays: 0 }],
   ]);
-  assert.deepEqual(paypalResult.state.paypalProducts, { 'proof-press': 'PROD-QA' });
   assert.ok(readConfigSource(paypalRoot).includes(`{ id: 'proof-press', paypal: { productId: "PROD-QA" } }, // Proof Press`));
 
   const stripeResponses = stripeConverged();
@@ -812,8 +831,8 @@ test('payment: a hidden product is presentation-only — the walk still ensures 
   const stripe = fakeStripe(stripeResponses);
   const stripeConfig = brandConfig({ products });
   const stripeRoot = makeBrandRoot(writebackSource(stripeConfig));
-  const stripeResult = await runService(stripeConfig, {
-    stripe, options: { processor: 'stripe' }, serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot: stripeRoot,
+  await runService(stripeConfig, {
+    stripe, options: { provider: 'stripe' }, confirmed: true, brandRoot: stripeRoot,
   });
 
   assert.deepEqual(stripe.callsTo('createProduct').map((c) => c.args), [[{
@@ -825,7 +844,74 @@ test('payment: a hidden product is presentation-only — the walk still ensures 
     url: BRAND_URL,
   }]]);
   assert.deepEqual(stripe.callsTo('createRecurringPrice').map((c) => c.args), [['prod_qa', 5, 'monthly']]);
-  assert.deepEqual(stripeResult.state.stripeProducts, { 'proof-press': 'prod_qa' });
+  assert.ok(readConfigSource(stripeRoot).includes(`{ id: 'proof-press', stripe: { productId: "prod_qa" } }, // Proof Press`));
+});
+
+// #348 (buyer half) — PayPal mints no sandbox buyer through any API, so the
+// walk reminds instead of precreating: sandbox runs close paypal-products with
+// the buyer note, live runs and unconfigured PayPal stay silent.
+
+/** Capture console.log lines around a walk run (the walk's report is console output). */
+function captureLog() {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => { lines.push(args.join(' ')); };
+  return { lines, restore: () => { console.log = original; } };
+}
+
+const BUYER_REMINDER = 'sandbox BUYER account';
+
+test('paypal-products: sandbox mode closes with the sandbox-buyer reminder (#348)', async () => {
+  const responses = paypalConverged();
+  responses.getAccountInfo = { appId: 'APP-1', environment: 'sandbox', clientId: 'client-id-fixture' };
+  const paypal = fakePaypal(responses);
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  const log = captureLog();
+  let result;
+  try {
+    result = await runService(config, { paypal, options: { provider: 'paypal' } });
+  } finally {
+    log.restore();
+  }
+
+  assert.equal(result.status, 'success');
+  const reminder = log.lines.find((line) => line.includes(BUYER_REMINDER));
+  assert.ok(reminder, 'sandbox run printed no buyer reminder');
+  assert.ok(reminder.includes('proof-press'), 'the reminder names the QA fixture product');
+  const pointer = log.lines.find((line) => line.includes('https://developer.paypal.com/dashboard/accounts'));
+  assert.ok(pointer, 'the reminder points at the Developer Dashboard sandbox accounts page');
+  assert.ok(pointer.includes('@omega.js/backend/docs/paypal-sandbox-qa.md'), 'the reminder points at the runbook');
+  assert.deepEqual(paypal.mutations(), []); // a reminder, never a mutation
+});
+
+test('paypal-products: live mode prints no buyer reminder (#348)', async () => {
+  const paypal = fakePaypal(paypalConverged()); // environment: 'live'
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  const log = captureLog();
+  try {
+    await runService(config, { paypal, options: { provider: 'paypal' } });
+  } finally {
+    log.restore();
+  }
+
+  assert.ok(!log.lines.some((line) => line.includes(BUYER_REMINDER)));
+});
+
+test('paypal-products: unconfigured PayPal prints no buyer reminder (#348)', async () => {
+  const stripe = fakeStripe(stripeConverged());
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) }); // no paypal client injected
+
+  const log = captureLog();
+  try {
+    await runService(config, { stripe, confirmed: true });
+  } finally {
+    log.restore();
+  }
+
+  assert.ok(log.lines.some((line) => line.includes('PayPal not configured')));
+  assert.ok(!log.lines.some((line) => line.includes(BUYER_REMINDER)));
 });
 
 test('paypal-webhook: missing → created with exact URL + events', async () => {
@@ -835,7 +921,7 @@ test('paypal-webhook: missing → created with exact URL + events', async () => 
   const paypal = fakePaypal(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { paypal, options: { processor: 'paypal' } });
+  await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.deepEqual(paypal.callsTo('createWebhook').map((c) => c.args), [
     [PAYPAL_WEBHOOK_URL, PAYPAL_EVENTS],
@@ -851,7 +937,7 @@ test('paypal-webhook: event drift → single JSON Patch replacing event_types', 
   const paypal = fakePaypal(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { paypal, options: { processor: 'paypal' } });
+  await runService(config, { paypal, options: { provider: 'paypal' } });
 
   assert.deepEqual(paypal.callsTo('updateWebhook').map((c) => c.args), [
     ['WH-1', [{ op: 'replace', path: '/event_types', value: PAYPAL_EVENTS.map((name) => ({ name })) }]],
@@ -877,7 +963,7 @@ test('chargebee-products: empty site → exact family + item + price create chai
   responses.createItemPrice = ({ id }) => ({ id });
   const chargebee = fakeChargebee(responses);
 
-  await runService(brandConfig({ products }), { chargebee, options: { processor: 'chargebee' } });
+  await runService(brandConfig({ products }), { chargebee, options: { provider: 'chargebee' } });
 
   assert.deepEqual(chargebee.callsTo('createItemFamily').map((c) => c.args), [[{
     id: BRAND_ID,
@@ -922,7 +1008,7 @@ test('chargebee-products: price amount drift → updated in place (deterministic
   const chargebee = fakeChargebee(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { chargebee, options: { processor: 'chargebee' } });
+  await runService(config, { chargebee, options: { provider: 'chargebee' } });
 
   assert.deepEqual(chargebee.callsTo('updateItemPrice').map((c) => c.args), [
     [`${BRAND_ID}-plus-monthly`, { price: 1000 }],
@@ -937,7 +1023,7 @@ test('chargebee-products: legacy plans reported read-only', async () => {
   const chargebee = fakeChargebee(responses);
   const config = brandConfig({ products: makeProducts({ ids }) });
 
-  await runService(config, { chargebee, options: { processor: 'chargebee' } });
+  await runService(config, { chargebee, options: { provider: 'chargebee' } });
 
   assert.deepEqual(chargebee.callsTo('getPlan').map((c) => c.args), [['old-plan']]);
   assert.deepEqual(chargebee.mutations(), []);
@@ -950,7 +1036,7 @@ test('chargebee-webhook: missing → created with &brand= URL, name, and 15 even
   const chargebee = fakeChargebee(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { chargebee, options: { processor: 'chargebee' } });
+  await runService(config, { chargebee, options: { provider: 'chargebee' } });
 
   assert.deepEqual(chargebee.callsTo('createWebhook').map((c) => c.args), [[{
     url: CHARGEBEE_WEBHOOK_URL,
@@ -966,7 +1052,7 @@ test('chargebee-webhook: disabled endpoint → re-activated', async () => {
   const chargebee = fakeChargebee(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  await runService(config, { chargebee, options: { processor: 'chargebee' } });
+  await runService(config, { chargebee, options: { provider: 'chargebee' } });
 
   assert.deepEqual(chargebee.callsTo('updateWebhook').map((c) => c.args), [
     ['cbwh_1', { status: 'active' }],
@@ -975,7 +1061,7 @@ test('chargebee-webhook: disabled endpoint → re-activated', async () => {
 
 // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
-test('payment: dry-run on a fully drifted account — zero mutations on all three processors', async () => {
+test('payment: dry-run on a fully drifted account — zero mutations on all three providers', async () => {
   // Everything is missing or wrong everywhere: account drifted, no products,
   // no webhooks, no item family. A dry run may only read.
   const stripe = fakeStripe({
@@ -999,61 +1085,61 @@ test('payment: dry-run on a fully drifted account — zero mutations on all thre
     },
     listWebhooks: [],
   });
-  // No per-processor product IDs configured — full-create territory
+  // No per-provider product IDs configured — full-create territory
   const config = brandConfig();
+  const brandRoot = makeBrandRoot(writebackSource(config));
 
-  const result = await runService(config, { stripe, paypal, chargebee, options: { dryRun: true } });
+  const result = await runService(config, { stripe, paypal, chargebee, options: { dryRun: true }, brandRoot });
 
   assert.equal(result.status, 'warned'); // radar + disputes guidance still warns
   assert.deepEqual(stripe.mutations(), []);
   assert.deepEqual(paypal.mutations(), []);
   assert.deepEqual(chargebee.mutations(), []);
-  // Dry-run persists no product-ID state either
-  assert.equal(result.state.stripeProducts, undefined);
-  assert.equal(result.state.paypalProducts, undefined);
+  // Dry-run lands no product ID in omega.json5 either
+  assert.ok(!readConfigSource(brandRoot).includes('productId'));
 });
 
-// ─── Interactive processor credential entry (config-landing flow) ────────────
+// ─── Interactive provider credential entry (config-landing flow) ────────────
 
-const { processorSetupFlow } = require('../src/services/payment/lib/processor-setup.js');
+const { providerSetupFlow } = require('../src/services/payment/lib/provider-setup.js');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { readFileSync } = require('node:fs');
 const { join: joinPath } = require('node:path');
 
-const PROCESSOR_FLOW_CONFIG = `{
-  // Fixture Brand — processor writeback target
+const PROVIDER_FLOW_CONFIG = `{
+  // Fixture Brand — provider writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   payment: {
-    processors: {
+    providers: {
       stripe: { updateAccountInfo: true }, // publishableKey lands here
     },
   },
 }
 `;
 
-function processorFlowContext(brandRoot) {
+function providerFlowContext(brandRoot) {
   return {
     brandId: 'fixture-brand',
     brandRoot,
     options: {},
     brandConfig: {
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-      payment: { processors: { stripe: { updateAccountInfo: true } } },
+      payment: { providers: { stripe: { updateAccountInfo: true } } },
     },
   };
 }
 
-test('processor-setup: stripe flow lands the publishable key in config and the secret in .env + process.env', async () => {
+test('provider-setup: stripe flow lands the publishable key in config and the secret in .env + process.env', async () => {
   const saved = process.env.STRIPE_SECRET_KEY;
   delete process.env.STRIPE_SECRET_KEY;
   const opened = [];
   setBrowserOpener(async (url) => { opened.push(url); return true; });
-  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
-  const context = processorFlowContext(brandRoot);
+  const brandRoot = makeBrandRoot(PROVIDER_FLOW_CONFIG);
+  const context = providerFlowContext(brandRoot);
   const tty = openTtyPrompt();
 
   try {
-    const run = processorSetupFlow(context, 'stripe');
+    const run = providerSetupFlow(context, 'stripe');
     await tty.answer('Set up now?', '\r'); // Yes
     await tty.answer('Stripe publishable key', 'pk_test_fixture123\r');
     await tty.answer('Stripe secret key', 'sk_test_fixture456\r');
@@ -1065,7 +1151,7 @@ test('processor-setup: stripe flow lands the publishable key in config and the s
     const written = readConfigSource(brandRoot);
     assert.ok(written.includes('publishableKey: "pk_test_fixture123"'));
     assert.ok(written.includes('// publishableKey lands here'));
-    assert.equal(context.brandConfig.payment.processors.stripe.publishableKey, 'pk_test_fixture123');
+    assert.equal(context.brandConfig.payment.providers.stripe.publishableKey, 'pk_test_fixture123');
     // Secret half → brand .env + the current process
     assert.ok(readFileSync(joinPath(brandRoot, '.env'), 'utf8').includes('STRIPE_SECRET_KEY="sk_test_fixture456"'));
     assert.equal(process.env.STRIPE_SECRET_KEY, 'sk_test_fixture456');
@@ -1080,32 +1166,32 @@ test('processor-setup: stripe flow lands the publishable key in config and the s
   }
 });
 
-test('processor-setup: Disable writes payment.processors.stripe: false and lands nothing', async () => {
-  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
-  const context = processorFlowContext(brandRoot);
+test('provider-setup: Disable writes payment.providers.stripe: false and lands nothing', async () => {
+  const brandRoot = makeBrandRoot(PROVIDER_FLOW_CONFIG);
+  const context = providerFlowContext(brandRoot);
   const tty = openTtyPrompt();
 
   try {
-    const run = processorSetupFlow(context, 'stripe');
+    const run = providerSetupFlow(context, 'stripe');
     await tty.answer('Set up now?', '\x1B[B\x1B[B\r'); // Disable (stop prompting)
     const landed = await run;
 
     assert.equal(landed, false);
-    assert.equal(context.brandConfig.payment.processors.stripe, false);
+    assert.equal(context.brandConfig.payment.providers.stripe, false);
     assert.ok(readConfigSource(brandRoot).includes('stripe: false, // publishableKey lands here'));
   } finally {
     tty.close();
   }
 });
 
-test('processor-setup: non-interactive returns false without touching anything', async () => {
-  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
-  const context = processorFlowContext(brandRoot);
+test('provider-setup: non-interactive returns false without touching anything', async () => {
+  const brandRoot = makeBrandRoot(PROVIDER_FLOW_CONFIG);
+  const context = providerFlowContext(brandRoot);
 
-  const landed = await processorSetupFlow(context, 'stripe');
+  const landed = await providerSetupFlow(context, 'stripe');
 
   assert.equal(landed, false);
-  assert.equal(readConfigSource(brandRoot), PROCESSOR_FLOW_CONFIG);
+  assert.equal(readConfigSource(brandRoot), PROVIDER_FLOW_CONFIG);
 });
 
 test('absoluteBrandImage: relative brand.images join brand.url; full URLs pass through; unresolvable → null', () => {

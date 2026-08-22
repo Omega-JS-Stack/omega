@@ -1,12 +1,12 @@
 ---
 name: backend
-description: Use when working on a brand's backend app or on @omega.js/backend itself — Cloud Functions routes, schemas, auth hooks, the emulator harness, usage, payments, email, or anything under apps/backend, functions/, or packages/backend/.
+description: Use when working on a brand's backend app or on @omega.js/backend itself — Cloud Functions routes, schemas, auth hooks, the emulator harness, usage, payments, email, or anything under targets/backend, functions/, or packages/backend/.
 user-invocable: true
 ---
 
 # OMEGA Backend (@omega.js/backend)
 
-`@omega.js/backend` builds Firebase Cloud Functions backends: one `Manager.init(exports, {...})` bootstrap wires the built-in functions (`omega_api`, auth events, cron jobs), the helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities), the payment processors, Firestore-trigger pipelines, marketing campaigns, an MCP server, and the CLI for emulator, deploy, logs, auth, and Firestore work. Consumer apps are src-first: `src/index.js` plus optional `src/routes/`, `src/schemas/`, `src/hooks/`, staged into `dist/` by `omega build`.
+`@omega.js/backend` builds Firebase Cloud Functions backends: one `Manager.init(exports, {...})` bootstrap wires the built-in functions (`omega_api`, auth events, cron jobs), the helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities), the payment providers, Firestore-trigger pipelines, marketing campaigns, an MCP server, and the CLI for emulator, deploy, logs, auth, and Firestore work. Consumer apps are src-first: `src/index.js` plus optional `src/routes/`, `src/schemas/`, `src/hooks/`, staged into `dist/` by `omega build`.
 
 ## Where the knowledge lives
 

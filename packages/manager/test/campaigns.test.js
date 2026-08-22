@@ -54,7 +54,13 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
       ...(address ? { address } : {}),
     },
     parent,
-    marketing: { campaigns: { ...structuredClone(DEFAULTS.marketing.campaigns), listId, ...campaigns } },
+    marketing: {
+      campaigns: {
+        ...structuredClone(DEFAULTS.marketing.campaigns),
+        providers: { sendgrid: { listId } },
+        ...campaigns,
+      },
+    },
     targets: { web: {} },
   };
 }
@@ -160,9 +166,8 @@ function runService(config, { sendgrid, cloudflare = null, options = {}, service
     brandId: 'fixture-brand',
     brandRoot: brandRoot || makeBrandRoot(WRITEBACK_CONFIG), // the list op writes into config/omega.json5 here
     brandConfig: config,
-    brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
-    brandState: {},
-    apps: [],
+    brand: { id: 'fixture-brand', config, enabledTargets: Object.keys(config.targets || {}), targets: [] },
+    targets: [],
     operations: OPERATIONS.campaigns,
     options,
     serviceData,
@@ -186,9 +191,15 @@ test('campaigns: marketing.campaigns.enabled = false skips the service', async (
 });
 
 test('campaigns: a different campaigns provider skips the service', async () => {
-  const result = await runService(brandConfig({ campaigns: { provider: 'other' } }), { sendgrid: fakeSendgrid() });
+  const result = await runService(brandConfig({ campaigns: { providers: { other: {} } } }), { sendgrid: fakeSendgrid() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /provider = 'other'/);
+  assert.match(result.reason, /marketing\.campaigns\.providers\.other/);
+});
+
+test('campaigns: an empty providers block means none chosen — the service skips (#425)', async () => {
+  const result = await runService(brandConfig({ campaigns: { providers: {} } }), { sendgrid: fakeSendgrid() });
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /no marketing\.campaigns\.providers entry/);
 });
 
 test('campaigns: skips without brand.url', async () => {
@@ -201,8 +212,7 @@ test('campaigns: the defaults carry no company parent URL', () => {
   // omega-manager defaulted parent to the company's brand URL — the manager
   // defaults layer must leave the choice to config
   assert.equal(DEFAULTS.parent, null);
-  assert.equal(DEFAULTS.marketing.campaigns.provider, 'sendgrid');
-  assert.equal(DEFAULTS.marketing.campaigns.listId, null);
+  assert.equal(DEFAULTS.marketing.campaigns.providers.sendgrid.listId, null);
 });
 
 // ─── Converged no-op ─────────────────────────────────────────────────────────

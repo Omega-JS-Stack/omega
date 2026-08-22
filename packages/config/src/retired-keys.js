@@ -81,6 +81,129 @@ const RETIRED_PATHS = {
     replacement: 'advertising.providers.adsense',
     why: 'provider ids drop the vendor prefix and every key is camelCase (#23) — the slots are displaySlot/inArticleSlot/inFeedSlot/multiplexSlot',
   },
+
+  // ─── one provider shape everywhere (#425) ──────────────────────────────
+  // Every role names its vendors under `providers`, so the flat picks
+  // (`domain.provider`), the fourth word (`payment.processors`) and the bare
+  // vendor key (`certificates.apple`) are gone. Each CONVERTED LEAF is its
+  // own row: a config still carrying the old key would validate clean and
+  // silently lose the setting, which is exactly what this guard exists for.
+  'payment.processors': {
+    replacement: 'payment.providers',
+    why: 'one provider shape everywhere (#425) — the block is `providers` in every role, payment included (and the singular word followed in #428: `provider` on a subscription/webhook document, on the payments routes, and in the code)',
+  },
+  'certificates.apple': {
+    replacement: 'certificates.providers.apple',
+    why: 'one provider shape everywhere (#425) — no bare vendor keys; Windows signing will sit beside it as certificates.providers.<vendor>',
+  },
+  'domain.provider': {
+    replacement: 'domain.providers.<registrar>',
+    why: 'one provider shape everywhere (#425) — the registrar is a KEY under `domain.providers` (namecheap/squarespace); no entry = none chosen and the domain service skips, exactly as a null provider did',
+  },
+  'domain.email.provider': {
+    replacement: 'domain.email.providers.<provider>',
+    why: 'one provider shape everywhere (#425) — the mailbox provider is a KEY under `domain.email.providers` (cloudflare/squarespace/privateemail); `domain.email.forwarding` stays role-level',
+  },
+  'translation.provider': {
+    replacement: 'translation.providers.<name>',
+    why: 'one provider shape everywhere (#425) — presence picks the engine ({ claude: {} } / { chatgpt: {} }); `translation.model` stays role-level',
+  },
+  'devlog.provider': {
+    replacement: 'devlog.providers.ghostii',
+    why: 'one provider shape everywhere (#425) — the writer is a KEY under `devlog.providers`, and its settings moved inside it; `devlog.enabled` stays role-level',
+  },
+  'devlog.lookbackDays': {
+    replacement: 'devlog.providers.ghostii.lookbackDays',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.orgs': {
+    replacement: 'devlog.providers.ghostii.orgs',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.excludeRepos': {
+    replacement: 'devlog.providers.ghostii.excludeRepos',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.excludeCommits': {
+    replacement: 'devlog.providers.ghostii.excludeCommits',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.excludeTopics': {
+    replacement: 'devlog.providers.ghostii.excludeTopics',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.includePrivate': {
+    replacement: 'devlog.providers.ghostii.includePrivate',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.postPath': {
+    replacement: 'devlog.providers.ghostii.postPath',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.destinations': {
+    replacement: 'devlog.providers.ghostii.destinations',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'devlog.overrides': {
+    replacement: 'devlog.providers.ghostii.overrides',
+    why: 'provider-hung devlog settings live under the provider that reads them (#425)',
+  },
+  'monitoring.provider': {
+    replacement: 'monitoring.providers.sentry',
+    why: "one provider shape everywhere (#425) — the monitor is a KEY under `monitoring.providers` (only sentry today); `monitoring.enabled` stays role-level",
+  },
+  'monitoring.org': {
+    replacement: 'monitoring.providers.sentry.org',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.dsn': {
+    replacement: 'monitoring.providers.sentry.dsn',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425) — per-surface DSNs are targets.<type>.monitoring.providers.sentry.dsn',
+  },
+  'monitoring.environment': {
+    replacement: 'monitoring.providers.sentry.environment',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.sampleRate': {
+    replacement: 'monitoring.providers.sentry.sampleRate',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.tracesSampleRate': {
+    replacement: 'monitoring.providers.sentry.tracesSampleRate',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.scrubEmail': {
+    replacement: 'monitoring.providers.sentry.scrubEmail',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.attachScreenshot': {
+    replacement: 'monitoring.providers.sentry.attachScreenshot',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'monitoring.bundlePatterns': {
+    replacement: 'monitoring.providers.sentry.bundlePatterns',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425)',
+  },
+  'marketing.campaigns.provider': {
+    replacement: 'marketing.campaigns.providers.sendgrid',
+    why: "one provider shape everywhere (#425) — the email-marketing vendor is a KEY under `marketing.campaigns.providers`; `marketing.campaigns.enabled` stays role-level",
+  },
+  'marketing.campaigns.listId': {
+    replacement: 'marketing.campaigns.providers.sendgrid.listId',
+    why: 'the list id is a SendGrid fact and lives under the provider that reads it (#425)',
+  },
+  'marketing.newsletter.provider': {
+    replacement: 'marketing.newsletter.providers.beehiiv',
+    why: "one provider shape everywhere (#425) — the newsletter vendor is a KEY under `marketing.newsletter.providers`; `marketing.newsletter.enabled` and `marketing.newsletter.content` stay role-level (content is pipeline config, not Beehiiv config)",
+  },
+  'marketing.newsletter.publicationId': {
+    replacement: 'marketing.newsletter.providers.beehiiv.publicationId',
+    why: 'the publication id is a Beehiiv fact and lives under the provider that reads it (#425)',
+  },
+  'blog.provider': {
+    replacement: 'blog.providers.ghostii',
+    why: "one provider shape everywhere (#425) — the blog writer is a KEY under `blog.providers`; `blog.enabled` and `blog.content` stay role-level (content is pipeline config)",
+  },
 };
 
 function walk(node, path, found) {

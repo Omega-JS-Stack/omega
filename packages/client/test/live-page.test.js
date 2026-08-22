@@ -254,9 +254,17 @@ describe('live-page', () => {
       );
     });
 
-    it('polls each feed on its own cadence until it is stopped', async () => {
+    it('polls each feed on its own cadence until it is stopped', async (t) => {
+      // The cadence IS what this case pins, so the clock is the runner's, not
+      // the wall's: a real sleep only delivers as many ticks as a loaded
+      // machine felt like giving, which is what made this the flaky one (#419).
+      // Only setInterval is faked — the awaits below still need real
+      // timers/microtasks to drain each read.
+      t.mock.timers.enable({ apis: ['setInterval'] });
+
       const answers = [];
       const fetcher = async (path) => { answers.push(path); return {}; };
+      const countOf = (path) => answers.filter((asked) => asked === path).length;
       const poller = createFeedPoller({
         feeds: {
           fast: { path: '/fast', every: 20 },
@@ -271,15 +279,20 @@ describe('live-page', () => {
       await poller.start();
       assert.strictEqual(answers.length, 2, 'starting twice does not read twice');
 
-      await sleep(90);
-      poller.stop();
-      const fast = answers.filter((path) => path === '/fast').length;
-      const slow = answers.filter((path) => path === '/slow').length;
-      assert.ok(fast >= 3, `the fast feed re-read on its cadence (saw ${fast})`);
-      assert.strictEqual(slow, 1, 'while the slow one has not come round yet');
+      // 100ms on the poller's clock: five fast cadences, and the slow feed's
+      // has not come round even once
+      t.mock.timers.tick(100);
+      assert.strictEqual(countOf('/fast'), 6, 'the fast feed re-read on every one of its own cadences');
+      assert.strictEqual(countOf('/slow'), 1, 'while the slow one has not come round yet');
 
+      // 200ms in, the slow feed reads — once, on ITS cadence
+      t.mock.timers.tick(100);
+      assert.strictEqual(countOf('/slow'), 2, 'the slow feed reads when its own cadence lands');
+      assert.strictEqual(countOf('/fast'), 11, 'and the fast one kept its own, unchanged');
+
+      poller.stop();
       const after = answers.length;
-      await sleep(60);
+      t.mock.timers.tick(10000);
       assert.strictEqual(answers.length, after, 'and a stopped poller reads nothing more');
     });
 

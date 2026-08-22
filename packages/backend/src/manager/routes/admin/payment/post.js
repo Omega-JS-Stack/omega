@@ -1,5 +1,5 @@
 /**
- * POST /admin/payment - Payment processor webhook
+ * POST /admin/payment - Payment provider webhook
  * Admin-only endpoint to process payment events
  */
 const jetpack = require('fs-jetpack');
@@ -22,31 +22,31 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
     return ctx.respond('No productId', { code: 400 });
   }
 
-  const processorPath = `${Manager.cwd}/payment-processors/${productId}.js`;
+  const providerPath = `${Manager.cwd}/payment-providers/${productId}.js`;
 
-  ctx.log('Loading payment processor:', processorPath);
+  ctx.log('Loading payment provider:', providerPath);
 
-  // Check if processor exists
-  if (!jetpack.exists(processorPath)) {
-    ctx.warn('Subprocessor does not exist:', processorPath);
+  // Check if provider exists
+  if (!jetpack.exists(providerPath)) {
+    ctx.warn('Subprovider does not exist:', providerPath);
     return ctx.respond({});
   }
 
-  // Load processor
-  let processor;
+  // Load provider
+  let provider;
   try {
-    processor = new (require(processorPath));
-    processor.Manager = Manager;
+    provider = new (require(providerPath));
+    provider.Manager = Manager;
   } catch (e) {
-    ctx.error('Subprocessor failed to load:', processorPath, e);
+    ctx.error('Subprovider failed to load:', providerPath, e);
     return ctx.respond({});
   }
 
   // Process payment
-  const result = await processor.process(settings).catch(e => e);
+  const result = await provider.process(settings).catch(e => e);
 
   if (result instanceof Error) {
-    return ctx.respond(`Payment processor @ "${processorPath}" failed: ${result}`, { code: 500 });
+    return ctx.respond(`Payment provider @ "${providerPath}" failed: ${result}`, { code: 500 });
   }
 
   // Track analytics

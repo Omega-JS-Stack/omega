@@ -22,7 +22,7 @@ const path = require('node:path');
 
 const MONOREPO_ROOT = path.join(__dirname, '..');
 const { runOnboard } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'onboard.js'));
-const { TARGET_APP_DIRS } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'config.js'));
+const { TARGET_DIRS } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'config.js'));
 const { configureOmega, loadSiteData } = require('@omega.js/web');
 
 // One row per brand shape. targets: null = the non-interactive derivation
@@ -62,8 +62,8 @@ function flipTheme(brandRoot, themeId) {
   fs.writeFileSync(configPath, flipped);
 }
 
-function writePost(webAppDir) {
-  const postPath = path.join(webAppDir, '_posts', '2026', '2026-07-01-corpus-post.md');
+function writePost(webTargetDir) {
+  const postPath = path.join(webTargetDir, '_posts', '2026', '2026-07-01-corpus-post.md');
   fs.mkdirSync(path.dirname(postPath), { recursive: true });
   fs.writeFileSync(postPath, [
     '---',
@@ -81,13 +81,13 @@ function writePost(webAppDir) {
   ].join('\n'));
 }
 
-/** Real Eleventy build of a cell's web app (any instance dir); returns results by URL. */
-async function buildWebApp(brandRoot, appDirName = 'website') {
+/** Real Eleventy build of a cell's web target (any instance dir); returns results by URL. */
+async function buildWebTarget(brandRoot, targetDirName = 'website') {
   const Eleventy = require('@11ty/eleventy').default;
-  const webAppDir = path.join(brandRoot, 'apps', appDirName);
-  const siteData = loadSiteData(webAppDir); // the REAL config chain (throws on invalid)
+  const webTargetDir = path.join(brandRoot, 'targets', targetDirName);
+  const siteData = loadSiteData(webTargetDir); // the REAL config chain (throws on invalid)
 
-  const elev = new Eleventy(webAppDir, path.join(brandRoot, `.corpus-out-${appDirName}`), {
+  const elev = new Eleventy(webTargetDir, path.join(brandRoot, `.corpus-out-${targetDirName}`), {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
@@ -95,9 +95,9 @@ async function buildWebApp(brandRoot, appDirName = 'website') {
       // bleed one brand's layouts into the next (slice-test precedent)
       eleventyConfig.setUseTemplateCache(false);
       return configureOmega(eleventyConfig, {
-        consumerDir: webAppDir,
+        consumerDir: webTargetDir,
         siteData,
-        farmDir: path.join(brandRoot, `.corpus-farm-${appDirName}`),
+        farmDir: path.join(brandRoot, `.corpus-farm-${targetDirName}`),
         assetManifest: {
           js: { main: '/assets/js/main-CORPUS.js', pages: {} },
           css: { main: '/assets/css/main-CORPUS.css', pages: {}, themePages: {} },
@@ -144,11 +144,11 @@ function assertWebInvariants(cell, pages) {
  * whole sweep through the REAL mechanisms — the workspace structure op's
  * per-instance dir expectations, per-instance compose (the admin entry
  * overrides brand shared for admin ONLY), deterministic dev-port offsets,
- * deploy-record keying by app, and a real Eleventy build of BOTH instances.
+ * deploy-record keying by target dir, and a real Eleventy build of BOTH instances.
  */
 async function proveInstances(brandRoot, cell) {
   const JSON5 = require('json5');
-  const { loadConfig, appInstance, instancePortOffset } = require('@omega.js/config');
+  const { loadConfig, targetInstance, instancePortOffset } = require('@omega.js/config');
   const { loadBrand } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'lib', 'brand.js'));
   const structureOp = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'services', 'workspace', 'ensure', 'structure.js'));
   const { websiteWantedPort } = require(path.join(MONOREPO_ROOT, 'packages', 'web', 'src', 'commands', 'dev.js'));
@@ -176,26 +176,26 @@ async function proveInstances(brandRoot, cell) {
     console.log = () => {};
     try {
       const brand = loadBrand(brandRoot);
-      return await structureOp({ brandRoot, brand, apps: brand.apps });
+      return await structureOp({ brandRoot, brand, targets: brand.targets });
     } finally {
       console.log = log;
     }
   };
   const missing = await runStructure();
-  need(missing.status === 'error' && /create apps\/website-admin\//.test(missing.error || ''), 'structure errors on the missing instance dir');
+  need(missing.status === 'error' && /create targets\/website-admin\//.test(missing.error || ''), 'structure errors on the missing instance dir');
 
-  // Birth the admin instance as a copy of the main app, then structure heals
-  const mainDir = path.join(brandRoot, 'apps', 'website');
-  const adminDir = path.join(brandRoot, 'apps', 'website-admin');
+  // Birth the admin instance as a copy of the main dir, then structure heals
+  const mainDir = path.join(brandRoot, 'targets', 'website');
+  const adminDir = path.join(brandRoot, 'targets', 'website-admin');
   fs.cpSync(mainDir, adminDir, { recursive: true });
   const healed = await runStructure();
   need(healed.status !== 'error', `structure passes with both instance dirs (${healed.error || 'ok'})`);
 
-  // Per-instance compose: the admin entry is scoped to apps/website-admin
+  // Per-instance compose: the admin entry is scoped to targets/website-admin
   const main = loadConfig(mainDir, 'web');
   const admin = loadConfig(adminDir, 'web');
   need(main.errors.length === 0 && admin.errors.length === 0, 'both instances validate');
-  need(main.instance === 'main' && admin.instance === 'admin', 'app dirs resolve their instance ids');
+  need(main.instance === 'main' && admin.instance === 'admin', 'target dirs resolve their instance ids');
   need(main.config.brand.name === baseName, 'main keeps the brand-shared name');
   need(admin.config.brand.name === adminName, 'admin instance entry overrides brand shared for admin only');
   need(admin.config.url === `https://admin.${cell.id}.invalid`, 'admin carries its instance url');
@@ -204,15 +204,15 @@ async function proveInstances(brandRoot, cell) {
   need(instancePortOffset(data.targets.web, 'admin') === 1, 'admin offsets by its array position');
   need(websiteWantedPort(adminDir) - websiteWantedPort(mainDir) === 1, 'admin wants the next port beside main');
 
-  // Deploy records key by app: main stays `web`, admin lands `web:admin`
-  recordDeploy({ dir: mainDir, target: 'web', instance: appInstance(mainDir, 'web'), detail: { method: 'corpus' } });
-  recordDeploy({ dir: adminDir, target: 'web', instance: appInstance(adminDir, 'web'), detail: { method: 'corpus' } });
+  // Deploy records key by target dir: main stays `web`, admin lands `web:admin`
+  recordDeploy({ dir: mainDir, target: 'web', instance: targetInstance(mainDir, 'web'), detail: { method: 'corpus' } });
+  recordDeploy({ dir: adminDir, target: 'web', instance: targetInstance(adminDir, 'web'), detail: { method: 'corpus' } });
   const state = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'state.json'), 'utf8'));
-  need(!!(state.deploy && state.deploy.web && state.deploy['web:admin']), 'deploy records key per instance app');
+  need(!!(state.deploy && state.deploy.web && state.deploy['web:admin']), 'deploy records key per instance dir');
 
   // Real Eleventy build of BOTH instances — each branded as ITS instance
-  const mainPages = await buildWebApp(brandRoot, 'website');
-  const adminPages = await buildWebApp(brandRoot, 'website-admin');
+  const mainPages = await buildWebTarget(brandRoot, 'website');
+  const adminPages = await buildWebTarget(brandRoot, 'website-admin');
   failures.push(...assertWebInvariants(cell, mainPages));
   const mainHome = mainPages.get('/') || '';
   const adminHome = adminPages.get('/') || '';
@@ -241,22 +241,22 @@ async function runCell(cell) {
 
     const targets = expectedTargets(cell);
     for (const target of targets) {
-      const dir = TARGET_APP_DIRS[target] || target;
-      if (!fs.existsSync(path.join(brandRoot, 'apps', dir, 'package.json'))) {
-        failures.push(`apps/${dir} missing for target ${target}`);
+      const dir = TARGET_DIRS[target] || target;
+      if (!fs.existsSync(path.join(brandRoot, 'targets', dir, 'package.json'))) {
+        failures.push(`targets/${dir} missing for target ${target}`);
       }
     }
-    const scaffoldedApps = fs.readdirSync(path.join(brandRoot, 'apps'));
-    if (scaffoldedApps.length !== targets.length) {
-      failures.push(`expected ${targets.length} apps, found ${scaffoldedApps.length} (${scaffoldedApps.join(', ')})`);
+    const scaffoldedDirs = fs.readdirSync(path.join(brandRoot, 'targets'));
+    if (scaffoldedDirs.length !== targets.length) {
+      failures.push(`expected ${targets.length} target dirs, found ${scaffoldedDirs.length} (${scaffoldedDirs.join(', ')})`);
     }
 
     if (cell.instances) {
       failures.push(...await proveInstances(brandRoot, cell));
     } else if (targets.includes('web')) {
       if (cell.theme) flipTheme(brandRoot, cell.theme);
-      if (cell.post) writePost(path.join(brandRoot, 'apps', 'website'));
-      failures.push(...assertWebInvariants(cell, await buildWebApp(brandRoot)));
+      if (cell.post) writePost(path.join(brandRoot, 'targets', 'website'));
+      failures.push(...assertWebInvariants(cell, await buildWebTarget(brandRoot)));
     }
   } catch (error) {
     failures.push(`crashed: ${error.message}`);

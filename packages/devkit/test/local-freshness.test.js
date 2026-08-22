@@ -1011,27 +1011,27 @@ test('a failed watch-down heal stops the boot, naming the prepare to run by hand
 
 const HOST_B_NAME = '@omega.js/scratch-host-b';
 
-/** Two lane hosts sharing one dep, each linked into its own app dir. */
+/** Two lane hosts sharing one dep, each linked into its own target dir. */
 function makeFanOut(scratch) {
   const hostA = path.join(scratch, 'host-a');
   const hostB = path.join(scratch, 'host-b');
   const depDir = path.join(scratch, 'dep');
-  const appA = path.join(scratch, 'app-a');
-  const appB = path.join(scratch, 'app-b');
+  const targetA = path.join(scratch, 'target-a');
+  const targetB = path.join(scratch, 'target-b');
 
   makeOmegaPkg(hostA, HOST_NAME, { [DEP_NAME]: '*' });
   makeOmegaPkg(hostB, HOST_B_NAME, { [DEP_NAME]: '*' });
   makeOmegaPkg(depDir, DEP_NAME);
   linkPkg(hostA, DEP_NAME, depDir);
   linkPkg(hostB, DEP_NAME, depDir);
-  makeConsumerRoot(appA);
-  linkPkg(appA, HOST_NAME, hostA);
-  makeConsumerRoot(appB);
-  linkPkg(appB, HOST_B_NAME, hostB);
+  makeConsumerRoot(targetA);
+  linkPkg(targetA, HOST_NAME, hostA);
+  makeConsumerRoot(targetB);
+  linkPkg(targetB, HOST_B_NAME, hostB);
 
   return {
     depDir,
-    hosts: [{ packageName: HOST_NAME, fromDir: appA }, { packageName: HOST_B_NAME, fromDir: appB }],
+    hosts: [{ packageName: HOST_NAME, fromDir: targetA }, { packageName: HOST_B_NAME, fromDir: targetB }],
   };
 }
 

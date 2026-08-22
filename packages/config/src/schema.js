@@ -279,22 +279,22 @@ const SHARED_SCHEMA = [
     description: "The parent company's canonical URL. Sub-brand surfaces derive the company api from it (e.g. advertising inhouse source 'company' → api.<company host>).",
   },
 
-  // ── payment ──────────────────────────────────────────────────────────────
+  // ── payment (role: billing; provider-discriminated) ──────────────────────
   {
-    path:        'payment.processors.stripe.publishableKey',
+    path:        'payment.providers.stripe.publishableKey',
     type:        'string',
     required:    false,
     match:       /^pk_(test|live)_/,
     description: 'Stripe publishable key. Lives in config (not secret); the secret key stays in env.',
   },
   {
-    path:        'payment.processors.paypal.clientId',
+    path:        'payment.providers.paypal.clientId',
     type:        'string',
     required:    false,
     description: 'PayPal client ID. Lives in config; secret stays in env.',
   },
   {
-    path:        'payment.processors.chargebee.site',
+    path:        'payment.providers.chargebee.site',
     type:        'string',
     required:    false,
     description: 'Chargebee site slug.',
@@ -303,7 +303,7 @@ const SHARED_SCHEMA = [
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every processor and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features [{ id, name, icon, definition, value }].',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-provider IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every provider and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features [{ id, name, icon, definition, value }].',
   },
   {
     path:        'payment.winback.enabled',
@@ -334,35 +334,34 @@ const SHARED_SCHEMA = [
     description: "How long the accepted offer lasts: 'once' (the next cycle only, the default) or 'forever' (a permanent price cut).",
   },
 
-  // ── monitoring (role: error monitoring; D12 provider-discriminated) ──────
+  // ── monitoring (role: error monitoring; provider-keyed, #425) ────────────
   {
-    path:        'monitoring.provider',
-    type:        'string',
+    path:        'monitoring.enabled',
+    type:        'boolean',
     required:    false,
-    enum:        ['sentry'],
-    description: "Error-monitoring provider. Only 'sentry' today.",
+    description: 'Role-level switch (default true). false skips the monitoring service outright, whatever the providers block says.',
   },
   {
-    path:        'monitoring.org',
+    path:        'monitoring.providers.sentry.org',
     type:        'string',
     required:    false,
-    description: 'Sentry organization slug (public). Auto-detected when the auth token sees exactly one org — the sentry service writes it back here.',
+    description: 'Sentry organization slug (public). Auto-detected when the auth token sees exactly one org — the monitoring service writes it back here.',
   },
   {
-    path:        'monitoring.dsn',
+    path:        'monitoring.providers.sentry.dsn',
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.monitoring.dsn overrides.',
+    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.monitoring.providers.sentry.dsn overrides.',
   },
   {
-    path:        'monitoring.environment',
+    path:        'monitoring.providers.sentry.environment',
     type:        'string',
     required:    false,
     description: "Environment tag every event carries. Unset (or null) lets the host's own gate name it: 'production' on a production run, 'development' otherwise.",
   },
   {
-    path:        'monitoring.sampleRate',
+    path:        'monitoring.providers.sentry.sampleRate',
     type:        'number',
     required:    false,
     min:         0,
@@ -370,7 +369,7 @@ const SHARED_SCHEMA = [
     description: 'Fraction of ERROR events kept, 0..1. Defaults to 1 (keep everything).',
   },
   {
-    path:        'monitoring.tracesSampleRate',
+    path:        'monitoring.providers.sentry.tracesSampleRate',
     type:        'number',
     required:    false,
     min:         0,
@@ -378,19 +377,19 @@ const SHARED_SCHEMA = [
     description: 'Fraction of performance traces kept, 0..1. Defaults to 0.1.',
   },
   {
-    path:        'monitoring.scrubEmail',
+    path:        'monitoring.providers.sentry.scrubEmail',
     type:        'boolean',
     required:    false,
     description: 'PII guard on the user attached to an event: the uid always rides, the email only when this is explicitly false. Defaults to true (scrubbed).',
   },
   {
-    path:        'monitoring.attachScreenshot',
+    path:        'monitoring.providers.sentry.attachScreenshot',
     type:        'boolean',
     required:    false,
     description: '@omega.js/desktop only: attach a screenshot of the window to a captured event. Defaults to false.',
   },
   {
-    path:        'monitoring.bundlePatterns',
+    path:        'monitoring.providers.sentry.bundlePatterns',
     type:        'array',
     required:    false,
     description: "Browser only: the URL fragments that identify OUR bundles — a browser event reports only when a stack frame matches one. Defaults to ['/assets/js/'], where both @omega.js/web and @omega.js/extension serve every framework bundle.",
@@ -584,12 +583,12 @@ const SHARED_SCHEMA = [
     description: "Sitemap paths submitted as https://{domain}{path} (default ['/sitemap.xml']).",
   },
 
-  // ── devlog ───────────────────────────────────────────────────────────────
+  // ── devlog (role: commit-digest publishing; provider-discriminated) ──────
   {
     path:        'devlog',
     type:        'object',
     required:    false,
-    description: 'Commit-digest devlog pipeline (@omega.js/manager devlog): enabled, orgs, lookbackDays, publish settings.',
+    description: 'Commit-digest devlog pipeline (@omega.js/manager devlog): enabled + providers.ghostii (orgs, lookbackDays, publish settings).',
   },
 
   // ── seo ──────────────────────────────────────────────────────────────────
@@ -637,12 +636,52 @@ const SHARED_SCHEMA = [
     description: 'Review-collection settings (enabled, sites).',
   },
 
-  // ── marketing ────────────────────────────────────────────────────────────
+  // ── marketing (two roles: campaigns + newsletter, provider-keyed, #425) ──
+  // Enumerated field by field (#425): the section used to validate as one
+  // opaque object, so a typo in a list id or a publication id read as nothing
+  // and the sync silently landed contacts in the wrong place. The section entry
+  // stays too — it is one of the shared keys #277 types at brand level.
   {
     path:        'marketing',
     type:        'object',
     required:    false,
-    description: 'Marketing automation: campaigns, newsletter (Beehiiv), prune.',
+    description: 'Marketing automation: the campaigns + newsletter roles (each provider-keyed) and the prune switch.',
+  },
+  {
+    path:        'marketing.campaigns.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'Role-level switch for email marketing (default true). false skips the campaigns service and the backend contact sync.',
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.listId',
+    type:        'string',
+    required:    false,
+    description: "SendGrid Marketing list UUID the brand's contacts land in. Written back by the campaigns service; unset means contacts reach All Contacts only.",
+  },
+  {
+    path:        'marketing.newsletter.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'Role-level switch for the newsletter (default true). false skips the newsletter service and the backend subscriber sync.',
+  },
+  {
+    path:        'marketing.newsletter.providers.beehiiv.publicationId',
+    type:        'string',
+    required:    false,
+    description: "Beehiiv publication id (e.g. 'pub_xxxxx') the brand's subscribers land in, and the id every inbound Beehiiv webhook event is matched against. Written back by the newsletter service.",
+  },
+  {
+    path:        'marketing.newsletter.content',
+    type:        'object|array',
+    required:    false,
+    description: 'Newsletter-PIPELINE config (sources, categories, tone, template, theme, sponsorships) — a single object or an array whose first entry the generator uses. Role-level on purpose: it configures @omega.js/backend\'s generator, not Beehiiv.',
+  },
+  {
+    path:        'marketing.prune.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'Monthly cold-contact prune across both providers. OPT-IN: nothing runs unless this is explicitly true.',
   },
 
   // ── blog ─────────────────────────────────────────────────────────────────
@@ -748,17 +787,16 @@ const SHARED_SCHEMA = [
     description: "Target language codes (e.g. ['es', 'fr']). Empty/absent = translation off. Validated against @omega.js/devkit/translate's language SSOT.",
   },
   {
-    path:        'translation.provider',
-    type:        'string',
+    path:        'translation.providers',
+    type:        'object',
     required:    false,
-    enum:        ['claude', 'chatgpt'],
-    description: "AI translation provider. 'claude' (default) rides the local Claude Code install — no API key; 'chatgpt' uses the OpenAI API via OPENAI_API_KEY in env.",
+    description: "AI translation provider, keyed by name — presence picks the engine ({ claude: {} } or { chatgpt: {} }). 'claude' (the default when the block is absent) rides the local Claude Code install — no API key; 'chatgpt' uses the OpenAI API via OPENAI_API_KEY in env.",
   },
   {
     path:        'translation.model',
     type:        'string',
     required:    false,
-    description: "Model override for the provider (defaults: claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano').",
+    description: "Model override for the chosen provider (defaults: claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano').",
   },
   {
     path:        'translation.exclude',

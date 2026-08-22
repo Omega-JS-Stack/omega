@@ -124,7 +124,7 @@ function paidAccount(subscription) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: HOUR_FROM_NOW },
       ...subscription,
     },
@@ -614,7 +614,7 @@ test('plan switcher: an unrecorded frequency locks the current product at BOTH c
   // The repro: a subscription whose `payment.frequency` never got recorded made
   // the old exact-pair filter miss, and the modal offered Studio → Studio. With
   // nothing to match on, the product id alone decides.
-  const view = await openSwitcher(paidAccount({ payment: { price: 10, processor: 'test' } }));
+  const view = await openSwitcher(paidAccount({ payment: { price: 10, provider: 'test' } }));
 
   assert.equal(view.cadence.segments[0].checked, true, 'With no cadence on record the toggle opens on Monthly');
   assert.equal(find(view.cards, 'premium').disabled, true, 'No recorded frequency: the monthly card is conservative');

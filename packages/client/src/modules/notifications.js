@@ -212,15 +212,15 @@ class Notifications {
     const analytics = this.manager.analytics();
 
     if (prompted) {
-      analytics.event('notification_permission_requested');
+      analytics.event('notification_permission_request');
     }
 
     const permission = await Notification.requestPermission();
 
     if (prompted && permission === 'granted') {
-      analytics.event('notification_permission_granted');
+      analytics.event('notification_permission_grant');
     } else if (prompted && permission === 'denied') {
-      analytics.event('notification_permission_denied');
+      analytics.event('notification_permission_deny');
     }
 
     return permission;

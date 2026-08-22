@@ -5,7 +5,7 @@
  * A one-time Checkout Session carries the productId in its OWN metadata, but the
  * charge Stripe creates behind it only inherits `payment_intent_data.metadata` —
  * which carried uid and orderId alone. So the refund of that purchase arrived as
- * a charge that could not say what was bought, at the processor or anywhere the
+ * a charge that could not say what was bought, at the provider or anywhere the
  * charge is read on its own.
  *
  * The SDK is the one thing stubbed: creating a session needs a live Stripe
@@ -14,8 +14,8 @@
  *
  * Run: npx omega test backend:routes/payments/intent-one-time-metadata
  */
-const StripeLib = require('../../../src/manager/libraries/payment/processors/stripe.js');
-const stripeIntent = require('../../../src/manager/routes/payments/intent/processors/stripe.js');
+const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const stripeIntent = require('../../../src/manager/routes/payments/intent/providers/stripe.js');
 
 const UID = '_test-intent-metadata-uid';
 const ORDER_ID = '1212-3434-5656';

@@ -3,7 +3,7 @@
  * the fallback when a brand has no assets/logo/brandmark.svg yet. MrLogo is
  * OURS, so the endpoint is a product constant (like the Ghostii client's
  * write URL) and auth rides the same credential ladder as the other product
- * services (slapform/chatsy/replyify — Ian 2026-07-14: no config options,
+ * services (forms/chat/email — Ian 2026-07-14: no config options,
  * "use an API key or service account or whatever slapform, chatsy,
  * replyify use"):
  *

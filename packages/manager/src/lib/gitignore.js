@@ -1,6 +1,6 @@
 /**
- * Shared gitignore ensure — durable state, run output, and the run logs never
- * get committed. Used by the workspace service (brand roots) and runCompany
+ * Shared gitignore ensure — the secrets store, run output, and the run logs
+ * never get committed. Used by the workspace service (brand roots) and runCompany
  * (the company root, which no service pass touches).
  *
  * The scaffold writes both entries into a NEW brand's .gitignore; this heals

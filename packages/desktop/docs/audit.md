@@ -1,6 +1,6 @@
 # Audit Workflow
 
-Full-project audit for @omega.js/desktop — runs against a CONSUMER app or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:desktop` skill (`/omega:desktop audit`) or any "audit this app/project" request.
+Full-project audit for @omega.js/desktop — runs against a CONSUMER project or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:desktop` skill (`/omega:desktop audit`) or any "audit this app/project" request.
 
 Every check has a stable ID, a severity, and a scope. Findings are reported as `ID @ file:line`, fixed one at a time, then re-verified. The tables below do NOT restate the rules — each check links to the doc that owns the rule and the fix.
 
@@ -47,7 +47,7 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / @omeg
 | DSK-04 | HIGH | B | Zero-trust IPC — all channels go through `manager.ipc` (never raw `ipcMain`); handlers validate payload content before acting, especially in apps embedding remote web content ([ipc.md](ipc.md#zero-trust-payloads)) |
 | DSK-05 | MED | C | Icons — one native-size PNG per slot (no `@2x` siblings), macOS tray source named `tray.png` (@omega.js/desktop owns the `Template` rename), no `app.icons` config block ([icons.md](icons.md)) |
 | DSK-06 | HIGH | C | File-based integrations — tray/menu/context-menu logic lives in `src/integrations/<name>/index.js`, never expressed in config JSON ([tray.md](tray.md), [menu.md](menu.md), [context-menu.md](context-menu.md)) |
-| DSK-07 | HIGH | B | Presence-driven feature flags — credentials enable features (`monitoring.dsn`, `analytics.providers.google.id`, `cloud.config`); no invented `enabled:` toggles ([config-schema.md](config-schema.md)) |
+| DSK-07 | HIGH | B | Presence-driven feature flags — credentials enable features (`monitoring.providers.sentry.dsn`, `analytics.providers.google.id`, `cloud.config`); no invented `enabled:` toggles ([config-schema.md](config-schema.md)) |
 | DSK-08 | MED | B | Accessibility basics in renderer views — meaningful `alt` text, labeled form fields, real `<button>`/`<a>` elements (no clickable `div`s) |
 
 ## Framework-repo checks (F-xx)

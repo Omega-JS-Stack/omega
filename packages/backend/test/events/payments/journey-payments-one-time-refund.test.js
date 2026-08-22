@@ -5,7 +5,7 @@
  *
  * The refund of a one-time purchase is its own path end to end: the subject is
  * the `payments-orders` doc (a one-time purchase never touches the user doc), the
- * processor refunds the payment behind that order, and the resulting
+ * provider refunds the payment behind that order, and the resulting
  * `charge.refunded` webhook carries no subscription — so it is categorized
  * one-time and fires purchase-refunded ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
@@ -45,7 +45,7 @@ module.exports = {
       name: 'buy-the-one-time-product',
       async run({ http, firestore, assert, state, waitFor }) {
         const response = await http.as('journey-payments-one-time-refund').post('backend-manager/payments/intent', {
-          processor: 'test',
+          provider: 'test',
           productId: state.productId,
         });
 
@@ -114,7 +114,7 @@ module.exports = {
     {
       name: 'refund-webhook-fires-purchase-refunded',
       async run({ firestore, assert, state, waitFor }) {
-        // The test processor writes the synthetic charge.refunded doc itself, so its
+        // The test provider writes the synthetic charge.refunded doc itself, so its
         // event id is not knowable here — find it by owner + event type.
         const webhookDoc = await waitFor(async () => {
           const snapshot = await firestore.collection('payments-webhooks')

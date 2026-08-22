@@ -4,7 +4,7 @@
  */
 const path = require('path');
 const { merge } = require('lodash');
-const { loadTemplate } = require('../../../libraries/load-processor');
+const { loadTemplate } = require('../../../libraries/load-provider');
 module.exports = async ({ ctx, Manager, settings }) => {
   // Validate required parameters
   if (!settings.id) {

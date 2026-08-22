@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Chargebee = require('../../../../src/manager/libraries/payment/processors/chargebee.js');
+const Chargebee = require('../../../../src/manager/libraries/payment/providers/chargebee.js');
 
 // Chargebee fixtures
 const FIXTURE_ACTIVE = require('../../../fixtures/chargebee/subscription-active.json');
@@ -367,10 +367,10 @@ module.exports = {
     // ─── Payment metadata ───
 
     {
-      name: 'payment-processor-always-chargebee',
+      name: 'payment-provider-always-chargebee',
       async run({ assert }) {
         const result = toUnifiedSubscription({});
-        assert.equal(result.payment.processor, 'chargebee', 'Processor should always be chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Provider should always be chargebee');
       },
     },
 
@@ -466,7 +466,7 @@ module.exports = {
         assert.equal(result.status, 'active', 'Status should be active');
         assert.equal(result.trial.claimed, false, 'Trial should not be claimed');
         assert.equal(result.cancellation.pending, false, 'Should not be pending cancellation');
-        assert.equal(result.payment.processor, 'chargebee', 'Processor should be chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Provider should be chargebee');
         assert.equal(result.payment.resourceId, 'sub_full_test', 'Resource ID should match');
         assert.equal(result.payment.frequency, 'monthly', 'Frequency should be monthly');
         assert.equal(result.payment.orderId, '9999-8888-7777', 'Order ID from meta_data');
@@ -483,7 +483,7 @@ module.exports = {
         assert.equal(result.status, 'cancelled', 'Empty → cancelled (no status field)');
         assert.equal(result.trial.claimed, false, 'Empty → trial not claimed');
         assert.equal(result.cancellation.pending, false, 'Empty → not pending');
-        assert.equal(result.payment.processor, 'chargebee', 'Empty → still chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Empty → still chargebee');
         assert.equal(result.payment.orderId, null, 'Empty → null orderId');
         assert.equal(result.payment.resourceId, null, 'Empty → null resourceId');
         assert.equal(result.payment.frequency, null, 'Empty → null frequency');
@@ -497,7 +497,7 @@ module.exports = {
       async run({ assert }) {
         const result = toUnifiedSubscription(FIXTURE_ACTIVE);
         assert.equal(result.status, 'active', 'Active fixture → active');
-        assert.equal(result.payment.processor, 'chargebee', 'Processor is chargebee');
+        assert.equal(result.payment.provider, 'chargebee', 'Provider is chargebee');
         assert.equal(result.payment.resourceId, FIXTURE_ACTIVE.id, 'resourceId matches fixture');
       },
     },
@@ -585,7 +585,7 @@ module.exports = {
           assert.ok(result.trial, `${label}: should have trial`);
           assert.ok(result.cancellation, `${label}: should have cancellation`);
           assert.ok(result.payment, `${label}: should have payment`);
-          assert.equal(result.payment.processor, 'chargebee', `${label}: processor should be chargebee`);
+          assert.equal(result.payment.provider, 'chargebee', `${label}: provider should be chargebee`);
           assert.ok(result.payment.updatedBy, `${label}: should have updatedBy`);
           assert.ok(result.payment.updatedBy.date, `${label}: should have updatedBy.date`);
         }

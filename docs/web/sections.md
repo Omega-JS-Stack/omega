@@ -478,7 +478,7 @@ the corpus epoch (2026-07-18) and re-anchors to the build day on every
 non-production build — post filenames shift (Eleventy `page.date`),
 `update.date` frontmatter lines rewrite, dateless team files pass through —
 so a virgin blog always looks alive. `omega dev` additionally materializes
-the generated set under the app's `.omega/sample-content/`
+the generated set under the target's `.omega/sample-content/`
 (self-`.gitignore`d, regenerated each boot, removed per collection the
 moment the consumer owns one) for humans to read and copy. Determinism: the
 web test harness pins `OMEGA_SAMPLE_ANCHOR` to the epoch — generation

@@ -13,7 +13,7 @@
 // NOTE: inspect bodies are serialized to the spawned Electron process — no closures over
 // module scope. `require`, `process`, and `Buffer` are injected; { manager, expect,
 // projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore } is the inspect argument
-// (projectRoot = the fixture root; appRoot = the staged app root holding the build).
+// (projectRoot = the fixture root; appRoot = the staged target root holding the build).
 
 module.exports = {
   type: 'group',

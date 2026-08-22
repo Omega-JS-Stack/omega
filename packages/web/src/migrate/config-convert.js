@@ -7,7 +7,7 @@
  * - Shared sections to the TOP LEVEL with unified spellings:
  *   `brand` (+ merged `url`), `theme`, `oauth2`,
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
- *   `web_manager.payment` → `payment`,
+ *   `web_manager.payment` → `payment` (`processors` → `providers` — #425),
  *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`,
  *   flat `advertising.<provider>` → `advertising.providers.<provider>`
  *   (`google-adsense` → `adsense` + camelCase slots — #23),
@@ -164,17 +164,24 @@ function convertConfig({ jekyll, ujm }) {
     omega.edge = { providers: { cloudflare } };
   }
 
+  // ---- web_manager.payment → payment, with `processors` → `providers` (#425:
+  // every role names its vendors under `providers`, payment included)
   if (!isEmpty(legacyWebManager.payment)) {
     omega.payment = legacyWebManager.payment;
     delete legacyWebManager.payment;
 
+    if (!isEmpty(omega.payment.processors)) {
+      omega.payment = renameKeys(omega.payment, { processors: 'providers' });
+      notes.push('`payment.processors` renamed to `payment.providers` (#425 — one provider shape per role)');
+    }
+
     // Legacy "disabled" idiom: credential keys set to `false` (somiibo ships
     // `stripe.publishableKey: false`). The schema types them as strings —
     // absent means not configured, so drop the false-valued keys.
-    for (const processor of Object.values(omega.payment.processors || {})) {
-      for (const [key, value] of Object.entries(processor)) {
+    for (const provider of Object.values(omega.payment.providers || {})) {
+      for (const [key, value] of Object.entries(provider)) {
         if (value === false && key !== 'enabled') {
-          delete processor[key];
+          delete provider[key];
           notes.push(`payment credential \`${key}: false\` dropped (absent = not configured)`);
         }
       }

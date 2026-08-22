@@ -9,7 +9,7 @@ class EnvFileTest extends BaseTest {
   }
 
   async run() {
-    // Authored home = the APP ROOT (src/dist pillar) — the stage step copies
+    // Authored home = the TARGET ROOT (src/dist pillar) — the stage step copies
     // it into functions/.env so the deploy artifact stays self-contained
     const envPath = `${this.self.firebaseProjectPath}/.env`;
     const existingContent = jetpack.read(envPath);
@@ -93,7 +93,7 @@ class EnvFileTest extends BaseTest {
     let existingContent = jetpack.read(envPath) || '';
 
     // A pre-pillar functions/.env is the same authored file in its old home —
-    // adopt its content once, then the app root owns it (functions/ is staged)
+    // adopt its content once, then the target root owns it (functions/ is staged)
     if (!existingContent) {
       existingContent = jetpack.read(`${this.self.firebaseProjectPath}/functions/.env`) || '';
     }

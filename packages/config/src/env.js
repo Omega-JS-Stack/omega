@@ -1,14 +1,14 @@
 /**
  * .env cascade — the secrets mirror of the omega.json5 hierarchy (D15).
  *
- * Weakest → strongest: company .env ← brand .env ← app .env ← shell.
+ * Weakest → strongest: company .env ← brand .env ← local .env ← shell.
  *
- * Same walk as the config cascade (load.js owns it): an app inside a brand
- * monorepo ({brand}/apps/{app}) layers the brand root's .env under its own,
+ * Same walk as the config cascade (load.js owns it): a target inside a brand
+ * monorepo ({brand}/targets/{target}) layers the brand root's .env under its own,
  * and a brand stamped with .omega/company.json layers its company root's
  * .env underneath that. Loading uses dotenv's no-override semantics — keys
  * already in process.env (the shell) always win, and files apply
- * innermost-first, so app beats brand beats company.
+ * innermost-first, so local beats brand beats company.
  *
  * Secrets are DEFINED once at their source level (a brand-wide GH_TOKEN in
  * the brand .env, a company-wide key in the company .env) and RESOLVED here
@@ -26,24 +26,24 @@ const { readCompanyRoot } = require('./company.js');
 /**
  * Resolve the .env chain for a project dir, strongest file first.
  *
- * `startDir` is the dir whose .env is the app layer — the project root for
+ * `startDir` is the dir whose .env is the local layer — the project root for
  * web/desktop/extension, the functions dir for a backend (its .env rides
- * the deploy artifact). Brand discovery normalizes an app subdir (functions/,
- * dist/) → app root, same as the config loader.
+ * the deploy artifact). Brand discovery normalizes a target subdir (functions/,
+ * dist/) → target root, same as the config loader.
  *
  * @param {string} startDir
- * @returns {{ app: string, brand: string|null, company: string|null }}
+ * @returns {{ local: string, brand: string|null, company: string|null }}
  *   Absolute .env paths (existence not checked here).
  */
 function resolveEnvChain(startDir) {
-  const appDir = path.resolve(startDir);
-  const brandRoot = findBrandRoot(appDir);
+  const targetDir = path.resolve(startDir);
+  const brandRoot = findBrandRoot(targetDir);
   // The marker sits at the brand root; when startDir IS a brand root (no
-  // apps/ walk above it), its own marker supplies the company layer.
-  const companyRoot = readCompanyRoot(brandRoot || appDir);
+  // targets/ walk above it), its own marker supplies the company layer.
+  const companyRoot = readCompanyRoot(brandRoot || targetDir);
 
   return {
-    app: path.join(appDir, '.env'),
+    local: path.join(targetDir, '.env'),
     brand: brandRoot ? path.join(brandRoot, '.env') : null,
     company: companyRoot ? path.join(companyRoot, '.env') : null,
   };
@@ -58,7 +58,7 @@ function resolveEnvChain(startDir) {
  * One rule on top of plain dotenv (dogfood friction #20): a file layer's
  * EMPTY value (`KEY=` / `KEY=""`) never claims the key — empty means
  * "documented here, value supplied by another layer", so a scaffolded
- * app .env full of placeholders can't shadow the brand root's real
+ * local .env full of placeholders can't shadow the brand root's real
  * values. Only the shell can deliberately set a key to empty.
  *
  * @param {Array<string|null>} envPaths
@@ -84,14 +84,14 @@ function loadEnvChain(envPaths) {
 
 /**
  * Resolve + load the full .env cascade for a project dir:
- * shell > app .env > brand .env > company .env.
+ * shell > local .env > brand .env > company .env.
  *
  * @param {string} startDir - See resolveEnvChain.
- * @returns {{ chain: { app: string, brand: string|null, company: string|null }, loaded: string[] }}
+ * @returns {{ chain: { local: string, brand: string|null, company: string|null }, loaded: string[] }}
  */
 function loadEnv(startDir) {
   const chain = resolveEnvChain(startDir);
-  const loaded = loadEnvChain([chain.app, chain.brand, chain.company]);
+  const loaded = loadEnvChain([chain.local, chain.brand, chain.company]);
   return { chain, loaded };
 }
 

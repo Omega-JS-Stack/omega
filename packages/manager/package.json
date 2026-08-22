@@ -22,7 +22,6 @@
     "./service-runner": "./dist/lib/service-runner.js",
     "./run-summary": "./dist/lib/run-summary.js",
     "./brand": "./dist/lib/brand.js",
-    "./state": "./dist/lib/state.js",
     "./manage": "./dist/manage.js"
   },
   "scripts": {

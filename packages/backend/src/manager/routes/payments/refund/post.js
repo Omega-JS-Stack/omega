@@ -1,5 +1,5 @@
 const path = require('path');
-const loadProcessor = require('../../../libraries/load-processor.js');
+const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 
 // Payments older than this are not eligible for a refund, whatever was bought.
@@ -17,7 +17,7 @@ const OUTSIDE_WINDOW_MESSAGE = 'Payments older than 6 months are not eligible fo
  *   one-time purchase never touches the user doc, so the order IS the subject
  *   ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
  *
- * Delegates to the processor (e.g., Stripe) to issue the refund. The resulting
+ * Delegates to the provider (e.g., Stripe) to issue the refund. The resulting
  * webhook triggers the Firestore pipeline, which fires the matching transition
  * handler (subscription-cancelled / purchase-refunded).
  * Stores the refund reason/feedback on payments-orders/{orderId}.requests.refund.
@@ -68,30 +68,30 @@ module.exports = async ({ ctx, user, settings }) => {
     return ctx.respond(OUTSIDE_WINDOW_MESSAGE, { code: 400 });
   }
 
-  const processor = subscription.payment?.processor;
+  const provider = subscription.payment?.provider;
   const resourceId = subscription.payment?.resourceId;
 
-  if (!processor || !resourceId) {
-    ctx.log(`Refund rejected: uid=${uid}, missing processor=${processor} or resourceId=${resourceId}`);
+  if (!provider || !resourceId) {
+    ctx.log(`Refund rejected: uid=${uid}, missing provider=${provider} or resourceId=${resourceId}`);
     return ctx.respond('Subscription payment details not found', { code: 400 });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Process the refund via the processor
+  // Process the refund via the provider
   let refund;
   try {
-    refund = await processorModule.processRefund({ resourceId, uid, subscription, ctx });
+    refund = await providerModule.processRefund({ resourceId, uid, subscription, ctx });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to process refund via ${processor}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
+    ctx.error(`Failed to process refund via ${provider}: uid=${uid}, sub=${resourceId}, error=${e.message}`);
     return ctx.respond('We could not process your refund right now. Please try again shortly.', { code: 500 });
   }
 
@@ -102,7 +102,7 @@ module.exports = async ({ ctx, user, settings }) => {
     await storeRefundRequest({ ctx, orderId, refund, settings });
   }
 
-  ctx.log(`Refund processed: uid=${uid}, processor=${processor}, sub=${resourceId}, amount=${refund.amount}, full=${refund.full}, reason=${settings.reason}`);
+  ctx.log(`Refund processed: uid=${uid}, provider=${provider}, sub=${resourceId}, amount=${refund.amount}, full=${refund.full}, reason=${settings.reason}`);
 
   return ctx.respond({ success: true, refund });
 };
@@ -139,7 +139,7 @@ async function refundOneTimePurchase({ ctx, uid, settings }) {
   }
 
   // requests.refund covers the in-app path; unified.status covers a refund issued
-  // from the processor dashboard, which arrives by webhook and writes no request
+  // from the provider dashboard, which arrives by webhook and writes no request
   if (order.requests?.refund || order.unified?.status === 'refunded') {
     ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, already refunded (request=${!!order.requests?.refund}, status=${order.unified?.status})`);
     return ctx.respond('This purchase has already been refunded', { code: 400 });
@@ -154,36 +154,36 @@ async function refundOneTimePurchase({ ctx, uid, settings }) {
     return ctx.respond(OUTSIDE_WINDOW_MESSAGE, { code: 400 });
   }
 
-  const processor = order.processor || order.unified?.payment?.processor;
+  const provider = order.provider || order.unified?.payment?.provider;
   const resourceId = order.resourceId || order.unified?.payment?.resourceId;
 
-  if (!processor || !resourceId) {
-    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, missing processor=${processor} or resourceId=${resourceId}`);
+  if (!provider || !resourceId) {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, missing provider=${provider} or resourceId=${resourceId}`);
     return ctx.respond('Order payment details not found', { code: 400 });
   }
 
-  // Load the processor module
-  let processorModule;
+  // Load the provider module
+  let providerModule;
   try {
-    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
+    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
-    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Process the refund via the processor
+  // Process the refund via the provider
   let refund;
   try {
-    refund = await processorModule.processOneTimeRefund({ resourceId, uid, order, ctx });
+    refund = await providerModule.processOneTimeRefund({ resourceId, uid, order, ctx });
   } catch (e) {
-    // The processor's own words stay in the logs — a client gets one neutral
+    // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
-    ctx.error(`Failed to process one-time refund via ${processor}: uid=${uid}, orderId=${orderId}, resource=${resourceId}, error=${e.message}`);
+    ctx.error(`Failed to process one-time refund via ${provider}: uid=${uid}, orderId=${orderId}, resource=${resourceId}, error=${e.message}`);
     return ctx.respond('We could not process your refund right now. Please try again shortly.', { code: 500 });
   }
 
   await storeRefundRequest({ ctx, orderId, refund, settings });
 
-  ctx.log(`One-time refund processed: uid=${uid}, processor=${processor}, orderId=${orderId}, resource=${resourceId}, amount=${refund.amount}, reason=${settings.reason}`);
+  ctx.log(`One-time refund processed: uid=${uid}, provider=${provider}, orderId=${orderId}, resource=${resourceId}, amount=${refund.amount}, reason=${settings.reason}`);
 
   return ctx.respond({ success: true, refund });
 }
@@ -197,7 +197,7 @@ async function refundOneTimePurchase({ ctx, uid, settings }) {
  * @param {object} options
  * @param {object} options.ctx - RouteContext
  * @param {string} options.orderId - The payments-orders id
- * @param {object} options.refund - What the processor returned ({ amount, currency, full })
+ * @param {object} options.refund - What the provider returned ({ amount, currency, full })
  * @param {object} options.settings - Resolved request settings (reason, feedback)
  */
 async function storeRefundRequest({ ctx, orderId, refund, settings }) {

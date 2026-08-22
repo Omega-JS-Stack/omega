@@ -40,7 +40,7 @@ export function warmupServer() {
 }
 
 // Create payment intent and return { url }
-export async function createPaymentIntent({ state, processor, formData }) {
+export async function createPaymentIntent({ state, provider, formData }) {
   // Get reCAPTCHA token
   const recaptchaToken = await getRecaptchaToken('payment_intent');
 
@@ -62,7 +62,7 @@ export async function createPaymentIntent({ state, processor, formData }) {
 
   // Build payload
   const payload = {
-    processor,
+    provider,
     productId: state.product.id,
     frequency: state.frequency,
     trial: state.trialEligible,
@@ -98,7 +98,7 @@ export async function createPaymentIntent({ state, processor, formData }) {
   }
   /* @dev-only:end */
 
-  console.log('Sending payment intent:', { processor, productId: state.product.id, payload });
+  console.log('Sending payment intent:', { provider, productId: state.product.id, payload });
 
   // POST to backend (authorized — attaches Firebase ID token)
   const response = await omega.request(`/omega/payments/intent`, {

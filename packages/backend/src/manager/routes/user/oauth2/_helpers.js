@@ -2,7 +2,8 @@ const crypto = require('crypto');
 const path = require('path');
 const fetch = require('wonderful-fetch');
 const { arrayify } = require('node-powertools');
-const loadProcessor = require('../../../libraries/load-processor.js');
+// Aliased: this file already exports its OWN loadProvider (the OAuth2 lookup below)
+const loadProviderModule = require('../../../libraries/load-provider.js');
 
 const PROVIDERS_DIR = path.join(__dirname, 'providers');
 
@@ -72,7 +73,7 @@ async function buildContext({ ctx, user, settings, requireProvider = true }) {
   let oauth2Provider;
 
   try {
-    oauth2Provider = loadProcessor(PROVIDERS_DIR, settings.provider);
+    oauth2Provider = loadProviderModule(PROVIDERS_DIR, settings.provider);
   } catch (e) {
     return { error: { message: `Unknown OAuth2 provider: ${settings.provider}`, code: 400 } };
   }
@@ -103,7 +104,7 @@ function loadProvider(providerName) {
   let oauth2Provider;
 
   try {
-    oauth2Provider = loadProcessor(PROVIDERS_DIR, providerName);
+    oauth2Provider = loadProviderModule(PROVIDERS_DIR, providerName);
   } catch (e) {
     return { error: { message: `Unknown OAuth2 provider: ${providerName}`, code: 400 } };
   }

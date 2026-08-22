@@ -1,6 +1,8 @@
 /**
- * Per-provider prune test — each provider's OWN engagement decides that
- * provider's removals ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)).
+ * Marketing prune test — the opt-in gate on the cron entry
+ * ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)), then the
+ * per-provider lanes: each provider's OWN engagement decides that provider's
+ * removals ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)).
  *
  * The bug this pins: stage 2 measured engagement in SendGrid and then deleted
  * the same emails from Beehiiv, so a reader who opens every newsletter but
@@ -86,8 +88,49 @@ function buildAssistant() {
   return { ctx, calls };
 }
 
-function buildManager(marketing) {
-  return { config: { brand: BRAND, marketing } };
+/**
+ * A Manager stub. The cron ENTRY runs stage 1, which sends the re-engagement
+ * campaign through Manager.Email(ctx) — stages 2 and 3 never touch the mailer,
+ * so the recorder stays optional.
+ */
+function buildManager(marketing, sentCampaigns = []) {
+  return {
+    config: { brand: BRAND, marketing },
+    Email: () => ({
+      sendCampaign: async (campaign) => { sentCampaigns.push(campaign); return { success: true }; },
+    }),
+  };
+}
+
+/**
+ * Run with the clock pinned to the 1st of the CURRENT month — the cron entry
+ * acts on that day alone, so a gate test on any other day would return before
+ * ever reaching the gate and pass without proving anything. The current month
+ * (rather than a fixed date) keeps the subscription ages the seams build
+ * inside the window honest.
+ */
+async function onPruneDay(run) {
+  const RealDate = Date;
+  const today = new RealDate();
+  const frozen = new RealDate(today.getFullYear(), today.getMonth(), 1, 12, 0, 0).getTime();
+
+  class FrozenDate extends RealDate {
+    constructor(...args) {
+      super(...(args.length ? args : [frozen]));
+    }
+
+    static now() {
+      return frozen;
+    }
+  }
+
+  global.Date = FrozenDate;
+
+  try {
+    return await run();
+  } finally {
+    global.Date = RealDate;
+  }
 }
 
 /**
@@ -143,7 +186,7 @@ async function withProviders({ sendgrid = {}, beehiiv = {}, env = {} }, run) {
 async function withPublication(run) {
   const original = Manager.config;
 
-  Manager.config = { marketing: { newsletter: { publicationId: 'pub_test' } } };
+  Manager.config = { marketing: { newsletter: { providers: { beehiiv: { publicationId: 'pub_test' } } } } };
 
   try {
     return await run();
@@ -187,6 +230,10 @@ function subscription({ email, received = NEWSLETTER_RECEIVED_FLOOR, openRate = 
 }
 
 const NEWSLETTER_ENABLED = { campaigns: { enabled: true }, newsletter: { enabled: true } };
+
+// Both providers live, and the prune explicitly opted in — the only shape that
+// deletes anything ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)).
+const PRUNE_OPTED_IN = { ...NEWSLETTER_ENABLED, prune: { enabled: true } };
 
 // Paid-ness is whatever resolveSubscription() calls active — the subscription_paid
 // segment's two conditions (plan not basic AND status active), not a local rule.
@@ -599,6 +646,78 @@ module.exports = {
         assert.match(result.error, /500 pages/, `The error names the cap, got ${result.error}`);
         assert.strictEqual(calls, 500, `The cap stops the walk at 500 pages, got ${calls}`);
         assert.strictEqual(result.subscriptions, undefined, 'A capped walk reports no list at all, so nobody can prune from it');
+      },
+    },
+
+    // ─── 10. The cron entry is OPT-IN (#422) ───
+    // A framework that deletes a consumer's contacts unless told not to is the
+    // wrong default: nothing runs without an explicit marketing.prune.enabled.
+    {
+      name: 'entry: a marketing block with no prune key books zero deletions',
+
+      async run() {
+        const { admin, writes } = buildAdmin();
+        const { ctx, calls } = buildAssistant();
+        const deleted = [];
+        const removals = [];
+        const sent = [];
+
+        await onPruneDay(() => withProviders({
+          sendgrid: sendgridSeam([contact('cold@gmail.com', 'sg_1')], deleted),
+          beehiiv: {
+            listSubscriptions: async () => ({
+              success: true,
+              subscriptions: [subscription({ email: 'cold@gmail.com' })],
+            }),
+            removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
+          },
+          env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
+        }, () => cron({ Manager: buildManager(NEWSLETTER_ENABLED, sent), ctx, libraries: { admin } })));
+
+        assert.deepStrictEqual(deleted, [], `An unconfigured prune deletes no SendGrid contact, got ${JSON.stringify(deleted)}`);
+        assert.deepStrictEqual(removals, [], `An unconfigured prune deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`);
+        assert.deepStrictEqual(sent, [], `An unconfigured prune sends no re-engagement campaign, got ${JSON.stringify(sent)}`);
+        assert.strictEqual(writes.length, 0, `Nothing ran, so nothing is logged, got ${JSON.stringify(writes)}`);
+        assert.ok(
+          calls.logs.some((line) => line.includes('Marketing prune: disabled')),
+          `The skip is logged, got ${JSON.stringify(calls.logs)}`,
+        );
+      },
+    },
+
+    {
+      name: 'entry: prune.enabled = true runs every lane',
+
+      async run() {
+        const { admin, writes } = buildAdmin();
+        const { ctx } = buildAssistant();
+        const deleted = [];
+        const removals = [];
+        const sent = [];
+
+        await onPruneDay(() => withProviders({
+          sendgrid: sendgridSeam([contact('cold@gmail.com', 'sg_1')], deleted),
+          beehiiv: {
+            listSubscriptions: async () => ({
+              success: true,
+              subscriptions: [subscription({ email: 'cold@gmail.com' })],
+            }),
+            removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
+          },
+          env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
+        }, () => cron({ Manager: buildManager(PRUNE_OPTED_IN, sent), ctx, libraries: { admin } })));
+
+        assert.deepStrictEqual(deleted, ['sg_1'], `The SendGrid lane still deletes, got ${JSON.stringify(deleted)}`);
+        assert.deepStrictEqual(removals, ['cold@gmail.com'], `The Beehiiv lane still deletes, got ${JSON.stringify(removals)}`);
+        assert.strictEqual(sent.length, 1, `The re-engagement campaign still sends, got ${sent.length}`);
+        assert.deepStrictEqual(
+          writes.map((write) => write.path),
+          [
+            `marketing-prune-logs/${BRAND.id}/runs/${logKey()}`,
+            `marketing-prune-logs/${BRAND.id}/runs/${logKey()}-newsletter`,
+          ],
+          `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`,
+        );
       },
     },
   ],

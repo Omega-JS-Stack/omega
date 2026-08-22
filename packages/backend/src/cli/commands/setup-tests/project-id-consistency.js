@@ -99,7 +99,7 @@ class ProjectIdConsistencyTest extends BaseTest {
     const firebasercData = firebasercContent ? JSON5.parse(firebasercContent) : null;
 
     // config/omega.json5 — resolved through the loader so the projectId is
-    // found wherever the hierarchy puts it (app file or brand file; a brand
+    // found wherever the hierarchy puts it (local file or brand file; a brand
     // app with no file of its own still resolves via the brand root)
     let omegaProjectId = null;
     const omegaExists = hasOmegaConfig(projectPath) || !!findBrandRoot(projectPath);
@@ -111,7 +111,7 @@ class ProjectIdConsistencyTest extends BaseTest {
       }
     }
 
-    // service-account.json — source chain: app root (standalone) → brand
+    // service-account.json — source chain: target root (standalone) → brand
     // .omega/secrets/ (src/dist pillar; the stage step reads the same chain)
     const brandRoot = findBrandRoot(projectPath);
     const serviceAccountPath = [
@@ -150,7 +150,7 @@ class ProjectIdConsistencyTest extends BaseTest {
 
     // Config lacks the id (only .firebaserc had one) — land it in config via
     // the comment-preserving editor, so the config owns it from here on. A
-    // brand app has no file of its own → the value belongs in the BRAND file.
+    // brand target has no file of its own → the value belongs in the BRAND file.
     if (sources.bemConfig.exists && !sources.bemConfig.projectId) {
       const configHome = hasOmegaConfig(projectPath) ? projectPath : findBrandRoot(projectPath);
       writeConfigValues(configHome, { 'cloud.config.projectId': expectedProjectId });

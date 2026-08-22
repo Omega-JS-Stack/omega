@@ -131,7 +131,7 @@ async function seed(firestore, { uid, orderId, productId, expiresUNIX, orderUpda
       expires: stamp(expiresUNIX),
       trial: { claimed: false, expires: stamp(0) },
       cancellation: { pending: true, date: stamp(expiresUNIX) },
-      payment: { processor: 'paypal', orderId: orderId, resourceId: `I-${uid}`, frequency: 'monthly' },
+      payment: { provider: 'paypal', orderId: orderId, resourceId: `I-${uid}`, frequency: 'monthly' },
     },
   });
 
@@ -140,14 +140,14 @@ async function seed(firestore, { uid, orderId, productId, expiresUNIX, orderUpda
     type: 'subscription',
     owner: uid,
     productId: productId,
-    processor: 'paypal',
+    provider: 'paypal',
     resourceId: `I-${uid}`,
     unified: {
       product: { id: productId, name: productId },
       status: 'active',
       expires: stamp(expiresUNIX),
       cancellation: { pending: true, date: stamp(expiresUNIX) },
-      payment: { processor: 'paypal', orderId: orderId, resourceId: `I-${uid}`, frequency: 'monthly' },
+      payment: { provider: 'paypal', orderId: orderId, resourceId: `I-${uid}`, frequency: 'monthly' },
     },
     metadata: {
       created: stamp(orderUpdatedUNIX - 30 * DAY),

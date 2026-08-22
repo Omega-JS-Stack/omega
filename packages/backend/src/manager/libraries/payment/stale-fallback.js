@@ -1,7 +1,7 @@
 /**
- * The ONE way a processor library falls back to the raw webhook payload.
+ * The ONE way a provider library falls back to the raw webhook payload.
  *
- * Every processor's fetchResource() prefers the API's answer and falls back to the
+ * Every provider's fetchResource() prefers the API's answer and falls back to the
  * payload the webhook carried when that call fails. The payload is by definition
  * older than the API's answer — and the API error that forced the fallback used to
  * be swallowed whole, so a fallback read downstream exactly like a fresh fetch.
@@ -17,16 +17,16 @@
  * @param {object} rawFallback - The webhook payload being fallen back to
  * @param {object} options
  * @param {object} [options.ctx] - Route/event context (logs to its own file identity without one)
- * @param {string} options.processor - Processor name (e.g. 'stripe')
+ * @param {string} options.provider - Provider name (e.g. 'stripe')
  * @param {string} options.resourceType - Resource type that was being fetched
  * @param {string} options.resourceId - Resource ID that was being fetched
  * @param {Error} options.error - The swallowed API error
  * @param {string} [options.consequence] - What the failed call did NOT do (e.g. an uncaptured capture)
  * @returns {object} A copy of the fallback payload flagged `_stale: true`
  */
-function staleFallback(rawFallback, { ctx, processor, resourceType, resourceId, error, consequence }) {
+function staleFallback(rawFallback, { ctx, provider, resourceType, resourceId, error, consequence }) {
   const suffix = consequence ? ` — ${consequence}` : '';
-  const message = `${processor} fetchResource(${resourceType}/${resourceId}) failed — falling back to the STALE webhook payload: ${error?.message || error}${suffix}`;
+  const message = `${provider} fetchResource(${resourceType}/${resourceId}) failed — falling back to the STALE webhook payload: ${error?.message || error}${suffix}`;
 
   if (ctx?.error) {
     ctx.error(message, error);

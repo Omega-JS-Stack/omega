@@ -32,7 +32,7 @@ module.exports = {
       run: (ctx) => {
         const main = require('@omega.js/monitoring/main');
         main.shutdown();
-        main.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } }, getVersion: () => '1.0.0' });
+        main.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } }, getVersion: () => '1.0.0' });
         ctx.expect(main._initialized).toBe(true);
         ctx.expect(main._enabled).toBe(false);
       },
@@ -79,7 +79,7 @@ module.exports = {
       name: 'the preload surface is reachable and silent when disabled',
       run: (ctx) => {
         const preload = require('@omega.js/monitoring/preload');
-        preload.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
+        preload.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } } });
         ctx.expect(preload._enabled).toBe(false);
         preload.captureException(new Error('test'));
       },

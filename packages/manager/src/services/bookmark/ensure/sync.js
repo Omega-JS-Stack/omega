@@ -38,15 +38,14 @@ function getDeployedFunctions(projectId) {
 }
 
 /**
- * Build the bookmark link groups from brand config/state.
+ * Build the bookmark link groups from brand config.
  *
  * @param {Object} brandConfig - Merged brand config
- * @param {Object} brandState - Durable state
- * @param {Array} apps - Discovered apps ({ target } consulted)
+ * @param {Array} targets - Discovered target dirs ({ target } consulted)
  * @param {Object} [extras] - { deployedFunctions } (injectable; defaults to none)
  * @returns {Object} { Category: [{ title, url }] }
  */
-function generateLinks(brandConfig, brandState, apps = [], extras = {}) {
+function generateLinks(brandConfig, targets = [], extras = {}) {
   const links = {};
 
   const brandUrl = brandConfig.brand?.url;
@@ -110,7 +109,7 @@ function generateLinks(brandConfig, brandState, apps = [], extras = {}) {
 
   // Stripe Dashboard — per-brand keys, so the key's own account is the
   // dashboard default (no account slug in the URL)
-  if (brandConfig.payment?.processors?.stripe) {
+  if (brandConfig.payment?.providers?.stripe) {
     const s = 'https://dashboard.stripe.com';
     links.Stripe = [
       { title: 'Dashboard', url: `${s}/dashboard` },
@@ -141,7 +140,7 @@ function generateLinks(brandConfig, brandState, apps = [], extras = {}) {
   if (brandUrl) {
     liveLinks.push({ title: 'Website', url: brandUrl });
   }
-  if (domain && apps.some((app) => app.target === 'backend')) {
+  if (domain && targets.some((entry) => entry.target === 'backend')) {
     liveLinks.push({ title: 'API', url: `https://api.${domain}` });
   }
   if (liveLinks.length > 0) {
@@ -152,7 +151,7 @@ function generateLinks(brandConfig, brandState, apps = [], extras = {}) {
 }
 
 module.exports = async function ensureSync(context) {
-  const { brandConfig, brandState, apps, options = {} } = context;
+  const { brandConfig, targets, options = {} } = context;
 
   const brandId = brandConfig.brand.id;
   const brandName = brandConfig.brand.name || brandId;
@@ -160,7 +159,7 @@ module.exports = async function ensureSync(context) {
   const linkCount = (links) => Object.values(links).flat().length;
 
   if (options.dryRun) {
-    const links = generateLinks(brandConfig, brandState, apps);
+    const links = generateLinks(brandConfig, targets);
     console.log(`      ${chalk.yellow('[DRY RUN]')} Would sync ${chalk.cyan(linkCount(links))} bookmarks in ${chalk.cyan(groupCount(links))} groups: ${Object.keys(links).join(', ') || '(none)'}`);
     return { output: { sync: { planned: Object.keys(links) } } };
   }
@@ -171,7 +170,7 @@ module.exports = async function ensureSync(context) {
   }
 
   const firebaseProjectId = brandConfig.cloud?.config?.projectId;
-  const links = generateLinks(brandConfig, brandState, apps, {
+  const links = generateLinks(brandConfig, targets, {
     deployedFunctions: firebaseProjectId ? getDeployedFunctions(firebaseProjectId) : [],
   });
 

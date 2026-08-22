@@ -111,7 +111,7 @@ const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
 /**
  * A paying subscriber — the only state the offer is ever made to. The payment
- * block carries the PROCESSOR DETAILS a real checkout writes (`processor` and
+ * block carries the PROVIDER DETAILS a real checkout writes (`provider` and
  * `resourceId`), because the apply route needs them to reach the subscription
  * at all and the pitch is gated on them ([#311]).
  */
@@ -120,7 +120,7 @@ function paidAccount(subscription) {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
@@ -133,7 +133,7 @@ function trialingAccount() {
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
-      payment: { frequency: 'monthly', price: 10, processor: 'stripe', resourceId: 'sub_live_premium' },
+      payment: { frequency: 'monthly', price: 10, provider: 'stripe', resourceId: 'sub_live_premium' },
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
     },
@@ -563,7 +563,7 @@ test('#268: the offer names the brand\'s own number and the cycle it applies to'
   const quarter = await wireCancelFlow(paidAccount(), { winback: { percent: 25 } });
   assert.strictEqual(quarter.state().billing.winbackOffer.headline, 'Take 25% off your next month');
 
-  const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, processor: 'stripe', resourceId: 'sub_live_premium' } }));
+  const annual = await wireCancelFlow(paidAccount({ payment: { frequency: 'annually', price: 100, provider: 'stripe', resourceId: 'sub_live_premium' } }));
   assert.strictEqual(annual.state().billing.winbackOffer.headline, 'Take 50% off your next year', 'the cycle word follows the subscription, not the copy');
 
   const amount = await wireCancelFlow(paidAccount(), { winback: { amount: 10 } });
@@ -629,9 +629,9 @@ test('#325: a persisted winback claim suppresses the pitch, a checkout code does
   assert.strictEqual(checkout.state().billing.winbackOffer.show, true, 'a checkout code leaves the offer open');
 });
 
-test('#311: a subscription with no processor payment details is never pitched the offer', async () => {
+test('#311: a subscription with no provider payment details is never pitched the offer', async () => {
   // Paid, active, and unreachable: an admin-granted plan or an imported record
-  // carries no `payment.processor` / `payment.resourceId`, so the apply route
+  // carries no `payment.provider` / `payment.resourceId`, so the apply route
   // has nothing to send a discount to and can only refuse. Pitching it anyway
   // put the customer in a dialog whose only button 400s, so the gate reads the
   // fields the accept path needs.
@@ -640,9 +640,9 @@ test('#311: a subscription with no processor payment details is never pitched th
   // fallback for exactly this state. No discount is pitched and no route is
   // called, which is the whole of what #311 asks of it.
   const cases = [
-    { what: 'no processor details at all', payment: { frequency: 'monthly', price: 10 } },
-    { what: 'a processor but no resource', payment: { frequency: 'monthly', price: 10, processor: 'stripe' } },
-    { what: 'a resource but no processor', payment: { frequency: 'monthly', price: 10, resourceId: 'sub_live_premium' } },
+    { what: 'no provider details at all', payment: { frequency: 'monthly', price: 10 } },
+    { what: 'a provider but no resource', payment: { frequency: 'monthly', price: 10, provider: 'stripe' } },
+    { what: 'a resource but no provider', payment: { frequency: 'monthly', price: 10, resourceId: 'sub_live_premium' } },
   ];
 
   for (const { what, payment } of cases) {
@@ -673,9 +673,9 @@ test('#268: a refusal the account cannot answer retires the offer and lets the c
   // The route now names EVERY refusal ([#311]), and all but the unconfirmed
   // request are dead ends for this account — the brand turned the offer off,
   // the subscription is not the state the offer is for, or it carries no
-  // processor to discount through. None of them change on a retry.
+  // provider to discount through. None of them change on a retry.
   const deadEnds = [
-    { code: 'not-supported-by-processor', message: 'Your payment provider cannot apply this offer.' },
+    { code: 'not-supported-by-provider', message: 'Your payment provider cannot apply this offer.' },
     { code: 'offer-not-claimable', message: 'This offer is not available on your subscription.' },
     { code: 'offer-already-claimed', message: 'You have already claimed this offer' },
     { code: 'offer-disabled', message: 'This offer is not available' },
@@ -683,7 +683,7 @@ test('#268: a refusal the account cannot answer retires the offer and lets the c
     { code: 'trial-not-eligible', message: 'This offer is not available on a free trial' },
     { code: 'cancellation-pending', message: 'Your subscription is already scheduled to cancel' },
     { code: 'missing-payment-details', message: 'Subscription payment details not found' },
-    { code: 'unknown-processor', message: 'Unknown processor: not-a-processor' },
+    { code: 'unknown-provider', message: 'Unknown provider: not-a-provider' },
   ];
 
   for (const { code, message } of deadEnds) {

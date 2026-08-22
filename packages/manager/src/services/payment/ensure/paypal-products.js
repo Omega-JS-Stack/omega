@@ -10,6 +10,9 @@
  * matching active plans are kept, duplicates and stale plans deactivated,
  * missing ones created. Legacy products (product.paypal.legacyProductIds)
  * get their active plans deactivated so no new subscriptions land on them.
+ *
+ * In sandbox mode the ensured products are the payments-QA fixtures, so the
+ * step closes with the sandbox-buyer reminder (see below).
  */
 const chalk = require('chalk').default;
 const { paidProducts, productDisplayName, productImage } = require('../lib/payment-utils.js');
@@ -22,6 +25,11 @@ const FREQUENCY_TO_INTERVAL = {
   weekly: 'WEEK',
   daily: 'DAY',
 };
+
+// PayPal Developer Dashboard → Sandbox → Accounts (the only surface that mints
+// a sandbox buyer) and the drive runbook that documents the hoops
+const SANDBOX_ACCOUNTS_URL = 'https://developer.paypal.com/dashboard/accounts';
+const SANDBOX_QA_RUNBOOK = '@omega.js/backend/docs/paypal-sandbox-qa.md';
 
 /**
  * Build desired catalog-product details from brand/product config
@@ -222,8 +230,23 @@ async function deactivateLegacyPlans(api, products, dryRun) {
   }
 }
 
+/**
+ * Sandbox only: the fixtures just ensured can be bought only by a sandbox
+ * BUYER account, and PayPal exposes no API to mint one (probed 2026-08-18,
+ * #348 — the app-credential token carries no sandbox-account scope), so the
+ * walk reminds the operator instead of precreating it. Live runs say nothing.
+ */
+function remindSandboxBuyer(api) {
+  if (api.getAccountInfo().environment !== 'sandbox') {
+    return;
+  }
+
+  console.log(`      ${chalk.yellow('⚠')} Sandbox — buying the QA fixture (proof-press) through guest checkout needs a sandbox BUYER account (no API mints one)`);
+  console.log(`      ${chalk.dim('→')} Sandbox → Accounts: ${chalk.cyan(SANDBOX_ACCOUNTS_URL)} ${chalk.dim(`· runbook: ${SANDBOX_QA_RUNBOOK}`)}`);
+}
+
 module.exports = async function ensurePayPalProducts(context) {
-  const { brandConfig, paypalApi: api, options, serviceData } = context;
+  const { brandConfig, paypalApi: api, options } = context;
   const dryRun = options?.dryRun || false;
 
   if (!api) {
@@ -236,18 +259,16 @@ module.exports = async function ensurePayPalProducts(context) {
   }
 
   const products = paidProducts(brandConfig);
-  const knownIds = { ...(serviceData.paypalProducts || {}) };
   const configEdits = {};
-  let stateChanged = false;
-  let catalog = null; // Lazy-listed only when a product has no known ID
+  let catalog = null; // Lazy-listed only when a product has no configured ID
 
   for (const product of products) {
     console.log(`      ${chalk.bold(product.name)} (${product.id}):`);
 
     const desired = buildProductDetails(brandConfig, product);
 
-    // --- Resolve the PayPal catalog product: config → state → name match → create ---
-    let paypalId = product.paypal?.productId || knownIds[product.id] || null;
+    // --- Resolve the PayPal catalog product: config → name match → create ---
+    let paypalId = product.paypal?.productId || null;
     let paypalProduct = null;
 
     if (!paypalId) {
@@ -257,8 +278,6 @@ module.exports = async function ensurePayPalProducts(context) {
       const match = catalog.find((p) => p.name === desired.name);
       if (match) {
         paypalId = match.id;
-        knownIds[product.id] = match.id;
-        stateChanged = true;
         console.log(`        ${chalk.green('✓')} Matched existing product by name: ${chalk.dim(match.id)}`);
       }
     }
@@ -292,9 +311,6 @@ module.exports = async function ensurePayPalProducts(context) {
         homeUrl: desired.homeUrl,
       });
       console.log(`        ${chalk.green('✓')} Created product: ${chalk.cyan(paypalProduct.id)}`);
-
-      knownIds[product.id] = paypalProduct.id;
-      stateChanged = true;
     }
 
     if (paypalProduct.id !== product.paypal?.productId) {
@@ -316,9 +332,8 @@ module.exports = async function ensurePayPalProducts(context) {
   // --- Deactivate plans on legacy products ---
   await deactivateLegacyPlans(api, products, dryRun);
 
-  const result = { output: { paypalSync: { productsProcessed: products.length } } };
-  if (stateChanged && !dryRun) {
-    result.state = { paypalProducts: knownIds };
-  }
-  return result;
+  // --- The fixtures exist; a sandbox drive still needs a buyer ---
+  remindSandboxBuyer(api);
+
+  return { output: { paypalSync: { productsProcessed: products.length } } };
 };

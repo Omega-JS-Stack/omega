@@ -60,9 +60,10 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no account.admins configured' };
     }
 
-    // Firebase web API key from firebase state — without it, password
-    // verification and backend calls degrade (handled per-operation)
-    const apiKey = context.brandState?.cloud?.sdkConfig?.apiKey || null;
+    // Firebase web API key from config (the cloud service lands it there) —
+    // without it, password verification and backend calls degrade (handled
+    // per-operation)
+    const apiKey = context.brandConfig.cloud?.config?.apiKey || null;
     const apiBaseUrl = `https://api.${domain}`;
 
     // Tests inject fakes via context

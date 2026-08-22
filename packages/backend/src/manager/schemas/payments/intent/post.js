@@ -5,7 +5,7 @@
 const { fields: f } = require('../../../helpers/schema-zod.js');
 
 module.exports = () => f.object({
-  processor: f.string({ required: true }),
+  provider: f.string({ required: true }),
   productId: f.string({ required: true }),
   frequency: f.string({ default: null }),
   trial: f.boolean({ default: false }),
@@ -16,7 +16,7 @@ module.exports = () => f.object({
   trackingConsent: f.passthrough({ default: null }),
   discount: f.string({ default: null }),
   supplemental: f.passthrough({ default: {} }),
-  // Checkout simulation — honored ONLY by the test processor (itself
+  // Checkout simulation — honored ONLY by the test provider (itself
   // non-production), ignored everywhere else. Request-only: it is never
   // persisted onto the intent or the order.
   simulate: f.string({ default: null, enum: ['decline'] }),

@@ -388,7 +388,7 @@ class Manager {
       },
       validRedirectHosts: [],
       payment: {
-        processors: {},
+        providers: {},
         products: [],
       },
 

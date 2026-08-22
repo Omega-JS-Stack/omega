@@ -51,7 +51,7 @@ to redo:
   whoever imports it, so it ships once.
 
 The practical consequence for a consumer: do not hand-roll SVG for a chart or a
-diagram, and do not add chart.js or mermaid to an app's dependencies.
+diagram, and do not add chart.js or mermaid to a target's dependencies.
 
 ## The modules
 
@@ -65,7 +65,7 @@ diagram, and do not add chart.js or mermaid to an app's dependencies.
 | `initialize-tooltips.js` | Initializes every `[data-bs-toggle="tooltip"]` element as a Bootstrap tooltip, and exits early when the page has none. The ONE home for the behavior ([#99](https://github.com/Omega-JS-Stack/omega/issues/99)): each theme's `_theme.js` calls it from its DOM-ready handler instead of shipping its own copy | default export: `initializeTooltips()` |
 | `logger.js` | The web runtime's tagged console, `[@omega.js/web:<module>]` with no timestamp ([#12](https://github.com/Omega-JS-Stack/omega/issues/12)). The methods are getters returning a bound `console` method, so devtools attributes each line to the real call site and a swapped `console` method is still seen | `createLogger(module)`, also the default export |
 | `path-prefix.js` | The browser half of base-path support ([#355](https://github.com/Omega-JS-Stack/omega/issues/355)): reads the mount off `<html data-omega-path-prefix>` (the build's own stamp — never baked into the bundle) and mounts a root-relative site path under it. Every absence — no stamp, no document, a worker scope — means the domain root | `pathPrefix()`, `siteUrl(path)` |
-| `payment-config.js` | Reads the payment config (products, processors, prices, limits, currency) off `omega.config.payment`, which the build populates, so no page fetches it at runtime | `getPaymentConfig`, `getProcessors`, `getProducts`, `getProductById`, `getProductLimits`, `getProductPrices`, `getCurrency` |
+| `payment-config.js` | Reads the payment config (products, providers, prices, limits, currency) off `omega.config.payment`, which the build populates, so no page fetches it at runtime | `getPaymentConfig`, `getProviders`, `getProducts`, `getProductById`, `getProductLimits`, `getProductPrices`, `getCurrency` |
 | `prerendered-icons.js` | Pulls icon HTML out of the page's `#prerendered-icons` block by `data-icon` name: the JS-context equivalent of `{% omega_icon %}`, taking the same optional class string, and returning `''` when the icon was not prerendered | `getPrerenderedIcon(iconName, classes)` |
 | `recaptcha.js` | reCAPTCHA v3 for any public form posting to a recaptcha-gated backend route (checkout payment intent, newsletter capture): lazy script load through `omega.dom().loadScript()`, then a token per action. Site key: `omega.config.captcha.providers.recaptcha.siteKey` | `initializeRecaptcha(siteKey)`, `getRecaptchaToken(action)` |
 | `srcset.js` | The srcset candidate parser for the browser ([#367](https://github.com/Omega-JS-Stack/omega/issues/367)): rewrites every candidate URL through a caller's function, reading a comma inside a URL (a `data:` payload, a `?w=100,200` query) as part of the URL. The FORMAT TWIN of the build-time `packages/web/src/srcset.js` — a grammar change lands in both files, and each one says so. Used by the runtime lazy-loader for the `data-srcset` lane the build passes defer | `mapSrcset(value, mapUrl)` |
@@ -78,7 +78,7 @@ The ONE call, and nothing about a provider at the call site:
 ```js
 import { event } from '__main_assets__/js/libs/analytics.js';
 
-event('refund_action', { action: 'submit' });
+event('user_refund_request', { action: 'submit' });
 ```
 
 The name is a CANONICAL event from `@omega.js/analytics`' catalog, which decides
@@ -216,7 +216,7 @@ redirect (return if one was handled), then check the subdomain policy, call
 | `auth/index.js` | The orchestrator: owns the boot order above and picks the form by matching the final segment of `data-page-path`. Imported by the `/signin`, `/signup`, and `/reset` page modules | default export: a function |
 | `auth/forms.js` | FormManager wiring for the three forms (built with `autoReady: false`, since the boot sequence calls `ready()` itself), the shared validation that only checks email and password when the pressed button's `data-provider` is `email`, the provider-aware submit handler, and the signup consent UI: both checkboxes are outlined as one unit, and consent is stashed to `omega.storage()` BEFORE any Firebase call so it survives the post-signup redirect for the backend's signup route | `initializeSigninForm`, `initializeSignupForm`, `initializeResetForm` |
 | `auth/email.js` | Email and password flows. Signup falls back to signing the user in when the address is already in use; reset reports success even for an unknown address, to avoid email enumeration; and each error lands on the field it belongs to (Firebase collapses wrong-email and wrong-password into one code, so both fields get the shared message) | `handleEmailSignin`, `handleEmailSignup`, `handlePasswordReset` |
-| `auth/oauth.js` | Provider flows: redirect by default, popup only inside an iframe or with `?authPopup=true`, with a popup-to-redirect fallback on blockers. Also the returning-redirect processor (a one-shot sessionStorage marker makes a redirect that came home empty loud instead of silent) and the accidental-signup reversal: Google auto-creates an account during a signin attempt, so the reversal deletes it, signs out, and shows an inline error | `shouldUseAuthPopup`, `handleRedirectResult`, `signInWithProvider`, `reverseAccidentalSignup` |
+| `auth/oauth.js` | Provider flows: redirect by default, popup only inside an iframe or with `?authPopup=true`, with a popup-to-redirect fallback on blockers. Also the returning-redirect provider (a one-shot sessionStorage marker makes a redirect that came home empty loud instead of silent) and the accidental-signup reversal: Google auto-creates an account during a signin attempt, so the reversal deletes it, signs out, and shows an inline error | `shouldUseAuthPopup`, `handleRedirectResult`, `signInWithProvider`, `reverseAccidentalSignup` |
 | `auth/session-params.js` | The URL-parameter session behaviors: `?authSignout=true` (sign out, then strip the param so reloads do not loop), `?authCustomToken=…` (admin impersonation and custom-token sign-in, which owns its own post-signin navigation), `authReturnUrl` propagation into every auth link on the page, and the apex-domain bounce when `auth.config.allowSubdomainAuth` is false | `handleAuthSignout`, `handleCustomTokenSignin`, `updateAuthReturnUrl`, `checkSubdomainAuth` |
 | `auth/errors.js` | Pure Firebase error translation, no DOM and no form state: which codes belong on the password field, the short message for each, which codes are user-caused and therefore never worth a Sentry capture, and pulling a `@omega.js/backend` blocking-function message (rate limit, disposable email) back out of the opaque `auth/internal-error` blob | `isPasswordError`, `passwordErrorMessage`, `isUserError`, `extractBlockingFunctionMessage` |
 | `auth/tracking.js` | GA4, Facebook Pixel, and TikTok Pixel events for the three auth outcomes | `trackLogin`, `trackSignup`, `trackPasswordReset` |

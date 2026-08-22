@@ -1,17 +1,17 @@
 /**
  * Test: the daily trial-lapse sweep
  *
- * A trial that ends without converting should leave the user on basic. The processors
+ * A trial that ends without converting should leave the user on basic. The providers
  * say so with a webhook, and when that webhook is missed the user keeps a paid product
  * they never paid for — invisibly, because `trial.claimed` means "this subscription HAD
  * a trial", never "it converted" ([#212]).
  *
  * The sweep is a BACKSTOP, so what it must NOT do matters as much as what it does: it
  * never infers a lapse from dates alone (every candidate is confirmed against live
- * processor state), it leaves the 24h grace window and everything older than 30 days
+ * provider state), it leaves the 24h grace window and everything older than 30 days
  * alone, and a second run changes nothing.
  *
- * The test processor answers `fetchResource` from `payments-orders`, so "the processor
+ * The test provider answers `fetchResource` from `payments-orders`, so "the provider
  * says X" is seeded as an order doc — or, for "the subscription is gone", as no order
  * doc at all.
  */
@@ -30,7 +30,7 @@ const CANCELLED_ORDER = '_test-order-trial-lapse-cancelled';
 const CONVERTED_ORDER = '_test-order-trial-lapse-converted';
 
 module.exports = {
-  description: 'Trial-lapse sweep: confirms with the processor, then corrects state',
+  description: 'Trial-lapse sweep: confirms with the provider, then corrects state',
   type: 'suite',
   timeout: 180000,
 
@@ -52,26 +52,26 @@ module.exports = {
           status: 'active',
           expires: stamp(trialEndUNIX),
           trial: { claimed: true, expires: stamp(trialEndUNIX) },
-          payment: { processor: 'paypal', resourceId: 'I-PAYPAL-TRIAL', frequency: 'monthly', price: 9.99 },
+          payment: { provider: 'paypal', resourceId: 'I-PAYPAL-TRIAL', frequency: 'monthly', price: 9.99 },
         };
 
         const conversion = sweep.resolveTrialOutcomeConversion(paypalTrial, 'lapsed', 'USD');
 
         assert.ok(conversion, 'a lapse the sweep decided should be reported');
-        assert.equal(conversion.event, 'trial_lapsed');
+        assert.equal(conversion.event, 'trial_lapse');
         assert.equal(conversion.params.value, 9.99, 'the value is the subscription that never started paying');
         assert.equal(conversion.params.is_trial, true);
         assert.equal(conversion.params.is_recurring, false, 'nothing was ever charged');
         assert.equal(
           conversion.eventId,
-          'trial_lapsed.I-PAYPAL-TRIAL',
+          'trial_lapse.I-PAYPAL-TRIAL',
           'the dedupe id is keyed to the SUBSCRIPTION, which is the one thing this sweep and the payment webhook both know',
         );
 
         const converted = sweep.resolveTrialOutcomeConversion({ ...paypalTrial }, 'converted', 'USD');
 
-        assert.equal(converted.event, 'trial_converted');
-        assert.equal(converted.eventId, 'trial_converted.I-PAYPAL-TRIAL');
+        assert.equal(converted.event, 'trial_convert');
+        assert.equal(converted.eventId, 'trial_convert.I-PAYPAL-TRIAL');
       },
     },
 
@@ -86,13 +86,13 @@ module.exports = {
         const trialEndUNIX = nowUNIX - 5 * DAY;
 
         // The conversion charge moved `expires` out to the end of the first paid
-        // period — the webhook saw it, and fired trial_converted then.
+        // period — the webhook saw it, and fired trial_convert then.
         const alreadyReported = {
           product: { id: 'premium', name: 'Premium' },
           status: 'active',
           expires: stamp(nowUNIX + 25 * DAY),
           trial: { claimed: true, expires: stamp(trialEndUNIX) },
-          payment: { processor: 'stripe', resourceId: 'sub_stripe_converted', frequency: 'monthly', price: 9.99 },
+          payment: { provider: 'stripe', resourceId: 'sub_stripe_converted', frequency: 'monthly', price: 9.99 },
         };
 
         assert.equal(
@@ -120,7 +120,7 @@ module.exports = {
           status: 'active',
           expires: stamp(trialEndUNIX),
           trial: { claimed: true, expires: stamp(trialEndUNIX) },
-          payment: { processor: 'stripe', resourceId: RESOURCE_ID, frequency: 'monthly', price: 9.99 },
+          payment: { provider: 'stripe', resourceId: RESOURCE_ID, frequency: 'monthly', price: 9.99 },
         };
 
         // The same subscription, one charge later — what the webhook resolves.
@@ -153,9 +153,9 @@ module.exports = {
 
         // Five candidates, one per branch the sweep has to get right
         state.seeds = {
-          // Trial ended 5 days ago; NO order doc → the processor has no such subscription
+          // Trial ended 5 days ago; NO order doc → the provider has no such subscription
           [GONE_UID]: { expiredAgo: 5 * DAY, resourceId: 'sub_test_trial_gone', orderId: null },
-          // Trial ended 5 days ago; the order says the processor cancelled it
+          // Trial ended 5 days ago; the order says the provider cancelled it
           [CANCELLED_UID]: { expiredAgo: 5 * DAY, resourceId: 'sub_test_trial_cancelled', orderId: CANCELLED_ORDER },
           // Trial ended 5 days ago; the order says the subscription is live — it converted
           [CONVERTED_UID]: { expiredAgo: 5 * DAY, resourceId: 'sub_test_trial_converted', orderId: CONVERTED_ORDER },
@@ -178,12 +178,12 @@ module.exports = {
               expires: stamp(expiredUNIX),
               trial: { claimed: true, expires: stamp(expiredUNIX) },
               cancellation: { pending: false, date: stamp(0) },
-              payment: { processor: 'test', orderId: seed.orderId, resourceId: seed.resourceId, frequency: 'monthly' },
+              payment: { provider: 'test', orderId: seed.orderId, resourceId: seed.resourceId, frequency: 'monthly' },
             },
           });
         }
 
-        // The processor's answers for the two candidates that have a subscription:
+        // The provider's answers for the two candidates that have a subscription:
         // an order whose `unified` the test library reconstructs a resource from
         await firestore.delete(`payments-orders/${CANCELLED_ORDER}`);
         await firestore.set(`payments-orders/${CANCELLED_ORDER}`, order({
@@ -209,7 +209,7 @@ module.exports = {
     },
 
     {
-      name: 'the-sweep-lapses-what-the-processor-no-longer-has',
+      name: 'the-sweep-lapses-what-the-provider-no-longer-has',
       timeout: 150000,
       async run({ firestore, assert, waitFor, pubsub, state }) {
         await pubsub.trigger('omega_cronDaily');
@@ -221,7 +221,7 @@ module.exports = {
 
         const gone = await firestore.get(`users/${GONE_UID}`);
 
-        assert.equal(gone.subscription.trial.outcome, 'lapsed', 'The processor has no such subscription — the trial lapsed');
+        assert.equal(gone.subscription.trial.outcome, 'lapsed', 'The provider has no such subscription — the trial lapsed');
         assert.equal(gone.subscription.status, 'cancelled', 'A lapsed trial ends cancelled');
         assert.equal(gone.subscription.product.id, 'basic', 'A lapsed trial ends on basic');
         assert.equal(gone.subscription.cancellation.pending, false, 'Nothing is left pending');
@@ -242,7 +242,7 @@ module.exports = {
 
         const cancelled = await firestore.get(`users/${CANCELLED_UID}`);
 
-        assert.equal(cancelled.subscription.trial.outcome, 'lapsed', 'The processor says cancelled — the trial lapsed');
+        assert.equal(cancelled.subscription.trial.outcome, 'lapsed', 'The provider says cancelled — the trial lapsed');
         assert.equal(cancelled.subscription.status, 'cancelled', 'A lapsed trial ends cancelled');
         assert.equal(cancelled.subscription.product.id, 'basic', 'A lapsed trial ends on basic');
       },
@@ -259,7 +259,7 @@ module.exports = {
 
         const converted = await firestore.get(`users/${CONVERTED_UID}`);
 
-        assert.equal(converted.subscription.trial.outcome, 'converted', 'The processor says active — the trial converted');
+        assert.equal(converted.subscription.trial.outcome, 'converted', 'The provider says active — the trial converted');
         assert.equal(converted.subscription.status, 'active', 'A converted trial keeps its active subscription');
         assert.equal(converted.subscription.product.id, state.paidProductId, 'A converted trial keeps its paid product');
         assert.equal(converted.subscription.cancellation.pending, false, 'Nothing was cancelled');
@@ -327,8 +327,8 @@ function stamp(unix) {
 }
 
 /**
- * The purchase record the test processor answers `fetchResource` from — its `unified`
- * status IS what the processor reports for the subscription
+ * The purchase record the test provider answers `fetchResource` from — its `unified`
+ * status IS what the provider reports for the subscription
  */
 function order({ id, owner, productId, resourceId, status }) {
   const nowUNIX = Math.floor(Date.now() / 1000);
@@ -338,7 +338,7 @@ function order({ id, owner, productId, resourceId, status }) {
     type: 'subscription',
     owner: owner,
     productId: productId,
-    processor: 'test',
+    provider: 'test',
     resourceId: resourceId,
     unified: {
       product: { id: productId },
@@ -346,7 +346,7 @@ function order({ id, owner, productId, resourceId, status }) {
       expires: stamp(nowUNIX + 30 * DAY),
       trial: { claimed: true, expires: stamp(nowUNIX - 5 * DAY) },
       cancellation: { pending: false },
-      payment: { processor: 'test', orderId: id, resourceId: resourceId, frequency: 'monthly' },
+      payment: { provider: 'test', orderId: id, resourceId: resourceId, frequency: 'monthly' },
     },
     metadata: {
       created: stamp(nowUNIX - 20 * DAY),
