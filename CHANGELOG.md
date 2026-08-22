@@ -6,34 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.45.0] 2026-08-22
+
 ### Added
-- [#429](../../issues/429) — Every entry in the config socials block emits a `/<key>` shortlink redirect page, noindex and out of the sitemap; an entry can name a redirect target distinct from the profile URL JSON-LD reads.
-- [#442](../../issues/442) — `targets.web.redirects` maps patterns with one captured segment (`/c/:id` → `/code?id=:id`); the built 404 page answers them on static hosting, the dev server mirrors them live, and the docs name the SEO caveat.
-- [#430](../../issues/430) — `omega test` natively checks every internal link in the built output against the URL contract, with a per-page exception file — and an exception that starts resolving fails too.
-- [#435](../../issues/435) — The marketing/hero section gains the `cards` arg the ported stat cards needed to render.
-- [#437](../../issues/437) — The marketing/hero demo type `form` renders a real form mock instead of nothing.
-- [#436](../../issues/436) — The marketing/testimonials section takes `headline`, `headline_accent` and `subheadline` args like its siblings.
-- [#439](../../issues/439) — The marketing/bento section gains a `cta_button`, and `superheadline` accepts the two-part object shape beside the plain string.
+- [#429](../../issues/429) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Every entry in the config socials block emits a `/<key>` shortlink redirect page, noindex and out of the sitemap; an entry can name a redirect target distinct from the profile URL JSON-LD reads.
+- [#442](../../issues/442) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — `targets.web.redirects` maps patterns with one captured segment (`/c/:id` → `/code?id=:id`); the built 404 page answers them on static hosting, the dev server mirrors them live, and the docs name the SEO caveat.
+- [#430](../../issues/430) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — `omega test` natively checks every internal link in the built output against the URL contract, with a per-page exception file — and an exception that starts resolving fails too.
+- [#435](../../issues/435) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The marketing/hero section gains the `cards` arg the ported stat cards needed to render.
+- [#437](../../issues/437) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The marketing/hero demo type `form` renders a real form mock instead of nothing.
+- [#436](../../issues/436) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The marketing/testimonials section takes `headline`, `headline_accent` and `subheadline` args like its siblings.
+- [#439](../../issues/439) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The marketing/bento section gains a `cta_button`, and `superheadline` accepts the two-part object shape beside the plain string.
 
 ### Changed
-- [#449](../../issues/449) — The deploy record lives in `.omega/deploys.json`; an existing `state.json` deploy key is adopted once, silently, and the old file is removed when nothing else remains in it.
-- [#450](../../issues/450) — The mcp-router overlay `.env` is parsed by node's `util.parseEnv` instead of a hand-rolled line parser; interpolation is unchanged.
-- [#457](../../issues/457) — Blog taxonomy terms humanize the way legacy UJM did: separators become spaces and every word capitalizes, on pages and in meta alike; URLs and slugs are untouched.
+- [#449](../../issues/449) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The deploy record lives in `.omega/deploys.json`; an existing `state.json` deploy key is adopted once, silently, and the old file is removed when nothing else remains in it.
+- [#450](../../issues/450) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The mcp-router overlay `.env` is parsed by node's `util.parseEnv` instead of a hand-rolled line parser; interpolation is unchanged.
+- [#457](../../issues/457) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Blog taxonomy terms humanize the way legacy UJM did: separators become spaces and every word capitalizes, on pages and in meta alike; URLs and slugs are untouched.
 
 ### Fixed
-- [#404](../../issues/404) — Backend test pubsub triggers publish into the lane's own resolved emulator port instead of a hardcoded `localhost:8085`, so a port-bumped stack stops feeding a foreign emulator.
-- [#424](../../issues/424) — The manager search service docblock names the real cache home instead of a token cache file that never existed.
-- [#426](../../issues/426) — Fatal config errors exit non-zero everywhere: the extension build stops swallowing them after the first call, and `deployDirect` fails loudly before deploying instead of dropping them.
-- [#427](../../issues/427) — Default pages stop linking framework routes a brand build does not emit; the footer's `/discord` hardlink is gone in favor of the socials shortlinks.
-- [#438](../../issues/438) — The marketing/hero `primary_button` honors `enabled: false` instead of rendering anyway.
-- [#440](../../issues/440) — Firebase emulator teardown stops hanging: the java child no longer holds the CLI's pipes open, and a shared helper signals the group with a hard backstop.
-- [#451](../../issues/451) — The contact facts default escapes its `<15m` response-time value, which the production minifier was turning into a DOM-breaking tag.
-- [#454](../../issues/454) — Machine-local `.env` keys (`OMEGA_FONTAWESOME_ROOT`) stay out of published Actions secrets and composed workflows; CI resolves Pro icons through the npm token lane.
-- [#456](../../issues/456) — The about/letter section gates off cleanly and takes `feed_items`/`feed_status` args instead of rendering a hardcoded demo feed unconditionally.
-- [#458](../../issues/458) — `omega customize` materializes paginating default pages byte-identical instead of failing on the Liquid inside their permalinks.
-- [#459](../../issues/459) — The backend emulator stop-path port sweep is bounded and cannot stall on `lsof`; a sweep that cannot prove a port's owner reports instead of hanging the suite.
-- [#460](../../issues/460) — Test-lane teardown now guarantees the emulator java process dies: a scoped collection pass terminates only a JVM proven to belong to the lane, and spares everything else.
-- [#461](../../issues/461) — `omega_social` reads the resolved socials the web build actually provides, so social links render on every build instead of silently dying.
+- [#404](../../issues/404) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Backend test pubsub triggers publish into the lane's own resolved emulator port instead of a hardcoded `localhost:8085`, so a port-bumped stack stops feeding a foreign emulator.
+- [#424](../../issues/424) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The manager search service docblock names the real cache home instead of a token cache file that never existed.
+- [#426](../../issues/426) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Fatal config errors exit non-zero everywhere: the extension build stops swallowing them after the first call, and `deployDirect` fails loudly before deploying instead of dropping them.
+- [#427](../../issues/427) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Default pages stop linking framework routes a brand build does not emit; the footer's `/discord` hardlink is gone in favor of the socials shortlinks.
+- [#438](../../issues/438) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The marketing/hero `primary_button` honors `enabled: false` instead of rendering anyway.
+- [#440](../../issues/440) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Firebase emulator teardown stops hanging: the java child no longer holds the CLI's pipes open, and a shared helper signals the group with a hard backstop.
+- [#451](../../issues/451) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The contact facts default escapes its `<15m` response-time value, which the production minifier was turning into a DOM-breaking tag.
+- [#454](../../issues/454) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Machine-local `.env` keys (`OMEGA_FONTAWESOME_ROOT`) stay out of published Actions secrets and composed workflows; CI resolves Pro icons through the npm token lane.
+- [#456](../../issues/456) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The about/letter section gates off cleanly and takes `feed_items`/`feed_status` args instead of rendering a hardcoded demo feed unconditionally.
+- [#458](../../issues/458) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — `omega customize` materializes paginating default pages byte-identical instead of failing on the Liquid inside their permalinks.
+- [#459](../../issues/459) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — The backend emulator stop-path port sweep is bounded and cannot stall on `lsof`; a sweep that cannot prove a port's owner reports instead of hanging the suite.
+- [#460](../../issues/460) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — Test-lane teardown now guarantees the emulator java process dies: a scoped collection pass terminates only a JVM proven to belong to the lane, and spares everything else.
+- [#461](../../issues/461) [`518e0f23`](../../commit/518e0f23) Thanks [@ianwieds]! — `omega_social` reads the resolved socials the web build actually provides, so social links render on every build instead of silently dying.
 
 ## [0.44.0] 2026-08-22
 
