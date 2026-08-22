@@ -6,30 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.44.0] 2026-08-22
+
 ### Added
-- [#446](../../issues/446) — `omega company init` scaffolds the central company workspace in one command — config, README and gitignore tracked; `.env`, machine state and adopted brands ignored — and `omega company adopt` registers an existing brand under it.
-- [#417](../../issues/417) — The analytics service provisions Meta and TikTok pixels programmatically: it creates the pixel on the ad account, stores the token, and writes the pixel id back into the brand config.
-- [#348](../../issues/348) — The manager precreates the full payments QA fixture set — hidden QA products and sandbox buyer accounts — and the walk prints the fixture buyer and dashboard link at the moment a human check needs them.
+- [#446](../../issues/446) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — `omega company init` scaffolds the central company workspace in one command — config, README and gitignore tracked; `.env`, machine state and adopted brands ignored — and `omega company adopt` registers an existing brand under it.
+- [#417](../../issues/417) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The analytics service provisions Meta and TikTok pixels programmatically: it creates the pixel on the ad account, stores the token, and writes the pixel id back into the brand config.
+- [#348](../../issues/348) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The manager precreates the full payments QA fixture set — hidden QA products and sandbox buyer accounts — and the walk prints the fixture buyer and dashboard link at the moment a human check needs them.
 
 ### Changed
-- [#443](../../issues/443) — BREAKING: a brand's targets live in `targets/` (was `apps/`), and this monorepo's test brands live in `brands/`. An old-shape brand stops loudly at discovery with the one-time fix: `npx omega manage --migration=targets-rename --execute`, then `npm install`. Nothing heals silently.
-- [#455](../../issues/455) — BREAKING: the apps-era vocabulary is gone. Code speaks target identifiers, the config merge chain's per-machine layer is named `local`, and "app" survives only for a running application. The CI deploy helper `appPathPrefix` is now `targetPathPrefix` — re-scaffold workflows at migration.
-- [#434](../../issues/434) — BREAKING: `.omega/state.json` is retired. Provisioned public ids write back into `omega.json5`, secrets land in `.env`, and re-checkable facts re-derive every run; only humanly-confirmed flags stay in config.
-- [#428](../../issues/428) — BREAKING: "processor" is now "provider" across payment code, API params and stored data. Existing documents convert through the one-time `omega manage --migration=payment-provider` handler — audit by default, `--execute` writes.
-- [#425](../../issues/425) — BREAKING: every provisioned provider reads and writes one config shape, `<role>.providers.<provider>.*`, across analytics, captcha and payment alike.
-- [#418](../../issues/418) — BREAKING: manager services are named by their config keys, with no third-party brand names in service folders, log tags or output keys. The breaking-changes register carries the rename table.
-- [#416](../../issues/416) — BREAKING: canonical analytics events get consistent domain prefixes before first publish; the catalog and every per-provider mapping follow the new names.
-- [#422](../../issues/422) — BREAKING: the marketing-prune cron is opt-in. It runs only when its config `enabled` is explicitly `true`; a brand that never opted in stops pruning subscribers entirely.
-- [#423](../../issues/423) — Brazil, South Korea and China join the consent opt-in tier: visitors there see the banner, and tracking waits for consent.
-- [#445](../../issues/445) — `omega update` goes incremental: a target whose own files and installed `@omega.js/*` frameworks both match the last successful run skips its install and build. The local-link lane sweeps the link target's `dist/`, `--force` overrides, and a corrupt cache means a full run.
-- [#433](../../issues/433) — The playground brand is "OMEGA Playground" throughout — the Paperloom fiction is purged — and the web head falls back to the brand description when a page declares none.
-- [#406](../../issues/406) — Exclusive backend test accounts move into the seed roster; the in-test creation helper stays only for the broken-state guard tests that need a deliberately malformed account.
+- [#443](../../issues/443) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: a brand's targets live in `targets/` (was `apps/`), and this monorepo's test brands live in `brands/`. An old-shape brand stops loudly at discovery with the one-time fix: `npx omega manage --migration=targets-rename --execute`, then `npm install`. Nothing heals silently.
+- [#455](../../issues/455) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: the apps-era vocabulary is gone. Code speaks target identifiers, the config merge chain's per-machine layer is named `local`, and "app" survives only for a running application. The CI deploy helper `appPathPrefix` is now `targetPathPrefix` — re-scaffold workflows at migration.
+- [#434](../../issues/434) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: `.omega/state.json` is retired. Provisioned public ids write back into `omega.json5`, secrets land in `.env`, and re-checkable facts re-derive every run; only humanly-confirmed flags stay in config.
+- [#428](../../issues/428) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: "processor" is now "provider" across payment code, API params and stored data. Existing documents convert through the one-time `omega manage --migration=payment-provider` handler — audit by default, `--execute` writes.
+- [#425](../../issues/425) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: every provisioned provider reads and writes one config shape, `<role>.providers.<provider>.*`, across analytics, captcha and payment alike.
+- [#418](../../issues/418) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: manager services are named by their config keys, with no third-party brand names in service folders, log tags or output keys. The breaking-changes register carries the rename table.
+- [#416](../../issues/416) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: canonical analytics events get consistent domain prefixes before first publish; the catalog and every per-provider mapping follow the new names.
+- [#422](../../issues/422) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — BREAKING: the marketing-prune cron is opt-in. It runs only when its config `enabled` is explicitly `true`; a brand that never opted in stops pruning subscribers entirely.
+- [#423](../../issues/423) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — Brazil, South Korea and China join the consent opt-in tier: visitors there see the banner, and tracking waits for consent.
+- [#445](../../issues/445) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — `omega update` goes incremental: a target whose own files and installed `@omega.js/*` frameworks both match the last successful run skips its install and build. The local-link lane sweeps the link target's `dist/`, `--force` overrides, and a corrupt cache means a full run.
+- [#433](../../issues/433) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The playground brand is "OMEGA Playground" throughout — the Paperloom fiction is purged — and the web head falls back to the brand description when a page declares none.
+- [#406](../../issues/406) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — Exclusive backend test accounts move into the seed roster; the in-test creation helper stays only for the broken-state guard tests that need a deliberately malformed account.
 
 ### Fixed
-- [#444](../../issues/444) — The captcha walk deep-links the reCAPTCHA key's own console page, scoped to the resolved cloud project, and registers the bare domain instead of recommending a `www` twin; already-confirmed domains re-confirm through config, not a state file.
-- [#412](../../issues/412) — The extension's analytics session id survives popup reopens: session continuity moves off `sessionStorage`, which an extension popup discards on every open, so one browsing session stops counting as many.
-- [#419](../../issues/419) — The client's live-page feed-poller cadence test stops flaking under full-lane load; it asserts cadence against its own clock instead of racing the lane.
-- [#420](../../issues/420) — The mcp-router's refresh-timeout stall cases stop racing the handshake budget under lane load.
+- [#444](../../issues/444) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The captcha walk deep-links the reCAPTCHA key's own console page, scoped to the resolved cloud project, and registers the bare domain instead of recommending a `www` twin; already-confirmed domains re-confirm through config, not a state file.
+- [#412](../../issues/412) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The extension's analytics session id survives popup reopens: session continuity moves off `sessionStorage`, which an extension popup discards on every open, so one browsing session stops counting as many.
+- [#419](../../issues/419) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The client's live-page feed-poller cadence test stops flaking under full-lane load; it asserts cadence against its own clock instead of racing the lane.
+- [#420](../../issues/420) [`ea7547df`](../../commit/ea7547df) Thanks [@ianwieds]! — The mcp-router's refresh-timeout stall cases stop racing the handshake budget under lane load.
 
 ## [0.43.0] 2026-08-21
 
