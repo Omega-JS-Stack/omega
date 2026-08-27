@@ -6,4 +6,4 @@
 - `usage`: Current usage stats
 - `schema`: Resolved schema info
 
-The header rides every `ctx.respond()`/`errorify()` response (exposed via `Access-Control-Expose-Headers`) and is consumed automatically by @omega.js/client's `omega.request()`, which merges `usage.current` + `usage.limits` into the frontend `usage` bindings key — `data-omega-bind` elements refresh after every API call.
+The header rides every `ctx.respond()`/`ctx.report()` response (exposed via `Access-Control-Expose-Headers`) and is consumed automatically by @omega.js/client's `omega.request()`, which merges `usage.current` + `usage.limits` into the frontend `usage` bindings key — `data-omega-bind` elements refresh after every API call.

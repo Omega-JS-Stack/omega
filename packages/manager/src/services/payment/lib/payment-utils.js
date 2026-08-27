@@ -70,6 +70,31 @@ function redactWebhookUrl(url) {
 }
 
 /**
+ * The endpoints on the brand's OWN webhook host that are NOT the desired URL —
+ * legacy twins (omega-manager's `?processor=` form, an old key) that keep
+ * receiving every event and answering 400. Exactly one endpoint per host
+ * survives a manage run; endpoints on other hosts belong to whatever else the
+ * account runs and are never touched (#570).
+ *
+ * @param {Array} endpoints - Provider webhook objects carrying a `url`
+ * @param {string} desiredUrl - A buildWebhookUrl() result
+ * @returns {Array} The stale endpoints, in list order
+ */
+function staleWebhookEndpoints(endpoints, desiredUrl) {
+  const desired = new URL(desiredUrl);
+
+  return endpoints.filter((endpoint) => {
+    if (!endpoint.url || endpoint.url === desiredUrl) {
+      return false;
+    }
+
+    const url = URL.parse(endpoint.url);
+
+    return !!url && url.host === desired.host && url.pathname === desired.pathname;
+  });
+}
+
+/**
  * Diff current webhook events against desired.
  *
  * @param {string[]} currentEvents - Events on the endpoint now
@@ -88,4 +113,4 @@ function diffEventSets(currentEvents, desiredEvents) {
     : null;
 }
 
-module.exports = { paidProducts, productDisplayName, productImage, buildWebhookUrl, redactWebhookUrl, diffEventSets };
+module.exports = { paidProducts, productDisplayName, productImage, buildWebhookUrl, redactWebhookUrl, staleWebhookEndpoints, diffEventSets };

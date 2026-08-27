@@ -5,7 +5,8 @@ post:
   description: "The first mini post"
   author: jane doe
   id: 1000001
-  tags: ["automation", "growth-hacks"]
+  # `A&R` is the #488 case: a term whose slug two slugifiers used to disagree on.
+  tags: ["automation", "growth-hacks", "A&R"]
   categories: ["Growth"]
 ---
 

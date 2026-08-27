@@ -2,10 +2,18 @@
   {% for stat in args.facts %}
     <div class="omega-facts__item">
       <span class="omega-micro omega-facts__label">{{ stat.label }}</span>
-      <span class="omega-facts__value omega-facts__value--num" data-omega-countup>{{ stat.number }}</span>
+      {%- comment %} A value is TEXT, never markup (#580). {% endcomment -%}
+      <span class="omega-facts__value omega-facts__value--num" data-omega-countup>{{ stat.number | escape_once }}</span>
     </div>
   {% endfor %}
 {% endcapture %}
+{% comment %} The stats band head (legacy parity): the rail's own
+superheadline/headline/subheadline, rendered only when a composition authors
+them — an unauthored rail is the bare grid it has always been. {% endcomment %}
+{% capture facts_head %}
+  {% component "heading/section-head", superheadline: args.facts_head.superheadline.text, headline: args.facts_head.headline, headline_accent: args.facts_head.headline_accent, sub: args.facts_head.subheadline %}
+{% endcapture %}
+{% assign facts_head = facts_head | strip %}
 <section class="omega-dotgrid{% if args.image != blank %} omega-photo-lead-band{% endif %}" data-omega-dotfield>
   <div class="container">
     {% if args.image != blank %}
@@ -18,6 +26,11 @@
       </figure>
 
       {% if args.facts %}
+        {% iftruthy facts_head %}
+          <div class="omega-section-head mt-5" data-omega-reveal>
+            {{ facts_head }}
+          </div>
+        {% endiftruthy %}
         <div class="omega-facts omega-photo-lead__facts" style="--omega-facts-cols: 4;" data-omega-reveal>
           {{ facts_rail }}
         </div>
@@ -29,9 +42,21 @@
         </div>
 
         {% if args.facts %}
-          <div class="omega-facts" style="--omega-facts-cols: 2;" data-omega-reveal="left">
-            {{ facts_rail }}
-          </div>
+          {% iftruthy facts_head %}
+            <div data-omega-reveal="left">
+              <div class="omega-section-head mb-4">
+                {{ facts_head }}
+              </div>
+              <div class="omega-facts" style="--omega-facts-cols: 2;">
+                {{ facts_rail }}
+              </div>
+            </div>
+          {% endiftruthy %}
+          {% iffalsy facts_head %}
+            <div class="omega-facts" style="--omega-facts-cols: 2;" data-omega-reveal="left">
+              {{ facts_rail }}
+            </div>
+          {% endiffalsy %}
         {% endif %}
       </div>
     {% endif %}

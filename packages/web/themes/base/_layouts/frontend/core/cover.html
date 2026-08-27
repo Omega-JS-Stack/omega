@@ -1,13 +1,14 @@
 ---
 layout: frontend/core/base
 
-theme:
-  nav:
-    enabled: false
-  main:
-    class: "d-flex align-items-{{ resolved.theme.main.align | default: 'center' }} py-5"
-  footer:
-    enabled: false
+config:
+  theme:
+    nav:
+      enabled: false
+    main:
+      class: "d-flex align-items-{{ resolved.config.theme.main.align | default: 'center' }} py-5"
+    footer:
+      enabled: false
 ---
 
 <!-- Critical inline CSS to prevent FOUC on cover pages -->

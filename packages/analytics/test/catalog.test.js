@@ -334,6 +334,52 @@ test('attribution lands where each provider wants it', () => {
   assert.strictEqual(tt.payload.gclid, undefined, 'and GA4\'s param never rides another platform');
 });
 
+test('the touch\'s page rides the descriptor for the server senders', () => {
+  // The attribution touch is the only URL a server conversion has any claim to
+  // (a webhook has no page of its own), and the two ad platforms both read one:
+  // TikTok's `page: { url, referrer }` data-item member and Meta's
+  // `event_source_url` ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)).
+  const context = { attribution: { url: 'https://brand.test/pricing?utm_source=meta', referrer: 'https://facebook.com/' } };
+
+  for (const adapter of [meta, tiktok]) {
+    const descriptor = adapter.resolve('purchase', { value: 9.99, currency: 'USD' }, context);
+
+    assert.deepEqual(descriptor.page, { url: 'https://brand.test/pricing?utm_source=meta', referrer: 'https://facebook.com/' }, `${adapter.provider} carries the page`);
+    assert.strictEqual(descriptor.payload.url, undefined, `${adapter.provider} never rides the url in the event payload`);
+    assert.strictEqual(descriptor.userData.url, undefined, 'nor in the match block');
+  }
+
+  // GA4's Measurement Protocol has no slot the campaign params do not already
+  // fill, and an invented one is worse than an absent one.
+  const google = ga4.resolve('purchase', { value: 9.99, currency: 'USD' }, context);
+
+  assert.strictEqual(Object.hasOwn(google, 'page'), false, 'GA4 is untouched');
+  assert.strictEqual(google.payload.url, undefined, 'and gains no url param');
+});
+
+test('a touch with no referrer carries a page of the url alone', () => {
+  const context = { attribution: { url: 'https://brand.test/' } };
+
+  for (const adapter of [meta, tiktok]) {
+    const descriptor = adapter.resolve('purchase', { value: 9.99 }, context);
+
+    assert.deepEqual(descriptor.page, { url: 'https://brand.test/' }, `${adapter.provider} sends the url without an empty referrer`);
+    assert.strictEqual(Object.hasOwn(descriptor.page, 'referrer'), false, 'a direct landing has no referrer to send');
+  }
+});
+
+test('no touch url means no page at all', () => {
+  // The raw-API recovery lane: no browser was ever involved. A referrer with no
+  // url is not half a page — it is nothing to send.
+  for (const attribution of [undefined, {}, { referrer: 'https://facebook.com/' }]) {
+    for (const adapter of [meta, tiktok]) {
+      const descriptor = adapter.resolve('purchase', { value: 9.99 }, { attribution: attribution });
+
+      assert.strictEqual(Object.hasOwn(descriptor, 'page'), false, `${adapter.provider} invents no page from ${JSON.stringify(attribution)}`);
+    }
+  }
+});
+
 test('every descriptor carries a userData block for the server enrichment', () => {
   for (const adapter of ADAPTERS) {
     const descriptor = adapter.resolve('sign_up', { method: 'email' });

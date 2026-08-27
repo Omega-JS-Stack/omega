@@ -40,6 +40,7 @@ const AuthCommand = require('./commands/auth');
 const LogsCommand = require('./commands/logs');
 const UpdateCommand = require('./commands/update');
 const McpCommand = require('./commands/mcp');
+const MigrateRulesCommand = require('./commands/migrate-rules');
 
 // Returned by an args-taking command's match() when the command was named but no
 // argument was given — the branch that must name the real spellings instead of
@@ -209,6 +210,15 @@ const COMMANDS = [
     name: 'mcp',
     description: 'run the MCP server',
     run: (self) => new McpCommand(self).execute(),
+  },
+  {
+    // The one-time move onto the compiled rules model — run ALONE and
+    // deliberately, because it changes what the live project enforces. Setup
+    // defers to it instead of healing the tree on the way to a deploy (#522).
+    name: 'migrate:rules',
+    aliases: ['migrate:firestore-rules'],
+    description: 'migrate legacy firestore.rules onto the compiled model (changes live posture)',
+    run: (self) => new MigrateRulesCommand(self).execute(),
   },
 ];
 

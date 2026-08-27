@@ -11,15 +11,15 @@ alternative:
         ours: "Deep"
         theirs: "Shallow"
   # Exercises the CENTER faq variant (the only center caller) + call-site
-  # liquification of the {{ site.brand.name }} tokens.
+  # liquification of the {{ resolved.config.brand.name }} tokens.
   faqs:
     superheadline:
       text: "FAQs"
     headline: "Questions about"
     headline_accent: "switching"
-    subheadline: "Answers from the {{ site.brand.name }} team."
+    subheadline: "Answers from the {{ resolved.config.brand.name }} team."
     items:
-      - question: "How long does a {{ site.brand.name }} migration take?"
+      - question: "How long does a {{ resolved.config.brand.name }} migration take?"
         answer: "Most teams finish in under a day."
       - question: "Can I import my data?"
         answer: "Yes — imports are built in."

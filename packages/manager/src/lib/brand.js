@@ -15,6 +15,18 @@
  *   2. Directory convention — targets/website* → web, targets/backend* → backend,
  *      targets/desktop* → desktop, targets/extension* → extension, targets/mobile* → mobile.
  * Unmapped dirs surface as workspace-service warnings, never silent skips.
+ *
+ * A CUSTOM target (#603) is neither: the brand config declares it
+ * (`targets.<name>: { type: 'custom' }`) and its dir carries no framework. It
+ * is marked `custom: true` with `target` left NULL, which is what makes every
+ * framework service's `filter((entry) => entry.target)` skip it for free —
+ * only the two ops that must see it (env disperse, the workspace service)
+ * read the flag.
+ *
+ * A backend entry also carries `projectType` (#584) — 'firebase' (Cloud
+ * Functions) or 'custom' (the same backend as its own server on a container
+ * host). That is a framework target either way; the mode only decides which
+ * verbs its framework can serve (framework-bin.js).
  */
 
 const fs = require('node:fs');
@@ -23,8 +35,9 @@ const JSON5 = require('json5');
 
 // resolveBrandRoot moved into @omega.js/config (cp73c) — the hierarchy walk
 // has ONE home there, alongside findBrandRoot and the env cascade.
-const { loadConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot } = require('@omega.js/config');
+const { loadConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, backendProjectType, normalizeTargetInstances } = require('@omega.js/config');
 const { DEFAULTS, DIR_TARGETS, templateObject } = require('../config.js');
+const { customTargetDirs } = require('./custom-target.js');
 
 /**
  * Read a target's raw omega.json5 (no merge, no validation) purely to see which
@@ -67,11 +80,32 @@ function targetFromDirName(dirName) {
  * heals it inside a run.
  *
  * @param {string} brandRoot - Absolute brand-monorepo root
- * @returns {Array<{ name, dir, path, target, declaredTargets }>} - One entry
- *   per target directory; `target` is null when unmapped (workspace warns).
+ * @returns {Array<{ name, dir, path, target, projectType, declaredTargets }>} -
+ *   One entry per target directory; `target` is null when unmapped (workspace
+ *   warns), and `projectType` rides the backend entry only (#584).
  * @throws {Error} when the brand is still on the pre-#443 `apps/` shape
  */
 function discoverTargets(brandRoot) {
+  // The brand file's own raw view — read here (never through loadBrand, which
+  // calls US) purely to learn which dirs are declared custom. Discovery must
+  // never throw: an unreadable brand file simply declares no custom targets,
+  // and the workspace service reports the real problem.
+  let customDirs = new Set();
+  // How the backend RUNS (#584) — 'firebase' (Cloud Functions) or 'custom'
+  // (its own server on a container host). Read from the same raw view, since
+  // it steers which verbs the fan-outs may dispatch at that target.
+  let backendMode = 'firebase';
+  try {
+    const brandConfigPath = resolveConfigPath(brandRoot);
+    if (brandConfigPath) {
+      const raw = JSON5.parse(fs.readFileSync(brandConfigPath, 'utf8'));
+      customDirs = new Set(customTargetDirs(raw));
+      backendMode = backendProjectType(normalizeTargetInstances(raw.targets?.backend)[0]);
+    }
+  } catch {
+    // Unreadable brand config — no custom declarations to honor
+  }
+
   const targetsDir = path.join(brandRoot, 'targets');
   if (!fs.existsSync(targetsDir)) {
     if (fs.existsSync(path.join(brandRoot, 'apps'))) {
@@ -90,6 +124,21 @@ function discoverTargets(brandRoot) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
 
     const targetPath = path.join(targetsDir, entry.name);
+
+    // A custom target (#603) has no framework to map to — the brand's own
+    // declaration is the whole mapping, and `target` stays null on purpose
+    if (customDirs.has(entry.name)) {
+      targets.push({
+        name: entry.name,
+        dir: `targets/${entry.name}`,
+        path: targetPath,
+        target: null,
+        custom: true,
+        declaredTargets: null,
+      });
+      continue;
+    }
+
     const declaredTargets = readDeclaredTargets(targetPath);
 
     // Declared target wins; a single declaration is unambiguous, multiple
@@ -107,6 +156,9 @@ function discoverTargets(brandRoot) {
       dir: `targets/${entry.name}`,
       path: targetPath,
       target,
+      // Backend only: the mode decides which verbs its framework can serve
+      // (#584). Every other target has one shape, so it carries no key.
+      ...(target === 'backend' ? { projectType: backendMode } : {}),
       declaredTargets,
     });
   }

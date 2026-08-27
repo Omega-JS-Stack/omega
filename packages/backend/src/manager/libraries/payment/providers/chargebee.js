@@ -1,5 +1,7 @@
 const powertools = require('node-powertools');
-const staleFallback = require('../stale-fallback.js');
+const fetchFailure = require('../fetch-failure.js');
+const assertRefundLinkage = require('../refund-linkage.js');
+const env = require('../../env.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -29,13 +31,13 @@ const Chargebee = {
       return cachedConfig;
     }
 
-    const apiKey = process.env.CHARGEBEE_API_KEY;
+    const apiKey = env.get('CHARGEBEE_API_KEY');
 
     if (!apiKey) {
       throw new Error('CHARGEBEE_API_KEY environment variable is required');
     }
 
-    const site = process.env.CHARGEBEE_SITE;
+    const site = env.get('CHARGEBEE_SITE');
 
     if (!site) {
       throw new Error('CHARGEBEE_SITE environment variable is required (set from config payment.providers.chargebee.site)');
@@ -102,15 +104,16 @@ const Chargebee = {
 
   /**
    * Fetch the latest resource from Chargebee's API
-   * Falls back to the raw webhook payload if the API call fails
+   * Chargebee's answer is the only trusted source — a lookup that fails throws the
+   * classified failure ([../fetch-failure.js](../fetch-failure.js)) instead of
+   * degrading to the webhook payload
    *
    * @param {string} resourceType - 'subscription' or 'invoice'
    * @param {string} resourceId - Chargebee resource ID
-   * @param {object} rawFallback - Fallback data from webhook payload
    * @param {object} context - Additional context
    * @returns {object} Full Chargebee resource object
    */
-  async fetchResource(resourceType, resourceId, rawFallback, context) {
+  async fetchResource(resourceType, resourceId, context) {
     try {
       if (resourceType === 'subscription') {
         const result = await this.request(`/subscriptions/${resourceId}`);
@@ -124,19 +127,7 @@ const Chargebee = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it — flagged and
-      // logged, because the payload is older than the answer we could not get
-      if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return staleFallback(rawFallback, {
-          ctx: context?.ctx,
-          provider: 'chargebee',
-          resourceType,
-          resourceId,
-          error: e,
-        });
-      }
-
-      throw e;
+      throw fetchFailure(e, { provider: 'chargebee', resourceType, resourceId });
     }
   },
 
@@ -217,7 +208,7 @@ const Chargebee = {
 
   /**
    * Extract the resource a Chargebee webhook envelope carries
-   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   * Identifiers only — the payload never drives state ([../fetch-failure.js](../fetch-failure.js))
    *
    * Chargebee nests it under `content`, keyed by type, and the key varies by event:
    * subscription events carry content.subscription (alongside the invoice + customer
@@ -270,34 +261,80 @@ const Chargebee = {
   },
 
   /**
-   * Extract refund details from a Chargebee payment_refunded webhook payload
+   * What a Chargebee refund actually moved, read back from the credit note itself
    *
-   * @param {object} raw - Raw Chargebee webhook payload
-   * @returns {{ amount: string|null, currency: string, reason: string|null }}
+   * The refund lives on the CREDIT NOTE, and the resource already in hand — the
+   * subscription or the invoice the refund belongs to — carries none of its fields.
+   * The amounts used to be read straight out of the webhook envelope (its credit
+   * note, or its transaction), so a payload naming an inflated total wrote that
+   * number onto the order and into the customer's refund email
+   * ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+   *
+   * The envelope's credit-note id is kept as the lookup KEY only — an identifier,
+   * the same trust level as the resourceId every lookup here starts from — and
+   * `GET /credit_notes/{id}` answers with the amounts.
+   *
+   * A gateway refund issued WITHOUT a credit note has a trusted record too: the
+   * transaction. Removing the untrusted `content.transaction` fallback and putting
+   * nothing in its place wrote `amount: null` onto the order and into the
+   * customer's refund email for a refund that plainly moved money
+   * ([#534](https://github.com/Omega-JS-Stack/omega/issues/534)), so the
+   * transaction's id is read the same way the credit note's is — as a key, never
+   * as an amount. An event naming neither has nothing to ask about, and the refund
+   * is recorded with no amount rather than with the payload's.
+   *
+   * Whichever record answers is linked back to the resource the event named
+   * ([refund-linkage.js](../refund-linkage.js)).
+   *
+   * @param {object} resource - The resource already fetched from Chargebee (the record the refund must link back to)
+   * @param {object} [options] - { raw, resourceType, ctx }
+   * @returns {Promise<{ amount: string|null, currency: string, reason: string|null }>}
    */
-  getRefundDetails(raw) {
-    const creditNote = raw?.content?.credit_note;
-    const transaction = raw?.content?.transaction;
+  async getRefundDetails(resource, options = {}) {
+    const creditNoteId = options.raw?.content?.credit_note?.id || null;
+    const transactionId = creditNoteId ? null : (options.raw?.content?.transaction?.id || null);
 
-    // Credit note has the refund amount
-    if (creditNote) {
-      return {
-        amount: creditNote.total ? (creditNote.total / 100).toFixed(2) : null,
-        currency: creditNote.currency_code?.toUpperCase() || 'USD',
-        reason: creditNote.reason_code || null,
-      };
+    if (!creditNoteId && !transactionId) {
+      const message = `chargebee getRefundDetails(): the event carries no credit note id and no transaction id, so Chargebee cannot be asked what came back — the refund is recorded with no amount rather than with the payload's`;
+
+      if (options.ctx?.warn) {
+        options.ctx.warn(message);
+      } else {
+        console.warn(`[@omega.js/backend:payment:chargebee] ${message}`);
+      }
+
+      return { amount: null, currency: 'USD', reason: null };
     }
 
-    // Fall back to transaction
-    if (transaction) {
-      return {
-        amount: transaction.amount ? (transaction.amount / 100).toFixed(2) : null,
-        currency: transaction.currency_code?.toUpperCase() || 'USD',
-        reason: null,
-      };
+    const refundType = creditNoteId ? 'credit_note' : 'transaction';
+    const refundId = creditNoteId || transactionId;
+    const endpoint = creditNoteId ? `/credit_notes/${creditNoteId}` : `/transactions/${transactionId}`;
+
+    let record;
+
+    try {
+      const result = await this.request(endpoint);
+      record = result[refundType] || result;
+    } catch (e) {
+      throw fetchFailure(e, { provider: 'chargebee', resourceType: refundType, resourceId: refundId });
     }
 
-    return { amount: null, currency: 'USD', reason: null };
+    assertRefundLinkage({
+      provider: 'chargebee',
+      refundType: refundType,
+      refundId: refundId,
+      resourceType: options.resourceType || 'resource',
+      resourceId: resource?.id || null,
+      expected: resource?.id || null,
+      ctx: options.ctx,
+      ...refundLink(record, options.resourceType, resource?.id || null),
+    });
+
+    return {
+      amount: record.total ? (record.total / 100).toFixed(2) : (record.amount ? (record.amount / 100).toFixed(2) : null),
+      currency: record.currency_code?.toUpperCase() || 'USD',
+      reason: record.reason_code || null,
+    };
   },
 
   /**
@@ -426,6 +463,39 @@ const Chargebee = {
     return JSON.stringify(data);
   },
 };
+
+/**
+ * The back-pointer a Chargebee refund record carries to the resource it credits
+ *
+ * A credit note names the subscription it was raised on and the invoice it
+ * credits; a transaction names the subscription it settled and every invoice it
+ * was applied to. Which one is the answer depends on what the EVENT resolved to
+ * ([refund-linkage.js](../refund-linkage.js)).
+ *
+ * @param {object} record - The fetched credit note or transaction
+ * @param {string} resourceType - The event's resource type ('subscription' | 'invoice')
+ * @param {string|null} expected - The event's resource id, for the multi-invoice case
+ * @returns {{ field: string|null, found: string|null }}
+ */
+function refundLink(record, resourceType, expected) {
+  if (resourceType === 'subscription') {
+    return { field: 'subscription_id', found: record.subscription_id || null };
+  }
+
+  if (resourceType === 'invoice') {
+    if (record.reference_invoice_id) {
+      return { field: 'reference_invoice_id', found: record.reference_invoice_id };
+    }
+
+    // A refund transaction settles one or more invoices — the event's own counts
+    // as the link when it is among them
+    const invoices = (record.linked_invoices || []).map((entry) => entry.invoice_id).filter(Boolean);
+
+    return { field: 'linked_invoices', found: invoices.includes(expected) ? expected : (invoices[0] || null) };
+  }
+
+  return { field: null, found: null };
+}
 
 /**
  * Parse the meta_data JSON from a Chargebee resource

@@ -1,6 +1,7 @@
 const moment = require('moment');
 const uuidv5 = require('uuid').v5;
 const { get, set, merge } = require('lodash');
+const env = require('../libraries/env.js');
 
 const sampleUser = {
   api: {},
@@ -274,7 +275,7 @@ ApiManager.prototype.validateOfficialRequest = async function (ctx, apiUser) {
   }
 
   if (self.options.officialAPIKeys.includes(data.apiKey)) {
-      const captchaResult = await hcaptcha.verify(process.env.HCAPTCHA_SECRET, data['h-captcha-response'])
+      const captchaResult = await hcaptcha.verify(env.get('HCAPTCHA_SECRET'), data['h-captcha-response'])
         .then((data) => data)
         .catch((e) => e);
       if (!captchaResult || captchaResult instanceof Error || !captchaResult.success) {

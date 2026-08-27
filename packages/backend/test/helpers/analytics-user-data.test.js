@@ -143,5 +143,29 @@ module.exports = {
         assert.equal(userData.address.sha256_last_name, undefined, 'no name on file means no match key');
       },
     },
+
+    {
+      // GA4's user-data spec takes a whole ADDRESS block, and only the names and
+      // the street are hashed: city, region, postal code and country ride in the
+      // clear, normalized ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)).
+      // The ACCOUNT's own location wins over the request's geolocation — the
+      // person's address is what the platform matches, not the exit node they
+      // happened to browse from.
+      name: 'the-address-block-comes-off-the-account-per-ga4-spec',
+      auth: 'none',
+
+      run: async ({ assert, Manager }) => {
+        const { userData } = userDataFor(Manager, {
+          auth: { uid: UID, email: EMAIL },
+          personal: { location: { country: 'us', region: 'California', city: 'San Diego' } },
+        });
+
+        assert.equal(userData.address.city, 'san diego', 'city: lowercased and trimmed, never hashed');
+        assert.equal(userData.address.region, 'california', 'region: the NAME, GA4\'s own sample shape');
+        assert.equal(userData.address.country, 'US', 'country: uppercase ISO 3166-1 alpha-2');
+        assert.equal(userData.address.postal_code, undefined, 'nothing on file means no key at all');
+        assert.equal(userData.address.sha256_street, undefined);
+      },
+    },
   ],
 };

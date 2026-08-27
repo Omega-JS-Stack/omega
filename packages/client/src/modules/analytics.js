@@ -493,6 +493,15 @@ class Analytics {
       return;
     }
 
+    // Bridged: identity is main's OWN, and this is the one place the bridge
+    // does not forward — the preload exposes no setUserId, because main's auth
+    // bridge already flips user_id off the same Firebase user (#411). Storing
+    // it here would set a value nothing in this process ever reads, so the
+    // call raises where it was made instead of quietly doing nothing (#480).
+    if (this._isBridged()) {
+      throw new Error('setUserId() is not a bridged renderer\'s to call — the main process owns identity (its auth bridge sets user_id off the same Firebase user). Call manager.analytics.setUserId(uid) in MAIN to set one by hand');
+    }
+
     this.userId = core.deriveUserId(userId, this.namespace);
 
     // Web sends it (#159). A null userId is sent as null, which is how GA4 is
@@ -542,10 +551,17 @@ class Analytics {
   handleAuthChange(user) {
     const uid = user?.uid || null;
 
-    // Identity follows auth on every runtime (user_id = uuidv5(uid, namespace))
+    // Bridged: NEITHER half is this renderer's — main's auth bridge sets the
+    // identity and fires the events off the same user, so the setUserId below
+    // would hit the throw that guards main's ownership (#480).
+    if (this._isBridged()) {
+      return;
+    }
+
+    // Identity follows auth on every other runtime (user_id = uuidv5(uid, namespace))
     this.setUserId(uid);
 
-    if (this._isWeb() || this._isBridged()) {
+    if (this._isWeb()) {
       return;
     }
 

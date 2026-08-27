@@ -56,7 +56,7 @@ module.exports = {
    * Extracts event data and determines category, resource type, resource ID, and UID
    *
    * @param {object} req - The raw HTTP request
-   * @returns {object} { eventId, eventType, category, resourceType, resourceId, raw, uid }
+   * @returns {object} { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid }
    */
   parseWebhook(req) {
     const event = req.body;
@@ -73,6 +73,11 @@ module.exports = {
     let resourceType = null;
     let resourceId = null;
     let uid = null;
+    // A refund event's resourceId is reassigned to the sale/capture the refund
+    // reversed, which used to be the last anything saw of the REFUND's own id —
+    // the key its amounts are looked up by
+    // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+    let refundId = null;
 
     if (eventType.startsWith('BILLING.SUBSCRIPTION.')) {
       // Subscription lifecycle events
@@ -127,6 +132,9 @@ module.exports = {
         resourceId = resource.sale_id || resource.id;
       }
 
+      // The v1 refund resource IS the event's own resource — its id is the refund's
+      refundId = resource.id || null;
+
       uid = parseUidFromCustomId(resource.custom_id);
 
     } else if (eventType === 'PAYMENT.CAPTURE.REFUNDED') {
@@ -140,6 +148,9 @@ module.exports = {
       resourceType = 'capture';
       resourceId = resource.capture_id || parseCaptureIdFromLinks(resource.links) || resource.id;
 
+      // The v2 Refund resource IS the event's own resource — its id is the refund's
+      refundId = resource.id || null;
+
       uid = parseUidFromCustomId(resource.custom_id);
     }
 
@@ -149,6 +160,7 @@ module.exports = {
       category: category,
       resourceType: resourceType,
       resourceId: resourceId,
+      refundId: refundId,
       raw: event,
       uid: uid,
     };

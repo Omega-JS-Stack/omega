@@ -5,23 +5,28 @@
  * produces ONE omega.json5 object per the mapping table in docs/shared/config.md:
  *
  * - Shared sections to the TOP LEVEL with unified spellings:
- *   `brand` (+ merged `url`), `theme`, `oauth2`,
+ *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526), `theme`, `oauth2`,
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment` (`processors` → `providers` — #425),
+ *   `web_manager.sentry` → `monitoring.providers.sentry` (#485),
  *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`,
  *   flat `advertising.<provider>` → `advertising.providers.<provider>`
  *   (`google-adsense` → `adsense` + camelCase slots — #23),
  *   `recaptcha` → `captcha.providers.recaptcha` (camelCase sub-keys),
  *   `cloudflare` → `edge.providers.cloudflare`.
- * - Everything web-only under `targets.web`: presentation sections (meta,
- *   socials, download, extension, favicon, manifest, icons,
- *   translation), blog/engine config (permalink, pagination,
+ * - `meta` to the TOP LEVEL (#607 — a real shared section now, the site's
+ *   default page meta; a page overrides it bare in frontmatter).
+ * - Everything web-only under `targets.web`: presentation sections (favicon,
+ *   manifest, icons),
+ *   blog/engine config (permalink, pagination,
  *   collections, defaults, generators — codemod rule 8's home), the
  *   remaining `web_manager` client-settings blob (renamed `client` on the way
  *   out — #1: WebManager is not an OMEGA concept), and the UJM-json build
  *   settings (distribute, purgecss, imagemin, workflows).
- * - Dropped with notes: Jekyll machinery keys, `webpack` (esbuild now),
- *   `gems` (Ruby is gone), secret-shaped keys (they belong in .env).
+ * - Dropped with notes: Jekyll machinery keys, the legacy `download` /
+ *   `extension` page maps (#610 — derived from targets.desktop.releases and
+ *   targets.extension.listings now), `webpack` (esbuild now), `gems` (Ruby is
+ *   gone), secret-shaped keys (they belong in .env).
  *
  * The engine composes the runtime shape back together (cloud.config →
  * client.firebase.app.config, payment → client.payment) in
@@ -42,10 +47,24 @@ const DROPPED_JEKYLL_KEYS = [
 
 // _config.yml sections that stay web-scoped (targets.web), in output order
 const WEB_SECTION_ORDER = [
-  'meta', 'socials', 'download', 'extension', 'favicon', 'manifest', 'icons',
-  'translation', 'permalink', 'pagination',
+  'favicon', 'manifest', 'icons',
+  'permalink', 'pagination',
   'collections', 'defaults', 'generators', 'client',
 ];
+
+// _config.yml sections that land at the TOP level: `meta` is a real shared
+// config section since #607 (the site's default page meta), not a web-only
+// presentation block.
+const SHARED_SECTION_ORDER = ['meta'];
+
+// The UJM page maps #610 retired: the /download page, the /extension page and
+// their shortlinks derive from `targets.desktop.releases` and
+// `targets.extension.listings`, so carrying these would be a second home for
+// the same links — and the validator refuses them.
+const RETIRED_PAGE_MAPS = {
+  download: 'targets.desktop.releases (curated onto site.targets.desktop.releasesUrl)',
+  extension: 'targets.extension.listings',
+};
 
 // Legacy kebab-case sub-keys → the camelCase names every OMEGA config key uses (#23)
 const ADSENSE_SLOT_KEYS = {
@@ -107,6 +126,21 @@ function convertConfig({ jekyll, ujm }) {
 
   const baseurl = take('baseurl');
   if (!isEmpty(baseurl) && baseurl !== '') omega.baseurl = baseurl;
+
+  // ---- socials: a SHARED_SCHEMA key, so the TOP LEVEL is its home (#483).
+  // A web load resolves `targets.web.socials` identically, but the handles are
+  // brand identity — the scaffold emits them at the root and every surface
+  // beyond the website reads them there.
+  const socials = take('socials');
+  if (!isEmpty(socials)) omega.socials = socials;
+
+  // ---- translation: a SHARED_SECTIONS key, so the TOP LEVEL is its home (#526).
+  // Legacy UJM translation was website-only and a web load resolves
+  // `targets.web.translation` identically, but disperse copies the SHARED
+  // sections — left in the target, the engine config is invisible to every
+  // other target that translates (the extension's `_locales`).
+  const translation = take('translation');
+  if (!isEmpty(translation)) omega.translation = translation;
 
   // ---- theme (verbatim — templates read theme.nav.enabled etc.)
   const theme = take('theme');
@@ -188,6 +222,32 @@ function convertConfig({ jekyll, ujm }) {
     }
   }
 
+  // ---- web_manager.sentry → monitoring.providers.sentry (#485). The schema
+  // picked the home: the manager's monitoring service reads that block's
+  // presence as the brand's pick of Sentry, so a converted brand that left the
+  // settings in the client blob had NO `monitoring` key and never provisioned a
+  // project. The legacy shape is a client-module toggle — `{ enabled, config }`
+  // — and the SDK knobs inside `config` are exactly the provider block.
+  if (!isEmpty(legacyWebManager.sentry)) {
+    const legacySentry = legacyWebManager.sentry;
+    delete legacyWebManager.sentry;
+
+    const monitoring = {};
+    if (typeof legacySentry.enabled === 'boolean') monitoring.enabled = legacySentry.enabled;
+    monitoring.providers = { sentry: legacySentry.config || {} };
+
+    omega.monitoring = monitoring;
+    notes.push('`web_manager.sentry` → `monitoring.providers.sentry` (#485) — the one error-reporting contract\'s config seam, which the manager\'s monitoring service reconciles');
+
+    // The two `enabled` flags do NOT mean the same thing: the legacy one gated
+    // the client module, while `monitoring.enabled` is only the manager's skip
+    // switch — at runtime, DSN presence IS the signal. So a legacy-disabled
+    // block that still carries a DSN starts reporting after the migration.
+    if (legacySentry.enabled === false && monitoring.providers.sentry.dsn) {
+      notes.push('`web_manager.sentry.enabled: false` carried a DSN — `monitoring.enabled: false` only skips the manager\'s provisioning service; DSN presence is the RUNTIME switch, so remove the dsn to keep reporting off');
+    }
+  }
+
   // ---- cookieConsent → consent (#383). The banner became a real gate, so the
   // block was renamed and most of its settings stopped existing: `palette` and
   // `theme` (the panel paints from the --omega-* tokens, which is the only way
@@ -212,6 +272,19 @@ function convertConfig({ jekyll, ujm }) {
 
   const oauth2 = take('oauth2');
   if (!isEmpty(oauth2)) omega.oauth2 = oauth2;
+
+  // ---- the UJM page maps #610 retired — dropped with the block that replaced them
+  for (const [key, replacement] of Object.entries(RETIRED_PAGE_MAPS)) {
+    const value = take(key);
+    if (isEmpty(value)) continue;
+    notes.push(`_config.yml \`${key}\` dropped (#610) — the page and its shortlinks derive from \`${replacement}\`; declare the target and delete the hand-written links`);
+  }
+
+  // ---- shared sections from _config.yml
+  for (const key of SHARED_SECTION_ORDER) {
+    const value = take(key);
+    if (!isEmpty(value)) omega[key] = value;
+  }
 
   // ---- web-scoped sections from _config.yml
   for (const key of WEB_SECTION_ORDER) {

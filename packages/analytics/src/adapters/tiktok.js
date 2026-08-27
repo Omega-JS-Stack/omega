@@ -6,7 +6,7 @@
  * through as properties. Consent category: 'marketing'.
  */
 
-const { createAdapter, pick } = require('./resolve.js');
+const { createAdapter, pick, attachPage } = require('./resolve.js');
 
 // TikTok's click id and cookie live in the Events API's context.user block —
 // never in the event properties.
@@ -17,6 +17,8 @@ const adapter = createAdapter({
   consentCategory: 'marketing',
   attach: (descriptor, attribution) => {
     Object.assign(descriptor.userData, pick(attribution, ATTRIBUTION_KEYS));
+    // The Events API 2.0 data item's `page` member (#497) — the transport's to place.
+    attachPage(descriptor, attribution);
   },
 });
 

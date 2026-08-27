@@ -6,6 +6,7 @@ const path = require('path');
 const mimeTypes = require('mime-types');
 const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
 const { VALID_PROMPT_ROLES, normalizePrompt, loadContent } = require('../prompt.js');
+const env = require('../../env.js');
 
 // Constants
 const DEFAULT_MODEL = 'gpt-5.4-mini';
@@ -342,8 +343,8 @@ function OpenAI(ctx, key) {
     || self.Manager?.config?.openai?.key
     || self.Manager?.config?.openai?.global
     || self.Manager?.config?.openai?.main
-    || process.env.OPENAI_API_KEY
-    || process.env.OMEGA_OPENAI_API_KEY
+    || env.get('OPENAI_API_KEY')
+    || env.get('OMEGA_OPENAI_API_KEY')
 
   // Running counter across every call this provider instance makes. Each call
   // reports its OWN usage (see attemptRequest) — this is the instance total.

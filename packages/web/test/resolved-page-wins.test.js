@@ -37,7 +37,7 @@ test('collection doc beats layout defaults: arrays replace, false kills, partial
     '  # Array override — these TWO items must be the whole why-switch list.',
     '  why_switch:',
     '    items:',
-    '      - title: "Doc reason one for {{ site.brand.name }}"',
+    '      - title: "Doc reason one for {{ resolved.config.brand.name }}"',
     '        description: "First"',
     '      - title: "Doc reason two"',
     '        description: "Second"',
@@ -59,7 +59,7 @@ test('collection doc beats layout defaults: arrays replace, false kills, partial
 
     // Arrays REPLACE — the doc's two reasons, and NONE of the layout's three
     assert.ok(page.includes('Doc reason two'), 'doc why-switch items render');
-    assert.ok(page.includes(`Doc reason one for ${bareData.brand.name}`), 'doc items liquify against site scope');
+    assert.ok(page.includes(`Doc reason one for ${bareData.brand.name}`), 'doc items liquify against the config scope');
     assert.ok(!page.includes('10x faster performance'), 'layout default why-switch items are GONE (no concat)');
     assert.ok(!page.includes('AI that actually works'), 'no concatenated leftovers');
 

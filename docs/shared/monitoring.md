@@ -43,6 +43,8 @@ monitoring: {
       environment:      null,     // null = the host's gate names it ('production' / 'development')
       sampleRate:       1,        // error events kept, 0..1 — the sampling knob
       tracesSampleRate: 0.1,
+      replaysSessionSampleRate: 0,  // browser only — session replay is opt-IN (0 = off, and off is the default)
+      replaysOnErrorSampleRate: 0,  // browser only — replay of an ERRORING session; either rate above 0 loads the integration
       scrubEmail:       true,     // set false to opt IN to sending emails
       attachScreenshot: false,    // desktop only
       bundlePatterns:   ['/assets/js/'],  // browser only — the URLs that identify our bundles
@@ -112,6 +114,7 @@ by hand. Nothing tags a build stamp by design.
 |---|---|
 | Backend routes | `RouteContext.report()` — 5xx captures automatically, 4xx never ([backend guide](../backend/index.md)) |
 | Backend event triggers | `helpers/event-middleware.js` — a handler that throws, or a handler file that will not load, goes through the SAME `report()` door. A deliberate block (an `HttpsError`, or an explicit numeric 4xx code) is the trigger's 4xx and never captures — a string `.code` (`ENOENT`, `messaging/invalid-token`) is a system error, not a block, and reports. |
+| Backend payment webhooks | the REFUSAL family's shared seam (`acknowledgeRefusal()` in `events/firestore/payments-webhooks/on-write.js`) captures ONE `warning` per refused event, tagged with the reason and the provider. A refusal is a decision, not a fault, so it never reports as an exception; a processed event reports nothing; and only IDS ride — the refusal stamp's own fields plus the event's ([#550](https://github.com/Omega-JS-Stack/omega/issues/550)). |
 | Desktop main | `@sentry/electron/main`'s own `OnUncaughtException` + `onUnhandledRejection` integrations. Desktop's process handlers log to `runtime.log` and are ADDITIVE — never a second capture. |
 | Desktop renderer | the SDK's window `error` / `unhandledrejection` handlers |
 | Browser (web, extension) | the SDK's global handlers, filtered by `beforeSend` to our bundles |
@@ -136,7 +139,7 @@ maps it from `monitoring.providers.sentry`:
 
 | Framework | Where |
 |---|---|
-| `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring.providers.sentry` → `sentry`, emitted before the `resolved.client` loop so an explicit `client.sentry` still wins |
+| `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring.providers.sentry` → `sentry`. A real DSN is emitted AFTER the `resolved.client` loop, so the canonical home outranks a stale `client.sentry` ([#485](https://github.com/Omega-JS-Stack/omega/issues/485)); with no DSN there, the off state rides before the loop, so a brand not yet migrated off `client.sentry` keeps reporting |
 | `@omega.js/extension` | `src/gulp/tasks/webpack.js` and `src/gulp/tasks/package.js` (the generated `build.js`) |
 
 The client's `sentry.config` is the PROVIDER block, flat — nothing role-level ever rides into

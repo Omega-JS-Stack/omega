@@ -62,23 +62,38 @@ function readFileIfExists(filePath) {
 }
 
 // {% omega_icon name %} / {% omega_icon name, "css classes" %}
+//                       / {% omega_icon name, "css classes", label="Meaning" %}
+//
+// The WRAPPER carries the accessibility answer (#538). Icons are decorative
+// almost everywhere they appear — beside visible text in buttons, tiles and
+// facts — so the default emit is `aria-hidden="true"`: hidden from the a11y
+// tree by declaration instead of by the convention that screen readers skip
+// text-free SVGs. The rare icon that CARRIES meaning says so with `label=`,
+// and gets `role="img"` + `aria-label` instead of the hidden stamp.
 const omegaIcon = {
   block: false,
   render(ctx, markup) {
     const parts = parseArguments(markup);
     const iconName = resolveNameArg(ctx, parts[0]) || '';
-    const cssClasses = parts[1] ? resolveInput(ctx.lookup, parts[1], true) : null;
+    // The css classes stay POSITIONAL; anything key=value is an option, so
+    // `{% omega_icon "star", label="Featured" %}` never reads as a class list.
+    const classArg = parts[1] && !parts[1].includes('=') ? parts[1] : null;
+    const cssClasses = classArg ? resolveInput(ctx.lookup, classArg, true) : null;
+    const label = parseOptions(parts.slice(1), ctx.lookup).label;
 
     const iconSvg = loadIcon(ctx, iconName);
     if (!iconSvg) return '';
 
     const processed = injectSvgAttributes(iconSvg);
     const dataAttr = iconName ? ` data-icon="${escapeAttr(iconName)}"` : '';
+    const a11yAttrs = label
+      ? ` role="img" aria-label="${escapeAttr(label)}"`
+      : ' aria-hidden="true"';
 
     if (cssClasses) {
-      return `<i class="fa ${escapeAttr(cssClasses)}"${dataAttr}>${processed}</i>`;
+      return `<i class="fa ${escapeAttr(cssClasses)}"${dataAttr}${a11yAttrs}>${processed}</i>`;
     }
-    return `<i class="fa"${dataAttr}>${processed}</i>`;
+    return `<i class="fa"${dataAttr}${a11yAttrs}>${processed}</i>`;
   },
 };
 

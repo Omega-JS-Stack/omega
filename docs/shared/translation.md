@@ -16,7 +16,7 @@ translation: {
   languages: ['es', 'fr'],// target codes — EMPTY/ABSENT = translation off
   providers: { claude: {} },// the engine is a KEY (#425): claude | chatgpt. Absent block = claude
   model: null,            // optional override for the chosen engine (claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano')
-  exclude: [],            // web only: extra page routes/folders to skip
+  exclude: [],            // web only: BRAND page routes/folders to skip (the framework's own default pages are already excluded — #605)
 }
 ```
 
@@ -73,9 +73,32 @@ pinned by `packages/manager/test/workspace-translation-sdk.test.js`).
 → positionally-aligned translations:
 
 - **JSON array in → same-length JSON array out**, batches of 25.
+- **Batches fly concurrently**, `CONCURRENCY` wide (the constant at the top of
+  `packages/devkit/src/translate/engine.js`, currently 5 —
+  [#604](https://github.com/Omega-JS-Stack/omega/issues/604)). A batch is one
+  model call and the model's latency dominates it, so a serial pass paid that
+  latency once per 25 strings and one language took minutes it never needed.
+  Results are stitched back in BATCH order, never completion order, and
+  everything below still happens per batch, unchanged. Raise it only as far as
+  the providers' rate limits allow.
+- **Duplicates are deduped before batching** ([#529](https://github.com/Omega-JS-Stack/omega/issues/529)):
+  a page sends its title and description once per meta tag (`<title>`,
+  `og:title`, `twitter:title`), so the same string used to ride a batch three
+  times over — three times the AI spend, and adjacent twins are what a model
+  merges. Each unique string is translated ONCE and the translation is fanned
+  back to every occurrence. Occurrences key on the exact source string,
+  whitespace included, so a batch is 25 UNIQUE strings.
 - The `OMEGA-TRANSLATION-CONTROL` sentinel is appended to EVERY batch and must
   return unchanged at its exact position — alignment proof per batch.
 - Validation failures (parse, length, sentinel) retry up to 2× then throw.
+- An ALIGNMENT failure (length or sentinel) that survives the retries splits the
+  batch in half and re-asks each half, down to one string
+  ([#523](https://github.com/Omega-JS-Stack/omega/issues/523)): a model that
+  merges a pair of strings does it every time, so retrying the same array can
+  only fail the same way — the playground's ship-the-docs page came back
+  25-for-26 on all six attempts, in both languages, and shipped untranslated.
+  A single string that still will not come back whole throws, and the caller
+  skips that page-language pair whole (never half-translated).
 - Original leading/trailing whitespace is re-applied to every translation.
 - Rules baked into the system prompt: preserve HTML/URLs/placeholders
   (`$1`, `{name}`, `{{ value }}`), never translate the brand name.
@@ -134,10 +157,19 @@ Exclusions are matched on that same underneath-the-prefix route. ABSOLUTE URLs
 `brand.url`, which for a mounted site already carries the path — nothing
 prefixes them twice.
 
-Never translated: auth flows (`oauth2`, `authentication-*`), `checkout*`,
-`submission/confirmation`, legal (`terms`/`privacy`/`cookies`), `404`,
-socials redirects (config `socials` keys), `admin`/`test`/`team`/`updates`
-folders, every known language-code folder, plus config `translation.exclude`.
+Never translated, and the framework owns the list
+([#605](https://github.com/Omega-JS-Stack/omega/issues/605)): every one of its
+OWN default pages whose layout says it is plumbing rather than marketing copy —
+the auth flows, the `/app` shell, the account/payment/portal screens, the legal
+boilerplate, `404`, and the redirect stubs (`/login`, `/account`, `/cancel`, …).
+The list is DERIVED from the packaged defaults tree
+(`packages/web/defaults/pages/**`, read by `src/translate/default-routes.js`),
+never typed out, so a default page that moves or arrives cannot drift out of it,
+and each excluded route guards its subtree too. On top of that: socials
+redirects (config `socials` keys), the `admin`/`test`/`team`/`updates` folders,
+every known language-code folder, plus config `translation.exclude` — which is
+for the BRAND's own pages, and only those. A brand that lists `signin` or
+`account` is listing something the framework already skips.
 Element opt-out: `data-omega-no-translate`. Collector fixes vs UJM:
 `aria-describedby`/`aria-labelledby` are NOT collected (ID refs), `value`
 only on button-type inputs (hidden-input tokens stay intact).

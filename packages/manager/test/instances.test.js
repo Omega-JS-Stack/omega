@@ -126,7 +126,7 @@ test('structure: single-object form keeps today\'s any-dir-of-the-type check (ze
 test('testing: each web instance is checked on ITS url; a live record-less instance adopts under its own key', async () => {
   const root = stageBrand();
   // main already deployed; admin has no record yet
-  jetpack.write(join(root, '.omega', 'deploys.json'), { web: { at: '2026-07-17T00:00:00.000Z' } });
+  jetpack.write(join(root, '.omega', 'state.json'), { deploy: { web: { at: '2026-07-17T00:00:00.000Z' } } });
 
   const fetch = fakeFetch({ [MAIN_URL]: { status: 200 }, [ADMIN_URL]: { status: 200 } });
   const result = await runTesting(root, { fetch });
@@ -135,14 +135,14 @@ test('testing: each web instance is checked on ITS url; a live record-less insta
   assert.ok(fetch.calls.includes(MAIN_URL), 'main checked on the brand url');
   assert.ok(fetch.calls.includes(ADMIN_URL), 'admin checked on the instance url');
 
-  const records = jetpack.read(join(root, '.omega', 'deploys.json'), 'json');
+  const records = jetpack.read(join(root, '.omega', 'state.json'), 'json').deploy;
   assert.equal(records['web:admin'].adopted, true, 'live hit adopted under the instance key');
   assert.equal(records.web.adopted, undefined, 'the primary record was not rewritten');
 });
 
 test('testing: a down record-less instance nudges (not deployed yet) while a recorded live main passes', async () => {
   const root = stageBrand();
-  jetpack.write(join(root, '.omega', 'deploys.json'), { web: { at: '2026-07-17T00:00:00.000Z' } });
+  jetpack.write(join(root, '.omega', 'state.json'), { deploy: { web: { at: '2026-07-17T00:00:00.000Z' } } });
 
   const fetch = fakeFetch({ [MAIN_URL]: { status: 200 }, [ADMIN_URL]: new Error('getaddrinfo ENOTFOUND') });
   const result = await runTesting(root, { fetch });
@@ -155,9 +155,11 @@ test('testing: a down record-less instance nudges (not deployed yet) while a rec
 
 test('testing: a down instance WITH a deploy record is an honest per-instance error', async () => {
   const root = stageBrand();
-  jetpack.write(join(root, '.omega', 'deploys.json'), {
-    web: { at: '2026-07-17T00:00:00.000Z' },
-    'web:admin': { at: '2026-07-17T00:00:00.000Z' },
+  jetpack.write(join(root, '.omega', 'state.json'), {
+    deploy: {
+      web: { at: '2026-07-17T00:00:00.000Z' },
+      'web:admin': { at: '2026-07-17T00:00:00.000Z' },
+    },
   });
 
   const fetch = fakeFetch({ [MAIN_URL]: { status: 200 }, [ADMIN_URL]: new Error('ECONNREFUSED') });

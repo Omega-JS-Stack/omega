@@ -7,6 +7,7 @@
  * See: src/manager/libraries/email/ for the shared email builder and sender.
  */
 const prepare = require('../../../libraries/email/prepare.js');
+const env = require('../../../libraries/env.js');
 
 /**
  * How many recipients a send carries, across to/cc/bcc.
@@ -53,7 +54,7 @@ module.exports = async ({ ctx, user, settings }) => {
   }
 
   // Check for SendGrid key
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!env.has('SENDGRID_API_KEY')) {
     return ctx.respond('SendGrid API key not configured.', { code: 500 });
   }
 

@@ -42,7 +42,7 @@ const SITEMAP = (base = 'https://mini.co') => `<?xml version="1.0" encoding="UTF
 ${[
     SITEMAP_ENTRY(base, '1.0'),
     SITEMAP_ENTRY(`${base}/about`, '0.5'),
-    SITEMAP_ENTRY(`${base}/checkout`, '0.5'),
+    SITEMAP_ENTRY(`${base}/signin`, '0.5'),
   ].join('\n')}
 </urlset>
 `;
@@ -67,13 +67,13 @@ function stage(prefix = '') {
   write('index.html', PAGE('Welcome home', `
     <p>Grow faster with MiniCo</p>
     <a href="${prefix}/about">About us</a>
-    <a href="${prefix}/checkout">Buy now</a>
+    <a href="${prefix}/signin">Sign in</a>
     <a href="https://external.example/x">External</a>
     <span data-omega-no-translate>Do Not Touch</span>
     <input type="submit" value="Send it"/>
     <input type="hidden" value="csrf-token-123"/>`, prefix));
   write('about/index.html', PAGE('About - MiniCo', '<p>The consumer about page</p>', prefix));
-  write('checkout/index.html', PAGE('Checkout', '<p>Card number</p>', prefix));
+  write('signin/index.html', PAGE('Sign in', '<p>Email address</p>', prefix));
   write('admin/panel/index.html', PAGE('Admin', '<p>Secret admin copy</p>', prefix));
   write('skipme/index.html', PAGE('Skipped', '<p>User-excluded page</p>', prefix));
   write('twitter.html', PAGE('Social redirect', '<p>Social</p>', prefix));
@@ -116,7 +116,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'language home is a file, not a directory index');
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
   assert.ok(fs.existsSync(path.join(dist, 'ar.html')));
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'checkout')), 'system route excluded');
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'signin')), 'framework default page excluded');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'admin')), 'system folder excluded');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'skipme')), 'config exclude honored');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'twitter.html')), 'socials redirect excluded');
@@ -146,7 +146,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
 
   // Links: internal rewritten, excluded + external untouched
   assert.ok(es.includes('href="/es/about"'));
-  assert.ok(es.includes('href="/checkout"'), 'excluded route link not rewritten');
+  assert.ok(es.includes('href="/signin"'), 'excluded route link not rewritten');
   assert.ok(es.includes('https://external.example/x'));
 
   // RTL
@@ -180,6 +180,38 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   await translateSite({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('no calls'); } });
   const esAgain = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(esAgain.includes('Bienvenido a casa'), 'hand-edited cache value sticks');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#605: the framework skips its own default pages with no config exclude at all', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-wtr-'));
+  const dist = path.join(root, 'dist');
+  const write = (rel, html) => {
+    fs.mkdirSync(path.dirname(path.join(dist, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dist, rel), html);
+  };
+
+  // The framework's own plumbing, as the build emits it…
+  for (const route of ['signin', 'app', 'account', 'dashboard/account', 'payment/checkout', 'portal/email-preferences']) {
+    write(`${route}/index.html`, PAGE(route, `<p>Framework ${route}</p>`));
+  }
+  // …and a page the BRAND wrote.
+  write('guides/getting-started/index.html', PAGE('Getting started', '<p>Brand-authored guide</p>'));
+
+  const stats = await translateSite({
+    root,
+    outDir: dist,
+    // No `exclude` key whatsoever — a brand should not have to name any of this
+    config: { brand: { name: 'MiniCo', url: 'https://mini.co' }, translation: { languages: ['es'] } },
+    send: fakeSend([]),
+  });
+
+  for (const route of ['signin', 'app', 'account', 'dashboard/account', 'payment/checkout', 'portal/email-preferences']) {
+    assert.ok(!fs.existsSync(path.join(dist, 'es', route)), `/${route} is a framework default page, never translated`);
+  }
+  assert.ok(fs.existsSync(path.join(dist, 'es', 'guides', 'getting-started', 'index.html')), 'the brand page still translates');
+  assert.strictEqual(stats.pages, 1, 'exactly one page was translatable');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -309,7 +341,7 @@ test('translateSite: the sitemap gains every produced language URL with xhtml:li
   assert.ok(locs.includes('https://mini.co/ar'), 'ar language home listed');
   assert.ok(locs.includes('https://mini.co/es/about'), 'es about listed');
   assert.ok(locs.includes('https://mini.co/ar/about'), 'ar about listed');
-  assert.ok(!locs.some((loc) => loc.includes('/checkout') && loc.includes('/es/')), 'excluded route gets no copy entry');
+  assert.ok(!locs.some((loc) => loc.includes('/signin') && loc.includes('/es/')), 'excluded route gets no copy entry');
   assert.deepStrictEqual(locs, [...locs].sort(), 'entries stay in loc byte order (cp227)');
 
   // Every entry of a translated set carries the full alternate set, x-default
@@ -325,7 +357,7 @@ test('translateSite: the sitemap gains every produced language URL with xhtml:li
   assert.match(entry('https://mini.co/es/about'), /hreflang="ar" href="https:\/\/mini\.co\/ar\/about"\/>/, 'about copy names its sibling');
 
   // An untranslated page keeps a plain entry
-  assert.ok(!entry('https://mini.co/checkout').includes('xhtml:link'), 'untranslated page gets no alternates');
+  assert.ok(!entry('https://mini.co/signin').includes('xhtml:link'), 'untranslated page gets no alternates');
 
   // Copies inherit the source entry's metadata
   assert.match(entry('https://mini.co/es'), /<priority>1\.0<\/priority>/, 'language home inherits the home priority');
@@ -382,7 +414,7 @@ test('translateSite: a MOUNTED site composes prefix-then-lang in hrefs, alternat
   //    route is still recognized through the prefix
   const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(es.includes('href="/workkit/es/about"'), 'a mounted link keeps its prefix and gains the lang after it');
-  assert.ok(es.includes('href="/workkit/checkout"'), 'the excluded route is recognized under the prefix, link untouched');
+  assert.ok(es.includes('href="/workkit/signin"'), 'the excluded route is recognized under the prefix, link untouched');
   assert.ok(!es.includes('/es/workkit'), 'the lang segment never lands at the domain root');
   assert.ok(es.includes('href="https://external.example/x"'), 'external links stay external');
 
@@ -422,7 +454,7 @@ test('translateSite: an UNMOUNTED site composes exactly as it always has (#359 r
 
   const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(es.includes('href="/es/about"'), 'href: the lang segment sits at the site root');
-  assert.ok(es.includes('href="/checkout"'), 'excluded route link untouched');
+  assert.ok(es.includes('href="/signin"'), 'excluded route link untouched');
   assert.ok(es.includes('<link rel="canonical" href="https://mini.co/es"'), 'canonical unchanged');
   assert.ok(es.includes('href="https://mini.co/ar" hreflang="ar"'), 'alternate unchanged');
 

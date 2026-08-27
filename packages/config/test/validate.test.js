@@ -512,6 +512,36 @@ test('the retired cookieConsent key is an error and names client.consent (#383)'
   );
 });
 
+test('#610: the legacy download and extension page maps are retired — site.targets is the one home', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: {
+      web: {
+        download: { mac: { universal: 'https://acme.com/dl/mac' } },
+        extension: { chrome: 'https://acme.com/ext' },
+      },
+    },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.download') && e.includes('targets.desktop.releases')),
+    'the download map bounces and names the block it derives from',
+  );
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.extension') && e.includes('targets.extension.listings')),
+    'the extension map bounces and names the listings it derives from',
+  );
+
+  // The blocks they derive FROM are untouched.
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      targets: { desktop: { releases: {} }, extension: { listings: { chrome: { url: 'https://store/x' } } } },
+    }).errors,
+    [],
+  );
+});
+
 // ─── validateConfig: retired PATHS — the de-branding rekey (#23) ───
 
 test('every de-branded top-level key hard-fails and names its new home', () => {
@@ -643,4 +673,18 @@ test('targets.web.purgecss.safelist is declared — both accepted shapes pass, a
 
   const section = validateConfig({ ...VALID, purgecss: ['collapse'] }, { target: 'web' });
   assert.ok(section.errors.some((e) => e.includes('config.purgecss has wrong type')), 'the section itself is an object');
+});
+
+// ─── targets.backend.projectType (#584) ───
+
+test('targets.backend.projectType takes firebase or custom, and nothing else', () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, projectType: 'firebase' }, { target: 'backend' }).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, projectType: 'custom' }, { target: 'backend' }).errors, []);
+  assert.deepStrictEqual(validateConfig(VALID, { target: 'backend' }).errors, [], 'absence is the firebase default');
+
+  const wrong = validateConfig({ ...VALID, projectType: 'render' }, { target: 'backend' });
+  assert.ok(
+    wrong.errors.some((e) => e.includes('config.projectType') && e.includes('custom')),
+    `an unknown project type must be loud and name the options: ${wrong.errors.join(' | ')}`,
+  );
 });

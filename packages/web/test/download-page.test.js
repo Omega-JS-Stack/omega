@@ -16,18 +16,15 @@ const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'download-test');
 
-// A download map with the shapes that matter: one artifact (mac), TWO (linux:
-// .deb + snap), one shipped store (android) and one still in flight (ios).
+// A brand that opted into desktop releases (#124). Since #610 that is the ONLY
+// download declaration there is: one releases hub answers every desktop
+// artifact — one for mac, TWO for linux (.deb + snap) — and mobile derives
+// nothing while MAM is parked.
+const RELEASES = 'https://github.com/mini-org/mini-desktop/releases/latest';
 const withDownloads = {
   ...miniData,
-  download: {
-    mac: { universal: 'https://dl.example.com/mac' },
-    linux: {
-      debian: 'https://dl.example.com/app.deb',
-      snap: 'https://dl.example.com/app.snap',
-    },
-    android: { universal: 'https://play.example.com/app' },
-  },
+  repo: { providers: { github: { org: 'mini-org', repo: 'mini-site' } } },
+  targets: { web: {}, desktop: { releases: { repo: 'mini-desktop' } } },
 };
 
 test('#14: platform identity is the MARK — the small neutral chip is gone', async () => {
@@ -46,7 +43,8 @@ test('#14: two artifacts ride side by side — one does not', async () => {
 
   const splits = download.match(/omega-dl-card__actions omega-dl-card__actions--split/g) || [];
   assert.equal(splits.length, 1, 'only Linux (.deb + snap) splits its action row');
-  assert.ok(download.includes('app.deb') && download.includes('app.snap'), 'both Linux artifacts render');
+  assert.ok(download.includes('Debian package') && download.includes('Snap package'), 'both Linux artifacts render');
+  assert.equal(download.split(RELEASES).length - 1, 4, 'every desktop artifact points at the releases hub');
   assert.ok(!download.includes('btn-adaptive w-100'), 'action width is the flex row\'s job now');
 });
 
@@ -59,7 +57,9 @@ test('#14: ONE mobile notify form covers every unshipped store', async () => {
   assert.ok(download.includes('id="mobile-email-form"'), 'the form carries the platform-free id');
   assert.ok(!download.includes('mobile-email-form-ios'), 'the per-platform form ids are gone');
   assert.ok(download.includes('<strong>iOS</strong>'), 'the unshipped store is named on the block');
-  assert.ok(download.includes('play.example.com/app'), 'the shipped store still renders its badge');
+  // #610: mobile derives nothing while MAM is parked, so a shipped desktop
+  // release never puts a store badge on the mobile band.
+  assert.ok(!download.includes('omega-dl-store__badge'), 'no mobile store badge without a mobile fact');
 });
 
 test('#14: every mobile store unshipped → still exactly one form', async () => {

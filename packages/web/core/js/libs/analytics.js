@@ -304,8 +304,10 @@ function compact(block) {
  * The flat attribution the adapters read: GA4 takes the campaign fields as
  * event params, Meta takes `fbc`/`fbp` and TikTok `ttclid`/`ttp` into the
  * descriptor's match block. Mirrors the backend's `buildAttributionContext()`
- * ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)) — same keys, and
- * the one difference is deliberate: the browser sends only REAL cookies.
+ * ([#385](https://github.com/Omega-JS-Stack/omega/issues/385)), two deliberate
+ * differences: the browser sends only REAL cookies, and it carries no
+ * `url`/`referrer` ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)
+ * added them server-side; browser pixels read the page themselves).
  *
  * @returns {object} Only the keys that resolved to a value.
  */

@@ -189,7 +189,7 @@ class RunSummary {
   /**
    * Collect missing-secret skips (cp114): service results carry
    * `missingEnv: ['CLOUDFLARE_TOKEN', …]` when setup skipped for absent
-   * env vars (ensureEnvSecrets).
+   * env vars (the setup contract, lib/service-input.js).
    */
   _getMissingEnv() {
     const items = [];

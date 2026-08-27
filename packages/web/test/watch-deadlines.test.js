@@ -1,5 +1,6 @@
 /**
- * #211 — the watch-deadline knob, and #344 — the watcher suites' own lane.
+ * #211 — the watch-deadline knob, #344 — the watcher suites' own lane, and
+ * #615 — the contention the knob cannot see.
  *
  * The rebuild-watching suites poll a built page until it changes, with a
  * deadline. 30s is generous for a solo run and marginal under the full
@@ -17,6 +18,13 @@
  * 2026-08-14); the cost is ~20s and the alternative was a flake that twice
  * blocked a ship gate. The doubled-reset half of #344 is fixed in the suite
  * that owns it (dev-server-restart, event-keyed instead of count-keyed).
+ *
+ * The knob only reaches a run the LANE started, and the sightings that reopened
+ * this (#615) were bare `npm test -w packages/web` runs beside other work. So
+ * the deadline reads the machine too: the 30s floor times measured contention
+ * (load average per CPU), times this knob. The derivation and its failure
+ * message live in test/watch/rebuild-deadline.test.js; what this file holds is
+ * the knob's own contract and the lane's shape.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -24,6 +32,10 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const { BASE_REBUILD_DEADLINE_MS, deadlineScale, rebuildDeadlineMs } = require('./lib/deadlines.js');
+
+// An idle machine: the knob's assertions are about the knob, so the OTHER
+// measurement is pinned (#615).
+const IDLE = { load: 1, cpus: 10 };
 
 // The DIRECTORY is the list — a suite is serialized by living there, so a new
 // watcher suite cannot be added to one lane and forgotten by the other.
@@ -33,14 +45,14 @@ const WATCHERS = fs.readdirSync(WATCH_DIR).filter((file) => file.endsWith('.test
 test('#211: the scale defaults to 1 — a solo run keeps the tight deadline', () => {
   assert.strictEqual(deadlineScale({}), 1, 'unset means solo');
   assert.strictEqual(deadlineScale({ OMEGA_TEST_DEADLINE_SCALE: '' }), 1, 'an empty value is unset');
-  assert.strictEqual(rebuildDeadlineMs({}), BASE_REBUILD_DEADLINE_MS);
+  assert.strictEqual(rebuildDeadlineMs({ ...IDLE, env: {} }), BASE_REBUILD_DEADLINE_MS);
   assert.strictEqual(BASE_REBUILD_DEADLINE_MS, 30000, 'the solo deadline is unchanged');
 });
 
 test('#211: the lane multiplier scales every watch deadline', () => {
   assert.strictEqual(deadlineScale({ OMEGA_TEST_DEADLINE_SCALE: '3' }), 3);
-  assert.strictEqual(rebuildDeadlineMs({ OMEGA_TEST_DEADLINE_SCALE: '3' }), 90000, 'the full-suite deadline');
-  assert.strictEqual(rebuildDeadlineMs({ OMEGA_TEST_DEADLINE_SCALE: '1.5' }), 45000, 'fractional scales are honoured');
+  assert.strictEqual(rebuildDeadlineMs({ ...IDLE, env: { OMEGA_TEST_DEADLINE_SCALE: '3' } }), 90000, 'the full-suite deadline');
+  assert.strictEqual(rebuildDeadlineMs({ ...IDLE, env: { OMEGA_TEST_DEADLINE_SCALE: '1.5' } }), 45000, 'fractional scales are honoured');
 });
 
 test('#211: a junk multiplier fails loudly instead of silently running unscaled', () => {

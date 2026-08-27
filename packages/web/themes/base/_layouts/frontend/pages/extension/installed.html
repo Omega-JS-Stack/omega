@@ -14,7 +14,7 @@ steps:
   - title: "Pin the extension"
     description: "Click the pin icon to keep it visible in your toolbar"
   - title: "You're all set!"
-    description: "{{ site.brand.name }} is now pinned and ready to use"
+    description: "{{ resolved.config.brand.name }} is now pinned and ready to use"
 ---
 
 <!-- Main content -->
@@ -50,7 +50,7 @@ steps:
               <div class="extension-toolbar d-flex align-items-center justify-content-end gap-2 bg-body rounded-3 p-2 border">
                 <!-- Mock URL bar -->
                 <div class="extension-url-bar flex-grow-1 bg-body-secondary rounded px-3 py-1 small text-muted me-2 text-truncate">
-                  {{ site.url }}
+                  {{ resolved.config.url }}
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
@@ -109,9 +109,9 @@ steps:
                   <!-- Our extension (highlighted with pin click) -->
                   <div class="extension-dropdown-item d-flex align-items-center gap-3 p-2 rounded bg-primary bg-opacity-10 border border-primary">
                     <div class="extension-item-icon rounded p-1 d-flex align-items-center justify-content-center">
-                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-brandmark" alt="{{ site.brand.name }}"/>
+                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="extension-brandmark" alt="{{ resolved.config.brand.name }}"/>
                     </div>
-                    <span class="small flex-grow-1 fw-bold">{{ site.brand.name }}</span>
+                    <span class="small flex-grow-1 fw-bold">{{ resolved.config.brand.name }}</span>
                     <!-- Pin button - highlighted with click animation -->
                     <div class="extension-pin-target position-relative">
                       <button type="button" class="btn btn-sm btn-primary p-1">
@@ -144,7 +144,7 @@ steps:
               <div class="extension-toolbar d-flex align-items-center justify-content-end gap-2 bg-body rounded-3 p-2 border">
                 <!-- Mock URL bar -->
                 <div class="extension-url-bar flex-grow-1 bg-body-secondary rounded px-3 py-1 small text-muted me-2 text-truncate">
-                  {{ site.url }}
+                  {{ resolved.config.url }}
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
@@ -156,7 +156,7 @@ steps:
                 <!-- Our extension - now pinned! -->
                 <div class="extension-pinned-target position-relative">
                   <button type="button" class="btn btn-sm btn-primary animation-flex">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="extension-toolbar-brandmark" alt="{{ site.brand.name }}"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="extension-toolbar-brandmark" alt="{{ resolved.config.brand.name }}"/>
                   </button>
                 </div>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
@@ -184,7 +184,7 @@ steps:
       <!-- CTA Button -->
       <div class="text-center mt-4" data-omega-reveal>
         <a href="/" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
-          Start using {{ site.brand.name }}
+          Start using {{ resolved.config.brand.name }}
           <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
         </a>
       </div>

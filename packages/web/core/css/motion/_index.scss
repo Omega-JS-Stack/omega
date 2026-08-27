@@ -18,11 +18,29 @@
 //   - Reveals hide ONLY under html[data-omega-motion] (stamped by an inline
 //     head script) AND (prefers-reduced-motion: no-preference). No JS or
 //     reduced motion → everything renders visible and static.
+//   - NOTHING ABOVE THE FOLD WAITS FOR JS (#585). The page's first band plays
+//     its entrance from paint and the rest resolves itself a second in — both
+//     pure CSS. A slow bundle can only shorten an animation, never blank a
+//     hero.
 //   - The PurgeCSS safelist keeps every omega-* selector (src/assets.js):
 //     runtime-stamped state (data-omega-inview, data-omega-scrolled) never
 //     appears in rendered HTML for the content scan to find.
 
 // ─── Scroll reveal ───────────────────────────────────────────────────────────
+//
+// Three lanes, in the order a visitor meets them (#585):
+//   1. HIDDEN — every reveal target starts out of sight, under the head stamp
+//      only, and the engine's data-omega-inview transitions it back.
+//   2. LEAD — the page's FIRST band (the [data-omega-reveal-lead] shell hook's
+//      first section: the hero, the masthead) animates in from paint with no
+//      JS in its path, after a short lead-in and staggered by CSS delays at the
+//      band's own authored step, because the engine's stagger pass is not there
+//      yet. `will-change` stages the layer for the animation's duration; with
+//      no JS at all the hint simply persists (the CSS-only lane's one cost).
+//   3. NET — anything still hidden resolves itself after --omega-reveal-wait,
+//      unless the engine stamped html[data-omega-motion-ready] first and took
+//      the wheel (core/js/core/motion.js). Booting LATE, it adopts what the
+//      net already resolved, so the stamp can never re-hide read text.
 
 @media (prefers-reduced-motion: no-preference) {
   html[data-omega-motion] [data-omega-reveal] {
@@ -51,6 +69,76 @@
   }
 
   html[data-omega-motion] [data-omega-reveal][data-omega-inview] {
+    opacity: 1;
+    transform: none;
+  }
+
+  // The library's OWN ambient loop rides some reveal targets (the hero's
+  // decorative frame), and one `animation` shorthand replaces another — so
+  // there the float keeps the property and the element is simply painted.
+  // Both lanes below exclude it; a decorative thing that is already moving was
+  // never waiting to be revealed.
+  html[data-omega-motion] [data-omega-reveal].omega-float {
+    opacity: 1;
+  }
+
+  // Lane 2 — the lead band, from paint. Higher specificity than the net below,
+  // so the hero never inherits the one-second wait.
+  //
+  // The delay is a LEAD-IN plus the stagger step (#585 follow-up, Ian
+  // 2026-08-25): an entrance that starts at the very first frame runs while the
+  // browser is still fetching fonts and scripts, and it shows. ~120ms is after
+  // the worst of that burst and still far ahead of any bundle. `will-change`
+  // stages the compositor layer during that beat, instead of building it in the
+  // middle of the animation — core/js/core/motion.js drops the hint once the
+  // entrance settles, because a hint that outlives its animation is memory for
+  // nothing.
+  html[data-omega-motion] [data-omega-reveal-lead] > section:first-of-type [data-omega-reveal]:not(.omega-float) {
+    // Reset, because a custom property inherits: a nested reveal would
+    // otherwise take its ancestor's step instead of its own.
+    --omega-reveal-lead-index: 0;
+
+    will-change: opacity, transform;
+    animation:
+      omega-reveal-in var(--omega-speed-slow) var(--omega-ease)
+      calc(var(--omega-reveal-lead-delay, 120ms) + var(--omega-reveal-step, 90ms) * var(--omega-reveal-lead-index)) forwards;
+  }
+
+  // `--omega-reveal-step` is the band's own authored rhythm: the build mirrors
+  // `data-omega-reveal-stagger="N"` into it on the cluster element
+  // (src/reveal-stagger.js), and it inherits down to the reveal targets. One
+  // number, one home — the 90ms fallback is for a band that authors none.
+  //
+  // The lead band's reveal targets ARE their cluster's children (the hero's
+  // badge, headline, sub, CTAs, meta, demo, cards, frame), so nth-child is the
+  // reveal index; past the eighth the stagger caps rather than stretching a
+  // long band's tail past the fold's own patience.
+  @for $i from 2 through 7 {
+    html[data-omega-motion] [data-omega-reveal-lead] > section:first-of-type [data-omega-reveal]:nth-child(#{$i}) {
+      --omega-reveal-lead-index: #{$i - 1};
+    }
+  }
+
+  html[data-omega-motion] [data-omega-reveal-lead] > section:first-of-type [data-omega-reveal]:nth-child(n + 8) {
+    --omega-reveal-lead-index: 7;
+  }
+
+  // Lane 3 — the safety net for everything below. `forwards` (not `both`): the
+  // element already carries the hidden state above, so the delay window needs
+  // no backwards fill and a fast boot can drop this animation with nothing to
+  // snap back to.
+  html[data-omega-motion]:not([data-omega-motion-ready]) [data-omega-reveal]:not(.omega-float) {
+    animation:
+      omega-reveal-in var(--omega-speed-slow) var(--omega-ease)
+      var(--omega-reveal-wait, 1000ms) forwards;
+  }
+}
+
+// ONE keyframe serves both animated lanes: with no `from`, the implicit first
+// frame is the element's own hidden state, so up/fade/left/right/scale all
+// land here without a keyframe apiece.
+@keyframes omega-reveal-in {
+  to {
     opacity: 1;
     transform: none;
   }

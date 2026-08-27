@@ -15,9 +15,11 @@
     "start": "npx omega setup && npx omega serve",
     "deploy": "npx omega setup && npx omega deploy",
     "emulator": "npx omega setup && npx omega emulator",
-    "test": "npx omega setup && npx omega test",
+    "test": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
     "setup": "npx omega setup",
     "test:offline": "npx omega test",
-    "build": "npx omega build"
+    "build": "npx omega build",
+    "test:static": "npm test",
+    "test:emulator": "npx omega setup && npx omega test"
   }
 }

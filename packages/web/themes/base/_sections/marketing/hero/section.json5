@@ -1,30 +1,42 @@
 {
-  description: 'Serif display hero — rotating italic second line, ink CTA + mono command, optional stat cards, floating product frame, optional demo capture (input/form/custom). The classy homepage opener.',
+  description: 'Serif display hero — rotating italic second line, ink CTA + mono command, optional stat cards, floating product frame, optional demo capture (input/form/video/custom). The classy homepage opener.',
 
   // Top-level arg contract (validation is warn-only; names are API — renames
   // follow deprecation discipline, spec §6)
   args: {
+    breadcrumb: 'array', // ordered [{ label, href }] rendered as the nav above the headline — the LAST crumb is the current page and never links; absent renders nothing (#513). Pair it with the BreadcrumbList JSON-LD foot.html emits: the arg is the on-page trail, not the structured data
     badge: 'object',
     headline: 'string',
     headline_accent: 'string',
+    heading_level: 'number', // the headline's heading tag (default 1) — a hero-shaped band BELOW the page's opener authors 2, so one page never ships two h1s (#500)
     rotating: 'array',
     description: 'string',
-    primary_button: 'object',
+    primary_button: 'object', // { text, href, enabled, icon?, class? } — an authored class replaces btn-adaptive; an authored icon leads the label INSTEAD of the arrow nudge
     command: 'string',
     command_href: 'string',
-    secondary_button: 'object',
+    secondary_button: 'object', // { text, href, enabled, icon?, class? } — same contract over btn-outline-adaptive
     meta: 'array',
     cards: 'array', // stat cards under the hero ({ number, label, icon? }) — the marketing/stats vocabulary, no default: brand content is never a theme's voice
-    frame: 'object',
-    demo: 'object',
+    frame: 'object', // { enabled, title } — the centred product mock; a demo that IS the hero visual suppresses it: a side demo of any type (#496), and a video demo in any placement (#486)
+    // demo.type 'video' (legacy parity, #486) carries its knobs in the same
+    // options object: { src, poster, autoplay, loop, muted, controls, class,
+    // subtext }. The player rides omega_video, so the file lazy-loads like
+    // every other media; controls default ON (an unauthored video plays only
+    // on click) and an authored autoplay is ALWAYS muted.
+    // A `custom` demo has TWO fills: `name` points at a consumer animation
+    // folder — src/_hero/<name>/{index.html, style.scss, script.js}, resolved
+    // through the layer chain, its css and js bundled like a section's (#441) —
+    // and `options.content` is finished markup authored at the call site. A
+    // name wins over content. The framework ships `orbit` as the reference one.
+    demo: 'object', // { enabled, type, placement, name, options } — type: input | form | video | custom; placement: 'side' sets the demo BESIDE the copy; anything else (the default) centres it under the CTAs
     demo_html: 'html', // finished markup for the demo position ({% slot demo_html %}) — replaces the typed demo lanes when set
   },
 
   // Every key consumer-overridable; string values liquify at the call site
-  // (so {{ site.brand.name }} resolves against the calling page's scope).
+  // (so {{ resolved.config.brand.name }} resolves against the calling page's scope).
   defaults: {
     badge: {
-      text: 'Introducing {{ site.brand.name }}',
+      text: 'Introducing {{ resolved.config.brand.name }}',
       href: null,
     },
     headline: 'The platform for',
@@ -52,19 +64,21 @@
     ],
     frame: {
       enabled: true,
-      title: '{{ site.brand.name }} · Overview',
+      title: '{{ resolved.config.brand.name }} · Overview',
     },
     demo: {
       enabled: false,
       type: 'input',
+      placement: 'bottom',
+      // Input-lane knobs only — they render inside the input/form branches and
+      // leak nothing. Copy (subtext) and the card width live with the CALLER:
+      // a default here rides the deep merge onto every other demo type.
       options: {
-        class: 'mw-md',
         placeholder: 'Enter your email',
         name: 'email',
         input_type: 'email',
         required: true,
         redirect: '/dashboard/account',
-        subtext: 'No credit card required',
         button: {
           text: 'Start free trial',
           class: 'btn-adaptive',
@@ -80,7 +94,10 @@
     {
       label: 'Email capture',
       args: {
-        demo: { enabled: true },
+        demo: {
+          enabled: true,
+          options: { subtext: 'No credit card required' },
+        },
       },
     },
     {
@@ -88,6 +105,230 @@
       args: {
         frame: { enabled: false },
         secondary_button: { enabled: true },
+      },
+    },
+    {
+      label: 'Input capture',
+      args: {
+        headline: 'Create your logo in',
+        headline_accent: 'seconds',
+        description: 'Enter your business name and watch the magic happen',
+        demo: {
+          enabled: true,
+          type: 'input',
+          options: {
+            class: 'mw-md',
+            placeholder: 'Enter your business name...',
+            name: 'business_name',
+            input_type: 'text',
+            required: true,
+            redirect: '/dashboard',
+            subtext: 'No credit card required - 5 free logos',
+            button: {
+              text: 'Generate logo',
+              icon: 'wand-magic-sparkles',
+              class: 'btn-adaptive-inverse',
+            },
+          },
+        },
+        // The legacy button contract (#476): an authored class replaces
+        // btn-adaptive and an authored icon takes the arrow nudge's place.
+        primary_button: {
+          text: 'Get started free',
+          icon: 'rocket',
+          href: '/dashboard',
+          class: 'btn-light',
+        },
+        secondary_button: {
+          text: 'Explore solutions',
+          icon: 'book-open',
+          href: '/pricing',
+          class: 'btn-outline-light',
+        },
+      },
+    },
+    {
+      label: 'Form',
+      args: {
+        headline: 'Get your custom',
+        headline_accent: 'quote',
+        description: "Tell us about your project and we'll get back to you within 24 hours",
+        demo: {
+          enabled: true,
+          type: 'form',
+          options: {
+            class: 'mw-lg',
+            redirect: '/contact',
+            subtext: 'We respond within 24 hours',
+            fields: [
+              {
+                name: 'industry',
+                label: 'Industry',
+                icon: 'building',
+                type: 'select',
+                size: 'half',
+                placeholder: 'Select industry',
+                options: [
+                  { value: 'technology', label: 'Technology' },
+                  { value: 'healthcare', label: 'Healthcare' },
+                  { value: 'finance', label: 'Finance' },
+                  { value: 'retail', label: 'Retail' },
+                ],
+              },
+              {
+                name: 'company_size',
+                label: 'Company size',
+                icon: 'users',
+                type: 'select',
+                size: 'half',
+                placeholder: 'Select size',
+                options: [
+                  { value: '1-10', label: '1-10 employees' },
+                  { value: '11-50', label: '11-50 employees' },
+                  { value: '51-200', label: '51-200 employees' },
+                  { value: '200+', label: '200+ employees' },
+                ],
+              },
+              {
+                name: 'message',
+                label: 'Tell us about your project',
+                icon: 'comment',
+                type: 'textarea',
+                size: 'full',
+                placeholder: 'Describe your goals, challenges, or questions...',
+                rows: 4,
+                required: true,
+              },
+            ],
+            button: {
+              text: 'Get quote',
+              icon: 'paper-plane',
+              full_width: true,
+              class: 'btn-adaptive-inverse',
+            },
+          },
+        },
+      },
+    },
+    {
+      // No frame authored off: a video demo IS the hero visual, so the
+      // centred product frame suppresses itself (#486).
+      label: 'Video',
+      args: {
+        headline: 'See the platform in',
+        headline_accent: 'action',
+        description: 'Watch how easy it is to ship every surface of your product',
+        demo: {
+          enabled: true,
+          type: 'video',
+          options: {
+            class: 'mw-lg',
+            src: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-1.webm',
+            autoplay: true,
+            loop: true,
+            muted: true,
+            controls: false,
+            subtext: 'No sound - autoplay enabled',
+          },
+        },
+      },
+    },
+    {
+      label: 'Side placement',
+      args: {
+        headline: 'Everything you need,',
+        headline_accent: 'side by side',
+        description: 'The demo sits beside the copy instead of under the CTAs',
+        demo: {
+          enabled: true,
+          type: 'video',
+          placement: 'side',
+          options: {
+            class: 'mw-lg',
+            src: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-1.webm',
+            autoplay: true,
+            loop: true,
+            muted: true,
+            controls: false,
+            subtext: 'No sound, autoplay enabled',
+          },
+        },
+      },
+    },
+    {
+      // The named-folder lane (#441): the framework's own reference animation,
+      // resolved out of themes/base/_hero/orbit/ the way a consumer's
+      // src/_hero/<name>/ resolves. No frame — the animation IS the visual.
+      label: 'Custom animation',
+      args: {
+        headline: 'One stack for',
+        headline_accent: 'every surface',
+        description: 'A hero animation the brand owns: one folder, its own markup, styles and behavior.',
+        frame: { enabled: false },
+        demo: {
+          enabled: true,
+          type: 'custom',
+          name: 'orbit',
+          options: { subtext: 'src/_hero/orbit/' },
+        },
+      },
+    },
+    {
+      label: 'Custom slot',
+      args: {
+        headline: 'Design your',
+        headline_accent: 'brand',
+        description: 'Try our interactive brand builder right here',
+        demo: {
+          enabled: true,
+          type: 'custom',
+          options: {
+            class: 'bg-glassy rounded-4 p-4 mw-md',
+            subtext: 'Customize and preview in real-time',
+            // Finished markup, authored at the CALL site: it liquifies in the
+            // caller's scope (omega_* tags work) and lands in the demo slot as
+            // is. Anchors are welcome — the route guard skips escaped code
+            // display, so the gallery's copyable args block no longer reads a
+            // demo's href= as a link the page emits (#521).
+            content: '<div class="row g-3 text-start">\
+              <div class="col-12">\
+                <label for="demo-brand-color" class="form-label fw-bold">{% omega_icon "palette", "me-1" %}Choose your brand color:</label>\
+                <input type="color" class="form-control form-control-color form-control-lg border-0 w-100" id="demo-brand-color" value="#6366f1" aria-label="Choose your brand color">\
+              </div>\
+              <div class="col-12">\
+                <a href="/signup" class="btn btn-adaptive-inverse btn-lg px-4 w-100">{% omega_icon "palette", "me-2" %}Apply theme</a>\
+              </div>\
+            </div>',
+          },
+        },
+      },
+    },
+    {
+      // The deep-page shape: a page inside a hub says where it sits before it
+      // says anything else. No frame — the trail carries the page, not a mock.
+      // The crumb hrefs are REAL default routes: a variant's rendered frame
+      // rides the #427 route guard like every other default page.
+      label: 'Breadcrumb',
+      args: {
+        breadcrumb: [
+          { label: 'Home', href: '/' },
+          { label: 'Blog', href: '/blog' },
+          { label: 'Shipping faster' },
+        ],
+        headline: 'Everything we learned',
+        headline_accent: 'shipping faster',
+        description: 'A deep page that says where it sits before it says anything else.',
+        frame: { enabled: false },
+      },
+    },
+    {
+      label: 'Stat cards',
+      args: {
+        cards: [
+          { number: '99%', label: 'Uptime', icon: 'shield-halved' },
+          { number: '500K+', label: 'Builds shipped', icon: 'rocket' },
+          { number: '30+', label: 'Integrations' },
+        ],
       },
     },
   ],

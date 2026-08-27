@@ -70,6 +70,10 @@ function normalize(url, text) {
     .replace(/<lastBuildDate>[^<]+<\/lastBuildDate>/g, '<lastBuildDate>X</lastBuildDate>')
     .replace(/<pubDate>[^<]+<\/pubDate>/g, '<pubDate>X</pubDate>')
     .replace(/<lastmod>[^<]+<\/lastmod>/g, '<lastmod>X</lastmod>')
+    // The build stamp both modified-date surfaces read (#613): `site.time` is
+    // set per build, so two builds seconds apart legitimately differ here.
+    .replace(/(article:modified_time" content=")[^"]*/g, '$1X')
+    .replace(/("dateModified":\s*")[^"]*/g, '$1X')
     // omega_logo instance ids are `name-<build-global counter>-<original id>` in
     // id=/url(#/href="# homes — the counter value depends on page render
     // order, which legitimately shifts when a URL moves from virtual default

@@ -34,6 +34,13 @@ const STRIPE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provide
 const PAYPAL_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provider=paypal&key=${WEBHOOK_KEY}`;
 const CHARGEBEE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?provider=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
 
+// Legacy twins on the brand's OWN host (omega-manager wrote `?processor=`) and
+// a stranger on another host: only the twins are stale (#570)
+const STRIPE_LEGACY_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=stripe&key=${WEBHOOK_KEY}`;
+const PAYPAL_LEGACY_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=paypal&key=${WEBHOOK_KEY}`;
+const CHARGEBEE_LEGACY_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
+const FOREIGN_WEBHOOK_URL = 'https://api.someone-else.test/omega/payments/webhook?provider=stripe&key=not-ours';
+
 // Mirrors of the handlers' event lists (pins the desired sets)
 const STRIPE_EVENTS = [
   'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted',
@@ -135,15 +142,15 @@ function makeFake(name, readMethods, mutatingMethods, responses, { syncMethods =
 }
 
 const STRIPE_READS = ['getAccount', 'getProduct', 'listAllProducts', 'listPricesForProduct', 'listWebhookEndpoints'];
-const STRIPE_MUTATIONS = ['updateAccount', 'createProduct', 'updateProduct', 'createRecurringPrice', 'createOneTimePrice', 'archivePrice', 'createWebhookEndpoint', 'updateWebhookEndpoint'];
+const STRIPE_MUTATIONS = ['updateAccount', 'createProduct', 'updateProduct', 'createRecurringPrice', 'createOneTimePrice', 'archivePrice', 'createWebhookEndpoint', 'updateWebhookEndpoint', 'deleteWebhookEndpoint'];
 const fakeStripe = (responses = {}) => makeFake('fakeStripe', STRIPE_READS, STRIPE_MUTATIONS, responses);
 
 const PAYPAL_READS = ['getAccessToken', 'getAccountInfo', 'listProducts', 'getProduct', 'listPlansForProduct', 'listWebhooks'];
-const PAYPAL_MUTATIONS = ['createProduct', 'updateProduct', 'createPlan', 'deactivatePlan', 'createWebhook', 'updateWebhook'];
+const PAYPAL_MUTATIONS = ['createProduct', 'updateProduct', 'createPlan', 'deactivatePlan', 'createWebhook', 'updateWebhook', 'deleteWebhook'];
 const fakePaypal = (responses = {}) => makeFake('fakePaypal', PAYPAL_READS, PAYPAL_MUTATIONS, responses, { syncMethods: ['getAccountInfo'] });
 
 const CHARGEBEE_READS = ['makeRequest', 'getItemFamily', 'getItem', 'listItemPricesForItem', 'getPlan', 'listWebhooks'];
-const CHARGEBEE_MUTATIONS = ['createItemFamily', 'updateItemFamily', 'createItem', 'updateItem', 'createItemPrice', 'updateItemPrice', 'createWebhook', 'updateWebhook'];
+const CHARGEBEE_MUTATIONS = ['createItemFamily', 'updateItemFamily', 'createItem', 'updateItem', 'createItemPrice', 'updateItemPrice', 'createWebhook', 'updateWebhook', 'deleteWebhook'];
 const fakeChargebee = (responses = {}) => makeFake('fakeChargebee', CHARGEBEE_READS, CHARGEBEE_MUTATIONS, responses, { props: { site: 'fixture-site' } });
 
 // ─── Converged responders ────────────────────────────────────────────────────
@@ -652,6 +659,63 @@ test('stripe-webhook: disabled endpoint → re-enabled (events already converged
   ]);
 });
 
+test('stripe-webhook: legacy twin on the brand host → deleted; the desired URL and other hosts untouched', async () => {
+  const responses = stripeConverged();
+  responses.listWebhookEndpoints = {
+    data: [
+      { id: 'we_1', url: STRIPE_WEBHOOK_URL, status: 'enabled', enabled_events: [...STRIPE_EVENTS] },
+      { id: 'we_legacy', url: STRIPE_LEGACY_WEBHOOK_URL, status: 'enabled', enabled_events: [...STRIPE_EVENTS] },
+      { id: 'we_foreign', url: FOREIGN_WEBHOOK_URL, status: 'enabled', enabled_events: [...STRIPE_EVENTS] },
+    ],
+  };
+  responses.deleteWebhookEndpoint = { id: 'we_legacy', deleted: true };
+  const stripe = fakeStripe(responses);
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  const log = captureLog();
+  try {
+    await runService(config, { stripe, confirmed: true });
+  } finally {
+    log.restore();
+  }
+
+  assert.deepEqual(stripe.callsTo('deleteWebhookEndpoint').map((c) => c.args), [['we_legacy']]);
+  assert.deepEqual(stripe.callsTo('updateWebhookEndpoint'), []);
+  assert.deepEqual(stripe.callsTo('createWebhookEndpoint'), []);
+
+  // One loud line naming the URL — with the key redacted, never the secret
+  const loud = log.lines.filter((line) => line.includes('Deleted stale webhook'));
+  assert.equal(loud.length, 1);
+  assert.ok(loud[0].includes(`https://api.${DOMAIN}/omega/payments/webhook?processor=stripe&key=***`));
+  assert.ok(!log.lines.some((line) => line.includes(WEBHOOK_KEY)));
+});
+
+test('stripe-webhook: converged host → a second run still makes no webhook calls', async () => {
+  const stripe = fakeStripe(stripeConverged());
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  await runService(config, { stripe, confirmed: true });
+  await runService(config, { stripe, confirmed: true });
+
+  assert.deepEqual(stripe.mutations(), []);
+});
+
+test('stripe-webhook: dry run on a legacy twin reads only', async () => {
+  const responses = stripeConverged();
+  responses.listWebhookEndpoints = {
+    data: [
+      { id: 'we_1', url: STRIPE_WEBHOOK_URL, status: 'enabled', enabled_events: [...STRIPE_EVENTS] },
+      { id: 'we_legacy', url: STRIPE_LEGACY_WEBHOOK_URL, status: 'enabled', enabled_events: [...STRIPE_EVENTS] },
+    ],
+  };
+  const stripe = fakeStripe(responses);
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  await runService(config, { stripe, options: { dryRun: true }, confirmed: true });
+
+  assert.deepEqual(stripe.mutations(), []);
+});
+
 test('payment: missing OMEGA_WEBHOOK_KEY → warned, webhooks never listed', async () => {
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
@@ -944,6 +1008,26 @@ test('paypal-webhook: event drift → single JSON Patch replacing event_types', 
   ]);
 });
 
+test('paypal-webhook: legacy twin on the brand host → deleted; the desired URL and other hosts untouched', async () => {
+  const responses = paypalConverged();
+  responses.listWebhooks = {
+    webhooks: [
+      { id: 'WH-1', url: PAYPAL_WEBHOOK_URL, event_types: PAYPAL_EVENTS.map((name) => ({ name })) },
+      { id: 'WH-LEGACY', url: PAYPAL_LEGACY_WEBHOOK_URL, event_types: PAYPAL_EVENTS.map((name) => ({ name })) },
+      { id: 'WH-FOREIGN', url: FOREIGN_WEBHOOK_URL, event_types: PAYPAL_EVENTS.map((name) => ({ name })) },
+    ],
+  };
+  responses.deleteWebhook = null;
+  const paypal = fakePaypal(responses);
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  await runService(config, { paypal, options: { provider: 'paypal' } });
+
+  assert.deepEqual(paypal.callsTo('deleteWebhook').map((c) => c.args), [['WH-LEGACY']]);
+  assert.deepEqual(paypal.callsTo('updateWebhook'), []);
+  assert.deepEqual(paypal.callsTo('createWebhook'), []);
+});
+
 // ─── Chargebee ───────────────────────────────────────────────────────────────
 
 test('chargebee-products: empty site → exact family + item + price create chain', async () => {
@@ -1059,6 +1143,24 @@ test('chargebee-webhook: disabled endpoint → re-activated', async () => {
   ]);
 });
 
+test('chargebee-webhook: legacy twin on the brand host → deleted; the desired URL and other hosts untouched', async () => {
+  const responses = chargebeeConverged();
+  responses.listWebhooks = [
+    { id: 'cbwh_1', url: CHARGEBEE_WEBHOOK_URL, disabled: false },
+    { id: 'cbwh_legacy', url: CHARGEBEE_LEGACY_WEBHOOK_URL, disabled: false },
+    { id: 'cbwh_foreign', url: FOREIGN_WEBHOOK_URL, disabled: false },
+  ];
+  responses.deleteWebhook = { id: 'cbwh_legacy' };
+  const chargebee = fakeChargebee(responses);
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+
+  await runService(config, { chargebee, options: { provider: 'chargebee' } });
+
+  assert.deepEqual(chargebee.callsTo('deleteWebhook').map((c) => c.args), [['cbwh_legacy']]);
+  assert.deepEqual(chargebee.callsTo('updateWebhook'), []);
+  assert.deepEqual(chargebee.callsTo('createWebhook'), []);
+});
+
 // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
 test('payment: dry-run on a fully drifted account — zero mutations on all three providers', async () => {
@@ -1102,7 +1204,6 @@ test('payment: dry-run on a fully drifted account — zero mutations on all thre
 // ─── Interactive provider credential entry (config-landing flow) ────────────
 
 const { providerSetupFlow } = require('../src/services/payment/lib/provider-setup.js');
-const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { readFileSync } = require('node:fs');
 const { join: joinPath } = require('node:path');
 
@@ -1132,8 +1233,11 @@ function providerFlowContext(brandRoot) {
 test('provider-setup: stripe flow lands the publishable key in config and the secret in .env + process.env', async () => {
   const saved = process.env.STRIPE_SECRET_KEY;
   delete process.env.STRIPE_SECRET_KEY;
+  // The Enter-gated open runs through devkit/prompt's own launcher seam
+  const promptModule = require('@omega.js/devkit/prompt');
+  const realOpen = promptModule.openInBrowser;
   const opened = [];
-  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  promptModule.openInBrowser = (url) => { opened.push(url); return true; };
   const brandRoot = makeBrandRoot(PROVIDER_FLOW_CONFIG);
   const context = providerFlowContext(brandRoot);
   const tty = openTtyPrompt();
@@ -1142,10 +1246,14 @@ test('provider-setup: stripe flow lands the publishable key in config and the se
     const run = providerSetupFlow(context, 'stripe');
     await tty.answer('Set up now?', '\r'); // Yes
     await tty.answer('Stripe publishable key', 'pk_test_fixture123\r');
-    await tty.answer('Stripe secret key', 'sk_test_fixture456\r');
+    // The secret half rides the shared setup contract (#608) — the gate above
+    // already ran, so it goes straight to the Enter-gated open + guided paste
+    await tty.answer('Press Enter to open the Stripe secret key page', '\r');
+    await tty.answer('Paste STRIPE_SECRET_KEY:', 'sk_test_fixture456\r');
     const landed = await run;
 
     assert.equal(landed, true);
+    // ONE open, and only after Enter — never auto-opened
     assert.deepEqual(opened, ['https://dashboard.stripe.com/apikeys']);
     // Public half → omega.json5 (comment preserved), in-memory patched
     const written = readConfigSource(brandRoot);
@@ -1157,7 +1265,7 @@ test('provider-setup: stripe flow lands the publishable key in config and the se
     assert.equal(process.env.STRIPE_SECRET_KEY, 'sk_test_fixture456');
   } finally {
     tty.close();
-    setBrowserOpener(null);
+    promptModule.openInBrowser = realOpen;
     if (saved === undefined) {
       delete process.env.STRIPE_SECRET_KEY;
     } else {

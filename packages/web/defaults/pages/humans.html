@@ -4,13 +4,13 @@ sitemap:
   include: false
 ---
 /* TEAM */
-Website: {{ site.brand.name }}
-Site: {{ site.url }}
-{%- if site.socials.twitter %}
-Twitter: {{ site.socials.twitter.handle | default: site.socials.twitter }}
+Website: {{ resolved.config.brand.name }}
+Site: {{ resolved.config.url }}
+{%- if resolved.config.socials.twitter %}
+Twitter: {{ resolved.config.socials.twitter.handle | default: resolved.config.socials.twitter }}
 {%- endif %}
-{%- if site.brand.location %}
-Location: {{ site.brand.location }}
+{%- if resolved.config.brand.location %}
+Location: {{ resolved.config.brand.location }}
 {%- endif %}
 
 /* THANKS */

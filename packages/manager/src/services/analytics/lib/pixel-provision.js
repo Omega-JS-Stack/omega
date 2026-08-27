@@ -92,18 +92,22 @@ async function provisionPixel(context, spec) {
 
   // Nothing configured at all: ask permission before asking for a secret —
   // the uniform gate, whose Disable lands `providers.{provider}: false`
+  let gated = false;
   if (!provider.accountId && canPrompt(options)) {
-    const proceed = await confirmSetup(context, {
+    const action = await confirmSetup(context, {
       label: spec.label,
       instructions: spec.instructions,
       disablePath: `analytics.providers.${spec.key}`,
     });
-    if (!proceed) {
+    if (action !== 'yes') {
       return {};
     }
+    gated = true;
   }
 
-  if (!await acquirePixelToken(context, spec)) {
+  // When the gate above ran, the acquire must not open the same question
+  // twice; when it didn't (a configured accountId), the acquire owns it
+  if (!await acquirePixelToken(context, spec, gated ? { gate: false } : {})) {
     console.log(`      ${chalk.dim('→')} ${spec.label} not created — rerun with ${chalk.cyan(spec.envVar)} set (or set ${chalk.cyan(`analytics.providers.${spec.key}: false`)} to stop asking)`);
     return { status: 'warned', output: { [spec.key]: { pixelId: null, tokenConfigured: false } } };
   }

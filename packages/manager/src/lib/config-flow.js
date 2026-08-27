@@ -149,7 +149,8 @@ function landValue(context, path, value) {
 /**
  * The uniform Yes / Skip / Disable gate every config-landing flow leads
  * with — the ONE place that wording lives, so a flow built by hand
- * (the pixel provisioning's token ask) opens exactly like resolveConfigValue.
+ * (the pixel provisioning's token ask) and the shared setup contract
+ * (lib/service-input.js, #608) open exactly like resolveConfigValue.
  * "Disable" lands `false` at disablePath (the tri-state opt-out) and says
  * where to delete it.
  *
@@ -158,7 +159,9 @@ function landValue(context, path, value) {
  * @param {string} spec.label - Human name ("Meta Pixel", "GA4 property")
  * @param {string[]} [spec.instructions] - Numbered guidance lines
  * @param {string} spec.disablePath - Where Disable writes `false`
- * @returns {Promise<boolean>} - true only when the user said Yes
+ * @returns {Promise<'yes'|'skip'|'disable'>} - The chosen outcome; callers that
+ *   only proceed on Yes compare against 'yes', the ones that report WHICH
+ *   step-aside happened (#608) read the other two.
  */
 async function confirmSetup(context, spec) {
   const { label, instructions, disablePath } = spec;
@@ -184,7 +187,7 @@ async function confirmSetup(context, spec) {
     console.log(`    ${chalk.yellow('!')} ${label} disabled in omega.json5 (${disablePath}: false — delete the line to be asked again)`);
   }
 
-  return action === 'yes';
+  return action;
 }
 
 /**
@@ -309,12 +312,12 @@ async function resolveConfigValue(context, spec) {
   }
 
   if (spec.gate !== false) {
-    const proceed = await confirmSetup(context, {
+    const action = await confirmSetup(context, {
       label,
       instructions: spec.instructions,
       disablePath,
     });
-    if (!proceed) {
+    if (action !== 'yes') {
       return null;
     }
   }

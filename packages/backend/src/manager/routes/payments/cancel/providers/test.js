@@ -96,12 +96,17 @@ module.exports = {
         resourceId: resourceId,
       },
       error: null,
+      // The SAME keys the webhook route writes ([../../webhook/post.js]) — the
+      // pipeline's staleness clock reads `metadata.created.timestampUNIX`, so a
+      // synthetic doc spelling it `received` handed the clock nothing and rode a
+      // now-fallback that made every test-processor event look freshly arrived
+      // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
       metadata: {
-        received: {
+        created: {
           timestamp: nowTs,
           timestampUNIX: nowUNIX,
         },
-        processed: {
+        completed: {
           timestamp: null,
           timestampUNIX: null,
         },

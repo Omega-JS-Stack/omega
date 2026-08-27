@@ -107,6 +107,26 @@ test('--check names the legacy test files `omega test` will never discover (#248
   assert.match(output, /test\/build\/xp-curve\.js/, 'the files are named, like every other per-file report line');
 });
 
+test('--check names the dead `asset_path` frontmatter key and its successor idiom (#470)', (t) => {
+  const root = legacyConsumer(t);
+  fs.mkdirSync(path.join(root, 'src', 'pages', 'dashboard', 'agents'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'src', 'pages', 'dashboard', 'agents', 'new.md'),
+    '---\nlayout: page\nasset_path: dashboard/agents/edit\n---\n',
+  );
+
+  const result = spawnSync(process.execPath, [
+    '-e',
+    `require(${JSON.stringify(COMMAND)})({ check: true })`,
+  ], { cwd: root, encoding: 'utf8' });
+  const output = result.stdout + result.stderr;
+
+  assert.match(output, /src\/pages\/dashboard\/agents\/new\.md:3 — `asset_path` is DEAD/, 'the report line names the file, the line and the key');
+  assert.match(output, /js\/pages\/blog\/\[slug\]\.js/, 'and names the [name] wildcard family file first');
+  assert.match(output, /index\.js/, 'and points at the re-exporting index.js');
+  assert.match(output, /@use/, 'and at the @use scss half');
+});
+
 test('a report carrying errors exits non-zero and skips the next-steps block', (t) => {
   // A tree with no legacy configs at all — runMigration reports the error.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-empty-'));

@@ -12,12 +12,14 @@
  *
  * The name is checked against the catalog FIRST — an entry nobody knows is a
  * typo, and it says so once rather than reading like three deliberate
- * non-mappings. Then one fire walks the same three steps per provider the
- * browser facade walks:
+ * non-mappings. Then one fire walks the browser facade's own steps per provider,
+ * plus the environment gate a server has to carry itself:
  *   1. consent — the order's/user's `trackingConsent` snapshot gates the category
  *   2. adapter — the catalog mapping, or null when the provider has none
  *      (`subscription_plan_change` and `trial_lapse` are GA4-only by catalog design)
- *   3. transport — the platform's HTTP API, fire-and-forget, errors isolated
+ *   3. environment — only PRODUCTION reaches a platform; anywhere else the
+ *      resolved fire is blocked and says so ([#464](https://github.com/Omega-JS-Stack/omega/issues/464))
+ *   4. transport — the platform's HTTP API, fire-and-forget, errors isolated
  *
  * Delivery is NON-BLOCKING and never throws at its caller: a payment webhook or
  * a user creation must never fail because an ad platform did.
@@ -28,6 +30,7 @@
  * Protocol carrying the campaign params and gclid as event params.
  */
 const fetch = require('wonderful-fetch');
+const env = require('../env.js');
 
 // @omega.js/analytics is a private workspace package: in the monorepo the bare
 // specifier resolves via the workspace link (and the prepare-package vendor hook
@@ -54,6 +57,21 @@ try {
 
 // Meta's Graph version the Conversions API is called on.
 const META_API_VERSION = 'v21.0';
+
+// Every match parameter each platform ACCEPTS on a website conversion, in its
+// own vocabulary and the order the fire log reads them out
+// ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)). The log names
+// which of them went and which the fire had nothing for, so a brand can see its
+// match quality without opening an ads manager — KEY NAMES ONLY, because a match
+// value is personal data whether it is hashed or not.
+//
+// GA4 has no row: its match block is the Measurement Protocol helper's
+// `user_data` (`helpers/analytics.js`), built from the request's own user and
+// logged in full by that helper in development.
+const MATCH_KEYS = {
+  meta: ['em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'country', 'db', 'ge', 'external_id', 'client_ip_address', 'client_user_agent', 'fbc', 'fbp'],
+  tiktok: ['email', 'phone', 'external_id', 'ttclid', 'ttp', 'ip', 'user_agent'],
+};
 
 /**
  * Resolve the consent snapshot into the two category answers.
@@ -128,15 +146,36 @@ function deliverConversion({ event, params = {}, attribution = {}, identity = {}
       continue;
     }
 
+    // Read BEFORE the environment gate: what a blocked dev fire WOULD have
+    // matched on is the question a dev run is asking.
+    const match = matchSummary(provider, { descriptor, identity, eventId });
+
+    // ONLY production reaches a platform. An emulator boot seeds personas, every
+    // seeded account fired the server half of `sign_up`, and Meta DELIVERED dozens
+    // of fake registrations to the brand's live pixel — a dev run polluting real ad
+    // data ([#464](https://github.com/Omega-JS-Stack/omega/issues/464)). The gate is
+    // the one `@omega.js/monitoring` and the Measurement Protocol helper already
+    // use: any NON-production environment (development OR testing), intentional
+    // `!isProduction()`. It sits AFTER the resolve so the dev trace still names
+    // which providers would have fired, and with what — a blocked send is
+    // information, not silence, so each one says so on its own line.
+    if (!ctx.isProduction()) {
+      ctx.log(`deliverConversion [${provider}]: ${event} blocked (dev) — nothing sent (event_id=${eventId})`);
+      results.push({ provider, outcome: 'blocked (dev)', descriptor, match });
+      continue;
+    }
+
     try {
-      results.push({ provider, outcome: SENDERS[provider]({ descriptor, identity, eventId, ctx, Manager }), descriptor });
+      results.push({ provider, outcome: SENDERS[provider]({ descriptor, identity, eventId, ctx, Manager }), descriptor, match });
     } catch (e) {
       ctx.error(`deliverConversion [${provider}] failed: ${e.message}`, e);
       results.push({ provider, outcome: 'failed' });
     }
   }
 
-  ctx.log(`deliverConversion: ${event} → ${results.map((result) => `${result.provider} ${result.outcome}`).join(', ')} (event_id=${eventId})`);
+  // ` | ` between providers, because each one's match summary carries commas of
+  // its own — one line per fire is still the contract.
+  ctx.log(`deliverConversion: ${event} → ${results.map((result) => [result.provider, result.outcome, result.match].filter(Boolean).join(' ')).join(' | ')} (event_id=${eventId})`);
 
   return results;
 }
@@ -171,8 +210,16 @@ function sendGA4({ descriptor, identity, ctx, Manager }) {
  * Build the Conversions API body for one descriptor.
  *
  * `user_data` is the match block: the adapter has already put `fbc`/`fbp` there,
- * and the identity block fills the rest. `event_id` is Meta's DEDUPLICATION key —
- * a browser event with the same name and id is counted once.
+ * and the identity block fills the rest — every parameter Meta's
+ * customer-information reference accepts, hashed by Meta's own rule for each
+ * ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)). `event_id` is
+ * Meta's DEDUPLICATION key — a browser event with the same name and id is
+ * counted once.
+ *
+ * `event_source_url` is the page the conversion is credited to — the attribution
+ * touch's url, which the descriptor carries when the touch had one
+ * ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)). A webhook has no
+ * page of its own, so an order with no touch sends no key at all.
  *
  * https://developers.facebook.com/docs/marketing-api/conversions-api
  *
@@ -206,21 +253,32 @@ function buildMetaBody({ descriptor, identity, eventId }) {
     userData.client_user_agent = identity.userAgent;
   }
 
-  return {
-    data: [{
-      event_name: descriptor.name,
-      event_time: Math.floor(Date.now() / 1000),
-      event_id: eventId,
-      action_source: 'website',
-      user_data: userData,
-      custom_data: descriptor.payload,
-    }],
+  // The rest of Meta's customer-information set — fn ln ct st zp country db ge —
+  // already normalized and hashed by Meta's own table
+  // (`match-data.js`, [#577](https://github.com/Omega-JS-Stack/omega/issues/577)).
+  // Keyed in Meta's vocabulary at the source, so nothing is re-mapped here and
+  // a parameter is added in exactly one place.
+  Object.assign(userData, identity.meta);
+
+  const event = {
+    event_name: descriptor.name,
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: eventId,
+    action_source: 'website',
+    user_data: userData,
+    custom_data: descriptor.payload,
   };
+
+  if (descriptor.page) {
+    event.event_source_url = descriptor.page.url;
+  }
+
+  return { data: [event] };
 }
 
 function sendMeta({ descriptor, identity, eventId, ctx, Manager }) {
   const pixelId = Manager.config.analytics?.providers?.meta?.id;
-  const accessToken = process.env.META_ACCESS_TOKEN;
+  const accessToken = env.get('META_ACCESS_TOKEN');
 
   if (!pixelId || !accessToken) {
     return 'skipped (not configured)';
@@ -240,10 +298,22 @@ function sendMeta({ descriptor, identity, eventId, ctx, Manager }) {
 /**
  * Build the Events API body for one descriptor.
  *
- * TikTok's match block is `context.user` (hashed email, phone and external id,
- * plus `ttp`), with the click id in `context.ad.callback` and the request pair at
- * context level. The adapter has already put `ttclid`/`ttp` in `userData`; this
- * is where they land in TikTok's own vocabulary.
+ * The `/event/track/` endpoint speaks Events API 2.0, where the match block is
+ * ONE FLAT `data[].user` object: the hashed email, phone and external id, the
+ * `ttclid`/`ttp` the adapter put in `userData`, and the request pair. The v1.2
+ * nesting this used to build (`context.user`, `context.ad.callback`,
+ * `context.ip`, `context.user_agent`) is not a synonym — TikTok reads none of
+ * it, so a body in the old shape matched nobody while looking accepted
+ * ([#482](https://github.com/Omega-JS-Stack/omega/issues/482)). The phone's key
+ * moved with it: `phone_number` in v1.2, `phone` in 2.0.
+ *
+ * `page` (the url + referrer of the conversion) is 2.0's other data-item member,
+ * and it is the attribution touch's: a server conversion arrives from a payment
+ * webhook or an auth trigger and has no page of its own, so the touch's is the
+ * only URL it can honestly claim ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)).
+ * The descriptor carries it only when the touch did — an order with no touch
+ * sends no `page`, because an invented one is worse than an absent one. Meta's
+ * body takes the same url as its `event_source_url`.
  *
  * https://business-api.tiktok.com/portal/docs?id=1771100865818625
  *
@@ -256,7 +326,6 @@ function sendMeta({ descriptor, identity, eventId, ctx, Manager }) {
  */
 function buildTikTokBody({ descriptor, identity, eventId, pixelCode }) {
   const user = {};
-  const context = {};
 
   if (identity.tiktokExternalIdHash) {
     // TikTok's Events API reference: "SHA-256 hashing is required" for
@@ -270,36 +339,50 @@ function buildTikTokBody({ descriptor, identity, eventId, pixelCode }) {
   if (identity.tiktokPhoneHash) {
     // TikTok's own spec: the phone hashed in E.164, WITH the plus (#392) — a
     // different digest from Meta's for the same person.
-    user.phone_number = identity.tiktokPhoneHash;
+    user.phone = identity.tiktokPhoneHash;
   }
   if (descriptor.userData.ttp) {
     user.ttp = descriptor.userData.ttp;
   }
   if (descriptor.userData.ttclid) {
-    context.ad = { callback: descriptor.userData.ttclid };
+    user.ttclid = descriptor.userData.ttclid;
   }
   if (identity.ip) {
-    context.ip = identity.ip;
+    user.ip = identity.ip;
   }
   if (identity.userAgent) {
-    context.user_agent = identity.userAgent;
+    user.user_agent = identity.userAgent;
+  }
+
+  const event = {
+    event: descriptor.name,
+    // REQUIRED, and in Unix SECONDS — the ISO string this used to send is
+    // v1.2's `timestamp`, a field 2.0 does not read (#482).
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: eventId,
+    user: user,
+    properties: descriptor.payload,
+  };
+
+  if (descriptor.page) {
+    event.page = descriptor.page;
   }
 
   return {
-    data: [{
-      pixel_code: pixelCode,
-      event: descriptor.name,
-      event_id: eventId,
-      timestamp: new Date().toISOString(),
-      context: { ...context, user: user },
-      properties: descriptor.payload,
-    }],
+    // The DESTINATION is named at the top level, and TikTok validates it there
+    // first: the id used to ride as `data[].pixel_code`, so every live fire came
+    // back `{"code":40002,"message":"Invalid value for event_source_id: not a
+    // valid string."}` while the pixel id sat correctly in config the whole time
+    // ([#465](https://github.com/Omega-JS-Stack/omega/issues/465)).
+    event_source: 'web',
+    event_source_id: pixelCode,
+    data: [event],
   };
 }
 
 function sendTikTok({ descriptor, identity, eventId, ctx, Manager }) {
   const pixelCode = Manager.config.analytics?.providers?.tiktok?.id;
-  const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
+  const accessToken = env.get('TIKTOK_ACCESS_TOKEN');
 
   if (!pixelCode || !accessToken) {
     return 'skipped (not configured)';
@@ -320,6 +403,40 @@ const SENDERS = {
   meta: sendMeta,
   tiktok: sendTikTok,
 };
+
+// The provider key → its match block, read out of the body the transport would
+// send. Built here rather than tracked alongside, so the log can never claim a
+// key the wire does not actually carry.
+const MATCH_BLOCKS = {
+  meta: ({ descriptor, identity, eventId }) => buildMetaBody({ descriptor, identity, eventId }).data[0].user_data,
+  tiktok: ({ descriptor, identity, eventId }) => buildTikTokBody({ descriptor, identity, eventId, pixelCode: null }).data[0].user,
+};
+
+/**
+ * What this fire matches on, for the log: `sent em,external_id; empty ph,fn,…`
+ *
+ * KEY NAMES ONLY. A hashed email is still that person's email, so no value from
+ * a match block ever reaches a log line — the names are what say whether the
+ * plumbing is working.
+ *
+ * @param {string} provider - The provider key.
+ * @param {object} fire - `{ descriptor, identity, eventId }`.
+ * @returns {string|null} The summary, or null for a provider whose match block
+ *   this module does not build (GA4 — the Measurement Protocol helper owns it).
+ */
+function matchSummary(provider, fire) {
+  const accepted = MATCH_KEYS[provider];
+
+  if (!accepted) {
+    return null;
+  }
+
+  const block = MATCH_BLOCKS[provider](fire);
+  const sent = accepted.filter((key) => key in block);
+  const empty = accepted.filter((key) => !(key in block));
+
+  return `sent ${sent.join(',') || 'nothing'}; empty ${empty.join(',') || 'nothing'}`;
+}
 
 /**
  * Fire-and-forget POST. The conversion is a side effect of work that already

@@ -28,9 +28,6 @@ const input = [
 const output = 'dist';
 const delay = 250;
 
-// Set index
-let index = -1;
-
 // JSONP Template for build.js
 const JSONP_TEMPLATE = `
 (function() {
@@ -57,6 +54,10 @@ async function generateBuildJs(outputDir) {
 
     // The live sibling website's published origin, or null when none is up (#262)
     const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
+
+    // The Measurement Protocol secret (.env — secrets never live in omega.json5).
+    const googleAnalyticsId = config.analytics?.providers?.google?.id || '';
+    const googleAnalyticsSecret = process.env.GOOGLE_ANALYTICS_SECRET || '';
 
     // Build config object matching @omega.js/client's expected structure
     const buildConfig = {
@@ -148,8 +149,8 @@ async function generateBuildJs(outputDir) {
         analytics: {
           providers: {
             google: {
-              id: config.analytics?.providers?.google?.id || '',
-              secret: process.env.GOOGLE_ANALYTICS_SECRET || '',
+              id: googleAnalyticsId,
+              secret: googleAnalyticsSecret,
             },
           },
         },
@@ -343,6 +344,33 @@ function removeEmptyValues(obj) {
   return obj;
 }
 
+// The origins the framework default lets message this extension. A packaged
+// build needs the BRAND's own origin — it shipped the localhost dev origin
+// alone, so the live site could not message the published extension (#583).
+// The dev origin rides along in dev only. A consumer that DECLARES
+// `externally_connectable` still wins outright (#260) — this is only the default.
+function externallyConnectableOrigins() {
+  const origins = [];
+
+  let brandOrigin = null;
+  try { brandOrigin = new URL(config.brand?.url).origin; } catch (e) { /* no brand url — dev origin only */ }
+
+  if (brandOrigin) {
+    origins.push(`${brandOrigin}/*`);
+  } else if (Manager.isBuildMode()) {
+    logger.warn('externally_connectable: no brand.url in config/omega.json5, so the packaged extension declares no messaging origin — your site will not be able to message it');
+  }
+
+  // The dev-website origin is BUILD-TIME-BAKED by design (N7 non-goal: a shipped
+  // extension can't probe ports): the origin the LIVE sibling website published,
+  // or the classic default when nothing is up (#262).
+  if (!Manager.isBuildMode()) {
+    origins.push(`${Manager.getDevWebsiteOrigin() || CLASSIC_DEV_ORIGIN}/*`);
+  }
+
+  return origins;
+}
+
 // Special Compilation Task for manifest.json with default settings
 async function compileManifest(outputDir, target) {
   try {
@@ -352,10 +380,12 @@ async function compileManifest(outputDir, target) {
 
     // Read and parse using JSON5. The framework defaults carry build-time
     // tokens (the same `%%%name%%%` idiom the webpack replace plugin speaks) —
-    // the dev-website origin is a resolved fact now, never a literal (#262).
+    // the messaging origins are resolved facts now, never literals (#262, #583).
     let manifest = JSON5.parse(jetpack.read(manifestPath));
     const defaultConfig = JSON5.parse(template(jetpack.read(configPath), {
-      devWebsiteOrigin: Manager.getDevWebsiteOrigin() || CLASSIC_DEV_ORIGIN,
+      externallyConnectableOrigins: externallyConnectableOrigins()
+        .map((origin) => `'${origin}'`)
+        .join(', '),
     }, {
       brackets: ['%%%', '%%%'],
     }));
@@ -389,6 +419,14 @@ async function compileManifest(outputDir, target) {
       throw new Error('Cannot build the manifest: the extension app\'s package.json has no "version" (Chrome refuses to load a manifest without one)');
     }
     manifest.version = project.version;
+
+    // Chrome and Firefox both link the store listing's developer-site link from
+    // `homepage_url`, and nothing emitted it — the brand's site is right there in
+    // the config (#576). A DECLARED value is authoritative; missing, it is
+    // derived from the brand config, the same mechanism as the firefox gecko id.
+    if (manifest.homepage_url === undefined && config.brand?.url) {
+      manifest.homepage_url = config.brand.url;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP 2: Apply target-specific adjustments
@@ -669,7 +707,7 @@ function liveReload() {
 
   // Quit if in build mode
   if (Manager.isBuildMode()) {
-    return logger.log('Skipping live reload in non-build mode');
+    return logger.log('Skipping live reload in build mode');
   }
 
   // Quit if no websocket server
@@ -764,11 +802,8 @@ async function packageFn(complete) {
     // Log
     logger.log('Starting...');
 
-    // Increment index
-    index++;
-
     // Run build:pre hook
-    await hook('build:pre', index);
+    await hook('build:pre');
 
     // Run packageRaw
     await packageRaw();
@@ -783,7 +818,7 @@ async function packageFn(complete) {
     await deployStoreAssets();
 
     // Run build:post hook
-    await hook('build:post', index);
+    await hook('build:post');
 
     // Run liveReload
     liveReload();
@@ -827,21 +862,30 @@ module.exports.compileManifest = compileManifest;
 module.exports.generateBuildJs = generateBuildJs;
 module.exports.compileLocales = compileLocales;
 module.exports.deployStoreAssets = deployStoreAssets;
+module.exports.hook = hook;
 // The browser targets the package lane builds — the one list the CI workflow's
 // artifact upload is checked against (it ships packaged/<target>/extension.zip).
 module.exports.TARGETS = TARGETS;
 
 // Run hooks
-async function hook(file, index) {
-  // Full path
-  const fullPath = path.join(process.cwd(), 'hooks', `${file}.js`);
+async function hook(file) {
+  // Candidate paths, in order: the NESTED form the defaults scaffold writes and
+  // setup's migration moves flat files to (`hooks/build/pre.js`), then the flat
+  // pre-migration form (`hooks/build:pre.js`) as a transition fallback. Resolving
+  // only the flat one left every migrated consumer's hooks dead (#571).
+  const candidates = [
+    path.join(process.cwd(), 'hooks', `${file.split(':').join(path.sep)}.js`),
+    path.join(process.cwd(), 'hooks', `${file}.js`),
+  ];
 
-  // Log
-  // logger.log(`Loading hook: ${fullPath}`);
+  // Find the first one that exists
+  const fullPath = candidates.find((candidate) => jetpack.exists(candidate));
 
-  // Check if it exists
-  if (!jetpack.exists(fullPath)) {
-    return console.warn(`Hook not found: ${fullPath}`);
+  // Quit if there is none — a consumer may delete a scaffolded hook, so the
+  // miss is an informational line through the framework logger (the bare
+  // console.warn it replaces carried no tag and read as build noise, #571)
+  if (!fullPath) {
+    return logger.log(`No ${file} hook found at ${candidates[0]}`);
   }
 
   // Log
@@ -856,9 +900,18 @@ async function hook(file, index) {
     throw new Error(`Error loading hook: ${fullPath} ${e.stack}`);
   }
 
-  // Execute hook
+  // Execute hook — the ONE hook-argument shape across OMEGA frameworks: the same
+  // `{ manager, projectRoot, mode }` ctx @omega.js/desktop hands its lifecycle
+  // hooks. This used to pass the package task's internal watch counter while both
+  // docs described a build-info object nothing ever built, so a hook written from
+  // the docs read `undefined` at its first property (#591). Everything those docs
+  // promised is reachable through `manager` (getManifest/getConfig/getPackage).
   try {
-    return await hook(index);
+    return await hook({
+      manager: Manager,
+      projectRoot: process.cwd(),
+      mode: Manager.isBuildMode() ? 'production' : 'development',
+    });
   } catch (e) {
     throw new Error(`Error running hook: ${fullPath} ${e.stack}`);
   }

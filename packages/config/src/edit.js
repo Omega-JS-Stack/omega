@@ -38,6 +38,8 @@ const { resolveConfigPath, FILE_NAME } = require('./load.js');
 const IDENTIFIER_KEY = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const MATCHER_SEGMENT = /^([^[]+)\[([A-Za-z0-9_$]+)=([^\]]*)\]$/;
 const DEFAULT_INDENT_UNIT = '  ';
+// Where a guiding comment wraps — the whole line, indent and `// ` included.
+const COMMENT_WIDTH = 80;
 
 /**
  * Parse a dot-path into walk steps. A `name[key=value]` segment expands to a
@@ -231,9 +233,13 @@ function serializeKey(key) {
 
 /**
  * Serialize a value for insertion. `indent` is the indentation of the line
- * the value starts on; nested lines add `unit` per depth.
+ * the value starts on; nested lines add `unit` per depth. `comments` +
+ * `path` document the keys INSIDE the inserted value: every key whose full
+ * dot-path is in the map gets its comment on the line(s) above it (#478 — a
+ * materialized block arrives with the schema's guidance beside each key).
+ * Array items carry no path, so nothing inside one is documented.
  */
-function serializeValue(value, indent, unit) {
+function serializeValue(value, indent, unit, comments, path) {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
   }
@@ -256,7 +262,11 @@ function serializeValue(value, indent, unit) {
     return '{}';
   }
   const inner = indent + unit;
-  const lines = entries.map(([key, entry]) => `${inner}${serializeKey(key)}: ${serializeValue(entry, inner, unit)},`);
+  const lines = entries.map(([key, entry]) => {
+    const childPath = path ? `${path}.${key}` : null;
+    const doc = childPath && comments ? commentBlock(comments[childPath], inner) : '';
+    return `${doc}${inner}${serializeKey(key)}: ${serializeValue(entry, inner, unit, comments, childPath)},`;
+  });
   return `{\n${lines.join('\n')}\n${indent}}`;
 }
 
@@ -309,12 +319,45 @@ function detectIndentUnit(source) {
 // ─── Single-edit application ─────────────────────────────────────────────────
 
 /**
+ * Wrap a guiding comment into `// ` lines at the given indent (#478 — the
+ * manage-run heal documents each block it materializes with the schema's own
+ * description). Returns text ending in a newline, or '' when there is nothing
+ * to say.
+ */
+function commentBlock(text, indent) {
+  if (!text) {
+    return '';
+  }
+
+  const lines = [];
+  let line = '';
+
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && `${indent}// ${candidate}`.length > COMMENT_WIDTH) {
+      lines.push(`${indent}// ${line}`);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) {
+    lines.push(`${indent}// ${line}`);
+  }
+
+  return lines.map((entry) => `${entry}\n`).join('');
+}
+
+/**
  * Insert a missing property (possibly a nested branch) into an object node.
  * The remaining steps must all be plain keys — a matcher below a missing key
  * would mean creating an array element, which writeback never does.
+ * `comments` (dot-path → text) documents the inserted property on its own
+ * line(s) above it, and every key inside the inserted value — multi-line
+ * objects only, since a `//` line cannot ride inside `{ a: 1 }`.
  * Returns the new source.
  */
-function insertProperty(source, node, path, steps, value, unit) {
+function insertProperty(source, node, path, steps, value, unit, comments) {
   if (steps.some((step) => step.type !== 'plain')) {
     throw new Error(`Cannot set '${path}': the branch is missing and a [key=value] matcher cannot create array elements`);
   }
@@ -322,13 +365,18 @@ function insertProperty(source, node, path, steps, value, unit) {
   const names = steps.map((step) => step.name);
   const key = serializeKey(names[0]);
   const nested = nestValue(names.slice(1), value);
+  // The full dot-path of the property being inserted: the edit's path minus
+  // the branch nestValue() just wrapped around the value.
+  const segments = path.split('.');
+  const propertyPath = segments.slice(0, segments.length - names.length + 1).join('.');
+  const comment = comments ? comments[propertyPath] : undefined;
 
   // Empty object with nothing but whitespace inside → rewrite as a block
   const innerText = source.slice(node.start + 1, node.closeStart);
   if (node.entries.length === 0 && /^\s*$/.test(innerText)) {
     const closeIndent = lineIndentAt(source, node.start);
     const childIndent = closeIndent + unit;
-    const block = `{\n${childIndent}${key}: ${serializeValue(nested, childIndent, unit)},\n${closeIndent}}`;
+    const block = `{\n${commentBlock(comment, childIndent)}${childIndent}${key}: ${serializeValue(nested, childIndent, unit, comments, propertyPath)},\n${closeIndent}}`;
     return source.slice(0, node.start) + block + source.slice(node.end);
   }
 
@@ -352,14 +400,14 @@ function insertProperty(source, node, path, steps, value, unit) {
   const childIndent = node.entries.length > 0
     ? lineIndentAt(source, node.entries[0].keyStart)
     : lineIndentAt(source, node.closeStart) + unit;
-  const propertyLine = `${childIndent}${key}: ${serializeValue(nested, childIndent, unit)},\n`;
+  const propertyLine = `${commentBlock(comment, childIndent)}${childIndent}${key}: ${serializeValue(nested, childIndent, unit, comments, propertyPath)},\n`;
 
   let result = source.slice(0, braceLineStart) + propertyLine + source.slice(braceLineStart);
 
   // The previous last entry needs a trailing comma to stay parseable
   const last = node.entries[node.entries.length - 1];
   if (last && !last.hasComma) {
-    result = result.slice(0, last.valueNode.end) + ',' + result.slice(last.valueNode.end);
+    result = `${result.slice(0, last.valueNode.end)},${result.slice(last.valueNode.end)}`;
   }
 
   return result;
@@ -383,10 +431,11 @@ function matchesElement(source, item, step) {
 /**
  * Apply one dot-path edit to the source. Walks the span tree; replaces the
  * leaf's value span when the path exists, inserts the missing branch when it
- * doesn't. Throws when an intermediate value isn't a container, an array
- * index is out of range, or a [key=value] matcher finds no element.
+ * doesn't (documented from `comments`, which an existing key never gets). Throws
+ * when an intermediate value isn't a container, an array index is out of
+ * range, or a [key=value] matcher finds no element.
  */
-function applySingleEdit(source, path, value) {
+function applySingleEdit(source, path, value, comments) {
   const steps = parsePath(path);
   const unit = detectIndentUnit(source);
   let node = parseRoot(source);
@@ -439,7 +488,7 @@ function applySingleEdit(source, path, value) {
     const entry = [...node.entries].reverse().find((candidate) => candidate.key === step.name);
 
     if (!entry) {
-      return insertProperty(source, node, path, steps.slice(i), value, unit);
+      return insertProperty(source, node, path, steps.slice(i), value, unit, comments);
     }
 
     if (isLast) {
@@ -491,14 +540,18 @@ function pendingEdits(parsed, edits) {
  *
  * @param {string} source - omega.json5 text.
  * @param {Object<string, *>} edits - Dot-path → value (JSON-serializable).
+ * @param {object} [options]
+ * @param {Object<string, string>} [options.comments] - Dot-path → guiding
+ *   comment, written above the property when the path is INSERTED (#478). A
+ *   path that already exists keeps its own documentation.
  * @returns {string} The edited source.
  */
-function applyConfigEdits(source, edits) {
+function applyConfigEdits(source, edits, { comments = {} } = {}) {
   let current = source;
   let parsed = JSON5.parse(source);
 
   for (const [path, value] of pendingEdits(parsed, edits)) {
-    current = applySingleEdit(current, path, value);
+    current = applySingleEdit(current, path, value, comments);
     try {
       parsed = JSON5.parse(current);
     } catch (e) {
@@ -523,10 +576,10 @@ function applyConfigEdits(source, edits) {
  *
  * @param {string} projectDir - Project root (brand root in a brand monorepo).
  * @param {Object<string, *>} edits - Dot-path → value.
- * @param {{ dryRun?: boolean }} [options]
+ * @param {{ dryRun?: boolean, comments?: Object<string, string> }} [options]
  * @returns {{ path: string, changed: boolean, applied: string[] }}
  */
-function writeConfigValues(projectDir, edits, { dryRun = false } = {}) {
+function writeConfigValues(projectDir, edits, { dryRun = false, comments = {} } = {}) {
   const configPath = resolveConfigPath(projectDir);
   if (!configPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} — cannot write config values`);
@@ -537,7 +590,7 @@ function writeConfigValues(projectDir, edits, { dryRun = false } = {}) {
   // Every writeback also normalizes top-level key order (comments travel
   // with their keys) — lazy require: order.js depends on this module
   const { applyCanonicalOrder } = require('./order.js');
-  const next = applyCanonicalOrder(applyConfigEdits(source, edits));
+  const next = applyCanonicalOrder(applyConfigEdits(source, edits, { comments }));
 
   if (next !== source && !dryRun) {
     fs.writeFileSync(configPath, next);
@@ -546,4 +599,171 @@ function writeConfigValues(projectDir, edits, { dryRun = false } = {}) {
   return { path: configPath, changed: next !== source, applied };
 }
 
-module.exports = { applyConfigEdits, writeConfigValues, parseRoot };
+// ─── Removal (#612) ──────────────────────────────────────────────────────────
+
+/**
+ * Walk to the object entry a dot-path names. Returns null when any step is
+ * missing — a removal with nothing to remove is a no-op, never an error.
+ * Throws when the path names an ARRAY ELEMENT: elements are user-authored and
+ * writeback neither creates nor deletes them.
+ */
+function locateEntry(source, path) {
+  const steps = parsePath(path);
+  let node = parseRoot(source);
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const isLast = i === steps.length - 1;
+    const elementError = () => new Error(`Cannot remove '${path}': it names an array element (elements are never removed by writeback)`);
+
+    if (step.type === 'match') {
+      if (node.kind !== 'array') return null;
+      const item = node.items.find((candidate) => matchesElement(source, candidate, step));
+      if (!item) return null;
+      if (isLast) throw elementError();
+      node = item;
+      continue;
+    }
+
+    if (node.kind === 'array') {
+      if (!/^\d+$/.test(step.name)) return null;
+      const item = node.items[Number(step.name)];
+      if (!item) return null;
+      if (isLast) throw elementError();
+      node = item;
+      continue;
+    }
+
+    if (node.kind !== 'object') return null;
+
+    // Duplicate keys: JSON5 keeps the last one, so remove the last one
+    const entry = [...node.entries].reverse().find((candidate) => candidate.key === step.name);
+    if (!entry) return null;
+    if (isLast) return entry;
+    node = entry.valueNode;
+  }
+
+  return null;
+}
+
+/**
+ * The source span one entry occupies, comments included.
+ *
+ * A property on its own line takes its whole line(s) — the `//` comment block
+ * documenting it above, and a trailing comment on its own line — because that
+ * comment describes the key being deleted and would otherwise dangle over the
+ * next one. A property sharing its line (`{ a: 1, b: 2 }`) takes only itself
+ * plus the separator that held it: the space after when it carries a comma,
+ * the comma before when it is the last one.
+ */
+function removalSpan(source, entry) {
+  const lineStart = source.lastIndexOf('\n', entry.keyStart - 1) + 1;
+  const ownsLine = /^[ \t]*$/.test(source.slice(lineStart, entry.keyStart));
+  const after = source.slice(entry.commaEnd);
+  const tail = after.match(/^[ \t]*(\/\/[^\n]*)?\n/);
+
+  if (ownsLine && tail) {
+    let start = lineStart;
+    while (start > 0) {
+      const previousStart = source.lastIndexOf('\n', start - 2) + 1;
+      if (!/^[ \t]*\/\//.test(source.slice(previousStart, start))) break;
+      start = previousStart;
+    }
+
+    let end = entry.commaEnd + tail[0].length;
+    // Two blank lines back to back is the removal's own litter, not the
+    // author's formatting — one of them goes with it.
+    const blankBefore = /(^|\n)[ \t]*\n$/.test(source.slice(0, start));
+    const blankAfter = source.slice(end).match(/^[ \t]*\n/);
+    if (blankBefore && blankAfter) {
+      end += blankAfter[0].length;
+    }
+
+    return { start, end };
+  }
+
+  if (entry.hasComma) {
+    return { start: entry.keyStart, end: entry.commaEnd + (after.match(/^[ \t]*/) || [''])[0].length };
+  }
+
+  // Last property on the line: the comma that separated it goes too
+  let start = entry.keyStart;
+  while (start > 0 && /[ \t]/.test(source[start - 1])) start -= 1;
+  if (source[start - 1] === ',') start -= 1;
+
+  return { start, end: entry.commaEnd };
+}
+
+/**
+ * Delete dot-paths from JSON5 source text, preserving every byte outside the
+ * removed spans. Absent paths are skipped, so reruns are byte-identical.
+ * Verifies its own output after each removal: the result must parse and the
+ * path must be gone, or this throws and nothing is returned.
+ *
+ * @param {string} source - omega.json5 text.
+ * @param {string[]} paths - Dot-paths to delete (see the edit-path grammar).
+ * @returns {string} The edited source.
+ */
+function applyConfigRemovals(source, paths) {
+  let current = source;
+  let parsed = JSON5.parse(source);
+
+  for (const path of paths) {
+    // A duplicated key hides a second copy behind the first — keep cutting
+    // until the path reads undefined, which is what the file MEANS.
+    while (getAtPath(parsed, path) !== undefined) {
+      const entry = locateEntry(current, path);
+      if (!entry) {
+        throw new Error(`Config removal '${path}' resolves to a value with no property to delete — nothing written`);
+      }
+
+      const { start, end } = removalSpan(current, entry);
+      const next = current.slice(0, start) + current.slice(end);
+
+      try {
+        parsed = JSON5.parse(next);
+      } catch (e) {
+        throw new Error(`Config removal '${path}' produced unparseable output — nothing written: ${e.message}`);
+      }
+
+      current = next;
+    }
+  }
+
+  return current;
+}
+
+/**
+ * Delete paths from a project's omega.json5 on disk. Resolves the file via
+ * the standard locations, skips the write when nothing changes, and reports
+ * which paths were actually there. `dryRun` computes everything (including
+ * the removal + verification) but never writes.
+ *
+ * Unlike writeConfigValues this does NOT normalize top-level key order: a
+ * deletion is surgical, and re-sorting a hand-authored file around it would
+ * bury the one line the caller means to report.
+ *
+ * @param {string} projectDir - Project root (brand root in a brand monorepo).
+ * @param {string[]} paths - Dot-paths to delete.
+ * @param {{ dryRun?: boolean }} [options]
+ * @returns {{ path: string, changed: boolean, removed: string[] }}
+ */
+function removeConfigValues(projectDir, paths, { dryRun = false } = {}) {
+  const configPath = resolveConfigPath(projectDir);
+  if (!configPath) {
+    throw new Error(`No ${FILE_NAME} found under ${projectDir} — cannot remove config values`);
+  }
+
+  const source = fs.readFileSync(configPath, 'utf8');
+  const parsed = JSON5.parse(source);
+  const removed = paths.filter((path) => getAtPath(parsed, path) !== undefined);
+  const next = applyConfigRemovals(source, paths);
+
+  if (next !== source && !dryRun) {
+    fs.writeFileSync(configPath, next);
+  }
+
+  return { path: configPath, changed: next !== source, removed };
+}
+
+module.exports = { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues, parseRoot };

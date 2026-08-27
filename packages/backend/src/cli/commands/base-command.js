@@ -111,11 +111,16 @@ class BaseCommand {
    * Stage the authored target tree into dist/ (the src/dist pillar's build step).
    * Every runtime surface calls this before touching dist/ — emulator, serve,
    * test, deploy — so the staged tree is always fresh.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.deploy] - Stage for an UPLOAD: the .env loses its
+   *   dev-only rows (#586). Every local lane re-stages without it, so a deploy
+   *   never leaves the emulator without its dev payment secrets.
    */
-  ensureStaged() {
+  ensureStaged({ deploy = false } = {}) {
     const { stageFunctions } = require('../utils/stage-functions');
-    stageFunctions({ projectDir: this.main.firebaseProjectPath });
-    this.log(chalk.gray('  Staged dist/ from src/ (omega build)'));
+    stageFunctions({ projectDir: this.main.firebaseProjectPath, deploy });
+    this.log(chalk.gray(`  Staged dist/ from src/ (omega build${deploy ? ', deploy: dev-only keys stripped' : ''})`));
   }
 
   /**

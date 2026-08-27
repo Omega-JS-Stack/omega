@@ -33,7 +33,9 @@
  *     stylesheet only hides reveal targets under that stamp, so no-JS pages
  *     render fully visible.
  *   - prefers-reduced-motion: reveals resolve instantly, countups render their
- *     final value, rotators hold the first word, marquees stay static.
+ *     final value, rotators hold the first word, marquees stay static, and any
+ *     `video[autoplay]` parks paused with its controls on (CSS cannot pause a
+ *     video, so this lane owns it for every autoplaying band).
  *   - start() is idempotent; a MutationObserver picks up inserted content, and
  *     scan(root) is exposed for callers that render into detached roots.
  */
@@ -564,6 +566,28 @@ function createMotion() {
     });
   };
 
+  // ── autoplaying video ──────────────────────────────────────────────────────
+
+  const setupVideo = (el) => {
+    if (el.dataset.omegaVideoReady) {
+      return;
+    }
+    el.dataset.omegaVideoReady = 'true';
+
+    if (!prefersReducedMotion()) {
+      return; // the authored playback stands
+    }
+
+    // CSS can park an animation; it cannot pause a <video>. So the engine
+    // does: the poster (or first frame) holds, the controls come on, and the
+    // visitor decides whether anything moves. One lane for every autoplaying
+    // band — no section forks its own.
+    el.removeAttribute('autoplay');
+    el.autoplay = false;
+    el.controls = true;
+    el.pause?.();
+  };
+
   // ── scroll watch ───────────────────────────────────────────────────────────
 
   const syncScrollWatchers = () => {
@@ -607,6 +631,7 @@ function createMotion() {
     all('[data-omega-rotate]').forEach(setupRotate);
     all('[data-omega-marquee]').forEach(setupMarquee);
     all('[data-omega-scroll-watch]').forEach(setupScrollWatch);
+    all('video[autoplay]').forEach(setupVideo);
     all('[data-omega-segmented]').forEach(setupSegmented);
     all('[data-omega-dotfield]').forEach(setupDotfield);
   };

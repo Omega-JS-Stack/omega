@@ -17,9 +17,9 @@
  */
 const { chosenProvider } = require('@omega.js/config');
 
-const { REQUIRES } = require('../../config.js');
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { SentryAPI } = require('./lib/sentry-api.js');
 
 module.exports.run = createServiceRunner({
@@ -43,7 +43,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.sentryApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.monitoring.env);
+      const gate = await requestServiceInput(context, serviceInputSpec('monitoring'));
       if (gate) return gate;
     }
 

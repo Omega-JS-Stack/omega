@@ -1,13 +1,15 @@
 /**
  * Ensure a Stripe webhook endpoint exists for this brand's backend.
  *
- * Matches by exact URL, re-enables endpoints Stripe auto-disabled after
- * repeated failures, diffs enabled_events, updates when drifted, creates
- * when missing. Skipped for shared Firebase projects (no api.{domain}
- * backend to receive events). Requires OMEGA_WEBHOOK_KEY.
+ * Matches by exact URL, deletes every OTHER endpoint on the brand's API host
+ * (stale twins — one endpoint per host, and endpoints on other hosts are never
+ * touched), re-enables endpoints Stripe auto-disabled after repeated failures,
+ * diffs enabled_events, updates when drifted, creates when missing. Skipped for
+ * shared Firebase projects (no api.{domain} backend to receive events).
+ * Requires OMEGA_WEBHOOK_KEY.
  */
 const chalk = require('chalk').default;
-const { buildWebhookUrl, diffEventSets, redactWebhookUrl } = require('../lib/payment-utils.js');
+const { buildWebhookUrl, diffEventSets, redactWebhookUrl, staleWebhookEndpoints } = require('../lib/payment-utils.js');
 
 // Events the backend handles for subscription/payment processing
 const ENABLED_EVENTS = [
@@ -60,6 +62,19 @@ module.exports = async function ensureStripeWebhook(context) {
   const desiredUrl = buildWebhookUrl(brandConfig, 'stripe');
 
   const { data: webhooks = [] } = await api.listWebhookEndpoints();
+
+  // Exactly ONE endpoint on the brand's API host: the desired URL. Legacy twins
+  // there receive every event and answer 400 forever (#570).
+  for (const stale of staleWebhookEndpoints(webhooks, desiredUrl)) {
+    if (dryRun) {
+      console.log(`      ${chalk.cyan('-')} Would delete stale webhook ${chalk.dim(redactWebhookUrl(stale.url))} ${chalk.yellow('[DRY RUN]')}`);
+      continue;
+    }
+
+    await api.deleteWebhookEndpoint(stale.id);
+    console.log(`      ${chalk.yellow('⚠')} Deleted stale webhook ${chalk.dim(`(${stale.id})`)} ${redactWebhookUrl(stale.url)}`);
+  }
+
   const existing = webhooks.find((wh) => wh.url === desiredUrl);
 
   if (existing) {

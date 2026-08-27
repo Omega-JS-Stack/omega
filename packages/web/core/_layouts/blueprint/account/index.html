@@ -2,9 +2,10 @@
 layout: frontend/pages/account/index
 
 meta:
-  title: "Account - {{ site.brand.name }}"
-  description: "Manage your account settings on {{ site.brand.name }}."
+  title: "Account - {{ resolved.config.brand.name }}"
+  description: "Manage your account settings on {{ resolved.config.brand.name }}."
   breadcrumb: "Account"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 ---
 
 {{ content | omega_content_format }}

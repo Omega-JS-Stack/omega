@@ -5,20 +5,20 @@ sitemap:
 ---
 {
   "version": "https://jsonfeed.org/version/1",
-  "title": "{{ site.brand.name | omega_json_escape }} Blog",
-  "home_page_url": "{{ site.url }}/blog",
-  "feed_url": "{{ site.url }}/feeds/posts.json",
-  "description": "{{ site.brand.description | omega_json_escape }}",
+  "title": "{{ resolved.config.brand.name | omega_json_escape }} Blog",
+  "home_page_url": "{{ resolved.config.url }}/blog",
+  "feed_url": "{{ resolved.config.url }}/feeds/posts.json",
+  "description": "{{ resolved.config.brand.description | omega_json_escape }}",
   "generator": "OMEGA (@omega.js/web)",
   "language": "en",
-  "favicon": "{{ site.url }}/assets/images/favicon/favicon-32x32.png",
+  "favicon": "{{ resolved.config.url }}/assets/images/favicon/favicon-32x32.png",
   "items": [
     {%- assign first = true -%}
     {%- for post in collections.posts limit: 25 -%}
     {%- unless first %},{% endunless -%}{%- assign first = false %}
     {
-      "id": "{{ site.url }}{{ post.url }}",
-      "url": "{{ site.url }}{{ post.url }}",
+      "id": "{{ resolved.config.url }}{{ post.url }}",
+      "url": "{{ resolved.config.url }}{{ post.url }}",
       "title": "{{ post.data.post.title | strip_html | omega_json_escape }}",
       "date_published": "{{ post.date | date: "%Y-%m-%dT%H:%M:%S" }}.000Z",
       {%- if post.data.post.image %}
@@ -30,7 +30,7 @@ sitemap:
       "content_text": "{{ post.templateContent | strip_html | omega_json_escape }}",
       "content_html": "{{ post.templateContent | omega_strip_ads | omega_json_escape }}",
       "authors": [
-        { "name": "{{ site.brand.name | omega_json_escape }}" }
+        { "name": "{{ resolved.config.brand.name | omega_json_escape }}" }
       ],
       "summary": "{{ post.data.post.description | default: '' | strip_html | omega_json_escape }}",
       "tags": {% if post.data.post.categories %}{{ post.data.post.categories | json }}{% else %}[]{% endif %}

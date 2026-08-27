@@ -8,13 +8,18 @@
  * instance (`main` → the canonical dir, any other id → `<canonical>-<id>`) —
  * an enabled instance without its dir is the same create-this-dir error. The
  * single-object form keeps today's any-dir-of-the-type check untouched.
+ *
+ * Custom targets (#603) map to no framework by design, so they are checked BY
+ * DIR (the declaration names it) and never counted among the unmapped — this
+ * service is one of the two ops that see them at all.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { normalizeTargetInstances, instanceTargetDir } = require('@omega.js/config');
+const { normalizeTargetInstances, instanceTargetDir, isCustomTargetEntry } = require('@omega.js/config');
 const { TARGET_DIRS } = require('../../../config.js');
+const { customTargetDirs } = require('../../../lib/custom-target.js');
 
 module.exports = async ({ brandRoot, brand, targets }) => {
   const problems = [];
@@ -37,6 +42,17 @@ module.exports = async ({ brandRoot, brand, targets }) => {
   for (const target of brand.enabledTargets) {
     const declared = brand.config?.targets?.[target];
 
+    // A custom target's dirs are named by its own declaration, one per
+    // instance — the same create-this-dir error, checked by name
+    if (isCustomTargetEntry(declared)) {
+      for (const dir of customTargetDirs({ targets: { [target]: declared } })) {
+        if (!targets.some((entry) => entry.name === dir)) {
+          problems.push(`enabled custom target "${target}" has no dir — create targets/${dir}/`);
+        }
+      }
+      continue;
+    }
+
     if (Array.isArray(declared)) {
       for (const instance of normalizeTargetInstances(declared)) {
         if (typeof instance?.id !== 'string') continue;
@@ -54,10 +70,11 @@ module.exports = async ({ brandRoot, brand, targets }) => {
     }
   }
 
-  // Dirs that resolve to no target are suspicious but not fatal
-  const unmapped = targets.filter((entry) => !entry.target);
+  // Dirs that resolve to no target are suspicious but not fatal — a DECLARED
+  // custom dir is neither: the brand said what it is
+  const unmapped = targets.filter((entry) => !entry.target && !entry.custom);
   for (const entry of unmapped) {
-    findings.push(`${entry.dir} maps to no target — declare one in its omega.json5 or use a conventional dir name`);
+    findings.push(`${entry.dir} maps to no target — declare one in its omega.json5, use a conventional dir name, or declare it \`type: 'custom'\``);
   }
 
   if (problems.length > 0) {
@@ -67,7 +84,7 @@ module.exports = async ({ brandRoot, brand, targets }) => {
     return { status: 'error', error: problems.join('; '), output: { problems } };
   }
 
-  console.log(`      ${chalk.green('✓')} ${targets.length} target(s): ${targets.map((entry) => `${entry.name}→${entry.target || '?'}`).join(', ')}`);
+  console.log(`      ${chalk.green('✓')} ${targets.length} target(s): ${targets.map((entry) => `${entry.name}→${entry.target || (entry.custom ? 'custom' : '?')}`).join(', ')}`);
 
   if (findings.length > 0) {
     for (const finding of findings) {

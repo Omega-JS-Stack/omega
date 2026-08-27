@@ -4,20 +4,20 @@ layout: frontend/core/base
 permalink: /
 
 #### THEME CONFIG ####
-theme:
-  main:
-    class: "pt-0"
-
 ### REGULAR PAGES ###
 meta:
-  title: "{{ site.meta.title }}"
-  description: "{{ site.meta.description }}"
+  title: "{{ resolved.config.meta.title }}"
+  description: "{{ resolved.config.meta.description }}"
 
 schema:
   software_application:
     enabled: true
     application_category: "SocialNetworkingApplication"
     operating_system: "Windows, macOS, Linux"
+config:
+  theme:
+    main:
+      class: "pt-0"
 ---
 
 <!-- Hero Section -->

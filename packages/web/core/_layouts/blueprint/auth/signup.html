@@ -2,16 +2,18 @@
 layout: frontend/pages/auth/signup
 
 meta:
-  title: "Signup - {{ site.brand.name }}"
-  description: "Create an account with {{ site.brand.name }} to get started."
+  title: "Signup - {{ resolved.config.brand.name }}"
+  description: "Create an account with {{ resolved.config.brand.name }} to get started."
   breadcrumb: "Signup"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 
-client:
-  auth:
-    config:
-      policy: "unauthenticated"
-      redirects:
-        authenticated: "/"
+config:
+  client:
+    auth:
+      config:
+        policy: "unauthenticated"
+        redirects:
+          authenticated: "/"
 ---
 
 {{ content | omega_content_format }}

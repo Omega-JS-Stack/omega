@@ -38,7 +38,9 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { canPrompt } = require('../../lib/run-gates.js');
 const { writeEnvValue } = require('../../lib/env-secret.js');
 const { createAppleClient } = require('./lib/apple-api.js');
@@ -134,18 +136,18 @@ async function rescueAuthKey(appleDir, downloadsDir = join(homedir(), 'Downloads
  */
 async function resolveAppleSecrets(context, appleDir, signingRoot) {
   const dryRun = context.options?.dryRun || false;
+
+  // The shared setup contract (#608): an interactive run walks the App Store
+  // Connect keys page and takes the three ids right here; a headless one steps
+  // aside loudly, and "disable" retires the service for this brand.
+  const gate = await requestServiceInput(context, serviceInputSpec('certificates'));
+  if (gate) {
+    return gate;
+  }
+
   const issuerId = process.env.APPLE_API_ISSUER;
   const keyId = process.env.APPLE_API_KEY_ID;
   const teamId = process.env.APPLE_TEAM_ID;
-
-  const missing = [];
-  if (!issuerId) missing.push('APPLE_API_ISSUER');
-  if (!keyId) missing.push('APPLE_API_KEY_ID');
-  if (!teamId) missing.push('APPLE_TEAM_ID');
-
-  if (missing.length > 0) {
-    return { skip: true, reason: `no Apple credentials configured (set ${missing.join(', ')} in the brand .env)` };
-  }
 
   let privateKeyPath = findAuthKey(appleDir);
   if (!privateKeyPath && canPrompt(context.options)) {

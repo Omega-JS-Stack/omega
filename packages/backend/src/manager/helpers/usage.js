@@ -9,6 +9,7 @@ const moment = require('moment');
 const _ = require('lodash');
 const hcaptcha = require('hcaptcha');
 const User = require('./user.js');
+const env = require('../libraries/env.js');
 
 function Usage(m) {
   const self = this;
@@ -50,7 +51,7 @@ Usage.prototype.init = function (ctx, options) {
     }
 
     // Add @omega.js/backend to whitelist keys
-    options.whitelistKeys.push(process.env.OMEGA_ADMIN_KEY);
+    options.whitelistKeys.push(env.get('OMEGA_ADMIN_KEY'));
 
     // Set options
     self.options = options;
@@ -227,7 +228,7 @@ Usage.prototype.validate = function (name, options) {
     if (captchaResponse && options.useCaptchaResponse) {
       self.log(`Usage.validate(): Checking captcha response`, captchaResponse);
 
-      const captchaResult = await hcaptcha.verify(process.env.HCAPTCHA_SECRET, captchaResponse)
+      const captchaResult = await hcaptcha.verify(env.get('HCAPTCHA_SECRET'), captchaResponse)
         .then((data) => data)
         .catch((e) => e);
 

@@ -1,0 +1,41 @@
+{
+  description: 'The head-plus-lede band — the standard section head cluster over one or more paragraphs of copy. No items, no media: when a page just needs a heading and a couple of sentences, this is the section (before it, that shape had to fake itself with an item-less showcase). A SHARED band, so the defaults stay NEUTRAL and every caller passes its own words (spec §6).',
+
+  args: {
+    superheadline: 'string',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    body: 'array', // the paragraphs, in order — one <p> each; absent renders the head alone
+  },
+
+  // Neutral by design: a band that serves every page can never carry one
+  // page's copy (spec §6 shared-band ruling).
+  defaults: {},
+
+  // Showcase variants (spec §9) — the band is neutral, so the demos supply
+  // the copy exactly the way a caller does.
+  demo: [
+    {
+      label: 'Head and lede',
+      args: {
+        superheadline: 'About',
+        headline: 'Built by people who',
+        headline_accent: 'ship',
+        subheadline: 'The short version.',
+        body: [
+          'We started {{ resolved.config.brand.name }} because the tooling kept getting in the way of the work. Every project began the same way: a week of plumbing before a single feature.',
+          'So we built the plumbing once, and kept building on it. That is still the whole idea.',
+        ],
+      },
+    },
+    {
+      label: 'Head only',
+      args: {
+        superheadline: 'How it works',
+        headline: 'Three steps, and',
+        headline_accent: "you're live",
+      },
+    },
+  ],
+}

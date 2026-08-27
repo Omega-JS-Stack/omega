@@ -121,11 +121,16 @@ function app(t, pages) {
 }
 
 const noop = () => {};
-const stubConfig = () => ({
-  addWatchTarget: noop, setLiquidOptions: noop, setIncludesDirectory: noop, amendLibrary: noop,
-  addGlobalData: noop, addPreprocessor: noop, addFilter: noop, addUrlTransform: noop,
-  addTransform: noop, addTemplate: noop, addCollection: noop, on: noop, ignores: new Set(),
-});
+const stubConfig = () => {
+  const config = {
+    addWatchTarget: noop, setLiquidOptions: noop, setIncludesDirectory: noop, amendLibrary: noop,
+    addGlobalData: noop, addPreprocessor: noop, addFilter: noop, addUrlTransform: noop,
+    addTransform: noop, addTemplate: noop, addCollection: noop, on: noop, ignores: new Set(),
+    // Eleventy hands a function plugin the config itself (#488's slugifier).
+    addPlugin: (plugin, ...args) => plugin(config, ...args),
+  };
+  return config;
+};
 
 const configure = (fixture, environment) => configureOmega(stubConfig(), {
   consumerDir: fixture.consumerDir,

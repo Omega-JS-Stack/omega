@@ -126,7 +126,15 @@ export function buildBindingsState() {
         annualMonthlyRate: formatCurrency(annualPrice ? annualPrice / 12 : null),
         savingsBadge: savingsPercent > 0 ? `Save ${savingsPercent}%` : '',
         showSavingsBadge: savingsPercent > 0,
-        frequencyPaymentText: `${formatCurrency(cyclePrice)} ${frequencyLabels[cycle] || cycle}`,
+        // `once` is not a cadence (#558, the checkout-side sibling of #282):
+        // `cycle` is the URL default for EVERY product, so pricing a one-time
+        // buy by cycle quoted "$0.00 annually" under a $49.99 product while
+        // the rows beneath it said $49.99. calculatePrices() is the one place
+        // that knows the `once` key, and its subtotal is the list price the
+        // summary line names.
+        frequencyPaymentText: isSubscription
+          ? `${formatCurrency(cyclePrice)} ${frequencyLabels[cycle] || cycle}`
+          : `${formatCurrency(prices.subtotal)} one-time`,
         subtotal: formatCurrency(prices.subtotal),
         total: formatCurrency(prices.total),
         totalDueText: `${formatCurrency(prices.total)} due today`,

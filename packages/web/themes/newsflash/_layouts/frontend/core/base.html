@@ -1,14 +1,15 @@
 ---
 layout: core/root
 
-theme:
-  # html:
-  #   class: ""
-  # Fonts are VENDORED (css/base/_fonts.scss + fonts/) — no CDN link here.
-  body:
-    class: "d-flex flex-column min-vh-100"
-  # main:
-  #   class: "flex-fill"
+config:
+  theme:
+    # html:
+    #   class: ""
+    # Fonts are VENDORED (css/base/_fonts.scss + fonts/) — no CDN link here.
+    body:
+      class: "d-flex flex-column min-vh-100"
+    # main:
+    #   class: "flex-fill"
 ---
 
 <!-- News ticker — the latest headlines marquee above the masthead.
@@ -17,7 +18,7 @@ theme:
      are aria-hidden + untabbable, reduced-motion/no-JS = static row).
      Absent when the site has no posts. Nav-chrome: pages that disable the
      masthead (cover chain — 404, auth) drop the ticker with it. -->
-{% if site.posts.size > 0 and resolved.theme.nav.enabled != false %}
+{% if site.posts.size > 0 and resolved.config.theme.nav.enabled != false %}
   <div class="newsflash-ticker omega-marquee" data-omega-marquee="50">
     <div class="newsflash-ticker__track omega-marquee__track">
       {% for post in site.posts limit: 5 %}
@@ -27,7 +28,7 @@ theme:
           {% else %}
             {% omega_icon "bolt" %}
           {% endif %}
-          <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
+          <a href="{{ resolved.config.url }}{{ post.url }}">{{ post.post.title }}</a>
         </span>
       {% endfor %}
     </div>
@@ -35,16 +36,16 @@ theme:
 {% endif %}
 
 <!-- Nav (controlled by page/layout front matter) -->
-{% unless resolved.theme.nav.enabled == false %}
+{% unless resolved.config.theme.nav.enabled == false %}
   {%- include frontend/sections/nav.html -%}
 {% endunless %}
 
 <!-- Main Content -->
-<main id="main-content" class="flex-fill {{ resolved.theme.main.class | omega_liquify }}" aria-label="Main content">
+<main id="main-content" class="flex-fill {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
   {{ content | omega_content_format }}
 </main>
 
 <!-- Footer (controlled by page/layout front matter) -->
-{% unless resolved.theme.footer.enabled == false %}
+{% unless resolved.config.theme.footer.enabled == false %}
   {%- include frontend/sections/footer.html -%}
 {% endunless %}

@@ -3,9 +3,9 @@ permalink: /ads.txt
 sitemap:
   include: false
 ---
-{%- assign adsense = site.advertising.providers.adsense -%}
-{%- if adsense.client %}
+{%- assign adsense = resolved.config.advertising.providers.adsense -%}
+{%- if adsense.client -%}
 google.com, {{ adsense.client | remove: "ca-" }}, DIRECT, f08c47fec0942fa0
-{%- else %}
+{%- else -%}
 # No advertising providers configured
 {%- endif %}

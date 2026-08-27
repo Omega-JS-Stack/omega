@@ -61,9 +61,19 @@ export default async function ({ manager, options } = {}) {
   // switcher + quick links. Dynamic import so production pages never load
   // the chunk; the branch itself is a two-line no-op there.
   if (omega.isDevelopment()) {
-    import('__main_assets__/js/core/dev-palette.js')
-      .then(({ default: devPalette }) => devPalette())
-      .catch((error) => console.error('Failed to load dev-palette.js:', error));
+    // …but never INSIDE a frame (#555, Ian's ruling 2026-08-25): the showcase
+    // gallery stacks one embedded document per demo variant, and a pull-tab in
+    // every frame is the same noise the cookie banner and the chat widget
+    // already stopped making there. Those two ride the frame page's own
+    // frontmatter (the client mounts chatsy before this module runs, so a
+    // runtime flag could never reach it); the palette is imported HERE, so the
+    // iframe mark core/_includes/core/body.html stamps before first paint is
+    // all this needs.
+    if (document.documentElement.getAttribute('data-iframed') !== 'true') {
+      import('__main_assets__/js/core/dev-palette.js')
+        .then(({ default: devPalette }) => devPalette())
+        .catch((error) => console.error('Failed to load dev-palette.js:', error));
+    }
 
     // Missing-icon loudness (Ian 2026-07-16): every fallback triangle the
     // build stamped becomes a console.error in dev
@@ -76,7 +86,13 @@ export default async function ({ manager, options } = {}) {
   // template literals) — esbuild resolves and inlines each dynamic import;
   // webpack-style expression contexts don't exist here.
   const conditionalModules = [
-    { path: 'consent.js', configKey: 'consent', load: () => import('__main_assets__/js/core/consent.js') },
+    // The consent gate is the one DEFAULT-ON module (`client.consent.enabled`,
+    // schema default true): a config that never mentions it still ships the
+    // banner, and only an explicit `false` drops it. Read strict-truthy, any
+    // config assembled outside loadConfig()'s materialization shipped a site
+    // with no consent gate while the schema promised one
+    // ([#551](https://github.com/Omega-JS-Stack/omega/issues/551)).
+    { path: 'consent.js', configKey: 'consent', defaultOn: true, load: () => import('__main_assets__/js/core/consent.js') },
     { path: 'exit-popup.js', configKey: 'exitPopup', load: () => import('__main_assets__/js/core/exit-popup.js') },
     { path: 'social-sharing.js', configKey: 'socialSharing', load: () => import('__main_assets__/js/core/social-sharing.js') }
   ];
@@ -87,7 +103,9 @@ export default async function ({ manager, options } = {}) {
   // Add conditional modules if enabled
   for (const module of conditionalModules) {
     const moduleConfig = omega.config[module.configKey];
-    if (moduleConfig?.enabled) {
+    const enabled = module.defaultOn ? moduleConfig?.enabled !== false : !!moduleConfig?.enabled;
+
+    if (enabled) {
       modulePromises.push(
         module.load()
           .then(({ default: moduleFunc }) => moduleFunc({ manager, options }))

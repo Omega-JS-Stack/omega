@@ -2,7 +2,7 @@
 layout: frontend/core/cover
 
 app:
-  protocol: "{{ site.brand.id | default: site.brand.name | slugify }}://"
+  protocol: "{{ resolved.config.brand.id | default: resolved.config.brand.name | slugify }}://"
 ---
 
 <!-- Self-contained, token-driven (mirrors the redirect interstitial) -->
@@ -92,11 +92,11 @@ app:
   <div class="omega-launch">
     <!-- Brand mark -->
     <span class="omega-launch__mark">
-      <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+      <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
     </span>
 
     <!-- Header -->
-    <h1 class="omega-launch__title">Opening <em>{{ site.brand.name }}</em></h1>
+    <h1 class="omega-launch__title">Opening <em>{{ resolved.config.brand.name }}</em></h1>
     <p class="omega-launch__sub">Handing you off to the desktop app.</p>
 
     <!-- Progress -->
@@ -111,7 +111,7 @@ app:
         {% omega_icon "triangle-exclamation", "me-2" %}
         <div>
           <strong>App not installed?</strong><br>
-          <small>Download {{ site.brand.name }} for your platform below.</small>
+          <small>Download {{ resolved.config.brand.name }} for your platform below.</small>
         </div>
       </div>
     </div>

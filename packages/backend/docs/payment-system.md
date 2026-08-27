@@ -10,9 +10,41 @@ The payment system follows a linear pipeline: **Intent → Webhook → On-Write 
 
 2. **Webhook** (`POST /payments/webhook?provider=X&key=Y`): Provider sends event data. @omega.js/backend parses and categorizes the event (`subscription` or `one-time`), extracts the UID, and saves to `payments-webhooks/{eventId}` with `status: 'pending'`.
 
-3. **On-Write** (Firestore trigger on `payments-webhooks/{eventId}`): Fetches the latest resource from the provider API (not stale webhook data), transforms it into a unified object, detects state transitions, dispatches handlers, tracks analytics, and writes to `users/{uid}.subscription` (subscriptions) and `payments-orders/{orderId}`.
+3. **On-Write** (Firestore trigger on `payments-webhooks/{eventId}`): Fetches the resource from the provider API — [the only trusted source](#a-lookup-the-provider-cannot-answer-never-processes-the-payload), never the object the webhook body carried — transforms it into a unified object, detects state transitions, dispatches handlers, tracks analytics, and writes to `users/{uid}.subscription` (subscriptions) and `payments-orders/{orderId}`.
 
 4. **Transitions** (fire-and-forget): Handler files run asynchronously after detection. Failures never block webhook processing. Skipped during tests unless `TEST_EXTENDED_MODE` is set.
+
+### A lookup the provider cannot answer never processes the payload
+
+**The provider's lookup response is the only trusted source.** A webhook body is whatever the caller posted — the endpoint authenticates on the query key by design, and nothing in the body is verified — so `fetchResource()` used to swallow a failed lookup and hand that body back as the resource, flagged `_stale`. Unverified data then drove real subscription state and real conversion events ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)). There is no fallback any more, for any provider: a lookup that fails produces no resource at all, and the pipeline branches on WHICH failure it was.
+
+| Outcome | What it means | What the pipeline does |
+|---|---|---|
+| **Not found** | The provider affirmatively does not have the resource (Stripe `resource_missing`/404, a Chargebee 404, `PayPal API 404`) | **Refuse and acknowledge.** Nothing is written — no subscription, no order, no intent, no conversion. The event doc completes with `refusal` = `{ reason: 'resource-not-found', resourceType, resourceId }` and a loud `RESOURCE NOT FOUND` error naming the provider and the resource. Completed, not failed: no retry could ever turn a resource the provider does not have into one it does, so the ladder is not burned and the provider stops redelivering |
+| **Unreachable** | A timeout, a 5xx, an expired key — the answer exists and this attempt could not read it | **Defer.** The throw marks the doc `failed`, which is what the [retry sweep](#payments-webhooks-retry-state) re-pends: the redelivery IS the reconciliation mechanism. Still nothing is written off the payload |
+| **Permanent** | The lookup can never even be ATTEMPTED — a malformed envelope, a parser error. Today's one instance: a Stripe refund envelope carrying no charge id at `data.object.id` | **Fail terminally.** The doc is marked `failed` AND `deadLetter: true` on its FIRST attempt, with a loud `PERMANENT FAILURE` line and the envelope's actual shape (`type=`, `data.object.object=`, `data.object keys=[…]`) in the message. Handing `undefined` to the SDK threw something that is not a 404, so this used to classify as unreachable and burn the whole ladder ten minutes at a time before dead-lettering something the first attempt already knew was unprocessable ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)) |
+
+The split is one rule for every provider, in `libraries/payment/provider-errors.js` — the same classifier the cancel route and the trial-lapse sweep force-write against — and `libraries/payment/fetch-failure.js` is what every library's `fetchResource()` throws through, so no provider names its own not-found shape twice. Anything unrecognized is unreachable by construction: an unknown error must never be the one that drops an event.
+
+The webhook body is still read for **identifiers** — which event, which resource id, which order a failed event belonged to. What it may never do is say what STATE a resource is in. The one library that reads its own body as an answer is the [test provider](#test-provider): there is no test provider out there to ask, so the emulator's records plus the event body are its API — and the webhook route refuses `provider=test` in production.
+
+### A lookup that DOES answer says whose event it is
+
+The same rule, one step further in: on a successful lookup the uid comes from `library.getUid(resource)` — the record the provider answered with — and the payload's uid is only what that is **cross-checked** against. Reading the payload's uid first meant an event naming a REAL subscription id with a different `metadata.uid` moved that subscription onto whatever uid the caller typed ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)). Every provider's resource carries the uid this framework put on it: Stripe `metadata.uid`, PayPal `custom_id`, Chargebee `meta_data`/`cf_uid`.
+
+| The provider's record | The payload | What the pipeline does |
+|---|---|---|
+| Carries a uid | Claims the same one, or claims none | **Write, steered by the provider's.** A payload that claimed none has the resolved uid persisted on the event doc, exactly as the PayPal `PAYMENT.SALE` path always did |
+| Carries a uid | Claims a DIFFERENT one | **Refuse and acknowledge.** Nothing is written — not under the claimed uid, and not under the provider's either: an event that lies about its owner has nothing left in it worth acting on, and writing it quietly under the real owner would hide the forgery. The doc completes with `refusal` = `{ reason: 'uid-mismatch', payloadUid, providerUid, source }` and a loud `UID MISMATCH` error naming both |
+| Carries none, but the **hosted page** does | Claims anything | The hosted page is a record of the PROVIDER's, so it steers and the payload is cross-checked against it — a match writes, a mismatch earns the same `uid-mismatch` refusal, stamped `source: 'hosted-page'`. A hit also brings its `orderId` and backfills `meta_data` onto the subscription, so the next event resolves directly |
+| Carries none, and no hosted page answers | Claims one | **Write, steered by the payload's** — nothing is left to check it against. A loud `UID FALLBACK` warning names the fallback, because that write is the one that was never cross-checked |
+| Carries none, and no hosted page answers | Claims none | Unchanged: an event with no uid fails |
+
+**The hosted-page lookup runs BEFORE the payload's claim is believed.** A Chargebee hosted-page checkout does not forward `subscription[meta_data]`, so the subscription answers no uid until the backfill runs — but `pass_thru_content` on the hosted page holds ours, and that lookup used to be gated on `!uid`: it was consulted only when the payload claimed nothing, i.e. never in the one case where a claim needed checking ([#533](https://github.com/Omega-JS-Stack/omega/issues/533)).
+
+A miss **falls back, never refuses**: the scan covers only the last 25 hosted pages (`GET /hosted_pages?limit=25&sort_by[desc]=created_at`), so a null honestly means "not in the window", not "not this uid" — refusing on it would break every hosted-page checkout older than 25 pages.
+
+`provider=test` is exempt in practice, not by a branch: its `fetchResource()` may legitimately answer with the payload object, so the two uids are the same value and no mismatch can arise. Its protection is the production refusal above.
 
 ### The writes are one batch
 
@@ -25,6 +57,41 @@ A refund **updates** a purchase record; it does not redefine it. A one-time refu
 - `unified.status` → `refunded`
 - `unified.payment.refund` → `{ amount, currency, reason, date }` (from the provider library's `getRefundDetails()`)
 - product, price, and the purchase's own `resourceId` stay exactly what the completed purchase wrote
+
+**What came back is the provider's number.** `getRefundDetails()` used to read the amount, the currency and the reason out of the webhook envelope, so an event claiming an inflated refund booked that number onto the order record, into the customer's refund email and into the refund conversion ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)). It takes the resource the pipeline already looked up (`getRefundDetails(resource, { raw, refundId, eventType, resourceType, ctx })` — `resourceType` says which of the provider's back-pointers to read, [below](#a-refund-record-has-to-belong-to-the-event-that-named-it)) and answers from provider data only — the envelope is read for the lookup KEY and nothing else, the same trust level as the `resourceId` every lookup starts from. The providers are not symmetric about where a refund lives:
+
+| Provider | Where the refund's numbers come from |
+|---|---|
+| **Stripe** | The **charge**. The one-time path already fetched it (`resourceType: 'charge'`); the subscription path — whose resource is the subscription the refunded charge belongs to — reads it back by the charge id the payload names |
+| **PayPal** | The **refund's own record**: `GET /v2/payments/refunds/{id}` for `PAYMENT.CAPTURE.REFUNDED`, `GET /v1/payments/refund/{id}` for the v1 sale refunds. The sale or capture already in hand is the ORIGINAL payment — its amount is the purchase price, which a partial refund makes plainly wrong. The refund's own id rides on the parsed event as `refundId`, kept there because `resourceId` is reassigned to the sale/capture the refund reversed |
+| **Chargebee** | The **credit note**: `GET /credit_notes/{id}`, keyed by the id in the envelope. The subscription or invoice the event resolves to carries no credit-note fields at all, and the envelope's own `content.transaction` amount is no longer a fallback |
+| **Chargebee, no credit note** | The **transaction**: `GET /transactions/{id}`, keyed by `content.transaction.id` — a lookup KEY only, exactly the trust level the credit-note id has. A gateway refund issued without a credit note is a real refund, and dropping the untrusted envelope fallback without putting a trusted one in its place wrote `amount: null` onto the order and into the customer's refund email ([#534](https://github.com/Omega-JS-Stack/omega/issues/534)). Amount comes off `transaction.amount` (cents, like the credit note's `total`); `reason` stays null, because a transaction carries no `reason_code` |
+| **Test** | Stripe's reader over the charge it already has — the fetched resource when the event resolved to the charge, otherwise the event body. Never a real Stripe lookup: there is no Stripe account behind a test-provider event to answer one |
+
+A refund lookup that fails is classified by the same seam as any other ([above](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)): not-found refuses the event (the stamp names the lookup that actually missed — `charge`, `refund`, `credit_note`, `transaction`), unreachable defers it, and a Stripe envelope naming no charge id at all fails permanently before the call is made. An event that names no refund record at all — no refund id, or for Chargebee neither a credit note nor a transaction — records **no amount** rather than the payload's, and says so in the log.
+
+### A refund record has to belong to the event that named it
+
+The lookup key is the payload's, and that is where the [#510](https://github.com/Omega-JS-Stack/omega/issues/510) trust argument stopped one step short: the event's own `resourceId` is SELF-CONSISTENT (whatever it names is what gets fetched and what gets written), while a refund id imports numbers ACROSS records. An attacker holding the webhook key could pair a real sale of their own — which passes the uid check above — with an UNRELATED refund id from the same merchant account, and another customer's amount, currency and reason landed on this order, its email and its refund conversion ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)).
+
+So every refund lookup is linked back. Each provider reads its own back-pointer and hands the pair to `libraries/payment/refund-linkage.js`, where the decision is written once:
+
+| Provider | The event's resource | The record's back-pointer |
+|---|---|---|
+| **PayPal** | `sale` (v1 one-time refund) | `sale_id` |
+| **PayPal** | `capture` (v2 `PAYMENT.CAPTURE.REFUNDED`) | `links[rel=up]` — the URL's last segment is the capture id |
+| **PayPal** | `subscription` (a v1 sale refund behind a billing agreement) | none — the refund names the SALE, never the agreement, so there is nothing to compare |
+| **Chargebee** | `subscription` | `subscription_id` (credit note or transaction) |
+| **Chargebee** | `invoice` | `reference_invoice_id` (credit note), else `linked_invoices[].invoice_id` (transaction — the event's own invoice counts as the link when it is among them) |
+| **Stripe** | `subscription` | the charge's `subscription`, else its `metadata.uid` against the subscription's own uid |
+| **Stripe** | `charge` | none needed — the charge IS the resource, fetched by the event's `resourceId`, so it is self-consistent |
+| **Test** | any | none — the test provider is its own API and looks nothing up |
+
+| The record's back-pointer | What the pipeline does |
+|---|---|
+| **Disagrees** | **Refuse and acknowledge.** Nothing is written; the doc completes with `refusal` = `{ reason: 'refund-not-linked', refundType, refundId, resourceType, resourceId, linkedTo }` and a loud `REFUND NOT LINKED` error naming what the record really belongs to. Completed, not failed: no retry can relate two unrelated records |
+| **Agrees** | Proceed — the numbers are recorded exactly as before |
+| **Absent** | **Proceed, loudly.** A record carrying no back-pointer for this kind of resource (the PayPal subscription row above; a Stripe charge with neither `subscription` nor `metadata.uid`) is UNPROVEN, not wrong — the rule is refuse on mismatch, and absence is not a mismatch. A `REFUND LINK UNPROVEN` warning names the refund that was recorded without being linked back, the same posture the `UID FALLBACK` warning takes (ratified 2026-08-23 on [#532](https://github.com/Omega-JS-Stack/omega/issues/532)) |
 
 ### A refund with no purchase behind it is refused, not minted
 
@@ -267,7 +334,7 @@ Guards: authenticated, `confirmed: true`, an active or suspended paid subscripti
 
 **Analytics consults it too, with one documented widening** (`events/firestore/payments-webhooks/analytics.js` `isInsideTrial()`, which the trial-lapse sweep also reads). Chargebee's in-trial payload names no `current_term_end` at all, so `expires` folds to the epoch and the timestamp match cannot see a Chargebee trial — every Chargebee conversion read as a renewal and every Chargebee lapse reported nothing ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)). An epoch expiry is the ABSENCE of a term, not a term that ended in 1970, so for REPORTING a claimed trial with a real trial expiry and no term at all still counts. That widening stays out of `_is-trialing.js` deliberately: the shared predicate also waives the 24-hour guard, and a guard must never be waived by missing data. Reporting carries no such stake.
 
-**The widening is bounded by the state the payload arrived FROM** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). A degraded delivery carries no term either, because the [stale fallback](#pipeline) hands over the webhook's own body when the provider API is unreachable ([#222](https://github.com/Omega-JS-Stack/omega/issues/222)), and an active PAID subscription in that body is shaped exactly like a Chargebee trial: same claimed trial, same epoch expiry. Nothing inside the payload separates them, so the prior state does. A subscription already paid through a real term did not lose that term by trialing, so a term missing there is a hole in the delivery and the widening does not apply. Unbounded, a renewal on that path matched no branch at all and booked nothing: real revenue, silently unreported. The bound needs one healthy delivery behind it, which is its limit: two degraded deliveries in a row leave no term on either side, so that renewal still books nothing. It fails toward silence, never toward a fabricated number.
+**The widening is bounded by the state the payload arrived FROM** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). A degraded delivery carried no term either: the pipeline used to hand over the webhook's own body when the provider API was unreachable, and an active PAID subscription in that body is shaped exactly like a Chargebee trial — same claimed trial, same epoch expiry. Nothing inside such a payload separates them, so the prior state does. That degraded path no longer exists at all — a lookup the provider cannot answer now refuses or defers rather than processing the body ([below](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)) — and the bound stays as the guard for any other object that reaches the transformers without a term. A subscription already paid through a real term did not lose that term by trialing, so a term missing there is a hole in the delivery and the widening does not apply. Unbounded, a renewal on that path matched no branch at all and booked nothing: real revenue, silently unreported. The bound needs one healthy delivery behind it, which is its limit: two degraded deliveries in a row leave no term on either side, so that renewal still books nothing. It fails toward silence, never toward a fabricated number.
 
 The sweep passes no prior state and keeps the unbounded widening. Two other things bound it there: its candidate query only reaches trials whose `trial.expires` sits between 30 days and 24 hours ago, and `trial.outcome` is stamped once and never revisited, so a degraded record can be misread at most once and only inside that window.
 
@@ -383,7 +450,7 @@ module.exports = {
 ```javascript
 module.exports = {
   isSupported(eventType) { return boolean; },
-  parseWebhook(req) { return { eventId, eventType, category, resourceType, resourceId, raw, uid }; },
+  parseWebhook(req) { return { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid }; },
   // Optional — the provider's native signature, checked over the raw bytes
   verifySignature(req) { return { status: 'verified' | 'invalid' | 'unconfigured', reason }; },
 };
@@ -452,15 +519,21 @@ module.exports = {
 ```javascript
 module.exports = {
   init() { /* return SDK instance */ },
-  async fetchResource(resourceType, resourceId, rawFallback, context) { /* return resource */ },
+  async fetchResource(resourceType, resourceId, context) { /* return the provider's answer, or throw */ },
   extractResource(raw) { /* return the resource this provider's webhook envelope carries */ },
   getOrderId(resource) { /* return orderId string or null */ },
+  getUid(resource) { /* return the uid the provider's record carries, or null */ },
+  async getRefundDetails(resource, options) { /* { raw, refundId, eventType, resourceType, ctx } → { amount, currency, reason } from provider data, linked back to `resource` */ },
   toUnifiedSubscription(rawSubscription, options) { /* return unified object */ },
   toUnifiedOneTime(rawResource, options) { /* return unified object */ },
 };
 ```
 
-**Every library names its own envelope.** `extractResource(raw)` is how on-write builds the **stale fallback** — the payload `fetchResource()` degrades to when the provider API is unreachable. Each provider nests the resource somewhere else, so reading Stripe's shape for everyone degraded every other provider's fallback to nothing, and a Chargebee or PayPal API failure threw instead of falling back at all:
+**`fetchResource()` never falls back.** It returns what the provider answered or throws the classified failure the pipeline branches on ([above](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)) — a provider library that swallows its own lookup failure is the bug [#506](https://github.com/Omega-JS-Stack/omega/issues/506) closed.
+
+**`getRefundDetails()` answers about the resource it was handed.** The `options` bag carries the lookup KEYS the envelope supplies (`raw`, `refundId`) and the `resourceType` that says which back-pointer to read; the record it fetches is asserted against `resource` through `libraries/payment/refund-linkage.js` before its numbers are returned ([above](#a-refund-record-has-to-belong-to-the-event-that-named-it)).
+
+**Every library names its own envelope.** `extractResource(raw)` reads the resource out of the event body, for its IDENTIFIERS — which order a failed event belonged to, and the body the test provider answers its own lookups from. Each provider nests it somewhere else, so reading Stripe's shape for everyone resolved every other provider's to nothing ([#222](https://github.com/Omega-JS-Stack/omega/issues/222)):
 
 | Provider | Envelope |
 |---|---|
@@ -499,7 +572,7 @@ A refund with no subscription behind it is the refund of a **one-time purchase**
 | **PayPal** | `PAYMENT.SALE.REFUNDED` with no billing agreement | `sale` — the sale it reversed (`resource.sale_id` or `resource.id`) |
 | **Chargebee** | `payment_refunded` with no subscription in `content` | `invoice` — the invoice it refunded |
 
-PayPal's `fetchResource()` handles `'sale'` the same way, and it is a two-step read: it GETs the v1 sale (`/v1/payments/sale/{id}`) the refund reversed, and a v1 sale carries **no `custom_id`** — so when the sale names a `parent_payment`, that payment is fetched too and its transaction's `custom` (or `custom_id`) is folded onto the sale, which is the only place `uid`/`orderId`/`productId` live. The fold is best-effort, the way the subscription case's plan fetch is: an unreadable parent payment still returns the LIVE sale rather than demoting the event to the stale payload. Before this branch existed, every PayPal one-time refund threw "Unknown resource type" and rode the flagged **stale fallback**, logging a provider-unreachable error for a fetch that was never attempted ([#224](https://github.com/Omega-JS-Stack/omega/issues/224)).
+PayPal's `fetchResource()` handles `'sale'` the same way, and it is a two-step read: it GETs the v1 sale (`/v1/payments/sale/{id}`) the refund reversed, and a v1 sale carries **no `custom_id`** — so when the sale names a `parent_payment`, that payment is fetched too and its transaction's `custom` (or `custom_id`) is folded onto the sale, which is the only place `uid`/`orderId`/`productId` live. The fold is best-effort, the way the subscription case's plan fetch is: an unreadable parent payment still returns the LIVE sale rather than losing it, since only its identifiers were missed. Before this branch existed, every PayPal one-time refund threw "Unknown resource type" and logged a provider-unreachable error for a fetch that was never attempted ([#224](https://github.com/Omega-JS-Stack/omega/issues/224)).
 
 ## Product Configuration
 
@@ -554,7 +627,7 @@ Key rules:
 | Collection | Key | Purpose |
 |---|---|---|
 | `payments-intents/{orderId}` | Order ID | Intent metadata (provider, product, status) |
-| `payments-webhooks/{eventId}` | Provider event ID | Webhook processing state + transition result + `refusal`, the flag on an event the pipeline REFUSED to act on ([above](#a-refund-with-no-purchase-behind-it-is-refused-not-minted)) |
+| `payments-webhooks/{eventId}` | Provider event ID | Webhook processing state + transition result + `refusal`, the stamp on an event the pipeline REFUSED to act on ([above](#a-refund-with-no-purchase-behind-it-is-refused-not-minted)). One of five reasons: `resource-not-found`, `uid-mismatch`, `refund-not-linked`, `refund-without-order`, `user-without-auth` |
 | `payments-orders/{orderId}` | Order ID | Unified order data (single source of truth for orders) |
 | `users/{uid}.subscription` | User UID | Current subscription state (subscriptions only) |
 
@@ -565,7 +638,9 @@ Two fields on the event doc carry the retry ladder:
 | Field | Meaning |
 |---|---|
 | `retryCount` | How many times processing this event has failed. The on-write trigger increments it every time it marks the doc `failed`. |
-| `deadLetter` | Terminal latch. `true` means the doc has burned its retries and will never be re-flipped. |
+| `deadLetter` | Terminal latch. `true` means the doc will never be re-flipped — because it burned its retries, or because the trigger stamped it on the FIRST attempt for a [permanent failure](#a-lookup-the-provider-cannot-answer-never-processes-the-payload). |
+
+**A REFUSED event that could not record its own refusal writes nothing else.** If the refusal stamp's own Firestore write throws, the doc is marked `failed` (so the sweep below re-pends it and the next pass re-decides and re-stamps) and the failure path stops there: it does NOT fall back to resolving an orderId out of the payload and marking `payments-intents/{orderId}` failed. That was the one doc a refused forgery could still reach, named entirely by the caller ([#535](https://github.com/Omega-JS-Stack/omega/issues/535)). Failures that are not refusals still close their intent out, exactly as before.
 
 The webhook route answers the provider `200` the moment the event is stored, so a doc the trigger marked `failed` is never delivered again — a transient fault (a provider API blip, a lost Firestore write) would drop the payment silently. The frequent cron `events/cron/frequent/retry-failed-webhooks.js` closes that: it re-flips `failed` docs back to `pending` (which is exactly what the trigger picks up) under a ceiling of **5** attempts, then stamps `deadLetter: true` **once, loudly**, and leaves the doc alone — something permanent is wrong with it and it needs a human, not another pass.
 
@@ -589,9 +664,9 @@ So the sweep **asks the provider**. It never infers a lapse from dates:
 
 1. **Windowed candidate query** — trial claimed, subscription still `active`, and `trial.expires.timestampUNIX` between 30 days ago and 24 hours ago. The 24-hour grace exists because webhook lag at trial end is normal and PayPal's stored trial expiry is a computed estimate (PayPal fires no trial-end event); the 30-day floor keeps this a backstop for missed webhooks rather than a re-examination of every trial ever claimed.
 2. **Skip** the ones already stamped, already on `basic`, or with no provider to ask.
-3. **Fetch the live subscription** — with an empty fallback, deliberately: a stale webhook payload is exactly what this sweep must not act on, so a fetch that cannot answer waits for the next run instead of fabricating a cancellation. Only "no such subscription" counts as gone.
+3. **Fetch the live subscription** — the provider's answer is the only thing this sweep acts on, so a fetch that cannot answer waits for the next run instead of fabricating a cancellation. Only "no such subscription" counts as gone (the same `notFound` classification the webhook pipeline refuses on).
 4. **Decide.** Provider says active → the trial `converted`: stamp `trial.outcome` and touch nothing else. Gone or cancelled → the trial `lapsed`: the same end state the cancel route writes (status `cancelled`, back on `basic`, nothing pending) plus the stamp. Anything else (a suspended subscription still in dunning) → neither outcome is true yet, nothing is stamped, and the next run asks again.
-5. **Re-read before writing**, so a webhook that landed since the query is never clobbered.
+5. **Re-read and write in ONE transaction**, so a webhook that landed since the query is never clobbered. Both halves of that guard matter and both were wrong once ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)): a bare read followed by a separate `set` left a window where a webhook committing between the two was overwritten anyway (the guard proved freshness at a moment that had already passed), and the comparison against the run's read stamp was a strict `>` — but both numbers are whole SECONDS, so a webhook writing inside the sweep's own second read as OLDER, which is exactly the write the guard exists to protect. Equal now counts as newer; the cost of being wrong is one candidate re-examined next run.
 6. **Report the outcome** — `trial_convert` or `trial_lapse`, through the same `deliverConversion` path the payment webhook uses.
 
 No email is sent from here — the sweep is state correction.
@@ -671,3 +746,44 @@ A decline mirrors what a real provider does, per product type:
 | **one-time** | The session is still created; the payment is what fails, so a failed `manual` invoice (`invoice.payment_failed`) goes out in place of the completed session. |
 
 A decline's `payments-intents` doc still ends `completed`. The intent status means "the pipeline processed this", not "the customer paid" — the payment outcome lives on the order and the subscription.
+
+### Simulating an abandoned checkout
+
+`simulate: 'abandon'` is the same allow-listed field's other value: the session is created and returned exactly as always, and **no webhook is fired**. That is not a shortcut — it is what abandonment IS. The customer closes the tab, nothing happened, and the provider has nothing to report.
+
+It exists because every other payment test drives an event through the pipeline, so the one state nothing covered was the state where the pipeline never runs ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)). What an abandoned checkout must leave behind is exactly one thing — the `payments-intents/{orderId}` doc, still `pending`, which is what the abandoned-cart lane and any later reconciliation read. What it must NOT leave behind is anything shaped like a purchase: no `payments-orders` doc, no subscription change, no claimed trial, no name auto-filled off a payment resource. A customer who considered buying and did not is indistinguishable from one who never opened the page.
+
+### The dispute test provider
+
+The dispute pipeline gets the same treatment the payment routes do. `events/firestore/payments-disputes/providers/test.js` implements the same two functions the Stripe provider does — `searchAndMatch` and `processDispute` — against the emulator's own records, and it is selected the way every dispute provider is: off the alert's `provider` field (Chargeblast's `processor`).
+
+It exists because a dispute is the one payment path with no simulatable half: `searchAndMatch` needs a real charge and `processDispute` needs a real refund and a real cancel, so the assertion that matters most — *a chargeback takes the subscription away* — had no test at any tier.
+
+The simulation is deliberately shaped like the real thing:
+
+- the **match** is found by AMOUNT and CARD (last4 `4242`), the way Stripe's charge search is, so a mismatched alert reaches the `no-match` branch instead of being waved through on the email alone;
+- the **cancel** is not written onto the user. It writes the same synthetic `customer.subscription.deleted` pipeline document Stripe's `subscriptions.cancel()` produces, so the webhook pipeline is what revokes access — here as in production.
+
+It **refuses in production**, and that guard is load-bearing rather than decorative: the provider name comes off the alert payload, so without it a forged alert could force-cancel a real subscriber by asking for the simulation.
+
+## Scenario coverage matrix
+
+Every scenario in [#212](https://github.com/Omega-JS-Stack/omega/issues/212)'s spec, and the file that pins it. `test/` paths are relative to `packages/backend/`; the unit tier is plain-node (no emulator), the journey tier runs the real pipeline against the emulator.
+
+| # | Scenario | Pinned by |
+|---|---|---|
+| 1 | basic → premium upgrade | `test/events/payments/journey-payments-upgrade.test.js`; rule 1 in `transitions-detect.test.js` |
+| 2 | premium cancel, access to term end | `journey-payments-cancel.test.js`, `journey-payments-cancel-endpoint.test.js`, `journey-payments-cancel-no-order.test.js`, `routes/payments/cancel.test.js`, `cancel-trialing.test.js`, `cancel-provider-errors.test.js`, `cancel-skip-guards.test.js`; rules 6 + 8 |
+| 3 | uncancel before term end | `journey-payments-uncancel.test.js`, `routes/payments/uncancel.test.js`; rule 7 (`cancellation-removed`) |
+| 4 | plan switch + frequency switch, proration | `journey-payments-plan-switch.test.js`, `journey-payments-plan-switch-trial.test.js`, `journey-payments-plan-change.test.js`, `routes/payments/plan.test.js`, `refund-paypal-proration.test.js`; rule 9, and the **frequency-only switch has no rule** — pinned as a known gap |
+| 5 | refunds: full, prorated, partial, one-time | `journey-payments-refund-webhook.test.js`, `journey-payments-refund-no-order.test.js`, `journey-payments-one-time-refund.test.js`, `routes/payments/refund.test.js`, `refund-one-time.test.js`, `webhook-refund-*.test.js`, `purchase-refunded-handler.test.js`; refund priority + idempotency in `transitions-detect.test.js` |
+| 6 | trial: claim, convert, cancel mid-trial, lapse | `journey-payments-trial.test.js`, `journey-payments-trial-cancel.test.js`, `trial-lapse-sweep.test.js`, `trial-lapse-sweep-staleness.test.js`, `routes/payments/trial-eligibility.test.js` |
+| 7 | dunning: decline → retry → recovery → cancel | `journey-payments-decline.test.js`, `journey-payments-suspend.test.js`, `journey-payments-failure.test.js`, `journey-payments-winback-decline.test.js`; rules 3, 3b, 4, 5 |
+| 8 | payment-method update mid-subscription | `webhook-ordering.test.js` (`a-payment-method-update-refreshes-state-and-emails-nobody`), `routes/payments/portal.test.js`, `portal-return-url.test.js` |
+| 9 | chargebacks / disputes → forced cancel | `journey-payments-dispute.test.js` (end to end), `routes/payments/dispute-alert.test.js`, `dispute-alert-signature.test.js`, `dispute-email-status.test.js`, `dedup-race.test.js` |
+| 10 | webhook robustness: duplicates, ordering, unknown types, signatures | `webhook-ordering.test.js`, `dedup-race.test.js`, `webhook-retry-sweep.test.js`, `webhook-atomic-writes.test.js`, `routes/payments/webhook.test.js`, `webhook-signature.test.js`, `test-processor-doc-shape.test.js`; real signatures in `test/stripe-live/subscription-lifecycle.test.js` (opt-in lane) |
+| 11 | abandoned checkout — no residue | `journey-payments-abandoned.test.js` |
+| 12 | account deletion with an active subscription | `test/routes/user/delete.test.js` (deletion is REFUSED while a paid subscription stands) |
+| 13 | one-time: purchase, refund, re-purchase | `journey-payments-one-time.test.js`, `journey-payments-one-time-decline.test.js`, `journey-payments-one-time-failure.test.js`, `journey-payments-one-time-refund.test.js`, `routes/payments/intent-one-time-metadata.test.js`, `webhook-stripe-refund-one-time.test.js` |
+
+**Known gaps, pinned rather than hidden:** a frequency-only switch (same product, monthly → annually) matches no transition rule, so no email fires for it — asserted explicitly in `transitions-detect.test.js` so a future rule flips a test rather than passing unnoticed.

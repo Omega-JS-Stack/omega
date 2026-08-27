@@ -177,13 +177,19 @@ test('the real bundler splits Chart.js into its own chunk — the page entry sta
 
 test('data/org-chart: both demo variants render through the real engine', async () => {
   const pages = await buildWith(miniData);
-  const page = pages.get('/test/sections/component/data/org-chart');
 
-  assert.ok(page, 'the entry joins the library with zero authoring (spec §9)');
-  assert.equal((page.match(/class="omega-org-chart"/g) || []).length, 2, 'both demo variants render live');
+  assert.ok(pages.get('/test/components/data/org-chart'), 'the entry joins the library with zero authoring (spec §9)');
+
+  // Each variant owns its own embedded-frame page now (#463).
+  const four = pages.get('/test/components/data/org-chart/frames/root-over-four-nodes');
+  const alone = pages.get('/test/components/data/org-chart/frames/root-alone');
+  assert.ok(four && alone, 'both demo variants render live, one frame each');
+
+  const page = four + alone;
+  assert.equal((page.match(/class="omega-org-chart"/g) || []).length, 2, 'the component renders in both');
   assert.equal((page.match(/omega-org-chart__node/g) || []).length, 4, 'one node per entry');
   assert.equal((page.match(/omega-org-chart__children/g) || []).length, 1, 'the root-alone variant draws no bus — no children, no trunk');
-  assert.ok(page.includes('omega-badge-tone omega-tone-2'), 'a node chip rides the shared categorical ramp');
+  assert.ok(four.includes('omega-badge-tone omega-tone-2'), 'a node chip rides the shared categorical ramp');
 });
 
 test('data/org-chart: connectors are animated GRADIENTS, tilt narrow, and stop for reduced motion', () => {

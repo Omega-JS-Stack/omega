@@ -37,7 +37,7 @@ function stageBrand() {
  */
 function seedDeployRecord(root, ...targets) {
   const records = Object.fromEntries(targets.map((target) => [target, { at: '2026-07-17T00:00:00.000Z' }]));
-  jetpack.write(join(root, '.omega', 'deploys.json'), records);
+  jetpack.write(join(root, '.omega', 'state.json'), { deploy: records });
 }
 
 function brandConfig(overrides = {}) {
@@ -382,7 +382,7 @@ test('testing: record-less brand with a LIVE site passes and ADOPTS the deploy r
   const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
-  const records = jetpack.read(join(root, '.omega', 'deploys.json'), 'json');
+  const records = jetpack.read(join(root, '.omega', 'state.json'), 'json').deploy;
   assert.equal(records.web.adopted, true, 'live hit on a record-less brand writes the record (fresh clones self-heal)');
 });
 

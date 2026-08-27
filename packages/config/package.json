@@ -12,6 +12,7 @@
     "./validate": "./src/validate.js",
     "./load": "./src/load.js",
     "./env": "./src/env.js",
+    "./env-schema": "./src/env-schema.js",
     "./site-global": "./src/site-global.js",
     "./winback": "./src/winback.js"
   },

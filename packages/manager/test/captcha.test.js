@@ -21,10 +21,16 @@ const SITE_KEY = '6LfixtureFixtureFixtureFixture';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}` } = {}) {
+// A fully-keyed brand by default: the public half in config (what the client
+// renders), the secret half in the .env runService sets. `siteKey: null` is
+// the unkeyed brand — the sanctioned green state (#17, #507).
+function brandConfig({ url = `https://${DOMAIN}`, siteKey = SITE_KEY } = {}) {
+  const recaptcha = structuredClone(DEFAULTS.captcha.providers.recaptcha);
+  if (siteKey) recaptcha.siteKey = siteKey;
+
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    captcha: { providers: { recaptcha: structuredClone(DEFAULTS.captcha.providers.recaptcha) } },
+    captcha: { providers: { recaptcha } },
     targets: { web: {} },
   };
 }
@@ -78,7 +84,7 @@ function runService(config, { recaptcha, options = {}, env = true, brandRoot } =
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
 test('captcha: skips without the shared keys in .env', async () => {
-  const result = await runService(brandConfig(), { env: false });
+  const result = await runService(brandConfig({ siteKey: null }), { env: false });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /RECAPTCHA_SITE_KEY, RECAPTCHA_SECRET_KEY/);
   // cp114: the skip is machine-readable — the 🔑 summary aggregates it
@@ -92,7 +98,7 @@ test('captcha: skip reason names only the missing key', async () => {
   const result = await service.run({
     brandId: 'fixture-brand',
     brandRoot: '/tmp/omega-manager-recaptcha-unused',
-    brandConfig: brandConfig(),
+    brandConfig: brandConfig({ siteKey: null }),
     targets: [],
     operations: OPERATIONS.captcha,
     options: {},
@@ -118,6 +124,47 @@ test('captcha: skips without brand.url', async () => {
   const result = await runService(brandConfig({ url: '' }), { recaptcha: fakeRecaptcha() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /brand\.url/);
+});
+
+// ─── Half-keyed brand (#507) ─────────────────────────────────────────────────
+
+// A setup-time throw is how a service fails the walk: manage.js's runService
+// catches it into { status: 'error', error } for the run summary
+test('captcha: the secret without the config site key fails the service', async () => {
+  // The playground's live-checkout 403 state: the backend enforces token
+  // verification, the client has no key to mint a token with
+  await assert.rejects(
+    () => runService(brandConfig({ siteKey: null }), { recaptcha: fakeRecaptcha() }),
+    (error) => {
+      assert.match(error.message, /captcha\.providers\.recaptcha\.siteKey is missing from config/);
+      assert.match(error.message, /https:\/\/www\.google\.com\/recaptcha\/admin/);
+      return true;
+    },
+  );
+});
+
+test('captcha: the config site key without the secret fails, deep-linking the key page', async () => {
+  const config = brandConfig();
+  config.cloud = { provider: 'firebase', config: { projectId: 'fixture-brand-cloud' } };
+
+  await assert.rejects(
+    () => runService(config, { recaptcha: fakeRecaptcha(), env: false }),
+    (error) => {
+      assert.match(error.message, /RECAPTCHA_SECRET_KEY is missing from the brand \.env/);
+      // The #444 deep-link pattern, reused verbatim
+      assert.match(
+        error.message,
+        new RegExp(`https://console\\.cloud\\.google\\.com/security/recaptcha/${SITE_KEY}/overview\\?from=keysList&project=fixture-brand-cloud`),
+      );
+      return true;
+    },
+  );
+});
+
+test('captcha: neither half is the sanctioned unkeyed brand — it skips, never fails (#17)', async () => {
+  const result = await runService(brandConfig({ siteKey: null }), { env: false });
+
+  assert.equal(result.status, 'skipped');
 });
 
 // ─── Secret validation ───────────────────────────────────────────────────────

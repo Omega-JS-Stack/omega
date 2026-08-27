@@ -1,9 +1,10 @@
 // Newsflash Theme — Shared Panels & Numerals
 // Editorial overlays for the BASE marketing set pieces the theme renders
 // unforked: the dark "big read" CTA band (omega-cta on omega-ink-panel), the
-// stats strip (omega-stat), and the desk-card icon chip (the one fork-owned
-// piece left here). Structure comes from the classy floor partials imported
-// in _theme.scss; these rules land later and re-ink it editorial.
+// stats strip (omega-stat), the plan cards (omega-price-card), and the
+// desk-card icon chip (the one fork-owned piece left here). Structure comes
+// from the classy floor partials imported in _theme.scss; these rules land
+// later and re-ink it editorial.
 
 // ============================================
 // Ink panel: the dark slab (big-read CTA, newsletter band)
@@ -101,4 +102,55 @@
   height: 3rem;
   flex: none;
   border: var(--nf-border);
+}
+
+// ============================================
+// Plan cards (marketing/pricing-cards + /pricing): framed paper with the
+// vermilion Editor's pick
+// ============================================
+// In the MAIN bundle, not the pricing page sheet ([#531]): the homepage plan
+// band composes the same cards, and a page-scoped skin left them bare there.
+.omega-price-card {
+  // The frame comes from the theme's .card treatment; prices go serif.
+  .omega-price-card__price {
+    font-family: $nf-font-display;
+  }
+
+  .omega-price-card__currency {
+    font-weight: 600;
+    vertical-align: super;
+  }
+
+  .omega-price-card__amount {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .omega-price-card__per {
+    font-family: $font-family-sans-serif;
+    color: var(--bs-secondary-color);
+  }
+
+  .price-per-unit {
+    font-weight: 700;
+    color: var(--omega-accent);
+  }
+}
+
+.omega-price-card--popular {
+  border-color: var(--omega-accent);
+  border-width: 2.5px;
+  box-shadow: var(--nf-shadow-hard-hover);
+}
+
+// "Most popular": the rotated stamp chip pinned over the card edge
+.omega-price-card__popular {
+  position: absolute;
+  top: -0.85rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  white-space: nowrap;
+  background: var(--omega-accent);
+  color: var(--omega-accent-ink);
+  border-color: var(--omega-line-strong);
 }

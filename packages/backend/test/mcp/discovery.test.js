@@ -6,8 +6,6 @@
  */
 const fetch = require('wonderful-fetch');
 
-const BASE_URL = 'http://localhost:5002';
-
 module.exports = {
   description: 'MCP OAuth discovery endpoints',
   type: 'group',
@@ -15,8 +13,8 @@ module.exports = {
   tests: [
     {
       name: 'oauth-authorization-server returns valid metadata',
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/.well-known/oauth-authorization-server`, {
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/.well-known/oauth-authorization-server`, {
           method: 'GET',
           response: 'json',
           timeout: 10000,
@@ -35,8 +33,8 @@ module.exports = {
 
     {
       name: 'oauth-protected-resource returns valid metadata',
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/.well-known/oauth-protected-resource`, {
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/.well-known/oauth-protected-resource`, {
           method: 'GET',
           response: 'json',
           timeout: 10000,

@@ -7,7 +7,7 @@ layout: frontend/core/base
 hero:
   headline: "Get in"
   headline_accent: "touch"
-  subheadline: "Have questions about {{ site.brand.name }}? Our support team is here to help you"
+  subheadline: "Have questions about {{ resolved.config.brand.name }}? Our support team is here to help you"
 
 # Contact Methods Section
 contact_methods:
@@ -256,7 +256,7 @@ faqs:
                   {% omega_icon "paper-plane", "me-2" %}
                   Send message
                 </button>
-                <a href="{{ site.url }}" class="btn btn-link">
+                <a href="{{ resolved.config.url }}" class="btn btn-link">
                   {% omega_icon "arrow-left", "me-1" %}
                   Back to home
                 </a>

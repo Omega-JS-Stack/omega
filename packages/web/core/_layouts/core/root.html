@@ -3,15 +3,14 @@
 
 <!DOCTYPE html>
 <html
-  lang="{{ site.translation.default |  default: 'en' }}"
+  lang="{{ resolved.config.translation.default |  default: 'en' }}"
   dir="ltr"
 
-  class="{{ resolved.theme.html.class }}" {{ resolved.theme.html.attributes }}
+  class="{{ resolved.config.theme.html.class }}" {{ resolved.config.theme.html.attributes }}
 
-  data-theme-id="{{ resolved.theme.id }}"
-  data-theme-target="{{ resolved.theme.target }}"
+  data-theme-id="{{ resolved.config.theme.id }}"
 
-  data-bs-theme="{{ resolved.theme.appearance }}"
+  data-bs-theme="{{ resolved.config.theme.appearance }}"
 
   data-page-path="{{ page.url }}"
 
@@ -31,7 +30,7 @@
   </head>
 
   <body
-    class="{{ resolved.theme.body.class }}" {{ resolved.theme.body.attributes }}
+    class="{{ resolved.config.theme.body.class }}" {{ resolved.config.theme.body.attributes }}
     >
 
     <!-- Head -->

@@ -1,0 +1,60 @@
+{% comment %}
+  A gallery's navigation rail (#540) — the resolved library as a SIDEBAR: every
+  entry OF ONE KIND, grouped the way that gallery's index groups them, and the
+  current entry's demo variants nested under it as ANCHOR JUMPS to that
+  variant's frame (Ian's QA call: the entry page stacks every variant, so the
+  rail scrolls to one — no tab machinery, no reload).
+
+  Kind-scoped (#602): the two galleries are separate libraries in separate url
+  spaces, so a component rail lists components and a section rail lists
+  sections. One home for both — and for each gallery's index and entry pages —
+  so a rail that grows a group grows it everywhere it appears.
+
+  The sticky offset clears the site masthead: classy's nav is `position:
+  fixed`, and a rail pinned at the viewport top slid under it — taking the
+  back link with it, which is what made that link look dead.
+
+  Development-only surface (the engine gates the injection), so it reads the
+  sectionLibrary global directly. Neutral Bootstrap vocabulary, like the pages
+  around it — this renders under whichever theme is active.
+
+  In:  include.kind         — which library this rail is ('section'/'component')
+       include.home         — that library's index url
+       include.label        — that library's name, for the landmark + back link
+       include.current      — the entry id the page is showing ('' on the index)
+       include.variants     — that entry's demo variants (empty on the index)
+{% endcomment %}
+<nav class="position-sticky pb-3" style="top: 5.5rem; max-height: calc(100vh - 7rem); overflow-y: auto;" aria-label="{{ include.label }}">
+  <a href="{{ include.home }}" class="d-block small text-decoration-none mb-3">&larr; {{ include.label }}</a>
+
+  {% for group in sectionLibrary.groups %}
+    {% if group.kind == include.kind %}
+      <p class="text-uppercase small fw-bold text-muted mb-1">{{ group.category }}/</p>
+      <ul class="list-unstyled mb-3">
+        {% for item in group.entries %}
+          {% assign is_current = false %}
+          {% if item.id == include.current %}
+            {% assign is_current = true %}
+          {% endif %}
+          <li>
+            <a href="{{ item.url }}"
+              class="d-block small py-1 text-decoration-none{% if is_current %} fw-bold{% else %} text-body-secondary{% endif %}"
+              {% if is_current %}aria-current="page"{% endif %}>{{ item.id }}</a>
+
+            {% comment %} The current entry's variants are ANCHOR JUMPS: every
+            frame is on the page already, so a rail item scrolls to its own. {% endcomment %}
+            {% if is_current and include.variants.size > 0 %}
+              <ul class="list-unstyled border-start ms-1 ps-2 mb-2">
+                {% for variant in include.variants %}
+                  <li>
+                    <a href="#variant-{{ variant.slug }}" class="d-block small py-1 text-decoration-none text-body-secondary">{{ variant.label }}</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endfor %}
+</nav>

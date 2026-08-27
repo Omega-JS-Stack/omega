@@ -2,8 +2,8 @@
  * The section/component library machinery (docs/web/omega-sections-spec.md):
  * dual-form {% section %}/{% component %} tags, layer resolution, defaults ←
  * data ← args merge, call-site liquification, schema warnings, and the
- * context-free render — plus build-level pins for the frontmatter bridge
- * (hero-demo pages) and the body-call authoring lane.
+ * context-free render — plus build-level pins for the data bridge (the
+ * showcase gallery's per-variant frame pages) and the body-call authoring lane.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -29,7 +29,9 @@ function makeEngine(baseDirs = [THEME]) {
   return { engine, warnings };
 }
 
-const SITE = { site: { brand: { name: 'ACME' } } };
+// Config reads live under `resolved.config` (#607) — the caller scope a
+// section's defaults liquify against.
+const SITE = { resolved: { config: { brand: { name: 'ACME' } } } };
 
 // ─── parseInlineArgs ─────────────────────────────────────────────────────────
 
@@ -49,7 +51,7 @@ test('parseInlineArgs: quote-aware pairs — commas inside quoted values never s
 test('no args → json5 defaults render, liquified against the CALLER scope', async () => {
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender('{% section "marketing/hero" %}', SITE);
-  assert.ok(html.includes('<h1>Default ACME</h1>'), 'default headline liquified with site.brand.name');
+  assert.ok(html.includes('<h1>Default ACME</h1>'), 'default headline liquified with resolved.config.brand.name');
   assert.ok(html.includes('<span>default-tag</span>'), 'plain default untouched');
   assert.deepEqual(warnings, []);
 });
@@ -69,7 +71,7 @@ test('inline args: literal + variable ref override defaults, unset keys keep def
 test('block form: YAML body with arrays; liquid output tokens in values render at call scope', async () => {
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(
-    '{% section "marketing/hero" %}\nheadline: "Why {{ site.brand.name }}"\nitems:\n  - label: one\n  - label: two\n{% endsection %}AFTER',
+    '{% section "marketing/hero" %}\nheadline: "Why {{ resolved.config.brand.name }}"\nitems:\n  - label: one\n  - label: two\n{% endsection %}AFTER',
     SITE,
   );
   assert.ok(html.includes('<h1>Why ACME</h1>'), 'output token inside YAML value liquified');
@@ -232,21 +234,21 @@ test('§7 inherit: contradictions and malformed declarations throw; unfulfilled 
 
 // ─── build-level pins (the real classy hero through the real engine) ─────────
 
-test('frontmatter bridge: hero-demo page keeps its own keys AND the section defaults (deep merge end-to-end)', async () => {
+test('data bridge: a showcase frame keeps the variant\'s own keys AND the section defaults (deep merge end-to-end)', async () => {
   const pages = await buildWith(miniData);
-  const demo = pages.get('/test/components/hero-demo-input');
-  assert.ok(demo, 'hero-demo-input built');
-  assert.ok(demo.includes('Create your logo in'), 'page frontmatter headline survived the bridge');
+  const demo = pages.get('/test/sections/section/marketing/hero/frames/input-capture');
+  assert.ok(demo, 'the Input capture variant frame built');
+  assert.ok(demo.includes('Create your logo in'), 'the variant\'s headline survived the bridge');
   assert.ok(demo.includes('Introducing MiniCo'), 'unset badge fell through to the json5 default, brand-liquified');
   assert.ok(!demo.includes('btn-cmd'), 'unset command renders NO command button (pass B: a framework command is never a theme default)');
 });
 
 test('wave 2: the index composition renders every extracted band from its defaults', async () => {
   const pages = await buildWith(miniData);
-  // The hero-demo pages ride the full classy index layout (the mini homepage
-  // is its own custom page) — every band except their hero.* overrides
-  // renders from section defaults.
-  const page = pages.get('/test/components/hero-demo-input');
+  // The fixture's /about rides the full classy index layout (the mini
+  // homepage is its own custom page) — every band renders from its section
+  // defaults.
+  const page = pages.get('/about');
   assert.ok(page, 'index-composition page built');
   assert.ok(page.includes('Trusted by teams at'), 'trusted-by default headline');
   assert.ok(page.includes('Everything you need.'), 'bento default headline');
@@ -334,8 +336,8 @@ test('wave 7: heading/section-head — nested composition (sections call it) + l
   assert.ok(demo, 'sections-demo built');
   assert.ok(demo.includes('What makes MiniCo different'), 'showcase head renders through the NESTED component');
   assert.ok(demo.includes('>Showcase</span>'), 'nested superheadline string arg renders');
-  const hero = pages.get('/test/components/hero-demo-input');
-  assert.ok(hero.includes('Everything you need.'), 'bento head (plain-string superheadline) survives');
+  const indexComposition = pages.get('/about');
+  assert.ok(indexComposition.includes('Everything you need.'), 'bento head (plain-string superheadline) survives');
   const alt = pages.get('/alternatives/acme-growth');
   assert.ok(alt.includes('<em>compare</em>'), 'alternative comparison accent liquifies without the dropped omega_liquify');
   const post = pages.get('/blog/first-post');
@@ -398,14 +400,14 @@ const THEMES = path.join(__dirname, '..', 'themes');
 
 test('cp219: buildSectionLibrary — resolved entries over the real base chain', () => {
   const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'base')] });
-  assert.equal(entries.length, 19, `base chain: 16 sections + 3 components (verts/unit added cp246, data/org-chart #72), got ${entries.length}`);
+  assert.equal(entries.length, 22, `base chain: 18 sections + 4 components (verts/unit added cp246, data/org-chart #72, marketing/prose #515 + marketing/pricing-cards #493, pricing/features #539), got ${entries.length}`);
   assert.ok(entries.every((entry) => entry.source === 'base'), 'every entry owned by the base layer');
 
   const hero = entries.find((entry) => entry.id === 'marketing/hero' && entry.kind === 'section');
   assert.ok(hero.argsTable.some((row) => row.name === 'rotating' && row.type === 'array'), 'args rows normalized');
-  assert.equal(hero.demo.length, 3, 'hero demo variants ride through');
+  assert.equal(hero.demo.length, 11, 'hero demo variants ride through (the folded-in hero-demo pages, #463, the breadcrumb trail #513, the custom-animation slot #441)');
   assert.ok(!hero.defaultsJson.includes('{{'), 'defaultsJson is liquid-inert (escaped braces)');
-  assert.ok(hero.defaultsJson.includes('&#123;&#123; site.brand.name }}'), 'raw tokens display in escaped form');
+  assert.ok(hero.defaultsJson.includes('&#123;&#123; resolved.config.brand.name }}'), 'raw tokens display in escaped form');
 
   // Groups: sections before components, categories clustered (about sorts first)
   assert.equal(groups[0].kind, 'section');
@@ -413,9 +415,55 @@ test('cp219: buildSectionLibrary — resolved entries over the real base chain',
   assert.ok(groups.some((group) => group.kind === 'component' && group.category === 'heading'));
 });
 
+test('#463: buildSectionLibrary — a flattened variants list, one item per entry x demo variant', () => {
+  const { entries, variants } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'base')] });
+
+  const demoCount = entries.reduce((total, entry) => total + entry.demo.length, 0);
+  assert.equal(variants.length, demoCount, 'every demo variant of every entry, flattened — the frame pages\' pagination data');
+
+  const heroVariants = variants.filter((variant) => variant.id === 'marketing/hero');
+  assert.deepEqual(
+    heroVariants.map((variant) => variant.slug),
+    ['default', 'email-capture', 'no-frame-second-button', 'input-capture', 'form', 'video', 'side-placement', 'custom-animation', 'custom-slot', 'breadcrumb', 'stat-cards'],
+    'slugs are kebab-cased labels, in authored order',
+  );
+  assert.ok(heroVariants.every((variant) => variant.kind === 'section' && variant.source === 'base'),
+    'each item carries the entry coordinates its own page needs');
+
+  const video = heroVariants.find((variant) => variant.slug === 'video');
+  assert.equal(video.label, 'Video', 'the label rides through for the page title');
+  assert.equal(video.args.demo.type, 'video', 'args stay RAW — they liquify at the tag\'s call site');
+
+  // The entry's own copy carries the same slug (the iframe src on the entry
+  // page) plus the escaped args display block.
+  const hero = entries.find((entry) => entry.id === 'marketing/hero');
+  assert.deepEqual(hero.demo.map((variant) => variant.slug), heroVariants.map((variant) => variant.slug),
+    'entry.demo and variants agree on the slug — one URL, both sides');
+  assert.equal(hero.demo[0].argsJson, '', 'a variant with no args shows no args block');
+  assert.ok(hero.demo[1].argsJson.includes('&quot;subtext&quot;'), 'authored args pretty-print as display copy');
+  assert.ok(!hero.demo[1].argsJson.includes('{'), 'and are liquid-inert, like every other display string');
+});
+
+test('#463: buildSectionLibrary — colliding variant labels get numbered slugs, never a shared URL', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lib-slug-'));
+  const entryDir = path.join(dir, '_sections', 'demo', 'dupes');
+  fs.mkdirSync(entryDir, { recursive: true });
+  fs.writeFileSync(path.join(entryDir, 'section.html'), '<div></div>');
+  fs.writeFileSync(path.join(entryDir, 'section.json5'),
+    '{ demo: [{ label: "Side by side" }, { label: "side BY side" }, { label: "Side / by / side" }, { label: "Other" }] }');
+
+  const { variants } = buildSectionLibrary({ baseDirs: [dir], warn: () => {} });
+  assert.deepEqual(
+    variants.map((variant) => variant.slug),
+    ['side-by-side', 'side-by-side-2', 'side-by-side-3', 'other'],
+    'the first claim keeps the bare slug; the rest are numbered in authored order',
+  );
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('cp219: buildSectionLibrary — the newsflash chain resolves overrides and fallthroughs honestly', () => {
   const { entries } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'newsflash'), path.join(THEMES, 'base')] });
-  assert.equal(entries.length, 25, `nf chain: 19 shared ids + 6 nf-only, got ${entries.length}`);
+  assert.equal(entries.length, 28, `nf chain: 22 shared ids + 6 nf-only, got ${entries.length}`);
 
   const cta = entries.find((entry) => entry.id === 'marketing/cta');
   assert.equal(cta.source, 'base', 'the deleted fork falls through: the base owns the entry (#177 phase 2)');

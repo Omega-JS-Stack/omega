@@ -252,6 +252,60 @@ test('a stale lock (dead pid) is cleared and re-acquirable', () => {
   }
 });
 
+/**
+ * Stage a brand root whose one target declares @omega.js/web, beside a
+ * monorepo-shaped checkout. `link` decides how the dependency resolves:
+ * 'registry' installs a real directory under node_modules, 'monorepo' symlinks
+ * it to the checkout's packages/web.
+ * @param {string} link - 'registry' | 'monorepo'
+ * @returns {{ scratch: string, brandRoot: string, monorepoRoot: string }}
+ */
+function stageLinkedBrand(link) {
+  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-linked-brand-')));
+  const monorepoRoot = path.join(scratch, 'omega');
+  const brandRoot = path.join(scratch, 'brand');
+  const target = path.join(brandRoot, 'targets', 'website');
+  const installed = path.join(brandRoot, 'node_modules', '@omega.js', 'web');
+
+  fs.mkdirSync(path.join(monorepoRoot, 'packages', 'devkit'), { recursive: true });
+  fs.mkdirSync(path.join(monorepoRoot, 'packages', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(monorepoRoot, 'package.json'), JSON.stringify({ name: 'omega', private: true }));
+  fs.writeFileSync(path.join(monorepoRoot, 'packages', 'devkit', 'package.json'), JSON.stringify({ name: '@omega.js/devkit' }));
+  fs.writeFileSync(path.join(monorepoRoot, 'packages', 'web', 'package.json'), JSON.stringify({ name: '@omega.js/web' }));
+
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'package.json'), JSON.stringify({ name: 'fixture-brand', private: true }));
+  fs.writeFileSync(path.join(target, 'package.json'), JSON.stringify({ name: 'fixture-site', dependencies: { '@omega.js/web': '*' } }));
+
+  fs.mkdirSync(path.dirname(installed), { recursive: true });
+  if (link === 'monorepo') {
+    fs.symlinkSync(path.join(monorepoRoot, 'packages', 'web'), installed, 'dir');
+  } else {
+    fs.mkdirSync(installed, { recursive: true });
+    fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '1.0.0' }));
+  }
+
+  return { scratch, brandRoot, monorepoRoot };
+}
+
+test('#587: resolveLinkedMonorepo names the checkout a brand resolves INTO', () => {
+  const { scratch, brandRoot, monorepoRoot } = stageLinkedBrand('monorepo');
+  try {
+    assert.equal(local.resolveLinkedMonorepo(brandRoot), monorepoRoot);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('#587: a registry-installed brand resolves into no monorepo at all', () => {
+  const { scratch, brandRoot } = stageLinkedBrand('registry');
+  try {
+    assert.equal(local.resolveLinkedMonorepo(brandRoot), null);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 test('startMonorepoWatch declines to double-start when the lock is held', () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
   try {

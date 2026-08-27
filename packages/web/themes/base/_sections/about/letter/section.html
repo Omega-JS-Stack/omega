@@ -1,32 +1,12 @@
-<section>
-  <div class="container">
-    <div class="omega-duo">
-      <div class="omega-duo__aside" data-omega-reveal>
-        <span class="omega-micro">{{ args.aside_label }}</span>
-
-        {% if args.image != blank %}
-          <figure class="omega-aside-photo" data-omega-reveal>
-            <img src="{{ args.placeholder }}" data-lazy="@src {{ args.image }}" alt="{{ args.image_alt }}"/>
-          </figure>
-        {% endif %}
-
-        <!-- A living ops feed, not a paragraph -->
-        <div class="omega-object position-relative pe-4 mt-4 d-none d-lg-block">
-          <div class="omega-fragment pb-5">
-            <span class="omega-micro omega-fragment__label">{{ args.feed_label }}</span>
-            {% for item in args.feed_items %}
-              <div class="omega-fragment__msg">
-                <span class="omega-fragment__msg-mark">{% omega_icon item.icon, "fa-xs" %}</span>
-                <span>{{ item.text }}</span>
-              </div>
-            {% endfor %}
-          </div>
-          <div class="omega-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
-            <span class="omega-dot omega-status--ok"></span>
-            {{ args.feed_status }}
-          </div>
-        </div>
-      </div>
+{%- comment %} The aside earns its column: it renders only when it has
+something to SAY — the ops feed's items, or the aside photo. An emptied feed
+is no feed, so the frame, the chip and the label go with it and the letter
+runs the container's full width. {% endcomment -%}
+{% assign has_feed = false %}
+{% if args.feed_items and args.feed_items.size > 0 %}{% assign has_feed = true %}{% endif %}
+{% assign has_aside = has_feed %}
+{% if args.image != blank %}{% assign has_aside = true %}{% endif %}
+{% capture letter %}
       <div data-omega-reveal-stagger="120">
         <div data-omega-reveal>
           <span class="omega-micro d-block mb-3">{{ args.mission.title }}</span>
@@ -38,6 +18,43 @@
           <p class="omega-statement">{{ args.vision.description }}</p>
         </div>
       </div>
+{% endcapture %}
+<section>
+  <div class="container">
+    {% if has_aside %}
+    <div class="omega-duo">
+      <div class="omega-duo__aside" data-omega-reveal>
+        <span class="omega-micro">{{ args.aside_label }}</span>
+
+        {% if args.image != blank %}
+          <figure class="omega-aside-photo" data-omega-reveal>
+            <img src="{{ args.placeholder }}" data-lazy="@src {{ args.image }}" alt="{{ args.image_alt }}"/>
+          </figure>
+        {% endif %}
+
+        {% if has_feed %}
+          <!-- A living ops feed, not a paragraph -->
+          <div class="omega-object position-relative pe-4 mt-4 d-none d-lg-block">
+            <div class="omega-fragment pb-5">
+              <span class="omega-micro omega-fragment__label">{{ args.feed_label }}</span>
+              {% for item in args.feed_items %}
+                <div class="omega-fragment__msg">
+                  <span class="omega-fragment__msg-mark">{% omega_icon item.icon, "fa-xs" %}</span>
+                  <span>{{ item.text }}</span>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="omega-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
+              <span class="omega-dot omega-status--ok"></span>
+              {{ args.feed_status }}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+{{ letter }}
     </div>
+    {% else %}
+{{ letter }}
+    {% endif %}
   </div>
 </section>

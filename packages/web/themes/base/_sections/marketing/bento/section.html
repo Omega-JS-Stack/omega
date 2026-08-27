@@ -1,23 +1,31 @@
 {% if args.items and args.items.size > 0 %}
   <section>
     <div class="container">
-      {%- comment %} superheadline takes a plain string OR { icon, text }: the
-      object shape resolves to the icon + label the section-head renders as
-      one micro line, the string passes straight through. {% endcomment -%}
+      {%- comment %} superheadline takes a plain string OR { text }: the object
+      shape resolves to its label, the string passes straight through. Either
+      way the micro line is words only. {% endcomment -%}
       {%- if args.superheadline.text -%}
-        {%- capture superheadline %}{% iftruthy args.superheadline.icon %}{% omega_icon args.superheadline.icon, "me-1" %}{% endiftruthy %}{{ args.superheadline.text }}{% endcapture -%}
+        {%- assign superheadline = args.superheadline.text -%}
       {%- else -%}
         {%- assign superheadline = args.superheadline -%}
       {%- endif %}
       <div class="omega-section-head omega-section-head--center mb-5" data-omega-reveal>
-        {% component "heading/section-head", superheadline: superheadline, headline: args.headline, sub: args.subheadline %}
+        {% component "heading/section-head", superheadline: superheadline, headline: args.headline, headline_accent: args.headline_accent, sub: args.subheadline %}
       </div>
 
       <div class="omega-bento" data-omega-reveal-stagger="70">
         {% for item in args.items %}
           {% capture span_class %}{% if item.span == 'big' %}omega-tile--big{% elsif item.span == 'tall' %}omega-tile--tall{% elsif item.span == 'wide' %}omega-tile--wide{% endif %}{% endcapture %}
-          <div class="omega-tile {{ span_class }}" data-omega-reveal>
+          {%- comment %} A tile with href IS the link: the whole surface becomes
+          ONE anchor wearing the shared .omega-interactive states, so its body
+          carries no nested anchor (invalid html). No href = the div tile,
+          unchanged. {% endcomment -%}
+          {% capture tile_class %}omega-tile {{ span_class }}{% if item.href != blank %} omega-interactive{% endif %}{% endcapture %}
+          {% capture tile_body %}
             <div class="omega-tile__head">
+              {% iftruthy args.numbered %}
+                <span class="omega-tile__ordinal">{{ forloop.index }}</span>
+              {% endiftruthy %}
               {% iftruthy item.icon %}
                 <span class="omega-icon-chip">{% omega_icon item.icon, "fa-sm" %}</span>
               {% endiftruthy %}
@@ -27,16 +35,19 @@
 
             {% case item.type %}
               {% when 'code' %}
-                <div class="omega-tile__code omega-ink-panel"><span class="tok-c">{{ args.config_demo.label }}</span>
-{ brand: { name: <span class="tok-v">'{{ args.config_demo.name }}'</span>,
-           color: <span class="tok-a">'{{ args.config_demo.color }}'</span> },
+                {%- comment %} Panel tokens and transcript lines are TEXT, never
+                markup (#580): a literal `<` opened a tag the minifier ate.
+                {% endcomment -%}
+                <div class="omega-tile__code omega-ink-panel"><span class="tok-c">{{ args.config_demo.label | escape_once }}</span>
+{ brand: { name: <span class="tok-v">'{{ args.config_demo.name | escape_once }}'</span>,
+           color: <span class="tok-a">'{{ args.config_demo.color | escape_once }}'</span> },
   targets: { <span class="tok-k">web</span>: {…}, <span class="tok-k">backend</span>: {…},
              <span class="tok-k">desktop</span>: {…}, <span class="tok-k">extension</span>: {…} } }</div>
               {% when 'terminal' %}
                 <div class="omega-tile__term omega-ink-panel">
-                  <div><span class="omega-term__prompt">$</span> {{ item.terminal.command | default: 'npm run deploy' }}</div>
-                  <div class="omega-term__out">{{ item.terminal.out | default: '→ building 42 pages · hashing assets' }}</div>
-                  <div class="omega-term__out"><span class="omega-term__ok">✓</span> {{ item.terminal.ok | default: 'live in 38s' }}<span class="omega-caret"></span></div>
+                  <div><span class="omega-term__prompt">$</span> {{ item.terminal.command | default: 'npm run deploy' | escape_once }}</div>
+                  <div class="omega-term__out">{{ item.terminal.out | default: '→ building 42 pages · hashing assets' | escape_once }}</div>
+                  <div class="omega-term__out"><span class="omega-term__ok">✓</span> {{ item.terminal.ok | default: 'live in 38s' | escape_once }}<span class="omega-caret"></span></div>
                 </div>
               {% when 'split' %}
                 <div class="omega-tile__demo">
@@ -58,7 +69,12 @@
                   <span class="omega-tile__swatch" style="background: #12925c;"></span>
                 </div>
             {% endcase %}
-          </div>
+          {% endcapture %}
+          {% if item.href != blank %}
+            <a href="{{ item.href }}" class="{{ tile_class }}" data-omega-reveal>{{ tile_body }}</a>
+          {% else %}
+            <div class="{{ tile_class }}" data-omega-reveal>{{ tile_body }}</div>
+          {% endif %}
         {% endfor %}
       </div>
       {%- if args.cta_button.enabled != false and args.cta_button.text %}

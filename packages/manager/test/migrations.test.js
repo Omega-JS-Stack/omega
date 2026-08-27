@@ -1190,6 +1190,19 @@ test('state-retirement: every state key is either moved to a named home or expli
   }
 });
 
+test('state-retirement: a legacy `website` stream key lands on the web target (#505)', () => {
+  // omega-manager-era state files key the web stream by its DIR name — passed
+  // through it composes `targets.website`, a target validateConfig rejects
+  const moves = stateRetirement.planMoves({
+    analytics: { streams: { website: { measurementId: 'G-LEGACY', apiSecret: 'legacy-secret' } } },
+  }, RETIREMENT_CONFIG);
+
+  const by = (from) => moves.find((move) => move.from === from);
+  assert.equal(by('analytics.streams.website.measurementId').config, 'targets.web.analytics.providers.google.id');
+  assert.equal(by('analytics.streams.website.apiSecret').env, 'GOOGLE_ANALYTICS_SECRET_WEB');
+  assert.ok(moves.every((move) => !(move.config || '').startsWith('targets.website')), 'no move composes targets.website');
+});
+
 test('state-retirement: an audit run reports the plan and writes nothing', async () => {
   const root = stageRetirementBrand();
   const configBefore = jetpack.read(join(root, 'config', 'omega.json5'));
@@ -1254,6 +1267,24 @@ test('state-retirement: the devkit deploy record survives — the file is trimme
   const again = await runRetirement(root, { execute: true });
   assert.deepEqual(again.output.stateRetirement, { retired: true, kept: ['deploy'] });
   assert.deepEqual(jetpack.read(join(root, '.omega', 'state.json'), 'json'), { deploy });
+});
+
+test('state-retirement: a record section it does not recognize survives untouched (#479)', async () => {
+  const deploy = { web: { at: '2026-07-17T00:00:00.000Z', method: 'direct' } };
+  const install = { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] };
+  const root = stageRetirementBrand({ state: { ...FIXTURE_STATE, deploy, install } });
+
+  const result = await runRetirement(root, { execute: true });
+
+  // The retired CONTENT moves out; state.json lives on as the record file, and
+  // this migration owns only the sections it retires
+  assert.deepEqual(jetpack.read(join(root, '.omega', 'state.json'), 'json'), { deploy, install });
+  assert.deepEqual(result.output.stateRetirement.kept.sort(), ['deploy', 'install']);
+  assert.ok(result.output.stateRetirement.dropped.every((path) => !path.startsWith('install')),
+    'an unrecognized section is never a dropped fact');
+
+  const again = await runRetirement(root, { execute: true });
+  assert.deepEqual(again.output.stateRetirement, { retired: true, kept: ['deploy', 'install'] });
 });
 
 // ─── targets-rename (#443): the other LOCAL migration ────────────────────────

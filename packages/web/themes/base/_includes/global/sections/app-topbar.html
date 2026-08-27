@@ -12,7 +12,7 @@
     renders no size class. NEVER test it for truthiness: Liquid answers `.size`
     on a hash with its KEY COUNT, so every action would "have" a size (#43).
 
-  Breadcrumbs come from the page's resolved.theme.header.breadcrumbs.items
+  Breadcrumbs come from the page's resolved.config.theme.header.breadcrumbs.items
   (the same frontmatter API as ever — they render here now instead of the
   in-card page header).
 {% endcomment %}
@@ -31,8 +31,8 @@
 
     <!-- Breadcrumb trail -->
     <div class="omega-topbar__crumbs d-none d-md-flex">
-      {% if resolved.theme.header.breadcrumbs.items %}
-        {% for crumb in resolved.theme.header.breadcrumbs.items %}
+      {% if resolved.config.theme.header.breadcrumbs.items %}
+        {% for crumb in resolved.config.theme.header.breadcrumbs.items %}
           {% if forloop.last %}
             <span>{{ crumb.label }}</span>
           {% else %}
@@ -46,7 +46,7 @@
           {% endif %}
         {% endfor %}
       {% else %}
-        <span>{{ resolved.theme.header.title.content | default: resolved.meta.title | omega_liquify }}</span>
+        <span>{{ resolved.config.theme.header.title.content | default: resolved.meta.title | omega_liquify }}</span>
       {% endif %}
 
       {% iftruthy data.status.label %}

@@ -50,6 +50,11 @@ const BRAND_RULES_FILE = 'firestore.rules';
 // it. Re-created by every stage, so it can never go stale or missing.
 const COMPILED_RULES_FILE = 'dist/firestore.rules';
 
+// The deliberate, run-alone step that moves a brand onto the compiled model —
+// never a side effect of `omega setup`
+// ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
+const RULES_MIGRATION_COMMAND = 'npx omega migrate:rules';
+
 // The two halves that ship inside this package.
 const TEMPLATES_DIR = path.resolve(__dirname, '..', '..', '..', 'templates');
 const FRAMEWORK_RULES_TEMPLATE = path.join(TEMPLATES_DIR, 'firestore.framework.rules');
@@ -644,8 +649,15 @@ function compileFirestoreRules(options) {
 
   const brandSource = seededFallback ? jetpack.read(BRAND_RULES_SEED) : jetpack.read(sourcePath);
 
+  // Which command actually moves this tree forward: setup migrates a source
+  // whose brand already deploys the compiled artifact, but a brand still
+  // pointing firebase.json at its own file has deferred, and only the run-alone
+  // verb touches it ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
+  const deferred = deferredRulesTarget({ projectDir });
+  const nextStep = deferred ? RULES_MIGRATION_COMMAND : 'npx omega setup';
+
   if (isLegacyMarkerFile(brandSource)) {
-    onWarn(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — refusing to write a duplicate-function ${COMPILED_RULES_FILE} that cannot load. Run \`npx omega setup\` to migrate it (your custom rules are kept).`);
+    onWarn(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — refusing to write a duplicate-function ${COMPILED_RULES_FILE} that cannot load. Run \`${nextStep}\` to migrate it (your custom rules are kept).`);
 
     return { compiledPath, merged: [], seededFallback, refused: true };
   }
@@ -666,7 +678,7 @@ function compileFirestoreRules(options) {
   const firebaseJSON = jetpack.read(path.join(projectDir, 'firebase.json'), 'json');
   const target = firebaseJSON?.firestore?.rules;
   if (firebaseJSON && target !== COMPILED_RULES_FILE) {
-    onWarn(`firebase.json points firestore.rules at "${target}" — it must be "${COMPILED_RULES_FILE}" (the compiled artifact) or the framework rules never load. Run \`npx omega setup\`.`);
+    onWarn(`firebase.json points firestore.rules at "${target}" — it must be "${COMPILED_RULES_FILE}" (the compiled artifact) or the framework rules never load. Run \`${nextStep}\`.`);
   }
 
   return { compiledPath, merged, seededFallback, refused: false };
@@ -974,6 +986,49 @@ function collapseBlankRuns(text) {
   return text.replace(/\n[^\S\n]*\n(?:[^\S\n]*\n)+/g, '\n\n');
 }
 
+/**
+ * Has this brand DEFERRED the compiled-rules migration?
+ *
+ * A brand whose firebase.json still names its own rules file deploys the brand
+ * half alone — the legacy posture, deliberately kept. Migrating it flips what
+ * the live project enforces (the framework half joins, and `allow write`
+ * becomes `allow create, update`), so it is a one-time step a human runs alone,
+ * never something `omega setup` heals on the way to a deploy
+ * ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
+ *
+ * A target naming nothing, or naming a file that is not there, has deferred
+ * nothing: that is a fresh brand, and setup seeds it as it always has.
+ * @param {object} options
+ * @param {string} options.projectDir - The target root.
+ * @param {object} [options.firebaseJSON] - The parsed firebase.json (read from disk when omitted).
+ * @returns {string|null} The deferred target firebase.json names, or null.
+ */
+function deferredRulesTarget(options) {
+  const projectDir = options.projectDir;
+  const firebaseJSON = options.firebaseJSON || jetpack.read(path.join(projectDir, 'firebase.json'), 'json');
+  const target = firebaseJSON?.firestore?.rules;
+
+  if (!target || target === COMPILED_RULES_FILE) {
+    return null;
+  }
+
+  return jetpack.exists(path.join(projectDir, target)) === 'file' ? target : null;
+}
+
+/**
+ * The deferral, as setup reports it: what was NOT done, what migrating would
+ * change on the live project, and the one command that does it.
+ * @param {string} target - The rules file firebase.json still names.
+ * @returns {string[]} Pre-formatted lines.
+ */
+function rulesMigrationDeferralNotice(target) {
+  return [
+    `firebase.json still points firestore.rules at "${target}" — the compiled-rules migration is DEFERRED and nothing was changed.`,
+    `Migrating rewrites your ${BRAND_RULES_FILE} and deploys ${COMPILED_RULES_FILE} (your rules + the framework half), which CHANGES LIVE POSTURE — a legacy \`allow write\` becomes \`allow create, update\`, so a client deleting its own doc flips allowed → denied.`,
+    `Run it deliberately, on its own, once you have read the diff: ${RULES_MIGRATION_COMMAND}`,
+  ];
+}
+
 module.exports = {
   RULES_VERSION,
   BRAND_RULES_FILE,
@@ -981,9 +1036,12 @@ module.exports = {
   COMPILED_RULES_FILE,
   FRAMEWORK_RULES_TEMPLATE,
   RETIRED_NAMES,
+  RULES_MIGRATION_COMMAND,
   compileRules,
   compileFirestoreRules,
+  deferredRulesTarget,
   ensureBrandRulesSource,
   extractDocumentsBody,
   needsRulesMigration,
+  rulesMigrationDeferralNotice,
 };

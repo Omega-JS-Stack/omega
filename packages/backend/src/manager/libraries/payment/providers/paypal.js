@@ -1,5 +1,7 @@
 const powertools = require('node-powertools');
-const staleFallback = require('../stale-fallback.js');
+const fetchFailure = require('../fetch-failure.js');
+const assertRefundLinkage = require('../refund-linkage.js');
+const env = require('../../env.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -61,8 +63,8 @@ const PayPal = {
       return cachedToken;
     }
 
-    const clientId = process.env.PAYPAL_CLIENT_ID;
-    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    const clientId = env.get('PAYPAL_CLIENT_ID');
+    const clientSecret = env.get('PAYPAL_CLIENT_SECRET');
 
     if (!clientId || !clientSecret) {
       throw new Error('PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET environment variables are required');
@@ -142,17 +144,18 @@ const PayPal = {
 
   /**
    * Fetch the latest resource from PayPal's API
-   * Falls back to the raw webhook payload if the API call fails
+   * PayPal's answer is the only trusted source — a lookup that fails throws the
+   * classified failure ([../fetch-failure.js](../fetch-failure.js)) instead of
+   * degrading to the webhook payload
    *
    * For orders: captures the payment first (moves funds), then returns the captured order
    *
    * @param {string} resourceType - 'subscription', 'order', or 'sale'
    * @param {string} resourceId - PayPal resource ID (e.g., 'I-xxx', an order ID, or a sale ID)
-   * @param {object} rawFallback - Fallback data from webhook payload
    * @param {object} context - Additional context (e.g., { config })
    * @returns {object} Full PayPal resource object
    */
-  async fetchResource(resourceType, resourceId, rawFallback, context) {
+  async fetchResource(resourceType, resourceId, context) {
     try {
       if (resourceType === 'subscription') {
         const sub = await this.request(`/v1/billing/subscriptions/${resourceId}`);
@@ -229,23 +232,15 @@ const PayPal = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it — flagged and
-      // logged, because the payload is older than the answer we could not get.
-      // An order fetch IS the capture, so its failure also means the money never moved.
-      if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return staleFallback(rawFallback, {
-          ctx: context?.ctx,
-          provider: 'paypal',
-          resourceType,
-          resourceId,
-          error: e,
-          consequence: resourceType === 'order'
-            ? 'the order was NOT captured, so the funds have NOT moved; the payload below describes an UNCAPTURED order'
-            : null,
-        });
-      }
-
-      throw e;
+      // An order fetch IS the capture, so its failure also means the money never moved
+      throw fetchFailure(e, {
+        provider: 'paypal',
+        resourceType,
+        resourceId,
+        consequence: resourceType === 'order'
+          ? 'the order was NOT captured, so the funds have NOT moved'
+          : null,
+      });
     }
   },
 
@@ -408,7 +403,7 @@ const PayPal = {
 
   /**
    * Extract the resource a PayPal webhook envelope carries
-   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   * Identifiers only — the payload never drives state ([../fetch-failure.js](../fetch-failure.js))
    *
    * @param {object} raw - Raw PayPal webhook payload
    * @returns {object|null}
@@ -445,14 +440,76 @@ const PayPal = {
   },
 
   /**
-   * Extract refund details from a PayPal PAYMENT.SALE.REFUNDED webhook payload
-   * Returns a unified shape so transition handlers stay provider-agnostic
+   * What a PayPal refund actually moved, read back from PayPal's own refund record
    *
-   * @param {object} raw - Raw PayPal webhook payload
-   * @returns {{ amount: string|null, currency: string, reason: string|null }}
+   * The resource already in hand is no use here: it is the sale or the capture the
+   * refund reversed — the ORIGINAL payment, whose amount is the purchase price and
+   * not the refund's, which is simply wrong for a partial refund. And the amounts
+   * used to come from the webhook envelope, so a payload naming an inflated total
+   * wrote that number onto the order and into the customer's refund email
+   * ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+   *
+   * So the refund is fetched by its OWN id — the one the parser keeps beside the
+   * resourceId it reassigned to the sale/capture — and only the id comes from the
+   * event, the same trust level as the resourceId every lookup here starts from.
+   * v2 capture refunds read at `/v2/payments/refunds/{id}`; v1 sale refunds (both
+   * the one-time and the subscription path) at `/v1/payments/refund/{id}`.
+   *
+   * The record that answers has to point BACK at the sale or capture the event
+   * named, or it is another order's refund and the event is refused
+   * ([../refund-linkage.js](../refund-linkage.js)).
+   *
+   * @param {object} resource - The resource the refund reversed, as PayPal answered for it (the record it must link back to)
+   * @param {object} [options] - { refundId, eventType, resourceType, raw, ctx }
+   * @returns {Promise<{ amount: string|null, currency: string, reason: string|null }>}
    */
-  getRefundDetails(raw) {
-    const resource = raw?.resource;
+  async getRefundDetails(resource, options = {}) {
+    // A doc stored before the parser threaded the id still names the refund in the
+    // envelope it carries — an identifier, read the same way resourceId is
+    const refundId = options.refundId || options.raw?.resource?.id || null;
+
+    if (!refundId) {
+      const message = `paypal getRefundDetails(): ${options.eventType || 'refund event'} names no refund id, so PayPal cannot be asked what came back — the refund is recorded with no amount rather than with the payload's`;
+
+      if (options.ctx?.warn) {
+        options.ctx.warn(message);
+      } else {
+        console.warn(`[@omega.js/backend:payment:paypal] ${message}`);
+      }
+
+      return { amount: null, currency: 'USD', reason: null };
+    }
+
+    const endpoint = options.eventType === 'PAYMENT.CAPTURE.REFUNDED'
+      ? `/v2/payments/refunds/${refundId}`
+      : `/v1/payments/refund/${refundId}`;
+
+    let refund;
+
+    try {
+      refund = await this.request(endpoint);
+    } catch (e) {
+      throw fetchFailure(e, { provider: 'paypal', resourceType: 'refund', resourceId: refundId });
+    }
+
+    // The refund is a SECOND record, keyed by an id the payload chose: without a
+    // link back to the sale or capture this event is about, an unrelated refund
+    // from the same account would have booked its amount onto this order
+    // ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)). PayPal writes
+    // that link both ways round — a v1 refund names its `sale_id`, a v2 refund
+    // links `up` to its capture. A refund of a SUBSCRIPTION's sale names the sale,
+    // never the billing agreement the event resolved to, so there is nothing to
+    // compare and the linkage helper says so out loud.
+    assertRefundLinkage({
+      provider: 'paypal',
+      refundType: 'refund',
+      refundId: refundId,
+      resourceType: options.resourceType || 'resource',
+      resourceId: resource?.id || null,
+      expected: resource?.id || null,
+      ctx: options.ctx,
+      ...refundLink(refund, options.resourceType),
+    });
 
     return {
       // v1 spells the amount `total`/`currency`, v2 spells it
@@ -460,9 +517,9 @@ const PayPal = {
       // spelling and landed a null amount on the order record and the
       // customer's refund email
       // ([#240](https://github.com/Omega-JS-Stack/omega/issues/240)).
-      amount: resource?.amount?.total || resource?.amount?.value || resource?.total_refunded_amount?.value || null,
-      currency: resource?.amount?.currency || resource?.amount?.currency_code || 'USD',
-      reason: resource?.reason_code || null,
+      amount: refund?.amount?.total || refund?.amount?.value || refund?.total_refunded_amount?.value || null,
+      currency: refund?.amount?.currency || refund?.amount?.currency_code || 'USD',
+      reason: refund?.reason_code || null,
     };
   },
 
@@ -485,6 +542,50 @@ const PayPal = {
     return customId;
   },
 };
+
+/**
+ * The back-pointer a PayPal refund record carries to the payment it reversed
+ *
+ * A v1 refund names its `sale_id`; a v2 refund links `up` to its capture. The
+ * refund of a SUBSCRIPTION's sale names the sale, never the billing agreement the
+ * event resolved to, so that path has nothing to compare and says so
+ * ([refund-linkage.js](../refund-linkage.js)).
+ *
+ * @param {object} refund - The fetched refund record
+ * @param {string} resourceType - The event's resource type ('sale' | 'capture')
+ * @returns {{ field: string|null, found: string|null }}
+ */
+function refundLink(refund, resourceType) {
+  if (resourceType === 'sale') {
+    return { field: 'sale_id', found: refund?.sale_id || null };
+  }
+
+  if (resourceType === 'capture') {
+    return { field: 'links[rel=up]', found: parseUpLinkId(refund?.links) };
+  }
+
+  return { field: null, found: null };
+}
+
+/**
+ * The id a v2 record points `up` at, read off its HATEOAS links
+ *
+ * PayPal names a v2 refund's parent capture with a link whose `rel` is `up`, and
+ * the id is that URL's last segment — the only back-pointer a v2 refund carries
+ * ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)).
+ *
+ * @param {Array|undefined} links - The record's HATEOAS links
+ * @returns {string|null}
+ */
+function parseUpLinkId(links) {
+  const up = (links || []).find((link) => link?.rel === 'up');
+
+  if (!up?.href) {
+    return null;
+  }
+
+  return up.href.split('/').filter(Boolean).pop() || null;
+}
 
 /**
  * Parse the custom_id string from a PayPal subscription

@@ -40,9 +40,11 @@ Everything else falls through to base, including the whole pricing page.
 The scss floor for the fallthrough vocabulary comes from classy's token-pure
 partials (imported in `_theme.scss`) painted through this theme's
 `--omega-*` re-values, with neobrutalist overlays on top
-(`css/components/_marketing.scss` for the marketing bands, the omega voice
-rules in `css/base/_utilities.scss`, the ink-bar re-skin of `.omega-nav` in
-`css/layout/_navigation.scss`, and the pricing page css).
+(`css/components/_marketing.scss` for the marketing bands — plan cards
+included, since `marketing/pricing-cards` composes them off /pricing too
+(#531) — the omega voice rules in `css/base/_utilities.scss`, the ink-bar
+re-skin of `.omega-nav` in `css/layout/_navigation.scss`, and the pricing page
+css).
 
 ## Select the theme
 

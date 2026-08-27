@@ -3,6 +3,6 @@ const Manager = new (require('@omega.js/extension/build'));
 const logger = Manager.logger('build:pre');
 
 // Hook
-module.exports = async (index) => {
-  logger.log('Running with index =', index);
+module.exports = async ({ projectRoot, mode }) => {
+  logger.log(`Running in ${mode} mode from ${projectRoot}`);
 }

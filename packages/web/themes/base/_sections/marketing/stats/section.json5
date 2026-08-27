@@ -2,7 +2,8 @@
   description: 'Stats band — serif numbers with count-up on reveal. Callers with a bare frontmatter array pass it as the items named arg ({% section "marketing/stats", items: resolved.stats %}); empty items suppresses the band.',
 
   args: {
-    items: 'array',
+    items: 'array', // [{ number, label, sublabel, icon, color }] — icon rides omega_icon; color names a tone slot (tone-1…tone-6), never a hex
+
     after: 'html', // finished markup rendered inside the band container after the grid ({% slot after %}) — e.g. a trailing CTA button
   },
 
@@ -18,6 +19,17 @@
   // Showcase variants (spec §9)
   demo: [
     { label: 'Default four' },
+    {
+      label: 'Icons and tones',
+      args: {
+        items: [
+          { number: '2017', label: 'Founded', sublabel: 'Still shipping', icon: 'calendar', color: 'tone-1' },
+          { number: '50+', label: 'Team members', sublabel: 'Across 9 time zones', icon: 'users', color: 'tone-2' },
+          { number: '1M+', label: 'Happy customers', sublabel: 'And counting', icon: 'smile', color: 'tone-3' },
+          { number: '120+', label: 'Countries', sublabel: 'Served from the edge', icon: 'globe', color: 'tone-4' },
+        ],
+      },
+    },
     {
       label: 'Three stats',
       args: {

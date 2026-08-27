@@ -26,7 +26,9 @@
  *      runs skip cleanly.
  */
 const chalk = require('chalk').default;
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { resolveConfigValue, landValue } = require('../../lib/config-flow.js');
@@ -117,12 +119,19 @@ module.exports.run = createServiceRunner({
     }
 
     if (!db) {
-      return {
-        skip: true,
-        reason: process.env.CHATSY_API_KEY
-          ? 'CHATSY_API_KEY recognized, but product-API management is not wired yet — use the operator SA (CHATSY_SERVICE_ACCOUNT) or the dashboard'
-          : 'no CHATSY_SERVICE_ACCOUNT configured (path to Chatsy\'s service-account JSON, set it in the brand .env)',
-      };
+      if (process.env.CHATSY_API_KEY) {
+        return {
+          skip: true,
+          reason: 'CHATSY_API_KEY recognized, but product-API management is not wired yet — use the operator SA (CHATSY_SERVICE_ACCOUNT) or the dashboard',
+        };
+      }
+
+      // The shared setup contract (#608): the operator SA is asked for right
+      // here — most brands are not the Chatsy operator and answer Disable,
+      // which retires the ask for good.
+      const gate = await requestServiceInput(context, serviceInputSpec('chat'));
+      if (gate) return gate;
+      db = new FirestoreREST(loadServiceAccount(process.env.CHATSY_SERVICE_ACCOUNT, context.brandRoot));
     }
 
     return { db, agentId };

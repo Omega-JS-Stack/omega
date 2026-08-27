@@ -34,7 +34,7 @@ meta:
     {%- assign entry_category = item | omega_rendered: 'search.category' | default: post_category -%}
     {%- unless first %},{% endunless -%}{%- assign first = false %}
   {
-    "url": "{{ site.url }}{{ item.url }}",
+    "url": "{{ resolved.config.url }}{{ item.url }}",
     "title": "{{ entry_title | default: '' | omega_json_escape }}",
     "desc": "{{ entry_desc | default: '' | omega_json_escape }}",
     "breadcrumb": "{{ entry_breadcrumb | default: '' | omega_json_escape }}",

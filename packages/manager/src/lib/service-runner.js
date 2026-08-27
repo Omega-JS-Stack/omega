@@ -89,8 +89,8 @@ function getOperationHandler(serviceDir, operationName, type) {
  * Any other top-level key throws. This prevents accidental data leakage into
  * the carry via an "everything dumps to serviceData" pattern.
  *
- * `state` is the LATER-OPERATIONS channel and nothing more (#434 retired
- * .omega/state.json): a value a following operation in the same service needs
+ * `state` is the LATER-OPERATIONS channel and nothing more (#434 retired the
+ * .omega/state.json cache): a value a following operation in the same service needs
  * (the zone id, the bundle id, the Sentry project map). A fact that must
  * OUTLIVE the run belongs in config/omega.json5 via lib/config-write.js — or
  * in the brand .env via lib/env-secret.js when it is secret-shaped. Anything

@@ -30,11 +30,12 @@ const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findTarget } = require('@omega.js/devkit/omega-bin');
-const { freshnessSweep } = require('@omega.js/devkit/local');
+const { freshnessSweep, resolveLinkedMonorepo, startMonorepoWatch } = require('@omega.js/devkit/local');
 
 // Local
 const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
+const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
 
 // Target → the npm leg that IS local dev for that target
@@ -45,26 +46,57 @@ const DEV_LEGS = {
   extension: ['npm', 'run', 'start'], // opt-in: extension build watcher
 };
 
+// Every custom target's leg is the same one: its own `start` script (#603)
+const CUSTOM_DEV_LEG = ['npm', 'run', 'start'];
+
+/**
+ * The leg that IS local dev for one discovered target.
+ *
+ * A backend in custom-server mode (#584) has no Cloud Functions to emulate, so
+ * its leg is its own `start` — the same script a custom target boots with. Its
+ * server is the local stack's API either way, so it keeps the backend's place
+ * in the default set and its boot-first ordering.
+ *
+ * @param {{ target: string, custom?: boolean, projectType?: string }} entry
+ * @returns {string[]} argv for the leg
+ */
+function devLegFor(entry) {
+  if (entry.custom || entry.projectType === 'custom') return CUSTOM_DEV_LEG;
+  return DEV_LEGS[entry.target] || CUSTOM_DEV_LEG;
+}
+
 // Booted without flags — the local web loop
 const DEFAULT_TARGETS = ['web', 'backend'];
 
 /**
  * Pure target selection — which legs boot for a given flag set.
+ *
+ * Custom targets (#603) join the same fan-out: their leg is `npm run start`,
+ * and a custom target only reaches `custom` at all when its package.json
+ * declares that script — no script, no dev leg.
+ *
  * @param {object} input
  * @param {string[]} input.available - targets that have a dir in this brand
+ * @param {string[]} [input.custom] - custom target names with a `start` script
  * @param {string} [input.only] - comma list: exact set to boot
  * @param {string} [input.except] - comma list: subtract from the set
  * @param {boolean} [input.all] - start every target with a dev leg
  * @returns {{ selected: string[], unknown: string[], missing: string[] }}
  */
-function selectDevTargets({ available, only, except, all }) {
+function selectDevTargets({ available, custom = [], only, except, all }) {
+  // A custom target is a first-class leg once it has a start script — the
+  // default set boots it beside web + backend (it is part of the local stack,
+  // never an opt-in GUI surface)
+  const hasLeg = (target) => Boolean(DEV_LEGS[target]) || custom.includes(target);
+  const defaults = [...DEFAULT_TARGETS, ...custom].filter((target) => available.includes(target));
+
   const requested = only
     ? String(only).split(',').map((part) => part.trim()).filter(Boolean)
-    : (all ? Object.keys(DEV_LEGS) : DEFAULT_TARGETS.filter((target) => available.includes(target)));
+    : (all ? [...Object.keys(DEV_LEGS), ...custom] : defaults);
   const excluded = new Set(String(except || '').split(',').map((part) => part.trim()).filter(Boolean));
 
-  const unknown = requested.filter((target) => !DEV_LEGS[target]);
-  const kept = requested.filter((target) => DEV_LEGS[target] && !excluded.has(target));
+  const unknown = requested.filter((target) => !hasLeg(target));
+  const kept = requested.filter((target) => hasLeg(target) && !excluded.has(target));
   const selected = kept.filter((target) => available.includes(target));
   const missing = kept.filter((target) => !available.includes(target));
 
@@ -132,16 +164,27 @@ module.exports = async (options = {}) => {
   // with it, and the two are read for different questions (#231).
   attachLogFile(path.join(brandRoot, 'logs', 'dev.log'));
 
-  const targets = discoverTargets(brandRoot).filter((entry) => entry.target && DEV_LEGS[entry.target]);
+  // A custom target (#603) joins the fan-out under its own NAME, and only
+  // when its package.json declares a `start` script — the manager never
+  // invents a leg for it.
+  const discovered = discoverTargets(brandRoot);
+  const customLegs = discovered.filter((entry) => entry.custom && targetScripts(entry.path).start);
+  const targets = [
+    ...discovered.filter((entry) => entry.target && DEV_LEGS[entry.target]),
+    ...customLegs.map((entry) => ({ ...entry, target: entry.name })),
+  ];
+
+  const custom = customLegs.map((entry) => entry.name);
   const { selected, unknown, missing } = selectDevTargets({
     available: targets.map((entry) => entry.target),
+    custom,
     only: options.only,
     except: options.except,
     all: options.all,
   });
 
   unknown.forEach((target) => {
-    console.log(chalk.yellow(`⊘ unknown dev target "${target}" (know: ${Object.keys(DEV_LEGS).join(', ')})`));
+    console.log(chalk.yellow(`⊘ unknown dev target "${target}" (know: ${[...Object.keys(DEV_LEGS), ...custom].join(', ')})`));
   });
   missing.forEach((target) => {
     console.log(chalk.yellow(`⊘ ${target}: no dir in this brand — skipped`));
@@ -222,6 +265,21 @@ module.exports = async (options = {}) => {
     console.log(chalk.dim('   ⚑ boot ran the local lane only — `npm run manage` runs the full setup (or `omega dev --full`)'));
   }
 
+  // The one-terminal rule covers FRAMEWORK edits too (#587). A brand whose
+  // @omega.js deps resolve into a monorepo checkout has no src→dist rebuild
+  // without that monorepo's watch, so this boot starts it as a session child —
+  // the same mechanism the website target's `--local` prelude uses, one
+  // implementation in devkit. Lock-aware: a watch already running is reused.
+  // AFTER the sweep on purpose: the sweep's verdict depends on whether a watch
+  // holds the lock (#281/#398), so starting one first would change the answer
+  // it just gave.
+  const linkedMonorepo = resolveLinkedMonorepo(brandRoot);
+  if (linkedMonorepo) {
+    startMonorepoWatch({ monorepoRoot: linkedMonorepo, logger: { log: (line) => console.log(chalk.dim(`   ${line}`)) } });
+  } else {
+    console.log(chalk.dim('   ⚑ frameworks come from the registry — no monorepo watch to run (a linked brand starts one here)'));
+  }
+
   const pad = Math.max(...selected.map((target) => target.length));
   const children = [];
   let shuttingDown = false;
@@ -244,7 +302,7 @@ module.exports = async (options = {}) => {
 
   for (const target of selected) {
     const entry = targets.find((item) => item.target === target);
-    const leg = DEV_LEGS[target];
+    const leg = devLegFor(entry);
     const node = resolveTargetNode(entry.path);
     if (node?.error) {
       console.log(chalk.yellow(`   ⚠ ${target}: ${node.error} — using the inherited node`));
@@ -289,6 +347,7 @@ module.exports = async (options = {}) => {
 };
 
 module.exports.selectDevTargets = selectDevTargets;
+module.exports.devLegFor = devLegFor;
 module.exports.createLineDeduper = createLineDeduper;
 module.exports.DEV_LEGS = DEV_LEGS;
 module.exports.DEFAULT_TARGETS = DEFAULT_TARGETS;

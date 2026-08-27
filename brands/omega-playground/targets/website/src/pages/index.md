@@ -15,9 +15,10 @@ meta:
   description: "The live demo surface for the OMEGA stack: real builds, real sign-ins, real checkouts, on a brand nobody has to keep."
 ---
 
-<!-- ═══ Hero: a build IS the product shot (frame mock off, since the demo_html
-     slot carries a living build log instead: classy's ink-panel classes make
-     a terminal vignette for free) ═══ -->
+<!-- ═══ Hero: the stack IS the product shot (frame mock off — the custom
+     animation slot carries the framework's `orbit` reference instead, #441:
+     one folder of markup + style.scss + script.js, resolved through the layer
+     chain and bundled like a section's assets) ═══ -->
 {% section "marketing/hero" %}
 badge:
   text: "The OMEGA test surface"
@@ -29,7 +30,7 @@ rotating:
   - "your desktop app"
   - "your extension"
   - "your whole brand"
-description: "{{ site.brand.name }} is where the OMEGA stack runs in the open: real builds, real sign-ins, real checkouts — on a brand nobody has to keep."
+description: "{{ resolved.config.brand.name }} is where the OMEGA stack runs in the open: real builds, real sign-ins, real checkouts — on a brand nobody has to keep."
 primary_button:
   text: "Create a test account"
   href: "/signup"
@@ -42,19 +43,17 @@ meta:
   - "Every account here is throwaway"
 frame:
   enabled: false
-{% slot demo_html %}
-    <div class="classy-tile__term classy-ink-panel col-lg-7 mx-auto text-start">
-      <div class="classy-term__out">$ omega build</div>
-      <div>website · backend · desktop · extension</div>
-      <div>one config, four surfaces<span class="omega-caret"></span></div>
-      <div class="classy-term__out"><span class="classy-term__ok">✓</span> shipped · and none of it is production</div>
-    </div>
-{% endslot %}
+demo:
+  enabled: true
+  type: "custom"
+  name: "orbit"
+  options:
+    subtext: "One config in the middle, four surfaces around it"
 {% endsection %}
 <!-- ═══ Bento: six things the stack does, one per tile type (same tile-type
      coverage as before: code, split, terminal, brand, default ×2) ═══ -->
 {% section "marketing/bento" %}
-superheadline: "Why {{ site.brand.name }} exists"
+superheadline: "Why {{ resolved.config.brand.name }} exists"
 headline: "Everything the stack does. <em>Running, right now.</em>"
 subheadline: "Every framework and every integration, exercised live — so you can poke at it before you build on it."
 config_demo:
@@ -79,7 +78,7 @@ items:
   - type: "brand"
     icon: "palette"
     title: "Rebrand in one line"
-    description: "Change one hex in omega.json5 and {{ site.brand.name }} re-inks itself: buttons, links, highlights, focus rings."
+    description: "Change one hex in omega.json5 and {{ resolved.config.brand.name }} re-inks itself: buttons, links, highlights, focus rings."
   - type: "default"
     icon: "flask"
     title: "Throwaway by design"
@@ -89,6 +88,10 @@ items:
     title: "Real integrations, test mode"
     description: "Auth, payments, email, analytics, and ads are wired to the real providers in test mode, so a whole flow can be walked end to end."
 {% endsection %}
+<!-- ═══ Plan cards: the same catalog /pricing renders, right under the WHY
+     band — plans and billing bridge from resolved.pricing, so nothing here is
+     a copied number ═══ -->
+{% section "marketing/pricing-cards", plans: resolved.pricing.plans, annual: resolved.pricing.billing.annually, superheadline: "Pricing", headline: "Test plans, priced like", headline_accent: "the real thing", subheadline: "Every tier here is a throwaway test product: subscribe, switch, and cancel as often as you like." %}
 <!-- ═══ Stats band: the playground's shape in four numbers ═══ -->
 {% section "marketing/stats" %}
 items:
@@ -108,11 +111,10 @@ items:
 <!-- ═══ CTA band ═══ -->
 {% section "marketing/cta" %}
 superheadline:
-  icon: "rocket"
   text: "Try it"
 headline: "Take the whole stack"
 headline_accent: "for a spin"
-subheadline: "{{ site.brand.name }} makes you a test account in a minute: sign in, subscribe, cancel, and see how OMEGA behaves when it's wired up for real."
+subheadline: "{{ resolved.config.brand.name }} makes you a test account in a minute: sign in, subscribe, cancel, and see how OMEGA behaves when it's wired up for real."
 primary_button:
   text: "Create a test account"
   href: "/signup"

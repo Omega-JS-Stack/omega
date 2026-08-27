@@ -14,6 +14,9 @@
 //      brand config — failing loudly only when there is nothing to derive (#264).
 //   6. The store description assets ship RENDERED brand tokens — a `{{ brand.name }}`
 //      that reaches the live listing is the bug (#289).
+//   7. The build hooks resolve the NESTED path setup migrates to, with the flat
+//      pre-migration path as a transition fallback — every consumer's hooks were
+//      dead, and the miss printed an untagged console.warn (#571).
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
@@ -77,6 +80,38 @@ function evaluateBuildJs(file) {
 }
 
 const MANIFEST = (extra) => `{ manifest_version: 3, name: 'Staged', ${extra} }`;
+
+// Set env vars for one test, restoring exactly what was there (an empty string
+// means "declared but empty", the CI-with-no-.env shape) — returns the undo.
+function withEnv(vars) {
+  const previous = {};
+  for (const [key, value] of Object.entries(vars)) {
+    previous[key] = process.env[key];
+    process.env[key] = value;
+  }
+  return () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+}
+
+// A consumer build hook that records WHICH path the resolver found it at, and
+// the SHAPE of the argument it was handed (#591).
+const HOOK = (which) => `
+const fs = require('fs');
+const path = require('path');
+module.exports = async (ctx) => {
+  fs.writeFileSync(path.join(process.cwd(), 'hook-ran.json'), JSON.stringify({
+    which: '${which}',
+    keys: Object.keys(ctx || {}).sort(),
+    projectRoot: ctx && ctx.projectRoot,
+    mode: ctx && ctx.mode,
+    hasManager: Boolean(ctx && ctx.manager && typeof ctx.manager.getConfig === 'function'),
+  }));
+};
+`;
 
 module.exports = {
   type: 'suite',
@@ -657,6 +692,241 @@ module.exports = {
             ctx.expect(es).not.toContain('omega:source');
           });
         } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'homepage_url is baked from brand.url on every target, declared wins, absent ships nothing (#576)',
+      run: async (ctx) => {
+        const derived = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com/extension' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no homepage_url declared'`) },
+        });
+        const declared = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`homepage_url: 'https://staged.example.com/chrome'`) },
+        });
+        const noBrandUrl = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`browser_specific_settings: { gecko: { id: 'staged@example.com' } }`) },
+        });
+
+        try {
+          // Chrome and Firefox both link the store listing's developer site from it
+          for (const target of ['chromium', 'firefox']) {
+            await inProject(derived, async (task) => {
+              const outputDir = path.join(derived, `out-${target}`);
+              await task.compileManifest(outputDir, target);
+              const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+              ctx.expect(m.homepage_url).toBe('https://staged.example.com/extension');
+            });
+          }
+
+          await inProject(declared, async (task) => {
+            const outputDir = path.join(declared, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.homepage_url).toBe('https://staged.example.com/chrome');
+          });
+
+          await inProject(noBrandUrl, async (task) => {
+            const outputDir = path.join(noBrandUrl, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.homepage_url).toBeUndefined();
+          });
+        } finally {
+          fs.rmSync(derived, { recursive: true, force: true });
+          fs.rmSync(declared, { recursive: true, force: true });
+          fs.rmSync(noBrandUrl, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'externally_connectable: a build-mode default is the BRAND origin, no dev origin (#583)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no externally_connectable anywhere'`) },
+        });
+        const restore = withEnv({ OMEGA_BUILD_MODE: 'true' });
+
+        try {
+          await inProject(tmp, async (task) => {
+            const outputDir = path.join(tmp, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+
+            // The published extension is reachable from the brand's own site;
+            // the localhost dev origin is not in a packaged build
+            ctx.expect(m.externally_connectable.matches).toEqual(['https://staged.example.com/*']);
+          });
+        } finally {
+          restore();
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'externally_connectable: a dev default carries the brand origin AND the dev origin (#583)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com/' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'no externally_connectable anywhere'`) },
+        });
+
+        try {
+          await inProject(tmp, async (task) => {
+            const outputDir = path.join(tmp, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+
+            // A trailing slash in brand.url is normalized to a match pattern
+            ctx.expect(m.externally_connectable.matches).toEqual([
+              'https://staged.example.com/*',
+              'https://localhost:4000/*',
+            ]);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'externally_connectable: a DECLARED consumer value still wins in build mode (#583, #260)',
+      run: async (ctx) => {
+        const declared = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`externally_connectable: { matches: ['https://partner.example.com/*'] }`) },
+        });
+        const emptied = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com' } }`,
+          files: { 'dist/manifest.json': MANIFEST(`externally_connectable: { matches: [] }`) },
+        });
+        const restore = withEnv({ OMEGA_BUILD_MODE: 'true' });
+
+        try {
+          await inProject(declared, async (task) => {
+            const outputDir = path.join(declared, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.externally_connectable.matches).toEqual(['https://partner.example.com/*']);
+          });
+
+          await inProject(emptied, async (task) => {
+            const outputDir = path.join(emptied, 'out');
+            await task.compileManifest(outputDir, 'chromium');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.externally_connectable).toBeUndefined();
+          });
+        } finally {
+          restore();
+          fs.rmSync(declared, { recursive: true, force: true });
+          fs.rmSync(emptied, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the publish workflow injects GOOGLE_ANALYTICS_SECRET from the repo secrets (#582)',
+      run: async (ctx) => {
+        const workflow = fs.readFileSync(path.join(SRC, 'defaults', '.github', 'workflows', 'publish.yml'), 'utf8');
+
+        // A dispatched CI run has no `.env`, so the secret only reaches the
+        // build through the workflow env — without this line every published
+        // extension baked an empty GA secret and sent no events.
+        ctx.expect(workflow).toContain('GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}');
+      },
+    },
+    {
+      name: 'build hooks run from the NESTED hooks/build/pre.js setup migrates to (#571)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'hooks/build/pre.js': HOOK('nested') },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            await task.hook('build:pre');
+            const ran = JSON.parse(fs.readFileSync(path.join(tmp, 'hook-ran.json'), 'utf8'));
+            ctx.expect(ran.which).toBe('nested');
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'build hooks still run from the flat pre-migration hooks/build:pre.js (#571)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'hooks/build:pre.js': HOOK('flat') },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            await task.hook('build:pre');
+            const ran = JSON.parse(fs.readFileSync(path.join(tmp, 'hook-ran.json'), 'utf8'));
+            ctx.expect(ran.which).toBe('flat');
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'a build hook receives the ONE OMEGA ctx shape — { manager, projectRoot, mode } (#591)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'hooks/build/pre.js': HOOK('nested') },
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            await task.hook('build:pre');
+
+            const ran = JSON.parse(fs.readFileSync(path.join(tmp, 'hook-ran.json'), 'utf8'));
+            ctx.expect(ran.keys).toEqual(['manager', 'mode', 'projectRoot']);
+            ctx.expect(ran.projectRoot).toBe(fs.realpathSync(tmp));
+            ctx.expect(ran.mode).toBe('development');
+            ctx.expect(ran.hasManager).toBe(true);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'a build hook run under OMEGA_BUILD_MODE gets mode: production (#591)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          files: { 'hooks/build/pre.js': HOOK('nested') },
+        });
+        const restore = withEnv({ OMEGA_BUILD_MODE: 'true' });
+        try {
+          await inProject(tmp, async (task) => {
+            await task.hook('build:pre');
+
+            const ran = JSON.parse(fs.readFileSync(path.join(tmp, 'hook-ran.json'), 'utf8'));
+            ctx.expect(ran.mode).toBe('production');
+          });
+        } finally {
+          restore();
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'a project with no hook at all logs the miss through the framework logger, never a bare console.warn (#571)',
+      run: async (ctx) => {
+        const tmp = stageProject({});
+        const warned = [];
+        const realWarn = console.warn;
+        console.warn = (...args) => warned.push(args.join(' '));
+        try {
+          await inProject(tmp, async (task) => {
+            await task.hook('build:post');
+          });
+          ctx.expect(warned).toEqual([]);
+        } finally {
+          console.warn = realWarn;
           fs.rmSync(tmp, { recursive: true, force: true });
         }
       },

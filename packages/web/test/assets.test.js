@@ -393,3 +393,47 @@ test('#249: a consumer js/modules/ dir stays out of the module-bundle lane, with
     fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+// #469 — the legacy 4-segment page module (js/pages/dashboard/agents/edit.js)
+// is collected as a HELPER, so the page ships with no JS and the build stays
+// green. Real helpers (checkout modules/, account sections/) reach a bundle
+// through their page entry; an orphan reaches nothing, and says so.
+test('#469: a page module no entry reaches warns loudly; helpers and partials stay silent', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-orphan-page-'));
+  const siteLayer = path.join(tmp, 'assets');
+  const pageDir = path.join(siteLayer, 'js', 'pages', 'dashboard', 'agents');
+  fs.mkdirSync(pageDir, { recursive: true });
+  fs.writeFileSync(path.join(pageDir, 'edit.js'), 'export default () => {};\n');
+  fs.writeFileSync(path.join(pageDir, '_shared.js'), 'export const shared = () => {};\n');
+
+  const outDir = path.join(PKG, '.omega', `assets-orphan-page-${process.pid}`);
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const themeRoots = [path.join(PKG, 'themes', 'classy'), path.join(PKG, 'themes', 'base')];
+  const warnings = [];
+  try {
+    await buildAssets({
+      layers: [siteLayer, ...themeRoots, path.join(PKG, 'core')],
+      themeRoots,
+      themesDir: path.join(PKG, 'themes'),
+      coreDir: path.join(PKG, 'core'),
+      outDir,
+      clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+      warn: (message) => warnings.push(message),
+      only: 'js',
+    });
+
+    const warning = warnings.filter((line) => line.includes('js/pages'));
+    assert.equal(warning.length, 1, `exactly one warning: ${warnings.join(' | ')}`);
+    assert.ok(warning[0].includes(path.join(pageDir, 'edit.js')), 'the warning names the orphaned file');
+    assert.ok(warning[0].includes('[slug]'), 'the warning names the [name] wildcard family file (#470)');
+    assert.ok(warning[0].indexOf('[slug]') < warning[0].indexOf('index.js'), 'the family file comes FIRST, the single-page spellings after');
+    assert.ok(warning[0].includes('index.js'), 'the warning names the accepted per-page-dir spelling');
+    assert.ok(warning[0].includes('3 segments'), 'the warning names the accepted flat spelling');
+    assert.ok(!warning[0].includes('_shared.js'), 'underscore partials stay silent');
+    assert.ok(!warning[0].includes(path.join('checkout', 'modules')), 'a helper its page entry imports stays silent');
+    assert.ok(!warning[0].includes(path.join('account', 'sections')), 'account section helpers stay silent');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});

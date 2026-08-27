@@ -9,13 +9,6 @@
 # (omega-side__*) — one backend voice everywhere (cp183).
 layout: backend/core/minimal
 
-theme:
-  header:
-    enabled: false
-    breadcrumbs:
-      items:
-        - label: "Account"
-
 prerender_icons:
   - name: "apple"
   - name: "android"
@@ -141,6 +134,13 @@ badges:
     name: "VIP"
     icon: "award"
     chip_class: "omega-chip omega-chip--accent"
+config:
+  theme:
+    header:
+      enabled: false
+      breadcrumbs:
+        items:
+          - label: "Account"
 ---
 
 {% assign hidden_sections = "delete,data-request,refund" | split: "," %}
@@ -213,7 +213,7 @@ badges:
               <div id="avatar-container" class="me-3 position-relative d-flex align-items-center">
                 <!-- Avatar always available from getUser() -->
                 <div class="avatar avatar-lg rounded-circle overflow-hidden border">
-                  <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
+                  <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ resolved.config.brand.name }} profile picture"/>
                 </div>
                 <!-- Active status indicator -->
                 <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -1217,7 +1217,7 @@ badges:
                   <h5 class="fw-bold fs-4 mb-2" id="cancel-winback-title" data-omega-bind="@text billing.winbackOffer.headline">Your discount is waiting</h5>
 
                   <p class="text-muted mb-4">
-                    Give {{ site.brand.name }} another shot. Same plan, same features, better price.
+                    Give {{ resolved.config.brand.name }} another shot. Same plan, same features, better price.
                   </p>
 
                   <div class="d-flex flex-column align-items-center">
@@ -1296,7 +1296,7 @@ badges:
                   <h5 class="fw-bold fs-4 mb-2" id="cancel-retention-title">Cancel your subscription?</h5>
 
                   <p class="text-muted mb-4">
-                    Your {{ site.brand.name }} data, settings, and progress may be removed after your subscription ends.
+                    Your {{ resolved.config.brand.name }} data, settings, and progress may be removed after your subscription ends.
                   </p>
 
                   <div class="d-flex flex-column align-items-center">
@@ -1574,7 +1574,7 @@ badges:
         </div>
 
         <!-- MCP Integration Card -->
-        <div class="card" data-brand-id="{{ site.brand.id }}" id="mcp-card">
+        <div class="card" data-brand-id="{{ resolved.config.brand.id }}" id="mcp-card">
           <div class="card-header">
             <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "plug", "fa-md me-2" %} MCP integration</h6>
           </div>

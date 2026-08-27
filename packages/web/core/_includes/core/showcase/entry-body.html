@@ -1,0 +1,94 @@
+{% comment %}
+  One resolved library entry's BODY (#540): every demo variant STACKED — its
+  label, an Open-frame link, the embedded frame, then its options — followed by
+  the args reference the entry's own schema generates.
+
+  Rendered by `defaults/showcase/entry.html`, the ONE generator behind both
+  galleries (#602): a section entry and a component entry are the same page
+  wearing kind-aware urls, so neither kind can drift into documenting itself
+  differently. The caller owns the HEAD above this.
+
+  Docs display stays RAW: argsJson, defaultsJson and the descriptions arrive
+  HTML-escaped from the collector, printed verbatim, never liquified. The
+  frames are #463's — same lazy loading, same min-height fallback, same
+  `data-omega-showcase-frame` autosize hook. Their URLs come off the variant
+  itself (#602): the library computes each kind's gallery paths, so this
+  include never composes one and cannot disagree with the frame page's own
+  permalink.
+
+  In:  include.entry      — the sectionLibrary entry to render
+       include.prefix     — panel id prefix ('variant-'), the rail's anchor
+                            target for each variant
+       include.heading    — tag for the variant/Args headings, so the document
+                            outline stays ordered under either caller's head
+       include.subheading — tag one level under it (the Options label)
+{% endcomment %}
+{% assign showcase_entry = include.entry %}
+
+{% if showcase_entry.demo.size > 0 %}
+  <div data-omega-showcase-panels>
+    {% for variant in showcase_entry.demo %}
+      {% comment %} scroll-margin clears the fixed masthead, so a rail anchor
+      lands on the variant's own label, not behind the nav. {% endcomment %}
+      <section id="{{ include.prefix }}{{ variant.slug }}" class="mb-4" style="scroll-margin-top: 5.5rem;" data-omega-showcase-variant="{{ variant.slug }}">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge text-bg-secondary">demo</span>
+          <{{ include.heading }} class="h5 mb-0">{{ variant.label }}</{{ include.heading }}>
+          <a href="{{ variant.url }}" class="small ms-auto text-decoration-none" target="_blank" rel="noopener">Open frame &rarr;</a>
+        </div>
+        <iframe
+          class="w-100 border rounded"
+          src="{{ variant.url }}"
+          title="{{ variant.label }}"
+          loading="lazy"
+          style="min-height: 640px;"
+          data-omega-showcase-frame></iframe>
+        <{{ include.subheading }} class="h6 text-uppercase text-muted mt-4 mb-2">Options</{{ include.subheading }}>
+        {% if variant.argsJson != "" %}
+          {% comment %} argsJson arrives HTML-escaped from the collector — print verbatim {% endcomment %}
+          <pre class="border rounded p-3 mb-0 small overflow-auto"><code>{{ variant.argsJson }}</code></pre>
+        {% else %}
+          <p class="text-muted small mb-0">No args — the entry's own defaults, as they ship.</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">
+    No demo data: this entry documents its args only (lookup-driven entries render from live site content, which a gallery page can't fabricate).
+  </p>
+{% endif %}
+
+<!-- ═══ Args reference (generated from the schema) ═══ -->
+<{{ include.heading }} class="h5 border-top pt-4 mb-3">Args</{{ include.heading }}>
+{% if showcase_entry.argsTable.size > 0 %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in showcase_entry.argsTable %}
+          <tr>
+            <td><code>{{ row.name }}</code></td>
+            <td>{% if row.type != "" %}<code>{{ row.type }}</code>{% else %}<span class="text-muted">any</span>{% endif %}</td>
+            <td class="small">{{ row.description }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-muted">No declared args.</p>
+{% endif %}
+
+{% if showcase_entry.defaultsJson != "" %}
+  <details class="mt-2">
+    <summary class="fw-bold">Defaults</summary>
+    <pre class="border rounded p-3 mt-2 small overflow-auto"><code>{{ showcase_entry.defaultsJson }}</code></pre>
+  </details>
+{% endif %}

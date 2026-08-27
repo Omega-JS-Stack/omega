@@ -99,7 +99,7 @@ see the harness README for the honest before/after numbers.
 | [layouts.js](src/layouts.js) | Layered layout delivery, zero copying: virtual templates (build) / symlink farm (dev, watchable) |
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) — over `collectProviders()`, which keeps every layer that provides a path (what the override map reports as shadowed) |
 | [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/fa/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code — the language→country map stays `@omega.js/template-kit`'s |
-| [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass; the context-free `omega_*` filters are registered, since LiquidJS drops an unknown filter silently) |
+| [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid — a value's variable ROOTS pick its lane (cached site-scope renders; page-scoped values, the page's pagination alias included, defer to a per-page copy-on-write pass; everything else renders uncached against the template's own cascade, so the consumer's `_data` globals resolve; a `meta:` ref with an undefined root fails the build; the context-free `omega_*` filters are registered, since LiquidJS drops an unknown filter silently) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/web/sections.md in the Omega repo) |
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
@@ -115,7 +115,7 @@ see the harness README for the honest before/after numbers.
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
-| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registerLiquid path), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
+| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registration path: registerLiquid plus the framework's own `{% section %}`/`{% component %}`/`{% composition %}` tags, so a fully converted tree lints clean), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
 | [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (omega + mode helpers) |
 
 ## Packaged content (the real UJM port, B2)
@@ -170,7 +170,9 @@ see the harness README for the honest before/after numbers.
   entries in URL byte order (deterministic across builds). JSON outputs are
   valid by construction (`omega_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.adsense.client` or an
-  honest comment.
+  honest comment — that client id is the ONE adsense switch, the same
+  presence that renders the ad units and has the manager manage the account
+  ([#527](https://github.com/Omega-JS-Stack/omega/issues/527)).
 - `defaults/sample-posts/**`, `sample-team/**`, `sample-updates/**` — the
   shared sample-content corpus (spec §8: 11 posts, 4 teammates, 4 updates),
   injected as virtual collection templates in **development builds only**,

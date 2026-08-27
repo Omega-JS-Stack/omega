@@ -29,8 +29,8 @@ const CONFIG_TIME_MODULES = [
     // Both exceptions live inside configureOmega but run LATER — Eleventy
     // calls them per template, on the incremental lane the reset must not own.
     snippets: [
-      'fs.readFileSync(path.resolve(inputPath)', // render time: a page's own frontmatter, re-parsed per template
-      'fs.readFileSync(sidecarPath(inputPath)', // render time: a page's own sidecar data file, re-read per template (#269)
+      'fs.readFileSync(path.resolve(inputPath)', // render time: a page's own source, re-read per template (its frontmatter, and #611's dead-read census)
+      'JSON.parse(fs.readFileSync(file', // render time: a page's own sidecar data file, re-read per template (#269, every extension since #543)
       'fileExists: (file) => fs.existsSync', // template time: the file_exists Liquid filter
     ],
   },

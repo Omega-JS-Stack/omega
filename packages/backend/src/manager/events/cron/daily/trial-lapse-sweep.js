@@ -1,7 +1,6 @@
 const path = require('path');
 const powertools = require('node-powertools');
 const loadProvider = require('../../../libraries/load-provider.js');
-const isAlreadyGone = require('../../../routes/payments/cancel/_provider-errors.js');
 const { deliverConversion } = require('../../../libraries/analytics/conversions.js');
 const { buildAttributionContext, buildIdentity } = require('../../../libraries/analytics/match-data.js');
 // The payment webhook's analytics module owns what "still inside the trial" means
@@ -136,18 +135,17 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         continue;
       }
 
-      // Ask the provider. The empty fallback is deliberate: a stale webhook payload
-      // is exactly what this sweep must NOT act on, so a fetch that cannot answer
-      // throws instead of handing back the payload we already have.
+      // Ask the provider. Its answer is the only thing this sweep acts on — a fetch
+      // that cannot answer throws rather than handing back anything older.
       let live = null;
 
       try {
-        live = await library.fetchResource('subscription', resourceId, {}, { admin, ctx, config: Manager.config });
+        live = await library.fetchResource('subscription', resourceId, { admin, ctx, config: Manager.config });
       } catch (e) {
         // A provider that cannot answer is not a provider saying "cancelled". Only
         // "no such subscription" means gone; everything else is transient and waits
         // for the next run rather than fabricating a cancellation.
-        if (!isAlreadyGone(e)) {
+        if (!e.notFound) {
           ctx.warn(`skip ${uid}: provider ${provider} could not confirm ${resourceId} (${e.message}) — retrying next run`);
           skipped++;
           continue;
@@ -173,49 +171,62 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
         continue;
       }
 
-      // Re-read immediately before writing. The snapshot above is from the top of the
-      // run; a webhook may have written this subscription since, and that write is the
-      // newer truth — the sweep must never clobber it.
-      const fresh = await doc.ref.get();
-      const freshSub = fresh.data()?.subscription || {};
-      const freshStampUNIX = freshSub.payment?.updatedBy?.date?.timestampUNIX || 0;
+      // The trial converted into a paid subscription: stamp the outcome and touch
+      // NOTHING else — the subscription the user is paying for is correct as it is.
+      // A lapse writes the same end state the cancel route does for a subscription
+      // the provider no longer has: cancelled, back on basic, nothing pending.
+      const write = outcome === 'converted'
+        ? { subscription: { trial: { outcome: 'converted' } } }
+        : {
+          subscription: {
+            status: 'cancelled',
+            product: { id: 'basic', name: 'Basic' },
+            cancellation: { pending: false, date: { timestamp: now, timestampUNIX: nowUNIX } },
+            trial: { outcome: 'lapsed' },
+          },
+        };
 
-      if (freshStampUNIX > sweepReadUNIX) {
-        ctx.log(`skip ${uid}: a newer subscription write landed (updatedBy=${freshStampUNIX} > read=${sweepReadUNIX})`);
-        skipped++;
-        continue;
-      }
+      // Re-read and write in ONE transaction. The snapshot above is from the top of
+      // the run; a webhook may have written this subscription since, and that write
+      // is the newer truth — the sweep must never clobber it. As a bare read followed
+      // by a separate set, a webhook landing BETWEEN the two was clobbered anyway:
+      // the guard proved freshness at a moment that had already passed by the time
+      // the write went out. A transaction re-runs the whole block when the document
+      // changes under it, so the guard and the write see one state
+      // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+      const result = await admin.firestore().runTransaction(async (transaction) => {
+        const fresh = await transaction.get(doc.ref);
+        const freshSub = fresh.data()?.subscription || {};
+        const freshStampUNIX = freshSub.payment?.updatedBy?.date?.timestampUNIX || 0;
 
-      if (freshSub.status !== 'active' || freshSub.trial?.outcome) {
-        ctx.log(`skip ${uid}: no longer a candidate (status=${freshSub.status}, outcome=${freshSub.trial?.outcome || 'null'})`);
+        if (isNewerThanSweep(freshStampUNIX, sweepReadUNIX)) {
+          return { skipped: `a newer subscription write landed (updatedBy=${freshStampUNIX} >= read=${sweepReadUNIX})` };
+        }
+
+        if (freshSub.status !== 'active' || freshSub.trial?.outcome) {
+          return { skipped: `no longer a candidate (status=${freshSub.status}, outcome=${freshSub.trial?.outcome || 'null'})` };
+        }
+
+        transaction.set(doc.ref, write, { merge: true });
+
+        return { userData: fresh.data() || {}, sub: freshSub };
+      });
+
+      if (result.skipped) {
+        ctx.log(`skip ${uid}: ${result.skipped}`);
         skipped++;
         continue;
       }
 
       if (outcome === 'converted') {
-        // The trial converted into a paid subscription. Stamp the outcome and touch
-        // NOTHING else — the subscription the user is paying for is correct as it is.
-        await doc.ref.set({ subscription: { trial: { outcome: 'converted' } } }, { merge: true });
-
         ctx.log(`convert ${uid}: provider ${provider} reports the subscription is active, trial.outcome=converted`);
-        trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
+        trackOutcome({ outcome, uid, userData: result.userData, sub: result.sub, Manager, ctx });
         converted++;
         continue;
       }
 
-      // The trial lapsed. Same end state the cancel route writes for a subscription the
-      // provider no longer has: cancelled, back on basic, nothing pending.
-      await doc.ref.set({
-        subscription: {
-          status: 'cancelled',
-          product: { id: 'basic', name: 'Basic' },
-          cancellation: { pending: false, date: { timestamp: now, timestampUNIX: nowUNIX } },
-          trial: { outcome: 'lapsed' },
-        },
-      }, { merge: true });
-
       ctx.log(`lapse ${uid}: provider ${provider} reports ${gone ? 'the subscription is gone' : liveStatus}, reset to basic, trial.outcome=lapsed`);
-      trackOutcome({ outcome, uid, userData: fresh.data() || {}, sub: freshSub, Manager, ctx });
+      trackOutcome({ outcome, uid, userData: result.userData, sub: result.sub, Manager, ctx });
       lapsed++;
     } catch (e) {
       ctx.error(`Failed to sweep ${uid}: ${e.message}`);
@@ -225,6 +236,25 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
 
   ctx.log(`Completed! (${lapsed} lapsed, ${converted} converted, ${skipped} skipped, ${failed} failed)`);
 };
+
+/**
+ * Has a subscription write landed since this sweep read its candidates?
+ *
+ * `>=`, not `>`. Both numbers are whole SECONDS, so a webhook that wrote inside the
+ * same second the sweep took its snapshot carries an EQUAL stamp — and a strict `>`
+ * read that as older and let the sweep write over it, which is precisely the write
+ * the guard exists to protect (a provider's own trial-end event resolving the trial
+ * while the backstop was mid-run). Equal reads as newer: the cost of being wrong is
+ * one candidate re-examined on the next run, against a subscription silently
+ * reverted to a state the provider had already moved past.
+ *
+ * @param {number} freshStampUNIX - `subscription.payment.updatedBy.date.timestampUNIX`, 0 when never stamped
+ * @param {number} sweepReadUNIX - The second this run read its candidate snapshot
+ * @returns {boolean} True when the sweep's answer is stale and must not be written
+ */
+function isNewerThanSweep(freshStampUNIX, sweepReadUNIX) {
+  return (freshStampUNIX || 0) >= sweepReadUNIX;
+}
 
 /**
  * The conversion to report for an outcome this sweep just decided, or null when the
@@ -303,11 +333,8 @@ function trackOutcome({ outcome, uid, userData, sub, Manager, ctx }) {
     deliverConversion({
       ...conversion,
       attribution: buildAttributionContext(userData.attribution),
-      identity: buildIdentity({
-        uid: uid,
-        email: userData.auth?.email,
-        telephone: userData.personal?.telephone,
-      }),
+      // The whole doc, read by the ONE match reader (#577)
+      identity: buildIdentity({ uid: uid, user: userData }),
       trackingConsent: userData.trackingConsent,
       ctx: ctx,
       Manager: Manager,
@@ -319,3 +346,4 @@ function trackOutcome({ outcome, uid, userData, sub, Manager, ctx }) {
 
 // The sweep IS the module; these ride alongside it for the pipeline and the tests.
 module.exports.resolveTrialOutcomeConversion = resolveTrialOutcomeConversion;
+module.exports.isNewerThanSweep = isNewerThanSweep;

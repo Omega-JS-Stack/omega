@@ -592,8 +592,10 @@ test('analytics: interactive paste-in walks to the token page (Enter-gated) and 
 
   try {
     const run = runService(brandConfig({ google: false, metaId: 'PIXEL123' }), { brandRoot });
-    await tty.answer('Press Enter to open the Meta Pixel token page', '\r');
-    await tty.answer('META_ACCESS_TOKEN (leave empty to skip):', 'pasted-meta-token\r');
+    // The check path opens the same three-outcome gate as everything else (#608)
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('Press Enter to open the Meta Pixel access token page', '\r');
+    await tty.answer('Paste META_ACCESS_TOKEN:', 'pasted-meta-token\r');
     const result = await run;
 
     assert.equal(result.status, 'success');
@@ -616,8 +618,9 @@ test('analytics: an empty paste-in keeps the warned guidance and writes nothing'
 
   try {
     const run = runService(brandConfig({ google: false, metaId: 'PIXEL123' }), { brandRoot });
-    await tty.answer('Press Enter to open the Meta Pixel token page', '\r');
-    await tty.answer('META_ACCESS_TOKEN (leave empty to skip):', '\r');
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('Press Enter to open the Meta Pixel access token page', '\r');
+    await tty.answer('Paste META_ACCESS_TOKEN:', '\r');
     const result = await run;
 
     assert.equal(result.status, 'warned');
@@ -812,8 +815,8 @@ test('analytics: ONE interactive pass — gate, token paste-in, account discover
     // Nothing configured and no token — the state every brand starts in
     const run = runService(brandConfig({ google: false }), { meta, brandRoot });
     await tty.answer('Set up now?', '\r');
-    await tty.answer('Press Enter to open the Meta Pixel token page', '\r');
-    await tty.answer('META_ACCESS_TOKEN (leave empty to skip):', 'pasted-meta-token\r');
+    await tty.answer('Press Enter to open the Meta Pixel access token page', '\r');
+    await tty.answer('Paste META_ACCESS_TOKEN:', 'pasted-meta-token\r');
     const result = await run;
 
     assert.deepEqual(browser.opened, [SYSTEM_USERS_URL]);

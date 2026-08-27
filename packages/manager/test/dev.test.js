@@ -35,13 +35,21 @@ const spawned = [];
 
 childProcess.spawn = (command, args, options) => {
   boot.push(`spawn:${path.basename(options.cwd)}`);
-  nonInteractiveAt.spawn.push(process.env.OMEGA_NON_INTERACTIVE);
-  nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
-  forceColorAt.push(options.env.FORCE_COLOR);
+  // A LEG is spawned with an explicit env; the watch child (#587) inherits
+  // this process' own, so record only what a leg carried.
+  if (options.env) {
+    nonInteractiveAt.spawn.push(process.env.OMEGA_NON_INTERACTIVE);
+    nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
+    forceColorAt.push(options.env.FORCE_COLOR);
+  }
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  child.kill = () => {};
+  // devkit's watch forwarder sets an encoding before reading; the legs do not.
+  child.stdout.setEncoding = () => {};
+  child.stderr.setEncoding = () => {};
+  child.pid = 4242;
+  child.kill = (signal) => { child.killedWith = signal; };
   spawned.push(child);
   return child;
 };
@@ -51,6 +59,13 @@ childProcess.spawn = (command, args, options) => {
 // real linked dist on disk.
 let sweepResult = { checked: [], healed: [], staleLinked: [], healFailed: [], failed: [] };
 const sweepHosts = [];
+
+// The monorepo the staged brand's @omega.js deps resolve into (#587). Only the
+// RESOLUTION is stubbed — the watch start below is devkit's real lock-aware
+// function, spawning through the fake above, so the lock behavior is the real
+// one and no watch ever runs.
+let linkedMonorepo = null;
+const realLocal = require('@omega.js/devkit/local');
 const localPath = require.resolve('@omega.js/devkit/local');
 require.cache[localPath] = {
   id: localPath,
@@ -58,11 +73,13 @@ require.cache[localPath] = {
   path: path.dirname(localPath),
   loaded: true,
   exports: {
+    ...realLocal,
     freshnessSweep: ({ hosts }) => {
       boot.push(`sweep:${hosts.map((host) => host.packageName).join(',') || 'none'}`);
       sweepHosts.push(hosts);
       return sweepResult;
     },
+    resolveLinkedMonorepo: () => linkedMonorepo,
   },
 };
 
@@ -437,6 +454,123 @@ test('a heal before the fan-out is announced, so the boot pause has a reason (#3
   const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
 
   assert.match(log, /@omega\.js\/web/);
+});
+
+// ─── The monorepo watch as a session child (#587) ────────────────────────────
+
+/** A monorepo-root-shaped temp dir the watch lock can live in. */
+function stageMonorepo() {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-monorepo-')));
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'omega', private: true }));
+  return root;
+}
+
+/** Exit hooks registered during fn, removed again; returns them. */
+async function exitHooksAddedBy(fn) {
+  const before = process.listeners('exit');
+  await fn();
+  const added = process.listeners('exit').filter((hook) => !before.includes(hook));
+  added.forEach((hook) => process.removeListener('exit', hook));
+  return added;
+}
+
+test('#587: a locally-linked brand boots the monorepo watch — after the manage cycle, before the legs', async () => {
+  resetRecorders();
+  resetSweep();
+  spawned.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+  const monorepo = stageMonorepo();
+  linkedMonorepo = monorepo;
+
+  try {
+    await bootDev(root);
+
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+      `spawn:${path.basename(monorepo)}`,
+      'spawn:backend',
+      'spawn:website',
+    ], 'the watch starts after the sweep has settled every dist, and before any leg reads one');
+    assert.strictEqual(spawned.length, 3, 'ONE watch child, plus the two legs');
+  } finally {
+    linkedMonorepo = null;
+    fs.rmSync(monorepo, { recursive: true, force: true });
+  }
+});
+
+test('#587: the watch dies with the session — one exit hook, and it kills the child', async () => {
+  resetRecorders();
+  resetSweep();
+  spawned.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+  const monorepo = stageMonorepo();
+  linkedMonorepo = monorepo;
+
+  try {
+    const hooks = await exitHooksAddedBy(() => bootDev(root));
+    const watch = spawned[0];
+
+    assert.strictEqual(watch.killedWith, undefined, 'nothing killed while the session runs');
+
+    // The boot registers other exit hooks too (the log-file tee closes its fd),
+    // so the watch's own is identified by what it DOES.
+    const killers = hooks.filter((hook) => {
+      watch.killedWith = undefined;
+      hook();
+      return watch.killedWith === 'SIGTERM';
+    });
+
+    assert.strictEqual(killers.length, 1, 'the session ending takes the watch with it, once — no orphan, no pile-up');
+  } finally {
+    linkedMonorepo = null;
+    fs.rmSync(monorepo, { recursive: true, force: true });
+  }
+});
+
+test('#587: a watch already running is reused, never doubled', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+  const monorepo = stageMonorepo();
+  linkedMonorepo = monorepo;
+  realLocal.acquireWatchLock(monorepo); // held by a live process — this one
+
+  try {
+    await bootDev(root);
+
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+      'spawn:backend',
+      'spawn:website',
+    ], 'the lock says a watch is already on the job — the legs boot, nothing else spawns');
+  } finally {
+    realLocal.releaseWatchLock(monorepo);
+    linkedMonorepo = null;
+    fs.rmSync(monorepo, { recursive: true, force: true });
+  }
+});
+
+test('#587: a registry-installed brand spawns no watch, and says so once', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+
+  const log = await captureLogAsync(() => bootDev(root));
+
+  assert.deepStrictEqual(boot, [
+    'sweep:@omega.js/backend,@omega.js/web',
+    `manage:${root}`,
+    'spawn:backend',
+    'spawn:website',
+  ], 'nothing to watch — the frameworks came from the registry');
+  assert.match(log, /registry/, 'the skip is stated, not silent');
+  assert.strictEqual(log.match(/registry/g).length, 1, 'one line, not one per target');
 });
 
 // ─── Leg output dedup (#230) ─────────────────────────────────────────────────

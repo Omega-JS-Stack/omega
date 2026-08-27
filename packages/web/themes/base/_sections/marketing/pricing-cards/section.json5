@@ -1,0 +1,72 @@
+{
+  description: 'The minimal plan band — one compact card per subscription plan (name, price, the feature list, one CTA), for a homepage that should say what it costs without sending you to /pricing first. The bullets are /pricing\'s own `pricing/features` component, hover explanations included, and the line introducing a tier\'s extras reads "Everything in <previous>, and:" (#539). Reads the SAME resolved catalog /pricing renders (`resolved.pricing`), so no number here is ever a copy: the layout bridges `plans` and `annual` in. No plans, no band. `enabled: false` removes it (#473 family gate).',
+
+  args: {
+    enabled: 'boolean',
+    superheadline: 'string',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    plans: 'array', // the composed plan view-models — `resolved.pricing.plans`, never hand-authored numbers
+    annual: 'boolean', // show each plan's floored monthly equivalent (#477) instead of its monthly price — `resolved.pricing.billing.annually`
+    href: 'string', // where a plan with no url of its own sends you
+  },
+
+  defaults: {
+    enabled: true,
+    superheadline: 'Pricing',
+    headline: 'Simple pricing that',
+    headline_accent: 'scales with you',
+    // No sub line by default: an ABSENT subheadline renders NOTHING. A band
+    // the brand authors inherits no words it never wrote (the demo line lives
+    // in the gallery variant below, where sample content belongs).
+    subheadline: '',
+    // No plan defaults, ever: a plan a brand does not sell is fiction, and the
+    // catalog is the one source (C2). An empty list renders no band.
+    plans: [],
+    annual: false,
+    href: '/pricing',
+  },
+
+  // Showcase variants (spec §9): the band is catalog-driven, so the demo
+  // bridges plan view-models the way the layout does.
+  demo: [
+    {
+      label: 'Two plans',
+      args: {
+        subheadline: 'Start free, upgrade when it pays for itself.',
+        // commonFeatures/extraFeatures are the composer's own split (the tier
+        // note renders from it), and a `definition` is what makes a bullet
+        // hoverable — the demo carries both because the layout bridges both.
+        plans: [
+          {
+            id: 'starter',
+            name: 'Starter',
+            tagline: 'best for getting started',
+            free: true,
+            url: '/signup',
+            commonFeatures: [
+              { id: 'projects', name: 'Projects', value: 3, definition: 'Live projects you can keep at once.' },
+              { id: 'seats', name: 'Seat', value: 1 },
+            ],
+          },
+          {
+            id: 'team',
+            name: 'Team',
+            tagline: 'best for growing teams',
+            popular: true,
+            trialDays: 14,
+            prices: { monthly: 19, annually: 190, annuallyPerMonth: 15 },
+            commonFeatures: [
+              { id: 'projects', name: 'Projects', value: 'Unlimited', definition: 'Live projects you can keep at once.' },
+              { id: 'seats', name: 'Seats', value: 10 },
+            ],
+            extraFeatures: [
+              { id: 'support', name: 'Priority support', value: true },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+}

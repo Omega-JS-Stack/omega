@@ -4,6 +4,7 @@ let os;
 // let JSON5;
 // Native fetch (Node 22+)
 const Mailchimp = require('mailchimp-api-v3');
+const env = require('../../../libraries/env.js');
 
 let Module = {
   init: async function (Manager, data) {
@@ -55,7 +56,7 @@ let Module = {
           method: 'POST',
           response: 'json',
           headers: {
-            'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+            'omega-admin-key': env.get('OMEGA_ADMIN_KEY'),
           },
           body: {
             command: 'admin:send-notification',

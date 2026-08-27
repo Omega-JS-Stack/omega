@@ -27,6 +27,7 @@
  * keep them in sync if the GitHub upload conventions change.
  */
 const { Octokit } = require('@octokit/rest');
+const env = require('../../../env.js');
 
 const REPO_OWNER = 'itw-creative-works';
 const REPO_NAME  = 'newsletter-assets';
@@ -74,7 +75,7 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
  * @param {string} [args.cdnBase] - CDN base URL (e.g. 'https://cdn.itwcreativeworks.com/newsletters').
  *                                  When provided and USE_CDN_URLS is true, asset URLs use this
  *                                  instead of raw.githubusercontent.com.
- * @param {string} [args.token] - GitHub token (defaults to process.env.GH_TOKEN)
+ * @param {string} [args.token] - GitHub token (defaults to env.get('GH_TOKEN'))
  * @param {object} [args.ctx] - logger
  * @returns {Promise<{ urls: string[], paths: string[], htmlUrl?: string, htmlPath?: string, previewUrl?: string, folderUrl: string, commitSha: string }>}
  */
@@ -91,7 +92,7 @@ async function uploadAssets({ images, html, markdown, summary, brandId, campaign
   validateBrandId(brandId);
   validateCampaignId(campaignId);
 
-  const githubToken = token || process.env.GH_TOKEN;
+  const githubToken = token || env.get('GH_TOKEN');
 
   if (!githubToken) {
     throw new Error('image-host: GH_TOKEN env var (or token arg) is required');

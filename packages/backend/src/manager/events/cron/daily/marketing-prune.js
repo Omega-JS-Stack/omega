@@ -34,8 +34,10 @@
  *
  * Segment keys are resolved to provider-specific IDs at runtime.
  *
- * OPT-IN ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)): nothing
- * here runs without an explicit marketing.prune.enabled = true — see
+ * ON BY DEFAULT ([#478](https://github.com/Omega-JS-Stack/omega/issues/478),
+ * superseding #422's opt-in): the schema default supplies
+ * marketing.prune.enabled = true through the resolved config, so the gate
+ * below only stops a brand that set it false — see
  * docs/marketing-campaigns.md § Contact Pruning for the contract.
  *
  * Runs on omega_cronDaily.
@@ -44,6 +46,7 @@ const sendgridProvider = require('../../../libraries/email/providers/sendgrid.js
 const beehiivProvider = require('../../../libraries/email/providers/beehiiv.js');
 const Marketing = require('../../../libraries/email/marketing/index.js');
 const User = require('../../../helpers/user.js');
+const env = require('../../../libraries/env.js');
 
 // The Beehiiv lane's inactivity rule, mirroring the SendGrid engagement_inactive_6m
 // segment (libraries/email/constants.js) with Beehiiv's own numbers:
@@ -67,8 +70,13 @@ module.exports = async ({ Manager, ctx, libraries }) => {
     return;
   }
 
-  if (Manager.config?.marketing?.prune?.enabled !== true) {
-    ctx.log('Marketing prune: disabled (set marketing.prune.enabled to true to opt in)');
+  // `!== false`, not `!== true`: the switch is default-ON (#478), and reading it
+  // the opt-in way meant any config assembled outside loadConfig()'s
+  // materialization — a hand-built Manager.config, a test fixture — silently
+  // skipped the monthly run while the schema promised it
+  // ([#551](https://github.com/Omega-JS-Stack/omega/issues/551)).
+  if (Manager.config?.marketing?.prune?.enabled === false) {
+    ctx.log('Marketing prune: disabled (marketing.prune.enabled resolved false — the schema default is true)');
     return;
   }
 
@@ -162,7 +170,7 @@ async function stagePrune(Manager, ctx, libraries) {
     return;
   }
 
-  if (marketing.campaigns?.enabled === false || !process.env.SENDGRID_API_KEY) {
+  if (marketing.campaigns?.enabled === false || !env.has('SENDGRID_API_KEY')) {
     ctx.log('Marketing prune: SendGrid not configured, skipping');
     return;
   }
@@ -285,7 +293,7 @@ async function stageNewsletterPrune(Manager, ctx, libraries) {
     return;
   }
 
-  if (marketing.newsletter?.enabled === false || !process.env.BEEHIIV_API_KEY) {
+  if (marketing.newsletter?.enabled === false || !env.has('BEEHIIV_API_KEY')) {
     ctx.log('Marketing prune: Beehiiv not configured, skipping');
     return;
   }

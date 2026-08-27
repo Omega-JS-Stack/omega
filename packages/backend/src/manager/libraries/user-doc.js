@@ -119,9 +119,9 @@ async function healUserDoc({ Manager, ctx, admin, uid }) {
   }
 
   // A signup still in flight belongs to auth:on-create, not here. Its write is
-  // what fires the server half of sign_up and runs the consumer hook, and a heal
-  // that got there first would take that job away: on-create's own "already
-  // exists" check would then skip the account for good. Inside the window a
+  // what runs the consumer hook, and a heal that got there first would take that
+  // job away: on-create's own "already exists" check would then skip the account
+  // for good. Inside the window a
   // doc-less caller is answered exactly as it was before the heal existed, and
   // the signup route is already polling for the doc it is waiting on.
   const age = accountAge(authUser);

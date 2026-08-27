@@ -17,6 +17,7 @@ const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt } = require('../../../lib/run-gates.js');
+const { recaptchaConsoleUrl } = require('../lib/console-url.js');
 
 const CONFIRMED_PATH = 'captcha.providers.recaptcha.domainsConfirmed';
 
@@ -26,7 +27,7 @@ const PROBE_TOKEN = 'omega-manager-secret-validation-probe';
 module.exports = async function ensureSiteKey(context) {
   const { recaptchaApi, siteKey, domain, brandConfig, options = {} } = context;
 
-  const consoleUrl = buildConsoleUrl(siteKey, resolveProject(brandConfig));
+  const consoleUrl = recaptchaConsoleUrl(brandConfig, siteKey);
 
   console.log(`      ${chalk.dim('→')} Validating reCAPTCHA secret key...`);
   const verification = await recaptchaApi.verify(PROBE_TOKEN);
@@ -80,24 +81,3 @@ module.exports = async function ensureSiteKey(context) {
   console.log(`      ${chalk.dim(`→ The key's domain list has no read API — ensure ${domains.join(' + ')} is listed: ${consoleUrl}`)}`);
   return { output };
 };
-
-function resolveProject(brandConfig) {
-  // captcha.providers.recaptcha.project only exists to point at a project that
-  // ISN'T the brand's own (a key minted elsewhere); with no override the key
-  // lives in the brand's cloud project, whose ONE home is cloud.config.projectId
-  // (#23) — resolved config already carries the company/brand merge
-  return brandConfig.captcha?.providers?.recaptcha?.project
-    || brandConfig.cloud?.config?.projectId
-    || null;
-}
-
-function buildConsoleUrl(siteKey, project) {
-  // omega-manager hardcoded the company GCP project here; the project resolves
-  // from config now, so the deep link builds by default. Only a project unknown
-  // at EVERY layer falls back to the classic admin console, which lists your
-  // keys (it deep-links by internal numeric ID, not site key, so no key in the URL)
-  if (project) {
-    return `https://console.cloud.google.com/security/recaptcha/${siteKey}/overview?from=keysList&project=${project}`;
-  }
-  return 'https://www.google.com/recaptcha/admin';
-}

@@ -8,7 +8,7 @@
 const { chosenProvider } = require('@omega.js/config');
 const { LANGUAGE_NAMES, LANGUAGE_LOCALES, RTL_LANGUAGES, isRTL, languageName, ogLocale, assertKnownLanguages } = require('./languages.js');
 const { PROVIDERS, DEFAULT_MODELS, resolveProvider } = require('./providers.js');
-const { translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE } = require('./engine.js');
+const { translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE, CONCURRENCY } = require('./engine.js');
 const { hashKey, cachePath, loadCache, saveCache } = require('./cache.js');
 
 /**
@@ -41,7 +41,7 @@ module.exports = {
   // providers
   PROVIDERS, DEFAULT_MODELS, resolveProvider,
   // engine
-  translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE,
+  translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE, CONCURRENCY,
   // cache
   hashKey, cachePath, loadCache, saveCache,
   // config

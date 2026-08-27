@@ -1,4 +1,5 @@
 const fetch = require('wonderful-fetch');
+const env = require('../env.js');
 
 // NeverBounce numeric → textcode map. The v4 single/check API returns `result`
 // as a textcode STRING ('valid', 'invalid', ...); numeric codes only appear in
@@ -38,7 +39,7 @@ function parseResult(result) {
 async function verify(email) {
   try {
     const data = await fetch(
-      `https://api.neverbounce.com/v4.2/single/check?key=${process.env.NEVERBOUNCE_API_KEY}&email=${encodeURIComponent(email)}`,
+      `https://api.neverbounce.com/v4.2/single/check?key=${env.get('NEVERBOUNCE_API_KEY')}&email=${encodeURIComponent(email)}`,
       { response: 'json', timeout: 60000 },
     );
 

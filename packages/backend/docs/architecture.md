@@ -35,9 +35,15 @@ config package's own function.
 
 ## Dual-Mode Support
 
-@omega.js/backend supports two deployment modes:
-- **Firebase Functions** (`projectType: 'firebase'`): Cloud Functions with Firebase triggers
-- **Custom Server** (`projectType: 'custom'`): Express server for non-Firebase deployments
+@omega.js/backend supports two deployment modes, picked by the brand's config —
+`targets.backend.projectType` in `config/omega.json5`, read by `Manager.init()` (#584), so a
+consumer's `src/index.js` is the same in both. An explicit `init` option overrides it.
+- **Firebase Functions** (`projectType: 'firebase'`, the default): Cloud Functions with Firebase triggers
+- **Custom Server** (`projectType: 'custom'`): the same routes, schemas, auth middleware and
+  helpers, served by the Express app on `process.env.PORT` for a container host.
+  `firebase-functions` is never loaded (`libraries.functions` is `null`); `firebase-admin`
+  still is. The Firebase-only CLI verbs (`deploy`, `serve`, `emulator`, `test`) refuse and
+  name their replacement lane — `src/cli/utils/project-type.js` is the one home of that list.
 
 ## Helper Factory Pattern
 

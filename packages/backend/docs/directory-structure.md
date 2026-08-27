@@ -16,6 +16,10 @@ src/
       utilities.js                    # Batch operations
       metadata.js                     # Timestamps/tags
     libraries/
+      analytics/                      # Server-side conversion delivery
+        conversions.js                # The one send path (GA4 MP, Meta CAPI, TikTok Events API)
+        match-data.js                 # Attribution + identity: one match table per platform
+        signup.js                     # The server half of sign_up (fired by routes/user/signup)
       payment/                        # Shared payment utilities
         order-id.js                   # Order ID generation (XXXX-XXXX-XXXX)
         providers/                   # Payment provider libraries
@@ -127,7 +131,15 @@ src/
       on-delete.js                    # Post-deletion side effects (non-blocking)
     cron/
       daily/
-        {job}.js                      # Custom daily jobs
+        {job}.js                      # Custom daily jobs (async fn taking
+                                      # { Manager, ctx, context, libraries } —
+                                      # see routes.md)
+  payment-providers/
+    {productId}.js                    # OPTIONAL: per-product handler that
+                                      # POST /omega/admin/payment loads off
+                                      # Manager.cwd (the STAGED copy). A CLASS:
+                                      # the route news it up, sets .Manager,
+                                      # and awaits .process(settings)
   public/                             # OPTIONAL: hosting boilerplate overrides
 test/                                 # Project tests
 firebase.json  .firebaserc           # Firebase project config

@@ -1,7 +1,8 @@
 {
-  description: 'The ink CTA band — optional superheadline micro label, headline with optional <em> accent, optional subheadline, then primary button / mono command / secondary button (each renders only when set; secondary_button.nudge: true adds the arrow). A SHARED band (index, about, pricing, download, extension, team, alternatives) — defaults stay NEUTRAL and every page passes its own copy over the data bridge (spec §6 shared-band ruling).',
+  description: 'The ink CTA band — on by default, enabled: false removes it entirely; optional superheadline micro label, headline with optional <em> accent, optional subheadline, then primary button / mono command / secondary button (each renders only when set; secondary_button.nudge: true adds the arrow). A SHARED band (index, about, pricing, download, extension, team, alternatives) — defaults stay NEUTRAL and every page passes its own copy over the data bridge (spec §6 shared-band ruling).',
 
   args: {
+    enabled: 'boolean',
     superheadline: 'object',
     headline: 'string',
     headline_accent: 'string',
@@ -13,7 +14,12 @@
     section_class: 'string',
   },
 
-  defaults: {},
+  defaults: {
+    // Mechanical knob only (§6): the family gate. ON by default — a page that
+    // wants no CTA at all passes enabled: false and the band disappears
+    // instead of shipping framework words or an empty panel.
+    enabled: true,
+  },
 
   // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
   // the demo carries its own generic copy.
@@ -21,7 +27,7 @@
     {
       label: 'Full band',
       args: {
-        superheadline: { icon: 'bolt', text: 'Get started' },
+        superheadline: { text: 'Get started' },
         headline: 'Ready to ship',
         headline_accent: 'something great?',
         subheadline: 'Start free and grow into every surface your product needs.',

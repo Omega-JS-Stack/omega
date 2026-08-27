@@ -1,4 +1,5 @@
 const fetch = require('wonderful-fetch');
+const env = require('../../libraries/env.js');
 
 /**
  * DELETE /user - Delete user account
@@ -53,7 +54,7 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     tries: 2,
     log: true,
     headers: {
-      'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+      'omega-admin-key': env.get('OMEGA_ADMIN_KEY'),
     },
     body: {
       uid,

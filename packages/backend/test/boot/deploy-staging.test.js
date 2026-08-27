@@ -346,6 +346,51 @@ module.exports = {
     },
 
     {
+      name: 'stage-functions-strips-dev-only-keys-from-the-deploy-artifact',
+      async run({ assert }) {
+        const tmp = makeTmp();
+        const targetRoot = path.join(tmp, 'targets', 'backend');
+
+        jetpack.write(path.join(tmp, 'config', 'omega.json5'), `{
+          brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
+          targets: { backend: {} },
+        }`);
+        jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({ name: 'acme-backend', private: true }));
+        jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
+
+        // The .env disperse composes: the live payment secrets AND their dev
+        // twins, which the local emulator reads and no deploy may ever upload
+        const authored = [
+          '# ========== Default Values ==========',
+          'STRIPE_SECRET_KEY="sk_live_fixture"',
+          'STRIPE_SECRET_KEY_DEV="sk_test_fixture"',
+          '# STRIPE_WEBHOOK_SECRET_DEV=',
+          'CHARGEBEE_API_KEY_DEV="test_fixture"',
+          'OMEGA_ADMIN_KEY="fixture-admin-key"',
+          '',
+        ].join('\n');
+        jetpack.write(path.join(targetRoot, '.env'), authored);
+
+        // A LOCAL stage carries the file verbatim — the emulator needs the twins
+        const local = stageFunctions({ projectDir: targetRoot });
+        assert.equal(jetpack.read(path.join(local.distDir, '.env')), authored, 'a local stage is a verbatim copy');
+
+        // The DEPLOY stage drops every dev-only row and nothing else
+        const deploy = stageFunctions({ projectDir: targetRoot, deploy: true });
+        const staged = jetpack.read(path.join(deploy.distDir, '.env'));
+
+        assert.equal(/^STRIPE_SECRET_KEY_DEV=/m.test(staged), false, 'the Stripe dev twin never rides the artifact');
+        assert.equal(/^CHARGEBEE_API_KEY_DEV=/m.test(staged), false, 'the Chargebee dev twin never rides the artifact');
+        assert.equal(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), true, 'the live key still rides it');
+        assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(staged), true, 'unrelated keys are untouched');
+        assert.equal(staged.includes('# ========== Default Values =========='), true, 'the section markers survive');
+        assert.equal(staged.includes('sk_test_fixture'), false, 'no dev VALUE survives either');
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
       name: 'stage-functions-requires-the-authored-tree',
       async run({ assert }) {
         const tmp = makeTmp();

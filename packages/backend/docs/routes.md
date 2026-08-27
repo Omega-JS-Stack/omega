@@ -4,7 +4,7 @@ Recipes for building consumer-side routes plus @omega.js/backend-side event hand
 
 ## New Route (Consumer Project)
 
-Routes live at `functions/routes/{path}/{method}.js` — @omega.js/backend routes requests to the matching method file (`get.js` / `post.js` / `put.js` / `delete.js`), falling back to `index.js` if no method-specific file exists.
+Routes live at `src/routes/{path}/{method}.js` (staged to `dist/` by `omega build` — consumers are src-first, see [build-system.md](build-system.md)) — @omega.js/backend routes requests to the matching method file (`get.js` / `post.js` / `put.js` / `delete.js`), falling back to `index.js` if no method-specific file exists.
 
 A route exports an **async function receiving a context object** (built by the middleware — see `src/manager/helpers/middleware.js`):
 
@@ -99,7 +99,7 @@ Both the gate and the module loader read the route path **normalized** (`path.po
 
 `omega manage`'s live API check reads it on a real host (`@omega.js/manager`'s testing service) and the test runner reads it to confirm the emulator's project and mode. `test/health` still serves the same handler in dev/testing for anything that has not moved yet, but it is a `test/` route — **404 in production** like the rest of the folder. Point liveness checks at `/omega/health`.
 
-### Functions entry point (`functions/index.js`)
+### Functions entry point (`src/index.js`)
 
 ```javascript
 const Manager = (new (require('@omega.js/backend'))).init(exports, {
@@ -121,7 +121,7 @@ exports.items = functions
 .https.onRequest((req, res) => Manager.Middleware(req, res).run('items'));
 ```
 
-The schema defaults to the route name (`.run('items')` loads `functions/schemas/items/`); pass `{ schema: 'custom' }` only when the schema path differs.
+The schema defaults to the route name (`.run('items')` loads `src/schemas/items/`); pass `{ schema: 'custom' }` only when the schema path differs.
 
 For operations that don't fit CRUD (e.g. `/items/:itemId/export`), add an **action sub-path** handled within the same Cloud Function (parsed from the request path) or as a separate function if resource needs differ significantly.
 
@@ -159,60 +159,55 @@ Order: most specific → least specific → catch-all.
 
 ## New Event Handler
 
-Create `src/manager/functions/core/events/{type}/{event}.js`:
+Handlers live at `src/manager/events/{type}/{event}.js` — `auth/` (the Identity Platform user lifecycle), `firestore/{collection}/on-write.js` (document triggers), `cron/` (the scheduled runner, below).
+
+A handler exports an **async function receiving a context object**, exactly like a route — `await handler({ Manager, ctx, libraries, user, context, change, snapshot })` is the one call the middleware makes (`src/manager/helpers/event-middleware.js`). A handler exported any other way is called as a plain function: its body never runs and nothing errors.
 
 ```javascript
-function Module() {}
+/**
+ * Notification subscription write handler
+ */
+module.exports = async ({ Manager, ctx, change, context, libraries }) => {
+  const { admin } = libraries;
 
-Module.prototype.init = function (Manager, payload) {
-  const self = this;
-  self.Manager = Manager;
-  self.ctx = Manager.RouteContext();
-  self.libraries = Manager.libraries;
-  self.user = payload.user;
-  self.context = payload.context;
-  return self;
+  ctx.log('Event triggered', context.params);
+
+  // Event logic here
 };
-
-Module.prototype.main = function () {
-  const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
-
-  return new Promise(async function(resolve, reject) {
-    const { admin } = self.libraries;
-
-    ctx.log('Event triggered', self.user);
-
-    // Event logic here
-
-    return resolve(self);
-  });
-};
-
-module.exports = Module;
 ```
+
+Which payload keys carry a value is the TRIGGER's business — auth events bring `user` + `context`, Firestore document triggers bring `change` (or `snapshot`) + `context`, cron jobs bring `context` alone; the rest arrive `undefined`. `Manager`, `ctx` (a fresh `RouteContext` per event) and `libraries` always ride.
+
+Wire it to its trigger in `src/manager/index.js`, where every framework event runs through `EventMiddleware` (`events` is the absolute `src/manager/events` path):
+
+```javascript
+exporter.omega_notificationsOnWrite =
+fn({memory: '256MB', timeoutSeconds: 60})
+.firestore.document('notifications/{token}')
+.onWrite((change, context) => self.EventMiddleware({ change, context }).run(`${events}/firestore/notifications/on-write.js`));
+```
+
+A **consumer project** wires its own the same way, naming the handler relatively: `Manager.EventMiddleware({ snapshot, context }).run('users/on-create')` loads `{Manager.cwd}/events/users/on-create.js` — the STAGED copy (`dist/events/`, the deployed functions source), so author it at `src/events/users/on-create.js` and let `omega build` stage it. A name starting with `/` is used verbatim, which is how the framework points at its own.
+
+Throwing is the error contract: an `HttpsError` or an explicit numeric 4xx `code` rejects untouched (the trigger's client fault), and anything else is reported — logged AND captured to Sentry — as a server fault.
 
 ## New Cron Job (Consumer Project)
 
-Create `hooks/cron/daily/{job}.js`:
+Create `src/hooks/cron/daily/{job}.js` — the runner reads the STAGED copy (`dist/hooks/cron/{name}/`, off `Manager.cwd`), so author it in `src/` and let `omega build` stage it.
+
+A job exports an **async function receiving a context object**, exactly like a route — `await handler({ Manager, ctx, context, libraries })` is the one call the runner makes (`src/manager/events/cron/runner.js`). A job exported any other way is called as a plain function: its body never runs and nothing errors.
 
 ```javascript
-function Job() {}
+/**
+ * Daily job
+ */
+module.exports = async ({ Manager, ctx, context, libraries }) => {
+  const { admin } = libraries;
 
-Job.prototype.main = function () {
-  const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
+  ctx.log('Running daily job...');
 
-  return new Promise(async function(resolve, reject) {
-    ctx.log('Running daily job...');
-
-    // Job logic here
-
-    return resolve();
-  });
+  // Job logic here
 };
-
-module.exports = Job;
 ```
+
+Every schedule works the same way — `daily/`, `frequent/` — and the framework's own jobs (`src/manager/events/cron/{name}/`) are written in this exact shape.

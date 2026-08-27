@@ -10,7 +10,7 @@
  * Token resolution (first match wins):
  *   1. explicit key passed to the constructor / options.apiKey
  *   2. Manager config: config.claude_code.oauth_token
- *   3. process.env.CLAUDE_CODE_OAUTH_TOKEN  (from `claude setup-token`)
+ *   3. env.get('CLAUDE_CODE_OAUTH_TOKEN')  (from `claude setup-token`)
  *
  * This is pure HTTPS — no `claude` binary, no subprocess — so it runs in Cloud
  * Functions / CI / anywhere Node runs. It is subject to the token's subscription
@@ -26,6 +26,7 @@ const _ = require('lodash');
 const JSON5 = require('json5');
 const format = require('./anthropic-format.js');
 const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
+const env = require('../../env.js');
 
 const DEFAULT_MODEL = 'claude-opus-4-7';
 const OAUTH_BETA = 'oauth-2025-04-20';
@@ -46,7 +47,7 @@ function ClaudeCode(ctx, key) {
   self.user = ctx?.user;
   self.token = key
     || self.Manager?.config?.claude_code?.oauth_token
-    || process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    || env.get('CLAUDE_CODE_OAUTH_TOKEN');
 
   // Running counter across every call this provider instance makes. Each call
   // reports its OWN usage — this is the instance total.

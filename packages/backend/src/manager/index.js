@@ -2,8 +2,9 @@
 const path = require('path');
 const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
-const { hasOmegaConfig, loadConfig, loadEnv, formatErrors } = require('@omega.js/config');
+const { hasOmegaConfig, loadConfig, loadEnv, formatErrors, backendProjectType } = require('@omega.js/config');
 const { resolvedConfigValues } = require('./helpers/resolved-config.js');
+const env = require('./libraries/env.js');
 const EventEmitter = require('events');
 // const EventEmitter = require('events').EventEmitter;
 const util = require('util');
@@ -81,7 +82,10 @@ Manager.prototype.init = function (exporter, options) {
   options = options || {};
   options.initialize = typeof options.initialize === 'undefined' ? !isTestRunner : options.initialize;
   options.log = typeof options.log === 'undefined' ? false : options.log;
-  options.projectType = typeof options.projectType === 'undefined' ? 'firebase' : options.projectType; // firebase, custom
+  // projectType (firebase | custom) is resolved AFTER the config load below —
+  // the brand's own omega.json5 is its home (`targets.backend.projectType`,
+  // #584), so a custom backend needs no init flag a brand has to remember. An
+  // explicit option passed here still wins; until then it stays undefined.
   options.routes = typeof options.routes === 'undefined' ? '/routes' : options.routes;
   options.schemas = typeof options.schemas === 'undefined' ? '/schemas' : options.schemas;
   options.setupFunctions = typeof options.setupFunctions === 'undefined' ? !isTestRunner : options.setupFunctions;
@@ -116,9 +120,7 @@ Manager.prototype.init = function (exporter, options) {
   // Load libraries
   self.libraries = {
     // Third-party
-    functions: options.projectType === 'firebase'
-      ? require('firebase-functions/v1')
-      : null,
+    functions: null, // firebase-functions, loaded once projectType resolves (#584)
     admin: require('firebase-admin'),
     cors: require('cors')({ origin: true }),
     sentry: null,
@@ -161,7 +163,11 @@ Manager.prototype.init = function (exporter, options) {
   const configDefaults = loadConfig(BEM_TEMPLATES_DIR, 'backend').config;
   delete configDefaults.targets;
 
-  if (hasOmegaConfig(self.cwd)) {
+  // A consumer omega.json5 is what makes this process a BRAND's backend —
+  // the env guard below is advisory without one (framework fixture, #581)
+  const hasConsumerConfig = hasOmegaConfig(self.cwd);
+
+  if (hasConsumerConfig) {
     const { config, errors } = loadConfig(self.cwd, 'backend', { defaults: configDefaults });
     self.config = config;
 
@@ -173,6 +179,14 @@ Manager.prototype.init = function (exporter, options) {
   } else {
     self.config = configDefaults;
   }
+
+  // How this backend RUNS (#584): Cloud Functions, or the same app listening
+  // on PORT for a container host. The brand's config is the switch —
+  // `targets.backend.projectType`, resolved onto the top level here — and an
+  // explicit init option still wins for a caller that means to override it.
+  // firebase-functions is loaded only for the mode that has functions.
+  options.projectType = options.projectType || backendProjectType(self.config);
+  self.libraries.functions = options.projectType === 'firebase' ? require('firebase-functions/v1') : null;
 
   // Config-DERIVED values, on the config object consumer code already reads
   // (#290): `config.resolved.github.repo` and whatever joins it. The recipes
@@ -209,37 +223,18 @@ Manager.prototype.init = function (exporter, options) {
   }
 
   // Environment helpers — the Manager is the SINGLE SOURCE OF TRUTH (mirrors EM/UJM/BXM,
-  // where the Manager owns these). getEnvironment() is the ONLY place that reads the raw
-  // env vars (OMEGA_TEST_MODE / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM); the three
-  // is*() checks derive from it live on every call. They return exactly ONE of three
-  // mutually-exclusive values — testing wins, then production, else development.
+  // where the Manager owns these). The resolution itself lives in the env reader
+  // (libraries/env.js, the ONLY place that reads the raw OMEGA_TEST_MODE /
+  // ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM vars) because the provider
+  // libraries need the same answer with no Manager handle (#586's dev/live
+  // payment split); the three is*() checks derive from it live on every call.
+  // They return exactly ONE of three mutually-exclusive values — testing wins,
+  // then production, else development.
   // The ctx exposes the same methods but FORWARDS to these (ctx.isTesting()
   // → Manager.isTesting()), so request handlers can keep calling `ctx.*`.
   // Defined BEFORE the ctx is constructed so the ctx's own init() can call back.
   self.getEnvironment = function() {
-    // Testing takes precedence — set by the test runner / emulator (OMEGA_TEST_MODE=true).
-    if (process.env.OMEGA_TEST_MODE === 'true') {
-      return 'testing';
-    }
-    if (process.env.ENVIRONMENT === 'production') {
-      return 'production';
-    } else if (
-      process.env.ENVIRONMENT === 'development'
-      || process.env.FUNCTIONS_EMULATOR === true
-      || process.env.FUNCTIONS_EMULATOR === 'true'
-      || process.env.TERM_PROGRAM === 'Apple_Terminal'
-      || process.env.TERM_PROGRAM === 'vscode'
-    ) {
-      return 'development';
-    } else {
-      // Default: production. @omega.js/backend's deployed RUNTIME can legitimately lack a dev signal — a
-      // live Cloud Function has no FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so
-      // "no signal" IS the normal production state. Defaulting to development here would make
-      // every deployed function skip real side effects (emails/analytics/webhooks).
-      // (Contrast UJM/BXM, whose deployed artifacts always carry their signal, so they default
-      // to development — a bare context there is just build tooling.)
-      return 'production';
-    }
+    return env.environment();
   };
 
   // The three checks are mutually exclusive — each true for ONLY its own environment.
@@ -255,6 +250,22 @@ Manager.prototype.init = function (exporter, options) {
   self.isTesting = function() {
     return self.getEnvironment() === 'testing';
   };
+
+  // Boot guard for every REQUIRED env key (#581, superseding #569's
+  // production-only unsubscribe-key branch). A process without one serves
+  // every route fine and then crashes at the first customer action that needs
+  // it — a real customer's order email, in the case that started this — so a
+  // brand's backend refuses to boot instead, in every environment: the keys
+  // are one `npx omega manage` away, and a dev loop that boots without them
+  // only moves the crash downstream. The one advisory lane is a process with
+  // no consumer config at all (the framework's own fixture), which says the
+  // fault out loud and continues.
+  try {
+    env.assertRequired('backend');
+  } catch (e) {
+    if (!env.guardIsAdvisory({ hasConsumerConfig })) { throw e; }
+    console.warn(`[@omega.js/backend:index] ${e.message}`);
+  }
 
   // Init ctx
   self.ctx = self.RouteContext().init({

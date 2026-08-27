@@ -10,6 +10,11 @@ node_modules/
 # Runtime-generated throwaway RSA service account (emulator-only). Never committed.
 service-account.json
 
+# Boot-seeded env: the keys the env schema marks required, from the fixture's
+# own config values (emulator-only). See ensureFixtureEnv in
+# src/cli/commands/test.js. Never committed.
+.env
+
 # Boot-seeded BRAND rules source (from templates/firestore.rules) — the stage
 # compiles it with the framework half into dist/firestore.rules, which
 # firebase.json points at. See ensureFixtureRules in src/cli/commands/test.js.

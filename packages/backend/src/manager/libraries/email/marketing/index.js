@@ -38,6 +38,7 @@ const { validate } = require('../validation.js');
 const prepare = require('../prepare.js');
 const sendgridProvider = require('../providers/sendgrid.js');
 const beehiivProvider = require('../providers/beehiiv.js');
+const env = require('../../env.js');
 
 function Marketing(ctx) {
   const self = this;
@@ -49,8 +50,8 @@ function Marketing(ctx) {
   const marketing = self.Manager.config?.marketing || {};
 
   self.providers = {
-    campaigns: marketing.campaigns?.enabled !== false && !!process.env.SENDGRID_API_KEY,
-    newsletter: marketing.newsletter?.enabled !== false && !!process.env.BEEHIIV_API_KEY,
+    campaigns: marketing.campaigns?.enabled !== false && env.has('SENDGRID_API_KEY'),
+    newsletter: marketing.newsletter?.enabled !== false && env.has('BEEHIIV_API_KEY'),
   };
 
   return self;

@@ -1,5 +1,5 @@
 {
-  description: 'Newsflash story tile — framed art (omega_post image-tag from the post id), optional display-ready kicker, h5 headline, nested news/byline. url arrives absolute (site.url | append: post.url); date pre-formatted; readtime pre-captured.',
+  description: 'Newsflash story tile — framed art (omega_post image-tag from the post id), optional display-ready kicker, h5 headline, nested news/byline. url arrives absolute (resolved.config.url | append: post.url); date pre-formatted; readtime pre-captured.',
 
   args: {
     url: 'string',

@@ -432,8 +432,8 @@ module.exports = {
         // The interleaving that made this window necessary: a brand-new account
         // makes an authenticated request BEFORE auth:on-create has run. A heal
         // there would write the doc, and on-create's own "already exists" check
-        // would then skip the account for good — no server sign_up conversion, no
-        // consumer hook, ever, and an ordinary signup logged as out of sync.
+        // would then skip the account for good — no consumer hook, ever, and an
+        // ordinary signup logged as out of sync.
         const uid = '_test-heal-signup-in-flight';
 
         try {

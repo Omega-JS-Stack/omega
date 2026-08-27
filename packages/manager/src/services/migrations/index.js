@@ -18,7 +18,8 @@
  * field to `provider` across all five payment-touching collections.
  * Two are `local: true` — they work on the brand's own files, so they need
  * neither a backend target nor a service account: state-retirement moves the
- * retired .omega/state.json into config + .env (#434), and targets-rename
+ * retired .omega/state.json CONTENT into config + .env and leaves the file's
+ * machine records untouched (#434, #479), and targets-rename
  * moves a pre-#443 brand's apps/ folder to targets/. The rename is also the
  * one migration a walk never reaches on the brand it fixes (discovery fails
  * loud on the old shape), so `--migration=targets-rename` runs it alone from

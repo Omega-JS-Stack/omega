@@ -88,7 +88,7 @@ const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 | Option | Default | Description |
 |--------|---------|-------------|
 | `initialize` | `true` | Initialize Firebase Admin SDK |
-| `projectType` | `'firebase'` | `'firebase'` for Cloud Functions, `'custom'` for Express server |
+| `projectType` | `targets.backend.projectType` (default `'firebase'`) | `'firebase'` for Cloud Functions, `'custom'` for an Express server on `PORT`. The brand's `config/omega.json5` is the switch ([#584](https://github.com/Omega-JS-Stack/omega/issues/584)) — pass it here only to override the config |
 | `setupFunctions` | `true` | Setup built-in Cloud Functions (`omega_api`, etc.) |
 | `setupFunctionsIdentity` | `true` | Setup auth event functions (onCreate, onDelete, beforeCreate, beforeSignIn) |
 | `setupFunctionsLegacy` | `false` | Setup legacy admin functions |

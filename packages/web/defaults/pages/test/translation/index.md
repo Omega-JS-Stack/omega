@@ -10,18 +10,19 @@ meta:
   breadcrumb: "Test translation page"
   index: false
 
-client:
-  exitPopup:
-    enabled: false
+config:
+  client:
+    exitPopup:
+      enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture brand %}**{{ resolved.config.brand.name | omega_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 ### Effective date: <span class="text-primary">8th of April, 2017</span>
 <hr>
 
-Welcome to [{{ site.url }}]({{ site.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"), a brand that is a part of our parent company, **ITW Creative Works**.
+Welcome to [{{ resolved.config.url }}]({{ resolved.config.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"), a brand that is a part of our parent company, **ITW Creative Works**.
 
 By vising {{ brand }}, you agree to comply.
 
@@ -30,7 +31,7 @@ By vising {{ brand }}, you agree to comply.
 
 ## Test Internal URL
 - Relative URL: [/test](/test)
-- Absolute URL: [{{ site.url }}/test]({{ site.url }}/test)
+- Absolute URL: [{{ resolved.config.url }}/test]({{ resolved.config.url }}/test)
 
 ## Test Anchor URL
 - Anchor URL: [#test-anchor](#test-anchor)

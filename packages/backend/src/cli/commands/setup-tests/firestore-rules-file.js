@@ -4,7 +4,9 @@ const chalk = require('chalk').default;
 const {
   BRAND_RULES_FILE,
   COMPILED_RULES_FILE,
+  RULES_MIGRATION_COMMAND,
   compileFirestoreRules,
+  deferredRulesTarget,
   ensureBrandRulesSource,
   needsRulesMigration,
 } = require('../../utils/compile-rules');
@@ -16,14 +18,33 @@ const {
  * hook-era file whose retired hooks merge-by-match replaced
  * ([#353](https://github.com/Omega-JS-Stack/omega/issues/353)). The deployed
  * artifact is `dist/firestore.rules`, compiled by every stage.
+ *
+ * ONCE, but never behind a brand's back: while firebase.json still names the
+ * brand's own file, that brand deploys the legacy posture deliberately and the
+ * check DEFERS rather than rewriting the source under it
+ * ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
  */
 class FirestoreRulesFileTest extends BaseTest {
   getName() {
     return 'compile firestore rules';
   }
 
+  getWarning() {
+    return [
+      `${BRAND_RULES_FILE} was left untouched — the compiled-rules migration is deferred while firebase.json points at it.`,
+      `Run it deliberately, on its own: ${RULES_MIGRATION_COMMAND}`,
+    ];
+  }
+
   async run() {
     const self = this.self;
+
+    // The deferral is the firebase.json target's question — answered before we
+    // look at the source at all, so nothing here can rewrite it.
+    if (deferredRulesTarget({ projectDir: self.firebaseProjectPath, firebaseJSON: self.firebaseJSON })) {
+      return 'warn';
+    }
+
     const contents = jetpack.read(`${self.firebaseProjectPath}/${BRAND_RULES_FILE}`) || '';
 
     // An unparseable file fails the check and lets fix() throw with the

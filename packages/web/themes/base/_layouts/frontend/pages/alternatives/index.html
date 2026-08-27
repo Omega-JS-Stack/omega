@@ -8,7 +8,7 @@ layout: frontend/core/base
 # Hero Section
 hero:
   tagline: "Compare & choose"
-  headline: "{{ site.brand.name }} vs the"
+  headline: "{{ resolved.config.brand.name }} vs the"
   headline_accent: "competition"
   description: "Head-to-head comparisons, no spin. See exactly where we win."
   primary_button:
@@ -21,7 +21,6 @@ hero:
 # Alternatives Section
 alternatives:
   superheadline:
-    icon: "scale-balanced"
     text: "Comparisons"
   headline: "Explore <em>alternatives</em>"
   subheadline: "In-depth comparisons to help you make the right choice"
@@ -31,9 +30,8 @@ alternatives:
 # Value Props Section
 value_props:
   superheadline:
-    icon: "trophy"
     text: "Why us"
-  headline: "Why people choose <em>{{ site.brand.name }}</em>"
+  headline: "Why people choose <em>{{ resolved.config.brand.name }}</em>"
   subheadline: "Here's what sets us apart from the rest"
   items:
     - title: "Lightning fast"
@@ -64,10 +62,9 @@ stats:
 # CTA Section
 cta:
   superheadline:
-    icon: "rocket"
     text: "Get started"
   headline: "Ready to make the switch?"
-  subheadline: "Join thousands of happy users who chose {{ site.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
+  subheadline: "Join thousands of happy users who chose {{ resolved.config.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
   primary_button:
     text: "{% if resolved.pricing.trialDays > 0 %}Start free trial{% else %}Get started{% endif %}"
     href: "/pricing"
@@ -119,7 +116,16 @@ cta:
                 {% continue %}
               {% endif %}
               <a href="{{ item.url }}" class="omega-rowlist__item omega-rowlist__item--link" data-omega-reveal>
-                <span>{{ site.brand.name }} vs {{ item.alternative.competitor.name }}</span>
+                {%- comment %} The competitor's own description rides UNDER the
+                row title (#563, legacy UJM parity): every _alternatives doc
+                authors it, and the hub was the only place it could land.
+                Unauthored, the row is exactly what it always was. {% endcomment -%}
+                <span>
+                  <span>{{ resolved.config.brand.name }} vs {{ item.alternative.competitor.name }}</span>
+                  {% iftruthy item.alternative.competitor.description %}
+                    <span class="omega-rowlist__desc">{{ item.alternative.competitor.description }}</span>
+                  {% endiftruthy %}
+                </span>
                 <span class="omega-rowlist__meta">
                   {{ resolved.alternatives.view_comparison }}
                   {% omega_icon "arrow-right", "fa-xs ms-2" %}

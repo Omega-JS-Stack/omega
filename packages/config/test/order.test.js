@@ -119,6 +119,39 @@ test('canonical list sanity: no duplicates', () => {
   assert.strictEqual(new Set(CANONICAL_TOP_LEVEL_ORDER).size, CANONICAL_TOP_LEVEL_ORDER.length);
 });
 
+// The canonical list's ONLY legitimate members with no schema rule: top-level
+// blocks a manager service owns and reads directly. Every other entry must be
+// schema-known, so a key nothing reads can never sit here unnoticed (#484 —
+// `testing` did, for the whole life of the list).
+const MANAGER_OWNED_NON_SCHEMA_KEYS = [
+  'enabled',      // target enable flag — loadConfig reads it, not a validated value
+  'local',        // the local layer's own block
+  'domain',       // services/domain
+  'server',       // services/server
+  'assets',       // services/assets
+  'certificates', // services/certificates
+  'migrations',   // services/migrations
+];
+
+test('every canonical key is schema-known or a named manager-owned block (reverse drift guard)', () => {
+  const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
+  const topLevel = new Set([...SHARED_SCHEMA, ...Object.values(TARGET_SCHEMAS).flat()]
+    .map((rule) => rule.path.split(/[.[]/)[0]));
+
+  const orphans = CANONICAL_TOP_LEVEL_ORDER
+    .filter((key) => !topLevel.has(key) && !MANAGER_OWNED_NON_SCHEMA_KEYS.includes(key));
+
+  assert.deepStrictEqual(orphans, [], `canonical keys with no schema rule and no named owner: ${orphans.join(', ')}`);
+});
+
+test('canonical list covers every SHARED_SCHEMA top-level key (drift guard)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const topLevel = [...new Set(SHARED_SCHEMA.map((rule) => rule.path.split(/[.[]/)[0]))];
+  const missing = topLevel.filter((key) => !CANONICAL_TOP_LEVEL_ORDER.includes(key));
+
+  assert.deepStrictEqual(missing, [], `schema keys absent from CANONICAL_TOP_LEVEL_ORDER: ${missing.join(', ')}`);
+});
+
 test('loadConfig: a target with no omega.json5 of its own rides the brand file alone', () => {
   const { loadConfig } = require('../src/load.js');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-optional-target-'));

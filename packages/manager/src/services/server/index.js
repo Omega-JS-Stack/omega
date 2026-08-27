@@ -12,7 +12,9 @@
  * .output/ tree instead; its legacy-brand `_` prefix skip was a
  * company-instance convention and is dropped.
  */
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 
 module.exports.run = createServiceRunner({
@@ -27,11 +29,12 @@ module.exports.run = createServiceRunner({
     // Tests inject a fake client via context.serverDb
     let db = context.serverDb;
     if (!db) {
-      const envPath = process.env.SERVER_SERVICE_ACCOUNT;
-      if (!envPath) {
-        return { skip: true, reason: 'no SERVER_SERVICE_ACCOUNT configured (path to the company server\'s service-account JSON, set it in the brand .env)' };
-      }
-      db = new FirestoreREST(loadServiceAccount(envPath, context.brandRoot));
+      // The shared setup contract (#608): a company-server operator provides
+      // the path here; every standalone brand answers Disable once and is
+      // never asked again.
+      const gate = await requestServiceInput(context, serviceInputSpec('server'));
+      if (gate) return gate;
+      db = new FirestoreREST(loadServiceAccount(process.env.SERVER_SERVICE_ACCOUNT, context.brandRoot));
     }
 
     return { db };

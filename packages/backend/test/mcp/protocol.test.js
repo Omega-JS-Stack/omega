@@ -6,8 +6,6 @@
  */
 const fetch = require('wonderful-fetch');
 
-const MCP_ENDPOINT = 'http://localhost:5002/omega/mcp';
-
 function parseSSE(text) {
   const lines = text.split('\n');
   let lastData = null;
@@ -25,7 +23,18 @@ function parseSSE(text) {
   return JSON.parse(text);
 }
 
-async function mcpRequest(method, params, bearerToken, options) {
+/**
+ * The MCP endpoint on the lane THIS run booted — resolved from the same port
+ * map the runner's http client uses, never a literal
+ * ([#511](https://github.com/Omega-JS-Stack/omega/issues/511)).
+ * @param {object} config - The test context's resolved config.
+ * @returns {string} The lane's /omega/mcp URL.
+ */
+function mcpEndpoint(config) {
+  return `${config.apiUrl}/omega/mcp`;
+}
+
+async function mcpRequest(config, method, params, bearerToken, options) {
   options = options || {};
 
   const headers = {
@@ -45,7 +54,7 @@ async function mcpRequest(method, params, bearerToken, options) {
     params: params || {},
   });
 
-  const text = await fetch(MCP_ENDPOINT, {
+  const text = await fetch(mcpEndpoint(config), {
     method: 'POST',
     headers: headers,
     body: body,
@@ -65,9 +74,9 @@ module.exports = {
 
     {
       name: 'tools/list returns tool definitions with schemas',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/list', {}, key);
+        const response = await mcpRequest(config, 'tools/list', {}, key);
 
         assert.ok(response?.result, 'Should have result');
         assert.ok(Array.isArray(response.result.tools), 'tools should be an array');
@@ -82,9 +91,9 @@ module.exports = {
 
     {
       name: 'tools/call health_check succeeds',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
@@ -99,9 +108,9 @@ module.exports = {
 
     {
       name: 'tools/call generate_uuid returns valid response',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'generate_uuid',
           arguments: { version: '4' },
         }, key);
@@ -118,9 +127,9 @@ module.exports = {
 
     {
       name: 'tools/call unknown tool returns error',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'nonexistent_tool',
           arguments: {},
         }, key);
@@ -133,11 +142,11 @@ module.exports = {
 
     {
       name: 'GET method returns 405',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
-          const response = await fetch(MCP_ENDPOINT, {
+          const response = await fetch(mcpEndpoint(config), {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${key}`,
@@ -156,11 +165,11 @@ module.exports = {
 
     {
       name: 'DELETE method returns 200 (session cleanup)',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
-          await fetch(MCP_ENDPOINT, {
+          await fetch(mcpEndpoint(config), {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${key}`,
@@ -180,9 +189,9 @@ module.exports = {
 
     {
       name: 'tools/call with empty object arguments still works',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
@@ -194,9 +203,9 @@ module.exports = {
 
     {
       name: 'tools/call with missing arguments still works',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
         }, key);
 
@@ -207,9 +216,9 @@ module.exports = {
 
     {
       name: 'response preserves jsonrpc 2.0 envelope',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/list', {}, key, { id: 42 });
+        const response = await mcpRequest(config, 'tools/list', {}, key, { id: 42 });
 
         assert.equal(response?.jsonrpc, '2.0', 'Should have jsonrpc 2.0');
         assert.equal(response?.id, 42, 'Should echo back the request id');
@@ -218,9 +227,9 @@ module.exports = {
 
     {
       name: 'unauthenticated request returns 401 to trigger OAuth',
-      async run({ assert }) {
+      async run({ assert, config }) {
         try {
-          const text = await fetch(MCP_ENDPOINT, {
+          const text = await fetch(mcpEndpoint(config), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -240,9 +249,9 @@ module.exports = {
 
     {
       name: 'tools include annotations with title and hints',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/list', {}, key);
+        const response = await mcpRequest(config, 'tools/list', {}, key);
 
         const tool = response.result.tools.find((t) => t.name === 'health_check');
         assert.ok(tool.annotations, 'Should have annotations');
@@ -253,9 +262,9 @@ module.exports = {
 
     {
       name: 'admin can call public-role tool (role escalation works upward)',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);

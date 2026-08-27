@@ -6,6 +6,7 @@
 const fetch = require('wonderful-fetch');
 const Manager = require('../../../index.js');
 const { resolveFieldValues } = require('../constants.js');
+const env = require('../../env.js');
 
 const BASE_URL = 'https://api.sendgrid.com/v3';
 
@@ -19,7 +20,7 @@ const SENDGRID_TIMEOUT_MS = 60000;
 
 function headers() {
   return {
-    'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+    'Authorization': `Bearer ${env.get('SENDGRID_API_KEY')}`,
   };
 }
 

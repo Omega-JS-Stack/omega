@@ -126,6 +126,48 @@ module.exports = {
     },
 
     {
+      // The reclaim's OTHER half, and the one nothing pinned: the claim is a full
+      // `set`, not a merge, so taking over a failed doc wipes the retry ledger the
+      // frequent sweep built up — `retryCount`, `deadLetter` and the previous
+      // error all go. That is the documented escape hatch, ruled on #220: a
+      // provider REDELIVERY is fresh evidence, so it starts a new bounded ladder
+      // and a dead-lettered doc becomes processable again. Ruled, but only
+      // reachable through the claim, so a future merge-instead-of-set would have
+      // taken the escape hatch away silently
+      // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+      name: 'a-reclaimed-webhook-starts-a-fresh-retry-ladder',
+      auth: 'none',
+      async run({ assert, Manager, firestore, waitFor }) {
+        const eventId = '_test-evt-dedup-race-deadlettered';
+
+        // A doc the sweep gave up on: the ceiling burned, stamped once, terminal.
+        await firestore.set(`payments-webhooks/${eventId}`, {
+          id: eventId,
+          status: 'failed',
+          error: 'Previous error',
+          retryCount: 5,
+          deadLetter: true,
+        });
+
+        const sent = await deliverWebhook(Manager, eventId);
+
+        assert.equal(sent.code, 200, `A redelivery should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        assert.ok(!sent.body?.duplicate, 'A dead-lettered webhook must still be reclaimable — redelivery is the escape hatch');
+
+        // The trigger takes it from here; either terminal state proves the claim
+        // landed and the pipeline ran it again.
+        const settled = await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${eventId}`);
+          return ['completed', 'failed'].includes(doc?.status) ? doc : null;
+        }, 20000, 250);
+
+        assert.ok(!settled.deadLetter, 'The reclaim clears the dead-letter stamp — the doc is live again');
+        assert.ok((settled.retryCount || 0) < 5, `The reclaim restarts the ladder rather than resuming a burned one, got retryCount=${settled.retryCount}`);
+        assert.notEqual(settled.error, 'Previous error', 'The reclaim replaces the record wholesale — the previous failure does not survive it');
+      },
+    },
+
+    {
       name: 'a-failed-dispute-alert-is-still-reclaimable',
       auth: 'none',
       async run({ assert, Manager, firestore }) {

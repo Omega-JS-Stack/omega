@@ -206,6 +206,22 @@ module.exports = {
       },
     },
 
+    // ─── State rules: recovery ───
+
+    {
+      name: 'detects-a-plain-recovery',
+      async run({ assert }) {
+        // Dunning's happy ending, with no cancellation schedule in the way:
+        // the retry succeeded and the provider put the subscriber back
+        const before = paidSubscription();
+        before.status = 'suspended';
+
+        const detected = transitions.detectSubscriptionTransition(before, paidSubscription(), 'invoice.payment_succeeded');
+
+        assert.equal(detected, 'payment-recovered', 'suspended → active should detect payment-recovered');
+      },
+    },
+
     // ─── State rules: cancellation withdrawn ───
 
     {
@@ -262,6 +278,130 @@ module.exports = {
       },
     },
 
+    // ─── State rules: cancellation ───
+
+    {
+      name: 'detects-a-cancellation',
+      async run({ assert }) {
+        // The term actually ended (or the provider deleted the subscription):
+        // any non-cancelled state arriving at cancelled is the one rule for it
+        const after = paidSubscription();
+        after.status = 'cancelled';
+
+        const detected = transitions.detectSubscriptionTransition(paidSubscription(), after, 'customer.subscription.deleted');
+
+        assert.equal(detected, 'subscription-cancelled', 'active paid → cancelled should detect subscription-cancelled');
+      },
+    },
+
+    {
+      name: 'a-cancellation-that-also-drops-the-product-is-still-a-cancellation',
+      async run({ assert }) {
+        // The cancel route writes cancelled AND resets to basic in one go — the
+        // product moving must not make this read as a plan change
+        const after = cancelledSubscription();
+        after.product = { id: 'basic', name: 'Basic' };
+
+        const detected = transitions.detectSubscriptionTransition(paidSubscription(), after, 'customer.subscription.deleted');
+
+        assert.equal(detected, 'subscription-cancelled', 'active paid → cancelled basic should still detect subscription-cancelled');
+      },
+    },
+
+    {
+      name: 'a-second-cancellation-event-fires-nothing',
+      async run({ assert }) {
+        // The rule reads the EDGE (non-cancelled → cancelled), so a redelivered
+        // deletion against an already-cancelled subscriber sends no second email
+        const detected = transitions.detectSubscriptionTransition(cancelledSubscription(), cancelledSubscription(), 'customer.subscription.deleted');
+
+        assert.equal(detected, null, 'cancelled → cancelled should detect nothing');
+      },
+    },
+
+    // ─── State rules: plan change ───
+
+    {
+      name: 'detects-a-plan-change',
+      async run({ assert }) {
+        const after = paidSubscription();
+        after.product = { id: 'pro', name: 'Pro' };
+
+        const detected = transitions.detectSubscriptionTransition(paidSubscription(), after, 'customer.subscription.updated');
+
+        assert.equal(detected, 'plan-changed', 'active premium → active pro should detect plan-changed');
+      },
+    },
+
+    {
+      name: 'a-frequency-only-switch-detects-nothing',
+      async run({ assert }) {
+        // The rule keys on the PRODUCT, so monthly → annually on the same plan
+        // has no transition of its own. Recorded here because it is a real gap in
+        // the table, not an accident: the plan route's own tests pin the state it
+        // writes, and analytics reads the renewal, but no email fires for it
+        const after = paidSubscription();
+        after.payment = { frequency: 'annually', price: 99.99 };
+
+        const detected = transitions.detectSubscriptionTransition(paidSubscription(), after, 'customer.subscription.updated');
+
+        assert.equal(detected, null, 'A frequency-only switch has no transition rule');
+      },
+    },
+
+    // ─── The guards around the table ───
+
+    {
+      name: 'no-after-state-detects-nothing',
+      async run({ assert }) {
+        // The first line of the detector: with nothing to compare against, every
+        // rule below would read `undefined.status` and throw
+        assert.equal(transitions.detectSubscriptionTransition(paidSubscription(), null, 'customer.subscription.updated'), null, 'A null after state should detect nothing');
+        assert.equal(transitions.detectSubscriptionTransition(paidSubscription(), undefined, 'customer.subscription.updated'), null, 'An undefined after state should detect nothing');
+      },
+    },
+
+    {
+      name: 'an-unknown-category-detects-nothing',
+      async run({ assert }) {
+        // on-write refuses an unknown category before it ever gets here, so this
+        // is the detector's own belt: a category it does not know routes nowhere
+        const detected = transitions.detectTransition('donation', null, paidSubscription(), 'charge.refunded');
+
+        assert.equal(detected, null, 'An unknown category should route to no transition');
+      },
+    },
+
+    {
+      name: 'an-unknown-event-type-detects-nothing-on-either-side',
+      async run({ assert }) {
+        // The one-time side reads the event type ALONE, so an event nothing maps
+        // must come back null rather than falling into the last rule it read
+        assert.equal(transitions.detectOneTimeTransition('customer.subscription.trial_will_end'), null, 'An unmapped event should detect no one-time transition');
+
+        // The subscription side ignores the event type unless it is a refund, so
+        // an unknown type over an unchanged subscription (a renewal) is also null
+        assert.equal(transitions.detectSubscriptionTransition(paidSubscription(), paidSubscription(), 'invoice.payment_succeeded'), null, 'A renewal has no transition of its own');
+      },
+    },
+
+    {
+      name: 'the-paid-helpers-read-the-product-not-the-status',
+      async run({ assert }) {
+        // Every rule in the table branches on these two in boolean position, and
+        // both answer for a subscription in ANY status — the status is the other
+        // half of each rule, never these
+        assert.ok(transitions.isBasicOrNull(null), 'No subscription at all is basic-or-null');
+        assert.ok(transitions.isBasicOrNull({ status: 'active' }), 'A subscription with no product is basic-or-null');
+        assert.ok(transitions.isBasicOrNull(basicSubscription()), 'Basic is basic-or-null');
+        assert.ok(!transitions.isBasicOrNull(cancelledSubscription()), 'A cancelled PAID subscription is not basic — that is what makes the win-back rules necessary');
+
+        assert.ok(!transitions.isPaid(null), 'No subscription at all is not paid');
+        assert.ok(!transitions.isPaid(basicSubscription()), 'Basic is not paid');
+        assert.ok(transitions.isPaid(cancelledSubscription()), 'A cancelled paid subscription still reads as paid');
+      },
+    },
+
     // ─── Every rule has somewhere to dispatch ───
 
     {
@@ -309,6 +449,21 @@ module.exports = {
 
         assert.equal(detected, 'payment-refunded', 'payment_refunded should detect payment-refunded');
         assert.ok(chargebeeProvider.isSupported('payment_refunded'), 'Chargebee provider should accept the same event string');
+      },
+    },
+
+    {
+      name: 'a-refund-outranks-every-state-rule',
+      async run({ assert }) {
+        // The refund check sits in FRONT of the whole table, deliberately: a full
+        // refund usually cancels the subscription in the same breath, and reading
+        // that state diff instead would send the cancellation email for a refund
+        const after = paidSubscription();
+        after.status = 'cancelled';
+
+        const detected = transitions.detectSubscriptionTransition(paidSubscription(), after, 'charge.refunded');
+
+        assert.equal(detected, 'payment-refunded', 'A refund that also cancels should still detect payment-refunded');
       },
     },
 

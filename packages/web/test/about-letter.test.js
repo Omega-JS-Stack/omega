@@ -7,6 +7,11 @@
  * the placeholder copy (the photo-band idiom). Pinned over real builds: the
  * packaged default page for the untouched rendering, a consumer sidecar
  * (#269, the page-level data lane) for both overrides.
+ *
+ * #520 closed the third hole: emptying the feed still framed it — an empty
+ * fragment box and a chip holding a bare dot. The aside now GATES on having
+ * something to say (feed items, or the aside photo), and a letter with
+ * neither runs full width with no aside markup at all.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -14,7 +19,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { buildSite, BARE } = require('./lib/build.js');
+const { buildSite, buildWith, miniData, BARE } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
@@ -75,6 +80,59 @@ test('#456: a brand\'s own feed items and status chip replace the placeholder co
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test('#520: an emptied feed renders NO aside at all — no frame, no chip, no label', async () => {
+  const { tmp, consumerDir } = makeConsumer({ letter: { feed_items: [] } });
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-nofeed');
+    const html = pages.get('/about');
+    assert.ok(html, 'the about page built');
+
+    // The letter's own aside — the timeline band further down owns the other
+    // `omega-duo__aside omega-section-head` on this page.
+    assert.ok(!html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column is gone, not emptied');
+    assert.ok(!html.includes('omega-fragment'), 'no empty frame');
+    assert.ok(!html.includes('omega-fragment-chip'), 'no chip holding a bare dot');
+    assert.ok(!html.includes('Why we exist'), 'and no orphan aside label');
+    // The letter itself is the whole point of the band — it stays.
+    assert.ok(html.includes('omega-statement'), 'the mission/vision statements still render');
+    assert.ok(html.includes('Our mission'), 'with their own labels');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('#520: an emptied feed with an aside PHOTO keeps the aside — the picture is content', async () => {
+  const { tmp, consumerDir } = makeConsumer({
+    letter: {
+      feed_items: [],
+      image: '/assets/images/core/placeholder/photo-3.jpg',
+      image_alt: 'Placeholder artwork in soft green tones',
+    },
+  });
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'about-letter-photo-nofeed');
+    const html = pages.get('/about');
+    assert.ok(html, 'the about page built');
+
+    assert.ok(html.includes('<div class="omega-duo__aside" data-omega-reveal>'), 'the aside column survives for the photo');
+    assert.ok(html.includes('omega-aside-photo'), 'the photo hangs where it always did');
+    assert.ok(!html.includes('omega-fragment'), 'while the feed frame stays gone');
+    assert.ok(!html.includes('All systems go'), 'chip and all');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('#520: the gallery shows the feedless form — the letter, full width', async () => {
+  const pages = await buildWith(miniData, {}, 'about-letter-frames');
+  const frame = pages.get('/test/sections/section/about/letter/frames/no-feed-the-full-width-letter');
+  assert.ok(frame, 'the feedless variant frame built');
+
+  assert.ok(!frame.includes('omega-duo'), 'no aside column, so no duo grid either');
+  assert.ok(!frame.includes('omega-fragment'), 'and nothing left of the feed');
+  assert.ok(frame.includes('omega-statement'), 'the statements are the whole band now');
 });
 
 test('#456: no letter data — the packaged about page renders the placeholder feed, unchanged', async () => {

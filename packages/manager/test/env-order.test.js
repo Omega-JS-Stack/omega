@@ -11,7 +11,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { CANONICAL_ENV_GROUPS, renderCanonicalEnv, applyEnvOrder } = require('../src/lib/env-order.js');
+const { envKeysForTarget } = require('@omega.js/config');
+
+const { canonicalEnvGroups, renderCanonicalEnv, applyEnvOrder } = require('../src/lib/env-order.js');
 const { writeEnvValue } = require('../src/lib/env-secret.js');
 
 function tmpdir() {
@@ -41,7 +43,7 @@ test('env-order: render = header, every group in order, placeholders for absent 
 
   // Groups appear in canonical order, each under its boxed comment
   const groupLines = lines.filter((line) => /^# ── .* ──$/.test(line));
-  assert.deepEqual(groupLines, CANONICAL_ENV_GROUPS.map((group) => `# ── ${group.comment} ──`));
+  assert.deepEqual(groupLines, canonicalEnvGroups().map((group) => `# ── ${group.comment} ──`));
 
   // Present key renders its verbatim line; absent keys render placeholders
   assert.match(content, /^OMEGA_ADMIN_KEY=abc123$/m);
@@ -50,6 +52,15 @@ test('env-order: render = header, every group in order, placeholders for absent 
   assert.match(content, /^# MRLOGO_SERVICE_ACCOUNT=$/m);
   // No Other section when there are no unknown keys
   assert.doesNotMatch(content, /Other keys/);
+});
+
+test('env-order: every key the backend composer knows has a stub placeholder (#502)', () => {
+  // The env schema is the ONE inventory of the keys disperse composes into
+  // targets/backend/.env — the stub can never miss one of them
+  const content = renderCanonicalEnv({ header: ['# Fixture — brand secrets.'] });
+
+  const missing = envKeysForTarget('backend').filter((key) => !new RegExp(`^(# )?${key}=`, 'm').test(content));
+  assert.deepEqual(missing, [], `backend composition keys with no stub line: ${missing.join(', ')}`);
 });
 
 // ─── Reordering an organic file ──────────────────────────────────────────────

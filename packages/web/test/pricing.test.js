@@ -76,7 +76,7 @@ test('composePricing: subscription/one-time split, free detection, limits fallba
   assert.strictEqual(premium.url, null, 'paid plans without a url get a checkout button');
   assert.strictEqual(premium.popular, true);
   assert.strictEqual(premium.trialDays, 14);
-  assert.strictEqual(premium.prices.annuallyPerMonth, 8, '99.99/12 rounds for the card display');
+  assert.strictEqual(premium.prices.annuallyPerMonth, 8, '99.99/12 floors for the card display');
   assert.strictEqual(premium.features[0].value, 'Unlimited', '-1 limit renders as Unlimited');
   assert.strictEqual(premium.features[1].value, true, 'explicit feature value wins');
 
@@ -145,6 +145,23 @@ test('composePricing: empty/absent catalog → null (honest empty state)', () =>
 test('composePricing: untyped products default to subscription', () => {
   const pricing = composePricing({ products: [{ id: 'p', name: 'P' }] });
   assert.strictEqual(pricing.plans.length, 1);
+});
+
+// #477 — the card's "$N /month" under the annual toggle ROUNDED where the
+// fleet's legacy renders floored, so the same catalog priced a plan $1 higher
+// than the brand had shipped for years. The rule is flooring: a monthly
+// equivalent never claims more than a twelfth of what is charged.
+test('composePricing: the monthly equivalent FLOORS, never rounds up (#477)', () => {
+  const pricing = composePricing({
+    products: [
+      { id: 'team', name: 'Team', prices: { monthly: 79, annually: 790 } },
+      { id: 'scale', name: 'Scale', prices: { monthly: 199, annually: 1990 } },
+    ],
+  });
+  const [team, scale] = pricing.plans;
+
+  assert.strictEqual(team.prices.annuallyPerMonth, 65, '790/12 = 65.83 → $65, as the legacy renders showed');
+  assert.strictEqual(scale.prices.annuallyPerMonth, 165, '1990/12 = 165.83 → $165');
 });
 
 for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
@@ -377,6 +394,33 @@ test('classy: consumer frontmatter still overrides presentation (consumer surfac
   const html = pages.get('/pricing');
   assert.ok(html.includes('The right plans,'), 'template hero default');
   assert.ok(html.includes('for the right price'), 'template hero accent default');
+});
+
+// #471 — /pricing renders its FAQ head INLINE (the aside embeds the bespoke
+// guarantee object), and the inline call forwarded no headline_accent: the
+// same faqs copy that renders whole through marketing/faq on /contact lost
+// its tail here, so one brand needed two spellings of one thing.
+test('#471: the pricing FAQ head forwards headline_accent, same data shape as /contact', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-faq-accent-'));
+  const consumerDir = path.join(tmp, 'src');
+  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+  fs.writeFileSync(
+    path.join(consumerDir, 'src.11tydata.json'),
+    JSON.stringify({ faqs: { headline: 'Billing,', headline_accent: 'in plain words' } }),
+  );
+  fs.writeFileSync(
+    path.join(consumerDir, 'pages', 'pricing.md'),
+    ['---', 'layout: blueprint/pricing', 'permalink: /pricing', '---', ''].join('\n'),
+  );
+
+  try {
+    const pages = await buildSite(consumerDir, { ...bareData, payment: CATALOG }, {}, 'pricing-faq-accent');
+    const html = pages.get('/pricing');
+    assert.ok(html.includes('Billing,'), 'the brand headline reaches the inline head');
+    assert.ok(html.includes('<em>in plain words</em>'), 'and so does its accent, on the shared <em> mechanism');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 /** Heading levels inside <main>, in document order. @returns {number[]} */

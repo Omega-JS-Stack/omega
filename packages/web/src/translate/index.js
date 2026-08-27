@@ -29,25 +29,14 @@ const {
   LANGUAGE_NAMES,
 } = require('@omega.js/devkit/translate');
 const { collectTextNodes } = require('./collect-text-nodes.js');
+const { defaultExcludedRoutes } = require('./default-routes.js');
 const { updateSitemap } = require('./sitemap.js');
 const { readPathPrefixStamp, stripPathPrefix } = require('../path-prefix.js');
 
-// System routes never translated (auth flows, transactional + legal pages)
-const SYSTEM_EXCLUDED_ROUTES = [
-  'oauth2',
-  'authentication-token',
-  'authentication-success',
-  'authentication-required',
-  'checkout',
-  'checkout/confirmation',
-  'submission/confirmation',
-  'terms',
-  'privacy',
-  'cookies',
-  '404',
-];
-
-// System folders never translated
+// System folders never translated. The framework's default PAGES are derived
+// from the defaults tree instead (./default-routes.js) — these are the folders
+// whose contents the build generates or the brand fills, so no default page
+// declares them.
 const SYSTEM_EXCLUDED_FOLDERS = ['admin', 'test', 'team', 'updates', '__/auth'];
 
 /**
@@ -64,22 +53,26 @@ function routeOf(relPath) {
 }
 
 /**
- * Build the route-exclusion test from config + system sets. Every KNOWN
- * language code is excluded as a folder (not just the configured ones) so
+ * Build the route-exclusion test from config + the framework's own sets. Every
+ * KNOWN language code is excluded as a folder (not just the configured ones) so
  * copies from a previous run never get re-collected as source pages.
+ * `translation.exclude` is for BRAND pages only (#605): the framework's default
+ * pages exclude themselves, derived from the defaults tree, and each one guards
+ * its subtree too (nothing under /app or /payment is marketing copy).
  * @param {object} config - resolved config (translation.exclude, socials)
  * @returns {Function} (route: string) → boolean
  */
 function buildExclusionTest(config) {
   const userExcludes = (config.translation?.exclude || []).map((entry) => String(entry).replace(/^\/+|\/+$/g, ''));
+  const frameworkRoutes = [...defaultExcludedRoutes()];
 
   const files = new Set([
-    ...SYSTEM_EXCLUDED_ROUTES,
+    ...frameworkRoutes,
     ...Object.keys(config.socials || {}),
     ...userExcludes,
   ]);
 
-  const folders = [...SYSTEM_EXCLUDED_FOLDERS, ...Object.keys(LANGUAGE_NAMES), ...userExcludes];
+  const folders = [...SYSTEM_EXCLUDED_FOLDERS, ...frameworkRoutes, ...Object.keys(LANGUAGE_NAMES), ...userExcludes];
 
   return (route) => {
     if (files.has(route)) {

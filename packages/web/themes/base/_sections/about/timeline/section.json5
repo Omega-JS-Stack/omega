@@ -2,16 +2,20 @@
   description: 'About timeline — sticky section head beside the year-by-year journey. The layout bridges the page\'s story object via data:.',
 
   args: {
-    superheadline: 'object', // { icon, text }
+    superheadline: 'object', // { text }
     headline: 'string',
+    headline_accent: 'string',
     subheadline: 'string',
     items: 'array', // [{ year, title, description }]
   },
 
   defaults: {
-    superheadline: { icon: 'clock-rotate-left', text: 'History' },
+    superheadline: { text: 'History' },
     headline: 'Follow our <em>journey</em>',
-    subheadline: 'The moments that shaped how we work.',
+    // An ABSENT subheadline renders NOTHING (#512): the optional sub line is
+    // never a demo sentence a brand's own band inherits. The demo copy lives
+    // in the variant below.
+    subheadline: '',
     items: [
       { year: '2017', title: 'The beginning', description: 'Founded with a vision to revolutionize the industry' },
       { year: '2020', title: 'Global expansion', description: 'Reached customers in over 100 countries' },
@@ -20,6 +24,11 @@
   },
 
   demo: [
-    { label: 'Default journey' },
+    {
+      label: 'Default journey',
+      args: {
+        subheadline: 'The moments that shaped how we work.',
+      },
+    },
   ],
 }

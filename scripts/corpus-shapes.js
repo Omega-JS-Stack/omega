@@ -133,6 +133,14 @@ function assertWebInvariants(cell, pages) {
   if (cell.post) {
     const blogUrl = [...pages.keys()].find((url) => url.startsWith('/blog'));
     need(blogUrl && pages.get(blogUrl).includes(POST_MARKER), `blog lists "${POST_MARKER}"`);
+
+    // The build stamp both modified-date surfaces read (#613). A post is the
+    // page that declares one, and it shipped EMPTY on every brand until
+    // `site.time` became a real build fact — so the shape lane pins the VALUE,
+    // not just the tag.
+    const post = [...pages.values()].find((html) => html && html.includes(POST_MARKER) && html.includes('article:modified_time'));
+    const modified = post && post.match(/article:modified_time" content="([^"]*)"/);
+    need(modified && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/.test(modified[1]), 'post carries a real article:modified_time (#613)');
   }
 
   return failures;
@@ -207,8 +215,8 @@ async function proveInstances(brandRoot, cell) {
   // Deploy records key by target dir: main stays `web`, admin lands `web:admin`
   recordDeploy({ dir: mainDir, target: 'web', instance: targetInstance(mainDir, 'web'), detail: { method: 'corpus' } });
   recordDeploy({ dir: adminDir, target: 'web', instance: targetInstance(adminDir, 'web'), detail: { method: 'corpus' } });
-  const records = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'deploys.json'), 'utf8'));
-  need(!!(records.web && records['web:admin']), 'deploy records key per instance dir');
+  const state = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'state.json'), 'utf8'));
+  need(!!(state.deploy?.web && state.deploy['web:admin']), 'deploy records key per instance dir');
 
   // Real Eleventy build of BOTH instances — each branded as ITS instance
   const mainPages = await buildWebTarget(brandRoot, 'website');

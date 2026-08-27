@@ -8,21 +8,21 @@
  * which reads back at `/v2/payments/captures/{id}` and carries our `custom_id`
  * directly — no `parent_payment` to walk, so the v1 sale branch fits neither
  * the endpoint nor the fold. Without a 'capture' case the fetch fell through to
- * "Unknown resource type" and every such refund took the stale-fallback path.
+ * "Unknown resource type" and every such refund failed its lookup.
  *
  * The HTTP call is the one thing stubbed here: reading a capture back needs
  * live PayPal credentials (real PayPal calls are gated behind extended mode,
  * never mocked). Everything under test runs for real.
  *
- * The fixtures are PayPal's v2 shapes: the `Refund` resource a
- * PAYMENT.CAPTURE.REFUNDED event carries (its `up` link naming the capture),
- * and the `Capture` resource GET /v2/payments/captures/{id} answers with.
+ * The fixture is PayPal's v2 `Capture` shape, as GET /v2/payments/captures/{id}
+ * answers with. What the refund itself moved is a lookup of its own —
+ * [refund-details.test.js](refund-details.test.js)
+ * ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-capture
  */
 const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
 
-const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
 const FIXTURE_CAPTURE = require('../../../fixtures/paypal/capture-completed.json');
 
 const CAPTURE_ID = FIXTURE_CAPTURE.id;
@@ -68,10 +68,9 @@ module.exports = {
         const responses = { [CAPTURE_ENDPOINT]: FIXTURE_CAPTURE };
 
         const resource = await withPayPalRequest(requestReturning(responses, calls), () => {
-          return PayPal.fetchResource('capture', CAPTURE_ID, FIXTURE_CAPTURE_REFUNDED, {});
+          return PayPal.fetchResource('capture', CAPTURE_ID, {});
         });
 
-        assert.equal(resource._stale, undefined, 'A capture the API answered must not be flagged stale');
         assert.equal(resource.id, CAPTURE_ID, 'The capture itself is the resource');
         assert.equal(resource.status, 'REFUNDED', 'The live capture status comes through');
         assert.equal(calls.length, 1, 'The capture should be read once — a v2 capture needs no second call');
@@ -87,7 +86,7 @@ module.exports = {
         const responses = { [CAPTURE_ENDPOINT]: FIXTURE_CAPTURE };
 
         const resource = await withPayPalRequest(requestReturning(responses, []), () => {
-          return PayPal.fetchResource('capture', CAPTURE_ID, {}, {});
+          return PayPal.fetchResource('capture', CAPTURE_ID, {});
         });
 
         assert.equal(PayPal.getUid(resource), 'test-user-123', 'The uid reads straight off the capture');
@@ -97,44 +96,26 @@ module.exports = {
     },
 
     {
-      name: 'a-failed-fetch-still-falls-back-to-the-webhook-payload',
+      name: 'a-failed-fetch-throws-rather-than-answering-with-the-payload',
       async run({ assert }) {
-        const resource = await withPayPalRequest(
-          async () => {
-            throw new Error('PayPal API unreachable');
-          },
-          () => PayPal.fetchResource('capture', CAPTURE_ID, FIXTURE_CAPTURE_REFUNDED, {}),
-        );
+        // The capture the pipeline acts on is the one PayPal answered with. A fetch
+        // that fails has no answer to give ([#506]).
+        let threw = null;
 
-        assert.equal(resource._stale, true, 'An unreachable API still falls back to the payload, flagged');
-        assert.equal(resource.id, FIXTURE_CAPTURE_REFUNDED.id, 'The webhook payload comes through');
-      },
-    },
+        try {
+          await withPayPalRequest(
+            async () => {
+              throw new Error('PayPal API unreachable');
+            },
+            () => PayPal.fetchResource('capture', CAPTURE_ID, {}),
+          );
+        } catch (e) {
+          threw = e;
+        }
 
-    {
-      name: 'the-refund-details-read-the-v2-amount-shape',
-      async run({ assert }) {
-        // v2 spells the amount `value`/`currency_code`; v1 spelled it
-        // `total`/`currency`. Reading only the v1 spelling left the refund
-        // email and the order record with a null amount.
-        const details = PayPal.getRefundDetails({ resource: FIXTURE_CAPTURE_REFUNDED });
-
-        assert.equal(details.amount, '9.99', 'The refunded amount comes off the v2 resource');
-        assert.equal(details.currency, 'USD', 'The currency comes off the v2 resource');
-      },
-    },
-
-    {
-      name: 'the-v1-refund-details-still-read-the-v1-shape',
-      async run({ assert }) {
-        // The v1 sale path is untouched — both spellings resolve.
-        const details = PayPal.getRefundDetails({
-          resource: { amount: { total: '4.99', currency: 'EUR' }, reason_code: 'REFUND' },
-        });
-
-        assert.equal(details.amount, '4.99');
-        assert.equal(details.currency, 'EUR');
-        assert.equal(details.reason, 'REFUND');
+        assert.ok(threw, 'A failed fetch must throw');
+        assert.equal(threw.notFound, false, 'An unreachable PayPal is transient, not a capture that does not exist');
+        assert.match(threw.message, /could not be reached/, 'The failure says the lookup never got an answer');
       },
     },
   ],

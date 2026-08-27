@@ -64,16 +64,24 @@ function runService(config, { adsense, options = {}, brandRoot } = {}) {
 test('advertising: skips without Google credentials in .env', async () => {
   const result = await runService(brandConfig()); // no injected api → the creds check applies
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /GOOGLE_CLIENT_ID\/GOOGLE_CLIENT_SECRET/);
+  // The shared setup contract's loud headless skip (#608): names both keys and the fix
+  assert.match(result.reason, /GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET/);
+  assert.deepEqual(result.missingEnv, ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
 });
 
-test('advertising: provider enabled = false skips the service', async () => {
+// #527 — the adsense block has ONE switch, and it is the client id: `enabled`
+// was a SECOND polarity that stopped the manager managing the account while
+// the site kept serving ads off the same id. It is deleted; a config still
+// carrying it is an undeclared key the service never reads.
+test('advertising: a stray enabled = false does not skip — client presence is the only switch (#527)', async () => {
   const config = brandConfig();
   config.advertising.providers.adsense.enabled = false;
 
-  const result = await runService(config, { adsense: fakeAdsense() });
-  assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /advertising\.providers\.adsense\.enabled/);
+  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+  const result = await runService(config, { adsense: api });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(api.calls[0], { method: 'listSites', accountId: ACCOUNT_ID });
 });
 
 test('advertising: skips without brand.url', async () => {
@@ -198,7 +206,7 @@ test('setup: interactive run offers account selection and lands the client id in
   const brandRoot = makeBrandRoot(`{
   // Fixture Brand — adsense writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  advertising: { providers: { adsense: { enabled: true } } }, // client lands here
+  advertising: { providers: { adsense: {} } }, // client lands here
   targets: { web: {} },
 }
 `);
@@ -223,7 +231,7 @@ test('setup: interactive run offers account selection and lands the client id in
   }
 });
 
-test('setup: Disable lands enabled: false — never a false where the schema wants a string (cp268)', async () => {
+test('setup: Disable opts the provider out — never a false where the schema wants a string (cp268, #527)', async () => {
   const api = fakeAdsense();
   api.listAccounts = async () => [];
   const brandRoot = makeBrandRoot(`{
@@ -243,7 +251,11 @@ test('setup: Disable lands enabled: false — never a false where the schema wan
 
     assert.equal(result.status, 'skipped');
     const written = readConfigSource(brandRoot);
-    assert.ok(written.includes('enabled: false'), 'Disable writes the enabled gate');
+    // Since #527 there is no `enabled` gate to land it on: Disable opts the
+    // PROVIDER out (the chatsy/slapform shape), which the deliberate-absence
+    // skip already honors on the next run.
+    assert.ok(written.includes('adsense: false'), 'Disable opts the provider entry out');
+    assert.ok(!written.includes('enabled: false'), 'the deleted gate is never resurrected by a writeback');
     assert.ok(!written.includes('client: false'), 'client (schema string) never receives a boolean');
   } finally {
     tty.close();

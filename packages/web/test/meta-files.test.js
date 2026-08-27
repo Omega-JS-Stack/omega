@@ -115,6 +115,9 @@ test('pages.json + llms.txt: no unrendered Liquid survives the meta-file lane (#
 
 test('ads.txt: renders the configured AdSense client with the ca- prefix stripped', () => {
   assert.match(pages.get('/ads.txt'), /^google\.com, pub-1234567890, DIRECT, f08c47fec0942fa0$/m);
+  // #556 — the record is the FIRST byte: the gate tag was left-stripped only,
+  // so the newline after it opened every brand's file with a blank line.
+  assert.match(pages.get('/ads.txt'), /^google\.com, /, 'the file opens on the record, no leading blank line');
 });
 
 test('humans.txt + opensearch.xml + security.txt: brand-derived, no empties', () => {
@@ -196,9 +199,29 @@ test('sitemap.xml + pages.json: entries in URL byte order (deterministic emissio
   assert.deepStrictEqual(urls, [...urls].sort(), 'pages.json urls in byte order');
 });
 
+// #527 — the adsense block has ONE switch: the client id. A site that names
+// one sells inventory through it, so ads.txt declares it — the split gates
+// (`units`, a provider `enabled`) are deleted, and a config still carrying
+// them is an undeclared key that changes nothing about this file.
+test('ads.txt: the client id alone decides the record (#527)', async () => {
+  const gated = await buildWith({
+    ...miniData,
+    advertising: { providers: { adsense: { client: 'ca-pub-1234567890', units: false, enabled: false } } },
+  }, {}, 'meta-files-adsense-gates');
+
+  assert.match(
+    gated.get('/ads.txt'), /^google\.com, pub-1234567890, DIRECT, f08c47fec0942fa0$/m,
+    'no second gate takes a configured client id out of the market',
+  );
+
+  // The presence gate itself is unchanged (the `before` build).
+  assert.match(pages.get('/ads.txt'), /^google\.com, pub-1234567890, DIRECT, f08c47fec0942fa0$/m);
+});
+
 test('ads.txt without advertising config: honest comment, never a broken record', async () => {
   const bare = await buildWith(miniData, {}, 'meta-files-bare');
   assert.match(bare.get('/ads.txt'), /^# No advertising providers configured$/m);
+  assert.match(bare.get('/ads.txt'), /^# No advertising/, 'the else branch opens on its comment too (#556)');
   assert.ok(!bare.get('/ads.txt').includes('google.com,'), 'no fabricated AdSense line');
 
   // And humans.txt drops the socials line instead of rendering an empty field

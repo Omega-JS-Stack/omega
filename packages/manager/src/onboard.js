@@ -32,6 +32,7 @@ const { loadBrand } = require('./lib/brand.js');
 const { buildScaffoldPlan, applyScaffoldPlan, printPlanResults } = require('./lib/scaffold.js');
 const { canPrompt } = require('./lib/run-gates.js');
 const { deriveBundleIdPrefix } = require('./lib/bundle-id.js');
+const { convertLegacyOAuthSecret } = require('./lib/legacy-oauth.js');
 
 // New-brand ids are a conservative subset of the schema's brand.id pattern —
 // always dir-, repo-, and URL-scheme-safe.
@@ -419,6 +420,15 @@ async function runOnboard(cwd, options = {}) {
     return { brandRoot, mode, ...results, valid: true };
   }
 
+  // Port-time conversion: a carried legacy oauth.json becomes the canonical
+  // google-oauth.json once, here, so nothing downstream dual-reads it (#501)
+  const legacyOAuth = convertLegacyOAuthSecret(brandRoot);
+  if (legacyOAuth.converted) {
+    console.log(`  ${chalk.green('✓')} google-oauth.json ${chalk.dim('← the carried legacy oauth.json (converted, legacy file removed)')}`);
+  } else if (legacyOAuth.reason) {
+    console.log(`  ${chalk.yellow('⚠')} legacy oauth.json not converted ${chalk.dim(`(${legacyOAuth.reason})`)}`);
+  }
+
   // Company link — brand-local runs now layer the company defaults
   if (companyRoot) {
     if (stampCompanyMarker(brandRoot, companyRoot)) {
@@ -460,7 +470,7 @@ async function runOnboard(cwd, options = {}) {
     manageExitCode = await spawnManage(brandRoot);
   }
 
-  return { brandRoot, mode, ...results, valid, git, manageExitCode };
+  return { brandRoot, mode, ...results, valid, git, legacyOAuth, manageExitCode };
 }
 
 module.exports = { runOnboard, deriveId, deriveName, deriveUrl };

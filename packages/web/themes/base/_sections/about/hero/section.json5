@@ -1,5 +1,5 @@
 {
-  description: 'About hero — the dotgrid statement with the facts rail: masthead heading on the left, a 2-col count-up facts grid on the right. Supply image: and the band flips to the PHOTO LEAD: the picture opens the page, the masthead rides it on a scrim, and the facts run as a 4-col rail beneath. No image = the statement layout, unchanged. The layout bridges the page\'s hero words via data: and the facts rail via facts:.',
+  description: 'About hero — the dotgrid statement with the facts rail: masthead heading on the left, a 2-col count-up facts grid on the right. Supply image: and the band flips to the PHOTO LEAD: the picture opens the page, the masthead rides it on a scrim, and the facts run as a 4-col rail beneath. No image = the statement layout, unchanged. The layout bridges the page\'s hero words via data: and the facts rail via facts:. Author facts_head (superheadline/headline/subheadline) and the rail gains the stats band\'s own head; leave it unset and the rail renders bare, exactly as before.',
 
   args: {
     eyebrow: 'string', // masthead eyebrow fallback; a superheadline.text arg (legacy key) wins over it
@@ -8,17 +8,21 @@
     headline_accent: 'string',
     description: 'string',
     facts: 'array', // [{ label, number }] — the right-rail count-up grid; absent = statement only
+    facts_head: 'object', // { superheadline: { text }, headline, headline_accent, subheadline } — the stats band's own head above the rail (legacy parity); unauthored = the bare rail
     image: 'string', // the lead photo; unset = the statement layout (no frame, no hole)
     image_alt: 'string', // what the photo SHOWS — content imagery, never decoration
     placeholder: 'string', // first-paint img src swapped by the lazy loader
   },
 
   defaults: {
-    eyebrow: 'About {{ site.brand.name }}',
+    eyebrow: 'About {{ resolved.config.brand.name }}',
     superheadline: {},
+    // No head copy here: the band head is the PAGE's words, and an
+    // unauthored rail must render exactly as it always has.
+    facts_head: { superheadline: {} },
     headline: 'We make complex things <em>feel simple</em>',
     headline_accent: '',
-    description: 'The people and stubborn opinions behind {{ site.brand.name }}.',
+    description: 'The people and stubborn opinions behind {{ resolved.config.brand.name }}.',
     image: '',
     image_alt: '',
     placeholder: '{{ site.omega.placeholder.src }}',

@@ -65,7 +65,7 @@ faqs:
   superheadline:
     text: "FAQs"
   headline: "Frequently asked <em>questions</em>"
-  subheadline: "Everything you need to know about {{ site.brand.name }} billing & subscriptions."
+  subheadline: "Everything you need to know about {{ resolved.config.brand.name }} billing & subscriptions."
   # Trial copy DERIVES from the catalog (#273): the answer renders empty when
   # no product carries `trial.days`, and the renderers drop answerless items —
   # so a brand with no trial ships no trial claim. A refund policy is brand
@@ -257,56 +257,20 @@ faqs:
                 </p>
 
                 {% if plan.features.size > 0 %}
-                  <!-- Features (definitions from config → dotted underline + tooltip) -->
-                  <ul class="omega-price-card__features">
-                    {% for feature in plan.commonFeatures %}
-                      <li>
-                        <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
-                        <span>
-                          {% if feature.value == 'Unlimited' %}
-                            Unlimited
-                          {% elsif feature.value and feature.value != true %}
-                            {{ feature.value | omega_commaify }}
-                          {% endif %}
-                          {% iftruthy feature.definition %}
-                            <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
-                          {% endiftruthy %}
-                          {% iffalsy feature.definition %}
-                            {{ feature.name }}
-                          {% endiffalsy %}
-                        </span>
-                      </li>
-                    {% endfor %}
-                  </ul>
+                  <!-- Features (definitions from config → dotted underline +
+                       tooltip): the ONE list component the homepage plan band
+                       renders too (#539) -->
+                  {% component "pricing/features", features: plan.commonFeatures %}
 
                   {% if plan.extraFeatures.size > 0 %}
                     {% unless forloop.first %}
                       {% assign _prev_index = forloop.index0 | minus: 1 %}
                       {% assign _prev_plan = _plans[_prev_index] %}
                       <div class="omega-price-card__tier-note">
-                        Everything in <strong>{{ _prev_plan.name }}</strong>, and more:
+                        Everything in <strong>{{ _prev_plan.name }}</strong>, and:
                       </div>
                     {% endunless %}
-                    <ul class="omega-price-card__features">
-                      {% for feature in plan.extraFeatures %}
-                        <li>
-                          <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
-                          <span>
-                            {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
-                              {{ feature.value }}
-                            {% elsif feature.value and feature.value != true %}
-                              {{ feature.value | omega_commaify }}
-                            {% endif %}
-                            {% iftruthy feature.definition %}
-                              <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
-                            {% endiftruthy %}
-                            {% iffalsy feature.definition %}
-                              {{ feature.name }}
-                            {% endiffalsy %}
-                          </span>
-                        </li>
-                      {% endfor %}
-                    </ul>
+                    {% component "pricing/features", features: plan.extraFeatures %}
                   {% elsif forloop.first == false %}
                     {% assign _prev_index = forloop.index0 | minus: 1 %}
                     {% assign _prev_plan = _plans[_prev_index] %}
@@ -443,28 +407,7 @@ faqs:
               <span>Yours forever, pay once</span>
             </p>
 
-            {% if product.features.size > 0 %}
-              <ul class="omega-price-card__features">
-                {% for feature in product.features %}
-                  <li>
-                    <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
-                    <span>
-                      {% if feature.value == 'Unlimited' %}
-                        Unlimited
-                      {% elsif feature.value and feature.value != true %}
-                        {{ feature.value | omega_commaify }}
-                      {% endif %}
-                      {% iftruthy feature.definition %}
-                        <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
-                      {% endiftruthy %}
-                      {% iffalsy feature.definition %}
-                        {{ feature.name }}
-                      {% endiffalsy %}
-                    </span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
+            {% component "pricing/features", features: product.features %}
 
             <div class="d-grid omega-price-card__cta">
               <button class="btn btn-adaptive fw-semibold omega-hover-nudge" data-plan-id="{{ product.id }}" data-plan-type="one-time">
@@ -524,12 +467,17 @@ faqs:
               {% for plan in _plans %}
                 {% assign _cell = feature.values[plan.id] %}
                 <td>
-                  {% if _cell == true %}
+                  {%- comment %} One catalog value, both surfaces (#562): a
+                  truthy cell is a YES, and a cell that is not a bare `true`
+                  carries its own value as the label — exactly what the plan
+                  cards render beside their check. A row of "Included" beside
+                  circle-xmark icons was the same data telling two stories.
+                  {% endcomment -%}
+                  {% if _cell %}
                     <span class="omega-compare__yes text-success">{% omega_icon "circle-check", "fa-md" %}</span>
-                  {% elsif _cell == 'Unlimited' %}
-                    Unlimited
-                  {% elsif _cell %}
-                    {{ _cell | omega_commaify }}
+                    {% if _cell != true %}
+                      <span class="omega-compare__label">{{ _cell | omega_commaify | escape_once }}</span>
+                    {% endif %}
                   {% else %}
                     <span class="omega-compare__no">{% omega_icon "circle-xmark", "fa-md" %}</span>
                   {% endif %}
@@ -590,7 +538,7 @@ accordion here and out of the FAQPage schema in core/foot.html. The test is
   <div class="container">
     <div class="omega-duo">
       <div class="omega-duo__aside omega-section-head" data-omega-reveal>
-        {% component "heading/section-head", superheadline: resolved.faqs.superheadline.text, headline: resolved.faqs.headline | default: "Frequently asked <em>questions</em>", sub: resolved.faqs.subheadline %}
+        {% component "heading/section-head", superheadline: resolved.faqs.superheadline.text, headline: resolved.faqs.headline | default: "Frequently asked <em>questions</em>", headline_accent: resolved.faqs.headline_accent, sub: resolved.faqs.subheadline %}
 
         {% comment %} The billing object states what the framework KNOWS: the
         plan-switch route really does prorate. Its refund half — the fragment

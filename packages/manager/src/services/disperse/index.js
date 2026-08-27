@@ -27,7 +27,10 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: (context) => {
-    const mappedTargets = (context.targets || []).filter((entry) => entry.target);
+    // Custom targets (#603) ride along: they are one of the two ops that see
+    // them at all, because a non-OMEGA target has no @omega.js/config to walk
+    // the brand cascade with and needs its .env composed for it.
+    const mappedTargets = (context.targets || []).filter((entry) => entry.target || entry.custom);
 
     if (mappedTargets.length === 0) {
       return { skip: true, reason: 'no target-mapped dirs' };

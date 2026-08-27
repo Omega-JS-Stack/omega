@@ -33,11 +33,11 @@ meta:
           {% omega_icon "circle-info", "fa-sm" %}
           <strong>Advertising config</strong>
         </div>
-        {% iftruthy site.advertising %}
-          <p class="mb-1 small">This build carries an <code>advertising</code> key, so the ladder runs: AdSense{% iftruthy site.advertising.providers.adsense.client %} (client <code>{{ site.advertising.providers.adsense.client }}</code>){% endiftruthy %}{% iffalsy site.advertising.providers.adsense.client %} (not configured){% endiffalsy %}, falling back to <code>{{ site.advertising.fallback | default: "nothing" }}</code>.</p>
-          <p class="mb-0 small text-muted">In-house source: <code>{{ site.advertising.providers.inhouse.source | default: "not configured" }}</code>. Paying users see none of these units (the standard auth binding hides them).</p>
+        {% iftruthy resolved.config.advertising %}
+          <p class="mb-1 small">This build carries an <code>advertising</code> key, so the ladder runs: AdSense{% iftruthy resolved.config.advertising.providers.adsense.client %} (client <code>{{ resolved.config.advertising.providers.adsense.client }}</code>){% endiftruthy %}{% iffalsy resolved.config.advertising.providers.adsense.client %} (not configured){% endiffalsy %}, falling back to <code>{{ resolved.config.advertising.fallback | default: "nothing" }}</code>.</p>
+          <p class="mb-0 small text-muted">In-house source: <code>{{ resolved.config.advertising.providers.inhouse.source | default: "not configured" }}</code>. Paying users see none of these units (the standard auth binding hides them).</p>
         {% endiftruthy %}
-        {% iffalsy site.advertising %}
+        {% iffalsy resolved.config.advertising %}
           <p class="mb-1 small">This build carries no <code>advertising</code> key, so auto placements (blog posts, the blog feed, the dashboard rail) emit nothing at all.</p>
           <p class="mb-0 small text-muted">The hand-authored units below still mount and land on the built-in OMEGA promo: the terminal lane that keeps a unit from ever rendering empty.</p>
         {% endiffalsy %}

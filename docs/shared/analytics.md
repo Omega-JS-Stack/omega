@@ -44,7 +44,11 @@ One fire walks three steps per provider, in this order:
 3. **transport** — the host's seam; a missing or blocked page global is a silent no-op
 
 Nothing in that walk throws at a visitor. A transport that could not deliver returns
-`false`, and the dev log is the only trace.
+`false`, and the dev log is the only trace. That guard is the WHOLE contract for an
+unconfigured or blocked provider ([#606](https://github.com/Omega-JS-Stack/omega/issues/606)):
+no surface defines a placeholder `gtag`/`fbq`/`ttq`, because a stub only makes a pixel
+that never loaded read as present. @omega.js/web's page chrome carries none, and
+`test/analytics-blocked.test.js` fails any template or module that names one.
 
 **The host injects its seams** — nothing is sniffed:
 
@@ -170,7 +174,7 @@ and the two events split it the opposite way:
 
 | Event | The dedupe id | Browser half | Server half |
 |---|---|---|---|
-| `sign_up` | `sign_up.<uid>` — the uid is the only thing both sides hold before either fires | GA4 + Meta + TikTok (`libs/auth/tracking.js`) | Meta + TikTok (`events/auth/on-create.js`) |
+| `sign_up` | `sign_up.<uid>` — the uid is the only thing both sides hold before either fires | GA4 + Meta + TikTok (`libs/auth/tracking.js`) | Meta + TikTok (`routes/user/signup` → `libraries/analytics/signup.js`, the post-auth request — never the auth trigger, which has no request behind it, [#577](https://github.com/Omega-JS-Stack/omega/issues/577)) |
 | `purchase` | `purchase.<order id>` — the order-id branch of the webhook's own `<canonical>.<webhook event id>` derivation | Meta + TikTok (`pages/payment/confirmation/modules/tracking.js`) | GA4 + Meta + TikTok (`events/firestore/payments-webhooks/analytics.js`) |
 
 Revenue is the server's, because a browser cannot be trusted with it; a registration's GA4
@@ -262,8 +266,10 @@ Attribution is captured once and CARRIED; no event assembles its own.
   through its params — `configure({ context })` → `resolve(name, params, context)` → each
   adapter attaches it the way ITS provider wants: GA4 takes campaign fields as flat event
   params, while Meta (`fbc`, `fbp`) and TikTok (`ttclid`, `ttp`) take theirs in the
-  descriptor's `userData` match block, never in the event's custom data. A call site never
-  hand-attaches attribution.
+  descriptor's `userData` match block, never in the event's custom data. The touch's
+  `url`/`referrer` ride the same slot server-side ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)):
+  Meta sends `event_source_url`, TikTok a `page` object, GA4 nothing — omitted entirely
+  when the touch carried no url. A call site never hand-attaches attribution.
 
 Capture and storage are [#384](https://github.com/Omega-JS-Stack/omega/issues/384); the
 server-side delivery with full match data (hashed email/phone, IP, user agent, click ids) is
@@ -352,6 +358,30 @@ This one line is the whole dev trace. It replaced web core's `setupTrackingInter
 only ever saw the calls that survived the page's own guards, while the walk above reports the
 skips too, and why.
 
+## Only production reaches a platform
+
+**A server conversion is delivered in PRODUCTION and nowhere else.** An emulator boot seeds
+personas, every seeded account fired the server half of `sign_up`, and Meta delivered dozens
+of fake registrations to the brand's live pixel — a dev run polluting the ad data the
+optimizer bids on ([#464](https://github.com/Omega-JS-Stack/omega/issues/464)). So
+`deliverConversion` carries the gate `@omega.js/monitoring` and the Measurement Protocol
+helper already carry: any non-production environment (development OR testing, the intentional
+`!isProduction()` check) delivers nothing.
+
+The gate sits AFTER the catalog resolve, so the walk still reports what WOULD have fired and
+with what — a blocked send is information, not silence. Each blocked provider says so on its
+own line, and the fire's summary line carries the outcome word `blocked (dev)` plus the match
+keys that fire would have carried (providers separated by ` | `, since each summary has commas
+of its own):
+
+```
+[@omega.js/backend:omega_api] deliverConversion [meta]: sign_up blocked (dev) — nothing sent (event_id=sign_up.<uid>)
+[@omega.js/backend:omega_api] deliverConversion: sign_up → ga4 skipped (not selected) | meta blocked (dev) sent em,fn,ln,external_id,client_ip_address,client_user_agent,fbp; empty ph,ct,st,zp,country,db,ge,fbc | tiktok blocked (dev) sent … (event_id=sign_up.<uid>)
+```
+
+A real send is therefore proved the way **Verifying** says below — a live drive read in the
+platform's own debugger — never by pointing a dev run at the live pixel.
+
 ## Identity is not an event
 
 An identity has no catalog entry, because it is not something that happened — it is a SETTING
@@ -375,7 +405,10 @@ beside the transport rather than inside the catalog, in exactly one module per r
   identical match keys
   ([#392](https://github.com/Omega-JS-Stack/omega/issues/392)).
 - **every runtime** — `@omega.js/client`'s `setUserId` / `setUserProperties`, which SEND on
-  web through the page's gtag and ride the Measurement Protocol payload elsewhere. The
+  web through the page's gtag and ride the Measurement Protocol payload elsewhere. The one
+  carve-out is a bridged desktop renderer: main owns identity, so its renderer forwards
+  `setUserProperties` over the bridge and `setUserId` throws loudly
+  ([#480](https://github.com/Omega-JS-Stack/omega/issues/480)). The
   cross-surface value is `uuidv5(uid, namespace)`: the same human is the same `user_id` on a
   page, in the desktop app, in the extension and from a Cloud Function.
 
@@ -414,6 +447,76 @@ where it does not (an insecure origin), so no surface falls back to a random-loo
 device id from its own storage, so the desktop app and the browser on one machine are two
 `client_id`s. What unifies a human is `user_id`, and it rides ALONGSIDE the client id in every
 payload rather than replacing it — providers need the stable client id for session stitching.
+
+## Match quality — every parameter, and where its value comes from
+
+**The plumbing exists for EVERY match parameter each platform accepts, even where a brand does
+not yet hold the value** (Ian's ruling, 2026-08-24,
+[#577](https://github.com/Omega-JS-Stack/omega/issues/577)). An empty value compacts away as
+it always has; what is never acceptable is a parameter the platform reads and we never wired.
+Meta scored the playground's StartTrial 6.2/10 and its CompleteRegistration around 4/10 while
+every server event carried `em` + `external_id` alone — and the account doc already held the
+name, birthday, gender, location and phone.
+
+**One normalization table per provider, and no shared "close enough" normalizer.** The rules
+genuinely differ key by key, and a value normalized by the wrong platform's rule is ACCEPTED
+by the API and matched to nobody — the same silent nothing an unhashed value is. The server's
+tables live in `packages/backend/src/manager/libraries/analytics/match-data.js`; the browser
+half's shared rules (email, phone, external id) live in `@omega.js/analytics/identity` so both
+halves of one person present identical keys.
+
+**Meta** — Conversions API `user_data`
+([customer-information parameters](https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters)).
+Every key below is hashing-required except the last four.
+
+| Key | Source | Normalization |
+|---|---|---|
+| `em` | `auth.email` (Auth's record on a signup) | trim, lowercase, SHA-256 |
+| `ph` | `personal.telephone` `{ countryCode, national }` | digits only, country code included, SHA-256 |
+| `fn` / `ln` | `personal.name.first` / `.last` | lowercase, no punctuation, SHA-256 |
+| `ct` | `personal.location.city` | lowercase, no punctuation and NO SPACES (`newyork`), SHA-256 |
+| `st` | `personal.location.region` | the 2-character ANSI code in lowercase (a US state NAME is looked up); other countries lowercase with no spaces, SHA-256 |
+| `zp` | `personal.location.zip` — no account source today; wired for the brand that adds one | lowercase, no spaces or dashes, first five digits of a US zip, SHA-256 |
+| `country` | `personal.location.country` | ISO 3166-1 alpha-2, lowercase, SHA-256 — a country NAME sends nothing |
+| `db` | `personal.birthday` (the `$timestamp` pair) | `YYYYMMDD` in UTC, SHA-256 |
+| `ge` | `personal.gender` | the lowercase initial, and Meta accepts `f`/`m` alone — anything else sends nothing |
+| `external_id` | the uid | RAW (Meta only RECOMMENDS hashing, #410) |
+| `client_ip_address` / `client_user_agent` | the request that created the checkout intent, or the post-auth signup request | never hashed |
+| `fbc` / `fbp` | the browser's `_fbc`/`_fbp` cookies; `fbc` is CONSTRUCTED from a captured `fbclid` when the cookie never arrived | never hashed |
+
+**TikTok** — Events API 2.0 `data[].user`
+([event/track/](https://business-api.tiktok.com/portal/docs?id=1771101303285761)): `email`,
+`phone`, `external_id` (all three SHA-256 REQUIRED), `ttclid`, `ttp`, `ip`, `user_agent`.
+**There is no name or address parameter** — its user object documents none, so the backend
+sends none. A `first_name` or `zip_code` key there is read by nobody.
+
+**GA4** — Measurement Protocol `user_data`
+([user-provided data](https://developers.google.com/analytics/devguides/collection/ga4/uid-data)),
+built by `helpers/analytics.js` from the authenticated request's own user. Its rules are NOT
+Meta's: `sha256_email_address` and `sha256_phone_number` (E.164 WITH the `+`), and an
+`address` block whose `sha256_first_name` / `sha256_last_name` drop digits and symbols,
+`sha256_street` keeps its digits, while `city`, `region` (the region NAME, not a code) and
+`postal_code` ride in the CLEAR and `country` is UPPERCASE alpha-2. The account's own
+`personal.location` wins over the request's geolocation, which stays the fallback.
+
+**Where the signup's match data comes from.** The server half of `sign_up` fires from the
+post-auth request (`routes/user/signup`, via `libraries/analytics/signup.js`), NOT from the
+auth trigger: a trigger has no HTTP request behind it, so it could see no IP, no user agent,
+no platform cookies and no attribution the browser had not posted yet. The browser posts the
+cookies under `attribution.cookies` — the shape the checkout intent already sends — and the
+route's own `flags.signupProcessed` gate keeps it to one fire per account. The dedupe id is
+`sign_up.<uid>` on both halves, as before.
+
+**Reading it back.** Two dev surfaces answer the two halves of "did this match?":
+
+- the backend's fire log names, per provider, the keys that went and the accepted keys that
+  were empty — KEY NAMES ONLY, because a hashed email is still that person's email:
+  `deliverConversion: sign_up → meta blocked (dev) sent em,external_id,client_ip_address,client_user_agent; empty ph,fn,ln,… | tiktok …`
+- the dev palette's **Ad match keys** section (the one dev surface,
+  [#342](https://github.com/Omega-JS-Stack/omega/issues/342)) shows the browser's side: the
+  consent state, which pixel scripts loaded, which platform cookies exist right now, and the
+  stored attribution's keys. The checkout intent's response echoes the cookie key names the
+  SERVER received, which is where a blocked pixel shows up.
 
 ## Verifying
 

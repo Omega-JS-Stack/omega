@@ -167,7 +167,7 @@ Per-brand subusers provide full contact/segment/field isolation under one billin
 
 ## Contact Pruning
 
-**Pruning is OPT-IN, and this is the one place that default lives** ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)): nothing runs unless the brand sets `marketing.prune.enabled: true`. Any other shape — no `marketing` block, a `marketing` block with no `prune` key, `prune: {}`, `enabled: false` — logs the skip and deletes nothing. A framework that deletes a consumer's contacts unless told not to is the wrong default; the per-provider safety floors below reduce that blast radius, they do not remove it.
+**Pruning is ON by default** ([#478](https://github.com/Omega-JS-Stack/omega/issues/478), superseding #422's opt-in): the config schema's default supplies `marketing.prune.enabled: true` through the resolved chain, so a brand with no `marketing` block, no `prune` key, or `prune: {}` prunes. The ONLY shape that stops it is an explicit `enabled: false`, which logs the skip and deletes nothing. The per-provider safety floors below bound the blast radius of the on-default.
 
 `cron/daily/marketing-prune.js` — runs 1st of each month. Pruning is strictly PER-PROVIDER: each provider's own engagement decides that provider's removals, so a reader who opens every newsletter but ignores offer mail is never deleted from the newsletter on a SendGrid-only signal ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)). Three stages:
 1. **Re-engagement**: send email to `engagement_inactive_5m` (excluding `engagement_inactive_6m`). Each provider resolves the segment key against its own engagement tracking.
@@ -375,7 +375,7 @@ marketing: {
       sponsorships: [ ... ],
     },
   },
-  prune: { enabled: false },              // opt-in — true is the ONLY shape that prunes (see Contact Pruning)
+  prune: { enabled: false },              // ON by default (#478) — false is the ONLY shape that stops it (see Contact Pruning)
 }
 ```
 

@@ -54,6 +54,24 @@
     margin-bottom: 0.625rem;
   }
 
+  // Step ordinal (band-level `numbered`) — a quiet mono chip, never an accent
+  // badge: the number orders the tiles, the words carry the meaning.
+  .omega-tile__ordinal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    font-family: var(--omega-font-mono);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--omega-ink-muted);
+    background: var(--omega-surface-2);
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-s);
+  }
+
   .omega-tile__title {
     font-size: 0.9375rem;
     font-weight: 650;
@@ -72,6 +90,14 @@
     margin-top: auto;
     padding-top: 1rem;
   }
+}
+
+// A linked tile IS the anchor (the hub-listing form): it keeps the tile's own
+// type colors instead of the link palette — the whole surface already says
+// "click me" through .omega-interactive.
+a.omega-tile {
+  text-decoration: none;
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

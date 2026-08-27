@@ -14,13 +14,20 @@
   {% assign page-keywords = resolved.meta.keywords | omega_liquify %}
 {%- endiftruthy -%}
 
-{% assign favicon-path = site.url | append: "/assets/images/favicon" %}
-{%- iftruthy resolved.favicon.path -%}
-  {% assign favicon-path = resolved.favicon.path %}
+{% assign favicon-path = resolved.config.url | append: "/assets/images/favicon" %}
+{%- iftruthy resolved.config.favicon.path -%}
+  {% assign favicon-path = resolved.config.favicon.path %}
 {%- endiftruthy -%}
 
+<!-- The index posture (#564): `meta.index: false` is the ONE decision — a
+     layout, a page, or the config `meta` section sets it, and sitemap.xml
+     filters on the very same value, so the two signals can never disagree.
+     Two families answer by URL instead, because one template generates both
+     the indexable page and the ones that must not be: a listing's `/page/N`
+     (page 1 is the canonical listing) and the framework's `/test` dev
+     surfaces (#554 keeps them out of a production build entirely). -->
 {% assign page-robots = "index" %}
-{%- if resolved.meta.index == false -%}
+{%- if resolved.meta.index == false or page.url contains "/page/" or page.url contains "/test/" -%}
   {% assign page-robots = "noindex" %}
 {%- endif -%}
 
@@ -51,11 +58,11 @@
 <!-- Fallbacks: a value that LIQUIFIES to empty (nothing configured) still needs
      the brand default — `default:` only sees the raw string (footer.html pattern) -->
 {% assign page-title = page-title | strip %}
-{% if page-title == '' or page-title == 'null' %}{% assign page-title = site.brand.name %}{% endif %}
+{% if page-title == '' or page-title == 'null' %}{% assign page-title = resolved.config.brand.name %}{% endif %}
 {% assign page-description = page-description | strip %}
-{% if page-description == '' or page-description == 'null' %}{% assign page-description = site.brand.description %}{% endif %}
+{% if page-description == '' or page-description == 'null' %}{% assign page-description = resolved.config.brand.description %}{% endif %}
 {% assign page-image = page-image | strip %}
-{% if page-image == '' or page-image == 'null' %}{% assign page-image = site.brand.images.social | default: site.brand.images.brandmark %}{% endif %}
+{% if page-image == '' or page-image == 'null' %}{% assign page-image = resolved.config.brand.images.social | default: resolved.config.brand.images.brandmark %}{% endif %}
 
 <!-- Resolve Image -->
 {% capture page-image %}{% omega_external page-image %}{% endcapture %}
@@ -78,7 +85,7 @@
 <!-- <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/> -->
 
 <!-- Google Adsense (conditionally loaded) -->
-{% iftruthy resolved.advertising.providers.adsense.client %}
+{% iftruthy resolved.config.advertising.providers.adsense.client %}
   <!-- Google AdSense -->
   <!-- <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin/> -->
   <!-- <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com"/> -->
@@ -91,7 +98,7 @@
 {% endiftruthy %}
 
 <!-- Chatsy (if used) -->
-{% iftruthy resolved.inbound.chat.providers.chatsy.enabled %}
+{% iftruthy resolved.config.inbound.chat.providers.chatsy.enabled %}
   <link rel="preconnect" href="https://chatsy.ai" crossorigin/>
   <link rel="dns-prefetch" href="https://chatsy.ai"/>
 {% endiftruthy %}
@@ -111,14 +118,14 @@
 <meta name="HandheldFriendly" content="True"/>
 <meta name="MobileOptimized" content="320"/>
 <meta name="generator" content="OMEGA"/>
-<meta name="author" content="{{ site.brand.name }}"/>
-<meta name="copyright" content="{{ site.characters.copyright }} {{ site.omega.date.year }} {{ site.brand.name }}">
+<meta name="author" content="{{ resolved.config.brand.name }}"/>
+<meta name="copyright" content="{{ site.characters.copyright }} {{ site.omega.date.year }} {{ resolved.config.brand.name }}">
 
 <!-- Referrer -->
 <meta name="referrer" content="{{ page-referrer }}"/>
 
 <!-- Canonical -->
-<link rel="canonical" href="{{ site.url }}{{ page.url }}"/>
+<link rel="canonical" href="{{ resolved.config.url }}{{ page.url }}"/>
 
 <!-- Robots -->
 <meta name="robots" content="{{ page-robots }}"/>
@@ -150,31 +157,31 @@
 
 <!-- OG: Twitter -->
 <meta name="twitter:card" content="{{ resolved.meta.twitter_card | default: 'summary_large_image' }}"/>
-<meta name="twitter:site" content="@{{ site.socials.twitter.handle | default: site.socials.twitter }}"/>
+<meta name="twitter:site" content="@{{ resolved.config.socials.twitter.handle | default: resolved.config.socials.twitter }}"/>
 <meta name="twitter:widgets:theme" content="light"/>
 
 <!-- OG: Facebook / Open Graph -->
-<meta property="og:url" content="{{ site.url }}{{ page.url }}"/>
+<meta property="og:url" content="{{ resolved.config.url }}{{ page.url }}"/>
 <meta property="og:type" content="{{ page-og-type }}"/>
-{% assign page-translation-default = site.translation.default | default: 'en' %}
+{% assign page-translation-default = resolved.config.translation.default | default: 'en' %}
 <meta property="og:locale" content="{{ ogLocale }}"/>
-<meta property="og:site_name" content="{{ site.brand.name }}"/>
+<meta property="og:site_name" content="{{ resolved.config.brand.name }}"/>
 
 <!-- Additional SEO Tags -->
-<meta property="article:author" content="{{ site.brand.name }}"/>
-<meta property="article:publisher" content="{{ site.url }}"/>
-<meta name="twitter:creator" content="@{{ site.socials.twitter.handle | default: site.socials.twitter }}"/>
+<meta property="article:author" content="{{ resolved.config.brand.name }}"/>
+<meta property="article:publisher" content="{{ resolved.config.url }}"/>
+<meta name="twitter:creator" content="@{{ resolved.config.socials.twitter.handle | default: resolved.config.socials.twitter }}"/>
 {%- iftruthy resolved.post.id -%}
 <meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}"/>
 <meta property="article:modified_time" content="{{ site.time | date_to_xmlschema }}"/>
 {%- endiftruthy -%}
 
 <!-- Main Feed -->
-<link href="{{ site.url }}/feeds/posts.xml" type="application/atom+xml" rel="alternate" title="{{ site.brand.name }} Feed"/>
+<link href="{{ resolved.config.url }}/feeds/posts.xml" type="application/atom+xml" rel="alternate" title="{{ resolved.config.brand.name }} Feed"/>
 
 <!-- Language Tags -->
-<link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="x-default"/>
-<link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="{{ page-translation-default }}"/>
+<link rel="alternate" href="{{ resolved.config.url }}{{ page.url }}" hreflang="x-default"/>
+<link rel="alternate" href="{{ resolved.config.url }}{{ page.url }}" hreflang="{{ page-translation-default }}"/>
 
 <!-- Favicon — exactly the minted set (manager assets service → .omega/assets/favicon,
      bridged to /assets/images/favicon by the static-assets channel) -->
@@ -184,7 +191,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | omega_cachebreak }}"/>
   <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | omega_cachebreak }}"/>
 {% endif %}
-<meta name="theme-color" content="{{ resolved.favicon.theme-color }}"/>
+<meta name="theme-color" content="{{ resolved.config.favicon.theme-color }}"/>
 
 <!-- Browser Support -->
 <!--[if lte IE 11]>
@@ -242,7 +249,7 @@
 </noscript>
 
 <!-- Theme - Injected head -->
-{{ resolved.theme.head.content | omega_content_format }}
+{{ resolved.config.theme.head.content | omega_content_format }}
 
 <!-- Page - Injected head -->
 {{ resolved.head.content | omega_content_format }}

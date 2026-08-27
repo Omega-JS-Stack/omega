@@ -24,7 +24,9 @@
  *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { resolveConfigValue, landValue } = require('../../lib/config-flow.js');
@@ -116,12 +118,19 @@ module.exports.run = createServiceRunner({
     }
 
     if (!db) {
-      return {
-        skip: true,
-        reason: process.env.SLAPFORM_API_KEY
-          ? 'SLAPFORM_API_KEY recognized, but product-API management is not wired yet — use the operator SA (SLAPFORM_SERVICE_ACCOUNT) or the dashboard'
-          : 'no SLAPFORM_SERVICE_ACCOUNT configured (path to Slapform\'s service-account JSON, set it in the brand .env)',
-      };
+      if (process.env.SLAPFORM_API_KEY) {
+        return {
+          skip: true,
+          reason: 'SLAPFORM_API_KEY recognized, but product-API management is not wired yet — use the operator SA (SLAPFORM_SERVICE_ACCOUNT) or the dashboard',
+        };
+      }
+
+      // The shared setup contract (#608): the operator SA is asked for right
+      // here — most brands are not the Slapform operator and answer Disable,
+      // which retires the ask for good.
+      const gate = await requestServiceInput(context, serviceInputSpec('forms'));
+      if (gate) return gate;
+      db = new FirestoreREST(loadServiceAccount(process.env.SLAPFORM_SERVICE_ACCOUNT, context.brandRoot));
     }
 
     return { db, formId };

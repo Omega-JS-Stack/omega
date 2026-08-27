@@ -32,6 +32,7 @@ const {
   errorWithCode,
 } = require('./constants.js');
 const { tagLinks } = require('./utm.js');
+const env = require('../env.js');
 const { renderEmail } = require('./generators/lib/mjml-template.js');
 
 /**
@@ -240,7 +241,7 @@ function buildCategories(type, brandId, extra) {
  */
 function buildUnsubscribeUrl({ email, groupId, template, websiteUrl }) {
   const crypto = require('crypto');
-  const sig = crypto.createHmac('sha256', process.env.UNSUBSCRIBE_HMAC_KEY)
+  const sig = crypto.createHmac('sha256', env.require('UNSUBSCRIBE_HMAC_KEY'))
     .update(email.toLowerCase())
     .digest('hex');
 

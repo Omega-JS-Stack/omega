@@ -225,12 +225,16 @@ The gate logic is unit-tested without Firestore in [test/email/marketing/consent
 # All brands
 OMEGA_WEBHOOK_KEY="<shared-across-all-brands>"
 
+# Minted by the manager (brand-generated — nothing to paste)
+UNSUBSCRIBE_HMAC_KEY="<32 random bytes, hex>"
+
 # Existing (unchanged)
-UNSUBSCRIBE_HMAC_KEY="<existing-value>"
 SENDGRID_API_KEY="<account-wide>"
 ```
 
 The webhook key is shared because it has to be the same value the parent forwards to each child. Rotate by updating every brand's env in lockstep.
+
+`UNSUBSCRIBE_HMAC_KEY` has no dashboard behind it: `omega manage` mints it into the brand `.env` when the cascade serves none and disperse composes it into the backend's own ([#569](https://github.com/Omega-JS-Stack/omega/issues/569)). A brand's backend **refuses to boot without it, in every environment** ([#581](https://github.com/Omega-JS-Stack/omega/issues/581) — the boot guard validates every required key of the env schema at once and names them all) — signing an email with nothing, and only finding out at a real customer's first receipt, is the failure that bought this guard. There is ONE reader of the key, `libraries/env.js`, on both the signing and the verifying side.
 
 ### Provider dashboard setup
 

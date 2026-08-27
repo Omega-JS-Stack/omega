@@ -342,6 +342,13 @@ class PayPalAPI {
   async updateWebhook(webhookId, patches) {
     return this.makeRequest('PATCH', `/v1/notifications/webhooks/${webhookId}`, patches);
   }
+
+  /**
+   * Delete a webhook endpoint (204 No Content on success)
+   */
+  async deleteWebhook(webhookId) {
+    return this.makeRequest('DELETE', `/v1/notifications/webhooks/${webhookId}`);
+  }
 }
 
 module.exports = { PayPalAPI };

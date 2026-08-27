@@ -23,10 +23,9 @@
 const path = require('node:path');
 const chalk = require('chalk').default;
 
-const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
-const { resolveFrameworkBin } = require('../lib/framework-bin.js');
+const { resolveTargetRun } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 
 // Prefixes forwarded to every target as-is (each target's own C5 parser interprets them)
@@ -94,7 +93,7 @@ module.exports = async (options) => {
   // Nothing valid → every target runs bare (its project tests), scope.js parity.
   const runAllBare = shared.length === 0 && Object.keys(perFramework).length === 0;
 
-  const targets = discoverTargets(brandRoot).filter((entry) => entry.target);
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
   if (targets.length === 0) {
     console.log(chalk.yellow('⚠ No target-mapped dirs under targets/ — nothing to test.'));
     return;
@@ -106,26 +105,37 @@ module.exports = async (options) => {
   const runs = [];
 
   for (const entry of targets) {
-    const target = findTarget(entry.path);
+    const run = resolveTargetRun(entry, 'test');
 
-    if (!target || target.kind !== 'framework') {
+    // A target whose tests ARE its own `npm run test` — a custom target
+    // (#603), or a backend in custom-server mode whose framework has no
+    // emulator lane to run (#584) — never hears the scope vocabulary: it is
+    // the frameworks', and means nothing to a package script. So a SCOPED run
+    // never addresses one, a bare run does, and nothing is forwarded.
+    if (run.kind === 'custom' || run.kind === 'skip') {
+      if (!runAllBare) continue;
+
+      if (run.kind === 'skip') {
+        console.log(chalk.dim(`  ⊘ ${entry.name}: ${run.detail} — skipped`));
+        continue;
+      }
+
+      runs.push({ entry, framework: 'custom', command: run.command, args: run.args, label: run.label });
+      continue;
+    }
+
+    if (run.kind === 'error') {
       // Only an error if this target was (or would be) addressed
       if (runAllBare || shared.length > 0) {
-        runs.push({ entry, error: 'no framework dependency detected (target-root package.json)' });
+        runs.push({ entry, error: run.detail });
       }
       continue;
     }
 
-    const args = [...shared, ...(perFramework[target.name] || [])];
+    const args = [...shared, ...(perFramework[run.framework] || [])];
     if (!runAllBare && args.length === 0) continue; // targeted run, not addressed to this target
 
-    const binPath = resolveFrameworkBin(target.dir, target.name);
-    if (!binPath) {
-      runs.push({ entry, error: `${target.name} is not installed (node_modules climb from ${target.dir} found no bin)` });
-      continue;
-    }
-
-    runs.push({ entry, framework: target.name, binPath, args });
+    runs.push({ entry, framework: run.framework, command: run.command, args: [...run.args, ...args], label: `omega test ${args.join(' ')}`.trimEnd() });
   }
 
   if (runs.length === 0) {
@@ -147,8 +157,8 @@ module.exports = async (options) => {
       continue;
     }
 
-    console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — omega test ${run.args.join(' ')}`.trimEnd()} ───`));
-    const result = await runCommand(process.execPath, [run.binPath, 'test', ...run.args], run.entry.path);
+    console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework})`)} — ${run.label}`.trimEnd()} ───`));
+    const result = await runCommand(run.command, run.args, run.entry.path);
 
     summary.push({ name: run.entry.name, ok: result.success, detail: result.error });
     if (!result.success) failed = true;

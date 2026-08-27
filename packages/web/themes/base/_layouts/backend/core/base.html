@@ -5,20 +5,21 @@ layout: core/root
 # (core/css/shell/_index.scss + core/js/core/app-shell.js). The classy skin
 # (css/layout/_shell.scss) paints the gray canvas + big rounded content card.
 
-client:
-  auth:
-    config:
-      policy: "authenticated"
-  consent:
-    enabled: false
-  exitPopup:
-    enabled: false
+config:
+  client:
+    auth:
+      config:
+        policy: "authenticated"
+    consent:
+      enabled: false
+    exitPopup:
+      enabled: false
 ---
 
 <!-- Backend Layout: omega-shell (sidebar + topbar + main + drawer scrim) -->
 <div class="omega-shell" data-omega-shell>
   <!-- Sidebar (full height, controlled by page/layout front matter) -->
-  {% unless resolved.theme.sidebar.enabled == false %}
+  {% unless resolved.config.theme.sidebar.enabled == false %}
     {% if page.url contains "/admin" %}
       {%- include admin/sections/sidebar.html -%}
     {% else %}
@@ -27,7 +28,7 @@ client:
   {% endunless %}
 
   <!-- Top Bar (controlled by page/layout front matter) -->
-  {% unless resolved.theme.topbar.enabled == false %}
+  {% unless resolved.config.theme.topbar.enabled == false %}
     {% if page.url contains "/admin" %}
       {%- include admin/sections/topbar.html -%}
     {% else %}
@@ -36,7 +37,7 @@ client:
   {% endunless %}
 
   <!-- Main Content -->
-  <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.theme.main.class | omega_liquify }}" aria-label="Main content">
+  <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
     {{ content | omega_content_format }}
   </main>
 

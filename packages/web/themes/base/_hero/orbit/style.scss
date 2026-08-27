@@ -1,0 +1,133 @@
+// `orbit` — the reference hero animation's sheet (#441, the §7 omega:sections
+// lane picks it up like any section.scss).
+//
+// Token-only: every colour, shadow, radius and easing comes off the `--omega-*`
+// design system, so the visual re-inks with the brand instead of carrying a
+// palette of its own. Sizes are `em` off the block's own font-size, so a
+// consumer scales the whole thing with one declaration.
+//
+// The motion is TWO counter-rotations: the ring turns, each satellite turns
+// back by the same amount, so the icons stay upright while they travel. Under
+// `prefers-reduced-motion: reduce` both park and the piece reads as a still
+// diagram — the accessibility contract in docs/shared/theming.md.
+
+.omega-orbit {
+  --omega-orbit-size: 18em;
+  --omega-orbit-duration: 26s;
+
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(var(--omega-orbit-size), 100%);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  font-size: 1rem;
+}
+
+.omega-orbit__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--omega-line);
+  border-radius: 50%;
+  animation: omega-orbit-spin var(--omega-orbit-duration) linear infinite;
+}
+
+.omega-orbit__satellite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 3em;
+  height: 3em;
+  margin: -1.5em 0 0 -1.5em;
+  color: var(--omega-accent);
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: 50%;
+  box-shadow: var(--omega-shadow-1);
+  // Out to the rim at this satellite's share of the circle, then back upright
+  // by whatever the ring has turned.
+  transform:
+    rotate(calc(90deg * var(--omega-orbit-index)))
+    translateY(calc(var(--omega-orbit-size) / -2))
+    rotate(calc(-90deg * var(--omega-orbit-index)));
+  animation: omega-orbit-counter var(--omega-orbit-duration) linear infinite;
+}
+
+.omega-orbit__core {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6em;
+  height: 6em;
+  font-size: 1.6em;
+  color: var(--omega-accent-ink);
+  background: var(--omega-accent);
+  border-radius: var(--omega-radius-xl);
+  box-shadow: var(--omega-shadow-2);
+}
+
+// The core's breathing halo — a ring that grows and fades, never a fill, so
+// nothing behind the card shifts.
+.omega-orbit__pulse {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--omega-accent);
+  border-radius: inherit;
+  animation: omega-orbit-pulse 3.2s var(--omega-ease) infinite;
+}
+
+@keyframes omega-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// The counter-turn: the same rotation, backwards, composed after the satellite's
+// own placement so the icon stays the right way up all the way round.
+@keyframes omega-orbit-counter {
+  from {
+    transform:
+      rotate(calc(90deg * var(--omega-orbit-index)))
+      translateY(calc(var(--omega-orbit-size) / -2))
+      rotate(calc(-90deg * var(--omega-orbit-index)));
+  }
+
+  to {
+    transform:
+      rotate(calc(90deg * var(--omega-orbit-index)))
+      translateY(calc(var(--omega-orbit-size) / -2))
+      rotate(calc(-90deg * var(--omega-orbit-index) - 360deg));
+  }
+}
+
+@keyframes omega-orbit-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+// Reduced motion: everything parks at its final state. The satellites keep the
+// placement transform from the base rule (the animations are what is dropped),
+// so the piece still reads as the diagram it is.
+@media (prefers-reduced-motion: reduce) {
+  .omega-orbit__ring,
+  .omega-orbit__satellite {
+    animation: none;
+  }
+
+  // The halo's own park carries its resting frame too — dropping the animation
+  // alone would leave it at the keyframe-less default (fully opaque, unscaled),
+  // which is a heavier ring than the loop ever draws.
+  .omega-orbit__pulse {
+    opacity: 0.55;
+    animation: none;
+  }
+}

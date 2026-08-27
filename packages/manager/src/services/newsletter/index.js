@@ -14,9 +14,9 @@
  */
 const { chosenProvider } = require('@omega.js/config');
 
-const { REQUIRES } = require('../../config.js');
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { BeehiivAPI } = require('./lib/beehiiv-api.js');
 
 module.exports.run = createServiceRunner({
@@ -44,7 +44,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.beehiivApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.newsletter.env);
+      const gate = await requestServiceInput(context, serviceInputSpec('newsletter'));
       if (gate) return gate;
     }
 

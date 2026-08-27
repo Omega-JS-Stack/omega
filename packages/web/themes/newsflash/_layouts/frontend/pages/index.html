@@ -3,7 +3,7 @@ layout: frontend/core/base
 
 # Hero Section — the front-page lead. News voice: the brand IS the publication.
 hero:
-  tagline: "{{ site.brand.name }}: independent journalism"
+  tagline: "{{ resolved.config.brand.name }}: independent journalism"
   headline: "News with a"
   headline_accent: "pulse"
   description: "Sharp reporting and zero noise: the stories that matter, delivered before your coffee gets cold."
@@ -19,7 +19,6 @@ hero:
 # The Latest — the front-page feed (posts-driven; newsflash-specific section)
 latest:
   superheadline:
-    icon: "bolt"
     text: "The latest"
   view_all:
     text: "View the firehose"
@@ -28,17 +27,15 @@ latest:
 # More to Chew On — extra stories before the big read (posts-driven)
 more_stories:
   superheadline:
-    icon: "newspaper"
     text: "More to chew on"
 
 # The Rundown — the newsroom's three-step playbook (newsflash-specific section)
 rundown:
   superheadline:
-    icon: "list"
     text: "The rundown"
   headline: "Journalism worth your"
   headline_accent: "morning"
-  subheadline: "What you get from the {{ site.brand.name }} newsroom every single day"
+  subheadline: "What you get from the {{ resolved.config.brand.name }} newsroom every single day"
   items:
     - title: "Original reporting"
       description: "Stories researched and written by people who pick up the phone, not rewrites of someone else's scoop."
@@ -49,7 +46,7 @@ rundown:
 
 # Newsletter Rail (sidebar signup)
 newsletter:
-  headline: "{{ site.brand.name }}, daily."
+  headline: "{{ resolved.config.brand.name }}, daily."
   subheadline: "One ridiculously good email every morning. The stories that matter, minus the noise."
   button:
     text: "Join"
@@ -60,7 +57,6 @@ newsletter:
 # The Desks — coverage areas (newsflash-specific section)
 desks:
   superheadline:
-    icon: "newspaper"
     text: "The desks"
   headline: "Coverage with"
   headline_accent: "teeth"
@@ -101,11 +97,10 @@ stats:
 # CTA Section — the big-read band
 cta:
   superheadline:
-    icon: "bolt"
     text: "The big read"
   headline: "Don't just scroll the news."
   headline_accent: "Understand it."
-  subheadline: "Join the readers who start their day with {{ site.brand.name }}: reporting with teeth, context with heart, and zero filler."
+  subheadline: "Join the readers who start their day with {{ resolved.config.brand.name }}: reporting with teeth, context with heart, and zero filler."
   primary_button:
     text: "Start reading"
     icon: "bolt"
@@ -176,7 +171,7 @@ cta:
       <div class="col-lg-6" data-lazy="@class animation-slide-up">
         {% if site.posts.size > 0 %}
           {% assign featured = site.posts.first %}
-          <a href="{{ site.url }}{{ featured.url }}" class="newsflash-hero__art d-block position-relative text-decoration-none text-body">
+          <a href="{{ resolved.config.url }}{{ featured.url }}" class="newsflash-hero__art d-block position-relative text-decoration-none text-body">
             <span class="badge bg-body-tertiary newsflash-hero__chip">Featured</span>
             <div class="newsflash-frame shadow">
               {%- omega_post featured.post.id, "image-tag", class="w-100" -%}
@@ -209,12 +204,12 @@ cta:
 {% if site.posts.size > 1 %}
   <section class="pt-4">
     <div class="container">
-      {% component "heading/rule-head", text: "Top stories", link_text: "View all", link_href: site.url | append: "/blog" %}
+      {% component "heading/rule-head", text: "Top stories", link_text: "View all", link_href: resolved.config.url | append: "/blog" %}
       <div class="row g-4">
         {% for post in site.posts offset: 1 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
             {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
+            {% component "news/story-card", url: resolved.config.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
           </div>
         {% endfor %}
       </div>
@@ -243,7 +238,7 @@ cta:
       <div class="col-lg-7">
         <div>
           {% for post in site.posts offset: 4 limit: 5 %}
-            <a href="{{ site.url }}{{ post.url }}" class="newsflash-feed__item" data-lazy="@class animation-slide-up">
+            <a href="{{ resolved.config.url }}{{ post.url }}" class="newsflash-feed__item" data-lazy="@class animation-slide-up">
               <div class="newsflash-frame">
                 {%- omega_post post.post.id, "image-tag", class="w-100" -%}
               </div>
@@ -273,7 +268,7 @@ cta:
               <ol class="newsflash-rail__mostread list-unstyled mb-0">
                 {% for post in site.posts offset: 9 limit: 5 %}
                   <li>
-                    <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
+                    <a href="{{ resolved.config.url }}{{ post.url }}">{{ post.post.title }}</a>
                   </li>
                 {% endfor %}
               </ol>
@@ -317,7 +312,7 @@ cta:
         {% for post in site.posts offset: 14 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
             {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-            {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
+            {% component "news/story-card", url: resolved.config.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
           </div>
         {% endfor %}
       </div>

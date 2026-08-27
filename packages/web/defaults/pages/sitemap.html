@@ -18,12 +18,17 @@ sitemap:
     {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
     {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
     {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
+    {%- comment -%}#564: noindex and the sitemap are ONE decision — a page core/head.html
+    marks noindex (its own `meta.index: false`, its layout's, or the config `meta` section's)
+    is never listed here. The URL families head.html answers by url (`/page/N`, `/test/`) are
+    paginated defaults, which the render gate already keeps out of collections.{%- endcomment -%}
+    {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
     {%- if item.data.draft -%}{%- continue -%}{%- endif %}
   <url>
     {%- if item.url == '/' %}
-    <loc>{{ site.url }}</loc>
+    <loc>{{ resolved.config.url }}</loc>
     {%- else %}
-    <loc>{{ site.url }}{{ item.url }}</loc>
+    <loc>{{ resolved.config.url }}{{ item.url }}</loc>
     {%- endif %}
     <lastmod>{{ item.data.sitemap.lastmod | default: site.omega.date.iso }}</lastmod>
     <changefreq>{{ item.data.sitemap.changefreq | default: 'weekly' }}</changefreq>

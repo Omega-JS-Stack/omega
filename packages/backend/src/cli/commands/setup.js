@@ -23,6 +23,9 @@ const frameworkPackage = require('../../../package.json');
 // caller already knows.
 const { RULES_VERSION } = require('../utils/compile-rules');
 
+// The mode table (#584): custom-server targets scaffold no Firebase-only file.
+const { isCustomProject, FIREBASE_ONLY_SCAFFOLD } = require('../utils/project-type');
+
 class SetupCommand extends BaseCommand {
   async execute() {
     const self = this.main;
@@ -256,6 +259,12 @@ class SetupCommand extends BaseCommand {
     const templatesDir = path.resolve(`${__dirname}/../../../templates`);
     let touched = 0;
 
+    // Custom mode has no Functions deploy and no emulator, so the Firebase-only
+    // artifacts below are scaffolded away entirely (#614). The list lives with
+    // the mode table, next to the verbs the same mode refuses.
+    const custom = isCustomProject(self.firebaseProjectPath);
+    const skipsFirebaseFile = (file) => custom && FIREBASE_ONLY_SCAFFOLD.includes(file);
+
     // Config FIRST (friction #11: config → derived artifacts, so .firebaserc
     // below can read cloud.config.projectId). Inside a brand monorepo the target
     // carries NO omega.json5 at all — brand `targets.*` is the per-target home
@@ -280,7 +289,10 @@ class SetupCommand extends BaseCommand {
 
     // firebase.json — scaffold or migrate
     const firebaseJsonPath = `${self.firebaseProjectPath}/firebase.json`;
-    if (!hasContent(self.firebaseJSON)) {
+    if (skipsFirebaseFile('firebase.json')) {
+      // Nothing: not even the dist/ migration above, which would rewrite a
+      // file this mode never asked for.
+    } else if (!hasContent(self.firebaseJSON)) {
       const templatePath = path.join(templatesDir, 'firebase.json');
       jetpack.copy(templatePath, firebaseJsonPath);
       ui.status('add', `Created ${chalk.cyan('firebase.json')}`, { level: 2 });
@@ -321,7 +333,7 @@ class SetupCommand extends BaseCommand {
     // real source to splice the framework half into. Migration off a legacy
     // marker block + the hook lint belong to the firestore-rules-file check.
     const firestoreRulesPath = `${self.firebaseProjectPath}/firestore.rules`;
-    if (!jetpack.exists(firestoreRulesPath)) {
+    if (!skipsFirebaseFile('firestore.rules') && !jetpack.exists(firestoreRulesPath)) {
       jetpack.copy(path.join(templatesDir, 'firestore.rules'), firestoreRulesPath);
       ui.status('add', `Created ${chalk.cyan('firestore.rules')}`, { level: 2 });
       touched++;
@@ -331,7 +343,7 @@ class SetupCommand extends BaseCommand {
     // ENOENT without it (friction #9). The template ships the v0.0.0-stamped
     // marker block; the rules checks stamp the live version.
     const databaseRulesPath = `${self.firebaseProjectPath}/database.rules.json`;
-    if (!jetpack.exists(databaseRulesPath)) {
+    if (!skipsFirebaseFile('database.rules.json') && !jetpack.exists(databaseRulesPath)) {
       jetpack.copy(path.join(templatesDir, 'database.rules.json'), databaseRulesPath);
       ui.status('add', `Created ${chalk.cyan('database.rules.json')}`, { level: 2 });
       touched++;

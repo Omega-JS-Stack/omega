@@ -4,8 +4,10 @@
  * keys in a consumer page's frontmatter are STRIPPED from the cascade with a
  * warning — the build succeeds, but sections/components can never see the
  * values. The override lane doesn't silently work; it doesn't exist. Meta
- * keys (meta, sitemap, append) and plumbing (layout, permalink) stay legal,
- * and collection docs (_posts/…) are content entries the guard never touches.
+ * keys (meta, sitemap, append), the `config:` override block (#607) and
+ * plumbing (layout, permalink) stay legal, and collection docs (_posts/…) are
+ * content entries the guard never touches. A config section restated BARE is
+ * the one frontmatter mistake that FAILS the build — test/page-config-overrides.test.js.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -59,15 +61,16 @@ test('content keys in page frontmatter are stripped (never rendered) and warned 
 });
 
 // #1 — `client` (the @omega.js/client settings blob, renamed from the legacy
-// `web_manager`) is client MACHINERY configuration, the same class as `theme`
-// and `schema`: a page may set it, and the value must survive to resolved.client
-// with the layout chain still merging underneath it.
-test('a page may set `client` in frontmatter — it reaches resolved.client, layout chain merged underneath', async () => {
+// `web_manager`) is a CONFIG section, so #607 moved it under the page's
+// `config:` parent: a page may still set it, and the value must survive to
+// resolved.config.client with the layout chain still merging underneath it.
+test('a page may set `client` under `config:` — it reaches resolved.config.client, layout chain merged underneath', async () => {
   const { tmp, consumerDir } = makeConsumer([
-    'client:',
-    '  auth:',
-    '    config:',
-    '      policy: "authenticated"',
+    'config:',
+    '  client:',
+    '    auth:',
+    '      config:',
+    '        policy: "authenticated"',
   ], 'blueprint/auth/signin');
   const warnings = [];
   const originalWarn = console.warn;

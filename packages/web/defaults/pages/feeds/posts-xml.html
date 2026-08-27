@@ -12,25 +12,25 @@ sitemap:
   >
   <channel>
     <atom:link
-      href="{{ site.url }}/feeds/posts.xml"
+      href="{{ resolved.config.url }}/feeds/posts.xml"
       rel="self"
       type="application/rss+xml"
     />
-    <title><![CDATA[ {{ site.brand.name }} Blog ]]></title>
-    <description><![CDATA[ {{ site.brand.description }} ]]></description>
-    <link>{{ site.url }}/blog</link>
+    <title><![CDATA[ {{ resolved.config.brand.name }} Blog ]]></title>
+    <description><![CDATA[ {{ resolved.config.brand.description }} ]]></description>
+    <link>{{ resolved.config.url }}/blog</link>
     <generator>OMEGA (@omega.js/web)</generator>
     <lastBuildDate>{{ site.omega.date.iso | date: "%a, %d %b %Y %H:%M:%S" }} GMT</lastBuildDate>
     <language><![CDATA[ en ]]></language>
     {%- for post in collections.posts limit: 25 %}
     <item>
       <title><![CDATA[ {{ post.data.post.title | default: post.data.meta.title }} ]]></title>
-      <link>{{ site.url }}{{ post.url }}</link>
-      <guid isPermaLink="true">{{ site.url }}{{ post.url }}</guid>
+      <link>{{ resolved.config.url }}{{ post.url }}</link>
+      <guid isPermaLink="true">{{ resolved.config.url }}{{ post.url }}</guid>
       <pubDate>{{ post.date | date: "%a, %d %b %Y %H:%M:%S" }} GMT</pubDate>
       <description><![CDATA[ {{ post.data.post.description | default: post.data.meta.description }} ]]></description>
       <content:encoded><![CDATA[ {{ post.templateContent }} ]]></content:encoded>
-      <dc:creator><![CDATA[ {{ site.brand.name }} ]]></dc:creator>
+      <dc:creator><![CDATA[ {{ resolved.config.brand.name }} ]]></dc:creator>
       <category><![CDATA[ {{ post.data.post.categories | first }} ]]></category>
     </item>
     {%- endfor %}

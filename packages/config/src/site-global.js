@@ -4,17 +4,15 @@
  * SSG (plan §2: toSiteGlobal()).
  *
  * Scoped by the real-usage audit (2026-07-06) of UJM's theme/blueprints +
- * somiibo: config-owned keys referenced in templates are site.{brand, url,
- * theme, meta, socials, download, translation, extension, analytics,
- * client, icons, currency, advertising, …} — which is the resolved
+ * somiibo: config-owned keys referenced in templates are the resolved
  * config's own shape, so this is an identity mapping plus: machinery keys
  * stripped (`targets`, `enabled`), `url` derived (explicit url, else
- * brand.url), `baseurl` defaulted. ENGINE-owned keys (site.posts, site.pages,
- * site.data, site.time) are the SSG's job, not config's. `site.collections`
- * is NOT one of them (#207): it is the config-carried collections
- * DECLARATION (`targets.web.collections`), which rides the identity mapping
- * like any other section and which the engine reads to generate each
- * declared collection's pages.
+ * brand.url), `baseurl` defaulted. ENGINE-owned keys (posts, pages, data,
+ * time) are the SSG's job, not config's. `collections` is NOT one of them
+ * (#207): it is the config-carried collections DECLARATION
+ * (`targets.web.collections`), which rides the identity mapping like any
+ * other section and which the engine reads to generate each declared
+ * collection's pages.
  *
  * The resolved config for target 'web' already overlays targets.web onto the
  * top level, so web-specific sections land here automatically.
@@ -22,10 +20,13 @@
  * site.targets (#85) is a CURATED view of the raw `targets` machinery —
  * an explicit allow-list of display-safe facts (presence, the derived
  * desktop releases URL, extension store listings), never a spread of the
- * raw config. It also feeds the download/extension pages: when the config
- * carries no explicit `download`/`extension` page map, site.download and
- * site.extension derive from the targets so those pages populate with no
- * hand-supplied links. An explicit map always wins.
+ * raw config. It is the ONLY home of those facts
+ * ([#610](https://github.com/Omega-JS-Stack/omega/issues/610)): the
+ * `/download` page, the `/extension` page and the shortlink generator all
+ * read `site.targets.desktop.releasesUrl` and
+ * `site.targets.extension.listings` directly. The legacy UJM-shaped
+ * `download`/`extension` page maps — and the derivation that filled them —
+ * are gone; the validator refuses a config still carrying either key.
  *
  * The desktop derivation is OPT-IN (#124): only a brand that carries a
  * `targets.desktop.releases` block gets releases/latest links — merely
@@ -131,46 +132,6 @@ function curateTarget(name, config) {
 }
 
 /**
- * The download-page map derived from the desktop target once releases are
- * opted in: every desktop platform points at the releases hub (the exact
- * shape brands hand-wrote before #85). Mobile platforms stay absent — MAM
- * is parked.
- * @param {object} config - resolved config object
- * @returns {object|undefined}
- */
-function deriveDownload(config) {
-  if (!desktopReleasesEnabled(config)) return undefined;
-
-  const url = desktopReleasesUrl(config);
-  if (!url) return undefined;
-
-  return {
-    mac: { universal: url },
-    windows: { universal: url },
-    linux: { debian: url, snap: url },
-  };
-}
-
-/**
- * The extension-page map derived from the extension target's store
- * listings: site.extension[browser.id] is the store URL the theme reads.
- * Listings without a url derive nothing.
- * @param {object} config - resolved config object
- * @returns {object|undefined}
- */
-function deriveExtension(config) {
-  const listings = targetEntry(config, 'extension')?.listings;
-  if (!listings) return undefined;
-
-  const map = {};
-  for (const [store, entry] of Object.entries(listings)) {
-    if (entry?.url) map[store] = entry.url;
-  }
-
-  return Object.keys(map).length ? map : undefined;
-}
-
-/**
  * Convert a RESOLVED config (loadConfig(...).config) into the site.* global.
  * @param {object} config - resolved config object
  * @returns {object} the site global (new object; config is not mutated)
@@ -193,16 +154,6 @@ function toSiteGlobal(config) {
     for (const name of Object.keys(targets)) {
       site.targets[name] = curateTarget(name, config);
     }
-  }
-
-  // Derived page maps (#85) — an explicit config map always wins.
-  if (!site.download) {
-    const derived = deriveDownload(config);
-    if (derived) site.download = derived;
-  }
-  if (!site.extension) {
-    const derived = deriveExtension(config);
-    if (derived) site.extension = derived;
   }
 
   return site;

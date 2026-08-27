@@ -1,0 +1,29 @@
+{% comment %} The price card's feature bullets — the ONE home of the list
+/pricing's plan cards, its one-time cards and the homepage plan band all
+render (#539). A feature the catalog gave a `definition` becomes the
+dotted-underline hover target Bootstrap's tooltip engine binds (the themes
+initialize tooltips page-wide, so the affordance works anywhere the list
+lands); a feature without one stays plain text. Values print through
+omega_commaify, which passes non-numeric strings ("Unlimited", "24/7")
+through untouched — then escape_once, because a catalog value is TEXT and a
+literal `<` must never open a tag the minifier can eat (#580). {% endcomment %}
+{% if args.features.size > 0 %}
+  <ul class="omega-price-card__features">
+    {% for feature in args.features %}
+      <li>
+        <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
+        <span>
+          {% if feature.value and feature.value != true %}
+            {{ feature.value | omega_commaify | escape_once }}
+          {% endif %}
+          {% iftruthy feature.definition %}
+            <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
+          {% endiftruthy %}
+          {% iffalsy feature.definition %}
+            {{ feature.name }}
+          {% endiffalsy %}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}

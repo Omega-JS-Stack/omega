@@ -257,8 +257,21 @@ function setupScripts() {
   // The gulp `webpack` task emits dist/main.bundle.js; the consumer's src/main.js is the *source* entry.
   project.main = 'dist/main.bundle.js';
 
-  jetpack.write(path.join(process.cwd(), 'package.json'), project);
+  // Save the project — npm's own shape, trailing newline included. `jetpack.write`
+  // emits none, and this used to write unconditionally, so every build (clean &&
+  // setup && gulp) re-stripped the newline a consumer's editor or lint hook put
+  // back. Identical content is not a write (#590).
+  const projectPath = path.join(process.cwd(), 'package.json');
+  const contents = `${JSON.stringify(project, null, 2)}\n`;
+
+  if (jetpack.read(projectPath) === contents) {
+    return;
+  }
+
+  jetpack.write(projectPath, contents);
 }
+// Exported for the build-layer package.json write test (#590).
+module.exports.setupScripts = setupScripts;
 
 async function copyDefaults(targetDir) {
   const defaultsDir = path.resolve(__dirname, '..', 'defaults');

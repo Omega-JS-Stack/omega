@@ -7,7 +7,7 @@ sitemap:
 meta:
   index: false
 ---
-{% capture url %}{{ resolved.redirect.url | default: site.url | omega_liquify }}{% endcapture %}
+{% capture url %}{{ resolved.redirect.url | default: resolved.config.url | omega_liquify }}{% endcapture %}
 {% capture querystring %}{{ resolved.redirect.querystring }}{% endcapture %}
 
 <!-- Self-contained, token-driven — no page css bundle on redirect URLs -->
@@ -87,8 +87,8 @@ meta:
 <section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
   <div class="omega-redirect">
     <!-- Brand mark -->
-    <a class="omega-redirect__mark" href="/" aria-label="{{ site.brand.name }}">
-      <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" alt="{{ site.brand.name }}"/>
+    <a class="omega-redirect__mark" href="/" aria-label="{{ resolved.config.brand.name }}">
+      <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }}"/>
     </a>
 
     <!-- Header -->
@@ -125,7 +125,7 @@ meta:
 <div id="redirect-config" style="display: none;"
   data-url="{{ url }}"
   data-querystring="{{ querystring }}"
-  data-site-url="{{ site.url }}"
+  data-site-url="{{ resolved.config.url }}"
   data-environment="{{ jekyll.environment }}">
 </div>
 

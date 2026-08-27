@@ -1,5 +1,5 @@
 {
   description: 'Test hero',
   args: { headline: 'string', tag: 'string', items: 'array', flag: 'boolean', body: 'html' },
-  defaults: { headline: 'Default {{ site.brand.name }}', tag: 'default-tag', body: '<i>default-body</i>' },
+  defaults: { headline: 'Default {{ resolved.config.brand.name }}', tag: 'default-tag', body: '<i>default-body</i>' },
 }

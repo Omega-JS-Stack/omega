@@ -12,12 +12,12 @@ social_signin:
     <div class="omega-auth__card">
       <!-- Logo -->
       <div class="omega-auth__brand">
-        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+        <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
       <h1 class="omega-auth__title">Welcome back</h1>
-      <p class="omega-auth__sub">Sign in to your {{ site.brand.name }} account</p>
+      <p class="omega-auth__sub">Sign in to your {{ resolved.config.brand.name }} account</p>
 
       <!-- Spinner -->
       {% capture initializing_spinner %}<span class="spinner-border spinner-border-sm me-2 form-initializing-spinner"></span>{% endcapture %}

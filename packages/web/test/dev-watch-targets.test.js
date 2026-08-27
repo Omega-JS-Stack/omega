@@ -130,7 +130,7 @@ function app(t) {
 function stubConfig() {
   const watched = [];
   const noop = () => {};
-  return {
+  const config = {
     watched,
     addWatchTarget: (target, options) => watched.push({ target, options }),
     setLiquidOptions: noop,
@@ -143,9 +143,12 @@ function stubConfig() {
     addTransform: noop,
     addTemplate: noop,
     addCollection: noop,
+    // Eleventy hands a function plugin the config itself (#488's slugifier).
+    addPlugin: (plugin, ...args) => plugin(config, ...args),
     on: noop,
     ignores: new Set(),
   };
+  return config;
 }
 
 // Does a watcher over `dir` see events for `target`? (Watch targets are

@@ -1,34 +1,34 @@
 ---
 layout: frontend/core/base
 
-theme:
-  nav:
-    enabled: false
-  footer:
-    enabled: false
-
 meta:
   title: "Animation Studio"
   index: false
 sitemap:
   include: false
 
-client:
-  auth:
-    config:
-      policy: "authenticated"
-  consent:
-    enabled: false
-  chatsy:
-    enabled: false
-  exitPopup:
-    enabled: false
+config:
+  theme:
+    nav:
+      enabled: false
+    footer:
+      enabled: false
+  client:
+    auth:
+      config:
+        policy: "authenticated"
+    consent:
+      enabled: false
+    chatsy:
+      enabled: false
+    exitPopup:
+      enabled: false
 ---
 
 <div id="studio" hidden>
   <!-- Clip selector sidebar -->
   <nav id="studio-nav">
-    <div class="studio-brand">{{ site.brand.name }} Studio</div>
+    <div class="studio-brand">{{ resolved.config.brand.name }} Studio</div>
     <div class="studio-clips" id="studio-clips">
       <!-- Populated by JS from registered clips -->
     </div>

@@ -1,0 +1,30 @@
+{
+  description: 'The price card feature bullets — one green check per feature, the catalog\'s value ahead of its name, and the hover explanation a feature `definition` earns (dotted underline + tooltip). A COMPONENT because three surfaces render the same list: /pricing\'s plan cards, its one-time cards, and the homepage plan band (`marketing/pricing-cards`) — one home, so the hover surface can never exist on one and not the other (#539). The caller owns everything around the list, including the tier-note line above it — which reads `and:` on every surface (Ian 2026-08-24).',
+
+  args: {
+    features: 'array', // composed feature view-models — resolved.pricing plan/product `features`, never hand-authored
+  },
+
+  defaults: {
+    // No feature defaults, ever: a feature a brand does not sell is fiction,
+    // and the catalog is the one source (C2). An empty list renders nothing.
+    features: [],
+  },
+
+  // Showcase variants (spec §9): the list is catalog-driven, so the demo
+  // bridges feature view-models the way the pricing composer emits them.
+  demo: [
+    {
+      label: 'With a definition',
+      stage_class: 'omega-price-card',
+      args: {
+        features: [
+          { id: 'requests', name: 'Requests', value: 10000, definition: 'API requests per month.' },
+          { id: 'seats', name: 'Seats', value: 10 },
+          { id: 'projects', name: 'Projects', value: 'Unlimited' },
+          { id: 'support', name: 'Priority support', value: true },
+        ],
+      },
+    },
+  ],
+}

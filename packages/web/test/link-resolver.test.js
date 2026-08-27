@@ -137,6 +137,47 @@ test('#430: the exception list is a conventional file — absent is empty, malfo
   assert.throws(() => loadLinkExceptions(root), /must be an object of/);
 });
 
+test('#521: an href DISPLAYED as escaped code is not a link the page emits', () => {
+  // The section gallery prints a variant's args as a copyable `<pre><code>`
+  // block, so a demo variant carrying markup with a link had its escaped
+  // `href=` read as a real anchor and reported unresolvable — the variant had
+  // to be authored as a <button> to pass.
+  const { out } = tmpTarget({
+    ...CLEAN,
+    'gallery.html': '<html><body>'
+      + '<pre class="border rounded"><code>{ "content": "&lt;a href=&quot;/nowhere&quot;&gt;Apply theme&lt;/a&gt;" }</code></pre>'
+      + '</body></html>',
+    // The same URL in a REAL anchor is still the failure it always was.
+    'real.html': page('/nowhere'),
+  });
+
+  assert.deepStrictEqual(checkDistLinks({ distDir: out }).offenders, [
+    '/nowhere (linked from real.html)',
+  ]);
+});
+
+test('#490: the exception list is json5 — the WHY lives beside the entry', () => {
+  const { root } = tmpTarget(CLEAN);
+
+  // An exception is a last resort, so the reason it exists has to travel with
+  // it: strict JSON left every rationale in some worksheet the file never sees.
+  jetpack.write(path.join(root, EXCEPTIONS_FILE), [
+    '{',
+    '  // #488: the tag cloud links a slug the taxonomy page is not emitted at.',
+    '  "blog/tags.html": [\'/blog/tags/a-and-r\'],',
+    '}',
+  ].join('\n'));
+
+  assert.deepStrictEqual(loadLinkExceptions(root), { 'blog/tags.html': ['/blog/tags/a-and-r'] });
+});
+
+test('#490: a leftover strict-JSON exception list is named, never silently ignored', () => {
+  const { root } = tmpTarget(CLEAN);
+  jetpack.write(path.join(root, path.join('config', 'link-exceptions.json')), { 'admin.html': ['/admin/legacy'] });
+
+  assert.throws(() => loadLinkExceptions(root), /link-exceptions\.json5/);
+});
+
 test('#430: `omega test` surfaces the check as smoke-check failures', () => {
   const { root, out } = tmpTarget({ ...CLEAN, 'index.html': page('/', '/spotify') });
 

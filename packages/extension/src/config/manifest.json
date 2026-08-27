@@ -67,15 +67,18 @@
   },
 
   // Web accessible resources
-  // The dev-website origin is BUILD-TIME-BAKED by design (N7 non-goal: a
-  // shipped extension can't probe ports). The token resolves at package time to
-  // the origin the LIVE sibling website published — protocol and port both —
-  // and to the classic https://localhost:4000 when nothing is running. If your
-  // `omega dev` bumped, rebuild while it's running (or pin `ports.website` in
-  // the brand config) so both sides agree.
+  // Origins allowed to message this extension. BUILD-TIME-BAKED by design (N7
+  // non-goal: a shipped extension can't probe ports), and RESOLVED at package
+  // time, never a literal: the brand's own origin (from `brand.url`) always,
+  // plus the live sibling website's dev origin — protocol and port both, the
+  // classic https://localhost:4000 when nothing is running — in dev only. A
+  // packaged build used to ship the localhost origin alone, so the brand site
+  // could not message the published extension (#583). If your `omega dev`
+  // bumped, rebuild while it's running (or pin `ports.website` in the brand
+  // config) so both sides agree.
   externally_connectable: {
     matches: [
-      '%%%devWebsiteOrigin%%%/*',
+      %%%externallyConnectableOrigins%%%
     ],
   },
 

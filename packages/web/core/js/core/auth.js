@@ -1,6 +1,6 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
-import { identify } from '__main_assets__/js/libs/analytics.js';
+import { identify, readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth');
@@ -249,8 +249,22 @@ function updateAuthLinks() {
   });
 }
 
-// Send user metadata to server (affiliate, UTM params, etc.)
-async function sendUserSignupMetadata(account) {
+/**
+ * Send user metadata to server (affiliate, UTM params, etc.)
+ *
+ * This is also the request the SERVER half of `sign_up` fires from
+ * ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)): it is the only
+ * moment the backend hears from the browser that just registered, so its IP, its
+ * user agent and the platform cookies below are the entire match quality of
+ * every registration the brand reports. Meta scored it around 4/10 while this
+ * payload carried no cookies and the fire came off the auth trigger instead.
+ *
+ * Exported for testing — the payload is a contract with `routes/user/signup`.
+ *
+ * @param {object} account - The signed-in account doc (its `flags.signupProcessed` gates the post).
+ * @returns {Promise<void>}
+ */
+export async function sendUserSignupMetadata(account) {
   try {
     // Skip on auth pages to avoid blocking redirect (metadata will be sent on destination page)
     const pagePath = document.documentElement.getAttribute('data-page-path');
@@ -273,8 +287,16 @@ async function sendUserSignupMetadata(account) {
       return;
     }
 
-    // Get attribution data from storage
-    const attribution = omega.storage().get('attribution', {});
+    // Get attribution data from storage, plus the platform cookies as they
+    // stand right now. Read FRESH through the ONE reader the checkout intent
+    // uses and never persisted — a stale `_fbc` would match the wrong click —
+    // and carried under `attribution.cookies`, the shape the intent already
+    // sends and `match-data.js` already reads.
+    const storedAttribution = omega.storage().get('attribution', {});
+    const cookies = readPlatformCookies();
+    const attribution = Object.keys(cookies).length
+      ? { ...storedAttribution, cookies }
+      : storedAttribution;
     const consent = omega.storage().get('consent', {});
     // The tracking-consent snapshot: its own key and its own payload field, stored
     // verbatim beside attribution. Distinct from `consent` above, which is the

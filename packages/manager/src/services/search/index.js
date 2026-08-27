@@ -13,8 +13,10 @@
  * webmasters + siteverification scopes ride the same file). No credentials →
  * the service skips.
  */
+const { serviceInputSpec } = require('../../config.js');
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { GoogleSearchConsoleAPI } = require('./lib/search-console-api.js');
@@ -33,8 +35,11 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    if (!context.searchConsoleApi && (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)) {
-      return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
+    // The shared setup contract (#608) — provide, skip this run, or disable
+    // the service for good; a headless run steps aside loudly.
+    if (!context.searchConsoleApi) {
+      const gate = await requestServiceInput(context, serviceInputSpec('search'));
+      if (gate) return gate;
     }
 
     const apexDomain = getApexDomain(domain);

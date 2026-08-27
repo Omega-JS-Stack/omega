@@ -1,0 +1,43 @@
+{% comment %}
+  A gallery INDEX's listing (#602) — one row per resolved entry of ONE kind,
+  grouped by its category folder, linking that entry's own page. The two
+  galleries mirror each other, so this is ONE home: a listing that grows a
+  column grows it on both, and neither can drift into describing its library
+  differently.
+
+  Auto-generated from the resolved library: a new `_sections`/`_components`
+  folder appears here with zero authoring, and each row chips the layer that
+  owns it (a consumer override says `consumer`).
+
+  Development-only surface (the engine gates the whole `defaults/showcase/`
+  dir), so it reads the sectionLibrary global directly. Neutral Bootstrap
+  vocabulary, like the pages around it.
+
+  In:  include.kind — which library to list ('section' / 'component')
+{% endcomment %}
+{% for group in sectionLibrary.groups %}
+  {% if group.kind == include.kind %}
+    <div class="d-flex align-items-baseline gap-2 border-bottom pb-2 mb-3">
+      <h2 class="h5 mb-0 text-capitalize">{{ group.kind }}s</h2>
+      <code class="text-muted">{{ group.category }}/</code>
+    </div>
+
+    <ul class="list-unstyled mb-4">
+      {% for entry in group.entries %}
+        <li class="border-bottom py-3">
+          <a href="{{ entry.url }}" class="d-flex align-items-center gap-2 text-decoration-none mb-1">
+            <code>{{ entry.id }}</code>
+            <span class="badge text-bg-secondary ms-auto">{{ entry.source }}</span>
+          </a>
+          {% comment %} description arrives HTML-escaped from the collector — print verbatim {% endcomment %}
+          <p class="small text-muted mb-1">{{ entry.description | truncate: 200 }}</p>
+          <p class="small text-body-secondary mb-0">
+            {{ entry.argsTable.size }} args
+            · {{ entry.demo.size }} demo{% if entry.demo.size != 1 %}s{% endif %}
+            {% if entry.inherit.size > 0 %}· inherits {{ entry.inherit | join: ", " }}{% endif %}
+          </p>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endfor %}

@@ -25,7 +25,9 @@
     }
   }
 
-  h1 {
+  // Keyed on the CLASS, not the tag: the headline's level is an arg (#500),
+  // so a hero-shaped band below the fold wears the same display at h2.
+  .omega-display--hero {
     margin-inline: auto;
     margin-bottom: 0;
     max-width: 17ch;
@@ -108,6 +110,40 @@
     font-size: 0.78125rem;
     font-weight: 550;
     color: var(--omega-ink-muted);
+  }
+
+  // ── Side demo placement (demo.placement: side) ─────────────────────────────
+  // Copy and demo share the opener on wide screens; narrow keeps the centred
+  // stack the default hero has always had — a phone has no side.
+  .omega-hero__split {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+
+    @media (min-width: 992px) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 4rem;
+    }
+  }
+
+  &.omega-hero--side {
+    @media (min-width: 992px) {
+      text-align: start;
+
+      .omega-display--hero {
+        margin-inline: 0;
+        max-width: 14ch;
+      }
+
+      .omega-hero__sub {
+        margin-inline: 0;
+      }
+
+      .omega-hero__ctas,
+      .omega-hero__meta {
+        justify-content: flex-start;
+      }
+    }
   }
 }
 

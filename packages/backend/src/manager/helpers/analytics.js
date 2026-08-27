@@ -1,6 +1,7 @@
 const fetch = require('wonderful-fetch');
 const moment = require('moment');
-const { hashEmail, hashName, hashPhoneE164 } = require('../libraries/analytics/match-data.js');
+const { hashEmail, hashPhoneE164, hashGA4Name, hashGA4Street, ga4Place, ga4PostalCode, ga4Country } = require('../libraries/analytics/match-data.js');
+const env = require('../libraries/env.js');
 let uuidv5;
 
 const UUID_REGEX = /[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}/;
@@ -157,18 +158,27 @@ function Analytics(Manager, options) {
     // spec is written down once: GA4's Measurement Protocol hashes E.164 WITH
     // the plus, the same digest TikTok takes.
     sha256_phone_number: hashPhoneE164(authUser?.personal?.telephone) || undefined,
+    // GA4's ADDRESS block, every key normalized by GA4's own rule and no other
+    // platform's ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)):
+    // names and street hashed with digits and symbols removed; city, region,
+    // postal code and country in the CLEAR, the country uppercase. The rules
+    // live with the other match specs (`libraries/analytics/match-data.js`).
+    //
+    // The ACCOUNT's own location wins over the request's geolocation: an
+    // address is where the person is, not where the exit node they browsed
+    // through is — but the request stays the fallback, because a signed-in
+    // account that never filled in a profile still has a city worth sending.
     address: {
-      // Names were hashed RAW, the same silent miss the email had (#403):
-      // GA4's user-data spec matches the digest of the trimmed, lowercased
-      // name, so an account storing `Ada` never met a platform holding `ada`.
-      // Same home as the email and the phone above.
-      sha256_first_name: hashName(authUser?.personal?.name?.first) || undefined,
-      sha256_last_name: hashName(authUser?.personal?.name?.last) || undefined,
-      // sha256_street: TODO,
-      city: self.request.city || undefined,
-      region: self.request.region || undefined,
-      // postal_code: TODO,
-      country: self.request.country || undefined,
+      // Names were hashed RAW, the same silent miss the email had (#403): GA4
+      // matches the digest of the normalized name, so an account storing `Ada`
+      // never met a platform holding `ada`.
+      sha256_first_name: hashGA4Name(authUser?.personal?.name?.first) || undefined,
+      sha256_last_name: hashGA4Name(authUser?.personal?.name?.last) || undefined,
+      sha256_street: hashGA4Street(authUser?.personal?.location?.street) || undefined,
+      city: ga4Place(authUser?.personal?.location?.city || self.request.city) || undefined,
+      region: ga4Place(authUser?.personal?.location?.region || self.request.region) || undefined,
+      postal_code: ga4PostalCode(authUser?.personal?.location?.zip) || undefined,
+      country: ga4Country(authUser?.personal?.location?.country || self.request.country) || undefined,
     }
   }
 
@@ -180,7 +190,7 @@ function Analytics(Manager, options) {
 
   // Set id and secret
   self.analyticsId = self?.Manager?.config?.analytics?.providers?.google?.id;
-  self.analyticsSecret = process.env.GOOGLE_ANALYTICS_SECRET;
+  self.analyticsSecret = env.get('GOOGLE_ANALYTICS_SECRET');
 
   // Check if we have the required properties
   if (!self.analyticsId) {
@@ -225,7 +235,7 @@ Analytics.prototype.generateId = function (id) {
   uuidv5 = uuidv5 || require('uuid').v5;
 
   // Get namespace
-  const namespace = process.env.OMEGA_NAMESPACE || undefined;
+  const namespace = env.get('OMEGA_NAMESPACE') || undefined;
 
   // Generate id
   return id && namespace

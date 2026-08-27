@@ -120,7 +120,6 @@ test('a present releases block opts in (enabled defaults true)', () => {
   for (const releases of [{}, { enabled: true }, { repo: 'acme-site' }]) {
     const site = toSiteGlobal({ ...base, targets: { desktop: { releases } } });
     assert.strictEqual(site.targets.desktop.releasesUrl, url);
-    assert.strictEqual(site.download.mac.universal, url);
   }
 });
 
@@ -131,19 +130,7 @@ test('releases.enabled false always suppresses the derivation', () => {
     targets: { desktop: { releases: { enabled: false, repo: 'update-server' } } },
   });
 
-  assert.deepStrictEqual(site.targets.desktop, { enabled: true });
-  assert.strictEqual(site.download, undefined);
-});
-
-test('an explicit download map still wins on a suppressed (or bare) desktop target', () => {
-  const explicit = { mac: { universal: 'https://acme.com/dl/mac' } };
-  const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } }, download: explicit };
-
-  assert.deepStrictEqual(toSiteGlobal({ ...base, targets: { desktop: {} } }).download, explicit);
-  assert.deepStrictEqual(
-    toSiteGlobal({ ...base, targets: { desktop: { releases: { enabled: false } } } }).download,
-    explicit,
-  );
+  assert.deepStrictEqual(site.targets.desktop, { enabled: true }, 'no releasesUrl — the download page has nothing to point at');
 });
 
 test('double application is idempotent for a bare and a suppressed desktop target', () => {
@@ -155,7 +142,7 @@ test('double application is idempotent for a bare and a suppressed desktop targe
     });
     const twice = toSiteGlobal(once);
 
-    assert.strictEqual(once.download, undefined);
+    assert.strictEqual(once.targets.desktop.releasesUrl, undefined);
     assert.deepStrictEqual(twice, once);
   }
 });
@@ -178,61 +165,45 @@ test('exposes extension listings on site.targets.extension', () => {
   assert.strictEqual(site.targets.extension.listings.firefox.url, 'https://addons.mozilla.org/x');
 });
 
-// ── derived page maps (#85): templates keep reading site.download / site.extension ──
+// ── the curated view is the ONE home (#610): no derived page maps ──
 
-test('derives site.download from the desktop target when no explicit map exists', () => {
+test('#610: the site data carries NO download or extension page map — site.targets is the only home', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
     repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
-    targets: { desktop: { releases: {} } },
-  });
-
-  const url = 'https://github.com/Omega-JS-Stack/omega-playground/releases/latest';
-  // The exact shape the playground hand-wrote (mobile stays absent — MAM is parked).
-  assert.deepStrictEqual(site.download, {
-    mac: { universal: url },
-    windows: { universal: url },
-    linux: { debian: url, snap: url },
-  });
-});
-
-test('explicit download map wins over the derivation', () => {
-  const explicit = { mac: { universal: 'https://acme.com/dl/mac' } };
-  const site = toSiteGlobal({
-    brand: { id: 'acme' },
-    repo: { providers: { github: { org: 'Acme-Org' } } },
-    download: explicit,
-    targets: { desktop: { releases: {} } },
-  });
-
-  assert.deepStrictEqual(site.download, explicit);
-});
-
-test('no desktop target (or no derivable URL) leaves site.download absent', () => {
-  assert.strictEqual(toSiteGlobal({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'X' } } } }).download, undefined);
-  assert.strictEqual(
-    toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { releases: {} } } }).download,
-    undefined,
-  );
-});
-
-test('derives site.extension store URLs from listings when no explicit map exists', () => {
-  const site = toSiteGlobal({
-    brand: { id: 'acme' },
     targets: {
-      extension: {
-        listings: {
-          chrome: { url: 'https://chromewebstore.google.com/detail/x', state: 'live' },
-          edge: { url: 'https://microsoftedge.microsoft.com/addons/x' },
-        },
-      },
+      desktop: { releases: {} },
+      extension: { listings: { chrome: { url: 'https://chromewebstore.google.com/detail/x', state: 'live' } } },
     },
   });
 
-  assert.deepStrictEqual(site.extension, {
-    chrome: 'https://chromewebstore.google.com/detail/x',
-    edge: 'https://microsoftedge.microsoft.com/addons/x',
+  // Two homes for one fact is what #610 closed: the /download page, the
+  // /extension page and the shortlink generator all read site.targets now.
+  assert.strictEqual(site.download, undefined, 'no derived download map');
+  assert.strictEqual(site.extension, undefined, 'no derived extension map');
+  assert.strictEqual(
+    site.targets.desktop.releasesUrl,
+    'https://github.com/Omega-JS-Stack/omega-playground/releases/latest',
+    'the desktop releases URL is the ONE download fact',
+  );
+  assert.deepStrictEqual(
+    site.targets.extension.listings,
+    { chrome: { url: 'https://chromewebstore.google.com/detail/x', state: 'live' } },
+    'the store listings are the ONE extension fact',
+  );
+});
+
+test('#610: a config still carrying the legacy keys keeps nothing — they are not site data', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme' },
+    download: { mac: { universal: 'https://acme.com/dl/mac' } },
+    extension: { chrome: 'https://acme.com/ext' },
+    targets: { desktop: { releases: {} } },
   });
+
+  // The identity map still copies whatever the config carries — the validator
+  // is what refuses the keys; nothing DERIVES into them any more.
+  assert.strictEqual(site.targets.desktop.enabled, true);
 });
 
 test('double application is idempotent — the build pipeline applies toSiteGlobal twice', () => {
@@ -267,8 +238,6 @@ test('array-form (multi-instance) targets derive nothing — presence only', () 
   // Which instance's facts belong on the site is ambiguous — never guess a URL.
   assert.deepStrictEqual(site.targets.desktop, { enabled: true });
   assert.deepStrictEqual(site.targets.extension, { enabled: true });
-  assert.strictEqual(site.download, undefined);
-  assert.strictEqual(site.extension, undefined);
 });
 
 test('empty listing entries stay absent from the curated view', () => {
@@ -280,17 +249,8 @@ test('empty listing entries stay absent from the curated view', () => {
   assert.strictEqual(site.targets.extension.listings.firefox.url, 'https://addons.mozilla.org/x');
 });
 
-test('explicit extension map wins; listings without urls derive nothing', () => {
-  const explicit = { chrome: 'https://acme.com/ext' };
-  assert.deepStrictEqual(
-    toSiteGlobal({
-      extension: explicit,
-      targets: { extension: { listings: { chrome: { url: 'https://store/x' } } } },
-    }).extension,
-    explicit,
-  );
-  assert.strictEqual(
-    toSiteGlobal({ targets: { extension: { listings: { chrome: { state: 'pending' } } } } }).extension,
-    undefined,
-  );
+test('a listing with no url still rides the curated view — its state is the page\'s answer', () => {
+  const site = toSiteGlobal({ targets: { extension: { listings: { chrome: { state: 'pending' } } } } });
+
+  assert.deepStrictEqual(site.targets.extension.listings, { chrome: { state: 'pending' } });
 });

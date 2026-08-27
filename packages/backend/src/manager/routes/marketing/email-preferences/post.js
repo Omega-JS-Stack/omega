@@ -20,6 +20,7 @@
  */
 const fetch = require('wonderful-fetch');
 const crypto = require('crypto');
+const env = require('../../../libraries/env.js');
 
 const RATE_LIMIT = 5;
 
@@ -134,7 +135,7 @@ async function handleAnonymous({ ctx, Manager, settings, analytics }) {
   }
 
   // HMAC validation (proves we generated this link)
-  const expectedSig = crypto.createHmac('sha256', process.env.UNSUBSCRIBE_HMAC_KEY).update(email).digest('hex');
+  const expectedSig = crypto.createHmac('sha256', env.require('UNSUBSCRIBE_HMAC_KEY')).update(email).digest('hex');
   if (settings.sig !== expectedSig) {
     return ctx.respond('Invalid signature', { code: 403 });
   }
@@ -170,7 +171,7 @@ async function handleAnonymous({ ctx, Manager, settings, analytics }) {
       await fetch(`https://api.sendgrid.com/v3/asm/groups/${asmId}/suppressions`, {
         method: 'POST',
         response: 'json',
-        headers: { 'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}` },
+        headers: { 'Authorization': `Bearer ${env.get('SENDGRID_API_KEY')}` },
         timeout: 60000,
         body: { recipient_emails: [email] },
       });
@@ -180,7 +181,7 @@ async function handleAnonymous({ ctx, Manager, settings, analytics }) {
       await fetch(`https://api.sendgrid.com/v3/asm/groups/${asmId}/suppressions/${encodeURIComponent(email)}`, {
         method: 'DELETE',
         response: 'text',
-        headers: { 'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}` },
+        headers: { 'Authorization': `Bearer ${env.get('SENDGRID_API_KEY')}` },
         timeout: 60000,
       });
     }

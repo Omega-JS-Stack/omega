@@ -8,7 +8,7 @@ layout: frontend/core/base
 hero:
   headline: "We make complex things <em>feel simple</em>"
   headline_accent: ""
-  description: "The people and stubborn opinions behind {{ site.brand.name }}."
+  description: "The people and stubborn opinions behind {{ resolved.config.brand.name }}."
   image: ""
   image_alt: ""
 
@@ -34,14 +34,13 @@ letter:
 # Story Timeline Section
 story:
   superheadline:
-    icon: "clock-rotate-left"
     text: "History"
   headline: "Follow our <em>journey</em>"
   subheadline: "The moments that shaped how we work."
   items:
   - year: "2017"
     title: "The beginning"
-    description: "{{ site.brand.name }} was founded with a vision to revolutionize the industry"
+    description: "{{ resolved.config.brand.name }} was founded with a vision to revolutionize the industry"
   - year: "2018"
     title: "Rapid growth"
     description: "Expanded our team and launched our flagship platform to thousands of users"
@@ -74,10 +73,11 @@ gallery:
     alt: "Placeholder artwork in soft green tones"
     caption: "Plans in pencil"
 
-# Company facts — the hero rail (numbers count up on reveal)
+# Company facts — the hero rail (numbers count up on reveal). The
+# superheadline/headline/subheadline are the band's own head, rendered above
+# the rail; null any of them out and the rail runs bare.
 stats:
   superheadline:
-    icon: "chart-line"
     text: "Numbers"
   headline: "Measuring our <em>impact</em>"
   subheadline: "The milestones that define our growth"
@@ -98,7 +98,6 @@ stats:
 # Company Values Section — rendered as the numbered principles list
 values:
   superheadline:
-    icon: "compass"
     text: "Principles"
   headline: "What we <em>refuse</em> to compromise on"
   subheadline: "Four principles, in order. When two collide, the smaller number wins."
@@ -119,16 +118,15 @@ values:
 # Team CTA Section
 team_cta:
   superheadline:
-    icon: "handshake"
     text: "People"
-  headline: "Meet the people behind {{ site.brand.name }}"
+  headline: "Meet the people behind {{ resolved.config.brand.name }}"
   subheadline: "The people who build and run it, every day."
   primary_button:
     text: "Meet the team"
     href: "/team"
 ---
 {% composition %}
-{% section "about/hero", data: resolved.hero, facts: resolved.stats.items %}
+{% section "about/hero", data: resolved.hero, facts: resolved.stats.items, facts_head: resolved.stats %}
 <!-- ═══ The letter — mission & vision as editorial statements (letter: false kills it) ═══ -->
 {% unless resolved.letter == false %}
   {% section "about/letter", data: resolved.letter, mission: resolved.mission, vision: resolved.vision %}

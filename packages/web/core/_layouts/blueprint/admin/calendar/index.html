@@ -1,25 +1,6 @@
 ---
 layout: admin/core/minimal-viewport-locked
 
-theme:
-  header:
-    title:
-      content: "Marketing calendar"
-      icon: "calendar-days"
-    breadcrumbs:
-      items:
-        - label: "Admin"
-          href: "/admin"
-        - label: "Marketing"
-        - label: "Calendar"
-    actions:
-      items:
-        - label: "Create campaign"
-          icon: "plus"
-          color: "primary"
-          attributes:
-            - ["id", "btn-create-campaign"]
-
 meta:
   title: "Marketing calendar - Admin"
   description: "Schedule and manage marketing campaigns: emails and push notifications"
@@ -57,6 +38,25 @@ prerender_icons:
   - name: "battery-full"
   - name: "table-list"
   - name: "vial"
+config:
+  theme:
+    header:
+      title:
+        content: "Marketing calendar"
+        icon: "calendar-days"
+      breadcrumbs:
+        items:
+          - label: "Admin"
+            href: "/admin"
+          - label: "Marketing"
+          - label: "Calendar"
+      actions:
+        items:
+          - label: "Create campaign"
+            icon: "plus"
+            color: "primary"
+            attributes:
+              - ["id", "btn-create-campaign"]
 ---
 
 <!-- Calendar Root -->

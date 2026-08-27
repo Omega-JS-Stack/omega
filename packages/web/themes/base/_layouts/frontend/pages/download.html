@@ -4,11 +4,13 @@ layout: frontend/core/base
 # ═══ /download — reimagined 2026-07-16 (manus-grade: the page knows your
 # platform and leads with YOUR button; everything else is one scroll away).
 # Data contract preserved: resolved.downloads.platforms drives cards + the
-# detection JS; site.download[platform][type] supplies the URLs.
+# detection JS; site.targets.desktop.releasesUrl supplies the desktop URLs
+# (#610 — the curated targets view is the ONE home). Mobile derives nothing
+# while MAM is parked, so every mobile store stays on the notify form.
 
 # Hero Section
 hero:
-  headline: "Take {{ site.brand.name }} with you"
+  headline: "Take {{ resolved.config.brand.name }} with you"
   headline_accent: ""
   description: "One account, every device."
 
@@ -29,7 +31,7 @@ downloads:
     description: "Leave your email and the download link arrives the moment it ships."
   not_available:
     headline: "Not available yet"
-    description: "{{ site.brand.name }} is not currently available for this platform yet."
+    description: "{{ resolved.config.brand.name }} is not currently available for this platform yet."
   platforms:
     - id: "mac"
       name: "macOS"
@@ -80,7 +82,6 @@ downloads:
 # What travels with you — hairline rows
 features:
   superheadline:
-    icon: "star"
     text: "Included"
   headline: "The install is the"
   headline_accent: "easy part"
@@ -102,7 +103,6 @@ features:
 # System Requirements Section
 system_requirements:
   superheadline:
-    icon: "server"
     text: "Requirements"
   headline: "Will it run?"
   headline_accent: ""
@@ -127,13 +127,12 @@ system_requirements:
 # FAQ Section
 faqs:
   superheadline:
-    icon: "circle-question"
     text: "FAQs"
   headline: "Before you"
   headline_accent: "install"
   subheadline: "The questions everyone asks, answered straight."
   items:
-    - question: "Is {{ site.brand.name }} free to download?"
+    - question: "Is {{ resolved.config.brand.name }} free to download?"
       answer: "Yes. The download is free and the core product works without a card. Paid plans add capacity and team features. See pricing when you're ready."
     - question: "How do updates work?"
       answer: "The app keeps itself current in the background and tells you when something notable lands. Release notes live on the updates page."
@@ -145,7 +144,6 @@ faqs:
 # CTA Section
 cta:
   superheadline:
-    icon: "comments"
     text: "Support"
   headline: "Stuck on the"
   headline_accent: "install?"
@@ -201,7 +199,7 @@ cta:
 
         {% assign download_count = 0 %}
         {% for type in platform.types %}
-          {% assign config_url = site.download[platform.id][type.type] %}
+          {% assign config_url = site.targets.desktop.releasesUrl %}
           {% iftruthy config_url %}{% assign download_count = download_count | plus: 1 %}{% endiftruthy %}
         {% endfor %}
 
@@ -219,7 +217,7 @@ cta:
             <div class="omega-dl-card__actions{% if download_count > 1 %} omega-dl-card__actions--split{% endif %}">
               {% if download_count > 0 %}
                 {% for type in platform.types %}
-                  {% assign config_url = site.download[platform.id][type.type] %}
+                  {% assign config_url = site.targets.desktop.releasesUrl %}
                   {% iftruthy config_url %}
                     <a href="{{ config_url }}" class="btn {% if forloop.first %}btn-adaptive{% else %}btn-outline-adaptive{% endif %}" data-download="true" data-download-name="{{ type.name }}">
                       {% omega_icon "download", "fa-sm me-2" %}
@@ -258,14 +256,14 @@ cta:
 
           {% assign has_download = false %}
           {% for type in platform.types %}
-            {% assign config_url = site.download[platform.id][type.type] %}
+            {% assign config_url = "" %}{% comment %}MAM is parked (#610): site.targets carries no mobile fact{% endcomment %}
             {% iftruthy config_url %}{% assign has_download = true %}{% break %}{% endiftruthy %}
           {% endfor %}
 
           {% if has_download %}
             <div class="omega-dl-store" data-download-card data-platform="{{ platform.id }}" data-omega-reveal>
               {% for type in platform.types %}
-                {% assign config_url = site.download[platform.id][type.type] %}
+                {% assign config_url = "" %}{% comment %}MAM is parked (#610): site.targets carries no mobile fact{% endcomment %}
                 {% iftruthy config_url %}
                   <a href="{{ config_url }}" class="omega-dl-store__badge" data-download="true" aria-label="{{ platform.name }}: {{ type.name }}">
                     {% omega_logo platform.store_badge, "brandmarks" %}
@@ -291,7 +289,7 @@ cta:
                 {% unless platform.id == 'ios' or platform.id == 'android' %}{% continue %}{% endunless %}
                 {% assign has_download = false %}
                 {% for type in platform.types %}
-                  {% assign config_url = site.download[platform.id][type.type] %}
+                  {% assign config_url = "" %}{% comment %}MAM is parked (#610): site.targets carries no mobile fact{% endcomment %}
                   {% iftruthy config_url %}{% assign has_download = true %}{% break %}{% endiftruthy %}
                 {% endfor %}
                 {% unless has_download %}
@@ -440,14 +438,14 @@ cta:
 
             <div class="step-slide" data-step="2">
               <div class="step-number-badge">2</div>
-                <h5 class="step-title">Double-click {{ site.brand.name }}-Setup.exe</h5>
+                <h5 class="step-title">Double-click {{ resolved.config.brand.name }}-Setup.exe</h5>
               <!-- <p class="text-muted mb-3">Click <strong>"Yes"</strong> if Windows asks for permission</p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="file-to-click d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
-                  <span class="fw-bold">{{ site.brand.name }}-Setup.exe</span>
+                  <span class="fw-bold">{{ resolved.config.brand.name }}-Setup.exe</span>
                   <div class="click-indicator position-absolute top-50 start-50">
                     <div class="click-pulse position-absolute"></div>
                     <div class="pointer-icon">
@@ -465,7 +463,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="wizard-window overflow-hidden">
                   <div class="wizard-header d-flex align-items-center px-2 small fw-bold">
-                    {{ site.brand.name }} Setup
+                    {{ resolved.config.brand.name }} Setup
                   </div>
                   <div class="wizard-content bg-adaptive-inverse d-flex flex-column justify-content-center p-3">
                     <div class="small text-adaptive mb-2 text-center">Installing...</div>
@@ -480,13 +478,13 @@ cta:
             <div class="step-slide" data-step="4">
               <div class="step-number-badge">4</div>
                 <h5 class="step-title">Launch the app</h5>
-              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Start Menu</strong> or <strong>Desktop</strong> shortcut</p> -->
+              <!-- <p class="text-muted mb-3">Find {{ resolved.config.brand.name }} in your <strong>Start Menu</strong> or <strong>Desktop</strong> shortcut</p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
-                  <span class="fw-bold">{{ site.brand.name }}</span>
+                  <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
               </div>
             </div>
@@ -530,14 +528,14 @@ cta:
 
             <div class="step-slide" data-step="2">
               <div class="step-number-badge">2</div>
-                <h5 class="step-title">Double-click {{ site.brand.name }}.dmg</h5>
+                <h5 class="step-title">Double-click {{ resolved.config.brand.name }}.dmg</h5>
               <!-- <p class="text-muted mb-3">This will mount the disk image</p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="file-to-click d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
-                  <span class="fw-bold">{{ site.brand.name }}.dmg</span>
+                  <span class="fw-bold">{{ resolved.config.brand.name }}.dmg</span>
                   <div class="click-indicator position-absolute top-50 start-50">
                     <div class="click-pulse position-absolute"></div>
                     <div class="pointer-icon">
@@ -550,15 +548,15 @@ cta:
 
             <div class="step-slide" data-step="3">
               <div class="step-number-badge">3</div>
-                <h5 class="step-title">Drag {{ site.brand.name }} to Applications folder</h5>
+                <h5 class="step-title">Drag {{ resolved.config.brand.name }} to Applications folder</h5>
               <!-- <p class="text-muted mb-3">This installs the app for all users</p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex gap-5 align-items-center position-relative">
                   <div class="d-flex flex-column align-items-center gap-2 position-relative">
                     <div class="file-to-click d-flex align-items-center justify-content-center">
-                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                     </div>
-                    <span class="fw-bold">{{ site.brand.name }}</span>
+                    <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                     <div class="drag-indicator position-absolute top-50 start-50">
                       <div class="click-pulse position-absolute"></div>
                       <div class="pointer-icon">
@@ -587,13 +585,13 @@ cta:
             <div class="step-slide" data-step="4">
               <div class="step-number-badge">4</div>
                 <h5 class="step-title">Launch the app</h5>
-              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Applications</strong> folder or use <strong>Spotlight</strong></p> -->
+              <!-- <p class="text-muted mb-3">Find {{ resolved.config.brand.name }} in your <strong>Applications</strong> folder or use <strong>Spotlight</strong></p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
-                  <span class="fw-bold">{{ site.brand.name }}</span>
+                  <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
               </div>
             </div>
@@ -658,7 +656,7 @@ cta:
                 <div class="mb-3">
                   <small class="text-muted d-block mb-2 fw-bold" id="linux-debian-label">For Debian/Ubuntu:</small>
                   <div class="input-group">
-                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-2" value="sudo dpkg -i {{ site.brand.name | downcase }}_amd64.deb" readonly aria-labelledby="linux-debian-label">
+                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-2" value="sudo dpkg -i {{ resolved.config.brand.name | downcase }}_amd64.deb" readonly aria-labelledby="linux-debian-label">
                     <button type="button" class="btn btn-outline-adaptive copy-command-btn">
                       {% omega_icon "copy", "me-2" %}
                       <span class="button-text d-none d-sm-inline">Copy</span>
@@ -668,7 +666,7 @@ cta:
                 <div>
                   <small class="text-muted d-block mb-2 fw-bold" id="linux-fedora-label">For Fedora/RHEL:</small>
                   <div class="input-group">
-                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-3" value="sudo rpm -i {{ site.brand.name | downcase }}_amd64.rpm" readonly aria-labelledby="linux-fedora-label">
+                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-3" value="sudo rpm -i {{ resolved.config.brand.name | downcase }}_amd64.rpm" readonly aria-labelledby="linux-fedora-label">
                     <button type="button" class="btn btn-outline-adaptive copy-command-btn">
                       {% omega_icon "copy", "me-2" %}
                       <span class="button-text d-none d-sm-inline">Copy</span>
@@ -681,13 +679,13 @@ cta:
             <div class="step-slide" data-step="4">
               <div class="step-number-badge">4</div>
                 <h5 class="step-title">Launch the app</h5>
-              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Applications</strong> menu</p> -->
+              <!-- <p class="text-muted mb-3">Find {{ resolved.config.brand.name }} in your <strong>Applications</strong> menu</p> -->
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
-                  <span class="fw-bold">{{ site.brand.name }}</span>
+                  <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
               </div>
             </div>

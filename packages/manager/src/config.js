@@ -40,7 +40,7 @@
 // web, instance admin). The mapping's SSOT moved to @omega.js/config with the
 // multi-instance work (the config loader walks the same dirs) — re-exported
 // here so every existing manager import keeps working.
-const { DIR_TARGETS, TARGET_DIRS, isDemoProject, chosenProvider } = require('@omega.js/config');
+const { DIR_TARGETS, TARGET_DIRS, isDemoProject, chosenProvider, schemaDefaults, deepMerge } = require('@omega.js/config');
 const { resolveRegistrar } = require('./services/domain/lib/registrars.js');
 
 // Framework package per target — used by the testing service to compare each
@@ -61,7 +61,15 @@ const TARGET_FRAMEWORKS = {
 // data — each section moves here WITH its service port (cloudflare settings
 // arrive with the cloudflare service, etc.). Never park defaults for services
 // that don't exist here yet.
-const DEFAULTS = {
+//
+// SERVICE-OWNED data ONLY (#478): a default for a key @omega.js/config's schema
+// declares lives THERE, as that entry's `default:` — the schema is the one home,
+// and the manage walk materializes those blocks into the brand's own
+// omega.json5. What stays here is the engine data the schema does not declare
+// (Cloudflare zone settings, Apple cert types, Stripe Radar rules, the GA4
+// property fields) plus the placeholder keys a service writes back into. The
+// exported DEFAULTS is the two composed, schema first.
+const MANAGER_DEFAULTS = {
   // Whether the brand is active (disabled brands are skipped)
   enabled: true,
 
@@ -70,17 +78,6 @@ const DEFAULTS = {
   // fetch sources from. The parent brand itself uses 'self'. omega-manager
   // defaulted this to the company's parent URL — it's config now, no default.
   parent: null,
-
-  // Source hosting (brand omega.json5 `repo.providers.github`; org has no
-  // default — the service skips with a message until it's configured)
-  repo: {
-    providers: {
-      github: {
-        shared: false, // true = the org is shared with other brands; skips org-level reconciliation
-        private: true, // brand repo visibility
-      },
-    },
-  },
 
   // Domain registrar + email — two roles, one providers block each (#425).
   // The domain service reconciles registrar nameservers from the KEY under
@@ -105,9 +102,7 @@ const DEFAULTS = {
   // omega-manager hardcoded (googlegroup support email, the company org and
   // billing account) are config now — they land in company/brand config.
   cloud: {
-    shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
     supportEmail: null,   // OAuth consent screen support email (defaults to the AUTHORIZING user's email — Google rejects any address the caller doesn't own; set only for an owned Google Group)
-    apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
     organizationId: null, // GCloud org ID — tri-state (#33): null = ask at project create, false = no org (standalone), value = create inside it (proper default permissions)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — tri-state: null = ask, false = stay on Spark, value = auto-upgrade to Blaze
   },
@@ -181,19 +176,12 @@ const DEFAULTS = {
     },
   },
 
-  // Search Console. The domain property (sc-domain:) covers every subdomain;
-  // DNS TXT verification writes through Cloudflare. Auth: the same
+  // Search Console (submitSitemap + sitemapPaths: schema defaults) needs no
+  // manager-owned data. The domain property (sc-domain:) covers every
+  // subdomain; DNS TXT verification writes through Cloudflare. Auth: the same
   // GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET as firebase/analytics (own token
   // cache — webmasters + siteverification scopes). omega-manager also carried
   // a `subdomains: []` key here that nothing ever read — dropped.
-  search: {
-    providers: {
-      searchConsole: {
-        submitSitemap: true,          // false = skip sitemap submission
-        sitemapPaths: ['/sitemap.xml'], // submitted as https://{domain}{path}
-      },
-    },
-  },
 
   // AdSense: deliberately NO defaults entry (wave-5 F10). The service gates on
   // the PRESENCE of `advertising.providers.adsense` in the merged
@@ -217,7 +205,6 @@ const DEFAULTS = {
   // config-hierarchy dispersal story.
   marketing: {
     campaigns: {
-      enabled: true,
       providers: {
         sendgrid: {
           listId: null,
@@ -225,7 +212,6 @@ const DEFAULTS = {
       },
     },
     newsletter: {
-      enabled: true,
       providers: {
         beehiiv: {
           publicationId: null,
@@ -298,9 +284,7 @@ const DEFAULTS = {
   forms: {
     providers: {
       slapform: {
-        enabled: true,
         formId: null,
-        plan: { id: 'grandmaster', name: 'Grandmaster' },
       },
     },
   },
@@ -324,10 +308,7 @@ const DEFAULTS = {
     chat: {
       providers: {
         chatsy: {
-          enabled: true,
-          updateAgentInfo: true,
           agentId: null,
-          plan: { id: 'max', name: 'Max' },
           sponsorshipsUrl: null,
         },
       },
@@ -348,10 +329,7 @@ const DEFAULTS = {
     email: {
       providers: {
         replyify: {
-          enabled: true,
-          updateAgentInfo: true,
           agentId: null,
-          plan: { id: 'max', name: 'Max' },
           discount: null,
         },
       },
@@ -371,12 +349,10 @@ const DEFAULTS = {
   // Parent-project brand directory (#246) — pushes this brand's own entry
   // into the PARENT project's brands collection, so whatever the parent runs
   // on top of it (ITW's guest-post sponsorship marketplace is the first) reads
-  // a current directory. OFF by default: participation is opt-in, never
-  // implicit, because the entry is world-readable by design. Needs `parent` to
-  // name the relationship and DIRECTORY_SERVICE_ACCOUNT in the brand .env.
-  directory: {
-    enabled: false,
-  },
+  // a current directory. Its opt-in switch (`directory.enabled`, off by
+  // default because the entry is world-readable by design) is a schema
+  // default; the service also needs `parent` to name the relationship and
+  // DIRECTORY_SERVICE_ACCOUNT in the brand .env.
 
   // Derived visual collateral generated locally from the brand's logo
   // sources (assets/logo/*.svg in the brand repo → .omega/assets/):
@@ -623,6 +599,12 @@ const DEFAULTS = {
   },
 };
 
+// The manager's defaults layer: the schema's own answers first, this file's
+// service-owned data on top (#478). Every existing read site — the walk's
+// loadConfig defaults, `DEFAULTS.account.admins`, the zone-settings diff —
+// sees one composed object, and no default has two homes.
+const DEFAULTS = deepMerge(schemaDefaults(), MANAGER_DEFAULTS);
+
 // =============================================================================
 // SERVICE ORDER - Services run in this order due to dependencies
 // =============================================================================
@@ -674,10 +656,12 @@ const OPERATIONS = {
   workspace: [
     { name: 'structure', ensure: true },  // Root workspaces + a dir per enabled target
     { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-target)
+    { name: 'defaults', ensure: true },   // Schema-defaulted blocks the brand file lacks are materialized (#478)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` (legacy omega-manager healed) + a deploy script exists
     { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
+    { name: 'env-keys', ensure: true },   // Brand-generated keys (the OMEGA_* trio + UNSUBSCRIBE_HMAC_KEY) minted into the brand .env when the cascade has none (#569)
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
     { name: 'translation-sdk', ensure: true }, // Translating web targets declare + install @anthropic-ai/claude-agent-sdk (#168)
   ],
@@ -842,7 +826,7 @@ const OPERATIONS = {
     { name: 'orders', ensure: true },        // payments-orders: legacy attribution.utm blob → first/last touches
     { name: 'payments-intents', ensure: true }, // payments-intents: legacy attribution.utm blob → first/last touches
     { name: 'payment-provider', ensure: true }, // #428 word rename: the stored `processor` field → `provider`, across all five payment collections
-    { name: 'state-retirement', ensure: true, local: true }, // #434: .omega/state.json → config/omega.json5 + .env, then the file goes
+    { name: 'state-retirement', ensure: true, local: true }, // #434: the retired .omega/state.json content → config/omega.json5 + .env; the file's machine records stay (#479)
   ],
 
   bookmark: [
@@ -855,26 +839,41 @@ const OPERATIONS = {
 };
 
 // =============================================================================
-// REQUIRES - Per-service preflight requirements (env var names + Google scopes)
+// REQUIRES - Per-service inputs (env var names + Google scopes)
 // =============================================================================
-// The declarative half of the cp114 secret gate: services that need env vars
-// or Google OAuth scopes declare them HERE, next to their operations — ONE
-// home. lib/preflight.js checks the whole enabled set before any service runs
-// and prints one consolidated fix walkthrough (cp236's 403-diagnostics tone)
-// instead of N mid-run skips; the services with an ensureEnvSecrets gate
-// reference these same entries so every env NAME lives once.
+// The declarative half of the setup contract (#608, cp114 before it): every
+// service that needs a credential or a one-time authorization declares it
+// HERE, next to its operations — ONE home, read by both halves:
+//   - lib/preflight.js checks the whole enabled set before any service runs and
+//     prints one consolidated fix walkthrough (cp236's 403-diagnostics tone)
+//     instead of N mid-run skips;
+//   - lib/service-input.js asks for what is still missing when the service
+//     actually runs, through the uniform Provide / Skip / Disable gate.
+// Every env NAME therefore lives exactly once. WHICH keys OMEGA mints for
+// itself and which a human acquires is the env schema's to say
+// (@omega.js/config, #581) — the sweep test (test/service-input.test.js) holds
+// this registry to it: every acquired key the manager actually reads must be
+// declared here.
 //
 // Shape per service — requires: { env, scopes } plus the gates around them:
 //   why    - one line: what the requirement buys (the walkthrough's "needed")
+//   label  - the human name the setup gate opens with ("Cloudflare")
+//   disablePath - where "Disable permanently" writes `false` (the tri-state
+//            opt-out, #33). Mirrors the key the service's own setup gate reads.
 //   when   - (brandConfig) => bool: whether the service would run at all for
 //            this brand. Mirrors ONLY the service setup's own config gate —
 //            keep the two in lockstep. Absent = always applies.
-//   env    - [{ name, label?, url?, hint?, prompted?, when? }] — the same
-//            descriptor shape ensureEnvSecrets takes. prompted: true = an
-//            interactive run collects the value mid-run (the paste flow), so
-//            preflight lets the service run on a TTY. Entry-level `when` =
-//            the entry only applies for some configs (registrar-specific
-//            creds). Values are NEVER read here — names only.
+//   env    - [{ name, label?, url?, hint?, prompted?, when?, gates?, disablePath? }]
+//            — the descriptor shape lib/service-input.js takes. prompted: true =
+//            an interactive run collects the value mid-run (the paste flow), so
+//            preflight lets the service run on a TTY. Entry-level `when` = the
+//            entry only applies for some configs (registrar-specific creds).
+//            `gates: false` = OPTIONAL input: the service runs without it (a
+//            second payment provider, an operator-tier service account, one of
+//            two pixel platforms), so preflight never gates on it and the
+//            operation that needs it asks in place. Entry-level `disablePath`
+//            narrows the opt-out to the provider that owns the key.
+//            Values are NEVER read here — names only.
 //   scopes - the Google OAuth scopes this service's API calls actually hit
 //            (each a member of google-auth's GOOGLE_SCOPES union — every
 //            consent grants the union, so these only ever miss against a
@@ -882,9 +881,8 @@ const OPERATIONS = {
 //            store's granted-scopes record — what IS knowable before a
 //            call; the live grant is proven at call time (the google-auth
 //            403 diagnostics are the backstop).
-// Services NOT listed keep their own setup gates untouched (their needs are
-// conditional in ways config can't see up front — per-provider payment
-// keys, operator-only service accounts).
+// Services NOT listed need no credential of their own (repo authorizes through
+// `gh auth login`; the local services touch nothing external).
 
 // The shared Google OAuth app credentials — the ONE identity every Google
 // service authorizes (google-auth.js). Declared once, referenced per service.
@@ -896,6 +894,8 @@ const GOOGLE_ENV = [
 const REQUIRES = {
   edge: {
     why: 'reconciles the zone, DNS records, rulesets, and settings via the Cloudflare API',
+    label: 'Cloudflare',
+    disablePath: 'edge.providers.cloudflare.enabled',
     when: (config) => config.edge?.providers?.cloudflare?.enabled !== false,
     env: [
       { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
@@ -905,6 +905,8 @@ const REQUIRES = {
 
   domain: {
     why: 'points the registrar nameservers at the Cloudflare zone',
+    label: 'Domain registrar',
+    disablePath: 'domain.enabled',
     when: (config) => config.domain?.enabled !== false && Boolean(resolveRegistrar(config)),
     env: [
       { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
@@ -916,6 +918,8 @@ const REQUIRES = {
 
   cloud: {
     why: 'reconciles the Firebase/GCP project (billing, APIs, hosting, auth, data stores) via Google APIs',
+    label: 'Google Cloud',
+    disablePath: 'cloud.enabled',
     when: (config) => {
       if (config.cloud?.enabled === false) return false;
       // No projectId yet → the interactive selection flow is the fix, not a
@@ -935,6 +939,8 @@ const REQUIRES = {
 
   captcha: {
     why: "proves the brand's own classic reCAPTCHA keys are valid (siteverify)",
+    label: 'reCAPTCHA',
+    disablePath: 'captcha.providers.recaptcha.enabled',
     when: (config) => config.captcha?.providers?.recaptcha?.enabled !== false,
     env: [
       // De-ITW (Ian 2026-07-21): the key is the brand's OWN, minted in the
@@ -948,13 +954,42 @@ const REQUIRES = {
 
   analytics: {
     why: 'reconciles GA4 streams and the Firebase link via the GA Admin API',
+    label: 'Google Analytics',
+    disablePath: 'analytics.enabled',
     when: (config) => config.analytics?.enabled !== false && Boolean(config.analytics?.providers?.google?.propertyId),
-    env: GOOGLE_ENV,
+    // The pixel platforms are OPTIONAL beside GA4 (`gates: false`): a brand may
+    // run one, both, or neither, and their absence must never gate the GA4 half
+    // — the pixel operations ask for them in place (services/analytics/lib/
+    // pixel-token.js), each disabling only its own provider.
+    env: [
+      ...GOOGLE_ENV,
+      {
+        name: 'META_ACCESS_TOKEN',
+        label: 'Meta Pixel access token',
+        url: 'https://business.facebook.com/settings/system-users',
+        hint: 'A Business Manager SYSTEM USER token with ads_management — it creates the pixel and signs the conversions',
+        prompted: true,
+        gates: false,
+        disablePath: 'analytics.providers.meta',
+        when: (config) => config.analytics?.providers?.meta !== false,
+      },
+      {
+        name: 'TIKTOK_ACCESS_TOKEN',
+        label: 'TikTok Events API access token',
+        hint: 'Minted by the portal authorization the setup walks (#448) — the app secret is only needed at mint time',
+        prompted: true,
+        gates: false,
+        disablePath: 'analytics.providers.tiktok',
+        when: (config) => config.analytics?.providers?.tiktok !== false,
+      },
+    ],
     scopes: ['https://www.googleapis.com/auth/analytics.edit'],
   },
 
   search: {
     why: 'creates/verifies the sc-domain property and submits sitemaps via the Search Console API',
+    label: 'Search Console',
+    disablePath: 'search.providers.searchConsole.enabled',
     when: (config) => config.search?.providers?.searchConsole?.enabled !== false,
     env: GOOGLE_ENV,
     scopes: [
@@ -965,16 +1000,21 @@ const REQUIRES = {
 
   advertising: {
     why: 'verifies the domain is present + approved in the AdSense account (read-only API)',
-    when: (config) => {
-      const provider = config.advertising?.providers?.adsense;
-      return provider?.enabled !== false && Boolean(provider?.client);
-    },
+    label: 'AdSense',
+    // Disable must NOT land `client: false` — client is schema-typed as a
+    // string. It opts the PROVIDER out instead, and since #527 there is no
+    // second `enabled` switch to land it on.
+    disablePath: 'advertising.providers.adsense',
+    // The client id is the ONE adsense switch (#527) — no second gate.
+    when: (config) => Boolean(config.advertising?.providers?.adsense?.client),
     env: GOOGLE_ENV,
     scopes: ['https://www.googleapis.com/auth/adsense.readonly'],
   },
 
   monitoring: {
     why: 'creates one Sentry project per enabled target and lands the DSNs',
+    label: 'Sentry',
+    disablePath: 'monitoring.enabled',
     when: (config) => config.monitoring?.enabled !== false
       && chosenProvider(config.monitoring?.providers) === 'sentry',
     env: [
@@ -991,6 +1031,8 @@ const REQUIRES = {
 
   campaigns: {
     why: 'reconciles domain auth, the sender, the list, fields, segments, and the event webhook via the SendGrid API',
+    label: 'SendGrid',
+    disablePath: 'marketing.campaigns.enabled',
     when: (config) => config.marketing?.campaigns?.enabled !== false
       && chosenProvider(config.marketing?.campaigns?.providers) === 'sendgrid',
     env: [
@@ -1001,6 +1043,8 @@ const REQUIRES = {
 
   newsletter: {
     why: 'verifies publication access, fields, segments, and the webhook via the Beehiiv API',
+    label: 'Beehiiv',
+    disablePath: 'marketing.newsletter.enabled',
     when: (config) => config.marketing?.newsletter?.enabled !== false
       && chosenProvider(config.marketing?.newsletter?.providers) === 'beehiiv',
     env: [
@@ -1011,16 +1055,154 @@ const REQUIRES = {
 
   certificates: {
     why: 'reconciles Apple signing certs, bundle IDs, and provisioning profiles via App Store Connect',
+    label: 'Apple signing',
+    disablePath: 'certificates.enabled',
     when: (config) => config.certificates?.enabled !== false
       && Boolean(config.targets?.desktop || config.targets?.mobile),
     env: [
-      { name: 'APPLE_API_ISSUER', label: 'App Store Connect issuer ID', url: 'https://appstoreconnect.apple.com/access/api' },
-      { name: 'APPLE_API_KEY_ID', label: 'App Store Connect API key ID', url: 'https://appstoreconnect.apple.com/access/api' },
-      { name: 'APPLE_TEAM_ID', label: 'Apple Developer team ID' },
+      { name: 'APPLE_API_ISSUER', label: 'App Store Connect issuer ID', url: 'https://appstoreconnect.apple.com/access/api', prompted: true },
+      { name: 'APPLE_API_KEY_ID', label: 'App Store Connect API key ID', url: 'https://appstoreconnect.apple.com/access/api', prompted: true },
+      { name: 'APPLE_TEAM_ID', label: 'Apple Developer team ID', prompted: true },
+    ],
+    scopes: [],
+  },
+
+  // Per-provider credentials, every one OPTIONAL (`gates: false`): the payment
+  // service runs on whichever provider IS configured, so a missing Stripe key
+  // must never gate a PayPal brand. Each entry disables only its own provider.
+  payment: {
+    why: 'reconciles products, prices, and webhooks on the brand payment providers',
+    label: 'Payments',
+    disablePath: 'payment.enabled',
+    when: (config) => config.payment?.enabled !== false,
+    env: [
+      {
+        name: 'STRIPE_SECRET_KEY',
+        label: 'Stripe secret key',
+        url: 'https://dashboard.stripe.com/apikeys',
+        hint: 'Developers → API keys, on the BRAND\'s Stripe account (sk_live_… or sk_test_…)',
+        prompted: true,
+        gates: false,
+        disablePath: 'payment.providers.stripe',
+        when: (config) => config.payment?.providers?.stripe !== false,
+      },
+      {
+        name: 'PAYPAL_CLIENT_SECRET',
+        label: 'PayPal client secret',
+        url: 'https://developer.paypal.com/dashboard/applications',
+        hint: 'The secret half of the brand\'s REST API app (its client id is public and lives in omega.json5)',
+        prompted: true,
+        gates: false,
+        disablePath: 'payment.providers.paypal',
+        when: (config) => config.payment?.providers?.paypal !== false,
+      },
+      {
+        name: 'CHARGEBEE_API_KEY',
+        label: 'Chargebee API key',
+        url: 'https://app.chargebee.com/',
+        hint: 'Settings → API keys, on the brand\'s Chargebee site (the site name is public and lives in omega.json5)',
+        prompted: true,
+        gates: false,
+        disablePath: 'payment.providers.chargebee',
+        when: (config) => config.payment?.providers?.chargebee !== false,
+      },
+    ],
+    scopes: [],
+  },
+
+  // Operator-tier credentials (`gates: false`): the product lives in ITS OWN
+  // Firebase project, so only that product's operator holds the service
+  // account. Every other brand's clean skip is the sanctioned outcome, which
+  // is why these never gate a run — the service asks the operator in place.
+  forms: {
+    why: "manages the brand's Slapform contact form and its owner account (Slapform operator only)",
+    label: 'Slapform operator access',
+    disablePath: 'forms.providers.slapform.enabled',
+    when: (config) => config.forms?.providers?.slapform !== false
+      && config.forms?.providers?.slapform?.enabled !== false,
+    env: [
+      { name: 'SLAPFORM_SERVICE_ACCOUNT', label: "Slapform's service-account JSON path", hint: 'Absolute, or relative to the brand root', prompted: true, gates: false },
+    ],
+    scopes: [],
+  },
+
+  chat: {
+    why: "manages the brand's Chatsy agent, knowledge, and owner account (Chatsy operator only)",
+    label: 'Chatsy operator access',
+    disablePath: 'inbound.chat.providers.chatsy.enabled',
+    when: (config) => config.inbound?.chat?.providers?.chatsy !== false
+      && config.inbound?.chat?.providers?.chatsy?.enabled !== false,
+    env: [
+      { name: 'CHATSY_SERVICE_ACCOUNT', label: "Chatsy's service-account JSON path", hint: 'Absolute, or relative to the brand root', prompted: true, gates: false },
+    ],
+    scopes: [],
+  },
+
+  email: {
+    why: "manages the brand's Replyify agent, filter, and owner account (Replyify operator only)",
+    label: 'Replyify operator access',
+    disablePath: 'inbound.email.providers.replyify.enabled',
+    when: (config) => config.inbound?.email?.providers?.replyify !== false
+      && config.inbound?.email?.providers?.replyify?.enabled !== false,
+    env: [
+      { name: 'REPLYIFY_SERVICE_ACCOUNT', label: "Replyify's service-account JSON path", hint: 'Absolute, or relative to the brand root', prompted: true, gates: false },
+    ],
+    scopes: [],
+  },
+
+  server: {
+    why: "keeps the brand's registry entry on the company server's Firestore (company-server operators only)",
+    label: 'Company server access',
+    disablePath: 'server.enabled',
+    when: (config) => config.server !== false && config.server?.enabled !== false,
+    env: [
+      { name: 'SERVER_SERVICE_ACCOUNT', label: "the company server's service-account JSON path", hint: 'Absolute, or relative to the brand root', prompted: true, gates: false },
     ],
     scopes: [],
   },
 };
+
+/**
+ * Build the setup-contract spec for a service (#608) — what
+ * lib/service-input.js asks for. The registry is the SSOT; this is its
+ * accessor, so no call site re-spells an env name, a mint URL, or an opt-out
+ * path.
+ *
+ * @param {string} service - Service name (a REQUIRES key).
+ * @param {object} [options]
+ * @param {string[]} [options.names] - Narrow to these input names (a
+ *   per-provider ask: just the Stripe key, just the Meta token).
+ * @param {string} [options.label] - Override the gate's human name (the
+ *   PROVIDER's name, when the ask is per-provider).
+ * @param {string} [options.disablePath] - Override where Disable lands `false`
+ *   (defaults to the narrowed entry's own path, then the service's).
+ * @param {string[]} [options.instructions] - Guidance lines shown before the gate.
+ * @param {boolean} [options.gate] - false = the caller already ran the gate.
+ * @returns {object} The spec requestServiceInput takes.
+ */
+function serviceInputSpec(service, options = {}) {
+  const declaration = REQUIRES[service];
+  if (!declaration) {
+    throw new Error(`No REQUIRES entry for service "${service}" — declare its inputs in src/config.js`);
+  }
+
+  const inputs = options.names
+    ? declaration.env.filter((entry) => options.names.includes(entry.name))
+    : declaration.env;
+
+  // A single narrowed input carrying its own opt-out path owns the gate: the
+  // ask is about THAT provider, so Disable must not switch off the service.
+  const ownPath = inputs.length === 1 ? inputs[0].disablePath : null;
+
+  return {
+    service,
+    label: options.label || declaration.label,
+    disablePath: options.disablePath || ownPath || declaration.disablePath,
+    instructions: options.instructions,
+    ...(options.gate === false ? { gate: false } : {}),
+    inputs,
+  };
+}
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -1066,5 +1248,6 @@ module.exports = {
   BOOT_SERVICES,
   OPERATIONS,
   REQUIRES,
+  serviceInputSpec,
   templateObject,
 };

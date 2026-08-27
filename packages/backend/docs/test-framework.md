@@ -126,7 +126,7 @@ After the flush, `test/_init.js`'s `setup()` reseeds fixtures into the empty DB.
 
 ### Personas (N6)
 
-Every seeded account is a **persona** usable two ways: backend tests authenticate with its `api.privateKey` (`http.as('<id>')`), and a HUMAN or browser flow signs in with its email + the deterministic **`TEST_ACCOUNT_PASSWORD`** (`'omega-test-password'`, exported from [src/test/test-accounts.js](../src/test/test-accounts.js)) — boot the emulators, open an emulator-connected dev site, sign in as any persona. **`npx omega emulator` seeds personas automatically on boot** (`--no-seed` to skip; non-fatal on failure), via the same shared seed module the test runner uses ([src/test/seed.js](../src/test/seed.js) — wipe → meta/stats → create accounts → order fixtures → fetch keys → `test/_init.js` hooks). The test runner re-seeds at the start of every run regardless, so a long-running emulator always starts each test run from the same clean slate. Lifecycle states are first-class personas: `basic` (free), `premium-active` (paid), `premium-trialing` (mid-trial — active on the paid plan, nothing charged, its term ending exactly when the catalog's trial does), `premium-cancelling`, `premium-expired`/`refunded` (cancelled; `refunded` is the post-refund-webhook end state on the `test` provider), `premium-suspended`, `delete`/`delete-by-admin`. "Unauthed" needs no persona — that's `http.as('none')` or a signed-out browser. Payment flows get their own dedicated personas so the shared lifecycle ones stay clean (see [Test Account Isolation](#test-account-isolation-critical)): alongside the existing `journey-payments-*` set, `journey-payments-decline` (a first checkout that declines, seeded basic + active), `journey-payments-one-time-refund` (a one-time purchase bought then refunded), and `refund-no-order` (a paid subscriber pending cancellation whose subscription carries no `payment.orderId`, so the refund provider has to resolve the product from the subscription itself). For automated browser signin, mint a custom token for the persona's uid (admin SDK or `POST /user/token` as admin) and use the site's `?authCustomToken=` param / the client's `signInWithCustomToken`.
+Every seeded account is a **persona** usable two ways: backend tests authenticate with its `api.privateKey` (`http.as('<id>')`), and a HUMAN or browser flow signs in with its email + the deterministic **`TEST_ACCOUNT_PASSWORD`** (`'omega-test-password'`, exported from [src/test/test-accounts.js](../src/test/test-accounts.js)) — boot the emulators, open an emulator-connected dev site, sign in as any persona. **`npx omega emulator` seeds personas automatically on boot** (`--no-seed` to skip; non-fatal on failure), via the same shared seed module the test runner uses ([src/test/seed.js](../src/test/seed.js) — wipe → meta/stats → create accounts → order fixtures → fetch keys → `test/_init.js` hooks). The test runner re-seeds at the start of every run regardless, so a long-running emulator always starts each test run from the same clean slate. Lifecycle states are first-class personas: `basic` (free), `premium-active` (paid), `premium-trialing` (mid-trial — active on the paid plan, nothing charged, its term ending exactly when the catalog's trial does), `premium-cancelling`, `premium-expired`/`refunded` (cancelled; `refunded` is the post-refund-webhook end state on the `test` provider), `premium-suspended`, `delete`/`delete-by-admin`. "Unauthed" needs no persona — that's `http.as('none')` or a signed-out browser. Payment flows get their own dedicated personas so the shared lifecycle ones stay clean (see [Test Account Isolation](#test-account-isolation-critical)): alongside the existing `journey-payments-*` set, `journey-payments-decline` (a first checkout that declines, seeded basic + active), `journey-payments-one-time-refund` (a one-time purchase bought then refunded), `journey-payments-abandoned` (opens a checkout and never finishes it — the persona exists to prove nothing is written), `journey-payments-dispute` (buys, then gets charged back), and `refund-no-order` (a paid subscriber pending cancellation whose subscription carries no `payment.orderId`, so the refund provider has to resolve the product from the subscription itself). For automated browser signin, mint a custom token for the persona's uid (admin SDK or `POST /user/token` as admin) and use the site's `?authCustomToken=` param / the client's `signInWithCustomToken`.
 
 **A persona that holds a paid plan is one that BOUGHT it** ([#263](https://github.com/Omega-JS-Stack/omega/issues/263)). Its seed is resolved against the brand catalog, never hand-typed: `subscription.payment` carries the price and cadence `config.payment.products[].prices` lists for that plan (the same read the unified transforms make), a live term expires at the end of the billing cycle it is on rather than a decade out, and a seed naming `payment.orderId` gets the matching `payments-orders` document stood up at seed time — the fixture the test cancel provider reads the plan off, the test webhook library rebuilds a provider subscription from, and the per-owner trial-eligibility query counts. One definition builds it everywhere (`buildOrderFixture`/`seedOrderFixture` in [src/test/test-accounts.js](../src/test/test-accounts.js)): the boot seed, the flows lane, and the per-persona dev reset (`POST /test/reset-account`) all write the same record — and a project's own `test/_init.js` personas are seeded on the same terms, so a consumer persona naming an `orderId` gets its order too. A persona that bought nothing (`basic`, `journey-flows-trial`, the signup/consent set) stays deliberately hollow — any subscription order in its name would disqualify it from the trial its journey exists to prove.
 
@@ -245,12 +245,41 @@ npx omega test project:rules/     # Only project's rules tests
 npx omega test user/ admin/       # Multiple paths
 ```
 
+## Opt-in lanes (`--lane=`)
+
+A LANE is a suite that needs something the default run must never depend on: credentials, the network, an external CLI. It is off by default and stays off — `npx omega test --lane=<name>` is the only way in, and a lane that cannot satisfy its gate prints **one line** saying which condition failed and exits clean. A skipped lane is a normal outcome, not a failure.
+
+Lanes are unreachable by anything else. `test/<lane>/` is excluded from discovery unless that lane's gate opened it (the runner's `LANE_DIRECTORIES`), so no default run, no CI lane and no path filter can pull one in.
+
+**How a lane differs from `--extended`:** extended mode is a *mode* — it lets the SAME suites make real calls. A lane is a *set of suites* that exist only for the real thing, plus the gate deciding whether they may run at all.
+
+### `--lane=stripe-live`
+
+Runs the payment pipeline against REAL Stripe test-mode events: real objects in a test account, real deliveries, real signatures, forwarded into the local emulator by `stripe listen`.
+
+The gate, in order — any failure is one skip line:
+
+1. A Stripe secret resolves through the ONE env reader (`src/manager/libraries/env.js`), which outside production prefers `STRIPE_SECRET_KEY_DEV` and refuses a live-shaped credential outright ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)).
+2. That secret is **test-shaped** (`sk_test_`). The reader's refusal already catches `sk_live_`; this catches everything else a key slot picks up — a restricted key, a publishable key, a paste of the wrong line.
+3. The **Stripe CLI** is installed, because the forwarding and the event triggers are its job.
+
+```bash
+# In a brand's backend target, with STRIPE_SECRET_KEY_DEV="sk_test_…" in the .env cascade:
+npx omega test --lane=stripe-live
+```
+
+What the lane does on the way in: creates the Stripe products and prices the brand's catalogue needs, **idempotently** and tagged `metadata.omega_lane`, so a rerun reuses the first run's objects. The fixtures match on interval + amount because that is all `resolvePriceId()` matches on — a config that has drifted from the account fails here rather than at a customer's checkout. Then it starts `stripe listen --forward-to <hosting>/omega/payments/webhook?provider=stripe`, captures the endpoint signing secret it prints, and hands it to the runner as `STRIPE_WEBHOOK_SECRET` so every forwarded delivery is verified for real.
+
+**Nothing prints a secret.** The gate's refusals name the KEY and the fix; the signing secret rides to the child by env and is held back from the forwarder's own output.
+
+The gate and the fixture plan are pure functions with their own offline suite (`test/cli/stripe-live-lane.test.js`), so the safety property is proven on every normal run without an account, a CLI, or the network.
+
 ## Test Locations
 
 - **@omega.js/backend core tests:** `test/` (in the framework repo)
 - **Project tests:** the consumer project's repo-root `test/` directory (NOT inside `functions/`)
 
-Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.test.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.test.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.test.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.test.js`, `.../manual-validation.test.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx omega test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
+Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.test.js`, mirroring `src/routes/<route-path>/` — e.g. `src/routes/write/article/` → `test/routes/write/article/generate.test.js`, `src/routes/sponsorship/post.js` → `test/routes/sponsorship/post.test.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.test.js`, `.../manual-validation.test.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx omega test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
 
 **The `.test.js` suffix IS discovery:** the runner only picks up files ending in `.test.js` (the mirrored suite shape shared by every OMEGA package — monorepo `docs/shared/testing.md`). A `.js` file under `test/` without the suffix is support code, never a test, and never runs.
 
@@ -317,12 +346,12 @@ module.exports = {
 | `rules` | Firestore **rules** testing client — `rules.asAccount(id)` returns a DB scoped to that user's auth, `rules.expectSuccess(op)` / `rules.expectFailure(op)` assert rule outcomes (see [Rules Tests](#rules-tests)) |
 | `state` | Shared state (suites only) |
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
-| `config` | Test configuration |
+| `config` | Test configuration — `config.apiUrl` is the base URL of the lane THIS run booted (the resolved hosting port, not a literal): a suite that fetches directly instead of through `http` builds its URL from it |
 | `Manager` | Real booted @omega.js/backend Manager (+ `Manager.RouteContext()` etc.) |
 
 ## HTTP Routing
 
-The `http` client sends requests directly to the hosting emulator (`http://localhost:5002`) with no magic prefix. The route string you pass becomes the URL path as-is — the hosting emulator's `firebase.json` rewrites handle routing to the correct Cloud Function.
+The `http` client sends requests directly to the hosting emulator (`config.apiUrl` — classically `http://localhost:5002`, but whatever port THIS lane resolved) with no magic prefix. The route string you pass becomes the URL path as-is — the hosting emulator's `firebase.json` rewrites handle routing to the correct Cloud Function.
 
 ```javascript
 // @omega.js/backend built-in routes — go through omega_api via firebase.json rewrite

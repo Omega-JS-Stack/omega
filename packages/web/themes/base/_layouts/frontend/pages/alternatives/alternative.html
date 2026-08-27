@@ -14,9 +14,9 @@ alternative:
     description: ""
   hero:
     tagline: "The #1 {{ resolved.alternative.competitor.name }} alternative"
-    headline: "{{ site.brand.name }} vs"
+    headline: "{{ resolved.config.brand.name }} vs"
     headline_accent: "{{ resolved.alternative.competitor.name }}"
-    description: "Looking for a {{ resolved.alternative.competitor.name }} alternative? See why thousands of users choose {{ site.brand.name }} for a faster, more powerful experience."
+    description: "Looking for a {{ resolved.alternative.competitor.name }} alternative? See why thousands of users choose {{ resolved.config.brand.name }} for a faster, more powerful experience."
     primary_button:
       text: "{% if resolved.pricing.trialDays > 0 %}Try free for {{ resolved.pricing.trialDays }} days{% else %}Get started{% endif %}"
       href: "/pricing"
@@ -25,18 +25,16 @@ alternative:
       href: "/pricing"
   comparison:
     superheadline:
-      icon: "scale-balanced"
       text: "Head to head"
     headline: "See how we"
     headline_accent: "compare"
-    subheadline: "A side-by-side look at {{ site.brand.name }} vs {{ resolved.alternative.competitor.name }}"
+    subheadline: "A side-by-side look at {{ resolved.config.brand.name }} vs {{ resolved.alternative.competitor.name }}"
     features: []
   why_switch:
     superheadline:
-      icon: "arrow-right-arrow-left"
       text: "Why switch"
     headline: "Why teams are switching to"
-    headline_accent: "{{ site.brand.name }}"
+    headline_accent: "{{ resolved.config.brand.name }}"
     subheadline: "Here's what makes us different"
     items:
       - title: "10x faster performance"
@@ -50,15 +48,13 @@ alternative:
         image: "https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-3.svg"
   video:
     superheadline:
-      icon: "circle-play"
       text: "Watch demo"
-    headline: "See {{ site.brand.name }} in"
+    headline: "See {{ resolved.config.brand.name }} in"
     headline_accent: "action"
-    subheadline: "A quick walkthrough of what makes {{ site.brand.name }} the best {{ resolved.alternative.competitor.name }} alternative"
+    subheadline: "A quick walkthrough of what makes {{ resolved.config.brand.name }} the best {{ resolved.alternative.competitor.name }} alternative"
     youtube_id: null
   testimonials:
     superheadline:
-      icon: "bullhorn"
       text: "Testimonials"
     items:
       - quote: "We made the switch and the difference is <em>night and day</em>. Everything just works faster."
@@ -91,11 +87,10 @@ alternative:
       sublabel: "Real humans"
   faqs:
     superheadline:
-      icon: "circle-question"
       text: "FAQs"
     headline: "Switching"
     headline_accent: "questions"
-    subheadline: "Everything you need to know about switching from {{ resolved.alternative.competitor.name }} to {{ site.brand.name }}"
+    subheadline: "Everything you need to know about switching from {{ resolved.alternative.competitor.name }} to {{ resolved.config.brand.name }}"
     items:
       - question: "Can I import my data from {{ resolved.alternative.competitor.name }}?"
         answer: "Yes! We offer a one-click migration tool that imports all your projects, files, and settings. The entire process takes just a few minutes."
@@ -112,11 +107,10 @@ alternative:
     href: "/pricing"
   cta:
     superheadline:
-      icon: "rocket"
       text: "Make the switch"
     headline: "Ready to leave"
     headline_accent: "{{ resolved.alternative.competitor.name }} behind?"
-    subheadline: "Join thousands who chose {{ site.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
+    subheadline: "Join thousands who chose {{ resolved.config.brand.name }}.{% if resolved.pricing.trialDays > 0 %} Start your free trial today. No credit card required.{% endif %}"
     primary_button:
       text: "{% if resolved.pricing.trialDays > 0 %}Start free trial{% else %}Get started{% endif %}"
       href: "/pricing"
@@ -181,7 +175,7 @@ alternative:
               <thead>
                 <tr>
                   <th scope="col" class="w-40">Feature</th>
-                  <th scope="col" class="text-center">{{ site.brand.name }}</th>
+                  <th scope="col" class="text-center">{{ resolved.config.brand.name }}</th>
                   <th scope="col" class="text-center">{{ alt.competitor.name }}</th>
                 </tr>
               </thead>

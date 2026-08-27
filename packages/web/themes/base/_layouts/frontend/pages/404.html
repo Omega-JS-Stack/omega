@@ -6,11 +6,12 @@ layout: frontend/core/base
 # alive while you're lost), real URL stamped by the page JS (#page-url),
 # full chrome kept so every exit is one click away.
 
-theme:
-  nav:
-    enabled: true
-  footer:
-    enabled: true
+config:
+  theme:
+    nav:
+      enabled: true
+    footer:
+      enabled: true
 ---
 
 <section class="omega-404 omega-dotgrid" data-omega-dotfield>
@@ -26,7 +27,7 @@ theme:
 
     <div class="omega-404__url d-inline-flex align-items-center gap-2 px-3 py-2 small text-muted mw-100" data-omega-reveal>
       <span class="omega-micro flex-shrink-0">URL</span>
-      <span id="page-url" class="text-break font-monospace">{{ site.url }}{{ page.url }}</span>
+      <span id="page-url" class="text-break font-monospace">{{ resolved.config.url }}{{ page.url }}</span>
     </div>
 
     <div class="omega-404__actions" data-omega-reveal>

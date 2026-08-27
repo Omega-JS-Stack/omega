@@ -45,7 +45,7 @@ function templateFiles(dir) {
 function stubConfig() {
   const templates = [];
   const noop = () => {};
-  return {
+  const config = {
     templates,
     addTemplate: (virtual, raw, data) => templates.push({ virtual, raw, data }),
     setLiquidOptions: noop,
@@ -58,9 +58,12 @@ function stubConfig() {
     addTransform: noop,
     addCollection: noop,
     addWatchTarget: noop,
+    // Eleventy hands a function plugin the config itself (#488's slugifier).
+    addPlugin: (plugin, ...args) => plugin(config, ...args),
     on: noop,
     ignores: new Set(),
   };
+  return config;
 }
 
 // The real packaged defaults over a consumer that claims `/` — so the index

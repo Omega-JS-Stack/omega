@@ -1,6 +1,7 @@
 const fetch = require('wonderful-fetch');
 const powertools = require('node-powertools');
 const discountCodes = require('../../../../libraries/payment/discount-codes.js');
+const env = require('../../../../libraries/env.js');
 
 // A declined subscription fires two events, and the second one reads what the
 // first one wrote — how long it waits for that, and how often it looks
@@ -24,7 +25,7 @@ module.exports = {
    * @param {string} options.frequency - 'monthly', 'annually', 'weekly', or 'daily' (subscriptions only)
    * @param {boolean} options.trial - Whether to include a trial period (subscriptions only)
    * @param {object} options.discount - Validated discount from discount-codes.validate(), or null
-   * @param {string} options.simulate - Checkout outcome to simulate ('decline'), or null for success
+   * @param {string} options.simulate - Checkout outcome to simulate ('decline' | 'abandon'), or null for success
    * @param {string} options.confirmationUrl - Success redirect URL
    * @param {string} options.cancelUrl - Cancel redirect URL
    * @param {object} options.ctx - Assistant instance
@@ -38,12 +39,18 @@ module.exports = {
 
     const productType = product.type || 'subscription';
     const declined = simulate === 'decline';
+    // An ABANDONED checkout is the absence of an event, not a different one: the
+    // session is created, the customer closes the tab, and the provider has
+    // nothing to report. So the session comes back exactly as it always does and
+    // no webhook is fired — the state under test is what that leaves behind
+    // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+    const abandoned = simulate === 'abandon';
 
     if (productType === 'subscription') {
-      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, confirmationUrl, ctx });
+      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, abandoned, confirmationUrl, ctx });
     }
 
-    return createOneTimeIntent({ uid, orderId, product, productId, discount, declined, confirmationUrl, ctx });
+    return createOneTimeIntent({ uid, orderId, product, productId, discount, declined, abandoned, confirmationUrl, ctx });
   },
 };
 
@@ -54,7 +61,7 @@ module.exports = {
  * A declined checkout mirrors what a real provider does: the subscription is
  * created in a dunning state (past_due → suspended) and its first invoice fails.
  */
-async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, confirmationUrl, ctx }) {
+async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, discount, declined, abandoned, confirmationUrl, ctx }) {
   // Generate IDs
   const timestamp = Date.now();
   const sessionId = `_test-cs-${timestamp}`;
@@ -118,10 +125,12 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
     data: { object: subscription },
   };
 
-  ctx.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}, declined=${!!declined}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
+  ctx.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}, declined=${!!declined}, abandoned=${!!abandoned}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
 
   // Auto-fire webhook
-  if (declined) {
+  if (abandoned) {
+    ctx.log(`Test subscription intent: abandoned — no webhook fired, the intent stays pending`);
+  } else if (declined) {
     // The failed invoice names the subscription, and the pipeline resolves that
     // subscription from the order the FIRST event wrote — so the two events go out
     // in order, not at once.
@@ -157,7 +166,7 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
  * A declined checkout still creates the session — the payment is what fails, so
  * a failed manual invoice goes out in place of the completed session.
  */
-async function createOneTimeIntent({ uid, orderId, product, productId, discount, declined, confirmationUrl, ctx }) {
+async function createOneTimeIntent({ uid, orderId, product, productId, discount, declined, abandoned, confirmationUrl, ctx }) {
   // Validate that a price exists
   if (!product.prices?.once) {
     throw new Error(`No one-time price configured for ${product.id}`);
@@ -209,10 +218,14 @@ async function createOneTimeIntent({ uid, orderId, product, productId, discount,
       data: { object: session },
     };
 
-  ctx.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}, declined=${!!declined}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
+  ctx.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}, declined=${!!declined}, abandoned=${!!abandoned}, discount=${discount?.code || 'none'}, firstCharge=${firstCharge}`);
 
   // Auto-fire webhook
-  fireWebhook({ event, ctx });
+  if (abandoned) {
+    ctx.log(`Test one-time intent: abandoned — no webhook fired, the intent stays pending`);
+  } else {
+    fireWebhook({ event, ctx });
+  }
 
   return {
     id: sessionId,
@@ -316,7 +329,7 @@ async function waitForOrder({ orderId, ctx }) {
  * Returns the request so a caller that must order two events can chain them
  */
 function fireWebhook({ event, ctx }) {
-  const webhookUrl = `${ctx.Manager.getApiUrl()}/omega/payments/webhook?provider=test&key=${process.env.OMEGA_WEBHOOK_KEY}`;
+  const webhookUrl = `${ctx.Manager.getApiUrl()}/omega/payments/webhook?provider=test&key=${env.get('OMEGA_WEBHOOK_KEY')}`;
   return fetch(webhookUrl, {
     method: 'POST',
     response: 'json',

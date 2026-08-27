@@ -12,6 +12,43 @@ const JSON5 = require('json5');
 
 const { scaffoldDefaults } = require('../../../gulp/tasks/defaults.js');
 
+const SRC = path.join(__dirname, '..', '..', '..');
+
+// The defaults task reads the consumer config from cwd at REQUIRE time, so a
+// case that needs a REAL brand config stages one, chdirs in, and requires the
+// task fresh — the same model as package-task.test.js's inProject().
+function scaffoldWithBrand(brand) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-brand-'));
+  jetpack.write(path.join(tmp, 'config', 'omega.json5'), `${JSON.stringify({ brand, targets: { extension: {} } }, null, 2)}\n`);
+
+  const oldCwd = process.cwd();
+  const flush = () => {
+    for (const key of Object.keys(require.cache)) {
+      if (key.startsWith(SRC + path.sep)) delete require.cache[key];
+    }
+  };
+
+  flush();
+  try {
+    process.chdir(tmp);
+    require(path.join(SRC, 'gulp', 'tasks', 'defaults.js')).scaffoldDefaults({ outputDir: tmp });
+  } finally {
+    process.chdir(oldCwd);
+    flush();
+  }
+
+  return tmp;
+}
+
+// The scaffolded config/messages.json is JSON5 — read it the way the build does.
+function readMessages(dir) {
+  return JSON5.parse(jetpack.read(path.join(dir, 'config', 'messages.json')));
+}
+
+function readAppDescription(dir) {
+  return readMessages(dir).appDescription.message;
+}
+
 module.exports = {
   type: 'group',
   layer: 'build',
@@ -204,6 +241,42 @@ module.exports = {
         scaffoldDefaults({ outputDir: tmp });
 
         ctx.expect(jetpack.exists(path.join(tmp, '.github', 'workflows', 'publish.yml'))).toBe('file');
+      },
+    },
+    {
+      name: 'appDescription seeds from brand.description when it fits the store cap (#573)',
+      run: (ctx) => {
+        // A description with an apostrophe: the seed is a single-quoted JSON5
+        // string, so an unescaped one would make the scaffolded file unparseable
+        const description = `Save what you find — the world's tidiest clipper.`;
+        const tmp = scaffoldWithBrand({ id: 'acme', name: 'Acme', description });
+
+        ctx.expect(readAppDescription(tmp)).toBe(description);
+      },
+    },
+    {
+      name: 'appDescription falls back to today\'s phrasing over the cap, or with no description (#573)',
+      run: (ctx) => {
+        const tooLong = `${'x'.repeat(201)}`;
+        const overCap = scaffoldWithBrand({ id: 'acme', name: 'Acme', description: tooLong });
+        const none    = scaffoldWithBrand({ id: 'acme', name: 'Acme' });
+
+        ctx.expect(readAppDescription(overCap)).toBe('The official Acme browser extension.');
+        ctx.expect(readAppDescription(none)).toBe('The official Acme browser extension.');
+      },
+    },
+    {
+      name: 'every seeded message escapes the brand name — an apostrophe keeps the file parseable (#592)',
+      run: (ctx) => {
+        // #573 escaped the description path only; appName/appNameShort/btnTooltip
+        // rendered `[ site.brand.name ]` raw into the same single-quoted JSON5.
+        const name = `Ian's Clipper`;
+        const messages = readMessages(scaffoldWithBrand({ id: 'acme', name }));
+
+        ctx.expect(messages.appName.message).toBe(name);
+        ctx.expect(messages.appNameShort.message).toBe(name);
+        ctx.expect(messages.btnTooltip.message).toBe(name);
+        ctx.expect(messages.appDescription.message).toBe(`The official ${name} browser extension.`);
       },
     },
   ],

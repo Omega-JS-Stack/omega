@@ -19,7 +19,7 @@
  * at prepare time, never published on its own.
  */
 
-const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN } = require('./schema.js');
+const { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN } = require('./schema.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
@@ -27,8 +27,10 @@ const { chosenProvider } = require('./providers.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
+const { ENV_SCHEMA, ENV_GROUPS, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, devEnvKeys, devEnvKeyMap, envKeysByGroup } = require('./env-schema.js');
 const { readCompanyRoot, COMPANY_MARKER } = require('./company.js');
-const { applyConfigEdits, writeConfigValues } = require('./edit.js');
+const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('./edit.js');
+const { schemaDefaults, missingDefaults, defaultComments } = require('./defaults.js');
 const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js');
 const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
@@ -57,6 +59,20 @@ module.exports = {
   resolveEnvChain,
   loadEnvChain,
 
+  // The env schema (#581) — the ONE inventory of the keys OMEGA needs: the
+  // manager's mint/order/disperse lanes and the backend's env reader all
+  // derive from it, so a new key is one entry, not four edits
+  ENV_SCHEMA,
+  ENV_GROUPS,
+  envFileGroups,
+  envSchemaEntry,
+  envKeysForTarget,
+  generatedEnvKeys,
+  requiredEnvKeys,
+  devEnvKeys,
+  devEnvKeyMap,
+  envKeysByGroup,
+
   // Company layer discovery (the .omega/company.json stamp) — shared by the
   // config chain, the .env chain, and owner hooks
   readCompanyRoot,
@@ -65,8 +81,16 @@ module.exports = {
   // Writeback (comment-preserving edits + canonical top-level key order)
   applyConfigEdits,
   writeConfigValues,
+  applyConfigRemovals,
+  removeConfigValues,
   applyCanonicalOrder,
   CANONICAL_TOP_LEVEL_ORDER,
+
+  // Schema-derived defaults (#478) — the merge chain's lowest layer, and the
+  // heal list the manage walk materializes into a brand's omega.json5
+  schemaDefaults,
+  missingDefaults,
+  defaultComments,
 
   // Layer-aware consumer seeding (brand target = no local-layer config at all)
   resolveSeedMode,
@@ -145,6 +169,10 @@ module.exports = {
 
   // Schema (pure data)
   TARGETS,
+  CUSTOM_TARGET_TYPE,
+  isCustomTargetEntry,
+  BACKEND_PROJECT_TYPES,
+  backendProjectType,
   SHARED_SECTIONS,
   SHARED_SCHEMA,
   TARGET_SCHEMAS,

@@ -6,8 +6,10 @@
  * frontends embed, so it fills the `id` slot.
  *
  * Auth: TIKTOK_ACCESS_TOKEN in the brand .env (the `Access-Token` header) —
- * the developer-app token, the same key @omega.js/backend's Events API
- * sender reads.
+ * the long-lived token the portal authorization mints (#448, lib/tiktok-auth.js),
+ * the same key @omega.js/backend's Events API sender reads. The exchange that
+ * MINTS it lives here too, as a free function: it is the one call that runs
+ * without a token, so it can never be a method on the authenticated client.
  *
  * SCAFFOLD (#417, Ian 2026-08-21): the endpoints below are the documented
  * v1.3 pixel shapes, never yet exercised against the live API — Ian's TikTok
@@ -15,6 +17,57 @@
  * cannot reach this client. Treat a first live run as the proving run.
  */
 const API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
+const PORTAL_BASE = 'https://business-api.tiktok.com/portal/auth';
+
+/**
+ * The portal page a human authorizes the app on. The app's own redirect URI
+ * receives `auth_code` in its query string; when the brand names it in config
+ * it is passed through, otherwise the app's default applies.
+ *
+ * @param {object} params
+ * @param {string} params.appId - The TikTok developer app id (public config).
+ * @param {string} [params.redirectUri] - The app's configured redirect URI.
+ * @returns {string} The authorization URL.
+ */
+function TIKTOK_PORTAL_URL({ appId, redirectUri }) {
+  const query = `app_id=${encodeURIComponent(appId)}&state=omega`;
+  return redirectUri
+    ? `${PORTAL_BASE}?${query}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    : `${PORTAL_BASE}?${query}`;
+}
+
+/**
+ * Exchange a portal `auth_code` for the long-lived access token (#448). The
+ * app secret is a MINT-TIME credential — it is passed here and never stored.
+ *
+ * @param {object} params - { appId, secret, authCode }.
+ * @param {Function} [fetchImpl] - Test seam; defaults to global fetch.
+ * @returns {Promise<string>} The long-lived access token.
+ */
+async function exchangeAuthCode({ appId, secret, authCode }, fetchImpl = fetch) {
+  const response = await fetchImpl(`${API_BASE}/oauth2/access_token/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: appId, secret, auth_code: authCode }),
+  });
+
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : null;
+
+  // Same rule as the client: TikTok answers 200 with a non-zero `code`
+  if (!response.ok || (body && body.code !== 0)) {
+    throw new Error(`TikTok API error (${body?.code ?? response.status}): ${body?.message || response.statusText}`);
+  }
+
+  const token = body?.data?.access_token;
+  if (!token) {
+    // A 200 with code 0 and no token means the response shape moved —
+    // persisting `undefined` would poison the brand .env
+    throw new Error(`TikTok token exchange returned no access_token (${JSON.stringify(body?.data)})`);
+  }
+
+  return token;
+}
 
 class TikTokBusinessAPI {
   constructor(options = {}) {
@@ -63,4 +116,4 @@ class TikTokBusinessAPI {
   }
 }
 
-module.exports = { TikTokBusinessAPI };
+module.exports = { TikTokBusinessAPI, exchangeAuthCode, TIKTOK_PORTAL_URL };

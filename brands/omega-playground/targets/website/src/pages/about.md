@@ -11,7 +11,7 @@ permalink: /about
 {% section "about/hero" %}
 headline: "This whole site is <em>a demo</em>"
 headline_accent: ""
-description: "What {{ site.brand.name }} is, why it exists, and why nothing on it is real."
+description: "What {{ resolved.config.brand.name }} is, why it exists, and why nothing on it is real."
 image: "/assets/images/about/office.jpg"
 image_alt: "Writers at long wooden desks in a plant-filled studio, one of them writing in a notebook by a window"
 facts:
@@ -38,10 +38,9 @@ vision:
 <!-- ═══ The journey ═══ -->
 {% section "about/timeline" %}
 superheadline:
-  icon: "clock-rotate-left"
   text: "History"
 headline: "A test brand, <em>out in the open</em>"
-subheadline: "The small history of {{ site.brand.name }}."
+subheadline: "The small history of {{ resolved.config.brand.name }}."
 items:
   - year: "Before"
     title: "Demos that proved nothing"
@@ -67,7 +66,6 @@ items:
 <!-- ═══ Principles ═══ -->
 {% section "about/principles" %}
 superheadline:
-  icon: "compass"
   text: "Principles"
 headline: "What we <em>refuse</em> to compromise on"
 subheadline: "Four principles, in order. When two collide, the smaller number wins."
@@ -84,9 +82,8 @@ items:
 <!-- ═══ Team CTA ═══ -->
 {% section "marketing/cta" %}
 superheadline:
-  icon: "handshake"
   text: "People"
-headline: "Meet the people behind {{ site.brand.name }}"
+headline: "Meet the people behind {{ resolved.config.brand.name }}"
 subheadline: "The people who build OMEGA, and run this playground on it."
 primary_button:
   text: "Meet the team"

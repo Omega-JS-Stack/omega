@@ -4,6 +4,7 @@ const fetch = require('wonderful-fetch');
 const { arrayify } = require('node-powertools');
 // Aliased: this file already exports its OWN loadProvider (the OAuth2 lookup below)
 const loadProviderModule = require('../../../libraries/load-provider.js');
+const env = require('../../../libraries/env.js');
 
 const PROVIDERS_DIR = path.join(__dirname, 'providers');
 
@@ -11,8 +12,8 @@ const PROVIDERS_DIR = path.join(__dirname, 'providers');
 const STATE_TTL_MINUTES = 10;
 
 // Derive OAuth state encryption key from OMEGA_ADMIN_KEY
-const STATE_KEY = process.env.OMEGA_ADMIN_KEY
-  ? crypto.createHash('sha256').update(`oauth2-state:${process.env.OMEGA_ADMIN_KEY}`).digest('hex')
+const STATE_KEY = env.get('OMEGA_ADMIN_KEY')
+  ? crypto.createHash('sha256').update(`oauth2-state:${env.get('OMEGA_ADMIN_KEY')}`).digest('hex')
   : null;
 
 /**
@@ -80,8 +81,8 @@ async function buildContext({ ctx, user, settings, requireProvider = true }) {
 
   // Get OAuth2 credentials
   const providerEnvKey = settings.provider.toUpperCase().replace(/-/g, '_');
-  const clientId = process.env[`OAUTH2_${providerEnvKey}_CLIENT_ID`];
-  const clientSecret = process.env[`OAUTH2_${providerEnvKey}_CLIENT_SECRET`];
+  const clientId = env.get(`OAUTH2_${providerEnvKey}_CLIENT_ID`);
+  const clientSecret = env.get(`OAUTH2_${providerEnvKey}_CLIENT_SECRET`);
 
   return {
     ctx,
@@ -110,8 +111,8 @@ function loadProvider(providerName) {
   }
 
   const providerEnvKey = providerName.toUpperCase().replace(/-/g, '_');
-  const clientId = process.env[`OAUTH2_${providerEnvKey}_CLIENT_ID`];
-  const clientSecret = process.env[`OAUTH2_${providerEnvKey}_CLIENT_SECRET`];
+  const clientId = env.get(`OAUTH2_${providerEnvKey}_CLIENT_ID`);
+  const clientSecret = env.get(`OAUTH2_${providerEnvKey}_CLIENT_SECRET`);
 
   return { oauth2Provider, clientId, clientSecret };
 }

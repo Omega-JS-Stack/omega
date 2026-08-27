@@ -1,0 +1,22 @@
+{% comment %} The head-plus-lede band (#515): the shared section-head cluster
+over a narrow column of paragraphs. Nothing here is new vocabulary — the head
+is heading/section-head (nested composition), the column is the shared
+omega-prose reading measure, and the rhythm is the spacing utilities every
+other band uses. {% endcomment %}
+<section>
+  <div class="container" data-omega-reveal-stagger="90">
+    <div class="omega-section-head omega-section-head--center mb-4" data-omega-reveal>
+      {% component "heading/section-head", superheadline: args.superheadline, headline: args.headline, headline_accent: args.headline_accent, sub: args.subheadline %}
+    </div>
+
+    {% if args.body and args.body.size > 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-8 omega-prose" data-omega-reveal>
+          {% for paragraph in args.body %}
+            <p{% if forloop.last %} class="mb-0"{% endif %}>{{ paragraph }}</p>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>

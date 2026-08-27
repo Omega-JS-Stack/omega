@@ -2,10 +2,10 @@
 layout: frontend/pages/extension/installed
 
 meta:
-  title: "Extension Installed - {{ site.brand.name }}"
-  description: "Thank you for installing the {{ site.brand.name }} browser extension! Learn how to pin it for quick access."
+  title: "Extension Installed - {{ resolved.config.brand.name }}"
+  description: "Thank you for installing the {{ resolved.config.brand.name }} browser extension! Learn how to pin it for quick access."
   breadcrumb: "Installed"
-  robots: "noindex, nofollow"
+  index: false      # #564: the declared posture, now real (head.html reads meta.index; `robots` was a no-op)
 ---
 
 {{ content | omega_content_format }}

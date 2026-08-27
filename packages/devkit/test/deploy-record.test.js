@@ -1,9 +1,11 @@
 /**
- * Deploy record (cp196): brand-root-resolved `<target>` in
- * .omega/deploys.json — written by deploy verbs, read by the testing service
- * to split never-deployed (nudge) from deployed-but-down (error). A brand
- * that still carries the retired .omega/state.json's `deploy` key has it
- * adopted once, silently (#449).
+ * Deploy record (cp196): brand-root-resolved `<target>` under the `deploy`
+ * section of .omega/state.json — written by deploy verbs, read by the
+ * testing service to split never-deployed (nudge) from deployed-but-down
+ * (error). state.json is the ONE sectioned record file (#479): a brand still
+ * carrying the interim .omega/deploys.json (0.45.0) has it adopted once,
+ * loudly, and a brand still carrying retired config-shaped keys beside its
+ * records keeps them untouched.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -12,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { recordDeploy, readDeployRecord, deployKey } = require('../src/deploy-record.js');
+const { stripAnsi } = require('../src/attach-log-file.js');
 
 function makeBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-record-'));
@@ -21,13 +24,34 @@ function makeBrand() {
   return root;
 }
 
-function readRecords(root) {
-  return JSON.parse(fs.readFileSync(path.join(root, '.omega', 'deploys.json'), 'utf8'));
+function readState(root) {
+  return JSON.parse(fs.readFileSync(path.join(root, '.omega', 'state.json'), 'utf8'));
 }
 
-function writeLegacyState(root, state) {
+function readRecords(root) {
+  return readState(root).deploy;
+}
+
+function writeState(root, state) {
   fs.mkdirSync(path.join(root, '.omega'), { recursive: true });
   fs.writeFileSync(path.join(root, '.omega', 'state.json'), JSON.stringify(state));
+}
+
+function writeLegacyDeploys(root, records) {
+  fs.mkdirSync(path.join(root, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.omega', 'deploys.json'), JSON.stringify(records));
+}
+
+// Capture the adoption notices a call prints; returns { result, lines }.
+function capture(fn) {
+  const original = console.log;
+  const lines = [];
+  console.log = (...args) => lines.push(stripAnsi(args.map(String).join(' ')));
+  try {
+    return { result: fn(), lines };
+  } finally {
+    console.log = original;
+  }
 }
 
 test('recordDeploy resolves to the brand root from a target dir; readDeployRecord sees it from anywhere', () => {
@@ -81,46 +105,88 @@ test('recordDeploy preserves other targets', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('the retired state.json deploy key is adopted once, and the emptied file goes (#449)', () => {
+test('a foreign top-level state.json section survives a record write untouched (#479)', () => {
   const root = makeBrand();
-  writeLegacyState(root, { deploy: { backend: { at: '2026-07-17T00:00:00.000Z', method: 'firebase' } } });
+  writeState(root, { install: { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] } });
 
-  assert.equal(readDeployRecord({ dir: root, target: 'backend' }).method, 'firebase', 'the old record is not lost');
+  recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
 
-  assert.deepEqual(readRecords(root).backend, { at: '2026-07-17T00:00:00.000Z', method: 'firebase' }, 'adopted whole, stamps intact');
-  assert.equal(fs.existsSync(path.join(root, '.omega', 'state.json')), false, 'nothing else was in it — the file goes');
-
-  recordDeploy({ dir: root, target: 'web' });
-  const records = readRecords(root);
-  assert.equal(records.backend.method, 'firebase', 'the adopted record survives the next write');
-  assert.ok(records.web.at);
+  const state = readState(root);
+  assert.deepEqual(state.install, { lastCheck: '2026-08-22T00:00:00.000Z', packages: ['web'] }, 'other fact kinds are read-through, never rewritten');
+  assert.equal(state.deploy.web.method, 'direct', 'the deploy section is the only one this module writes');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('a state.json with other keys keeps its file, minus the adopted deploy key (#449)', () => {
+test('a standalone .omega/deploys.json is adopted into state.json, LOUDLY, and the old file goes (#479)', () => {
   const root = makeBrand();
-  writeLegacyState(root, { cloud: { projectId: 'p' }, deploy: { backend: { at: 'x' } } });
+  writeLegacyDeploys(root, { backend: { at: '2026-08-01T00:00:00.000Z', method: 'firebase' } });
 
-  recordDeploy({ dir: root, target: 'web' });
+  const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
 
-  const records = readRecords(root);
-  assert.equal(records.backend.at, 'x', 'the old record is adopted');
-  assert.ok(records.web.at);
+  assert.equal(result.method, 'firebase', 'the old record is not lost');
+  assert.deepEqual(readRecords(root).backend, { at: '2026-08-01T00:00:00.000Z', method: 'firebase' }, 'adopted whole, stamps intact');
+  assert.equal(fs.existsSync(path.join(root, '.omega', 'deploys.json')), false, 'the old file is removed');
 
-  const state = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'state.json'), 'utf8'));
-  assert.deepEqual(state, { cloud: { projectId: 'p' } }, 'a pre-#434 brand keeps its file for the state-retirement migration, minus the deploy key');
+  assert.equal(lines.length, 1, 'ONE line, not a per-record chorus');
+  assert.match(lines[0], /\[@omega\.js\/devkit:deploy-record\]/, 'the log-tag convention');
+  assert.match(lines[0], /deploys\.json/, 'names what was adopted');
+  assert.match(lines[0], /state\.json/, 'names where it landed');
+  assert.match(lines[0], /removed/, 'says the old file went');
+
+  const quiet = capture(() => recordDeploy({ dir: root, target: 'web' }));
+  assert.deepEqual(quiet.lines, [], 'adoption is ONE-TIME — the next write is silent');
+  assert.equal(readRecords(root).backend.method, 'firebase', 'the adopted record survives the next write');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('a record already in deploys.json wins over the legacy key it adopts beside', () => {
+test('an EMPTY legacy deploys.json is cleaned up silently — no "Adopted 0" line (#479)', () => {
+  const root = makeBrand();
+  writeLegacyDeploys(root, {});
+
+  const { lines } = capture(() => recordDeploy({ dir: root, target: 'web' }));
+
+  assert.equal(fs.existsSync(path.join(root, '.omega', 'deploys.json')), false, 'the empty husk still goes');
+  assert.deepEqual(lines, [], 'nothing was adopted, so nothing is announced');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('an unmigrated brand reads its records in place — retired keys untouched, nothing announced (#479)', () => {
+  const root = makeBrand();
+  writeState(root, {
+    edge: { zoneId: 'zone-abc' },
+    search: { propertyUrl: 'sc-domain:fixture-brand.test' },
+    deploy: { backend: { at: '2026-07-17T00:00:00.000Z', method: 'firebase' } },
+  });
+
+  const { result, lines } = capture(() => readDeployRecord({ dir: root, target: 'backend' }));
+  assert.equal(result.method, 'firebase', 'the record is already home — read in place, no adoption');
+  assert.deepEqual(lines, [], 'nothing moved, so nothing is announced');
+
+  const quiet = capture(() => recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } }));
+  assert.deepEqual(quiet.lines, [], 'the write is silent too');
+
+  const state = readState(root);
+  assert.equal(state.deploy.backend.method, 'firebase', 'the existing record survives the write');
+  assert.equal(state.deploy.web.method, 'direct');
+  assert.deepEqual(state.edge, { zoneId: 'zone-abc' }, 'retired content is the state-retirement migration\'s to move, never this module\'s');
+  assert.deepEqual(state.search, { propertyUrl: 'sc-domain:fixture-brand.test' });
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a record already in state.json wins over the legacy file it adopts beside', () => {
   const root = makeBrand();
   recordDeploy({ dir: root, target: 'web', detail: { method: 'direct' } });
-  writeLegacyState(root, { deploy: { web: { at: '2020-01-01T00:00:00.000Z', method: 'stale' }, backend: { at: 'x' } } });
+  writeLegacyDeploys(root, { web: { at: '2021-01-01T00:00:00.000Z', method: 'stale-file' }, desktop: { at: 'd' } });
 
-  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'direct', 'the newer write is the record');
-  assert.equal(readDeployRecord({ dir: root, target: 'backend' }).at, 'x', 'the rest is still adopted');
+  capture(() => {
+    assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'direct', 'the newer write is the record');
+  });
+
+  assert.equal(readDeployRecord({ dir: root, target: 'desktop' }).at, 'd', 'the rest of the old file is still adopted');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

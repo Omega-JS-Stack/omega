@@ -22,6 +22,7 @@
  */
 const fetch = require('wonderful-fetch');
 const powertools = require('node-powertools');
+const env = require('../env.js');
 
 /**
  * Generate an article via the Ghostii API.
@@ -45,7 +46,7 @@ async function writeArticle({ brand, description, links, sourceContent, override
     // whose auth reads exactly this payload field. Renames to the
     // omega-admin-key header only when Ghostii itself migrates to the new
     // stack — never "fix" unilaterally (it would break article generation).
-    backendManagerKey: process.env.OMEGA_ADMIN_KEY,
+    backendManagerKey: env.get('OMEGA_ADMIN_KEY'),
     keywords: o.keywords || [],
     description: description,
     insertLinks: o.insertLinks ?? true,
@@ -168,7 +169,7 @@ async function publishArticle(ctx, { brand, article, id, author, postPath, sourc
     tries: 1,
     response: 'json',
     headers: {
-      'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+      'omega-admin-key': env.get('OMEGA_ADMIN_KEY'),
     },
     body: postBody,
   });

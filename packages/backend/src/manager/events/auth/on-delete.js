@@ -112,7 +112,10 @@ function trackDelete({ Manager, ctx, user, userDoc }) {
     deliverConversion({
       event: 'user_delete',
       attribution: buildAttributionContext(userDoc?.attribution),
-      identity: buildIdentity({ uid: user.uid }),
+      // The doc as it stood, through the ONE match reader: a deletion is an
+      // exclusion audience, and an exclusion nobody can be matched to excludes
+      // nobody ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)).
+      identity: buildIdentity({ uid: user.uid, user: userDoc, email: user.email, telephone: user.phoneNumber }),
       trackingConsent: userDoc?.trackingConsent,
       eventId: `user_delete.${user.uid}`,
       ctx: ctx,

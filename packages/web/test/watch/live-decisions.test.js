@@ -21,9 +21,9 @@ const { test } = require('node:test');
 const { configureOmega } = require('../../src/index.js');
 const { registerTemplateWatchTargets, watchRescanTargets } = require('../../src/commands/dev.js');
 
-// The rebuild deadline scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
-const POLL_MS = 50;
+// The rebuild deadline scales with the lane's load knob (#211) and with this
+// machine's measured contention (#615).
+const { POLL_MS, buildRecorder, rebuildDeadlineMs, waitForRebuild } = require('../lib/deadlines.js');
 const DRAIN_QUIET_POLLS = 20;
 
 const ACTIVE_THEME = 'toy-theme';
@@ -57,7 +57,7 @@ test('the rescan watcher re-runs the affected capture when its dir changes', asy
 
   fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
 
-  const deadline = Date.now() + REBUILD_DEADLINE_MS;
+  const deadline = Date.now() + rebuildDeadlineMs();
   while (runs.pages === baseline.pages && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
@@ -91,7 +91,7 @@ test('closing a watcher cancels the rescan it had queued', async (t) => {
   const seen = events;
 
   fs.writeFileSync(path.join(root, 'pages', 'about.md'), '---\npermalink: /about\n---\nabout');
-  const deadline = Date.now() + REBUILD_DEADLINE_MS;
+  const deadline = Date.now() + rebuildDeadlineMs();
   while (events === seen && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 1));
   }
@@ -182,12 +182,16 @@ function target() {
 async function startWatch(t, fixture) {
   const Eleventy = require('@11ty/eleventy').default;
   const configRuns = { count: 0 };
+  // What the watcher actually did, for a timeout's failure message (#615).
+  const builds = buildRecorder();
   const watchers = [];
   const elev = new Eleventy(fixture.src, fixture.out, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
       configRuns.count += 1;
+      eleventyConfig.on('eleventy.before', builds.onStart);
+      eleventyConfig.on('eleventy.after', builds.onFinish);
       registerTemplateWatchTargets(eleventyConfig, {
         onRescans: (targets) => watchers.push(...watchRescanTargets(targets)),
       });
@@ -223,7 +227,7 @@ async function startWatch(t, fixture) {
     page,
     configRuns,
     async pageBecomes(pattern, message, file) {
-      const deadline = Date.now() + REBUILD_DEADLINE_MS;
+      const deadline = Date.now() + rebuildDeadlineMs();
       let rendered = page(file);
 
       while (!pattern.test(rendered) && Date.now() < deadline) {

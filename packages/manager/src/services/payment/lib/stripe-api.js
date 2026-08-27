@@ -140,6 +140,13 @@ class StripeAPI {
   async updateWebhookEndpoint(webhookId, params) {
     return this.stripe.webhookEndpoints.update(webhookId, params);
   }
+
+  /**
+   * Delete a webhook endpoint
+   */
+  async deleteWebhookEndpoint(webhookId) {
+    return this.stripe.webhookEndpoints.del(webhookId);
+  }
 }
 
 module.exports = { StripeAPI };

@@ -18,8 +18,10 @@
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (adsense.readonly scope, own token cache).
  */
+const { serviceInputSpec } = require('../../config.js');
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { GoogleAdsenseAPI } = require('./lib/adsense-api.js');
 const { resolveConfigValue } = require('../../lib/config-flow.js');
 
@@ -36,15 +38,17 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no advertising.providers.adsense section in omega.json5 (author it — even empty — to opt in)' };
     }
 
-    if (provider.enabled === false) {
-      return { skip: true, reason: 'advertising.providers.adsense.enabled = false' };
-    }
-
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
     if (!domain) {
       return { skip: true, reason: 'no brand.url configured' };
     }
 
+    // The shared setup contract (#608): ask for the Google OAuth client right
+    // here — provide, skip this run, or disable AdSense for good.
+    let gate = null;
+    if (!context.adsenseApi) {
+      gate = await requestServiceInput(context, serviceInputSpec('advertising'));
+    }
     const haveCreds = Boolean(
       context.adsenseApi
       || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
@@ -64,9 +68,11 @@ module.exports.run = createServiceRunner({
       client = await resolveConfigValue(context, {
         path: 'advertising.providers.adsense.client',
         // Disable must NOT land `client: false` — client is schema-typed as a
-        // string and the config would hard-fail validation forever. The
-        // enabled flag is the gate this service already honors.
-        disablePath: 'advertising.providers.adsense.enabled',
+        // string and the config would hard-fail validation forever. It opts
+        // the PROVIDER out instead (the chatsy/slapform shape): a falsy
+        // provider entry is the deliberate-absence skip above, and there is no
+        // second `enabled` switch to land it on since #527.
+        disablePath: 'advertising.providers.adsense',
         label: 'AdSense account',
         choices: () => flowApi.listAccounts(),
         getName: (account) => {
@@ -83,7 +89,7 @@ module.exports.run = createServiceRunner({
     const accountId = client.replace(/^ca-/, '');
 
     if (!haveCreds) {
-      return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
+      return gate || { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
     }
 
     return {

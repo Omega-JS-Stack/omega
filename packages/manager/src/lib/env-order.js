@@ -3,10 +3,14 @@
  * applyCanonicalOrder (cp137, Ian: "reorder our env files like the config
  * files... moving comments too?").
  *
- * CANONICAL_ENV_GROUPS is the ONE list of known keys, their grouping, and
- * the group comments: the scaffold stub renders from it and every reorder
- * renders from it, so a freshly scaffolded .env and a years-old converged
- * one have the same shape. Machine-owned comments — the boxed `# ── … ──`
+ * The grouping, the group comments, and the key inventory all live in
+ * @omega.js/config's env schema (#581): canonicalEnvGroups() is that schema
+ * rendered as .env sections, the scaffold stub renders from it and every
+ * reorder renders from it, so a freshly scaffolded .env and a years-old
+ * converged one have the same shape — and a key the composer knows can never
+ * be missing from the stub, because both derive from the same entries.
+ *
+ * Machine-owned comments — the boxed `# ── … ──`
  * group headers, `# KEY=` placeholders, the SSOT note lines — are
  * REGENERATED on every render (stale text self-heals); hand-written
  * comments travel verbatim with the key directly below them; the file's
@@ -24,58 +28,22 @@
  * return a reorder that changed any effective value.
  */
 
-// One entry per group, in canonical file order. `comment` renders as the
-// boxed header; optional `notes` render as plain comment lines under it.
-// The env var names are owned by the services (see each service's README
-// row) — this list only owns grouping, order, and the group comments.
-const CANONICAL_ENV_GROUPS = [
-  {
-    comment: 'Omega keys (auto-generated at scaffold — rotate by replacing the value)',
-    notes: [
-      'Admin key: grants admin on your backend. Webhook key: authenticates third-party',
-      'webhook deliveries. Namespace: the brand UUID namespace for deterministic ids.',
-    ],
-    keys: ['OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE'],
-  },
-  { comment: 'GitHub (repo + seo services) — `gh auth login` works instead of a token', keys: ['GH_TOKEN'] },
-  { comment: 'Cloudflare (edge service + every DNS-writing flow) — API token with Zone edit', keys: ['CLOUDFLARE_TOKEN'] },
-  { comment: 'Namecheap registrar (domain service)', keys: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] },
-  { comment: 'Google OAuth client (cloud, analytics, search, advertising services)', keys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] },
-  { comment: "Classic reCAPTCHA keys — the brand's own, from its GCP reCAPTCHA console (captcha service)", keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
-  {
-    comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)',
-    notes: [
-      'One token per platform: it CREATES the pixel on the ad account',
-      '(analytics.providers.{meta,tiktok}.accountId) and signs the conversions it sends.',
-      'Meta: a Business Manager system-user token with ads_management — an interactive',
-      '`omega manage` walks you to the page, pastes it in here, and discovers the ad',
-      'account itself. TikTok: set its advertiser id in config first.',
-    ],
-    keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'],
-  },
-  { comment: 'Error monitoring (monitoring service, Sentry provider) — a personal auth token with project+team write scopes', keys: ['SENTRY_AUTH_TOKEN'] },
-  { comment: 'Email marketing (campaigns + newsletter services: SendGrid + Beehiiv)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },
-  { comment: 'Payment providers (payment service; public halves live in omega.json5)', keys: ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY'] },
-  { comment: 'Operator service accounts (forms/chat/email/server/assets services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT', 'MRLOGO_SERVICE_ACCOUNT'] },
-  { comment: 'Apple signing (certificates service — desktop/mobile targets)', keys: ['APPLE_API_ISSUER', 'APPLE_API_KEY_ID', 'APPLE_TEAM_ID'] },
-  { comment: 'Font Awesome Pro (icons) — path to the local Pro package dir', keys: ['OMEGA_FONTAWESOME_ROOT'] },
-  {
-    comment: 'Auto-generated and persisted on the first real run — machine-owned, leave unset',
-    notes: [
-      'The GA4 Measurement Protocol secrets are per target (the analytics service resolves',
-      "one per stream; disperse composes each target its own GOOGLE_ANALYTICS_SECRET), and the",
-      'VAPID private key is the half the Firebase console only ever shows you once.',
-    ],
-    keys: [
-      'ACCOUNT_PASSWORD_SEED', 'CSC_KEY_PASSWORD', 'VAPID_PRIVATE_KEY',
-      'GOOGLE_ANALYTICS_SECRET_WEB', 'GOOGLE_ANALYTICS_SECRET_BACKEND',
-      'GOOGLE_ANALYTICS_SECRET_DESKTOP', 'GOOGLE_ANALYTICS_SECRET_EXTENSION',
-      'GOOGLE_ANALYTICS_SECRET_MOBILE',
-    ],
-  },
-];
+const { envFileGroups, envKeysByGroup } = require('@omega.js/config');
 
-const KNOWN_KEYS = new Set(CANONICAL_ENV_GROUPS.flatMap((group) => group.keys));
+/**
+ * The canonical .env sections: every schema group that renders into a file,
+ * in schema order, with its keys. Derived on every call so a key added to the
+ * schema needs no edit here (and the group's own `notes` travel with it).
+ *
+ * @returns {Array<{comment: string, notes?: string[], keys: string[]}>}
+ */
+function canonicalEnvGroups() {
+  const byGroup = envKeysByGroup();
+
+  return envFileGroups()
+    .map((group) => ({ comment: group.comment, notes: group.notes, keys: byGroup[group.id] || [] }))
+    .filter((group) => group.keys.length > 0);
+}
 
 const OTHER_COMMENT = 'Other keys (not in the canonical groups)';
 
@@ -87,14 +55,15 @@ const MACHINE_COMMENT_PATTERNS = [
   /^# ── .* ──$/,
   /^# [A-Za-z_][A-Za-z0-9_]*=$/,
 ];
-const MACHINE_COMMENT_EXACT = new Set([
-  ...CANONICAL_ENV_GROUPS.flatMap((group) => (group.notes || []).map((note) => `# ${note}`)),
+const MACHINE_COMMENT_EXACT = [
   '# Auto-generated and persisted here on the first real run — leave unset:',
   '# ACCOUNT_PASSWORD_SEED, CSC_KEY_PASSWORD',
-]);
+];
 
-function isMachineComment(line) {
-  return MACHINE_COMMENT_EXACT.has(line) || MACHINE_COMMENT_PATTERNS.some((pattern) => pattern.test(line));
+function isMachineComment(line, groups) {
+  return MACHINE_COMMENT_EXACT.includes(line)
+    || groups.some((group) => (group.notes || []).some((note) => `# ${note}` === line))
+    || MACHINE_COMMENT_PATTERNS.some((pattern) => pattern.test(line));
 }
 
 const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
@@ -106,6 +75,7 @@ const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
  * reorder rather than risk a legal-but-exotic dotenv construct.
  */
 function parseEnvFile(content) {
+  const groups = canonicalEnvGroups();
   const header = [];
   const entries = new Map(); // key → { raw, handComments: string[], order }
   const strays = [];
@@ -134,7 +104,7 @@ function parseEnvFile(content) {
       continue;
     }
     if (line.trimStart().startsWith('#')) {
-      if (!isMachineComment(line)) pending.push(line);
+      if (!isMachineComment(line, groups)) pending.push(line);
       continue;
     }
     const match = KEY_LINE.exec(line);
@@ -173,13 +143,15 @@ function parseEnvFile(content) {
  */
 function renderCanonicalEnv({ header = [], entries = new Map(), strays = [] } = {}) {
   const entryMap = entries instanceof Map ? entries : new Map(Object.entries(entries));
+  const groups = canonicalEnvGroups();
+  const knownKeys = new Set(groups.flatMap((group) => group.keys));
   const out = [];
 
   if (header.length > 0) {
     out.push(...header, '');
   }
 
-  for (const group of CANONICAL_ENV_GROUPS) {
+  for (const group of groups) {
     out.push(`# ── ${group.comment} ──`);
     for (const note of group.notes || []) {
       out.push(`# ${note}`);
@@ -196,7 +168,7 @@ function renderCanonicalEnv({ header = [], entries = new Map(), strays = [] } = 
   }
 
   const unknown = [...entryMap.entries()]
-    .filter(([key]) => !KNOWN_KEYS.has(key))
+    .filter(([key]) => !knownKeys.has(key))
     .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0));
   if (unknown.length > 0 || strays.length > 0) {
     out.push(`# ── ${OTHER_COMMENT} ──`);
@@ -258,4 +230,4 @@ function applyEnvOrder(content, { defaultHeader = [] } = {}) {
   return { content: rendered, changed: rendered !== content, duplicatesCollapsed };
 }
 
-module.exports = { CANONICAL_ENV_GROUPS, renderCanonicalEnv, applyEnvOrder };
+module.exports = { canonicalEnvGroups, renderCanonicalEnv, applyEnvOrder };

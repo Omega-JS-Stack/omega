@@ -150,7 +150,9 @@ test('company: loadBrand layers DEFAULTS ← company ← brand off the stamp, br
   const { root, brands } = stageCompany({ brandIds: ['brand-a'] });
 
   const standalone = loadBrand(brands['brand-a']);
-  assert.equal(standalone.config.monitoring, undefined);        // no layer without a stamp
+  // No layer without a stamp: what `monitoring` still carries is the
+  // schema-default layer every config gets (#478), never a company value
+  assert.equal(standalone.config.monitoring.providers?.sentry?.dsn, undefined);
 
   stampCompanyMarker(brands['brand-a'], root);
 
@@ -253,7 +255,8 @@ test('company: a stale marker runs standalone (no company layer)', async () => {
 
   const report = await runManage(brands['brand-a'], { service: 'workspace' });
 
-  assert.equal(report.brand.config.monitoring, undefined);
+  // Only the schema-default layer under `monitoring` — no company value (#478)
+  assert.equal(report.brand.config.monitoring.providers?.sentry?.dsn, undefined);
   assert.equal(report.results.workspace.status, 'success');
 });
 

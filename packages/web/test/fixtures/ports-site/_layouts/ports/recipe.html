@@ -2,15 +2,15 @@
 layout: frontend/core/base
 
 ### THEME CONFIG ###
-theme:
-  main:
-    class: "pt-0"
-
 ### PAGE CONFIG ###
 meta:
-  title: "{{ page.recipe.title }} Recipe - {{ site.brand.name }}"
+  title: "{{ page.recipe.title }} Recipe - {{ resolved.config.brand.name }}"
   description: "{{ page.recipe.description }}"
   image: "/assets/images/recipes/recipe-{{ page.recipe.id }}/{{ page.slug }}.jpg"
+config:
+  theme:
+    main:
+      class: "pt-0"
 ---
 
 {% assign recipe = recipe %}
@@ -358,8 +358,8 @@ meta:
   {
     "@context": "https://schema.org",
     "@type": "Recipe",
-    "@id": "{{ site.url }}{{ page.url }}#Recipe",
-    "url": "{{ site.url }}{{ page.url }}",
+    "@id": "{{ resolved.config.url }}{{ page.url }}#Recipe",
+    "url": "{{ resolved.config.url }}{{ page.url }}",
     "name": {{ recipe.title | jsonify }},
     "description": {{ recipe.description | jsonify }},
     "image": [{{ recipe_image | absolute_url | jsonify }}],
@@ -409,7 +409,7 @@ meta:
       {%- endfor -%}
     ],
     "publisher": {
-      "@id": "{{ site.url }}#{{ site.brand.type }}"
+      "@id": "{{ resolved.config.url }}#{{ resolved.config.brand.type }}"
     }
   }
 </script>

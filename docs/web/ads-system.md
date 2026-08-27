@@ -30,7 +30,7 @@ created: 2026-07-20
 advertising: {
   providers: {
     adsense: {
-      client: 'ca-pub-XXXX',            // feeds the ad tag AND ads.txt (SSOT)
+      client: 'ca-pub-XXXX',            // the ONE adsense switch: ad tag + ads.txt + the managed account (SSOT)
       displaySlot: '…', inArticleSlot: '…', inFeedSlot: '…', multiplexSlot: '…',
     },
     inhouse: {
@@ -43,6 +43,8 @@ advertising: {
 ```
 
 - Shared-section key, overridable per target. Key presence enables; no keys = no ads anywhere.
+- **One switch, one polarity** ([#527](https://github.com/Omega-JS-Stack/omega/issues/527)): `client` presence decides EVERYTHING adsense — the manager service reconciles the account it names, the ad units render off it, and `ads.txt` carries the record. No key set it out. There is no `units` gate and no provider `enabled` gate: a second switch is how one config told the manager "stop managing" while the site kept serving ads off the same id. The managed-but-ad-free brand is deliberately inexpressible — such a brand omits the block, and the account is managed by hand. This is case 1 of the gating doctrine in [docs/shared/config.md](../shared/config.md#feature-gating-polarity-527).
+- The house/promo lanes are independent of adsense: a brand with no `client` still fills its slots from in-house inventory if it configures any, and the promo lane still terminates the ladder.
 - `source: 'company'` resolves through the config company layer to the parent's api URL — sub-brands inherit the parent inventory with one word. `'self'` serves the brand's own inventory. **No hard company requirement** (Ian): a brand alone is fully functional. In DEV mode every source resolves the local stack, `company.url` included — dev makes no live server hits (ratified, [#34](https://github.com/Omega-JS-Stack/omega/issues/34); the mechanism note lives in [docs/shared/config.md](../shared/config.md)).
 - Legacy `advertising.<provider>` flat shape already converts via the existing migrate lane (`advertising.providers.*`).
 
@@ -67,7 +69,7 @@ advertising: {
   3. Fallback lane: sandboxed iframe → resolved inhouse source's `/omega/ads/serve`; origin-validated postMessage (set-dimensions/click); HOST-side rotation + staleness recovery.
   4. Paying users: unit hides on `auth.resolved.active` via the standard bindings (legacy behavior kept).
 - Desktop/extension: no AdSense (policy/no-web-context) — the shared client ships the same fallback-lane logic as an `omega.ads()` module binding `data-omega-ad` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
-- `ads.txt`: web build emits it from `providers.adsense.client` when present (closes the parity-gap item).
+- `ads.txt`: web build emits it from `providers.adsense.client` when present (closes the parity-gap item) — the same presence that renders the units, because the file is the declaration that this domain sells inventory through that account.
 
 ### Automatic placements (#44 items 24/25, 2026-07-31)
 

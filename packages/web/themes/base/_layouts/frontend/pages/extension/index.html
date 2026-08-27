@@ -5,7 +5,8 @@ layout: frontend/core/base
 # detected browser's button leads, every browser card sits in the open with
 # its REAL brandmark, and "coming soon" is a designed state, not a warning
 # banner. Data contract preserved: resolved.downloads.browsers + the
-# detection JS; site.extension[browser.id] supplies the store URLs.
+# detection JS; site.targets.extension.listings[browser.id].url supplies the
+# store URLs (#610 — the curated targets view is the ONE home).
 
 # Hero Section
 hero:
@@ -21,7 +22,7 @@ downloads:
     button_text: "Please wait"
   not_available:
     headline: "Coming soon"
-    description: "The {{ site.brand.name }} extension isn't listed for this browser yet."
+    description: "The {{ resolved.config.brand.name }} extension isn't listed for this browser yet."
   browsers:
     - id: "chrome"
       name: "Chrome"
@@ -57,7 +58,6 @@ downloads:
 # After install — the pin ritual
 setup:
   superheadline:
-    icon: "thumbtack"
     text: "Setup"
   headline: "Thirty seconds to"
   headline_accent: "pinned"
@@ -66,7 +66,7 @@ setup:
       description: "One click on the button above. The store handles the rest."
       icon: "puzzle-piece"
     - title: "Pin it to the toolbar"
-      description: "Click the puzzle piece in your toolbar, then the pin next to {{ site.brand.name }}."
+      description: "Click the puzzle piece in your toolbar, then the pin next to {{ resolved.config.brand.name }}."
       icon: "thumbtack"
     - title: "Sign in once"
       description: "Your account carries over. Everything you have here is in the popup."
@@ -75,7 +75,6 @@ setup:
 # Features Section
 features:
   superheadline:
-    icon: "star"
     text: "Included"
   headline: "Small icon, whole"
   headline_accent: "product"
@@ -97,7 +96,6 @@ features:
 # FAQ Section
 faqs:
   superheadline:
-    icon: "circle-question"
     text: "FAQs"
   headline: "Before you"
   headline_accent: "add it"
@@ -108,14 +106,13 @@ faqs:
     - question: "Which browsers are supported?"
       answer: "It's built for Chrome, Firefox, Edge, Opera, Safari, and Brave. Store buttons above go live per browser as listings roll out."
     - question: "How do I pin the extension?"
-      answer: "Click the puzzle-piece icon in your toolbar, then the pin next to {{ site.brand.name }}. Pinned is a different product: one click instead of three."
+      answer: "Click the puzzle-piece icon in your toolbar, then the pin next to {{ resolved.config.brand.name }}. Pinned is a different product: one click instead of three."
     - question: "What can it see?"
       answer: "Only what it needs to function, and the permission prompt tells you exactly what that is. No browsing-history collection, ever."
 
 # CTA Section
 cta:
   superheadline:
-    icon: "comments"
     text: "Support"
   headline: "Extension acting"
   headline_accent: "up?"
@@ -167,7 +164,7 @@ cta:
     <h2 class="visually-hidden">Supported browsers</h2>
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
       {% for browser in resolved.downloads.browsers %}
-        {% assign config_url = site.extension[browser.id] %}
+        {% assign config_url = site.targets.extension.listings[browser.id].url %}
 
         <div class="col-sm-6 col-lg-4 d-flex" data-omega-reveal>
           <div class="omega-dl-card omega-hover-lift" data-download-card data-browser="{{ browser.id }}">

@@ -23,9 +23,9 @@
 
 <aside class="omega-shell__sidebar" id="app-sidebar">
   <!-- Brand lockup -->
-  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
-  {% capture logo_text %}{{ data.logo.text | default: site.brand.name | omega_liquify }}{% endcapture %}
+  {% capture logo_href %}{% assign temp_href = data.logo.href | default: resolved.config.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+  {% capture logo_text %}{{ data.logo.text | default: resolved.config.brand.name | omega_liquify }}{% endcapture %}
 
   <a href="{{ logo_href }}" class="omega-side__brand">
     {% iftruthy logo_src %}
@@ -212,7 +212,7 @@
       {% comment %} The rail vert slot: the surface opts in through its sidebar data
         (the dashboard does, admin does not) and the brand's `advertising` config key
         gates it — no config, no slot chrome (docs/web/ads-system.md). {% endcomment %}
-      {% if data.bottom.vert.enabled and site.advertising %}
+      {% if data.bottom.vert.enabled and resolved.config.advertising %}
         <div class="omega-side__ad omega-shell__label">
           <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="omega-chip">Sponsored</span>
@@ -230,7 +230,7 @@
       <!-- User row -->
       <div class="omega-side__user" data-omega-bind="@show auth.user" hidden>
         <span class="avatar avatar-sm rounded-circle overflow-hidden d-inline-flex flex-shrink-0">
-          <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+          <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ resolved.config.brand.name }} profile picture"/>
         </span>
         <span class="omega-shell__label flex-grow-1 overflow-hidden">
           <span class="omega-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.displayName">User</span>

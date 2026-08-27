@@ -115,6 +115,31 @@ const delay = 250;
 // distribute task still uses as a gulp stream.
 const TEMPLATE_EXTENSIONS = ['html', 'md', 'liquid', 'json', 'yml', 'yaml'];
 
+// The Chrome Web Store caps a listing description at 200 characters.
+const STORE_DESCRIPTION_CAP = 200;
+
+// The store description config/messages.json seeds. `brand.description` is
+// already the one-sentence brand line, so it seeds appDescription whenever it
+// FITS the store cap — every consumer used to hand-edit this one field (#573).
+// Anything longer (or absent) keeps the generic phrasing.
+function resolveAppDescription() {
+  const description = (config.brand?.description || '').trim();
+
+  if (description && description.length <= STORE_DESCRIPTION_CAP) {
+    return description;
+  }
+
+  return `The official ${config.brand?.name || ''} browser extension.`.replace(/\s{2,}/g, ' ');
+}
+
+// Every message the seed renders lands INSIDE a single-quoted JSON5 string, so a
+// value carrying an apostrophe would otherwise leave the scaffolded file
+// unparseable. All four seeded strings — the brand name three of them render, and
+// the description — go through this one escape (#592).
+function escapeSingleQuoted(value) {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
 function siteTokenTransform(contents, item) {
   const ext = path.extname(item.name).toLowerCase().slice(1);
   if (!TEMPLATE_EXTENSIONS.includes(ext)) {
@@ -122,7 +147,14 @@ function siteTokenTransform(contents, item) {
   }
 
   try {
-    return template(contents, { site: config, versions: cleanVersions.versions }, {
+    return template(contents, {
+      site: config,
+      versions: cleanVersions.versions,
+      extension: {
+        name: escapeSingleQuoted((config.brand?.name || '').trim()),
+        description: escapeSingleQuoted(resolveAppDescription()),
+      },
+    }, {
       brackets: ['[', ']'],
     });
   } catch (error) {

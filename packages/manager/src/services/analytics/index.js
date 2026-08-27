@@ -24,9 +24,11 @@
  * token warns with guidance and never fails; `analytics.providers.{provider}:
  * false` disables the provider and stops every ask.
  */
+const { serviceInputSpec } = require('../../config.js');
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { GoogleAnalyticsAPI } = require('./lib/analytics-api.js');
 const { MetaMarketingAPI } = require('./lib/meta-api.js');
 const { TikTokBusinessAPI } = require('./lib/tiktok-api.js');
@@ -49,6 +51,19 @@ module.exports.run = createServiceRunner({
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
     if (!domain) {
       return { skip: true, reason: 'no brand.url configured' };
+    }
+
+    // The shared setup contract (#608) for the GOOGLE half only, and only
+    // once the brand has DECLARED it wants GA4 (a configured propertyId — the
+    // same gate REQUIRES.analytics.when reads): the pixel tokens are optional
+    // beside it and each pixel operation asks for its own in place
+    // (lib/pixel-token.js), so a pixel-only brand is never asked for a Google
+    // credential it has no use for.
+    if (!context.analyticsApi && analytics.providers?.google?.propertyId) {
+      await requestServiceInput(context, serviceInputSpec('analytics', {
+        names: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+        label: 'Google Analytics',
+      }));
     }
 
     const haveGoogleAuth = Boolean(

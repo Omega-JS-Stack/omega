@@ -2,21 +2,22 @@
 layout: frontend/pages/legal/document
 
 meta:
-  title: "Cookie Policy - {{ site.brand.name }}"
+  title: "Cookie Policy - {{ resolved.config.brand.name }}"
   description: "This cookie policy has been compiled to better serve those who are concerned with how their personal information is being used online."
   breadcrumb: "Cookie Policy"
 
-client:
-  exitPopup:
-    enabled: false
+config:
+  client:
+    exitPopup:
+      enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture brand %}**{{ resolved.config.brand.name | omega_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 <p class="omega-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
-This is the {{ breadcrumb }} for {{ brand }}, accessible from [{{ site.url }}]({{ site.url }}).
+This is the {{ breadcrumb }} for {{ brand }}, accessible from [{{ resolved.config.url }}]({{ resolved.config.url }}).
 
 ## What Are Cookies
 As is common practice with almost all professional websites this site uses cookies, which are tiny files that are downloaded to your computer, to improve your experience. This page describes what information they gather, how we use it and why we sometimes need to store these cookies. We will also share how you can prevent these cookies from being stored however this may downgrade or 'break' certain elements of the sites functionality.
@@ -53,4 +54,4 @@ In some special cases we also use cookies provided by trusted third parties. The
 Hopefully that has clarified things for you and as was previously mentioned if there is something that you aren't sure whether you need or not it's usually safer to leave cookies enabled in case it does interact with one of the features you use on our site. <a href="https://cookiepolicygenerator.com" rel="nofollow">This Cookies Policy was created with the help of the CookiePolicyGenerator.com</a>
 
 ## How to Contact Us:
-However if you are still looking for more information then you can contact us through one of our preferred contact methods: [{{ site.url }}/contact]({{ site.url }}/contact){% iftruthy site.brand.contact.email %}, or by email at [{{ site.brand.contact.email }}](mailto:{{ site.brand.contact.email }}){% endiftruthy %}.
+However if you are still looking for more information then you can contact us through one of our preferred contact methods: [{{ resolved.config.url }}/contact]({{ resolved.config.url }}/contact){% iftruthy resolved.config.brand.contact.email %}, or by email at [{{ resolved.config.brand.contact.email }}](mailto:{{ resolved.config.brand.contact.email }}){% endiftruthy %}.

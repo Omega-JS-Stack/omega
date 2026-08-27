@@ -21,6 +21,7 @@
 const path = require('path');
 const loadProvider = require('../../../libraries/load-provider.js');
 const safeCompare = require('../../../helpers/safe-compare.js');
+const env = require('../../../libraries/env.js');
 
 module.exports = async ({ ctx, Manager }) => {
   const query = ctx.request.query;
@@ -35,7 +36,7 @@ module.exports = async ({ ctx, Manager }) => {
 
   // Validate key against OMEGA_WEBHOOK_KEY (separate from OMEGA_ADMIN_KEY
   // so it can be rotated independently and scoped narrowly)
-  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
+  if (!safeCompare(key, env.get('OMEGA_WEBHOOK_KEY'))) {
     return ctx.respond('Invalid key', { code: 401 });
   }
 

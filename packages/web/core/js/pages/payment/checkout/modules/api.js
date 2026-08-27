@@ -111,6 +111,17 @@ export async function createPaymentIntent({ state, provider, formData }) {
     throw new Error('No checkout URL returned from server');
   }
 
+  /* @dev-only:start */
+  {
+    // Which of the cookies this payload sent actually ARRIVED — the route
+    // echoes their key names back and nothing else
+    // ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)). The dev
+    // palette shows the browser's side of the same question; this is the half
+    // only the server can answer.
+    console.log('Payment intent match cookies (server received):', response.attribution?.cookies || []);
+  }
+  /* @dev-only:end */
+
   console.log('Payment intent created:', response);
   return response;
 }

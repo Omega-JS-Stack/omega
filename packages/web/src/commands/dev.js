@@ -1007,13 +1007,12 @@ async function linkBrandToMonorepo() {
     await local.linkLocalPackages({ dir: targetDir, monorepoRoot, logger });
   }
 
+  // Session-scoped by the helper itself — the watch dies with this dev server
+  // (no orphans), the same way the brand-root `omega dev` gets it (#587). All
+  // that is left here is the dev server's own Ctrl-C policy: a SIGINT listener
+  // suppresses node's default kill, so it has to exit deliberately.
   const watch = local.startMonorepoWatch({ monorepoRoot, logger });
   if (watch.child) {
-    // Session-scoped: the watch dies with this dev server (no orphans)
-    process.on('SIGINT', () => {
-      watch.child.kill('SIGTERM');
-      process.exit(0);
-    });
-    process.on('exit', () => watch.child.kill('SIGTERM'));
+    process.on('SIGINT', () => process.exit(0));
   }
 }

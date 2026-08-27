@@ -1,15 +1,6 @@
 ---
 layout: frontend/core/base
 
-theme:
-  post:
-    image:
-      class: "img-fluid rounded-3 w-100 my-5"
-
-client:
-  socialSharing:
-    enabled: true
-
 author_section:
   author_position: "Marketing Manager"
 
@@ -20,7 +11,6 @@ related_posts:
 
 newsletter:
   superheadline:
-    icon: "envelope"
     text: "Newsletter"
   headline: "Stay in the loop"
   subheadline: "Join our newsletter and get resources, curated content, and inspiration delivered straight to your inbox."
@@ -28,6 +18,14 @@ newsletter:
     text: "Submit"
   form:
     placeholder: "jonsnow@gmail.com"
+config:
+  theme:
+    post:
+      image:
+        class: "img-fluid rounded-3 w-100 my-5"
+  client:
+    socialSharing:
+      enabled: true
 ---
 
 <!-- Reading progress — accent hairline pinned under the nav (post JS drives width) -->
@@ -38,7 +36,7 @@ newsletter:
   frontmatter. The opt-out also travels to the mid-article JS insertion lane
   (pages/blog/[slug].js) through data-omega-verts on the article. {% endcomment %}
 {% assign _verts_on = false %}
-{% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
+{% if resolved.config.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
 
 <!-- ═══ Article — left-aligned editorial header (bronn pattern) ═══ -->
 <article{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
@@ -90,7 +88,7 @@ newsletter:
                 {% if _author_name != '' %}
                   <a href="{%- omega_member resolved.post.author, "url" -%}">{{ _author_name }}</a>
                 {% else %}
-                  <span>{{ site.brand.name }}</span>
+                  <span>{{ resolved.config.brand.name }}</span>
                 {% endif %}
                 <span>·</span>
                 <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
@@ -211,7 +209,7 @@ newsletter:
               <span class="omega-post-card__avatar omega-post-card__avatar--fallback me-2" aria-hidden="true">
                 {% omega_icon "pen-nib", "fa-xs" %}
               </span>
-              <div class="fw-semibold">{{ site.brand.name }}</div>
+              <div class="fw-semibold">{{ resolved.config.brand.name }}</div>
             </div>
           {% endif %}
           <div data-social-share

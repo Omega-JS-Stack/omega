@@ -57,3 +57,8 @@ async function loadAndExecuteJobs(name, jobsPath, Manager, context) {
     }
   }
 }
+
+// The call shape a job is invoked with is the whole contract a consumer writes
+// against, so the docs' example is proven against THIS function rather than a
+// copy of it ([#495](https://github.com/Omega-JS-Stack/omega/issues/495)).
+module.exports.loadAndExecuteJobs = loadAndExecuteJobs;

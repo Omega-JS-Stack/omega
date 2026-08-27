@@ -2,5 +2,5 @@
 layout: blueprint/pricing
 permalink: /pricing
 meta:
-  title: "Pricing - {{ site.brand.name }}"
+  title: "Pricing - {{ resolved.config.brand.name }}"
 ---

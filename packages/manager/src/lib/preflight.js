@@ -1,7 +1,8 @@
 /**
  * Preflight — the REQUIRES registry check run before any service. Collects
- * the enabled services' declared requirements (env var names + Google OAuth
- * scopes, src/config.js REQUIRES), checks what IS knowable up front —
+ * the enabled services' declared REQUIRED inputs (env var names + Google OAuth
+ * scopes, src/config.js REQUIRES; an entry marked `gates: false` is optional
+ * and belongs to the mid-run ask, not here), checks what IS knowable up front —
  * process.env presence (names only, values never printed) and the token
  * store's granted-scopes record — and prints ONE consolidated fix
  * walkthrough (cp236's 403-diagnostics tone: what's missing, which service,
@@ -9,7 +10,7 @@
  *
  * Verdicts per failing service (Ian's ruling — absorb, never crash):
  *   run   - interactive and the run itself collects the fix (the cp114
- *           ensureEnvSecrets paste flow / the Google consent flow) — the
+ *           setup-contract paste flow / the Google consent flow) — the
  *           service proceeds and asks.
  *   skip  - the fix needs the operator (non-interactive, or an env var no
  *           flow collects) — the service skips with the walkthrough printed
@@ -73,7 +74,12 @@ function checkService(serviceName, declaration, brandConfig, tokenStore) {
     return null;
   }
 
-  const envEntries = (declaration.env || []).filter((entry) => !entry.when || entry.when(brandConfig));
+  // `gates: false` entries are OPTIONAL inputs (#608): the service runs
+  // without them, so their absence is not a preflight finding — the operation
+  // that needs one asks for it in place, through the shared setup contract.
+  const envEntries = (declaration.env || [])
+    .filter((entry) => entry.gates !== false)
+    .filter((entry) => !entry.when || entry.when(brandConfig));
   const missingEnv = envEntries.filter((entry) => !process.env[entry.name]);
 
   const requiredScopes = declaration.scopes || [];
@@ -230,7 +236,7 @@ function runPreflight({ services, brandConfig, brandRoot, options = {} }, deps =
   const gates = {};
   for (const finding of findings) {
     // Scope gaps always self-heal on a TTY (the consent flow); env gaps only
-    // when every missing entry rides the ensureEnvSecrets paste flow
+    // when every missing entry rides the setup-contract paste flow
     const selfHealing = finding.missingEnv.every((entry) => entry.prompted === true);
     const action = strict ? 'error' : (interactive && selfHealing ? 'run' : 'skip');
 

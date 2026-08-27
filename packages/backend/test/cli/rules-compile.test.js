@@ -23,6 +23,7 @@ const {
   BRAND_RULES_SEED,
   COMPILED_RULES_FILE,
   RETIRED_NAMES,
+  RULES_MIGRATION_COMMAND,
   RULES_VERSION,
   compileRules,
   compileFirestoreRules,
@@ -549,7 +550,9 @@ module.exports = {
 
         assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
         assert.match(warnings[0], /firebase\.json points firestore\.rules at "firestore\.rules"/, 'the warning must name the stale target');
-        assert.match(warnings[0], /npx omega setup/, 'the warning must say how to fix it');
+        // Setup DEFERS on this tree ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)) —
+        // the warning has to name the command that actually moves it.
+        assert.ok(warnings[0].includes(RULES_MIGRATION_COMMAND), `the warning must say how to fix it (${RULES_MIGRATION_COMMAND})`);
       },
     },
 

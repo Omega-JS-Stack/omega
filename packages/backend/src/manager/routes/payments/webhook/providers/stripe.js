@@ -5,6 +5,7 @@
  * Each event is mapped to a category (subscription or one-time) and includes
  * the resource type + ID needed to fetch the latest state from Stripe's API.
  */
+const env = require('../../../../libraries/env.js');
 
 // The Stripe SDK, loaded on first verification. Signature checking is a keyed
 // hash over the payload — it needs the endpoint secret, never the API key.
@@ -67,7 +68,7 @@ module.exports = {
    *   - status: 'verified' | 'invalid' | 'unconfigured'
    */
   verifySignature(req) {
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    const secret = env.get('STRIPE_WEBHOOK_SECRET');
 
     if (!secret) {
       return { status: 'unconfigured', reason: 'STRIPE_WEBHOOK_SECRET is not set' };

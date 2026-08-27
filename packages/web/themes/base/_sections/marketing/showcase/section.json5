@@ -5,6 +5,7 @@
     enabled: 'boolean',
     superheadline: 'object',
     headline: 'string',
+    headline_accent: 'string',
     subheadline: 'string',
     image_ratio: 'string',
     image_object_position: 'string',
@@ -16,8 +17,11 @@
     superheadline: {
       text: 'Showcase',
     },
-    headline: 'What makes {{ site.brand.name }} different',
-    subheadline: 'Powerful features designed to accelerate your success',
+    headline: 'What makes {{ resolved.config.brand.name }} different',
+    // No sub line by default: an ABSENT subheadline renders NOTHING. A band
+    // the brand authors inherits no words it never wrote (the demo line lives
+    // in the gallery variant below, where sample content belongs).
+    subheadline: '',
     image_ratio: '4x3',
     image_object_position: 'center',
     items: [
@@ -39,7 +43,10 @@
   demo: [
     {
       label: 'Alternating rows',
-      args: { enabled: true },
+      args: {
+        enabled: true,
+        subheadline: 'Powerful features designed to accelerate your success',
+      },
     },
   ],
 }

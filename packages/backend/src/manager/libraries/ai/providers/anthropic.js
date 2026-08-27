@@ -11,6 +11,7 @@ const _ = require('lodash');
 const JSON5 = require('json5');
 const format = require('./anthropic-format.js');
 const { emptyTokens, buildTokens, addTokens } = require('../tokens.js');
+const env = require('../../env.js');
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -30,8 +31,8 @@ function Anthropic(ctx, key) {
   self.user = ctx?.user;
   self.key = key
     || self.Manager?.config?.anthropic?.key
-    || process.env.ANTHROPIC_API_KEY
-    || process.env.OMEGA_ANTHROPIC_API_KEY;
+    || env.get('ANTHROPIC_API_KEY')
+    || env.get('OMEGA_ANTHROPIC_API_KEY');
 
   // Running counter across every call this provider instance makes. Each call
   // reports its OWN usage — this is the instance total.

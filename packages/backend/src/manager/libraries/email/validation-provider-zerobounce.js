@@ -1,4 +1,5 @@
 const fetch = require('wonderful-fetch');
+const env = require('../env.js');
 
 /**
  * @param {string} email
@@ -7,7 +8,7 @@ const fetch = require('wonderful-fetch');
 async function verify(email) {
   try {
     const data = await fetch(
-      `https://api.zerobounce.net/v2/validate?api_key=${process.env.ZEROBOUNCE_API_KEY}&email=${encodeURIComponent(email)}`,
+      `https://api.zerobounce.net/v2/validate?api_key=${env.get('ZEROBOUNCE_API_KEY')}&email=${encodeURIComponent(email)}`,
       { response: 'json', timeout: 60000 },
     );
 

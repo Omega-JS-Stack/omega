@@ -73,8 +73,8 @@ npx omega install live      # restore the published @omega.js/backend from npm
 // src/index.js: the entire backend bootstrap
 const Manager = require('@omega.js/backend');
 Manager.init(exports, {
-  projectType: 'firebase',
-  // ...your config
+  // ...your options. How this backend RUNS is config, not an option here:
+  // targets.backend.projectType in config/omega.json5 ('firebase' | 'custom').
 });
 
 // In a custom route (src/routes/get/hello.js):
@@ -104,6 +104,8 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically;
 - **@omega.js/client owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different).
 
 ## Testing
+
+**Two lanes.** `npm test` is the STATIC lane: `node --test` over `test/_unit/**/*.test.js` with `test/_helpers/connect-trap.js` preloaded, which turns any TCP connect or DNS lookup into a throw. `npm run test:emulator` (`npx omega test`) is the emulator lane. A test needing a real client goes there; in the static lane, pass a stub.
 
 Every feature ships with tests at every surface it exposes:
 

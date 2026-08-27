@@ -17,6 +17,13 @@ env:
   OMEGA_BUILD_MODE: 'true'
   OMEGA_IS_PUBLISH: 'true'
 
+  # Analytics — a dispatched run has no `.env`, so the Measurement Protocol
+  # secret the build bakes into build.js reaches it through this env alone
+  # (missing, every CI-published extension shipped an empty secret and sent no
+  # events, silently). `omega setup` publishes the brand's .env keys as repo
+  # secrets; the build FAILS if a GA-configured brand builds without it.
+  GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}
+
   # Chrome Web Store credentials
   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
   CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}

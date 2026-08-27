@@ -2,62 +2,17 @@
 // The theme forks no pricing layout: the BASE page renders (omega-price-card
 // grid, omega-billing-toggle, the omega-band enterprise strip, the
 // feature-comparison table, the FAQ duo) and this file dresses it as the
-// "subscription desk": the vermilion "Most popular" stamp, serif prices,
-// framed comparison table. Structure comes from the classy floor partials in
-// the main bundle; these page rules land after and win. The pill BILLING
-// TOGGLE is not here: it renders on the account page too, so its skin lives in
-// css/components/_billing-toggle.scss, in the main bundle ([#236]). Compiles
-// standalone: theme tokens + mixins via loadPaths.
+// "subscription desk": the framed enterprise band and comparison table.
+// Structure comes from the classy floor partials in the main bundle; these
+// page rules land after and win. The pill BILLING TOGGLE is not here: it
+// renders on the account page too, so its skin lives in
+// css/components/_billing-toggle.scss, in the main bundle ([#236]) — and the
+// PLAN CARDS left for the same reason ([#531]): marketing/pricing-cards
+// composes them on the homepage, so their skin lives in
+// css/components/_panels.scss. Compiles standalone: theme tokens + mixins via
+// loadPaths.
 @use 'config' as *;
 @import 'css/base/mixins';
-
-// ============================================
-// Plan cards: framed paper with the vermilion Editor's pick
-// ============================================
-.omega-price-card {
-  // The frame comes from the theme's .card treatment; prices go serif.
-  .omega-price-card__price {
-    font-family: $nf-font-display;
-  }
-
-  .omega-price-card__currency {
-    font-weight: 600;
-    vertical-align: super;
-  }
-
-  .omega-price-card__amount {
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-
-  .omega-price-card__per {
-    font-family: $font-family-sans-serif;
-    color: var(--bs-secondary-color);
-  }
-
-  .price-per-unit {
-    font-weight: 700;
-    color: var(--omega-accent);
-  }
-}
-
-.omega-price-card--popular {
-  border-color: var(--omega-accent);
-  border-width: 2.5px;
-  box-shadow: var(--nf-shadow-hard-hover);
-}
-
-// "Most popular": the rotated stamp chip pinned over the card edge
-.omega-price-card__popular {
-  position: absolute;
-  top: -0.85rem;
-  left: 50%;
-  transform: translateX(-50%) rotate(-2deg);
-  white-space: nowrap;
-  background: var(--omega-accent);
-  color: var(--omega-accent-ink);
-  border-color: var(--omega-line-strong);
-}
 
 // ============================================
 // Enterprise strip: framed paper band

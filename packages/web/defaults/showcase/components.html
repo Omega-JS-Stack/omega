@@ -1,0 +1,64 @@
+---
+layout: frontend/core/base
+permalink: /test/components
+
+eleventyExcludeFromCollections: true
+sitemap:
+  include: false
+meta:
+  title: "Component library"
+  description: "The auto-generated component showcase: every component in the resolved library, grouped by folder, with live demos and schema docs."
+  breadcrumb: "Component library"
+  index: false
+---
+
+{% comment %}
+  The COMPONENT gallery index (#549, reshaped by #602) — the `_components` half
+  of the resolved library, which had no listing of its own until Ian said so:
+  /test/components was the styleguide wearing the name, and that page is
+  /test/styleguide now.
+
+  It MIRRORS the section gallery rather than reinterpreting it: an index here,
+  one entry page at /test/components/<id>, its frames at
+  /test/components/<id>/frames/<slug>. The first shape that landed put every
+  component on this one page and embedded frames from the SECTION url space,
+  which read like a second view of /test/sections instead of a library of its
+  own (#602).
+
+  So this page is `defaults/showcase/index.html` with one word changed: same
+  shell, same rail (`core/showcase/nav.html`, kind-scoped), same listing
+  (`core/showcase/index-body.html`) — and the entry and frame pages are the
+  SAME generators, taking their kind-aware permalink off the entry.
+
+  Development builds only (the engine gates the whole `defaults/showcase/`
+  dir). Neutral Bootstrap vocabulary — this renders under whichever theme is
+  active.
+{% endcomment %}
+
+{% assign gallery = sectionLibrary.galleries | where: "kind", "component" | first %}
+{% assign other = sectionLibrary.galleries | where: "kind", "section" | first %}
+{% assign listed = sectionLibrary.entries | where: "kind", "component" %}
+
+<section class="container-fluid px-lg-4 pb-4" data-omega-showcase-shell>
+  <div class="row g-4">
+    <!-- ═══ Rail ═══ -->
+    <aside class="col-12 col-lg-3 col-xxl-2">
+      {% comment %} No entry is current here, so the rail carries no variants. {% endcomment %}
+      {% include core/showcase/nav.html kind="component" home=gallery.url label=gallery.label current="" %}
+    </aside>
+
+    <!-- ═══ Content ═══ -->
+    <div class="col-12 col-lg-9 col-xxl-10">
+      <span class="text-uppercase small fw-bold text-muted d-block mb-2">Auto-generated</span>
+      <h1 class="h3 mb-3">{{ gallery.label }}</h1>
+      <p class="lead mb-2">
+        Every component the active layer chain resolves: {{ listed.size }} entries, rendered from their own schemas.
+      </p>
+      <p class="text-muted mb-4">
+        Each entry page carries the args reference and live demo variants. A new <code>_components</code> folder appears here with zero authoring; overrides show which layer won. Sections live in the <a href="{{ other.url }}">section library</a>.
+      </p>
+
+      {% include core/showcase/index-body.html kind="component" %}
+    </div>
+  </div>
+</section>

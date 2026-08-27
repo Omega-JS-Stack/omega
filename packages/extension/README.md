@@ -114,7 +114,7 @@ npm run build
 
 Upload the `.zip` files under `packaged/<browser>/` to each browser's extension store.
 
-> Firefox needs an add-on id: set `browser_specific_settings.gecko.id` in `src/manifest.json` or the build stops there and tells you. The firefox artifact also gets its own translation of the chrome-only side panel keys (`side_panel` → `sidebar_action`), so the panel actually works.
+> Firefox needs an add-on id. Declare none and the build derives one from your brand (`extension@<your brand host>`); declare `browser_specific_settings.gecko.id` in `src/manifest.json` before your first publish, because the id has to stay the same for every release. The firefox artifact also gets its own translation of the chrome-only side panel keys (`side_panel` → `sidebar_action`), so the panel actually works.
 
 ### Automatic publishing
 

@@ -26,6 +26,71 @@ const fs    = require('fs');
 const { waitForTarget } = require('./helpers.js');
 const chalk = require('chalk').default;
 
+/**
+ * Locate the Chrome-loadable build of the consumer extension. The gulp pipeline
+ * produces multiple outputs:
+ *   - `dist/`                         — intermediate (JSON5 manifest, raw bundles)
+ *   - `packaged/<browser>/raw/`       — per-browser, strict JSON manifest, Chrome-loadable
+ *   - `packaged/<browser>/<name>.zip` — store-upload zip
+ *
+ * Boot tests run against `packaged/chromium/raw/` because that's the directory a
+ * developer would point Chrome's "Load unpacked" at (and what zips for the Web
+ * Store). It's the actual production-equivalent surface.
+ *
+ * Discovery order:
+ *   1. OMEGA_TEST_BOOT_DIR (explicit absolute path) — full override
+ *   2. <projectRoot>/packaged/chromium/raw   — default for consumers
+ *   3. <projectRoot>/dist                    — for non-standard pipelines
+ *
+ * A directory qualifies only when its manifest is STRICT JSON — what Chrome can
+ * actually parse. Existence alone used to qualify, and `dist/` exists after any
+ * dev run or `omega clean`, so an unbuilt project loaded the JSON5 source
+ * manifest and hard-failed every boot test instead of skipping as documented
+ * ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). An explicitly
+ * NAMED directory is not a fallback, so a JSON5 manifest there is still an error.
+ *
+ * The framework's own boot tests use the fixture extension under
+ * src/test/fixtures/consumer-extension/dist (no `packaged/` step — the fixture
+ * is already strict JSON), so OMEGA_TEST_BOOT_PROJECT points there and discovery
+ * lands on `dist`.
+ *
+ * @param {string} projectRoot - the consumer project root (OMEGA_TEST_BOOT_PROJECT wins)
+ * @returns {{effectiveRoot: string, dir: string|null, manifestPath: string|null, candidates: string[], rejected: object[], error: Error|null, errorPath: string|null}}
+ */
+function resolveBootDir(projectRoot) {
+  const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
+    ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
+    : projectRoot;
+
+  const override = process.env.OMEGA_TEST_BOOT_DIR ? path.resolve(process.env.OMEGA_TEST_BOOT_DIR) : null;
+
+  const candidates = [];
+  if (override) candidates.push(override);
+  candidates.push(path.join(effectiveRoot, 'packaged', 'chromium', 'raw'));
+  candidates.push(path.join(effectiveRoot, 'dist'));
+
+  const rejected = [];
+
+  for (const dir of candidates) {
+    const manifestPath = path.join(dir, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) continue;
+
+    try {
+      JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (e) {
+      if (dir === override) {
+        return { effectiveRoot, dir: null, manifestPath: null, candidates, rejected, error: e, errorPath: manifestPath };
+      }
+      rejected.push({ dir, manifestPath, error: e });
+      continue;
+    }
+
+    return { effectiveRoot, dir, manifestPath, candidates, rejected, error: null, errorPath: null };
+  }
+
+  return { effectiveRoot, dir: null, manifestPath: null, candidates, rejected, error: null, errorPath: null };
+}
+
 async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTimeout }) {
   if (tests.length === 0) return { passed: 0, failed: 0, skipped: 0 };
 
@@ -37,69 +102,30 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 
-  // Locate the Chrome-loadable build of the consumer extension. BXM's gulp
-  // pipeline produces multiple outputs:
-  //   - `dist/`                       — intermediate (JSON5 manifest, raw bundles)
-  //   - `packaged/<browser>/raw/`     — per-browser, strict JSON manifest, Chrome-loadable
-  //   - `packaged/<browser>/<name>.zip` — store-upload zip
-  //
-  // Boot tests run against `packaged/chromium/raw/` because that's the directory
-  // a developer would point Chrome's "Load unpacked" at (and what zips for the
-  // Web Store). It's the actual production-equivalent surface.
-  //
-  // Discovery order:
-  //   1. OMEGA_TEST_BOOT_DIR (explicit absolute path) — full override
-  //   2. <projectRoot>/packaged/chromium/raw   — default for BXM consumers
-  //   3. <projectRoot>/dist                    — fallback for non-standard pipelines
-  //
-  // BXM's own framework boot tests use a fixture extension under
-  // src/test/fixtures/consumer-extension/dist (no `packaged/` step needed — the
-  // fixture is already strict JSON), so OMEGA_TEST_BOOT_PROJECT points there and
-  // the discovery falls through to `dist`.
-  const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
-    ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
-    : projectRoot;
+  const discovery = resolveBootDir(projectRoot);
 
-  const candidates = [];
-  if (process.env.OMEGA_TEST_BOOT_DIR) candidates.push(path.resolve(process.env.OMEGA_TEST_BOOT_DIR));
-  candidates.push(path.join(effectiveRoot, 'packaged', 'chromium', 'raw'));
-  candidates.push(path.join(effectiveRoot, 'dist'));
-
-  let consumerDist = null;
-  let manifestPath = null;
-  for (const dir of candidates) {
-    const mp = path.join(dir, 'manifest.json');
-    if (fs.existsSync(mp)) {
-      consumerDist = dir;
-      manifestPath = mp;
-      break;
-    }
+  // An explicitly named OMEGA_TEST_BOOT_DIR whose manifest Chrome cannot parse
+  // is the caller's own mistake — name it, fail the tests.
+  if (discovery.error) {
+    console.log(chalk.red(`    ✗ boot tests aborted: ${discovery.errorPath} is not strict JSON.`));
+    console.log(chalk.gray(`      Chrome requires manifest.json to have no comments, no trailing commas, no single quotes.`));
+    console.log(chalk.gray(`      Parser error: ${discovery.error.message}`));
+    console.log(chalk.gray(`      OMEGA_TEST_BOOT_DIR names this directory explicitly — point it at a`));
+    console.log(chalk.gray(`      packaged/<browser>/raw/ output, or unset it and run \`npm run build\`.`));
+    return { passed: 0, failed: tests.length, skipped: 0 };
   }
-  if (!consumerDist) {
-    console.log(chalk.yellow(`    ○ boot tests skipped (no manifest.json found in any of:`));
-    for (const c of candidates) console.log(chalk.yellow(`        ${c}`));
+
+  if (!discovery.dir) {
+    console.log(chalk.yellow(`    ○ boot tests skipped (no strict-JSON manifest.json found in any of:`));
+    for (const c of discovery.candidates) console.log(chalk.yellow(`        ${c}`));
+    for (const r of discovery.rejected) console.log(chalk.yellow(`      ${r.manifestPath} exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)`));
     console.log(chalk.yellow(`      — run \`npm run build\` first to produce packaged/chromium/raw/)`));
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 
-  // Chrome requires manifest.json to be STRICT JSON (no comments, no trailing
-  // commas, no single quotes). If we matched a directory but its manifest is
-  // still JSON5, the user picked the wrong dir — surface that clearly. This is
-  // the difference between BXM's intermediate `dist/` (JSON5) and the packaged
-  // `packaged/chromium/raw/` (normalized JSON).
-  let manifestRaw;
-  try {
-    manifestRaw = fs.readFileSync(manifestPath, 'utf8');
-    JSON.parse(manifestRaw);
-  } catch (e) {
-    console.log(chalk.red(`    ✗ boot tests aborted: ${manifestPath} is not strict JSON.`));
-    console.log(chalk.gray(`      Chrome requires manifest.json to have no comments, no trailing commas, no single quotes.`));
-    console.log(chalk.gray(`      Parser error: ${e.message}`));
-    console.log(chalk.gray(`      If you see this, the runner picked an intermediate dist/ output instead of a`));
-    console.log(chalk.gray(`      packaged/<browser>/raw/ output. Run \`npm run build\` to produce the packaged dir,`));
-    console.log(chalk.gray(`      or set OMEGA_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.`));
-    return { passed: 0, failed: tests.length, skipped: 0 };
-  }
+  const consumerDist = discovery.dir;
+  const manifestPath = discovery.manifestPath;
+
   if (process.env.OMEGA_TEST_DEBUG) {
     console.log(chalk.gray(`      [boot] loading extension from ${consumerDist}`));
   }
@@ -166,7 +192,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
       const page = await browser.newPage();
       try {
         await Promise.race([
-          t.inspect({ extension, page, expect, projectRoot: effectiveRoot }),
+          t.inspect({ extension, page, expect, projectRoot: discovery.effectiveRoot }),
           // The runner resolves every test's timeout before it gets here
           // (its bootDefaultTimeout); `defaultTimeout` is the same number for a
           // caller driving this runner directly, so the number lives in ONE
@@ -192,4 +218,4 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
   return counts;
 }
 
-module.exports = { runBootTests };
+module.exports = { runBootTests, resolveBootDir };

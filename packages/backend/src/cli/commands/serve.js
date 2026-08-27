@@ -4,11 +4,15 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const WatchCommand = require('./watch');
 const { createChildLog } = require('../utils/attach-log-file');
+const { refuseWhenCustom } = require('../utils/project-type');
 
 class ServeCommand extends BaseCommand {
   async execute() {
     const self = this.main;
     const projectDir = self.firebaseProjectPath;
+
+    // Custom-server mode boots its own server, not the emulator suite (#584)
+    if (refuseWhenCustom(projectDir, 'serve')) return;
 
     // The backend's dev loop → <targetRoot>/logs/dev.log (#197). A SUPERSET of the
     // firebase CHILD's dist/dev.log wired further down: our own output (port

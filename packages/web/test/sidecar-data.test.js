@@ -38,7 +38,7 @@ const SHELL_LAYOUT = [
   '',
 ].join('\n');
 
-function makeConsumer(sidecar) {
+function makeConsumer(sidecar, extension = 'json') {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sidecar-'));
   const consumerDir = path.join(tmp, 'src');
   fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
@@ -52,7 +52,10 @@ function makeConsumer(sidecar) {
     '',
   ].join('\n'));
   if (sidecar) {
-    fs.writeFileSync(path.join(consumerDir, 'pages', 'index.11tydata.json'), `${JSON.stringify(sidecar, null, 2)}\n`);
+    const body = extension === 'json'
+      ? `${JSON.stringify(sidecar, null, 2)}\n`
+      : `module.exports = ${JSON.stringify(sidecar, null, 2)};\n`;
+    fs.writeFileSync(path.join(consumerDir, 'pages', `index.11tydata.${extension}`), body);
   }
   return { tmp, consumerDir };
 }
@@ -88,6 +91,53 @@ test('#269: object and string sidecar keys keep today\'s merge', async () => {
   });
   try {
     const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-merge');
+    const html = pages.get('/');
+    assert.ok(html, 'page built');
+
+    assert.ok(html.includes('<h2>Sidecar headline</h2>'), 'the sidecar string wins its key');
+    assert.ok(html.includes('<p>Layout eyebrow</p>'), 'the layout\'s other object keys merge underneath');
+    assert.ok(html.includes('<p>sidecar note</p>'), 'a top-level string key wins');
+    assert.ok(
+      html.includes('<li>Default one</li>') && html.includes('<li>Default two</li>'),
+      'arrays the sidecar never names keep the layout defaults',
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// #543: the SAME contract, chosen by file extension — a `.11tydata.js` sidecar
+// concatenated where the `.json` twin replaced (found porting trusteroo: a
+// 6-item faqs.items merged with the layout default into 7 FAQs).
+for (const extension of ['js', 'cjs']) {
+  test(`#543: a .11tydata.${extension} sidecar array REPLACES the layout default too`, async () => {
+    const { tmp, consumerDir } = makeConsumer({
+      stats: { items: [{ label: 'Sidecar only' }] },
+      contact_methods: [{ label: 'Sidecar channel' }],
+    }, extension);
+    try {
+      const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, `sidecar-${extension}`);
+      const html = pages.get('/');
+      assert.ok(html, 'page built');
+
+      assert.ok(html.includes('<li>Sidecar only</li>'), 'the sidecar item renders');
+      assert.ok(!html.includes('Default one') && !html.includes('Default two'), 'the layout defaults are REPLACED, not appended to');
+      assert.ok(html.includes('<li>Sidecar channel</li>'), 'a top-level sidecar array renders');
+      assert.ok(!html.includes('Default channel'), 'the top-level layout default is replaced');
+      assert.equal((html.match(/<li>/g) || []).length, 2, 'exactly the two sidecar items — no concat duplicates');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+}
+
+test('#543: object and string keys of a module sidecar keep the cascade merge', async () => {
+  const { tmp, consumerDir } = makeConsumer({
+    stats: { headline: 'Sidecar headline' },
+    note: 'sidecar note',
+  }, 'js');
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'sidecar-js-merge');
     const html = pages.get('/');
     assert.ok(html, 'page built');
 

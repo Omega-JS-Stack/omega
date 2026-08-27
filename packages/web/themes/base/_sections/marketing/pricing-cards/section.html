@@ -1,0 +1,115 @@
+{% comment %} The minimal plan band (#493). Every figure comes from the plan
+view-models the layout bridges in — the same `resolved.pricing` /pricing
+renders — so the homepage can never drift from the catalog. The annual view
+shows the resolver's own floored monthly equivalent (#477); nothing here does
+arithmetic. The card vocabulary is /pricing's `omega-price-card`, minus the
+billing-toggle JS hooks (`amount`, `billing-info`): the toggle is a page
+module, and a hook nothing binds is a dead contract. Each CTA is a real link
+for the same reason — the checkout button only works on /pricing. {% endcomment %}
+{% if args.enabled != false and args.plans and args.plans.size > 0 %}
+  <section>
+    <div class="container" data-omega-reveal-stagger="80">
+      <div class="omega-section-head omega-section-head--center mb-5" data-omega-reveal>
+        {% component "heading/section-head", superheadline: args.superheadline, headline: args.headline, headline_accent: args.headline_accent, sub: args.subheadline %}
+      </div>
+
+      {% comment %} The row fits the catalog it was given — a brand with two
+      tiers gets two wide cards, not two thirds of a row. {% endcomment %}
+      {% assign plan_count = args.plans | size %}
+      {% if plan_count == 1 %}
+        {% assign col_classes = "col-12 col-md-8 col-lg-5" %}
+      {% elsif plan_count == 2 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-5" %}
+      {% elsif plan_count == 3 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
+      {% else %}
+        {% assign col_classes = "col-12 col-sm-6 col-lg-4 col-xl-3" %}
+      {% endif %}
+
+      <div class="row g-4 justify-content-center">
+        {% for plan in args.plans %}
+          <div class="{{ col_classes }}" data-omega-reveal>
+            <div class="card omega-price-card {% if plan.popular %}omega-price-card--popular{% endif %} h-100">
+              {% if plan.popular %}
+                <span class="omega-chip omega-chip--ink omega-price-card__popular">Most popular</span>
+              {% endif %}
+
+              <h3 class="card-title omega-price-card__name mb-0">{{ plan.name }}</h3>
+              {% iftruthy plan.tagline %}
+                <p class="omega-price-card__tagline">{{ plan.tagline }}</p>
+              {% endiftruthy %}
+
+              {% if plan.free %}
+                <div class="omega-price-card__price">
+                  <span class="omega-price-card__amount">Free</span>
+                </div>
+              {% else %}
+                {% if args.annual and plan.prices.annually > 0 %}
+                  {% assign plan_amount = plan.prices.annuallyPerMonth %}
+                {% else %}
+                  {% assign plan_amount = plan.prices.monthly %}
+                {% endif %}
+                <div class="omega-price-card__price">
+                  <span class="omega-price-card__currency">$</span>
+                  <span class="omega-price-card__amount">{{ plan_amount }}</span>
+                  <span class="omega-price-card__per">/month</span>
+                </div>
+              {% endif %}
+
+              {% comment %} The features, through the SAME component /pricing's
+              cards render (#539): the catalog's definitions carry their hover
+              explanations here too. The tier note between the two lists reads
+              `and:` — the ONE wording, here and on /pricing, because a thing
+              never renders differently in two places (Ian 2026-08-24).
+              {% endcomment %}
+              {% comment %} The composer splits a plan's features into the set
+              every plan shares and that plan's extras; a plan hand-authored in
+              a page body carries neither, so its whole list is the shared one.
+              {% endcomment %}
+              {% assign plan_common = plan.commonFeatures %}
+              {% if plan.commonFeatures == nil and plan.extraFeatures == nil %}
+                {% assign plan_common = plan.features %}
+              {% endif %}
+              {% if plan_common.size > 0 or plan.extraFeatures.size > 0 %}
+                {% component "pricing/features", features: plan_common %}
+
+                {% if plan.extraFeatures.size > 0 %}
+                  {% unless forloop.first %}
+                    {% assign prev_index = forloop.index0 | minus: 1 %}
+                    {% assign prev_plan = args.plans[prev_index] %}
+                    <div class="omega-price-card__tier-note">
+                      Everything in <strong>{{ prev_plan.name }}</strong>, and:
+                    </div>
+                  {% endunless %}
+                  {% component "pricing/features", features: plan.extraFeatures %}
+                {% elsif forloop.first == false %}
+                  {% assign prev_index = forloop.index0 | minus: 1 %}
+                  {% assign prev_plan = args.plans[prev_index] %}
+                  <div class="omega-price-card__tier-note">
+                    Everything in <strong>{{ prev_plan.name }}</strong>
+                  </div>
+                {% endif %}
+              {% endif %}
+
+              <div class="d-grid omega-price-card__cta">
+                {% if plan.popular %}
+                  {% assign plan_btn = "btn-adaptive omega-btn-ring" %}
+                {% else %}
+                  {% assign plan_btn = "btn-outline-adaptive" %}
+                {% endif %}
+                <a href="{{ plan.url | default: args.href }}" class="btn {{ plan_btn }} fw-semibold omega-hover-nudge">
+                  {% if plan.trialDays > 0 %}
+                    Get free trial
+                  {% else %}
+                    Get started
+                  {% endif %}
+                  <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

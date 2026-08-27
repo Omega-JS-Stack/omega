@@ -14,9 +14,9 @@
  * Missing credentials → the service skips with guidance.
  */
 const chalk = require('chalk').default;
-const { REQUIRES } = require('../../config.js');
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { NamecheapAPI } = require('./lib/namecheap-api.js');
@@ -43,16 +43,16 @@ module.exports.run = createServiceRunner({
 
     // The zone lookup needs Cloudflare even for manual registrars — the
     // required nameserver values come from the zone
-    // The env descriptors live in the REQUIRES registry (one home): the
-    // unconditional entry is the Cloudflare token; the `when`-gated entries
-    // are the namecheap credentials (registrar-specific)
+    // The input descriptors live in the REQUIRES registry (one home): the
+    // Cloudflare token is unconditional, the namecheap credentials are
+    // registrar-specific (their entry-level `when` drops them for the rest)
     if (!context.cloudflareApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.domain.env.filter((entry) => !entry.when));
+      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: ['CLOUDFLARE_TOKEN'] }));
       if (gate) return gate;
     }
 
     if (provider === 'namecheap' && !context.namecheapApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.domain.env.filter((entry) => entry.when?.(context.brandConfig)));
+      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] }));
       if (gate) return gate;
     }
 

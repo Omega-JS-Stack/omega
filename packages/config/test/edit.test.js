@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { applyConfigEdits, writeConfigValues } = require('../src/index.js');
+const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -234,6 +234,80 @@ test('insert into a multi-line comment-only object lands after the comment', () 
 `);
 });
 
+// ─── Inserted comments (the manage-run heal, #478) ───
+
+test('an inserted block is documented by dot-path: the property AND the keys inside it', () => {
+  const source = `{
+  brand: { id: 'a' },
+}
+`;
+  const result = applyConfigEdits(
+    source,
+    { marketing: { prune: { enabled: true } } },
+    {
+      comments: {
+        marketing: 'Marketing automation: the campaigns + newsletter roles and the prune switch.',
+        'marketing.prune.enabled': 'Monthly cold-contact prune across both providers. ON by default — false is the per-brand off switch.',
+      },
+    },
+  );
+
+  assert.equal(result, `{
+  brand: { id: 'a' },
+  // Marketing automation: the campaigns + newsletter roles and the prune
+  // switch.
+  marketing: {
+    prune: {
+      // Monthly cold-contact prune across both providers. ON by default — false
+      // is the per-brand off switch.
+      enabled: true,
+    },
+  },
+}
+`);
+  assert.equal(JSON5.parse(result).marketing.prune.enabled, true);
+});
+
+test('a comment lands at the key its dot-path names, wherever inside the insert that is', () => {
+  const source = `{
+  brand: { id: 'a' },
+}
+`;
+  const result = applyConfigEdits(
+    source,
+    { 'marketing.prune': { enabled: true } },
+    { comments: { 'marketing.prune': 'The prune switch.' } },
+  );
+
+  assert.equal(result, `{
+  brand: { id: 'a' },
+  marketing: {
+    // The prune switch.
+    prune: {
+      enabled: true,
+    },
+  },
+}
+`);
+});
+
+test('a REPLACED value never gains a comment (comments document new blocks only)', () => {
+  const result = applyConfigEdits(
+    NASTY,
+    { 'marketing.campaigns.enabled': false },
+    { comments: { 'marketing.campaigns.enabled': 'Role-level switch for email marketing.' } },
+  );
+
+  assert.equal(result, NASTY.replace('enabled: true,', 'enabled: false,'));
+  assert.ok(!result.includes('// Role-level switch'), 'an authored key keeps its own documentation');
+});
+
+test('an insert with no comment for its path is unchanged by the comments option', () => {
+  const withOption = applyConfigEdits(NASTY, { 'brand.tagline': 'Test' }, { comments: { 'something.else': 'x' } });
+
+  assert.equal(withOption, applyConfigEdits(NASTY, { 'brand.tagline': 'Test' }));
+});
+
 test('string values escape safely via JSON.stringify', () => {
   const result = applyConfigEdits(NASTY, { 'brand.tagline': `It's "quoted"\nand multiline` });
 
@@ -376,4 +450,104 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
     'cloud.config.projectId': 'acme-app',
     'cloud.config.appId': '1:123:web:abc',
   }), result);
+});
+
+// ─── Remove (#612) ───
+
+// A converted brand config still carrying the two retired page maps (#610),
+// each documented by the converter's own comment.
+const CONVERTED = `// Fixture Brand — converted from UJM, comments carried across
+{
+  brand: {
+    id: 'fixture-brand',
+  },
+
+  targets: {
+    web: {
+      // The download page map — one card per platform.
+      download: {
+        mac: 'https://cdn.fixture-brand.test/mac.dmg',
+        windows: 'https://cdn.fixture-brand.test/win.exe',
+      },
+
+      // Store listings for the /extension page.
+      extension: { chrome: 'https://chrome.test/abc' },
+
+      redirects: [], // keep me
+    },
+    backend: {}, // enabled, defaults
+  },
+}
+`;
+
+test('remove: the key, its subtree, its comma and its own comment go — every other byte survives', () => {
+  const result = applyConfigRemovals(CONVERTED, ['targets.web.download', 'targets.web.extension']);
+  const parsed = JSON5.parse(result);
+
+  assert.equal(parsed.targets.web.download, undefined);
+  assert.equal(parsed.targets.web.extension, undefined);
+  assert.deepEqual(parsed.targets.web.redirects, []);
+  assert.deepEqual(parsed.targets.backend, {});
+  assert.equal(parsed.brand.id, 'fixture-brand');
+
+  // The removed keys' documenting comments go with them; nothing else moves.
+  assert.ok(!result.includes('The download page map'), 'the removed key kept its comment');
+  assert.ok(!result.includes('Store listings for the /extension page'), 'the removed key kept its comment');
+  assert.ok(result.includes('// Fixture Brand — converted from UJM, comments carried across'));
+  assert.ok(result.includes('redirects: [], // keep me'));
+  assert.ok(result.includes('backend: {}, // enabled, defaults'));
+  assert.ok(!/^\s*mac:/m.test(result), 'the subtree survived the removal');
+  assert.ok(!/\n[ \t]*\n[ \t]*\n/.test(result), 'the removal left blank lines stacked up');
+});
+
+test('remove: an absent path is a no-op — reruns are byte-identical', () => {
+  const once = applyConfigRemovals(CONVERTED, ['targets.web.download', 'targets.web.extension']);
+  const twice = applyConfigRemovals(once, ['targets.web.download', 'targets.web.extension', 'targets.web.nothing']);
+
+  assert.equal(twice, once);
+  assert.equal(applyConfigRemovals(CONVERTED, []), CONVERTED);
+});
+
+test('remove: a single-line object loses the property inline', () => {
+  const source = `{\n  targets: { web: { extension: { chrome: 'x' }, redirects: [] } },\n}\n`;
+  const result = applyConfigRemovals(source, ['targets.web.extension']);
+
+  assert.equal(result, `{\n  targets: { web: { redirects: [] } },\n}\n`);
+});
+
+test('remove: a name-matched retired key at any depth, including inside an instance array', () => {
+  const source = `{
+  targets: {
+    backend: [
+      { id: 'main', web_manager: { auth: true } },
+      { id: 'worker' },
+    ],
+  },
+}
+`;
+  const parsed = JSON5.parse(applyConfigRemovals(source, ['targets.backend.0.web_manager']));
+
+  assert.deepEqual(parsed.targets.backend, [{ id: 'main' }, { id: 'worker' }]);
+});
+
+test('removeConfigValues: reports what it removed, dry-run writes nothing, reruns are no-ops', (t) => {
+  const root = makeFixture('remove-values', { 'config/omega.json5': CONVERTED });
+  cleanup(t, root);
+  const configPath = path.join(root, 'config', 'omega.json5');
+
+  const planned = removeConfigValues(root, ['targets.web.download', 'targets.web.extension'], { dryRun: true });
+  assert.deepEqual(planned.removed, ['targets.web.download', 'targets.web.extension']);
+  assert.equal(planned.changed, true);
+  assert.equal(fs.readFileSync(configPath, 'utf8'), CONVERTED, 'dry run wrote to the file');
+
+  const report = removeConfigValues(root, ['targets.web.download', 'targets.web.extension']);
+  assert.equal(report.path, configPath);
+  assert.deepEqual(report.removed, ['targets.web.download', 'targets.web.extension']);
+  const written = fs.readFileSync(configPath, 'utf8');
+  assert.equal(JSON5.parse(written).targets.web.download, undefined);
+
+  const rerun = removeConfigValues(root, ['targets.web.download', 'targets.web.extension']);
+  assert.deepEqual(rerun.removed, []);
+  assert.equal(rerun.changed, false);
+  assert.equal(fs.readFileSync(configPath, 'utf8'), written, 'the rerun rewrote the file');
 });

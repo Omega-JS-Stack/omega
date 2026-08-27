@@ -2,7 +2,7 @@
   logo: {
     href: '/',
     class: 'filter-adaptive',
-    text: '{{ site.brand.name }}',
+    text: '{{ resolved.config.brand.name }}',
   },
   links: [
     {

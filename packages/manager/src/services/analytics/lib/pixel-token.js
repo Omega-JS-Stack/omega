@@ -8,18 +8,21 @@
  * ships in the frontend); the conversions/events access token is a secret
  * and lives in the brand .env under the exact name @omega.js/backend reads.
  * There's no practical validation API for either token, so this is a
- * presence check with where-to-get guidance — interactive runs walk the user
- * to the exact page that mints one (the Enter-gated open, house rule: ask
- * permission, never auto-open) and take a paste-in that saves the token to
- * the brand .env (the disperse service composes it into the backend's app
- * .env; the stage step carries it into dist/); leaving it empty keeps the
- * warned guidance.
+ * presence check plus an ask — and the ask is the SHARED setup contract
+ * (#608, lib/service-input.js): provide (the Enter-gated open of the exact
+ * page that mints one, then a masked paste saved to the brand .env), skip
+ * this run, or disable the provider for good (`analytics.providers.
+ * {provider}: false`). Non-interactive runs never prompt and keep the warned
+ * guidance. The disperse service composes the saved token into the backend's
+ * app .env; the stage step carries it into dist/.
+ *
+ * A provider whose token is MINTED rather than pasted names its own acquire
+ * on the spec (TikTok's portal exchange, #448) — the outcomes are identical.
  */
 const chalk = require('chalk').default;
-const { input, pressEnterToOpen } = require('@omega.js/devkit/prompt');
 
-const { writeEnvValue } = require('../../../lib/env-secret.js');
-const { canPrompt } = require('../../../lib/run-gates.js');
+const { serviceInputSpec } = require('../../../config.js');
+const { requestServiceInput } = require('../../../lib/service-input.js');
 
 /**
  * Make sure the provider's access token is in the environment, asking for
@@ -28,43 +31,35 @@ const { canPrompt } = require('../../../lib/run-gates.js');
  * ✓ line).
  *
  * @param {Object} context - Handler context
- * @param {Object} spec - { label, envVar, tokenSource, tokenUrl }
+ * @param {Object} spec - A pixel spec ({ key, label, envVar, acquire?, instructions? })
+ * @param {Object} [options] - { gate: false } when the caller already ran the
+ *   Provide / Skip / Disable gate for this provider.
  * @returns {Promise<boolean>} - Whether the token is now in process.env
  */
-async function acquirePixelToken(context, spec) {
-  const { brandRoot, options = {} } = context;
-
+async function acquirePixelToken(context, spec, options = {}) {
   if (process.env[spec.envVar]) {
     return true;
   }
 
-  console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(spec.envVar)} not set in the brand .env`);
-  console.log(`      ${chalk.dim('→')} Get it from ${spec.tokenSource}`);
-
-  if (!canPrompt(options)) {
-    return false;
+  if (spec.acquire) {
+    return spec.acquire(context, spec, options);
   }
 
-  if (spec.tokenUrl) {
-    await pressEnterToOpen(spec.tokenUrl, `the ${spec.label} token page`);
-  }
+  const gate = await requestServiceInput(context, serviceInputSpec('analytics', {
+    names: [spec.envVar],
+    label: spec.label,
+    instructions: spec.instructions,
+    gate: options.gate,
+  }));
 
-  const value = (await input({ message: `    ${spec.envVar} (leave empty to skip):` })).trim();
-  if (!value) {
-    return false;
-  }
-
-  writeEnvValue(brandRoot, spec.envVar, value);
-  process.env[spec.envVar] = value;
-  console.log(`      ${chalk.green('✓')} ${spec.envVar} saved to the brand .env`);
-  return true;
+  return gate === null;
 }
 
 /**
  * Check one provider's pixel config + access token.
  *
  * @param {Object} context - Handler context
- * @param {Object} spec - { key, label, idLabel, envVar, tokenSource, tokenUrl }
+ * @param {Object} spec - { key, label, idLabel, envVar }
  * @returns {Object} - Handler return ({ output } / warned)
  */
 async function ensurePixelToken(context, spec) {

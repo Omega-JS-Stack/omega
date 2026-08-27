@@ -12,6 +12,8 @@
 import omega from '@omega.js/client';
 import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
+import { PLATFORM_COOKIES, readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
+import { getTrackingConsent } from '__main_assets__/js/libs/tracking-consent.js';
 
 const logger = createLogger('dev-palette');
 
@@ -503,10 +505,49 @@ export default function devPalette() {
   storageActions.append(logStorage, clearStorage);
   storage.append(storageTarget, storageActions);
 
+  // Ad match keys (#577) — why a conversion matched, or did not. The four
+  // things that decide it, read LIVE when the panel opens: what the visitor
+  // consented to, which pixel scripts actually loaded (a blocker takes one
+  // without touching the others, #306), which platform cookies exist right now,
+  // and what the stored attribution would send with them.
+  //
+  // KEY NAMES ONLY, exactly like the backend's fire log: a match value is
+  // personal data whether it is hashed or not, and the names are what say
+  // whether the plumbing is working.
+  const match = doc.createElement('div');
+  match.className = 'omega-devbar__who';
+
+  const renderMatch = () => {
+    // A consent record that cannot be READ (a private window, a jar the visitor
+    // turned off) is what the facade treats as no consent — and here it must not
+    // take the whole panel down with it.
+    let consent = {};
+    try {
+      consent = getTrackingConsent();
+    } catch (error) {
+      consent = {};
+    }
+
+    const cookies = readPlatformCookies();
+    const attribution = omega.storage().get('attribution', {}) || {};
+    const touch = attribution.last || attribution.first || {};
+    const pixels = [['gtag', typeof gtag === 'function'], ['fbq', typeof fbq === 'function'], ['ttq', typeof ttq !== 'undefined']];
+    const present = Object.values(PLATFORM_COOKIES).filter((key) => cookies[key]);
+    const missing = Object.values(PLATFORM_COOKIES).filter((key) => !cookies[key]);
+
+    match.textContent = [
+      `consent: ${Object.keys(consent).filter((key) => consent[key] === true).join(', ') || 'none granted'}`,
+      `pixels: ${pixels.filter(([, loaded]) => loaded).map(([name]) => name).join(', ') || 'none loaded'}`,
+      `cookies: ${present.join(', ') || 'none'}${missing.length ? ` (missing ${missing.join(', ')})` : ''}`,
+      `attribution: ${[...Object.keys(touch.tags || {}), ...Object.keys(touch.clickIds || {})].join(', ') || 'none stored'}`,
+    ].join('\n');
+  };
+
   // Quick links
   const links = doc.createElement('div');
   links.className = 'omega-devbar__grid';
   [
+    ['Styleguide', '/test/styleguide'],
     ['Components', '/test/components'],
     ['Admin', '/admin'],
     ['Account', '/dashboard/account'],
@@ -549,6 +590,7 @@ export default function devPalette() {
     reset,
     signOut,
     builtIn('storage', 'Storage', storage),
+    builtIn('match', 'Ad match keys', match),
     extras,
     builtIn('links', 'Go to', links),
     note,
@@ -582,6 +624,7 @@ export default function devPalette() {
 
     if (open) {
       renderStorage();
+      renderMatch();
       renderDevSections();
     }
   };

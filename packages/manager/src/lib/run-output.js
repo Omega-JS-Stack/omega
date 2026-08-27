@@ -8,10 +8,13 @@
  *   .omega/runs/{ts}.json   → this run's transient output (counts, status
  *                             flags, errors), for post-mortem debugging
  *
- * The old third bucket — `.omega/state.json`, a durable cache of derived
- * data — is RETIRED ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)):
+ * The old third bucket — the durable cache of derived data `.omega/state.json`
+ * carried — is RETIRED ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)):
  * every fact it held either re-derives from the platform on each idempotent
- * ensure, or has an authoritative home in config/.env. `.omega/` is
+ * ensure, or has an authoritative home in config/.env. The FILE lives on as
+ * the per-machine RECORD home ([#479](https://github.com/Omega-JS-Stack/omega/issues/479))
+ * — deploy stamps under its `deploy` section, written by
+ * `@omega.js/devkit/deploy-record` and by nothing here. `.omega/` is
  * gitignored (the workspace service ensures the entry).
  */
 

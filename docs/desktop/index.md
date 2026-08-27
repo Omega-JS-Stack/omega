@@ -152,7 +152,7 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 
 | Command | Description |
 |---|---|
-| `setup` | scaffold consumer, ensure peer deps, write projectScripts |
+| `setup` | scaffold consumer, ensure peer deps, write projectScripts into `package.json` (npm's trailing newline kept, written only when the content changed — [#590](https://github.com/Omega-JS-Stack/omega/issues/590)) |
 | `clean` | remove `dist/`, `release/`, `.cache/` |
 | `install` | install peer deps |
 | `version` | print versions |

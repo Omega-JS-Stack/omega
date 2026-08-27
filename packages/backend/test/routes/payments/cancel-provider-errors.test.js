@@ -23,7 +23,7 @@ const Stripe = require('stripe');
 const { buildUser, callHandler, withEnvironment } = require('./_route-harness.js');
 
 const handler = require('../../../src/manager/routes/payments/cancel/post.js');
-const isAlreadyGone = require('../../../src/manager/routes/payments/cancel/_provider-errors.js');
+const isAlreadyGone = require('../../../src/manager/libraries/payment/provider-errors.js');
 
 // A subscriber on a real provider, old enough to clear the age guard.
 function subscriber(Manager, { uid, status, provider }) {

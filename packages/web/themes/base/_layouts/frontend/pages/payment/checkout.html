@@ -31,16 +31,16 @@ layout: frontend/core/cover
 # #discount-code, #apply-discount, #switch-account, #checkout-help-button,
 # #subscription-toggle, the dev panel ids, and all data-omega-bind expressions.
 
-theme:
-  main:
-    align: "start"
-
-client:
-  auth:
-    config:
-      policy: "authenticated"
-  consent:
-    enabled: false
+config:
+  theme:
+    main:
+      align: "start"
+  client:
+    auth:
+      config:
+        policy: "authenticated"
+    consent:
+      enabled: false
 ---
 
 <!-- The pay buttons captured once and rendered by both column positions (the
@@ -164,8 +164,8 @@ client:
   <header class="omega-checkout__head" data-omega-reveal="fade">
     <h1 class="omega-checkout__head-mark mb-0">
       <a href="/" class="omega-checkout__brand">
-        <img src="{{ site.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} logo" width="24" height="24">
-        <span class="fw-semibold">{{ site.brand.name }}</span>
+        <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} logo" width="24" height="24">
+        <span class="fw-semibold">{{ resolved.config.brand.name }}</span>
       </a>
     </h1>
   </header>
@@ -359,7 +359,7 @@ client:
 
               <!-- Product identity: what you get, on what cadence -->
               <div class="omega-checkout__product omega-binding-skeleton" data-omega-bind="@show checkout">
-                <span class="omega-checkout__product-name">{{ site.brand.name }} <span data-omega-bind="@text checkout.product.name">Loading...</span></span>
+                <span class="omega-checkout__product-name">{{ resolved.config.brand.name }} <span data-omega-bind="@text checkout.product.name">Loading...</span></span>
                 <span class="omega-quiet small" data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
               </div>
 

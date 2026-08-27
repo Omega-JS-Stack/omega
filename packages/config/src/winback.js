@@ -25,14 +25,15 @@
  * flag to read — it is simply never made.
  */
 
-// What a brand that configures nothing gets. `duration: 'once'` is the next
-// cycle only; 'forever' is the brand asking for a permanent price cut.
-const WINBACK_OFFER_DEFAULTS = { enabled: true, percent: 50, duration: 'once' };
+const { WINBACK_DURATIONS } = require('./schema.js');
+const { schemaDefaults } = require('./defaults.js');
 
-// The durations a coupon can be built for on every provider that supports the
-// offer. Stripe's third option ('repeating') needs a duration_in_months beside
-// it, which is provider surface nothing here asks for.
-const WINBACK_DURATIONS = ['once', 'forever'];
+// What a brand that configures nothing gets — DERIVED from the schema's own
+// `payment.winback` defaults (#478: one home for every default, and the block
+// materializes into the brand file on the next manage run). `duration: 'once'`
+// is the next cycle only; 'forever' is the brand asking for a permanent price
+// cut.
+const WINBACK_OFFER_DEFAULTS = schemaDefaults().payment.winback;
 
 /**
  * The save offer a `payment` section makes, with the framework default applied.

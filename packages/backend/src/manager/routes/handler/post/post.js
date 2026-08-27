@@ -2,6 +2,8 @@
  * POST /handler/post - Create post handler (with invoice and notification)
  * Admin-only endpoint that creates invoices and sends notifications for guest posts
  */
+const env = require('../../../libraries/env.js');
+
 module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   const fetch = Manager.require('wonderful-fetch');
 
@@ -40,7 +42,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
       method: 'POST',
       response: 'json',
       body: {
-        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
+        backendManagerKey: env.get('OMEGA_ADMIN_KEY'),
         method: 'post',
         service: 'paypal',
         command: 'v2/invoicing/invoices',
@@ -84,7 +86,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
       method: 'POST',
       response: 'json',
       body: {
-        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
+        backendManagerKey: env.get('OMEGA_ADMIN_KEY'),
         service: 'paypal',
         command: `v2/invoicing/invoices/${createdInvoiceId}/send`,
         method: 'post',
@@ -109,7 +111,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
       method: 'POST',
       response: 'json',
       headers: {
-        'Authorization': `Bearer ${process.env.OMEGA_ADMIN_KEY}`,
+        'Authorization': `Bearer ${env.get('OMEGA_ADMIN_KEY')}`,
       },
       body: {
         notification: {

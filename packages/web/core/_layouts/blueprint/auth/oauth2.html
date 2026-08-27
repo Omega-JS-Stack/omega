@@ -2,9 +2,10 @@
 layout: frontend/pages/auth/oauth2
 
 meta:
-  title: "OAuth2 Authentication - {{ site.brand.name }}"
+  title: "OAuth2 Authentication - {{ resolved.config.brand.name }}"
   description: "Connect your account using OAuth2 for secure authentication."
   breadcrumb: "OAuth2 authentication"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 ---
 
 {{ content | omega_content_format }}

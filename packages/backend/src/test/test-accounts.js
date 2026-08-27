@@ -1429,14 +1429,36 @@ const JOURNEY_ACCOUNTS = {
       personal: { name: { first: 'Uma', last: 'Uncancel' } },
     },
   },
-  // The two webhook suites DELETE this doc before they run: their pipeline
-  // writes the subscriber's doc from scratch, which it only does for a uid this
-  // project has an auth user for ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)).
-  // That auth user is the half the seed owns.
-  'webhook-chargebee-stale-fallback': {
-    id: 'webhook-chargebee-stale-fallback',
-    uid: '_test-webhook-chargebee-stale-fallback',
-    email: '_test.webhook-chargebee-stale-fallback@{domain}',
+  'journey-payments-abandoned': {
+    id: 'journey-payments-abandoned',
+    uid: '_test-journey-payments-abandoned',
+    email: '_test.journey-payments-abandoned@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Avery', last: 'Abandon' } },
+    },
+  },
+  'journey-payments-dispute': {
+    id: 'journey-payments-dispute',
+    uid: '_test-journey-payments-dispute',
+    email: '_test.journey-payments-dispute@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+      personal: { name: { first: 'Dana', last: 'Dispute' } },
+    },
+  },
+  // The two webhook suites DELETE this doc before they run: the pipeline writes a
+  // subscriber's doc from scratch only for a uid this project has an auth user for
+  // ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)), and that auth
+  // user is the half the seed owns. The chargebee suite proves the opposite half:
+  // with the provider unreachable, nothing recreates the doc at all
+  // ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
+  'webhook-chargebee-unreachable': {
+    id: 'webhook-chargebee-unreachable',
+    uid: '_test-webhook-chargebee-unreachable',
+    email: '_test.webhook-chargebee-unreachable@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },

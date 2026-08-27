@@ -20,6 +20,7 @@ const pushid = require('pushid');
 
 const { SEND_AT_LIMIT, errorWithCode } = require('../constants.js');
 const prepare = require('../prepare.js');
+const env = require('../../env.js');
 
 function Transactional(ctx) {
   const self = this;
@@ -237,7 +238,7 @@ Transactional.prototype.send = async function (settings) {
 
   // Initialize SendGrid
   const sendgrid = Manager.require('@sendgrid/mail');
-  sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
+  sendgrid.setApiKey(env.get('SENDGRID_API_KEY'));
 
   // If scheduled beyond the limit, queue for later
   if (email.sendAt && email.sendAt >= moment().add(SEND_AT_LIMIT, 'hours').unix()) {

@@ -5,14 +5,13 @@ layout: frontend/core/base
 hero:
   # No hardcoded article — brand names often carry their own ("The Daily
   # Build wire", "OMEGA Playground wire" both read right).
-  headline: "{{ site.brand.name }}"
+  headline: "{{ resolved.config.brand.name }}"
   headline_accent: "wire"
   subheadline: "Discover insights, tutorials, and news from our team"
 
 # Newsletter CTA Section
 newsletter_cta:
   superheadline:
-    icon: "envelope"
     text: "Newsletter"
   headline: "Never miss a"
   headline_accent: "story"
@@ -79,7 +78,7 @@ newsletter_cta:
       <!-- Lead story splash -->
       {% assign lead = paginator.posts.first %}
       {% component "heading/rule-head", text: "Lead story" %}
-      <a href="{{ site.url }}{{ lead.url }}" class="newsflash-story-card newsflash-story-card--lead mb-5" data-lazy="@class animation-slide-up">
+      <a href="{{ resolved.config.url }}{{ lead.url }}" class="newsflash-story-card newsflash-story-card--lead mb-5" data-lazy="@class animation-slide-up">
         <div class="row g-4 g-lg-5 align-items-center">
           <div class="col-lg-7">
             <div class="newsflash-frame shadow">
@@ -110,7 +109,7 @@ newsletter_cta:
           {% for post in paginator.posts offset: 1 %}
             <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
               {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
+              {% component "news/story-card", url: resolved.config.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
             </div>
           {% endfor %}
         </div>
@@ -153,7 +152,7 @@ newsletter_cta:
 
               {% if start_page > 1 %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ site.url }}/blog">1</a>
+                  <a class="page-link" href="{{ resolved.config.url }}/blog">1</a>
                 </li>
                 {% if start_page > 2 %}
                   <li class="page-item disabled">
@@ -165,9 +164,9 @@ newsletter_cta:
               {% for page in (start_page..end_page) %}
                 <li class="page-item {% if page == paginator.page %}active{% endif %}">
                   {% if page == 1 %}
-                    <a class="page-link" href="{{ site.url }}/blog">{{ page }}</a>
+                    <a class="page-link" href="{{ resolved.config.url }}/blog">{{ page }}</a>
                   {% else %}
-                    <a class="page-link" href="{{ site.url }}/blog/page/{{ page }}">{{ page }}</a>
+                    <a class="page-link" href="{{ resolved.config.url }}/blog/page/{{ page }}">{{ page }}</a>
                   {% endif %}
                 </li>
               {% endfor %}
@@ -180,7 +179,7 @@ newsletter_cta:
                   </li>
                 {% endif %}
                 <li class="page-item">
-                  <a class="page-link" href="{{ site.url }}/blog/page/{{ paginator.total_pages }}">
+                  <a class="page-link" href="{{ resolved.config.url }}/blog/page/{{ paginator.total_pages }}">
                     {{ paginator.total_pages }}
                   </a>
                 </li>
@@ -209,7 +208,7 @@ newsletter_cta:
     </div>
 
     <!-- In-Feed Vert (auto placement — the advertising config key gates it) -->
-    {% if site.advertising %}
+    {% if resolved.config.advertising %}
       <div class="row justify-content-center mb-5">
         <div class="col-12 col-lg-8" data-lazy="@class animation-slide-up">
           {% section "verts/unit", type: "in-feed" %}
@@ -258,11 +257,11 @@ newsletter_cta:
               </h3>
               <div>
                 {% for category in categories %}
-                  <a href="{{ site.url }}/blog/categories/{{ category | slugify }}" class="badge bg-primary-soft text-primary text-decoration-none me-1 mb-2">
+                  <a href="{{ resolved.config.url }}/blog/categories/{{ category | slugify }}" class="badge bg-primary-soft text-primary text-decoration-none me-1 mb-2">
                     {{ category }}
                   </a>
                 {% endfor %}
-                <a href="{{ site.url }}/blog/categories" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
+                <a href="{{ resolved.config.url }}/blog/categories" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
                   View all {% omega_icon "arrow-right", "ms-1" %}
                 </a>
               </div>
@@ -278,11 +277,11 @@ newsletter_cta:
               </h3>
               <div>
                 {% for tag in tags %}
-                  <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="badge bg-body-tertiary text-decoration-none me-1 mb-2">
+                  <a href="{{ resolved.config.url }}/blog/tags/{{ tag | slugify }}" class="badge bg-body-tertiary text-decoration-none me-1 mb-2">
                     {{ tag }}
                   </a>
                 {% endfor %}
-                <a href="{{ site.url }}/blog/tags" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
+                <a href="{{ resolved.config.url }}/blog/tags" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
                   View all {% omega_icon "arrow-right", "ms-1" %}
                 </a>
               </div>

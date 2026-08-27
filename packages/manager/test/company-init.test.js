@@ -193,8 +193,9 @@ test('company adopt: the adopted brand inherits the company layer through the RE
   ));
   const brandRoot = stageBrand(path.join(root, 'brands'), 'brand-a');
 
-  // Standalone before the stamp: no company layer anywhere
-  assert.equal(loadBrand(brandRoot).config.monitoring, undefined);
+  // Standalone before the stamp: no company layer anywhere (what `monitoring`
+  // carries is the schema-default layer every config gets, #478)
+  assert.equal(loadBrand(brandRoot).config.monitoring.providers?.sentry?.org, undefined);
 
   captureOutput(() => runCompanyAdopt(root, brandRoot));
 

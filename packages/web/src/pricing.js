@@ -80,8 +80,10 @@ function composePlan(product) {
     prices: {
       monthly: monthly,
       annually: annually,
-      // What the card shows in "$N /month" while the annual toggle is active
-      annuallyPerMonth: annually > 0 ? Math.round(annually / 12) : 0,
+      // What the card shows in "$N /month" while the annual toggle is active.
+      // FLOORS (#477 — legacy parity): the monthly equivalent never claims
+      // more than a twelfth of what is actually charged.
+      annuallyPerMonth: annually > 0 ? Math.floor(annually / 12) : 0,
     },
     features: composeFeatures(product),
   };

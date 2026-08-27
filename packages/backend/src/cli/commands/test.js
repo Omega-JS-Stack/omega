@@ -2,6 +2,7 @@ const BaseCommand = require('./base-command');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const util = require('util');
 const { spawn } = require('child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
@@ -10,6 +11,7 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
+const { refuseWhenCustom } = require('../utils/project-type');
 
 // The Firebase emulator hub — fixed, not part of the N7-allocated map.
 const HUB_PORT = 4400;
@@ -142,6 +144,9 @@ class TestCommand extends BaseCommand {
     const self = this.main;
     const argv = self.argv;
 
+    // The emulator test lane needs Cloud Functions; custom mode has none (#584)
+    if (refuseWhenCustom(self.firebaseProjectPath, 'test')) return;
+
     // Tee THIS process to <targetRoot>/logs/test.log (#197) — the setup lines, the
     // port summary and the emulator boot that the runner-child's dist/test.log
     // never sees.
@@ -218,6 +223,22 @@ class TestCommand extends BaseCommand {
       return;
     }
 
+    // Opt-in lanes. OFF by default and gated on conditions the default suite
+    // must never depend on (credentials, the network, a CLI). A gate that
+    // refuses prints ONE line and the run exits clean — a skipped lane is a
+    // normal outcome, not a failure
+    // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+    if (argv.lane) {
+      const gate = this.openLane(argv.lane);
+
+      if (!gate) {
+        return;
+      }
+
+      this.lane = gate;
+      testPaths.push(`backend:${gate.laneModule.LANE}`);
+    }
+
     // Build unified test config object
     // Use hosting URL for all API requests (rewrites to omega_api function)
     const testConfig = {
@@ -242,7 +263,17 @@ class TestCommand extends BaseCommand {
 
     if (adoption.adopt) {
       this.log(chalk.cyan('Running tests against EXISTING emulator'));
-      await this.runTestsDirectly(this.buildTestCommand(testConfig), functionsDir, emulatorPorts);
+
+      // The forwarder needs the RESOLVED port, so it starts here rather than at
+      // the gate — and stops in the finally, so a failed run never leaves a
+      // `stripe listen` behind holding the terminal.
+      const laneSession = await this.startLane(testConfig, emulatorPorts);
+
+      try {
+        await this.runTestsDirectly(this.buildTestCommand({ ...testConfig, laneEnv: laneSession.env }), functionsDir, emulatorPorts);
+      } finally {
+        laneSession.stop();
+      }
     } else {
       if (adoption.reason === 'project-mismatch') {
         this.log(chalk.yellow(`  Port ${emulatorPorts.functions} belongs to project "${adoption.runningProjectId}", not "${projectConfig.cloud?.config?.projectId}" — booting this project's own emulator on free ports.`));
@@ -255,6 +286,101 @@ class TestCommand extends BaseCommand {
       // may bump ports, and a pre-built command would bake the stale ones.
       await this.runEmulatorTests(testConfig, functionsDir);
     }
+  }
+
+  /**
+   * Open an opt-in lane, or say why it stays shut
+   *
+   * The ONE decision point for every lane: the gate answers from facts already
+   * on this machine (a credential, a CLI, the environment), so a refusal costs
+   * nothing and reads as a skip. Nothing is started here — the forwarding needs
+   * a port the emulator has not chosen yet.
+   *
+   * @param {string} name - The `--lane=` value
+   * @returns {object|null} The opened lane, or null when it stays shut
+   */
+  openLane(name) {
+    let laneModule;
+
+    try {
+      laneModule = require(path.join(__dirname, 'test-lanes', `${name}.js`));
+    } catch (error) {
+      this.logError(`Unknown test lane: ${name}`);
+      process.exitCode = 1;
+      return null;
+    }
+
+    const decision = laneModule.resolveGate({ env: laneModule.env, hasStripeCli: !!laneModule.findStripeCli() });
+
+    if (!decision.ok) {
+      this.log(laneModule.skipLine(decision.reason));
+      return null;
+    }
+
+    this.log(chalk.cyan(`  Lane --lane=${name}: ENABLED (real external services)`));
+
+    return { laneModule, decision };
+  }
+
+  /**
+   * Bring an opened lane up against the RESOLVED emulator ports
+   *
+   * Creates the Stripe fixtures the brand's catalogue needs (idempotently — a
+   * rerun reuses them) and starts the forwarder, handing back the env the runner
+   * child needs and the stop the caller owes it. No lane opened = an inert
+   * session, so both run paths call this unconditionally.
+   *
+   * @param {object} testConfig - The resolved test config
+   * @param {object} emulatorPorts - The port map the emulator actually took
+   * @returns {Promise<{ env: object, stop: function }>}
+   */
+  async startLane(testConfig, emulatorPorts) {
+    const inert = { env: {}, stop: () => {} };
+
+    if (!this.lane) {
+      return inert;
+    }
+
+    const { laneModule, decision } = this.lane;
+    const stripePath = laneModule.findStripeCli();
+
+    const { fixtures, unsupported } = laneModule.planFixtures(
+      testConfig.payment?.products,
+      testConfig.payment?.currency,
+    );
+
+    for (const item of unsupported) {
+      this.logWarning(`  Lane ${laneModule.LANE}: ${item.productId} has no Stripe fixture — ${item.reason}`);
+    }
+
+    const stripe = require('stripe')(decision.key);
+
+    await laneModule.ensureFixtures({
+      stripe: stripe,
+      fixtures: fixtures,
+      log: (line) => this.log(chalk.gray(`  [${laneModule.LANE}] ${line}`)),
+    });
+
+    const { webhookSecret, stop } = await laneModule.startForwarding({
+      stripePath: stripePath,
+      apiKey: decision.key,
+      forwardUrl: laneModule.forwardUrl({ hostingPort: emulatorPorts.hosting, webhookKey: testConfig.webhookKey }),
+      log: (line) => this.log(chalk.gray(`  [Stripe] ${line}`)),
+    });
+
+    this.log(chalk.gray(`  [${laneModule.LANE}] forwarding real test-mode webhooks to localhost:${emulatorPorts.hosting}\n`));
+
+    return {
+      // The signing secret rides to the child by env and is never printed: the
+      // route verifies every forwarded delivery against it, which is the whole
+      // point of running real events through the real door.
+      env: {
+        [laneModule.LANE_ENV]: laneModule.LANE,
+        STRIPE_WEBHOOK_SECRET: webhookSecret,
+        STRIPE_CLI_PATH: stripePath,
+      },
+      stop: stop,
+    };
   }
 
   /**
@@ -382,6 +508,7 @@ class TestCommand extends BaseCommand {
     process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || '_test-unsubscribe-hmac-key';
 
     this.ensureFixtureServiceAccount(fixture);
+    this.ensureFixtureEnv(fixture);
     this.ensureFixtureRules(fixture);
     this.linkFixtureDeps(fixture);
     this.log(chalk.cyan(`  Self-test: booting bundled fixture project (${fixture})`));
@@ -423,6 +550,46 @@ class TestCommand extends BaseCommand {
       fs.writeFileSync(saPath, `${JSON.stringify(serviceAccount, null, 2)}\n`);
     } catch (e) {
       this.logWarning(`Could not write fixture service-account.json: ${e.message}`);
+    }
+  }
+
+  /**
+   * Seed the fixture's `.env` with every key the env schema marks REQUIRED
+   * ([#581](https://github.com/Omega-JS-Stack/omega/issues/581)). The fixture
+   * carries a consumer `config/omega.json5`, so it IS a brand's backend to the
+   * boot guard — and firebase-tools analyzes function definitions in its own
+   * child process, which never saw the values injected into this one above, so
+   * `Manager.init()` threw before a single function loaded.
+   *
+   * Values come from the SAME resolution the injection above does (the fixture
+   * config's `omega.*` keys, the shared unsubscribe secret), so the server and
+   * the test client authenticate with one value; a key the schema marks
+   * required LATER gets an obvious dummy, so the fixture can never fall behind
+   * the schema again. Existing lines are never touched — a fixture edit
+   * survives the run that reads it. Written to the TARGET ROOT (the authored
+   * home under the src/dist pillar); the stage step carries it into functions/.
+   * Emulator-only values, gitignored like the service account, never committed.
+   */
+  ensureFixtureEnv(fixture) {
+    const { requiredEnvKeys } = require('@omega.js/config');
+    const envPath = path.join(fixture, '.env');
+    const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
+    const present = util.parseEnv(existing);
+
+    const lines = requiredEnvKeys('backend')
+      .filter((name) => !present[name])
+      .map((name) => `${name}="${process.env[name] || `fixture-${name.toLowerCase().replace(/_/g, '-')}`}"`);
+
+    if (lines.length === 0) {
+      return;
+    }
+
+    const header = existing ? '' : '# @omega.js/backend self-test fixture — emulator-only values, seeded per run.\n';
+
+    try {
+      jetpack.write(envPath, `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
+    } catch (e) {
+      this.logWarning(`Could not write fixture .env: ${e.message}`);
     }
   }
 
@@ -508,6 +675,10 @@ class TestCommand extends BaseCommand {
       // firebase-functions logger compat shim and turns every test line into
       // JSON. Say what this process IS before Manager.init() looks.
       OMEGA_TEST_MODE: 'true',
+      // An opt-in lane's own environment: the lane name the runner's discovery
+      // gates on, plus whatever the lane brought up (the forwarder's signing
+      // secret). Empty on every default run.
+      ...(testConfig.laneEnv || {}),
     };
 
     const envString = Object.entries(testEnv)
@@ -665,12 +836,16 @@ class TestCommand extends BaseCommand {
 
     const { shutdown, exitPromise, emulatorPorts } = started;
 
+    // The forwarder needs the RESOLVED port too, so it starts after the boot
+    const laneSession = await this.startLane(testConfig, emulatorPorts);
+
     // Build the test command from the RESOLVED ports — allocation may have
     // bumped them off the firebase.json values testConfig was seeded with.
     const testCommand = this.buildTestCommand({
       ...testConfig,
       apiUrl: `http://127.0.0.1:${emulatorPorts.hosting}`,
       emulatorPorts,
+      laneEnv: laneSession.env,
     });
 
     // Forward Ctrl+C to a clean emulator shutdown
@@ -724,6 +899,7 @@ class TestCommand extends BaseCommand {
       this.logError(`Test runner error: ${error.message || error}`);
       testExitCode = 1;
     } finally {
+      laneSession.stop();
       process.removeListener('SIGINT', onSigint);
       await shutdown();
       await exitPromise;

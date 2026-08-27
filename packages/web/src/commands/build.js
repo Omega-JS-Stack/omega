@@ -110,10 +110,14 @@ module.exports = async function (options) {
 
   // Self-host Firebase's /__/auth/* helper files so authDomain can be the
   // brand host on static hosting (translation excludes __/auth by design).
+  // The fetch writes through to the brand's machine-owned cache (never
+  // committed, same home as the imagemin cache) so an offline build serves
+  // the last good copy instead of failing after emitting every page (#548).
   await fetchFirebaseAuthHelpers({
     siteData,
     outDir: paths.out,
     logger,
+    cacheDir: path.join(brandRoot || paths.root, '.omega', 'cache', 'firebase-auth'),
   });
 
   // Post-build translation (site.* IS the resolved config shape).

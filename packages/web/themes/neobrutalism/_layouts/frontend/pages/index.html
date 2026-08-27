@@ -2,13 +2,9 @@
 layout: frontend/core/base
 
 #### THEME CONFIG ####
-theme:
-  main:
-    class: "pt-0"
-
 # Hero Section
 hero:
-  tagline: "Introducing {{ site.brand.name }}"
+  tagline: "Introducing {{ resolved.config.brand.name }}"
   headline: "The #1 platform for business"
   headline_accent: "success"
   description: "AI automation for modern businesses made simple"
@@ -43,9 +39,8 @@ trusted_by:
 # Showcase Section
 showcase:
   superheadline:
-    icon: "cubes"
     text: "Showcase"
-  headline: "What makes {{ site.brand.name }}"
+  headline: "What makes {{ resolved.config.brand.name }}"
   headline_accent: "different"
   subheadline: "Powerful features designed to accelerate your success"
   items:
@@ -59,7 +54,6 @@ showcase:
 # Features Section
 features:
   superheadline:
-    icon: "wand-magic-sparkles"
     text: "How it works"
   headline: "Design made"
   headline_accent: "simple"
@@ -82,7 +76,6 @@ features:
 # Testimonials Section
 testimonials:
   superheadline:
-    icon: "megaphone"
     text: "Testimonials"
   items:
     - quote: "This platform transformed my business. The support is incredible!"
@@ -121,13 +114,17 @@ cta:
     text: "Launch"
   headline: "Ready to transform your"
   headline_accent: "business?"
-  subheadline: "Join thousands of successful companies who have already accelerated their growth with {{ site.brand.name }}"
+  subheadline: "Join thousands of successful companies who have already accelerated their growth with {{ resolved.config.brand.name }}"
   primary_button:
     text: "Start today"
     href: "/dashboard"
   secondary_button:
     text: "Talk to an expert"
     href: "/contact"
+config:
+  theme:
+    main:
+      class: "pt-0"
 ---
 
 {% comment %}
@@ -189,7 +186,7 @@ cta:
     <header class="neo-section-head mb-5">
       {% iftruthy resolved.showcase.superheadline.text %}
         <span class="neo-kicker mb-3">
-          {% omega_icon resolved.showcase.superheadline.icon, "me-1" %}{{ resolved.showcase.superheadline.text }}
+          {{ resolved.showcase.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="neo-section-head__title">
@@ -226,7 +223,7 @@ cta:
     <header class="neo-section-head mb-5">
       {% iftruthy resolved.features.superheadline.text %}
         <span class="neo-kicker mb-3">
-          {% omega_icon resolved.features.superheadline.icon, "me-1" %}{{ resolved.features.superheadline.text }}
+          {{ resolved.features.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="neo-section-head__title">

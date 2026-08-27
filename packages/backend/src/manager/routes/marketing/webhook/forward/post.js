@@ -32,6 +32,7 @@
  */
 const fetch = require('wonderful-fetch');
 const safeCompare = require('../../../../helpers/safe-compare.js');
+const env = require('../../../../libraries/env.js');
 
 const CHILD_TIMEOUT_MS = 10000;
 
@@ -54,7 +55,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
 
   // Same key used for the receiver — parent validates incoming, then re-uses
   // it for outbound calls to children (all brands share this env value).
-  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
+  if (!safeCompare(key, env.get('OMEGA_WEBHOOK_KEY'))) {
     return ctx.respond('Invalid key', { code: 401 });
   }
 

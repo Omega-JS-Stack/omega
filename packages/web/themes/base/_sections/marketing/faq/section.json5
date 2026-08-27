@@ -2,7 +2,7 @@
   description: 'FAQ accordion band — aside head + Bootstrap accordion in the asymmetric duo layout by default; variant: "center" stacks a centered head over a narrowed accordion (col-lg-8). A SHARED band (contact, download, extension, alternatives) — defaults stay NEUTRAL and every page passes its own copy over the data bridge (spec §6 shared-band ruling). Pricing keeps its own inline copy: its aside embeds the bespoke billing-guarantee object.',
 
   args: {
-    superheadline: 'object',
+    superheadline: 'object', // { text } — the micro label is words only
     headline: 'string',
     headline_accent: 'string',
     subheadline: 'string',

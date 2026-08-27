@@ -1,14 +1,17 @@
 /**
  * Test: provider extractResource() — each library names its own webhook envelope
  *
- * The webhook trigger takes the stale fallback (the payload to use when the API
- * re-fetch fails) out of the event it received. It used to read Stripe's envelope
- * for every provider — `raw.data.object` — so a Chargebee event (`content.<type>`)
- * or a PayPal event (`resource`) degraded to an empty fallback and the failed fetch
- * threw instead of falling back at all ([#222]).
+ * The webhook trigger reads the resource out of the event it received to name what
+ * the event is ABOUT — the orderId a failed event belongs to, and the body the test
+ * provider answers its own lookups from. It used to read Stripe's envelope for every
+ * provider — `raw.data.object` — so a Chargebee event (`content.<type>`) or a PayPal
+ * event (`resource`) resolved to nothing at all ([#222]).
  *
  * Each library now names its own shape, and these assert the shape against the
  * real fixtures each provider's route parser already reads.
+ *
+ * What the envelope must NEVER do is drive state: that comes from the provider's own
+ * lookup ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
  */
 const assert = require('node:assert');
 const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');

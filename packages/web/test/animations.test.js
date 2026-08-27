@@ -53,11 +53,13 @@ const loopNames = (file) => [...fs.readFileSync(file, 'utf8')
 
 // A theme partial is a fragment, not a compilation unit: its variables and
 // mixins arrive through the theme entry's import chain, so the entry is what
-// compiles. Component and section sheets are the exception, because the
-// sections lane compiles each one on its own.
+// compiles. Component, section and hero-animation sheets are the exception,
+// because the `omega:sections` lane compiles each one on its own (#441 put
+// `_hero/<name>/style.scss` on that same lane).
+const SELF_CONTAINED_AREAS = ['_components', '_sections', '_hero'];
 const compileUnitFor = (sheet) => {
   const [theme, area] = path.relative(THEMES_DIR, sheet).split(path.sep);
-  return area === '_components' || area === '_sections' ? sheet : path.join(THEMES_DIR, theme, '_theme.scss');
+  return SELF_CONTAINED_AREAS.includes(area) ? sheet : path.join(THEMES_DIR, theme, '_theme.scss');
 };
 
 // Compiled sass is flat, so every innermost `selector { decls }` reads off one

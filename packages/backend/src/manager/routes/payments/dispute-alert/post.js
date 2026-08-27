@@ -2,6 +2,7 @@ const path = require('path');
 const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
+const env = require('../../../libraries/env.js');
 
 // Providers already warned about running key-only, so the notice lands once per
 // instance instead of once per alert
@@ -28,7 +29,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
 
   // Validate key
   const key = query.key;
-  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
+  if (!safeCompare(key, env.get('OMEGA_WEBHOOK_KEY'))) {
     return ctx.respond('Invalid key', { code: 401 });
   }
 

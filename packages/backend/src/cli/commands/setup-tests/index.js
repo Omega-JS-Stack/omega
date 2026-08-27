@@ -3,6 +3,8 @@
  * Manages the order and execution of all setup tests
  */
 
+const { isCustomProject, FIREBASE_ONLY_SETUP_CHECKS } = require('../../utils/project-type');
+
 // Import all test classes in the order they should run
 const IsFirebaseProjectTest = require('./is-firebase-project');
 const NodeVersionTest = require('./node-version');
@@ -43,13 +45,22 @@ const ProjectDirectoriesTest = require('./project-directories');
 const LegacyTestsCleanupTest = require('./legacy-tests-cleanup');
 const MarketingCampaignsSeededTest = require('./marketing-campaigns-seeded');
 
+// The checks a custom-server target skips whole (#614) — the mode table names
+// them, this resolves each name to the class the list below instantiates.
+const FIREBASE_ONLY_CLASSES = new Set(FIREBASE_ONLY_SETUP_CHECKS.map((name) => require(`./${name}`)));
+
 /**
  * Get all tests in the order they should run
+ *
+ * A custom-server backend (#584) has no Cloud Functions deploy and no
+ * emulator, so the checks that scaffold and maintain the Firebase-only
+ * artifacts are not part of its setup at all.
+ *
  * @param {Object} context - The test context containing main and other dependencies
  * @returns {Array} Array of test instances
  */
 function getTests(context) {
-  return [
+  const tests = [
     new IsFirebaseProjectTest(context),
     new NodeVersionTest(context),
     new NvmrcVersionTest(context),
@@ -89,6 +100,12 @@ function getTests(context) {
     new LegacyTestsCleanupTest(context),
     new MarketingCampaignsSeededTest(context),
   ];
+
+  if (!isCustomProject(context.main.firebaseProjectPath)) {
+    return tests;
+  }
+
+  return tests.filter((test) => !FIREBASE_ONLY_CLASSES.has(test.constructor));
 }
 
 module.exports = {

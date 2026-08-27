@@ -1,8 +1,8 @@
 /**
- * The per-brand deploy record — `<target>` in `.omega/deploys.json`
- * (gitignored, per-machine). Multi-instance targets key per target: the
- * primary stays `<target>`, other instances record under `<target>:<id>`
- * (see deployKey).
+ * The per-brand deploy record — `<target>` under the `deploy` section of
+ * `.omega/state.json` (gitignored, per-machine). Multi-instance targets key
+ * per target: the primary stays `<target>`, other instances record under
+ * `<target>:<id>` (see deployKey).
  *
  * Written by every framework's deploy verb on success; read by the
  * manager's testing service to tell "never deployed" (live-URL checks skip
@@ -11,53 +11,73 @@
  * fresh clones of long-deployed brands self-heal on their first manage run
  * (Ian 2026-07-17).
  *
- * The record used to live under the `deploy` key of `.omega/state.json`; that
- * file is retired (#434) and the record moved to a file of its own (#449). A
- * brand still carrying the old key has it adopted here, once and silently.
+ * state.json is the ONE per-machine record file, sectioned per fact kind
+ * (#479): future record-shaped facts join it as sibling top-level sections, so
+ * this module reads and writes ONLY `deploy` and passes every other section
+ * through verbatim — including the config-shaped keys an unmigrated brand
+ * still carries from the retired state CONTENT (#434), which belong to the
+ * state-retirement migration and to nothing here.
+ *
+ * The record spent 0.45.0 in a `.omega/deploys.json` of its own (#449); a
+ * brand still carrying that file has it adopted here, once and loudly.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
+const Logger = require('./logger.js');
 const { findBrandRoot } = require('./local.js');
 
-function recordsFile(dir) {
-  return path.join(findBrandRoot(dir), '.omega', 'deploys.json');
+const logger = new Logger('deploy-record');
+
+function stateFile(dir) {
+  return path.join(findBrandRoot(dir), '.omega', 'state.json');
 }
 
 /**
- * Read the records, adopting the `deploy` key of a retired
- * `.omega/state.json` on the way (#449) — one-time and silent, so a brand
- * that deployed before the rename keeps its stamps. The old file goes once
- * nothing else is left in it; a brand that has not run the state-retirement
- * migration yet keeps its file (minus the key) for that migration to finish.
- * Records already here WIN: they are the newer write.
+ * Read the machine state with its `deploy` section resolved, folding in the
+ * interim `.omega/deploys.json` (#449) on the way — one-time and LOUD, so a
+ * brand that deployed on 0.45.0 keeps its stamps and the operator sees where
+ * they went. Records already in state.json WIN: newest write, newest home.
  *
- * Rewrites both files, so callers hold the lock.
+ * A brand whose state.json already carries a `deploy` key is home — the
+ * records are read in place, silently, whatever else the file still holds.
  *
- * @param {string} file - The deploys.json path.
- * @returns {Object} key → record.
+ * Rewrites the files it touches, so callers hold the lock.
+ *
+ * @param {string} file - The state.json path.
+ * @returns {Object} The machine state, `deploy` section included.
  */
-function loadRecords(file) {
-  const records = jetpack.read(file, 'json') || {};
+function loadState(file) {
+  const state = jetpack.read(file, 'json') || {};
+  const records = state.deploy || {};
 
-  const legacy = path.join(path.dirname(file), 'state.json');
-  const state = jetpack.read(legacy, 'json');
-  if (!state?.deploy) {
-    return records;
+  const deploysFile = path.join(path.dirname(file), 'deploys.json');
+  const deploys = jetpack.read(deploysFile, 'json');
+
+  state.deploy = deploys ? { ...deploys, ...records } : records;
+  if (!deploys) return state;
+
+  // The new home lands before the old file goes: a crash between the two
+  // writes must never leave the records with no file at all.
+  jetpack.write(file, state, { jsonIndent: 2 });
+  jetpack.remove(deploysFile);
+
+  if (Object.keys(deploys).length > 0) {
+    logger.log(`Adopted ${describe(deploys)} from .omega/deploys.json into .omega/state.json — the old file was removed.`);
   }
 
-  const { deploy, ...rest } = state;
-  const adopted = { ...deploy, ...records };
-  jetpack.write(file, adopted, { jsonIndent: 2 });
+  return state;
+}
 
-  if (Object.keys(rest).length > 0) {
-    jetpack.write(legacy, rest, { jsonIndent: 2 });
-  } else {
-    jetpack.remove(legacy);
-  }
-
-  return adopted;
+/**
+ * "1 deploy record" / "3 deploy records" — the adoption line's subject.
+ * @param {Object} records - key → record.
+ * @returns {string}
+ */
+function describe(records) {
+  const count = Object.keys(records).length;
+  return `${count} deploy record${count === 1 ? '' : 's'}`;
 }
 
 /**
@@ -129,16 +149,16 @@ function withStateLock(file, fn) {
  * @returns {Object} The written record
  */
 function recordDeploy(options) {
-  const file = recordsFile(options.dir);
+  const file = stateFile(options.dir);
   const key = deployKey(options.target, options.instance);
 
   return withStateLock(file, () => {
-    const records = loadRecords(file);
+    const state = loadState(file);
 
-    records[key] = { at: new Date().toISOString(), ...(options.detail || {}) };
-    jetpack.write(file, records, { jsonIndent: 2 });
+    state.deploy[key] = { at: new Date().toISOString(), ...(options.detail || {}) };
+    jetpack.write(file, state, { jsonIndent: 2 });
 
-    return records[key];
+    return state.deploy[key];
   });
 }
 
@@ -151,10 +171,10 @@ function recordDeploy(options) {
  * @returns {Object|null}
  */
 function readDeployRecord(options) {
-  const file = recordsFile(options.dir);
+  const file = stateFile(options.dir);
   // Under the lock because the read is also where a legacy record is adopted
-  const records = withStateLock(file, () => loadRecords(file));
-  return records[deployKey(options.target, options.instance)] || null;
+  const state = withStateLock(file, () => loadState(file));
+  return state.deploy[deployKey(options.target, options.instance)] || null;
 }
 
 module.exports = { recordDeploy, readDeployRecord, deployKey };

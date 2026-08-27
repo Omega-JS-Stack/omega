@@ -2,16 +2,18 @@
 layout: frontend/pages/auth/token
 
 meta:
-  title: "Authenticating - {{ site.brand.name }}"
-  description: "Generating authentication token for {{ site.brand.name }}."
+  title: "Authenticating - {{ resolved.config.brand.name }}"
+  description: "Generating authentication token for {{ resolved.config.brand.name }}."
   breadcrumb: "Token"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 
-client:
-  auth:
-    config:
-      policy: "authenticated"
-      redirects:
-        unauthenticated: "/signup"
+config:
+  client:
+    auth:
+      config:
+        policy: "authenticated"
+        redirects:
+          unauthenticated: "/signup"
 ---
 
 {{ content | omega_content_format }}

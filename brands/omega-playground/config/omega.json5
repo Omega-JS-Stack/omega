@@ -63,6 +63,19 @@
     url: "https://itwcreativeworks.com",
   },
 
+  // Socials (#462 footer test surface — Ian 2026-08-22: "main popular ones
+  // including gh"). github is the real org; the rest are ITW-named
+  // placeholders so the footer row and /<platform> shortlinks render.
+  socials: {
+    github: "Omega-JS-Stack",
+    twitter: "itwcreativeworks",
+    youtube: "itwcreativeworks",
+    instagram: "itwcreativeworks",
+    facebook: "itwcreativeworks",
+    linkedin: "itwcreativeworks",
+    discord: "itwcreativeworks",
+  },
+
   // Brand repo (github service: repo + Pages; the admin/post CMS routes
   // commit to the same repo). No `repo` slug — the derivation defaults
   // resolve it: name = brand.id (omega-playground), owner = org. The repo
@@ -77,6 +90,10 @@
         org: "Omega-JS-Stack",
         shared: true,
         private: false,
+        // false = the repo service skips entirely — no org profile, no repo
+        // settings, no GitHub Pages reconciliation; the brand hosts its source
+        // somewhere the manager does not touch.
+        enabled: true,
       },
     },
   },
@@ -90,6 +107,9 @@
     providers: {
       cloudflare: {
         zone: "60d8937b328e927aaddb7e27f277c61e",
+        // false = the edge service skips entirely — no zone, DNS, settings,
+        // rules, speed-test or worker reconciliation for this brand.
+        enabled: true,
       },
     },
   },
@@ -126,11 +146,17 @@
     messaging: {
       vapidKey: "BCqp_yZGRNzaUXbhH_3rfu5W33Xwe2xUGR1HykAFcBVw4YYaRwSIPKvE8DlOIYStJHRka7OovhjCRdwaJyE6YKQ",
     },
+    // true = the cloud project is shared with other brands; only per-brand
+    // operations run (service-account, sdk-config).
+    shared: false,
+    // false = skip the api.{domain} hosting custom domain.
+    apiSubdomain: true,
   },
   captcha: {
     providers: {
       recaptcha: {
-        domainsConfirmed: ["playground.omegajs.dev", "www.playground.omegajs.dev"],
+        siteKey: "6LdxsmAnAAAAACbft_UmKZXJV_KTEiuG-7tfgJJ5",
+        domainsConfirmed: ["playground.omegajs.dev"],
       },
     },
   },
@@ -150,6 +176,9 @@
         org: "itw-creative-works",
       },
     },
+    // Role-level switch (default true). false skips the monitoring service
+    // outright, whatever the providers block says.
+    enabled: true,
   },
 
   // Shared ITW AdSense account (from legacy omega-manager — one pub id
@@ -289,6 +318,18 @@
         ],
       },
     ],
+    winback: {
+      // The cancel-flow save offer (#268), shown before the cancellation
+      // questionnaire. Defaults ON — false is the whole off switch, and the
+      // cancel flow goes straight to the questionnaire.
+      enabled: true,
+      // Whole percentage off the next cycle the save offer pitches. Defaults to
+      // 50. Mutually exclusive with payment.winback.amount.
+      percent: 50,
+      // How long the accepted offer lasts: 'once' (the next cycle only, the
+      // default) or 'forever' (a permanent price cut).
+      duration: "once",
+    },
   },
   marketing: {
     campaigns: {
@@ -297,17 +338,35 @@
           listId: "daae211b-bc50-4d57-ae5e-8e86f6abb734",
         },
       },
+      // Role-level switch for email marketing (default true). false skips the
+      // campaigns service and the backend contact sync.
+      enabled: true,
     },
     // No newsletter for the rehearsal brand (Ian 2026-07-12) — the beehiiv
     // service skips deliberately instead of asking for a publication.
     newsletter: {
       enabled: false,
     },
+    prune: {
+      // Monthly cold-contact prune across both providers. ON by default (Ian
+      // 2026-08-22) and materialized into every brand config — false is the
+      // per-brand off switch.
+      enabled: true,
+    },
   },
   search: {
     providers: {
       searchConsole: {
         gaLinked: true,
+        // false = skip sitemap submission to Google Search Console.
+        submitSitemap: true,
+        // Sitemap paths submitted as https://{domain}{path} (default
+        // ['/sitemap.xml']).
+        sitemapPaths: ["/sitemap.xml"],
+        // false = the search service skips entirely — the property is never
+        // verified and no sitemap is submitted (submitSitemap only turns the
+        // sitemap half off).
+        enabled: true,
       },
     },
   },
@@ -322,6 +381,18 @@
       slapform: {
         templateFormId: "UlXJ49Q4C",
         formId: "POZXbmsFFHOW1I",
+        // false = the slapform service skips and the contact page has no form
+        // endpoint.
+        enabled: true,
+        // false = the form is shared and managed by another brand; its
+        // name/settings are left alone.
+        updateFormInfo: true,
+        // Tier granted to the form-owner account ({ id, name }) —
+        // Slapform-operator only.
+        plan: {
+          id: "grandmaster",
+          name: "Grandmaster",
+        },
       },
     },
   },
@@ -335,6 +406,15 @@
           enabled: true,
           templateAgentId: "8YIsRlzAAiv03d",
           agentId: "KJT3xUjlQQVuaC",
+          // false = the agent is shared and managed by another brand; its
+          // settings/knowledge are left alone.
+          updateAgentInfo: true,
+          // Tier granted to the agent-owner account ({ id, name }) —
+          // Chatsy-operator only.
+          plan: {
+            id: "max",
+            name: "Max",
+          },
         },
       },
     },
@@ -343,9 +423,29 @@
         replyify: {
           templateAgentId: "stcbsieo7n1Lrk",
           agentId: "hkBrbPds9V4U0F",
+          // false = the replyify service skips.
+          enabled: true,
+          // false = the agent is shared and managed by another brand; its
+          // filter/knowledge are left alone.
+          updateAgentInfo: true,
+          // Tier granted to the agent-owner account ({ id, name }) —
+          // Replyify-operator only.
+          plan: {
+            id: "max",
+            name: "Max",
+          },
         },
       },
     },
+  },
+  // Directory participation (@omega.js/manager directory service): { enabled }
+  // — opt in to push this brand's entry into the parent project's `brands`
+  // collection. Absent or false never pushes. Needs `parent` to name the
+  // relationship and DIRECTORY_SERVICE_ACCOUNT in the brand .env.
+  directory: {
+    // true opts the brand into the directory push. Default false —
+    // participation is never implicit.
+    enabled: false,
   },
 
   // Apple signing (certificates service): reverse-DNS prefix (ITW is the
@@ -371,27 +471,24 @@
   // "claude" (default) rides the local Claude Code install; "chatgpt" needs
   // OPENAI_API_KEY in .env. Per-string cache commits to each target's translations/.
   translation: {
-    languages: ["es"], // dogfood canary scope — expand at launch
-    // App-shell/auth/transactional pages skip translation (Ian 2026-07-18;
-    // mirrors the real brand) — marketing surface stays translated; system
-    // routes are framework-excluded already.
-    exclude: [
-      "account", "app", "dashboard", "signin", "signup", "login", "register",
-      "forgot", "recover", "reset", "reset-password", "change-password",
-      "token", "join", "cancel", "refund",
-    ],
+    languages: ["es", "fa"], // es + Farsi (RTL coverage — Ian 2026-08-22)
+    // No `exclude` (#605): the framework skips its OWN default pages — the app
+    // shell, auth, account, payment, and portal flows — derived from the
+    // defaults tree. `exclude` is for brand-authored pages, and the playground
+    // has none to skip.
+    // Master switch (default true). Translation only runs when languages is
+    // non-empty.
+    enabled: true,
+    // Source language code (default 'en'). Drives <html lang>, og:locale, and
+    // the default hreflang.
+    default: "en",
   },
-
-  // Download endpoints (site.download[platform][type]) — drive the /download
-  // cards + the detection hero. Playground points at the repo's releases hub
-  // until real release assets exist (releases stay GATED); ios/android are
-  // deliberately absent so the store band demos the notify-me flow.
-  download: {
-    mac: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
-    windows: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
-    linux: {
-      debian: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
-      snap: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+  client: {
+    consent: {
+      // The consent banner + the provider-script gate (default true). false
+      // ships NO banner — legal only for a site that loads no
+      // analytics/marketing provider at all.
+      enabled: true,
     },
   },
 

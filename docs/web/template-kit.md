@@ -46,7 +46,7 @@ Two consumption paths (plan §4 A0):
 | `omega_social` | inline | `page.resolved.socials.*` + SOCIAL_URLS data |
 | `omega_language` | inline | LANGUAGES data (184 codes, machine-extracted from the Ruby) |
 | `omega_translation_url` | inline | `site.translation` {default, languages, exclude} |
-| `omega_icon` | inline | `options.icons.{fontAwesomeDirs,aliasFile,flagsDir}` (+ `site.icons.style`); ordered root chain (earlier dirs win — web's engine feeds curated core → brand Pro set when supplied → free floor via `src/fontawesome-roots.js`, C4 cp111), alias resolution from the set's metadata, brands fallback, flag fallback via LANGUAGE_TO_COUNTRY (43 codes), default warning-triangle SVG with warn-once, module cache — semantics shared with desktop via `@omega.js/client/modules/icon-core.js` (C4 cp108) |
+| `omega_icon` | inline | `options.icons.{fontAwesomeDirs,aliasFile,flagsDir}` (+ `site.icons.style`); ordered root chain (earlier dirs win — web's engine feeds curated core → brand Pro set when supplied → free floor via `src/fontawesome-roots.js`, C4 cp111), alias resolution from the set's metadata, brands fallback, flag fallback via LANGUAGE_TO_COUNTRY (43 codes), default warning-triangle SVG with warn-once, module cache — semantics shared with desktop via `@omega.js/client/modules/icon-core.js` (C4 cp108). The `<i>` wrapper is `aria-hidden="true"` by default ([#538](https://github.com/Omega-JS-Stack/omega/issues/538)) — icons are decorative beside visible text, so they leave the a11y tree by declaration; the rare meaningful icon passes `label="…"` and gets `role="img"` + `aria-label` instead |
 | `omega_logo` | inline | `options.logos.dir`; per-instance SVG id prefixing (url()/href/xlink:href refs rewritten) |
 | `omega_image` | inline | pure HTML builder (picture + webp sources + lazy placeholders; `max_width`, `webp=false`, external `<img>`) |
 | `omega_video` | inline | pure HTML builder (flag attrs, mime map, lazy sources) |
@@ -70,6 +70,14 @@ These are omega's own template helpers under the familiar Jekyll-style names —
 the names are the authoring surface Ian writes in, and the contract is CORRECT
 BEHAVIOR, not emulation of Jekyll internals. Where Jekyll's own semantics are
 surprising, these do the sane thing and the tests pin it ([#102](https://github.com/Omega-JS-Stack/omega/issues/102)).
+
+`slugify` is the ONE slugifier ([#488](https://github.com/Omega-JS-Stack/omega/issues/488)):
+downcase, non-alphanumeric runs become `-`. It is what LINKS a taxonomy term
+and what the term's page is GENERATED at (`src/collections.js`), so `A&R` is
+`a-r` on both sides. Eleventy ships a universal `slugify` of its own (`&` →
+"and") that used to shadow it in templates — `src/engine.js` claims the name
+back through a plugin, because a term whose link and page disagree is a
+guaranteed 404 the framework's own link check fails the build on.
 
 Implemented: `slugify`, `date_to_xmlschema`, `date_to_rfc822`, `jsonify`,
 `strip_html`, `markdownify`, `relative_url`, `absolute_url`,

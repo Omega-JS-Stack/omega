@@ -389,7 +389,7 @@ module.exports = {
           'journey-payments-winback', 'journey-payments-winback-decline',
           'journey-payments-plan-switch', 'journey-payments-plan-switch-trial',
           'journey-payments-uncancel',
-          'webhook-chargebee-stale-fallback', 'webhook-retry-sweep',
+          'webhook-chargebee-unreachable', 'webhook-retry-sweep',
           'intent-discount-percent-url', 'intent-discount-amount-trial',
         ]) {
           assert.equal(TEST_ACCOUNTS[key].palette, undefined, `Persona '${key}' is machinery, so the palette must not offer it`);

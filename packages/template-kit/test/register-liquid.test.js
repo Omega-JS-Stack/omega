@@ -100,7 +100,7 @@ test('omega_icon + omega_logo render inline SVGs through the engine', async () =
   const engine = makeEngine();
 
   const icon = await engine.parseAndRender('{% omega_icon rocket, "me-2" %}');
-  assert.ok(icon.startsWith('<i class="fa me-2" data-icon="rocket">'));
+  assert.ok(icon.startsWith('<i class="fa me-2" data-icon="rocket" aria-hidden="true">'));
   assert.ok(icon.includes('M1 1'));
 
   const logo = await engine.parseAndRender('{% omega_logo acme %}');

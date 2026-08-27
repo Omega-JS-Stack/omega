@@ -5,11 +5,11 @@
   },
   selector: {
     enabled: true,
-    name: '{{ site.brand.name }}',
+    name: '{{ resolved.config.brand.name }}',
     env: 'Production',
     dropdown: [
       {
-        label: '{{ site.brand.name }}',
+        label: '{{ resolved.config.brand.name }}',
         href: '/admin',
         icon: 'circle-check'
       },

@@ -34,11 +34,10 @@ test('W8 + W11: og:locale/hreflang carry the default language; quoted brand stri
 });
 
 test('W16 (Ian 2026-07-23): synthesized aggregateRating count is seeded into 10k-30k', async () => {
-  const pages = await buildWith({
-    ...miniData,
-    schema: { software_application: { enabled: true } },
-  });
-  const html = pages.get('/blog');
+  // `schema` is page MACHINERY, not config (#607): the /download blueprint is
+  // the framework surface that switches SoftwareApplication on.
+  const pages = await buildWith(miniData, {}, 'head-foot-schema');
+  const html = pages.get('/download');
 
   const match = html.match(/<script id="omega-schema-software-application"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'SoftwareApplication schema block present when enabled');
@@ -46,6 +45,20 @@ test('W16 (Ian 2026-07-23): synthesized aggregateRating count is seeded into 10k
   const count = Number(schema.aggregateRating.ratingCount);
   assert.ok(count >= 10000 && count < 30000, `ratingCount ${count} inside the seeded 10k-30k band`);
   assert.ok(['4.8', '4.9'].includes(schema.aggregateRating.ratingValue), 'rating value stays 4.8/4.9');
+});
+
+test('#606: an unconfigured provider gets NO inline stub — the transport guards every call', async () => {
+  // foot.html used to define empty `gtag`/`fbq`/`ttq` when a provider had no
+  // id, so #306's guarded wrappers would read a stub as "present". The
+  // transport (@omega.js/analytics/transports/browser) checks `typeof` per
+  // provider and silently no-ops on a missing global, so the stubs were dead
+  // weight that only made a blocked pixel look loaded.
+  const pages = await buildWith(miniData, {}, 'head-foot-no-stubs');
+  const html = pages.get('/');
+
+  assert.ok(!/function\s+gtag\s*\(/.test(html), 'no gtag stub');
+  assert.ok(!/function\s+fbq\s*\(/.test(html), 'no fbq stub');
+  assert.ok(!/window\.ttq\s*=/.test(html), 'no ttq stub');
 });
 
 test('W13: unconfigured comments never inject the Giscus client script', async () => {
@@ -96,4 +109,30 @@ test('#271: no built page carries an empty-@type JSON-LD block; the brand block 
 
   const website = JSON.parse(html.match(/<script id="omega-schema-website"[^>]*>([\s\S]*?)<\/script>/)[1]);
   assert.equal(website.publisher['@id'], brand['@id'], 'the WebSite block still points at the brand node');
+});
+
+// #613: `site.time` was READ by both modified-date surfaces and set by
+// nothing, so `article:modified_time` and the JSON-LD `dateModified` shipped
+// empty on every page — a search engine reading either got a blank value.
+test('#613: site.time is a build fact — both dateModified surfaces render a real xmlschema date', async () => {
+  const pages = await buildWith(miniData, {}, 'head-foot-time');
+  // Both readers sit inside the POST gate — a post is the page that has a
+  // modified date to declare.
+  const html = pages.get('/blog/first-post');
+
+  const XMLSCHEMA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/;
+
+  const modified = html.match(/<meta property="article:modified_time" content="([^"]*)"/);
+  assert.ok(modified, 'the head still emits article:modified_time');
+  assert.match(modified[1], XMLSCHEMA, 'article:modified_time carries the build stamp, not an empty string');
+
+  const posting = JSON.parse(html.match(/<script id="omega-schema-blog"[^>]*>([\s\S]*?)<\/script>/)[1]);
+  assert.match(String(posting.dateModified), XMLSCHEMA, 'the JSON-LD dateModified carries it too');
+  assert.equal(posting.dateModified, modified[1], 'ONE stamp per build — the two surfaces can never disagree');
+
+  // …and it is the same instant the rest of the build stamp names.
+  assert.ok(
+    Math.abs(Date.parse(modified[1]) - Date.now()) < 10 * 60 * 1000,
+    'the stamp is this build, not a fixed date baked into a template',
+  );
 });

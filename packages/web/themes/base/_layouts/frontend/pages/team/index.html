@@ -7,7 +7,19 @@ hero:
   headline_accent: "product"
   description: "A small team with strong opinions, shipping every week."
 
-# Mission quote (rendered as the serif quote; attributed to the CEO/owner)
+# Portrait grid head — OPTIONAL: author superheadline/headline/
+# headline_accent/subheadline and the cluster renders above the portraits;
+# author none and the grid runs straight off the masthead, as it always has.
+# Each member's own one-line `bio:` (in their _team doc) reads under their
+# name and position on the card.
+# grid_head:
+#   superheadline: "Who we are"
+#   headline: "The people behind the"
+#   headline_accent: "magic"
+#   subheadline: "A short line about how the team works."
+
+# Mission quote (rendered as the serif quote; attributed to the CEO/owner).
+# mission_headline is OPTIONAL: authored, it heads the band as its h2.
 mission_quote: "To empower individuals and businesses with <em>innovative technology</em> that simplifies complex challenges and unlocks new possibilities."
 
 # How we work — quiet principles band (override per brand)
@@ -49,8 +61,18 @@ join_cta:
 </section>
 
 <!-- ═══ Portrait grid ═══ -->
+{% capture grid_head %}
+  {% component "heading/section-head", superheadline: resolved.grid_head.superheadline, headline: resolved.grid_head.headline, headline_accent: resolved.grid_head.headline_accent, sub: resolved.grid_head.subheadline %}
+{% endcapture %}
+{% assign grid_head = grid_head | strip %}
 <section class="pt-0">
   <div class="container">
+    {% iftruthy grid_head %}
+      <div class="omega-section-head mb-4" data-omega-reveal>
+        {{ grid_head }}
+      </div>
+    {% endiftruthy %}
+
     {% if _team_count == 0 %}
       <div class="row justify-content-center">
         <div class="col-lg-6">
@@ -79,6 +101,10 @@ join_cta:
                 </a>
               </h3>
               <span class="omega-micro omega-person__role">{{ member.member.position }}</span>
+
+              {% iftruthy member.member.bio %}
+                <p class="omega-person__desc">{{ member.member.bio }}</p>
+              {% endiftruthy %}
 
               {% iftruthy member.member.links %}
                 <div class="omega-person__links">
@@ -128,6 +154,12 @@ join_cta:
 {% if _team_count > 0 %}
 <section>
   <div class="container">
+    {% iftruthy resolved.mission_headline %}
+      <div class="omega-section-head omega-section-head--center mb-4" data-omega-reveal>
+        {% component "heading/section-head", headline: resolved.mission_headline %}
+      </div>
+    {% endiftruthy %}
+
     {% assign mission_member = nil %}
     {% for member in site.team %}
       {% assign position_lower = member.member.position | downcase %}

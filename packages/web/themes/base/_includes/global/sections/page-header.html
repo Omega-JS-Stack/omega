@@ -1,33 +1,33 @@
 {% comment %}
   Shared base in-card page header: title + actions. Breadcrumbs moved to the
   app topbar (global/sections/app-topbar.html) but keep their frontmatter API:
-  resolved.theme.header.{title, actions} render here.
+  resolved.config.theme.header.{title, actions} render here.
 
   action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else renders
   no size class. NEVER test it for truthiness: Liquid answers `.size` on a hash
   with its KEY COUNT, so every action would "have" a size (#43).
 {% endcomment %}
-{% unless resolved.theme.header.enabled == false %}
+{% unless resolved.config.theme.header.enabled == false %}
   <div class="page-header pb-3 mb-4 hairline-bottom">
     <div class="row align-items-center">
       <div class="col">
         <!-- Page Title -->
-        {% unless resolved.theme.header.title.enabled == false %}
-          <h1 class="page-title mb-0 d-flex align-items-center {{ resolved.theme.header.title.class }}">
-            {% if resolved.theme.header.title.icon %}
-              <span class="omega-icon-chip omega-icon-chip--neutral me-2">{% omega_icon resolved.theme.header.title.icon, "fa-sm" %}</span>
+        {% unless resolved.config.theme.header.title.enabled == false %}
+          <h1 class="page-title mb-0 d-flex align-items-center {{ resolved.config.theme.header.title.class }}">
+            {% if resolved.config.theme.header.title.icon %}
+              <span class="omega-icon-chip omega-icon-chip--neutral me-2">{% omega_icon resolved.config.theme.header.title.icon, "fa-sm" %}</span>
             {% endif %}
-            {{- resolved.theme.header.title.content | default: resolved.meta.title | omega_liquify -}}
+            {{- resolved.config.theme.header.title.content | default: resolved.meta.title | omega_liquify -}}
           </h1>
         {% endunless %}
       </div>
 
       <!-- Page Actions (Right Side) -->
-      {% unless resolved.theme.header.actions.enabled == false %}
-        {% if resolved.theme.header.actions.items %}
+      {% unless resolved.config.theme.header.actions.enabled == false %}
+        {% if resolved.config.theme.header.actions.items %}
           <div class="col-auto">
             <div class="d-flex gap-2">
-              {% for action in resolved.theme.header.actions.items %}
+              {% for action in resolved.config.theme.header.actions.items %}
                 {% capture action_color %}{{ action.color | default: 'adaptive' }}{% endcapture %}
                 {% if action_color == 'primary' %}
                   {% assign action_btn = 'btn-adaptive' %}

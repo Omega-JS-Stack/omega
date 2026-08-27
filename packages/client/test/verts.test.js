@@ -136,6 +136,40 @@ describe('Verts Module', () => {
       getManager().config.advertising = saved;
     });
 
+    // #527 — the adsense block has ONE switch, the client id: a configured
+    // client means this surface renders units off it, full stop. The split
+    // gates (`units`, a provider-level `enabled`) are gone, so a config still
+    // carrying them is an undeclared key that changes nothing — the lane runs.
+    it('a configured client id runs the provider lane — no second gate switches it off', async () => {
+      const verts = getManager().verts();
+      const saved = getManager().config.advertising;
+      const savedScript = verts._adsenseScript;
+      getManager().config.advertising = {
+        providers: {
+          adsense: { client: 'ca-pub-1234567890', displaySlot: '1111111111', units: false, enabled: false },
+          inhouse: { source: 'https://verts.example.com/' },
+        },
+        fallback: 'inhouse',
+      };
+      // The one thing a unit test cannot do for real: fetch Google's tag.
+      verts._adsenseScript = Promise.resolve({ script: {}, cached: true });
+
+      const $host = makeHost();
+      const result = await verts.render($host, { type: 'display', fillTimeout: 10 });
+
+      assert.strictEqual(
+        $host.children.some(($child) => String($child.className || '').includes('adsbygoogle')), true,
+        'the ad unit is built for every site that names a client id',
+      );
+      // Nothing fills a mock <ins>, so the ladder still falls through — the
+      // proof here is that it went THROUGH the provider lane to get there.
+      assert.strictEqual(result.lane, 'house');
+
+      result.unit.destroy();
+      verts._adsenseScript = savedScript;
+      getManager().config.advertising = saved;
+    });
+
     it('unknown types skip the provider lane and ride the ladder', async () => {
       const $host = makeHost();
       const result = await getManager().verts().render($host, { type: 'sideways', fillTimeout: 60000 });

@@ -8,10 +8,11 @@
  *
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env (OAuth2;
  * tokens cache to .omega/auth/google-tokens.json — the first run prints an
- * auth URL). No credentials → the service skips. No cloud.config.projectId →
- * interactive runs offer the project selection/creation flow
- * (lib/project-flow.js, lands the id in omega.json5); otherwise skip with
- * guidance.
+ * auth URL). Missing credentials go through the shared setup contract (#608):
+ * an interactive run asks for them right here, a headless one steps aside
+ * loudly. No cloud.config.projectId → interactive runs offer the project
+ * selection/creation flow (lib/project-flow.js, lands the id in omega.json5);
+ * otherwise skip with guidance.
  *
  * `cloud.shared: true` (project shared by multiple brands) filters to the
  * per-brand operations only (service-account, sdk-config) so one brand never
@@ -21,7 +22,9 @@ const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { ensureProjectAccess } = require('./lib/access-heal.js');
 const { isDemoProject } = require('@omega.js/config');
 const chalk = require('chalk').default;
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { FirebaseAPI } = require('./lib/firebase-api.js');
@@ -39,6 +42,13 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'cloud.enabled = false' };
     }
 
+    // The shared setup contract (#608): an interactive run asks for the
+    // Google OAuth client right here — provide, skip this run, or disable the
+    // service for good — before anything decides there is nothing to do.
+    let gate = null;
+    if (!context.firebaseApi) {
+      gate = await requestServiceInput(context, serviceInputSpec('cloud'));
+    }
     const haveCreds = Boolean(
       context.firebaseApi
       || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
@@ -71,7 +81,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!haveCreds) {
-      return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
+      return gate || { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
     }
 
     // Hostname-only (cp268): this value feeds authDomain + api.{domain} — a

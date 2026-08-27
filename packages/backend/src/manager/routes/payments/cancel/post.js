@@ -1,7 +1,7 @@
 const path = require('path');
 const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
-const isAlreadyGone = require('./_provider-errors.js');
+const isAlreadyGone = require('../../../libraries/payment/provider-errors.js');
 const isTrialing = require('./_is-trialing.js');
 
 /**

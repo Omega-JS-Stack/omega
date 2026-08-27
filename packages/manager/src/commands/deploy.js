@@ -23,12 +23,12 @@
 const path = require('node:path');
 const chalk = require('chalk').default;
 
-const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
-const { resolveFrameworkBin } = require('../lib/framework-bin.js');
+const { resolveTargetRun } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 
-// Deploy order — backend's API goes live before the surfaces that call it
+// Deploy order — backend's API goes live before the surfaces that call it.
+// A custom target (#603) has no rank, so it lands after every framework one.
 const DEPLOY_ORDER = ['backend', 'web', 'extension', 'desktop', 'mobile'];
 
 // Brand-level flags consumed HERE — everything else forwards to the targets.
@@ -101,11 +101,11 @@ module.exports = async (options = {}) => {
     return;
   }
 
-  const targets = discoverTargets(brandRoot).filter((entry) => entry.target);
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
   const { selected, unknown } = selectDeployTargets({ targets, only: options.only, except: options.except });
 
   for (const token of unknown) {
-    console.log(chalk.yellow(`  ⚠ Unknown deploy filter "${token}" — know targets/dirs: ${targets.map((entry) => entry.target).join(', ')}`));
+    console.log(chalk.yellow(`  ⚠ Unknown deploy filter "${token}" — know targets/dirs: ${targets.map((entry) => entry.target || entry.name).join(', ')}`));
   }
 
   if (selected.length === 0) {
@@ -117,8 +117,9 @@ module.exports = async (options = {}) => {
 
   const forwarded = buildForwardedFlags(options);
   const continueOnError = !!(options['continue-on-error'] || options.continueOnError);
+  const dryRun = !!(options['dry-run'] || options.dryRun);
 
-  console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target).join(' → ')})`)}`));
+  console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target || entry.name).join(' → ')})`)}`));
 
   // ─── Execute in order, streaming each target's output ──────────────────────
   const summary = [];
@@ -126,27 +127,31 @@ module.exports = async (options = {}) => {
 
   for (const [index, entry] of selected.entries()) {
     const label = `[${index + 1}/${selected.length}] ${entry.name}`;
-    const target = findTarget(entry.path);
+    const run = resolveTargetRun(entry, 'deploy', forwarded, { dryRun });
 
-    if (!target || target.kind !== 'framework') {
-      console.log(chalk.red(`\n✗ ${label}: no framework dependency detected (target-root package.json)`));
-      summary.push({ name: entry.name, ok: false, detail: 'no framework dependency detected' });
+    // A custom target that declares no deploy script steps aside loudly —
+    // there is nothing to publish and nothing broken (#603)
+    if (run.kind === 'skip') {
+      console.log(chalk.dim(`\n⊘ ${label}: ${run.detail} — skipped`));
+      continue;
+    }
+
+    // Its script cannot be handed --dry-run, so the dry run stops at the plan
+    if (run.kind === 'plan') {
+      console.log(chalk.dim(`\n⊘ ${label}: dry run — ${run.detail}`));
+      continue;
+    }
+
+    if (run.kind === 'error') {
+      console.log(chalk.red(`\n✗ ${label}: ${run.detail}`));
+      summary.push({ name: entry.name, ok: false, detail: run.detail });
       failed = true;
       if (!continueOnError) break;
       continue;
     }
 
-    const binPath = resolveFrameworkBin(target.dir, target.name);
-    if (!binPath) {
-      console.log(chalk.red(`\n✗ ${label}: ${target.name} is not installed (node_modules climb from ${target.dir} found no bin)`));
-      summary.push({ name: entry.name, ok: false, detail: `${target.name} is not installed` });
-      failed = true;
-      if (!continueOnError) break;
-      continue;
-    }
-
-    console.log(chalk.cyan(`\n─── ${label} ${chalk.dim(`(${target.name})`)} — omega deploy ${forwarded.join(' ')}`.trimEnd() + ' ───'));
-    const result = await runCommand(process.execPath, [binPath, 'deploy', ...forwarded], entry.path);
+    console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework || 'custom'})`)} — ${run.label}`.trimEnd()} ───`));
+    const result = await runCommand(run.command, run.args, entry.path);
 
     summary.push({ name: entry.name, ok: result.success, detail: result.error });
     if (!result.success) {

@@ -9,7 +9,8 @@
  *                           brand⊕local flattened; the deployed runtime cannot
  *                           walk up past the upload boundary, cp100e)
  *   .env                  → dist/.env               (verbatim copy — disperse
- *                           composes brand-level values into the LOCAL .env now)
+ *                           composes brand-level values into the LOCAL .env now;
+ *                           a DEPLOY stage drops the schema's `_DEV` rows, #586)
  *   .nvmrc                → dist/.nvmrc
  *   service-account.json  → dist/service-account.json (target root, else the
  *                           brand's .omega/secrets/ — the key's ONE home)
@@ -38,8 +39,9 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, findBrandRoot } = require('@omega.js/config');
+const { composeTargetConfig, findBrandRoot, devEnvKeys } = require('@omega.js/config');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
+const { isCustomProject } = require('./project-type');
 
 // The framework's pinned Cloud Functions runtime — the engines fallback when
 // a target manifest carries none (never the ambient node: staging must produce
@@ -71,9 +73,36 @@ function resolveServiceAccountPath(projectDir) {
 }
 
 /**
+ * Drop the env schema's dev-only rows from .env content (#586). The `_DEV`
+ * payment secrets exist so a LOCAL run never touches a live payment account;
+ * uploading them would put a test credential inside the deployed runtime's
+ * env, one stale `ENVIRONMENT` away from serving real customers with it. The
+ * key list is the schema's (`devEnvKeys()`), never a copy.
+ *
+ * Assignments only: a `# KEY=` placeholder carries no value and stays, so the
+ * artifact's .env keeps the shape `omega setup` templated.
+ *
+ * @param {string} content - The authored .env content.
+ * @returns {string} The same content minus every dev-only assignment.
+ */
+function stripDevEnvRows(content) {
+  const dev = new Set(devEnvKeys());
+
+  return content
+    .split('\n')
+    .filter((line) => {
+      const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+      return !match || !dev.has(match[1]);
+    })
+    .join('\n');
+}
+
+/**
  * Stage the authored target tree into dist/.
  * @param {object} options
  * @param {string} options.projectDir - The target root (firebaseProjectPath).
+ * @param {boolean} [options.deploy] - Stage for an UPLOAD: the .env loses its
+ *   dev-only rows (see stripDevEnvRows). Local lanes re-stage without it.
  * @param {function} [options.log] - Line logger (silent by default).
  * @returns {{ distDir: string, staged: string[] }} staged = relative paths written.
  */
@@ -168,6 +197,13 @@ function stageFunctions(options) {
   for (const file of ['.env', '.nvmrc']) {
     const source = path.join(projectDir, file);
     if (!jetpack.exists(source)) continue;
+
+    if (file === '.env' && options.deploy) {
+      jetpack.write(path.join(distDir, file), stripDevEnvRows(jetpack.read(source)));
+      staged.push('.env (dev-only keys stripped for the upload)');
+      continue;
+    }
+
     jetpack.copy(source, path.join(distDir, file), { overwrite: true });
     staged.push(file);
   }
@@ -179,7 +215,10 @@ function stageFunctions(options) {
   //     reading nothing. The AUTHORED file is never touched; setup owns that.
   //     An unmigrated (marker-block) source is refused there and reported —
   //     the step is then not claimed here either.
-  if (!compileFirestoreRules({ projectDir }).refused) {
+  //     A custom-server target has neither reader, and setup seeds it no rules
+  //     source (#614) — compiling one would only write an artifact nothing
+  //     deploys, under a warning telling it to run a setup that will not.
+  if (!isCustomProject(projectDir) && !compileFirestoreRules({ projectDir }).refused) {
     staged.push(`${COMPILED_RULES_FILE.replace('dist/', '')} (compiled)`);
   }
 

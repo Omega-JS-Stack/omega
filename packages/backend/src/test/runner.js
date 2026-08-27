@@ -12,6 +12,11 @@ const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
 const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 
+// Test directories that belong to an OPT-IN lane, discovered only when that
+// lane's own gate opened it (`npx omega test --lane=<name>`). One entry per lane
+// in src/cli/commands/test-lanes/.
+const LANE_DIRECTORIES = new Set(['stripe-live']);
+
 /**
  * @omega.js/backend Integration Test Runner
  * Supports standalone tests and test suites with sequential tests and shared state
@@ -332,6 +337,15 @@ class TestRunner {
       // the bundled fixture project and would be redundant noise in a real
       // consumer's run (mirrors EM/BXM/UJM excluding boot/** for consumers).
       if (item === 'boot' && !this.options.isFrameworkSelfTest) {
+        continue;
+      }
+
+      // An opt-in lane's suites are named for the lane and are UNREACHABLE by
+      // any run that did not ask for it: they need credentials and the network,
+      // and the `--lane=` gate is the only thing that sets this
+      // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)). A path
+      // filter naming the directory does not open it — only the gate does.
+      if (LANE_DIRECTORIES.has(item) && process.env.OMEGA_TEST_LANE !== item) {
         continue;
       }
 
@@ -918,5 +932,9 @@ class TestRunner {
     console.log(chalk.gray(`\n    Total: ${total} tests in ${duration}ms\n`));
   }
 }
+
+// The lane list rides alongside the runner: a lane whose directory name drifted
+// from its `--lane=` name would be silently unreachable, or worse, silently open.
+TestRunner.LANE_DIRECTORIES = LANE_DIRECTORIES;
 
 module.exports = TestRunner;

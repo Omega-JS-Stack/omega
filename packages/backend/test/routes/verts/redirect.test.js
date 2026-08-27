@@ -5,8 +5,6 @@
  *
  * Run: npx omega test backend:routes/verts/redirect
  */
-const BASE_URL = 'http://localhost:5002';
-
 module.exports = {
   description: 'Verts redirect route (fail-closed)',
   type: 'suite',
@@ -14,7 +12,7 @@ module.exports = {
     {
       name: 'redirects-to-stored-link-with-utm',
       timeout: 30000,
-      async run({ assert, firestore }) {
+      async run({ assert, firestore, config }) {
         await firestore.set('verts/redirect-a', {
           id: 'redirect-a',
           enabled: true,
@@ -23,7 +21,7 @@ module.exports = {
           weight: 1,
         });
 
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&parent=site.example&brand=site-brand`, { redirect: 'manual' });
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-a&parent=site.example&brand=site-brand`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Redirect should 302');
 
@@ -40,8 +38,8 @@ module.exports = {
     {
       name: 'no-brand-falls-back-to-the-parent-host',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&parent=site.example`, { redirect: 'manual' });
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-a&parent=site.example`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Redirect should 302');
 
@@ -54,8 +52,8 @@ module.exports = {
     {
       name: 'no-brand-and-no-parent-omits-utm-source',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a`, { redirect: 'manual' });
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-a`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Redirect should 302');
 
@@ -69,8 +67,8 @@ module.exports = {
     {
       name: 'unknown-id-returns-404',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=does-not-exist`, { redirect: 'manual' });
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=does-not-exist`, { redirect: 'manual' });
 
         assert.equal(response.status, 404, 'Unknown vert id should 404');
       },
@@ -79,8 +77,8 @@ module.exports = {
     {
       name: 'missing-id-returns-400',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect`, { redirect: 'manual' });
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect`, { redirect: 'manual' });
 
         assert.equal(response.status, 400, 'Missing id should fail schema validation with 400');
       },
@@ -89,9 +87,9 @@ module.exports = {
     {
       name: 'caller-supplied-url-is-ignored',
       timeout: 30000,
-      async run({ assert }) {
+      async run({ assert, config }) {
         // A url param must NEVER influence the destination — fail closed
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-a&url=${encodeURIComponent('https://evil.example/phish')}`, { redirect: 'manual' });
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-a&url=${encodeURIComponent('https://evil.example/phish')}`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Redirect should 302');
 
@@ -105,7 +103,7 @@ module.exports = {
     {
       name: 'vert-with-invalid-link-fails-closed',
       timeout: 30000,
-      async run({ assert, firestore }) {
+      async run({ assert, firestore, config }) {
         await firestore.set('verts/redirect-bad-link', {
           id: 'redirect-bad-link',
           enabled: true,
@@ -114,7 +112,7 @@ module.exports = {
           weight: 1,
         });
 
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-bad-link`, { redirect: 'manual' });
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-bad-link`, { redirect: 'manual' });
 
         assert.equal(response.status, 404, 'A non-http(s) stored link should fail closed with 404');
       },
@@ -123,7 +121,7 @@ module.exports = {
     {
       name: 'disabled-vert-still-redirects-to-its-own-link',
       timeout: 30000,
-      async run({ assert, firestore }) {
+      async run({ assert, firestore, config }) {
         // Clicks on a just-disabled vert must still resolve — it is still only
         // ITS stored link
         await firestore.set('verts/redirect-disabled', {
@@ -134,7 +132,7 @@ module.exports = {
           weight: 1,
         });
 
-        const response = await fetch(`${BASE_URL}/omega/verts/redirect?id=redirect-disabled`, { redirect: 'manual' });
+        const response = await fetch(`${config.apiUrl}/omega/verts/redirect?id=redirect-disabled`, { redirect: 'manual' });
 
         assert.equal(response.status, 302, 'Disabled vert should still redirect (stored link only)');
 

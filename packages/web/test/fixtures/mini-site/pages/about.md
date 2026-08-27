@@ -2,7 +2,7 @@
 layout: blueprint/index
 permalink: /about
 meta:
-  title: "About - {{ site.brand.name }}"
+  title: "About - {{ resolved.config.brand.name }}"
 # The deliberate append-contract exercise: meta-only frontmatter (the
 # content-key guard is exercised in frontmatter-guard.test.js), extra body
 # BELOW the layout composition (a body without this flag would REPLACE the

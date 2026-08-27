@@ -24,7 +24,7 @@
  *     additionally hard-fails on them before any merge happens
  */
 
-const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
+const { TARGETS, isCustomTargetEntry, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
 const { findRetiredKeys } = require('./retired-keys.js');
 const { isPlainObject } = require('./merge.js');
@@ -229,12 +229,25 @@ function validateConfig(config, options) {
   const targets = config ? config.targets : undefined;
   if (isPlainObject(targets)) {
     Object.keys(targets).forEach((key) => {
-      if (!TARGETS.includes(key)) {
-        errors.push(`config.targets.${key} is not a known target — must be one of [${TARGETS.join(', ')}]`);
+      const entry = targets[key];
+      const framework = TARGETS.includes(key);
+
+      // A key no framework owns is legal ONLY as a declared custom target
+      // (#603) — that declaration is what separates a deliberate Render API or
+      // worker from a typo'd framework name. The framework keys are the
+      // inverse: they may never claim the custom type, since their verbs come
+      // from their framework, not from package.json scripts.
+      if (!framework && !isCustomTargetEntry(entry)) {
+        errors.push(
+          `config.targets.${key} is not a known target — must be one of [${TARGETS.join(', ')}], `
+          + `or declare \`type: 'custom'\` (every instance of the array form) to run through its own package.json scripts`,
+        );
         return;
       }
-
-      const entry = targets[key];
+      if (framework && isCustomTargetEntry(entry)) {
+        errors.push(`config.targets.${key} is a framework target — it cannot declare \`type: 'custom'\``);
+        return;
+      }
 
       // Multi-instance array form: every entry MUST carry a unique dir-safe
       // id (it names the targets/<canonical>-<id> dir). Backend stays single-

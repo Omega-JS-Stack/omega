@@ -155,7 +155,7 @@ test('hero demo_html slot replaces the typed demo lane on a real build', async (
       'permalink: /slots-demo/',
       'layout: frontend/core/minimal',
       '---',
-      '{% section "marketing/hero", headline: "Slots" %}{% slot demo_html %}<div id="my-wild-demo">{% omega_icon "rocket" %} {{ site.brand.name }}</div>{% endslot %}{% endsection %}',
+      '{% section "marketing/hero", headline: "Slots" %}{% slot demo_html %}<div id="my-wild-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>{% endslot %}{% endsection %}',
       '{% capture trailing_cta %}<a class="btn" href="/pricing">See pricing</a>{% endcapture %}',
       '{% section "marketing/stats" %}',
       'items:',
@@ -172,7 +172,7 @@ test('hero demo_html slot replaces the typed demo lane on a real build', async (
     const page = pages.get('/slots-demo/');
     assert.ok(page, 'the slot page built');
     assert.ok(page.includes('id="my-wild-demo"'), 'demo_html slot markup rendered in the hero');
-    assert.ok(page.includes(bareData.brand.name), 'caller scope (site.brand.name) resolved inside the slot');
+    assert.ok(page.includes(bareData.brand.name), 'caller scope (resolved.config.brand.name) resolved inside the slot');
     assert.ok(!page.includes('hero-demo-form'), 'typed demo lane not rendered when demo_html is set');
     const statsAt = page.indexOf('10x');
     const ctaAt = page.indexOf('<a class="btn" href="/pricing">See pricing</a>');

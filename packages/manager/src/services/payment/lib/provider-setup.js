@@ -1,38 +1,39 @@
 /**
- * Interactive payment-provider credential entry (config-landing flows):
- * when a provider is enabled but its credentials are missing, open the
- * provider dashboard and take the keys — public halves (publishable key,
- * client id, site) land in omega.json5 via the comment-preserving
- * writeback; secret halves land in the brand .env (replace-or-append) AND
- * in process.env so the current run proceeds immediately. A Disable answer
- * writes `payment.providers.<name>: false` so the run stops asking.
+ * Interactive payment-provider credential entry — one provider's instance of
+ * the shared setup contract (#608): the same Provide / Skip / Disable gate
+ * every service opens with (lib/config-flow.js confirmSetup, the ONE home of
+ * that wording), then the provider dashboard and its keys. Public halves
+ * (publishable key, client id, site) land in omega.json5 via the
+ * comment-preserving writeback; the SECRET half rides the shared helper
+ * (lib/service-input.js), which persists it to the brand .env and exports it
+ * so the current run proceeds immediately. Disable writes
+ * `payment.providers.<name>: false` so the run stops asking — permanently.
  *
- * Non-interactive or dry-run sessions return null without prompting — the
+ * Non-interactive or dry-run sessions return false without prompting — the
  * provider stays unconfigured and its operations print their dim note.
  */
 const chalk = require('chalk').default;
-const { input, select } = require('@omega.js/devkit/prompt');
-const { openBrowser } = require('@omega.js/devkit/flows');
+const { input } = require('@omega.js/devkit/prompt');
+const { serviceInputSpec } = require('../../../config.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
-const { setAtPath } = require('../../../lib/config-flow.js');
-const { writeEnvValue } = require('../../../lib/env-secret.js');
+const { confirmSetup, setAtPath } = require('../../../lib/config-flow.js');
+const { requestServiceInput } = require('../../../lib/service-input.js');
 const { canPrompt } = require('../../../lib/run-gates.js');
 
+// Per provider: the dashboard to open, and the PUBLIC halves that land in
+// omega.json5. The secret half's descriptor (name, mint URL, hint) lives once,
+// in the REQUIRES registry — never re-spelled here.
 const PROVIDERS = {
   stripe: {
     label: 'Stripe',
     url: 'https://dashboard.stripe.com/apikeys',
     instructions: 'Create or switch to the brand\'s Stripe account, then go to Developers → API keys.',
+    secret: 'STRIPE_SECRET_KEY',
     fields: [
       {
         message: 'Stripe publishable key (pk_live_... or pk_test_...):',
         validate: (val) => (val?.trim().startsWith('pk_') ? true : 'Must start with pk_live_ or pk_test_'),
         configPath: 'payment.providers.stripe.publishableKey',
-      },
-      {
-        message: 'Stripe secret key (sk_live_... or sk_test_...):',
-        validate: (val) => (val?.trim().startsWith('sk_') ? true : 'Must start with sk_live_ or sk_test_'),
-        envName: 'STRIPE_SECRET_KEY',
       },
     ],
   },
@@ -40,16 +41,12 @@ const PROVIDERS = {
     label: 'PayPal',
     url: 'https://developer.paypal.com/dashboard/applications',
     instructions: 'Create or open the brand\'s REST API app (live), then copy its credentials.',
+    secret: 'PAYPAL_CLIENT_SECRET',
     fields: [
       {
         message: 'PayPal client ID:',
         validate: (val) => (val?.trim() ? true : 'Required'),
         configPath: 'payment.providers.paypal.clientId',
-      },
-      {
-        message: 'PayPal client secret:',
-        validate: (val) => (val?.trim() ? true : 'Required'),
-        envName: 'PAYPAL_CLIENT_SECRET',
       },
     ],
   },
@@ -57,16 +54,12 @@ const PROVIDERS = {
     label: 'Chargebee',
     url: 'https://app.chargebee.com/',
     instructions: 'Open the brand\'s Chargebee site, then go to Settings → API keys.',
+    secret: 'CHARGEBEE_API_KEY',
     fields: [
       {
         message: 'Chargebee site (the {site}.chargebee.com subdomain):',
         validate: (val) => (val?.trim() ? true : 'Required'),
         configPath: 'payment.providers.chargebee.site',
-      },
-      {
-        message: 'Chargebee API key:',
-        validate: (val) => (val?.trim() ? true : 'Required'),
-        envName: 'CHARGEBEE_API_KEY',
       },
     ],
   },
@@ -85,52 +78,37 @@ async function providerSetupFlow(context, name) {
   }
 
   const provider = PROVIDERS[name];
-  const brandName = context.brandConfig.brand?.name || context.brandId;
+  const disablePath = `payment.providers.${name}`;
 
-  console.log(`    ${chalk.yellow('!')} ${provider.label} not configured for ${chalk.cyan(brandName)}`);
-  console.log(`        ${provider.instructions}`);
-  console.log(`        URL: ${chalk.cyan(provider.url)}`);
-
-  const action = await select({
-    message: 'Set up now?',
-    choices: [
-      { name: 'Yes', value: 'yes' },
-      { name: 'Skip for now', value: 'skip' },
-      { name: 'Disable (stop prompting)', value: 'disable' },
-    ],
-    default: 'yes',
+  // The uniform gate — Disable lands `payment.providers.<name>: false`
+  const action = await confirmSetup(context, {
+    label: provider.label,
+    instructions: [provider.instructions, `URL: ${chalk.cyan(provider.url)}`],
+    disablePath,
   });
-
-  if (action === 'skip') {
+  if (action !== 'yes') {
     return false;
   }
 
-  if (action === 'disable') {
-    const disablePath = `payment.providers.${name}`;
-    writeBrandConfig(context, { [disablePath]: false });
-    setAtPath(context.brandConfig, disablePath, false);
-    console.log(`    ${chalk.yellow('!')} ${provider.label} disabled in omega.json5`);
-    return false;
-  }
-
-  await openBrowser(provider.url);
-
+  // The public halves land in omega.json5; the dashboard is opened by the
+  // secret ask below (Enter-gated, the house rule) — one page, both keys.
   const configEdits = {};
   for (const field of provider.fields) {
     const value = (await input({ message: field.message, validate: field.validate })).trim();
-
-    if (field.configPath) {
-      configEdits[field.configPath] = value;
-      setAtPath(context.brandConfig, field.configPath, value);
-    } else {
-      writeEnvValue(context.brandRoot, field.envName, value);
-      process.env[field.envName] = value;
-      console.log(`    ${chalk.green('✓')} ${field.envName} saved to the brand .env`);
-    }
+    configEdits[field.configPath] = value;
+    setAtPath(context.brandConfig, field.configPath, value);
   }
-
   writeBrandConfig(context, configEdits);
-  return true;
+
+  // The secret half through the shared helper — the gate already ran, so it
+  // goes straight to the guided paste, the brand .env, and process.env
+  const gate = await requestServiceInput(context, serviceInputSpec('payment', {
+    names: [provider.secret],
+    label: provider.label,
+    gate: false,
+  }));
+
+  return gate === null;
 }
 
 module.exports = { providerSetupFlow };

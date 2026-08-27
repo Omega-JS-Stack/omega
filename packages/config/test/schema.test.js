@@ -5,7 +5,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { SHARED_SECTIONS } = require('../src/index.js');
+const { SHARED_SECTIONS, BACKEND_PROJECT_TYPES, backendProjectType } = require('../src/index.js');
 
 test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   assert.deepStrictEqual(
@@ -36,6 +36,48 @@ test('advertising schema: role-keyed providers with the inhouse source (ads spec
   assert.ok(!paths.some((path) => /^advertising\..*-/.test(path)), 'no kebab-case key survives under advertising');
 });
 
+// #527 — adsense is case 1 of the gating doctrine (docs/shared/config.md):
+// a DATA-bearing feature switches on its data's presence, one polarity and
+// one switch. `client` set = the manager manages the account, the site
+// renders units, ads.txt carries the record; `client` absent = all of it off.
+// The split gates that once lived beside it (`units`, `enabled`) are deleted:
+// a second switch is how a config says "managed but ad-free" to one half of
+// the stack and "serve ads" to the other.
+test('advertising: adsense is pure client-presence — no second switch (#527)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'advertising.providers.adsense.client');
+
+  assert.ok(rule, 'missing advertising.providers.adsense.client');
+  assert.equal(rule.type, 'string');
+  assert.equal(rule.required, false);
+  assert.match(rule.description, /presence/i, 'the description names the polarity it drives');
+
+  for (const gate of ['units', 'enabled']) {
+    assert.equal(
+      SHARED_SCHEMA.find((entry) => entry.path === `advertising.providers.adsense.${gate}`), undefined,
+      `advertising.providers.adsense.${gate} is deleted — client presence decides everything`,
+    );
+  }
+
+  // `advertising` stays presence-gated end to end: no adsense rule carries a
+  // materialized default, so no brand grows an advertising block (the build's
+  // automatic vert placements key on `site.advertising` existing at all).
+  for (const adsenseRule of SHARED_SCHEMA.filter((entry) => entry.path.startsWith('advertising.'))) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(adsenseRule, 'default'), false,
+      `${adsenseRule.path} materializes an advertising block into every brand`,
+    );
+  }
+  assert.equal(require('../src/defaults.js').schemaDefaults('web').advertising, undefined, 'no brand grows an advertising block');
+
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepEqual(
+    validateConfig({ ...base, advertising: { providers: { adsense: { client: 'ca-pub-1' } } } }).errors, [],
+    'the one expressible ON state is a client id',
+  );
+});
+
 test('monitoring declares every knob the monitoring package resolves (#380)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const paths = SHARED_SCHEMA.map((entry) => entry.path);
@@ -44,7 +86,8 @@ test('monitoring declares every knob the monitoring package resolves (#380)', ()
   // vanish instead of failing — every documented knob is declared here. The
   // knobs hang off the PROVIDER since #425; only `enabled` is role-level.
   assert.ok(paths.includes('monitoring.enabled'), 'missing monitoring.enabled');
-  for (const key of ['org', 'dsn', 'environment', 'sampleRate', 'tracesSampleRate', 'scrubEmail', 'attachScreenshot', 'bundlePatterns']) {
+  for (const key of ['org', 'dsn', 'environment', 'sampleRate', 'tracesSampleRate', 'scrubEmail', 'attachScreenshot', 'bundlePatterns',
+    'replaysSessionSampleRate', 'replaysOnErrorSampleRate']) {
     assert.ok(paths.includes(`monitoring.providers.sentry.${key}`), `missing monitoring.providers.sentry.${key}`);
   }
 });
@@ -101,6 +144,57 @@ test('targets.web.redirects is declared — the path-redirect map (#442)', () =>
   );
 });
 
+// #524 — every key a real brand config carries owes the schema a rule, the
+// #272 precedent: an undeclared key validates only by not being looked at, so
+// a typo in one of these reads as nothing and the validator cannot say what it
+// means. Each one is carried by a converted brand or read by a service.
+test('the carried keys brand configs already use are declared (#524)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+
+  const expected = [
+    ['brand.type', 'string'],
+    ['brand.font', 'string'],
+    ['brand.contact.phone', 'string'],
+    ['cloud.oauthRedirectsConfigured', 'boolean'],
+    ['analytics.providers.google.propertyId', 'string'],
+    ['analytics.providers.google.accountId', 'string'],
+    ['analytics.providers.meta.accountId', 'string'],
+    ['analytics.providers.tiktok.accountId', 'string'],
+    ['inbound.chat.providers.chatsy.accountId', 'string'],
+  ];
+  for (const [path, type] of expected) {
+    assert.ok(rules.has(path), `missing ${path}`);
+    assert.equal(rules.get(path).type, type, `${path} is a ${type}`);
+    assert.ok(rules.get(path).description, `${path} documents what it drives`);
+    assert.equal(rules.get(path).required, false, `${path} stays optional`);
+  }
+
+  // A rule is only worth having if it fails loudly on the wrong shape.
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepEqual(
+    validateConfig({
+      brand: { ...base.brand, type: 'Corporation', font: 'CromaSans-ExtraBold', contact: { phone: '+1-555-0100' } },
+      cloud: { oauthRedirectsConfigured: true },
+      analytics: { providers: { google: { propertyId: '222', accountId: '111' }, meta: { accountId: 'act_1' }, tiktok: { accountId: '7' } } },
+      inbound: { chat: { providers: { chatsy: { accountId: 'uid-1' } } } },
+    }).errors,
+    [],
+    'the shapes real brands carry pass',
+  );
+  assert.ok(
+    validateConfig({ ...base, cloud: { oauthRedirectsConfigured: 'yes' } }).errors
+      .some((e) => e.includes('config.cloud.oauthRedirectsConfigured has wrong type')),
+    'the reconcile flag is a boolean, never a string',
+  );
+  assert.ok(
+    validateConfig({ ...base, analytics: { providers: { google: { propertyId: 222 } } } }).errors
+      .some((e) => e.includes('config.analytics.providers.google.propertyId has wrong type')),
+    'a GA property id is the string the Admin API returns',
+  );
+});
+
 test('socials is declared — the block @omega.js/web generates shortlink pages from (#429)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const { validateConfig } = require('../src/validate.js');
@@ -119,4 +213,106 @@ test('socials is declared — the block @omega.js/web generates shortlink pages 
     'the object form carries the handle plus its own redirect target',
   );
   assert.equal(validateConfig({ ...base, socials: ['twitter'] }).errors.length, 1, 'a list is not a socials block');
+});
+
+// #546 — three service switches the manager READS and the schema never
+// declared: an undeclared key validates clean, so `enbaled: false` reads as ON
+// forever and the validator cannot say what the real key does. All three are
+// case 2 of the gating doctrine (docs/shared/config.md): a zero-data feature
+// the framework runs for every brand, switched by `enabled`, default ON, read
+// `!== false` at the service.
+test('the service enabled switches the manager reads are declared, default ON (#546)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+
+  const expected = [
+    'repo.providers.github.enabled',
+    'search.providers.searchConsole.enabled',
+    'edge.providers.cloudflare.enabled',
+  ];
+  for (const path of expected) {
+    assert.ok(rules.has(path), `missing ${path}`);
+    assert.equal(rules.get(path).type, 'boolean', `${path} is a boolean`);
+    assert.equal(rules.get(path).required, false, `${path} stays optional`);
+    assert.equal(rules.get(path).default, true, `${path} defaults ON — the service runs unless told not to`);
+    assert.ok(rules.get(path).description, `${path} documents what false skips`);
+  }
+
+  // The default is materialized, so a brand's own config carries the answer.
+  const defaults = schemaDefaults('web');
+  assert.equal(defaults.repo.providers.github.enabled, true);
+  assert.equal(defaults.search.providers.searchConsole.enabled, true);
+  assert.equal(defaults.edge.providers.cloudflare.enabled, true);
+
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepEqual(
+    validateConfig({
+      ...base,
+      repo: { providers: { github: { enabled: false } } },
+      search: { providers: { searchConsole: { enabled: false } } },
+      edge: { providers: { cloudflare: { enabled: false } } },
+    }).errors,
+    [],
+    'the OFF state every one of them honors is expressible',
+  );
+  assert.ok(
+    validateConfig({ ...base, repo: { providers: { github: { enabled: 'no' } } } }).errors
+      .some((e) => e.includes('config.repo.providers.github.enabled has wrong type')),
+    'a truthy string would read as ON — the switch is a boolean',
+  );
+});
+
+// #553 — the same hole one case over: the manager reads `devlog.enabled ===
+// true` and the schema declared only the parent `devlog` object, so a typo
+// validated clean and the validator could not say what the key does. Devlog is
+// case 3 of the doctrine (docs/shared/config.md): it publishes AI-written posts
+// to the brand's LIVE site, so the literal `true` is the only ON, absence is
+// off, and NO default is materialized — writing a devlog block into every
+// brand's omega.json5 is exactly the invitation a consequential feature must
+// not extend.
+test('devlog.enabled is declared — case 3, no materialized default (#553)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'devlog.enabled');
+
+  assert.ok(rule, 'missing devlog.enabled');
+  assert.equal(rule.type, 'boolean', 'a truthy string must not read as ON');
+  assert.equal(rule.required, false, 'a brand that never devlogs says nothing');
+  assert.ok(!('default' in rule), 'no default — a materialized devlog block would put the switch in every brand\'s config');
+  assert.match(rule.description, /publish/i, 'the description names what true turns on: published devlog posts');
+
+  assert.equal(schemaDefaults('web').devlog, undefined, 'nothing devlog lands in the defaults layer');
+
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepEqual(validateConfig(base).errors, [], 'absence is valid — and means off');
+  assert.deepEqual(
+    validateConfig({ ...base, devlog: { enabled: true, providers: { ghostii: { orgs: ['x'] } } } }).errors, [],
+    'the opt-in a brand actually writes still validates',
+  );
+  assert.ok(
+    validateConfig({ ...base, devlog: { enabled: 'yes' } }).errors
+      .some((e) => e.includes('config.devlog.enabled has wrong type')),
+    'the switch is a boolean, so the near-miss is loud instead of ON',
+  );
+});
+
+// ─── backendProjectType (#584) ───
+
+test('backendProjectType reads the backend target entry, firebase unless it says custom', () => {
+  assert.deepStrictEqual(BACKEND_PROJECT_TYPES, ['firebase', 'custom']);
+
+  assert.equal(backendProjectType({ projectType: 'custom' }), 'custom');
+  assert.equal(backendProjectType({ projectType: 'firebase' }), 'firebase');
+  // An absent entry, an empty entry, and a nonsense value all read firebase —
+  // the validator is what makes the nonsense loud; the reader never guesses a
+  // brand OFF Cloud Functions.
+  assert.equal(backendProjectType(undefined), 'firebase');
+  assert.equal(backendProjectType({}), 'firebase');
+  assert.equal(backendProjectType({ projectType: 'render' }), 'firebase');
+  // It reads a RESOLVED backend config the same way — the target entry's keys
+  // land at the top level there.
+  assert.equal(backendProjectType({ brand: { id: 'b' }, projectType: 'custom' }), 'custom');
 });

@@ -78,6 +78,21 @@ items:
 Using both forms on one call is an error. No args → the section's json5
 defaults render.
 
+### Values are text, prose is markup (#580)
+
+An arg naming a literal VALUE — a stat number, a hero card number, a timeline
+year, a shell command, a terminal transcript line, a code-panel token, a price
+card's catalog value — renders through `| escape_once`. A value like `<200ms`
+otherwise opens a tag the html minifier eats, and the page prints a visible
+`< div>` (kramdown escaped these in the legacy build, so the defect is
+OMEGA-only). `escape_once` and not `escape`: a brand that already worked around
+this by authoring `&lt;200ms` keeps rendering `<200ms`, and the filter is
+idempotent.
+
+Prose args — headline, description, label, title, quote — stay raw: authoring
+inline `<em>` in them is the shipped idiom. Real markup beyond that rides the
+`html` schema type and slot blocks, below.
+
 ### Slots — passing finished HTML (Ian 2026-07-18)
 
 When an arg needs real markup beyond strings/numbers, the block body may
@@ -87,7 +102,7 @@ both-forms error applies to the YAML remainder only):
 ```liquid
 {% section "marketing/hero", data: resolved.hero %}
   {% slot demo_html %}
-    <div class="my-wild-demo">{% omega_icon "rocket" %} {{ site.brand.name }}</div>
+    <div class="my-wild-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ```
@@ -131,15 +146,18 @@ named arg keeps the default, so absence semantics survive.
 **Consumer page frontmatter is META-ONLY (Ian 2026-07-19: "not only no more
 frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter"; softened same
 day: no build-fail)**: a real file under `pages/` may carry only `layout`,
-`permalink`, `meta`, `schema`, `theme`, `client`, `sitemap`, `append` (+ engine
-plumbing). `client` (#1) is the `@omega.js/client` settings blob — auth policy,
-cookie consent, exit popup (the chat widget moved to
-`inbound.chat.providers.chatsy` in #23) — the key the core chrome reads into the
-Configuration payload via `resolved.client`; it is machinery configuration, the
-same class as `theme` and `schema`, so a page may set it and the layout chain
-still merges underneath. (It was `web_manager` through the UJM era; WebManager
-is not an OMEGA concept, and there is no dual-read — see the
-[config mapping tables](../shared/config.md).) Any other key is
+`permalink`, `meta`, `schema`, `config`, `sitemap`, `append` (+ engine
+plumbing). `config` ([#607](https://github.com/Omega-JS-Stack/omega/issues/607))
+is the page's omega.json5 override block — every config section a page or
+layout restates lives under it, including `theme` (shell chrome) and `client`
+(#1: the `@omega.js/client` settings blob — auth policy, cookie consent, exit
+popup; the chat widget moved to `inbound.chat.providers.chatsy` in #23), which
+the core chrome reads into the Configuration payload via
+`resolved.config.client`. The layout chain still merges underneath, key by key.
+A config section restated BARE is a build ERROR naming the file and the key —
+no dual-read, and `omega migrate`'s `config-parent` rule moves it. (`client`
+was `web_manager` through the UJM era; WebManager is not an OMEGA concept —
+see the [config mapping tables](../shared/config.md).) Any other key is
 content-in-frontmatter — a lane that doesn't
 exist: the engine STRIPS it from the data cascade before resolution (and the
 collections parity-repair lane filters pages to the same allow set, so
@@ -168,8 +186,9 @@ layout.
 Section markup never reads page globals — `{ args }` is the whole render
 scope. Interpolation happens at the CALL site: any string value (default or
 passed) containing Liquid renders against the calling page's scope before the
-section sees it, so defaults like `"Introducing {{ site.brand.name }}"` work
-while markup stays portable to every framework surface.
+section sees it, so defaults like `"Introducing {{ resolved.config.brand.name }}"`
+work while markup stays portable to every framework surface. Config keys are
+read through `resolved.config.*` (#607) — `site.*` is build facts only.
 
 ## Markup convention: base, skin, fork (ratified 2026-08-04, #177)
 
@@ -250,8 +269,37 @@ another page's words.
   the whole theme layer and `defaults/`
   ([#154](https://github.com/Omega-JS-Stack/omega/issues/154),
   [#158](https://github.com/Omega-JS-Stack/omega/issues/158)).
+- **Hero animations ride these same lanes**
+  ([#441](https://github.com/Omega-JS-Stack/omega/issues/441), Ian's ruling
+  2026-08-25). A brand that wants a moving hero visual makes ONE folder —
+  `src/_hero/<name>/{index.html, style.scss, script.js}` — and names it in the
+  hero's own frontmatter:
+
+  ```liquid
+  {% section "marketing/hero" %}
+  demo:
+    enabled: true
+    type: custom
+    name: orbit
+  {% endsection %}
+  ```
+
+  Resolution is the layer chain (consumer → theme layers), first folder with an
+  `index.html` wins the whole entry, so a brand overrides a shipped animation by
+  owning the name. `style.scss` joins the `omega:sections` sheet and `script.js`
+  joins the main bundle beside every `section.js` — the collector
+  ([hero-animations.js](../../packages/web/src/hero-animations.js)) returns the
+  same `{ kind, id, scss, js }` shape, and the markup's
+  `data-omega-hero="<name>"` wrapper is what `bootSections` inits on. The markup
+  reaches the hero through the `{% hero_animation %}` tag, not a global, because
+  section markup is context-free by contract. The framework ships ONE reference
+  animation in exactly that shape, `themes/base/_hero/orbit/`, with its
+  `prefers-reduced-motion` branch; the hero's `Custom animation` demo variant is
+  it, rendered. The other custom lane is unchanged: `demo.options.content` is
+  finished markup authored at the call site, and a named folder wins over it.
+  Pinned by `test/hero-animation.test.js`.
 - **Dev loop**: theme-layer section edits are covered by the theme-root
-  watchers; consumer `src/_sections`/`_components` have their own watch
+  watchers; consumer `src/_sections`/`_components`/`_hero` have their own watch
   entries — scss changes hot-swap css, js changes rebuild + reload.
 - **Page modules (cp221)**: `asset_path` frontmatter is DEAD — page assets
   bind to URLs alone. Exact key first (`js/pages/pricing.js` or the
@@ -283,31 +331,98 @@ resolves the base file live, so base js/scss updates still reach the fork).
 
 ## Showcase & docs (spec §9) — auto-generated
 
-`/test/sections` is the library's living reference: an index over every
-RESOLVED entry (grouped by kind + category folder) plus one page per entry
-carrying the args table (generated from the schema — name, type,
-description), the pretty-printed defaults, and every `demo` variant rendered
-LIVE through the real tag. New folder → new pages, zero authoring. The
+TWO galleries, one shape ([#602](https://github.com/Omega-JS-Stack/omega/issues/602)): `/test/sections` is the section library and `/test/components` the component library, each an index over every RESOLVED entry of its kind (grouped by category folder) plus one page per entry carrying the args table (generated from the schema — name, type, description), the pretty-printed defaults, and every `demo` variant rendered LIVE through the real tag. New folder → new pages, zero authoring. The
 engine computes the `sectionLibrary` global (`buildSectionLibrary`: same
 first-match-wins resolution as the tags) and the pages paginate over it;
 each entry chips its owning layer, so overrides say `newsflash` and
 fallthrough ids say `classy` — the override doctrine, visible.
 
+Each kind's URL SPACE has one home, `KINDS.<kind>.gallery` in [sections.js](../../packages/web/src/sections.js): `url` (the index), `base` (entry pages hang off `<base>/<id>`, frames off `<base>/<id>/frames/<slug>`) and `label`. The library stamps the resolved url onto every entry and variant, so no template ever composes one — a section entry lives at `/test/sections/section/<id>` and a component entry at `/test/components/<id>`.
+
+**It is the agent path.** Building a page means composing entries from this
+gallery, never hand-rolling HTML: the entry page is the args contract and
+the frames are what each variant actually looks like.
+
+- **Embedded frames (#463)**: a variant renders in its OWN document —
+  `<gallery base>/<id>/frames/<slug>` (`defaults/showcase/frame.html`,
+  paginating over `sectionLibrary.variants`, the flattened one-item-per-
+  entry×variant list). The slug is the kebab-cased label, numbered on
+  collision within the entry (`side-by-side`, `side-by-side-2`). The frame
+  wears the theme's real asset bundles with nav and footer off (page-level
+  `theme.nav.enabled: false`), so a hero that expects the viewport gets one.
+  The OVERLAY chrome is off in the same frontmatter (#555): the frame bakes
+  `client.consent.enabled: false` and
+  `inbound.chat.providers.chatsy.enabled: false`, so a stack of variants is not
+  a stack of cookie banners and chat bubbles. ONE generator serves both kinds,
+  so that is the ONE home for it; the gallery page around the frames is a page
+  like any other and still shows both. The DEV PALETTE is the third overlay a
+  frame drops, and it is gated in the other place: `core/js/main.js` imports it
+  only when `html[data-iframed]` is not `true` (the mark `core/_includes/core/body.html`
+  stamps before first paint), because main.js is what loads that chunk. The
+  other two are decided before it runs — the client mounts chatsy inside
+  `omega.initialize()` — which is why they live in the frontmatter and this one
+  does not.
+- **The entry page embeds them**: per variant, the label, the authored args
+  as a copyable escaped block (`argsJson`, escaped by the collector like
+  every other display string), and a lazy same-origin `<iframe>` autosized to
+  its content by `core/js/libs/showcase-frames.js` (the shared helper both
+  galleries' page modules call —
+  `core/js/pages/test/sections/[kind]/[category]/[name]/index.js` and
+  `core/js/pages/test/components/[category]/[name]/index.js` are the wildcard
+  page-asset entries serving the two generated families). An inline
+  `min-height` is the no-JS fallback — the frame scrolls, never collapses. The
+  stack itself is ONE include, `core/_includes/core/showcase/entry-body.html`,
+  rendered by the ONE entry-page generator.
+- **Sidebar + stacked frames (#540, Ian's QA call)**: every gallery page is
+  one row — the navigation rail on the left, the content on the right. The
+  rail (`core/_includes/core/showcase/nav.html`, one home for both galleries'
+  indexes and entry pages) is KIND-SCOPED (#602): it lists that library the way
+  its own index groups it, marks the entry being shown, and nests THAT entry's
+  demo variants under it.
+  The right pane shows EVERY variant STACKED, one frame each with its options
+  block, and the entry's args table beneath them; the rail's variant links are
+  plain anchor jumps (`#variant-<slug>`) into that stack — no tab machinery,
+  no reload, and no JS required (the page module only autosizes). Ian settled
+  the model at the 2026-08-24 QA pass: stacked scans faster.
+- **The gallery chrome clears the masthead**: each gallery page's shell is a
+  top-level `<section data-omega-showcase-shell>`, which is the element a
+  theme's nav clearance targets (classy's nav is `position: fixed`) — as a
+  bare `<div>` it took no clearance and slid under the nav, which is also what
+  made the rail's "← Section library" link unclickable. The rail's sticky
+  offset and each panel's `scroll-margin-top` clear the same nav.
+- **The component gallery (#549, reshaped by #602)**: `/test/components`
+  MIRRORS the section gallery rather than reinterpreting it — an index here,
+  an entry page at `/test/components/<id>`, its frames at
+  `/test/components/<id>/frames/<slug>`. ONE generator serves both kinds:
+  `defaults/showcase/entry.html` and `defaults/showcase/frame.html` paginate
+  the whole library and take their permalink off the entry's own kind-aware
+  url, and the two index pages share `core/_includes/core/showcase/index-body.html`.
+  Nothing is generated under `/test/sections/component/…` any more. The living
+  styleguide that used to hold the `/test/components` URL is `/test/styleguide`
+  (a `defaults/pages` page, so it ships in production builds too — noindex and
+  sitemap-excluded like every `/test` page); the galleries ride
+  `defaults/showcase/`, so production emits none of them.
+- The five `hero-demo-*` default pages folded INTO the gallery (#463): the
+  hero's own `demo:` roster now carries the input/form/video/side/custom
+  compositions they used to author page-side, and they render as frames.
+
 - **Development builds only** (the sample-content gate): a page rendering
   every section would keep every section's CSS alive through the PurgeCSS
   content scan and quietly defeat §7 self-trimming. Production never builds
   it; the pages are also collection-excluded, so sitemap.xml and pages.json
-  never carry them. A theme with its own sections gets exactly that many
-  extra entry pages — the one sanctioned cross-theme page-count delta
-  (pinned in the contract suite, derived from the collector).
+  never carry them. The frame pages ride the same injection (the engine
+  collects the whole `defaults/showcase/` dir). A theme with its own sections
+  gets exactly that many extra entry pages plus their frames — the one
+  sanctioned cross-theme page-count delta (pinned in the contract suite,
+  derived from the collector).
 - **`demo` variants** — `[{ label, args?, stage_class? }]`: args ride the
   data bridge over the entry's defaults (exactly the consumer experience)
-  and liquify at the call site; `stage_class` supplies the wrapper a
+  and liquify at the frame's call site; `stage_class` supplies the wrapper a
   component's caller normally owns (section-head's shell). Shared bands
   carry generic demo copy — neutral defaults stay neutral (§6).
 - **Docs display is RAW**: description/args/defaults strings arrive
   HTML-escaped from the collector (including `{` → `&#123;`), so the docs
-  show the `{{ site.brand.name }}` tokens a consumer would see in the file.
+  show the `{{ resolved.config.brand.name }}` tokens a consumer would see in the file.
   Load-bearing, not cosmetic — the library rides the page data cascade,
   whose frontmatter/resolved walkers liquify any string containing `{{`
   (the walkers also skip the `sectionLibrary` key wholesale).
@@ -438,7 +553,9 @@ across the index/about/pricing layouts is now the theme's override
 serving classy's exact contract, so those three bands compose it AND
 every fallthrough page (download, extension, alternatives ×2) flips from
 classy markup to the panel — with the icon keys classy's markup ignores
-(`superheadline.icon`, `*_button.icon`) finally rendering, and `command`
+(`superheadline.icon`, `*_button.icon`) finally rendering (superheadline
+icons were later removed everywhere — Ian's ruling, 2026-08-22; button
+icons stay), and `command`
 served as the mono $ button in panel idiom. The newsletter-cta override
 gained a second presentation the same checkpoint, `variant: "rail"` — the
 compact sidebar signup card with NO section/container wrapper, composed
@@ -567,6 +684,123 @@ animation, and the `tone` arg rides the shared categorical ramp
 same name's chart series. The class vocabulary is `omega-`-namespaced on
 purpose — a live page rendering it from JS keeps the connectors AND survives
 the PurgeCSS content scan. Pinned in `test/dataviz.test.js`.
+
+The porting pass (#513, #500, #515, #493) — four gaps the operst and
+playlisteer ports found, each closed in the library rather than brand-side:
+
+- `marketing/hero` `breadcrumb` — an ordered `[{ label, href }]` trail rendered
+  as `<nav aria-label="Breadcrumb">` above the headline cluster, small and
+  muted on shared utilities alone (inline list items, so the trail inherits the
+  hero's own alignment in both placements). The LAST crumb is the current page:
+  unlinked, `aria-current="page"`. Absent renders nothing. It is the ON-PAGE
+  trail only — `foot.html` emits the BreadcrumbList JSON-LD unconditionally
+  from `site`, and the arg neither feeds nor replaces it, so an author keeping
+  a deep page honest keeps BOTH consistent.
+- `marketing/hero` `heading_level` (#500) — the headline's tag, default `1`. A
+  page composing the band twice (the #496 pattern: the dashboard demo as its
+  own below-fold instance) authors `2` on the second and ships one h1. The
+  classes never change with the level, so classy's hero rules key on
+  `.omega-display--hero` rather than the tag.
+- `marketing/prose` (#515) — the head-plus-lede band: the shared
+  `heading/section-head` cluster over a `body` of paragraphs, one `<p>` each,
+  in the `omega-prose` reading column. No items, no media, no new CSS. Absent
+  body renders the head alone. Before it, that shape had to fake itself with an
+  item-less `marketing/showcase`; that empty-items rendering stays UNRATIFIED.
+- `marketing/pricing-cards` (#493) — the minimal plan band, composed by the
+  base index layout directly under the WHY band (the bento). It renders from
+  the SAME resolved catalog `/pricing` does: the layout bridges
+  `plans: resolved.pricing.plans` and `annual: resolved.pricing.billing.annually`,
+  so the annual view shows the resolver's own floored monthly equivalent
+  (#477) and no homepage number can drift from `payment.products`. The card
+  vocabulary is `/pricing`'s `omega-price-card`, minus the billing-toggle JS
+  hooks (`amount`, `billing-info`) and with a real link per card instead of a
+  checkout button — that binding is a page module, and a hook nothing binds is
+  a dead contract. No plans, no band; `enabled: false` removes it (#473).
+  Because the band composes price cards OFF /pricing, a theme's
+  `.omega-price-card` skin belongs in its marketing layer in the main bundle,
+  never in `css/pages/pricing/index.scss` — neobrutalism and newsflash hoisted
+  theirs there (#531), matching classy; /pricing renders identically, its
+  styles simply arrive from the shared layer.
+- `pricing/features` (#539) — the price card's feature bullets, hoisted out of
+  the /pricing layout into a COMPONENT because the band composes the same
+  list: green check, the catalog's value ahead of the name, and the
+  dotted-underline tooltip a feature's `definition` earns (the themes
+  initialize Bootstrap tooltips page-wide, so the affordance works wherever
+  the list lands). Three callers — /pricing's plan cards, its one-time cards,
+  and `marketing/pricing-cards` — so the hover surface can never exist on one
+  and not the other. The caller keeps the tier note above the extras, because
+  its WORDING differs by surface: the page says "Everything in <previous>,
+  and more:", the band says "and:" (Ian 2026-08-24). The band reads the
+  composer's own `commonFeatures`/`extraFeatures` split, falling back to the
+  flat `features` list for a plan hand-authored in a page body.
+- The /pricing comparison matrix reads a cell the SAME way (#562, ruling Ian
+  2026-08-25). A truthy cell is a YES and draws `circle-check`; a cell that is
+  not a bare `true` also prints its own value as `omega-compare__label` beside
+  the mark. `true` stays icon-only, falsy stays `circle-xmark`. **No schema
+  change and no second key**: one `features[].value` feeds both surfaces, so a
+  legacy catalog's `value: "Included"` stops mixing the word with x icons in
+  the same row while the cards keep printing the label. A value the catalog
+  authored is TEXT — `omega_commaify` still formats a number, then
+  `escape_once` (#580).
+
+- `marketing/bento` `subheadline` default (#512) — the section default is
+  EMPTY: an absent subheadline renders no sub node, never a demo sentence the
+  brand never wrote (it shipped onto 40 pages of the operst port). The demo
+  line moved into the band's `Default grid` gallery variant, where sample
+  content belongs. Same sweep, same move: `about/timeline` and
+  `about/principles` (the about layout authors both bands' real sub lines
+  itself, so the packaged /about is unchanged). The rule this pins: **a
+  json5 default is STRUCTURE — copy that reads as a live sentence belongs to
+  a gallery variant or to the composing layout.** The sweep's remainder
+  (#530) finished the job on the three marketing bands the base index layout
+  composes without copy of its own: `marketing/showcase`,
+  `marketing/product-demo` and `marketing/pricing-cards` all take the empty
+  default, their demo lines moved to their gallery variants, and the packaged
+  homepage's plan band now renders head-only until a brand writes its own sub
+  line. (`marketing/prose` was already neutral by design.)
+- `marketing/bento` tile `href` (#514) — the linked-card listing. With `href`
+  the WHOLE tile renders as one `<a>` wearing `.omega-interactive` (the shared
+  whole-surface click affordance); without it the tile is the div it always
+  was. **A linked tile's body carries no nested anchors** — one anchor per
+  tile, always, so the markup stays valid and the click target stays whole.
+  It covers every hub/category listing the operst port hand-rolled over the
+  `omega-rowlist` vocabulary; no separate link-list band exists (#514's
+  deletion test).
+- `marketing/bento` `numbered` (#519) — band-level, not per tile: `true`
+  numbers the tiles 1..N by position as a small mono ordinal chip
+  (`omega-tile__ordinal`, tokens only), so reordering a process band
+  renumbers itself. Default band unchanged.
+- `marketing/stats` item `icon` + `color` (#518) — the glyph rides the ONE
+  icon mechanism (`omega_icon` in the shared `omega-icon-chip` idiom); `color`
+  names a slot in the categorical token palette (`tone-1`…`tone-6` — the same
+  ramp charts and tone chips read, [theming](../shared/theming.md)) and is
+  WHITELISTED: anything else — a hex, a Bootstrap name — paints nothing, so a
+  band can never colour outside the theme. The tone marks the glyph; the
+  number stays ink.
+- `about/letter` aside gate (#520) — the aside renders only when it has
+  something to say: feed items, or the aside photo. Empty `feed_items` means
+  no feed AND no framing (fragment box, status chip, label), and with no photo
+  either the aside column goes with it and the letter runs the container's
+  full width. Before it, a brand that wanted the mission/vision copy without
+  the feed got an empty ornament no page asked for.
+- `about/hero` `facts_head.headline_accent` (#516) — the facts head composed
+  every line but the accent, so a legacy "Measuring our IMPACT" rendered as
+  "Measuring our". It passes through like every other head composition now.
+- `blueprint/team/index` copy homes (#517) — three optional args, all absent
+  by default (byte-identical hub): `grid_head` (superheadline / headline /
+  headline_accent / subheadline) heads the portrait grid through the shared
+  `heading/section-head` cluster; each member's own one-line `bio:` (in their
+  `_team` doc) reads under name and position as `omega-person__desc` — the
+  card vocabulary the theme already styled and nothing rendered; and
+  `mission_headline` gives the mission band its h2.
+- `blueprint/alternatives/index` competitor description (#563) — the same
+  shape one page over: each `_alternatives` doc's
+  `alternative.competitor.description` reads UNDER its hub row title as
+  `omega-rowlist__desc` (the row's first cell, above the "View comparison"
+  meta), muted and unweighted so the link voice stays the title's. Every
+  alternatives doc authors the key and legacy UJM printed it; the OMEGA hub
+  printed the title and the link alone, so brand copy had nowhere to land.
+  Unauthored, the row is byte-identical to what it always was.
 
 Pending (spec §13): the arc close — THE FORK (real omegajs.dev sub-brand
 born outside the monorepo on published omega; Ian-gated on publish/launch

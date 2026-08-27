@@ -171,4 +171,81 @@ describe('motion', () => {
       engine.stop();
     });
   });
+
+  // #499: CSS can park an animation; it cannot pause a <video>. No lane did,
+  // so every autoplaying band (the hero video demo, marketing/product-demo)
+  // kept moving for a visitor who asked for stillness. The engine owns it now,
+  // for every section at once. The unit env has no DOM, so the element is a
+  // stub of exactly the surface setupVideo touches (the icon-renderer idiom).
+  describe('reduced-motion video park (#499)', () => {
+    /** A <video autoplay> stub: attributes, properties, and pause(). */
+    function makeVideo() {
+      const attributes = new Set(['autoplay', 'loop', 'muted']);
+      return {
+        tagName: 'VIDEO',
+        dataset: {},
+        autoplay: true,
+        controls: false,
+        paused: false,
+        pauseCalls: 0,
+        hasAttribute: (name) => attributes.has(name),
+        removeAttribute: (name) => attributes.delete(name),
+        matches: (selector) => selector === 'video[autoplay]' && attributes.has('autoplay'),
+        querySelectorAll: () => [],
+        pause() {
+          this.pauseCalls += 1;
+          this.paused = true;
+        },
+      };
+    }
+
+    /** A root whose only motion targets are the given videos. */
+    const rootOf = (videos) => ({
+      matches: () => false,
+      querySelectorAll: (selector) => (selector === 'video[autoplay]' ? videos : []),
+    });
+
+    /** Run scan with prefers-reduced-motion answering `reduced`. */
+    function scanWith(reduced, videos) {
+      const original = global.window.matchMedia;
+      global.window.matchMedia = (query) => ({ matches: reduced && query.includes('prefers-reduced-motion') });
+      try {
+        motion.createMotion().scan(rootOf(videos));
+      } finally {
+        global.window.matchMedia = original;
+      }
+    }
+
+    it('pauses an autoplaying video and shows its controls', () => {
+      const video = makeVideo();
+      scanWith(true, [video]);
+
+      assert.strictEqual(video.paused, true, 'the video is parked');
+      assert.strictEqual(video.pauseCalls, 1, 'paused by the engine, not by luck');
+      assert.strictEqual(video.autoplay, false, 'and it will not restart itself');
+      assert.strictEqual(video.hasAttribute('autoplay'), false, 'the attribute goes with it');
+      assert.strictEqual(video.controls, true, 'the visitor gets the controls to start it themselves');
+    });
+
+    it('leaves an autoplaying video alone when the visitor asked for nothing', () => {
+      const video = makeVideo();
+      scanWith(false, [video]);
+
+      assert.strictEqual(video.paused, false, 'the authored playback stands');
+      assert.strictEqual(video.pauseCalls, 0, 'nothing paused it');
+      assert.strictEqual(video.autoplay, true, 'autoplay survives');
+      assert.strictEqual(video.controls, false, 'and a controls-off band stays clean');
+    });
+
+    it('is idempotent — a rescan never pauses a video the visitor started', () => {
+      const video = makeVideo();
+      scanWith(true, [video]);
+
+      video.paused = false; // the visitor pressed play
+      scanWith(true, [video]);
+
+      assert.strictEqual(video.pauseCalls, 1, 'the second scan leaves it running');
+      assert.strictEqual(video.paused, false);
+    });
+  });
 });

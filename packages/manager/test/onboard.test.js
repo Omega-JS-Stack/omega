@@ -152,6 +152,10 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     contact: { email: 'support@acme.io' },
   });
   assert.deepEqual(config.theme, { id: 'classy', appearance: 'system' });
+  // Socials seed EMPTY (#462): every surface that reads the block (the footer
+  // row, sameAs, the /<platform> shortlinks) shows what the brand DECLARED —
+  // a seeded platform key would print a link to a profile nobody owns
+  assert.deepEqual(config.socials, {});
   assert.deepEqual(Object.keys(config.targets), ['web', 'backend', 'desktop']);
   // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
   assert.deepEqual(config.certificates, { providers: { apple: { bundleIdPrefix: 'io.acme' } } });
@@ -199,12 +203,16 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.ok(env.includes('# CLOUDFLARE_TOKEN='));
   assert.ok(env.includes('# STRIPE_SECRET_KEY='));
-  assert.match(env, /^OMEGA_ADMIN_KEY=[A-Za-z0-9_-]{43}$/m);
-  assert.match(env, /^OMEGA_WEBHOOK_KEY=[A-Za-z0-9_-]{43}$/m);
-  assert.match(env, /^OMEGA_NAMESPACE=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/m);
+  assert.match(env, /^OMEGA_ADMIN_KEY="[A-Za-z0-9_-]{43}"$/m);
+  assert.match(env, /^OMEGA_WEBHOOK_KEY="[A-Za-z0-9_-]{43}"$/m);
+  assert.match(env, /^OMEGA_NAMESPACE="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"$/m);
+  // The email signing key is minted here too since #569 — a brand that never
+  // gets one crashes on its first order email
+  assert.match(env, /^UNSUBSCRIBE_HMAC_KEY="[0-9a-f]{64}"$/m);
   assert.notEqual(env.match(/^OMEGA_ADMIN_KEY=(.+)$/m)[1], env.match(/^OMEGA_WEBHOOK_KEY=(.+)$/m)[1]);
   const uncommented = env.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
-  assert.ok(uncommented.every((line) => line.startsWith('OMEGA_')), 'only omega-owned keys are provisioned');
+  const generated = Object.keys(require('@omega.js/config').generatedEnvKeys());
+  assert.ok(uncommented.every((line) => generated.some((key) => line.startsWith(`${key}=`))), 'only omega-generated keys are provisioned');
 
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
   // logs/ joins the list with #197 — every verb writes one there now.
@@ -370,6 +378,36 @@ test('resume from inside an existing brand: answers come from its config, only g
   assert.ok(readme.startsWith('# Existing Brand'));
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.ok(env.startsWith('# Existing Brand'));
+});
+
+// ─── Legacy port ─────────────────────────────────────────────────────────────
+
+test('port: a carried legacy oauth.json converts ONCE into the canonical google-oauth.json (#501)', async () => {
+  const root = tempDir();
+  const secrets = path.join(root, '.omega', 'secrets');
+  fs.mkdirSync(secrets, { recursive: true });
+  fs.writeFileSync(path.join(secrets, 'oauth.json'), `${JSON.stringify({
+    googleClientId: '1234-abc.apps.googleusercontent.com',
+    googleClientSecret: 'legacy-secret',
+  }, null, 2)}\n`);
+
+  // The write gate holds: a dry run plans and converts nothing
+  const dry = await runOnboard(root, { id: 'ported', manage: false, dryRun: true });
+  assert.equal(dry.legacyOAuth, undefined);
+  assert.equal(fs.existsSync(path.join(secrets, 'google-oauth.json')), false);
+
+  const report = await runOnboard(root, { id: 'ported', manage: false });
+
+  assert.equal(report.legacyOAuth.converted, true);
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(secrets, 'google-oauth.json'), 'utf8')),
+    { clientId: '1234-abc.apps.googleusercontent.com', clientSecret: 'legacy-secret' },
+  );
+  // One-time: the inert legacy file is gone, so nothing dual-reads it later
+  assert.equal(fs.existsSync(path.join(secrets, 'oauth.json')), false);
+
+  const rerun = await runOnboard(root, { manage: false });
+  assert.equal(rerun.legacyOAuth.converted, false);
 });
 
 // ─── Company mode ────────────────────────────────────────────────────────────

@@ -20,14 +20,15 @@ const jetpack = require('fs-jetpack');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/disperse/index.js');
+const { envKeysForTarget, devEnvKeys } = require('@omega.js/config');
 const { ENV_MAP, updateEnvContent } = require('../src/services/disperse/write/env.js');
 
 // Tests must never see real credentials from the shell environment — every
 // env name the composition can read gets scrubbed, and non-skip tests set
 // fixture values explicitly.
 const MANAGED_ENV = [...new Set(
-  Object.values(ENV_MAP).flatMap((spec) => [
-    ...(spec.env || []),
+  Object.entries(ENV_MAP).flatMap(([target, spec]) => [
+    ...(spec.composeEnv ? envKeysForTarget(target) : []),
     ...(spec.streamSecret ? [spec.streamSecret] : []),
     ...Object.keys(spec.certPaths || {}),
   ]),
@@ -370,6 +371,35 @@ test('env: the backend target composes its target-root .env with its own stream 
   assert.match(env, /^# CLAUDE_CODE_OAUTH_TOKEN=$/m);
   // Composed values UNCOMMENT their placeholder in place — no duplicate lines
   assert.doesNotMatch(env, /^# GH_TOKEN=$/m);
+});
+
+test('env: the dev-suffixed payment secrets reach the backend target .env (#586)', async () => {
+  // The brand layer carries both halves: the live secret for the deploy and
+  // the _DEV twin the local emulator must use instead
+  setEnv({
+    STRIPE_SECRET_KEY: 'sk_live_fixture',
+    STRIPE_SECRET_KEY_DEV: 'sk_test_fixture',
+    STRIPE_WEBHOOK_SECRET_DEV: 'whsec_fixture_dev',
+    PAYPAL_CLIENT_SECRET_DEV: 'pp-sandbox-fixture',
+    CHARGEBEE_API_KEY_DEV: 'test_fixture',
+  });
+  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
+
+  const result = await runService(brand, { config: brandConfig({ targets: { backend: {} } }) });
+
+  assert.equal(result.status, 'success');
+  const env = jetpack.read(join(brand.root, 'targets', 'backend', '.env'));
+
+  // Derived from the env schema — a new twin is one entry, never an edit here
+  for (const name of devEnvKeys()) {
+    assert.ok(envKeysForTarget('backend').includes(name), `${name} is part of the backend composition`);
+  }
+  assert.match(env, /^STRIPE_SECRET_KEY_DEV="sk_test_fixture"$/m);
+  assert.match(env, /^STRIPE_WEBHOOK_SECRET_DEV="whsec_fixture_dev"$/m);
+  assert.match(env, /^PAYPAL_CLIENT_SECRET_DEV="pp-sandbox-fixture"$/m);
+  assert.match(env, /^CHARGEBEE_API_KEY_DEV="test_fixture"$/m);
+  // The live half still travels — the deploy stage is what drops the twins
+  assert.match(env, /^STRIPE_SECRET_KEY="sk_live_fixture"$/m);
 });
 
 test('env: a converged second run rewrites nothing', async () => {

@@ -118,8 +118,8 @@ test('omega_external absolutizes against site.url, passes full URLs through', ()
   assert.strictEqual(TAGS.omega_external.render(makeCtx({}), ''), '');
 });
 
-test('omega_social builds platform URLs from page.resolved.socials', () => {
-  const ctx = makeCtx({ page: { resolved: { socials: { twitter: 'somiibo', tumblr: 'myblog' } } } });
+test('omega_social builds platform URLs from page.resolved.config.socials', () => {
+  const ctx = makeCtx({ page: { resolved: { config: { socials: { twitter: 'somiibo', tumblr: 'myblog' } } } } });
 
   assert.strictEqual(TAGS.omega_social.render(ctx, '"twitter"'), 'https://twitter.com/somiibo');
   assert.strictEqual(TAGS.omega_social.render(ctx, '"tumblr"'), 'https://myblog.tumblr.com');
@@ -132,19 +132,19 @@ test('omega_social reads the SSG\'s own `resolved` scope too, and the { handle, 
   // (its migrate rule 1 is literally `page.resolved.` → `resolved.`), so the
   // page-only lookup resolved nothing on every omega build — an empty href on
   // the footer's social row and an empty JSON-LD sameAs entry.
-  const engineCtx = makeCtx({ page: { url: '/' }, resolved: { socials: { twitter: 'somiibo' } } });
+  const engineCtx = makeCtx({ page: { url: '/' }, resolved: { config: { socials: { twitter: 'somiibo' } } } });
   assert.strictEqual(TAGS.omega_social.render(engineCtx, '"twitter"'), 'https://twitter.com/somiibo');
 
   // The object form names a PROFILE with its handle; where its shortlink
   // redirects is the socials page lane's business, never sameAs's.
   const objectCtx = makeCtx({
     page: { url: '/' },
-    resolved: { socials: { spotify: { handle: 'somiibo', redirect: 'https://open.spotify.com/artist/1k6' } } },
+    resolved: { config: { socials: { spotify: { handle: 'somiibo', redirect: 'https://open.spotify.com/artist/1k6' } } } },
   });
   assert.strictEqual(TAGS.omega_social.render(objectCtx, '"spotify"'), 'https://open.spotify.com/user/somiibo');
 
   // Redirect-only (a platform with no URL pattern): nothing to derive.
-  const redirectOnly = makeCtx({ page: { url: '/' }, resolved: { socials: { spotify: { redirect: 'https://open.spotify.com/artist/1k6' } } } });
+  const redirectOnly = makeCtx({ page: { url: '/' }, resolved: { config: { socials: { spotify: { redirect: 'https://open.spotify.com/artist/1k6' } } } } });
   assert.strictEqual(TAGS.omega_social.render(redirectOnly, '"spotify"'), '');
 });
 
@@ -180,13 +180,13 @@ test('omega_icon loads from injected dirs with brands fallback, flag mapping, an
   const ctx = makeCtx({}, { options });
 
   const rocket = TAGS.omega_icon.render(ctx, 'rocket');
-  assert.ok(rocket.startsWith('<i class="fa" data-icon="rocket">'));
+  assert.ok(rocket.startsWith('<i class="fa" data-icon="rocket" aria-hidden="true">'));
   assert.ok(rocket.includes('M1 1'));
   assert.ok(rocket.includes('width="1em"') && rocket.includes('height="1em"') && rocket.includes('fill="currentColor"'));
 
   // brands fallback when not in the configured style
   const github = TAGS.omega_icon.render(ctx, 'github, "me-2"');
-  assert.ok(github.startsWith('<i class="fa me-2" data-icon="github">'));
+  assert.ok(github.startsWith('<i class="fa me-2" data-icon="github" aria-hidden="true">'));
   assert.ok(github.includes('M2 2'));
   assert.ok(!github.includes('width="1em" width')); // existing width= not duplicated
 
@@ -233,7 +233,35 @@ test('omega_icon walks the dir chain and resolves aliases (icon-core semantics)'
   // alias resolves to the canonical file ('search' → 'magnifying-glass')
   const search = TAGS.omega_icon.render(ctx, 'search');
   assert.ok(search.includes('M8 8'));
-  assert.ok(search.startsWith('<i class="fa" data-icon="search">')); // data-icon keeps the requested name
+  assert.ok(search.startsWith('<i class="fa" data-icon="search" aria-hidden="true">')); // data-icon keeps the requested name
+});
+
+// #538 — the WRAPPER is the accessibility surface. Every icon sits beside
+// visible text (buttons, tiles, facts), so the default emit is hidden from the
+// a11y tree instead of relying on screen readers skipping text-free SVGs; the
+// rare meaningful icon says so with `label=` and gets a real name.
+test('omega_icon: the wrapper is aria-hidden by default, a labeled icon is role=img instead (#538)', () => {
+  const options = { icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')] } };
+  const ctx = makeCtx({ heading: 'Rocket status', risky: 'The "Pro" plan' }, { options });
+
+  const decorative = TAGS.omega_icon.render(ctx, 'rocket');
+  assert.ok(decorative.startsWith('<i class="fa" data-icon="rocket" aria-hidden="true">'), decorative);
+  assert.ok(!decorative.includes('role="img"'), 'a decorative icon claims no role');
+
+  const classed = TAGS.omega_icon.render(ctx, 'rocket, "me-2"');
+  assert.ok(classed.startsWith('<i class="fa me-2" data-icon="rocket" aria-hidden="true">'), classed);
+
+  const labeled = TAGS.omega_icon.render(ctx, 'rocket, "me-2", label="Launch status"');
+  assert.ok(labeled.startsWith('<i class="fa me-2" data-icon="rocket" role="img" aria-label="Launch status">'), labeled);
+  assert.ok(!labeled.includes('aria-hidden="true"><svg'), 'a labeled icon is never hidden from the a11y tree');
+
+  // The label rides the option lane like every other tag option: variables
+  // resolve, and the value is attribute-escaped at the emit.
+  const fromVariable = TAGS.omega_icon.render(ctx, 'rocket, label=heading');
+  assert.ok(fromVariable.startsWith('<i class="fa" data-icon="rocket" role="img" aria-label="Rocket status">'), fromVariable);
+
+  const quoted = TAGS.omega_icon.render(ctx, 'rocket, label=risky');
+  assert.ok(quoted.includes('aria-label="The &quot;Pro&quot; plan"'), quoted);
 });
 
 test('omega_logo prefixes SVG ids uniquely per instance', () => {

@@ -25,7 +25,9 @@
  *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { resolveConfigValue, landValue } = require('../../lib/config-flow.js');
@@ -116,12 +118,19 @@ module.exports.run = createServiceRunner({
     }
 
     if (!db) {
-      return {
-        skip: true,
-        reason: process.env.REPLYIFY_API_KEY
-          ? 'REPLYIFY_API_KEY recognized, but product-API management is not wired yet — use the operator SA (REPLYIFY_SERVICE_ACCOUNT) or the dashboard'
-          : 'no REPLYIFY_SERVICE_ACCOUNT configured (path to Replyify\'s service-account JSON, set it in the brand .env)',
-      };
+      if (process.env.REPLYIFY_API_KEY) {
+        return {
+          skip: true,
+          reason: 'REPLYIFY_API_KEY recognized, but product-API management is not wired yet — use the operator SA (REPLYIFY_SERVICE_ACCOUNT) or the dashboard',
+        };
+      }
+
+      // The shared setup contract (#608): the operator SA is asked for right
+      // here — most brands are not the Replyify operator and answer Disable,
+      // which retires the ask for good.
+      const gate = await requestServiceInput(context, serviceInputSpec('email'));
+      if (gate) return gate;
+      db = new FirestoreREST(loadServiceAccount(process.env.REPLYIFY_SERVICE_ACCOUNT, context.brandRoot));
     }
 
     return { db, agentId };

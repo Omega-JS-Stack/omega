@@ -112,7 +112,7 @@ Required setup: `brand.url` in config (background.js watches that host for the /
 - **Webpack** — bundles each `src/assets/js/components/<name>/index.js` with Babel transpilation. Custom `__theme__` alias resolves to the active theme. Template-replacement plugin substitutes `%%% version %%%` / `%%% brand.name %%%` / etc.
 - **Sass** — load-path resolution lets consumer SCSS `@use 'omega-extension'` / `@use 'theme'` / `@use 'components/popup'` without long relative paths. See [docs/css.md](../../packages/extension/docs/css.md).
 - **HTML templating** — two-pass `{{ }}` replacement: view first, then outer page-template. Vars: `brand.name`, `brand.url`, `page.title`, `theme.appearance`, `version`, `cacheBust`. See [docs/templating.md](../../packages/extension/docs/templating.md).
-- **Packaging** ([gulp/package.js](../../packages/extension/src/gulp/tasks/package.js)) — per-browser manifest normalization (JSON5 → strict JSON), zip, optional auto-publish. A DECLARED consumer value beats the framework default, arrays included — an empty array ships nothing, the only way to drop a default like `externally_connectable`'s dev origin ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)). The firefox target translates the chrome-only panel keys (`side_panel` → `sidebar_action`) and REFUSES to emit an artifact without `browser_specific_settings.gecko.id` ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
+- **Packaging** ([gulp/package.js](../../packages/extension/src/gulp/tasks/package.js)) — per-browser manifest normalization (JSON5 → strict JSON), zip, optional auto-publish. A DECLARED consumer value beats the framework default, arrays included — an empty array ships nothing, the only way to drop a default like `externally_connectable`'s dev origin ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)). That default is now the BRAND's own origin (from `brand.url`), with the dev-website origin added in dev builds only: a packaged build shipped the localhost origin alone, so the live site could not message the published extension ([#583](https://github.com/Omega-JS-Stack/omega/issues/583)); the scaffolded `test/boot/externally-connectable.test.js` asserts it against the real packaged manifest. `homepage_url` bakes from `brand.url` on every target — the store listing's developer-site link ([#576](https://github.com/Omega-JS-Stack/omega/issues/576)). The firefox target translates the chrome-only panel keys (`side_panel` → `sidebar_action`) and DERIVES `browser_specific_settings.gecko.id` when the consumer declares none — `extension@<brand.url host>`, falling back to `extension@<brand.id>.extension`, and failing loudly only with no brand facts at all ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)). Declare the id before the FIRST publish anyway: it must stay stable across releases, and `brand.url` can change ([#574](https://github.com/Omega-JS-Stack/omega/issues/574)).
 
 See [docs/build-system.md](../../packages/extension/docs/build-system.md).
 
@@ -132,17 +132,23 @@ Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and 
 
 `src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so setup composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every setup, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
 
+The workflow's `env:` carries `GOOGLE_ANALYTICS_SECRET` beside the ten store credentials: a dispatched run has no `.env`, so the Measurement Protocol secret the build bakes into `build.js` only reaches it from the repo secrets, and without it every CI-published extension shipped an empty secret and sent no events. A build-mode build of a brand with `analytics.providers.google.id` set now FAILS when the secret is empty ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)).
+
 ### Auto-translation
 
 `npm run build` invokes the `translate` gulp task: reads `src/_locales/en/messages.json`, finds keys missing from the other 16 locales, fills them via Claude CLI. Existing translations are preserved. Languages: `zh es hi ar pt ru ja de fr ko ur id bn tl vi it`. See [docs/translations.md](../../packages/extension/docs/translations.md).
 
+The English source is seeded from the brand: the scaffold renders `appName` / `appNameShort` / `btnTooltip` from `brand.name`, and `appDescription` from `brand.description` when it fits the 200-character store cap — otherwise "The official &lt;brand&gt; browser extension." ([#573](https://github.com/Omega-JS-Stack/omega/issues/573)). All four render through ONE escape — each lands inside a single-quoted JSON5 value, and the brand-name paths used to render raw, so a name carrying an apostrophe seeded an unparseable file ([#592](https://github.com/Omega-JS-Stack/omega/issues/592)). `config/messages.json` is copy-once, so the seed is a starting point, never a rewrite.
+
 ### Build hooks
 
 Two lifecycle hooks let consumers run custom logic during packaging:
-- `hooks/build:pre.js` — after `dist/` is built but before `packaged/` is assembled
-- `hooks/build:post.js` — after packaging (and after store publishing if `OMEGA_IS_PUBLISH=true`)
+- `hooks/build/pre.js` — after `dist/` is built but before `packaged/` is assembled
+- `hooks/build/post.js` — after packaging (and after store publishing if `OMEGA_IS_PUBLISH=true`)
 
-Both receive an `index` build-info object (package, manifest, config, paths, env). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
+The NESTED path is the one the defaults scaffold writes and setup's migration moves flat files to; the package task resolves it first and falls back to the flat pre-migration `hooks/build:pre.js` during the transition. It used to resolve ONLY the flat path, so every migrated consumer's hooks were dead and the miss printed an untagged `console.warn` ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
+
+Both receive the ONE hook-argument shape every OMEGA framework passes — `{ manager, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)) — and everything else comes off `manager` (`getManifest()`, `getConfig()`, `getPackage('project')`). The package task used to pass its internal watch counter while both docs described an `index` build-info object nothing ever built, so a hook written from the docs read `undefined` at its first property ([#591](https://github.com/Omega-JS-Stack/omega/issues/591)). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
 
 ### Cross-context helpers
 
@@ -168,6 +174,8 @@ Four layers:
 - **view** — Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html`. DOM bindings, Manager surface, popup ↔ background messaging.
 - **boot** — real headless Chromium loading the **consumer's** `packaged/<browser>/raw/` as an unpacked extension. End-to-end: does the real packaged extension boot?
 
+The boot layer SKIPS when the consumer has not built: a candidate directory qualifies only when its `manifest.json` is strict JSON, so the intermediate `dist/` (JSON5, and present after any dev run or `omega clean`) is passed over and named in the skip instead of loading and failing every boot test ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). An explicitly named `OMEGA_TEST_BOOT_DIR` still fails loudly — that one is a decision, not a fallback.
+
 A boot test's per-test timeout defaults to **45000ms** — sized for the FIRST run after a fresh build, where the extension's Firebase service worker initializes cold (observed 20-30s; the old 20000 default sat right under it and consumers had to declare a timeout of their own to get a green run, [#262](https://github.com/Omega-JS-Stack/omega/issues/262)). Later runs are far quicker. Declare `timeout` on a test only when THAT test is genuinely slower — never to work around the first-run cost.
 
 Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/test-framework.md](../../packages/extension/docs/test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
@@ -186,7 +194,7 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 | Command | Description |
 |---|---|
-| `setup` | scaffold consumer, copy `src/defaults/`, ensure peer deps. Default when no command given. |
+| `setup` | scaffold consumer, copy `src/defaults/`, ensure peer deps, write the project scripts into `package.json` (npm's trailing newline kept, written only when the content changed — [#572](https://github.com/Omega-JS-Stack/omega/issues/572)). Default when no command given. |
 | `clean` | remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | install peer deps |
 | `deploy` | dispatch the CI publish workflow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |

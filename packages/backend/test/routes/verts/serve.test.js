@@ -8,8 +8,6 @@
  *
  * Run: npx omega test backend:routes/verts/serve
  */
-const BASE_URL = 'http://localhost:5002';
-
 async function seedAds(firestore) {
   // Intra-run isolation: wipe docs left by earlier suites (cache/crud/redirect
   // seed verts too) so the no-fill assertion is deterministic
@@ -73,10 +71,10 @@ module.exports = {
     {
       name: 'serves-self-contained-html-unit',
       timeout: 30000,
-      async run({ assert, firestore }) {
+      async run({ assert, firestore, config }) {
         await seedAds(firestore);
 
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&brand=site-brand&vertId=serve-open`);
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&brand=site-brand&vertId=serve-open`);
         const body = await response.text();
 
         assert.equal(response.status, 200, 'Serve should return 200');
@@ -97,13 +95,13 @@ module.exports = {
     {
       name: 'postmessage-target-preserves-dev-port',
       timeout: 30000,
-      async run({ assert }) {
+      async run({ assert, config }) {
         // A dev site's parent host carries a port (localhost:4100). The unit's
         // postMessage target origin must keep it — a portless 'http://localhost'
         // origin makes the browser silently DROP every dimension report, so
         // house verts would always collapse as no-fill in local dev (found by
         // the verts step 6 company-mode proof).
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=localhost:4100&vertId=serve-open`);
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=localhost:4100&vertId=serve-open`);
         const body = await response.text();
 
         assert.equal(response.status, 200, 'Serve should return 200');
@@ -115,10 +113,10 @@ module.exports = {
     {
       name: 'tag-matching-serves-top-scorer',
       timeout: 30000,
-      async run({ assert }) {
+      async run({ assert, config }) {
         // serve-target is the only vert scoring > 0 for these tags — deterministic
         for (let i = 0; i < 5; i++) {
-          const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&tags=music,audio`);
+          const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&tags=music,audio`);
           const body = await response.text();
 
           assert.equal(response.status, 200, 'Serve should return 200');
@@ -130,10 +128,10 @@ module.exports = {
     {
       name: 'never-serves-an-vert-on-its-own-host',
       timeout: 30000,
-      async run({ assert }) {
+      async run({ assert, config }) {
         // Pin the self-linked vert while requesting from its own link host —
         // the pin is ineligible so another vert (or none) must serve
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=self-test.example&vertId=serve-self`);
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=self-test.example&vertId=serve-self`);
         const body = response.status === 200 ? await response.text() : '';
 
         assert.ok(!body.includes('id=serve-self'), 'A vert must never serve on its own link host');
@@ -143,9 +141,9 @@ module.exports = {
     {
       name: 'no-eligible-verts-returns-204',
       timeout: 30000,
-      async run({ assert }) {
+      async run({ assert, config }) {
         // Every seeded vert blacklists nofill.example
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=nofill.example`);
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=nofill.example`);
 
         assert.equal(response.status, 204, 'No fill should return 204');
       },
@@ -154,8 +152,8 @@ module.exports = {
     {
       name: 'vert-content-is-escaped',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&vertId=serve-xss`);
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&vertId=serve-xss`);
         const body = await response.text();
 
         assert.equal(response.status, 200, 'Serve should return 200');
@@ -169,8 +167,8 @@ module.exports = {
     {
       name: 'theme-and-size-params-are-accepted',
       timeout: 30000,
-      async run({ assert }) {
-        const response = await fetch(`${BASE_URL}/omega/verts/serve?parent=site.example&vertId=serve-open&width=300&height=250&theme=dark`);
+      async run({ assert, config }) {
+        const response = await fetch(`${config.apiUrl}/omega/verts/serve?parent=site.example&vertId=serve-open&width=300&height=250&theme=dark`);
         const body = await response.text();
 
         assert.equal(response.status, 200, 'Serve should return 200');

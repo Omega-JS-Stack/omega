@@ -50,6 +50,20 @@ const BUNDLE = path.join(BUNDLE_DIR, 'refund.cjs');
 let building = null;
 
 /** The file with its comments blanked, line structure intact. */
+/**
+ * Blank out TEMPLATE comments (HTML, Liquid, and a YAML frontmatter `#` line)
+ * while keeping the line count, so a static scan reads code only.
+ * @param {string} source
+ * @returns {string}
+ */
+function templateCodeOnly(source) {
+  const blank = (match) => match.replace(/[^\n]/g, ' ');
+  return source
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/\{%-?\s*comment\s*-?%\}[\s\S]*?\{%-?\s*endcomment\s*-?%\}/g, blank)
+    .replace(/^\s*#.*$/gm, blank);
+}
+
 function codeOnly(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
@@ -341,5 +355,43 @@ test('#306: no file in core/js or the theme layer calls a provider global bare',
     offenders,
     [],
     `fire the canonical event instead — event('<catalog name>', params) from __main_assets__/js/libs/analytics.js — so a blocked provider cannot take the action with it (#306):\n${offenders.join('\n')}`,
+  );
+});
+
+test('#606: no TEMPLATE names a provider global either — no stubs, no inline pixels', () => {
+  // foot.html used to define empty `gtag`/`fbq`/`ttq` for an unconfigured
+  // provider. The guarded transport already reads a missing global as a silent
+  // skip, so the stubs only made a pixel that never loaded look present — and
+  // an inline snippet in the chrome is what made the old cookie banner
+  // decorative (#383). The template surfaces stay clear of all three names.
+  const NAMES = /\bgtag\b|\bfbq\b|\bttq\b/;
+  const TEMPLATE_EXT = /\.(html|md|liquid|json|json5|xml|txt)$/;
+  const offenders = [];
+
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === 'bootstrap') continue;
+        walk(full);
+        continue;
+      }
+      if (!TEMPLATE_EXT.test(entry.name)) continue;
+
+      // Comments BLANKED, line structure intact (the codeOnly idiom above,
+      // for template comment syntax): a name explained in an HTML or Liquid
+      // comment is documentation, not a snippet.
+      templateCodeOnly(fs.readFileSync(full, 'utf8')).split('\n').forEach((line, index) => {
+        if (NAMES.test(line)) offenders.push(`${path.relative(PKG, full)}:${index + 1}: ${line.trim()}`);
+      });
+    }
+  };
+
+  for (const surface of ['core', 'defaults', 'themes', 'scaffold']) walk(path.join(PKG, surface));
+
+  assert.deepStrictEqual(
+    offenders,
+    [],
+    `a provider global has no home in a template (#606) — the loader installs it after consent, and the transport guards every call:\n${offenders.join('\n')}`,
   );
 });

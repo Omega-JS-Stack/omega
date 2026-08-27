@@ -29,14 +29,21 @@ const { parseRoot } = require('./edit.js');
 // into role-shaped homes — `repo`, `edge`, `captcha`, `search`, `forms`,
 // `inbound` — and folded `firebase`/`gcp` into `cloud`. Only the TOP level is
 // ordered, so each fold is one entry here; the nesting under it is authored.
+// Every SHARED_SCHEMA top-level key belongs here — the drift guard in
+// test/order.test.js fails the moment the schema grows one this list misses
+// (#503: socials, github, directory, ports, client had drifted out), and its
+// REVERSE guard fails on a key that is neither schema-known nor a named
+// manager-owned block (#484 retired `testing`: no schema rule, and the testing
+// service reads no config at all, so converters were carrying a dead key).
 const CANONICAL_TOP_LEVEL_ORDER = [
-  'enabled', 'parent', 'brand', 'company', 'account', 'local', 'repo', 'domain',
+  'enabled', 'parent', 'brand', 'meta', 'company', 'socials', 'account', 'local', 'ports',
+  'repo', 'github', 'domain',
   'edge', 'cloud', 'captcha', 'analytics',
   'monitoring', 'advertising', 'payment', 'oauth2', 'sponsorships',
   'marketing', 'blog', 'devlog', 'reviews', 'seo', 'search',
-  'testing', 'dataRequest', 'forms', 'inbound',
-  'server', 'assets',
-  'certificates', 'theme', 'translation', 'migrations', 'targets',
+  'dataRequest', 'forms', 'inbound',
+  'server', 'assets', 'directory',
+  'certificates', 'theme', 'translation', 'client', 'migrations', 'targets',
 ];
 
 /**

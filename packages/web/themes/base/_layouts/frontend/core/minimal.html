@@ -1,21 +1,28 @@
 ---
 layout: frontend/core/base
 
-theme:
-  nav:
-    enabled: true
-  # main:
-  #   class: ""
-  footer:
-    enabled: true
+config:
+  theme:
+    nav:
+      enabled: true
+    # main:
+    #   class: ""
+    footer:
+      enabled: true
 ---
 
 <!-- ═══ Masthead (document pages: legal, plain-markdown content) ═══ -->
 <section class="omega-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
-    <h1 class="omega-display omega-display--page" data-omega-reveal>
-      {{ resolved.meta.breadcrumb }}
-    </h1>
+    {% comment %} #491: the h1 is gated on its own arg. Rendered
+    unconditionally it shipped a BLANK first h1 on every page that authors no
+    breadcrumb — and a body carrying its own title then shipped two, the first
+    empty (the checklist's one-h1 rule). {% endcomment %}
+    {% iftruthy resolved.meta.breadcrumb %}
+      <h1 class="omega-display omega-display--page" data-omega-reveal>
+        {{ resolved.meta.breadcrumb }}
+      </h1>
+    {% endiftruthy %}
     {% iftruthy resolved.meta.description %}
       <p class="omega-hero-split__sub" data-omega-reveal>
         {{ resolved.meta.description }}

@@ -25,9 +25,9 @@ const { test } = require('node:test');
 const { buildAssets } = require('../../src/assets.js');
 const { watchAssetSources } = require('../../src/commands/dev.js');
 
-// The rebuild deadline scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
-const POLL_MS = 50;
+// The rebuild deadline scales with the lane's load knob (#211) and with this
+// machine's measured contention (#615).
+const { buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
 // A recursive watcher is not listening the instant it is created (the rescan
 // lane pays the same settle window in live-decisions.test.js).
 const SETTLE_MS = 500;
@@ -95,17 +95,27 @@ function app(t) {
  * names, no minify) and arm the asset lane's watchers over it.
  */
 async function startWatch(t, fixture) {
-  const build = (only) => buildAssets({
-    layers: [fixture.assets],
-    themeRoots: [],
-    sectionRoots: [fixture.assets],
-    themesDir: path.join(fixture.core, 'themes'),
-    coreDir: fixture.core,
-    outDir: fixture.out,
-    clientEntry: path.join(fixture.clientDist, 'index.js'),
-    dev: true,
-    only,
-  });
+  // What the watcher actually did, for a timeout's failure message (#615) —
+  // here the asset build IS the rebuild, so it records itself.
+  const builds = buildRecorder();
+  const build = async (only) => {
+    builds.onStart();
+    try {
+      return await buildAssets({
+        layers: [fixture.assets],
+        themeRoots: [],
+        sectionRoots: [fixture.assets],
+        themesDir: path.join(fixture.core, 'themes'),
+        coreDir: fixture.core,
+        outDir: fixture.out,
+        clientEntry: path.join(fixture.clientDist, 'index.js'),
+        dev: true,
+        only,
+      });
+    } finally {
+      builds.onFinish();
+    }
+  };
 
   await build();
 
@@ -131,16 +141,8 @@ async function startWatch(t, fixture) {
 
   return {
     bundle,
-    async bundleBecomes(pattern, message) {
-      const deadline = Date.now() + REBUILD_DEADLINE_MS;
-      let built = bundle();
-
-      while (!pattern.test(built) && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-        built = bundle();
-      }
-
-      assert.match(built, pattern, message);
+    bundleBecomes(pattern, message) {
+      return waitForRebuild({ read: bundle, pattern, message, builds });
     },
   };
 }

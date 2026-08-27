@@ -10,6 +10,7 @@
 const safeCompare = require('../safe-compare.js');
 const redactSecret = require('../redact-secret.js');
 const { healUserDoc, isUserDoc } = require('../../libraries/user-doc.js');
+const env = require('../../libraries/env.js');
 
 const methods = {
   async authenticate(options) {
@@ -21,7 +22,7 @@ const methods = {
     const data = self.request.data;
 
     // Get stored admin key
-    const OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || '';
+    const OMEGA_ADMIN_KEY = env.get('OMEGA_ADMIN_KEY') || '';
 
     // Build the ID token from the request
     let idToken;

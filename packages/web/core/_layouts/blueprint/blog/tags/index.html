@@ -2,9 +2,10 @@
 layout: frontend/pages/blog/tags/index
 
 meta:
-  title: "Blog Tags - {{ site.brand.name }}"
-  description: "Browse all blog tags on {{ site.brand.name }}."
+  title: "Blog Tags - {{ resolved.config.brand.name }}"
+  description: "Browse all blog tags on {{ resolved.config.brand.name }}."
   breadcrumb: "Tags"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 ---
 
 {{ content | omega_content_format }}

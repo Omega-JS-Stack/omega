@@ -19,5 +19,10 @@ module.exports = () => f.object({
   // Checkout simulation — honored ONLY by the test provider (itself
   // non-production), ignored everywhere else. Request-only: it is never
   // persisted onto the intent or the order.
-  simulate: f.string({ default: null, enum: ['decline'] }),
+  //
+  // `abandon` is the checkout nobody finishes: the session is created and the
+  // provider never sends an event, because none happened. It is the only way to
+  // reach the state the abandoned-cart lane exists for
+  // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+  simulate: f.string({ default: null, enum: ['decline', 'abandon'] }),
 });

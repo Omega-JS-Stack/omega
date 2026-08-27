@@ -58,7 +58,7 @@
                framework never loads an external image at runtime. A brand
                replaces them through client.exitPopup.config.avatars, and an
                explicit empty list drops back to neutral glyph slots. -->
-          {% assign _exit_avatars = resolved.client.exitPopup.config.avatars %}
+          {% assign _exit_avatars = resolved.config.client.exitPopup.config.avatars %}
           {% unless _exit_avatars %}
             {% assign _exit_avatars = "/assets/images/core/exit-popup/subscriber-1.jpg,/assets/images/core/exit-popup/subscriber-2.jpg,/assets/images/core/exit-popup/subscriber-3.jpg,/assets/images/core/exit-popup/subscriber-4.jpg" | split: "," %}
           {% endunless %}
@@ -97,34 +97,43 @@
     // The app's own package version — @omega.js/client tags every error report
     // `brand.id@version` and falls back to buildTime without it (#380).
     version: {{ site.omega.version | jsonify }},
-    brand: {{ resolved.brand | jsonify }},
-    advertising: {{ resolved.advertising | jsonify }},
+    brand: {{ resolved.config.brand | jsonify }},
+    advertising: {{ resolved.config.advertising | jsonify }},
     // Company layer (verts source: 'company' resolves company.url → api URL)
-    company: {{ resolved.company | jsonify }},
+    company: {{ resolved.config.company | jsonify }},
     // Canonical providers shape straight through (C4 cp106a — no flatten
     // bridge; secrets never ride: omega.json5 carries ids only)
-    analytics: {{ resolved.analytics | jsonify }},
+    analytics: {{ resolved.config.analytics | jsonify }},
     // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
     // (#380, reshaped #425). DSN presence IS the switch, and the provider block
-    // feeds @omega.js/monitoring, which applies the shared defaults. Emitted
-    // BEFORE the client loop so an explicit `client.sentry` still wins — the
-    // same precedence @omega.js/extension's webpack mapping gives it.
-    {% assign sentryConfig = resolved.monitoring.providers.sentry %}
-    sentry: { enabled: {% if sentryConfig.dsn %}true{% else %}false{% endif %}, config: {% if sentryConfig %}{{ sentryConfig | jsonify }}{% else %}{}{% endif %} },
-    {% for item in resolved.client %}
+    // feeds @omega.js/monitoring, which applies the shared defaults.
+    {% assign sentryConfig = resolved.config.monitoring.providers.sentry %}
+    // The off state rides BEFORE the client loop, so a brand still parked at a
+    // legacy `client.sentry` keeps reporting until the one-time migration
+    // moves it (#485 part 3).
+    {% unless sentryConfig.dsn %}
+      sentry: { enabled: false, config: {} },
+    {% endunless %}
+    {% for item in resolved.config.client %}
       {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
     {% endfor %}
-    env: {{ resolved.client.env | jsonify }},
-    captcha: {{ resolved.captcha | jsonify }},
+    // A real DSN at the canonical home rides AFTER the loop and wins (#485):
+    // the one error-reporting config seam outranks a stale client blob the two
+    // keys' coexistence would otherwise decide by accident.
+    {% if sentryConfig.dsn %}
+      sentry: { enabled: true, config: {{ sentryConfig | jsonify }} },
+    {% endif %}
+    env: {{ resolved.config.client.env | jsonify }},
+    captcha: {{ resolved.config.captcha | jsonify }},
     // Role sections the page/client runtime reads directly (#23): the contact
     // page's form endpoint and the chat widget's agent + settings. CURATED to
     // those leaves at their real paths — the provisioning-only siblings
     // (template ids, plan, update flags, sponsorshipsUrl) never go public.
-    {% assign slapform = resolved.forms.providers.slapform %}
+    {% assign slapform = resolved.config.forms.providers.slapform %}
     forms: {% if slapform %}{ providers: { slapform: { formId: {{ slapform.formId | jsonify }} } } }{% else %}null{% endif %},
-    {% assign chatsy = resolved.inbound.chat.providers.chatsy %}
+    {% assign chatsy = resolved.config.inbound.chat.providers.chatsy %}
     inbound: {% if chatsy %}{ chat: { providers: { chatsy: { enabled: {{ chatsy.enabled | jsonify }}, agentId: {{ chatsy.agentId | jsonify }}, settings: {{ chatsy.settings | jsonify }} } } } }{% else %}null{% endif %},
-    oauth2: {{ resolved.oauth2 | jsonify }},
+    oauth2: {{ resolved.config.oauth2 | jsonify }},
   };
 </script>
 
@@ -180,57 +189,37 @@
      snippets directly is what made the old cookie banner decorative — every
      pixel had already fired by the time it appeared.
 
-     The stubs below survive for the UNCONFIGURED case only: a site with no id
-     for a provider still has page code naming the global, and #306's guarded
-     wrappers read a stub as "present". A CONFIGURED provider gets no stub — its
-     global appears when (and only when) the loader injects it. -->
-{% iffalsy resolved.analytics.providers.google.id %}
-  <script type="text/javascript">
-    function gtag() {};
-  </script>
-{% endiffalsy %}
-{% iffalsy resolved.analytics.providers.meta.id %}
-  <script type="text/javascript">
-    function fbq() {};
-  </script>
-{% endiffalsy %}
-{% iffalsy resolved.analytics.providers.tiktok.id %}
-  <script type="text/javascript">
-    window.ttq = {
-      load: function () {},
-      page: function () {},
-      track: function () {},
-      identify: function () {},
-    }
-  </script>
-{% endiffalsy %}
+     No stub for an unconfigured provider (#606): the guarded browser transport
+     (@omega.js/analytics/transports/browser) checks `typeof` per provider and a
+     missing global is a SILENT no-op, so an empty gtag/fbq/ttq only made a
+     provider that never loaded look present. -->
 
 <!-- Script - Google Adsense -->
 {% comment %}
-{% iftruthy resolved.advertising.providers.adsense.client %}
+{% iftruthy resolved.config.advertising.providers.adsense.client %}
   <!-- client is the embed-ready ca-pub-… form (schema) — never prefix it -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ resolved.advertising.providers.adsense.client }}" crossorigin="anonymous"></script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ resolved.config.advertising.providers.adsense.client }}" crossorigin="anonymous"></script>
 {% endiftruthy %}
 {% endcomment %}
 
 <!-- The brand's schema.org type — the node every other block cross-references
-     as "<site.url>#<type>". `brand.type` is optional config, so it carries the
+     as "<resolved.config.url>#<type>". `brand.type` is optional config, so it carries the
      framework default here (#271): an empty type shipped invalid structured
      data ("@type": "") and collapsed every @id anchor to a bare "#". -->
-{% assign brand-type = site.brand.type | default: "Organization" %}
+{% assign brand-type = resolved.config.brand.type | default: "Organization" %}
 
 <!-- Schema - Breadcrumbs -->
 <!-- Only include the https://schema.org if size > -1 because it throws an error on Google Search Console if the itemListElement is empty -->
 {% assign breadcrumbs = page.url | split: "/" %}
 {% assign breadcrumbs = page.url | split: "/" %}
 {% assign breadcrumbs-size = breadcrumbs | size | minus: 1 %}
-{% assign breadcrumb-url = site.url %}
+{% assign breadcrumb-url = resolved.config.url %}
 <script id="omega-schema-breadcrumbs" type="application/ld+json">
   {
     {% if breadcrumbs-size > -1 %}
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
-      "name": "{{ site.brand.name | omega_json_escape }}",
+      "name": "{{ resolved.config.brand.name | omega_json_escape }}",
     {% endif %}
     "itemListElement": [
       {%- for breadcrumb in breadcrumbs -%}
@@ -255,13 +244,13 @@
   {
     "@context": "http://schema.org",
     "@type": "{{ brand-type }}",
-    "@id": "{{ site.url }}#{{ brand-type }}",
-    "url": "{{ site.url }}",
-    "name": "{{ site.brand.name | omega_json_escape }}",
-    "description": "{{ site.brand.description | omega_json_escape }}",
-    "logo": "{% omega_external site.brand.images.brandmark %}",
+    "@id": "{{ resolved.config.url }}#{{ brand-type }}",
+    "url": "{{ resolved.config.url }}",
+    "name": "{{ resolved.config.brand.name | omega_json_escape }}",
+    "description": "{{ resolved.config.brand.description | omega_json_escape }}",
+    "logo": "{% omega_external resolved.config.brand.images.brandmark %}",
     "sameAs": [
-      {%- for social in site.socials -%}
+      {%- for social in resolved.config.socials -%}
         {% assign platform = social[0] %}
         {% assign username = social[1] %}
 
@@ -270,20 +259,20 @@
         {%- endiftruthy -%}
       {%- endfor -%}
 
-      "{{ site.url }}"
+      "{{ resolved.config.url }}"
     ],
     "address": {
       "@type": "PostalAddress",
-      "addressLocality": "{{ site.brand.address.locality }}",
-      "addressCountry": "{{ site.brand.address.country }}"
+      "addressLocality": "{{ resolved.config.brand.address.locality }}",
+      "addressCountry": "{{ resolved.config.brand.address.country }}"
     },
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "Customer Support",
-      "email": "{{ site.brand.contact.email | omega_json_escape }}",
-      "url": "{{ site.url }}/contact"
+      "email": "{{ resolved.config.brand.contact.email | omega_json_escape }}",
+      "url": "{{ resolved.config.url }}/contact"
     },
-    "telephone": "{{ site.brand.contact.phone | omega_json_escape }}",
+    "telephone": "{{ resolved.config.brand.contact.phone | omega_json_escape }}",
     "areaServed": {
       "@type": "Place",
       "name": "Worldwide"
@@ -291,9 +280,9 @@
     {% comment %}
       "founder": {
         "@type": "Person",
-        "name": "{{ site.brand.founder }}"
+        "name": "{{ resolved.config.brand.founder }}"
       },
-      "slogan": "{{ site.brand.slogan }}",
+      "slogan": "{{ resolved.config.brand.slogan }}",
       "hasOfferCatalog": {
         "@type": "OfferCatalog",
         "name": "Our Services",
@@ -302,7 +291,7 @@
             "@type": "Offer",
             "itemOffered": {
               "@type": "Service",
-              "name": "{{ site.brand.service }}"
+              "name": "{{ resolved.config.brand.service }}"
             }
           }
         ]
@@ -316,17 +305,17 @@
   {
     "@context": "http://schema.org",
     "@type": "WebSite",
-    "@id": "{{ site.url }}#WebSite",
-    "url": "{{ site.url }}",
-    "name": "{{ site.brand.name | omega_json_escape }}",
+    "@id": "{{ resolved.config.url }}#WebSite",
+    "url": "{{ resolved.config.url }}",
+    "name": "{{ resolved.config.brand.name | omega_json_escape }}",
     "potentialAction": {
       "@type": "SearchAction",
       {%- comment -%} The blog index IS the site's search surface: it reads ?q= on load {%- endcomment -%}
-      "target": "{{ site.url }}/blog?q={search_term_string}",
+      "target": "{{ resolved.config.url }}/blog?q={search_term_string}",
       "query-input": "required name=search_term_string"
     },
     "publisher": {
-      "@id": "{{ site.url }}#{{ brand-type }}"
+      "@id": "{{ resolved.config.url }}#{{ brand-type }}"
     }
   }
 </script>
@@ -337,8 +326,8 @@
     {
       "@context": "http://schema.org",
       "@type": "BlogPosting",
-      "@id": "{{ site.url }}{{ page.url }}#BlogPosting",
-      "url": "{{ site.url }}{{ page.url }}",
+      "@id": "{{ resolved.config.url }}{{ page.url }}#BlogPosting",
+      "url": "{{ resolved.config.url }}{{ page.url }}",
       "name": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
       "description": "{{ resolved.post.description | omega_liquify | omega_json_escape }} ",
       "headline": "{{ resolved.post.title | omega_liquify | omega_json_escape }}",
@@ -350,19 +339,19 @@
         "url": "{%- omega_member resolved.post.author, "url" -%}#Person"
       },
       "publisher": {
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       },
       "isPartOf": {
-        "@id": "{{ site.url }}/blog"
+        "@id": "{{ resolved.config.url }}/blog"
       },
       "mainEntityOfPage": {
-        "@id": "{{ site.url }}{{ page.url }}"
+        "@id": "{{ resolved.config.url }}{{ page.url }}"
       },
       "image": {
         "@type": "ImageObject",
-        "url": "{{ site.url }}{%- omega_post resolved.post.id, "image" -%}"
+        "url": "{{ resolved.config.url }}{%- omega_post resolved.post.id, "image" -%}"
       },
-      "inLanguage": "{{ site.translation.default |  default: 'en' }}"
+      "inLanguage": "{{ resolved.config.translation.default |  default: 'en' }}"
     }
   </script>
 {% endiftruthy %}
@@ -378,16 +367,16 @@
       "name": "{%- omega_member resolved.member.id, "name" -%}",
       "image": {
         "@type": "ImageObject",
-        "url": "{{ site.url }}{%- omega_member resolved.member.id, "image" -%}"
+        "url": "{{ resolved.config.url }}{%- omega_member resolved.member.id, "image" -%}"
       },
       "jobTitle": "Blog Author",
       "worksFor": {
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       }
       {% comment %}
       "sameAs": [
         resolved.team.socials
-        {%- for social in site.socials -%}
+        {%- for social in resolved.config.socials -%}
           {% assign platform = social[0] %}
           {% assign username = social[1] %}
 
@@ -407,20 +396,20 @@
     {
       "@context": "http://schema.org",
       "@type": "Product",
-      "@id": "{{ site.url }}{{ page.url }}#Product",
-      "url": "{{ site.url }}{{ page.url }}",
+      "@id": "{{ resolved.config.url }}{{ page.url }}#Product",
+      "url": "{{ resolved.config.url }}{{ page.url }}",
       "name": "{{ resolved.product.title | omega_liquify }}",
       "description": "{{ resolved.product.description | omega_liquify }}",
       "image": [
-        "{{ site.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
+        "{{ resolved.config.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
       ],
       "brand": {
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       },
       "offers": {
         "@type": "Offer",
-        "url": "{{ site.url }}{{ page.url }}",
-        "priceCurrency": "{{ site.currency }}",
+        "url": "{{ resolved.config.url }}{{ page.url }}",
+        "priceCurrency": "{{ resolved.config.currency }}",
         "price": "{{ resolved.product.price }}",
         "itemCondition": "http://schema.org/NewCondition",
         "availability": "http://schema.org/InStock"
@@ -432,7 +421,7 @@
 <!-- Schema - SoftwareApplication -->
 {%- iftruthy resolved.schema.software_application.enabled -%}
   {% assign sa = resolved.schema.software_application %}
-  {% assign sa-hash-seed = sa.hash_seed | default: site.url %}
+  {% assign sa-hash-seed = sa.hash_seed | default: resolved.config.url %}
   {% assign sa-rating-rand = sa-hash-seed | omega_hash: 2 %}
   {% if sa-rating-rand == 0 %}
     {% assign sa-rating-value = "4.8" %}
@@ -445,9 +434,9 @@
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "@id": "{{ site.url }}{{ page.url }}#SoftwareApplication",
-      "url": "{{ site.url }}{{ page.url }}",
-      "name": "{{ sa.name | default: site.brand.name }}",
+      "@id": "{{ resolved.config.url }}{{ page.url }}#SoftwareApplication",
+      "url": "{{ resolved.config.url }}{{ page.url }}",
+      "name": "{{ sa.name | default: resolved.config.brand.name }}",
       "description": "{{ sa.description | default: resolved.meta.description | omega_liquify }}",
       "applicationCategory": "{{ sa.application_category | default: 'WebApplication' }}",
       "operatingSystem": "{{ sa.operating_system | default: 'Web-based' }}",
@@ -458,12 +447,12 @@
         "availability": "https://schema.org/InStock"
       },
       "provider": {
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       },
       "publisher": {
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       },
-      "image": "{% omega_external site.brand.images.brandmark %}",
+      "image": "{% omega_external resolved.config.brand.images.brandmark %}",
       {% iftruthy sa.features %}
       "featureList": {{ sa.features | jsonify }},
       {% endiftruthy %}
@@ -484,13 +473,13 @@
     {
       "@context": "http://schema.org",
       "@type": "ContactPage",
-      "@id": "{{ site.url }}{{ page.url }}#ContactPage",
-      "url": "{{ site.url }}{{ page.url }}",
+      "@id": "{{ resolved.config.url }}{{ page.url }}#ContactPage",
+      "url": "{{ resolved.config.url }}{{ page.url }}",
       "name": "{{ resolved.meta.title | omega_liquify }}",
       "description": "{{ resolved.meta.description | omega_liquify }}",
       "mainEntity": {
         "@type": "Organization",
-        "@id": "{{ site.url }}#{{ brand-type }}"
+        "@id": "{{ resolved.config.url }}#{{ brand-type }}"
       }
     }
   </script>
@@ -519,7 +508,7 @@
       {
         "@context": "https://schema.org",
         "@type": "FAQPage",
-        "@id": "{{ site.url }}{{ page.url }}#FAQPage",
+        "@id": "{{ resolved.config.url }}{{ page.url }}#FAQPage",
         "mainEntity": [
           {%- for item in faq_items -%}
             {

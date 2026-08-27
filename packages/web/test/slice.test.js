@@ -228,6 +228,30 @@ test('taxonomy pages generated from post.categories / post.tags', () => {
   assert.ok(pages.get('/blog/tags/automation').includes('Second post'), 'tag page');
 });
 
+test('#504: the root chrome stamps no attribute from a key the schema never had', () => {
+  // `data-theme-target` interpolated `resolved.theme.target` — a legacy UJM
+  // key the omega schema does not know, read by no CSS selector and no JS. A
+  // brand that correctly drops it rendered the attribute empty.
+  for (const url of ['/', '/pricing', '/blog/first-post']) {
+    assert.ok(!pages.get(url).includes('data-theme-target'), `${url}: the dead attribute is gone`);
+  }
+  assert.ok(pages.get('/').includes('data-theme-id="classy"'), 'the LIVE theme stamps stay');
+});
+
+test('#488: a term with `&` links the slug its own page is generated at', () => {
+  // Two slugifiers used to answer this term: Eleventy's universal `slugify`
+  // filter (`&` → "and") where posts and the tag cloud LINK it, template-kit's
+  // where the taxonomy page is GENERATED. Every term containing `&` shipped a
+  // guaranteed dead link, and `omega test`'s own link check failed the build on
+  // framework output. ONE slugifier answers both sides now.
+  const post = pages.get('/blog/first-post');
+  const linked = [...post.matchAll(/href="(\/blog\/tags\/[^"]+)"/g)].map((m) => m[1]);
+
+  assert.ok(linked.includes('/blog/tags/a-r'), `the post links the term at ${linked.join(', ')}`);
+  assert.ok(!linked.includes('/blog/tags/a-and-r'), 'no "and" spelling survives on the link side');
+  assert.ok(pages.has('/blog/tags/a-r'), 'and that is the page the build wrote');
+});
+
 test('alternatives collection: permalink convention + comparison content', () => {
   const html = pages.get('/alternatives/acme-growth');
   assert.ok(html.includes('MiniCo vs'), 'site brand in the layout-default hero headline');

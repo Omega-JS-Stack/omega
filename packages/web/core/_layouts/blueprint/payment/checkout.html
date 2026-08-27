@@ -1,14 +1,15 @@
 ---
 layout: frontend/pages/payment/checkout
 
-theme:
-  css:
-    bundle: "classy"
-
 meta:
-  title: "Checkout - {{ site.brand.name }}"
-  description: "Complete your purchase on {{ site.brand.name }}."
+  title: "Checkout - {{ resolved.config.brand.name }}"
+  description: "Complete your purchase on {{ resolved.config.brand.name }}."
   breadcrumb: "Checkout"
+  index: false      # #564: noindex, and out of sitemap.xml with it
+config:
+  theme:
+    css:
+      bundle: "classy"
 ---
 
 {{ content | omega_content_format }}

@@ -6,7 +6,7 @@
 
 | Command | Aliases | Purpose |
 |---|---|---|
-| `setup` | `-s`, `--setup` | Scaffold a consumer project (copy `src/defaults/`, install peer deps, write projectScripts). Default when no command given. |
+| `setup` | `-s`, `--setup` | Scaffold a consumer project (copy `src/defaults/`, install peer deps, write projectScripts). Default when no command given. The `package.json` write carries npm's own trailing newline and happens only when the content changed ([#572](https://github.com/Omega-JS-Stack/omega/issues/572)). |
 | `clean` | `-c`, `--clean` | Remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `deploy` | `-d`, `--deploy` | Dispatch the extension's CI publish workflow — `publish.yml` standalone, the composed `<target>-publish.yml` inside a brand monorepo ([defaults.md](defaults.md#brand-monorepos); see docs/shared/deploys.md in the Omega repo) |

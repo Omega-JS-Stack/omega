@@ -732,7 +732,9 @@ test('company layer: the brand root itself reads its own stamp; an unstamped bra
   assert.strictEqual(loadConfig(brandRoot).config.monitoring.providers.sentry.org, 'acme-co');
 
   fs.rmSync(path.join(brandRoot, '.omega'), { recursive: true, force: true });
-  assert.strictEqual(loadConfig(brandRoot).config.monitoring, undefined);
+  // The company's own values are gone; what remains under `monitoring` is the
+  // schema-default layer every config carries (#478), never an inherited fact.
+  assert.strictEqual(loadConfig(brandRoot).config.monitoring.providers?.sentry?.org, undefined);
   assert.strictEqual(loadConfig(brandRoot).files.company, null);
 });
 

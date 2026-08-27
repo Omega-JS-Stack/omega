@@ -8,9 +8,12 @@
  * Like secrets.js this is a key-NAME test, walked at every depth (shared
  * level, inside a target entry, inside an instance array) — the rename moved
  * the key, not its home. Only unambiguous renames belong here: a name that
- * still exists as a legitimate key somewhere in the schema (`sentry`, which
- * lives on as `client.sentry`; `google`/`meta` under `analytics.providers`)
- * would false-positive and is left to the mapping tables.
+ * still exists as a legitimate key somewhere in the schema (`google`/`meta`
+ * under `analytics.providers`) would false-positive and is left to the mapping
+ * tables. `sentry` is the one that LOOKS like an omission and is not: its new
+ * home is itself a `sentry` key (`monitoring.providers.sentry` — #485 moved
+ * the web converter there too), so a name test would fire on the very shape
+ * every mapping row points at.
  *
  * RETIRED_PATHS is the second half (#23): the de-branding rekey moved whole
  * top-level keys into role-shaped homes where the provider keeps its own
@@ -203,6 +206,23 @@ const RETIRED_PATHS = {
   'blog.provider': {
     replacement: 'blog.providers.ghostii',
     why: "one provider shape everywhere (#425) — the blog writer is a KEY under `blog.providers`; `blog.enabled` and `blog.content` stay role-level (content is pipeline config)",
+  },
+
+  // ─── one home for the download/extension links (#610) ──────────────────
+  // The legacy UJM page maps survived beside the derivation #85/#124 added,
+  // so explicit config could silently override the release the desktop target
+  // actually ships. Matched at their AUTHORED path: `targets.web` is where the
+  // converter wrote them and where every carrying brand still has them, and
+  // the merged targets map rides every resolved config, so one row fires once
+  // for every target load (a root `download` on a web load is the same key
+  // overlaid, not a second mistake).
+  'targets.web.download': {
+    replacement: 'targets.desktop.releases',
+    why: 'two homes for one fact (#610) — the /download page and its shortlinks derive from the desktop target\'s releases block, curated onto site.targets.desktop.releasesUrl; a hand-written map could point at a release that does not exist',
+  },
+  'targets.web.extension': {
+    replacement: 'targets.extension.listings',
+    why: 'two homes for one fact (#610) — the /extension page and its shortlinks read the extension target\'s store listings, curated onto site.targets.extension.listings',
   },
 };
 

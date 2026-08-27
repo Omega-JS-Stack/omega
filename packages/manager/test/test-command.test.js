@@ -42,7 +42,7 @@ function write(filePath, content) {
  * backend target (functions/ layout), plus fake @omega.js/web + @omega.js/backend
  * packages hoisted to the brand root.
  */
-function stageBrand() {
+function stageBrand({ backend = {}, backendScripts } = {}) {
   // realpath: macOS tmpdir is a symlink (/var → /private/var) and spawned
   // children report the real cwd
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-test-cmd-')));
@@ -53,7 +53,7 @@ function stageBrand() {
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, backend: {} },
+  targets: { web: {}, backend: ${JSON.stringify(backend)} },
 }
 `);
 
@@ -66,6 +66,7 @@ function stageBrand() {
   // RUNTIME dependency on the ONE target package.json — no functions/ manifest.
   write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
+    ...(backendScripts ? { scripts: backendScripts } : {}),
   }));
   write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
@@ -185,4 +186,40 @@ test('cli routes `test` through ALIASES to the command file', () => {
   const Main = require('../src/cli.js');
   assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'test'));
   assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'test.js')));
+});
+
+// ─── A backend in custom-server mode (#584) ──────────────────────────────────
+
+// Its framework `omega test` is the EMULATOR lane and refuses in that mode, so
+// the fan-out runs the target's own `test` script instead — the same lane a
+// custom target takes, scope vocabulary and all.
+const RECORDING_SCRIPT = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'backend-script',cwd:process.cwd(),argv:process.argv.slice(1)})+'\\n')\"";
+
+test("custom-server backend: a bare run takes its own `test` script, and no framework id is forwarded", async () => {
+  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
+
+  await runTestCommand(brand, []);
+
+  const calls = readCalls(brand);
+  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the website its framework bin');
+  const script = calls.find((c) => c.name === 'backend-script');
+  assert.equal(script.cwd, path.join(brand, 'targets', 'backend'));
+  assert.deepEqual(script.argv, [], 'a package script hears no scope ids and no flags');
+});
+
+test('custom-server backend: a SCOPED run never addresses it — the scope vocabulary is the frameworks\'', async () => {
+  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
+
+  await runTestCommand(brand, ['backend:']);
+
+  assert.deepEqual(readCalls(brand), [], 'nothing ran: the scoped id means nothing to a package script');
+});
+
+test('custom-server backend with no `test` script: skipped loudly on a bare run, never failed', async () => {
+  const { brand } = stageBrand({ backend: { projectType: 'custom' } });
+
+  const code = await runTestCommand(brand, []);
+
+  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], 'only the website ran');
+  assert.equal(code, undefined, 'an absent script is a brand that has not wired it, not a failure');
 });

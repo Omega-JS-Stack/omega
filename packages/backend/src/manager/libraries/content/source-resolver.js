@@ -26,6 +26,7 @@ const crypto = require('crypto');
 const fetch = require('wonderful-fetch');
 
 const { parseFeed, extractArticleContent } = require('./feed-parser.js');
+const env = require('../env.js');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const FEED_PREFIX = '$feed:';
@@ -218,7 +219,7 @@ async function loadParentPool(state) {
       // omega-admin-key header (sent below); legacy-BEM parents read exactly
       // this query field. DUAL-SEND until every parent runs the new stack,
       // then delete this field — never "fix" unilaterally.
-      backendManagerKey: process.env.OMEGA_ADMIN_KEY,
+      backendManagerKey: env.get('OMEGA_ADMIN_KEY'),
     };
 
     if (category) {
@@ -230,7 +231,7 @@ async function loadParentPool(state) {
       response: 'json',
       timeout: 60000,
       headers: {
-        'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+        'omega-admin-key': env.get('OMEGA_ADMIN_KEY'),
       },
       query: query,
     }).catch((e) => {

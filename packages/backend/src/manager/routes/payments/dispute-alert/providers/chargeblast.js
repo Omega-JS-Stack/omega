@@ -17,6 +17,7 @@
  */
 const crypto = require('crypto');
 const safeCompare = require('../../../../helpers/safe-compare.js');
+const env = require('../../../../libraries/env.js');
 
 // The Svix signature version this provider emits and we verify
 const SIGNATURE_VERSION = 'v1';
@@ -37,7 +38,7 @@ module.exports = {
    *   - status: 'verified' | 'invalid' | 'unconfigured'
    */
   verifySignature(req) {
-    const secret = process.env.CHARGEBLAST_WEBHOOK_SECRET;
+    const secret = env.get('CHARGEBLAST_WEBHOOK_SECRET');
 
     if (!secret) {
       return { status: 'unconfigured', reason: 'CHARGEBLAST_WEBHOOK_SECRET is not set' };

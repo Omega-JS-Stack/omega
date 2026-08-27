@@ -17,7 +17,7 @@ A verified ID token whose `users/{uid}` doc is gone is a database out of sync wi
 
 Three accounts are never healed, so the heal only ever completes an account that should already have a doc:
 
-- **A signup still in flight.** Within `SIGNUP_WINDOW_MS` (two minutes) of the Auth record being created, the heal stands down. That first write is `auth:on-create`'s: it fires the server half of `sign_up` and runs the consumer hook, and it would be skipped for good if a heal wrote the doc first. `POST /user/signup` arrives inside this window with nothing but sign-in residue on its doc, authenticates on it exactly as it did before the heal existed, and polls for the doc `auth:on-create` is about to write.
+- **A signup still in flight.** Within `SIGNUP_WINDOW_MS` (two minutes) of the Auth record being created, the heal stands down. That first write is `auth:on-create`'s: it runs the consumer hook, and it would be skipped for good if a heal wrote the doc first. `POST /user/signup` arrives inside this window with nothing but sign-in residue on its doc, authenticates on it exactly as it did before the heal existed, and polls for the doc `auth:on-create` is about to write.
 - **Anonymous accounts**, which get no user doc anywhere in the framework.
 - **A uid with no Auth user**, which keeps the opposite direction refused (see [payment-system.md](payment-system.md#a-payment-never-creates-a-user-doc)).
 

@@ -43,17 +43,21 @@ test('every theme builds the full default page set for a bare consumer', () => {
   // Identical page sets across themes — fallback fills every gap. The ONE
   // sanctioned delta (cp219): the showcase documents each theme's RESOLVED
   // library, so a theme shipping its own sections gets exactly that many
-  // extra entry pages. Derived from the collector, never hardcoded — a new
-  // theme-only section moves both sides together.
+  // extra entry pages — plus one embedded-frame page per demo variant of
+  // them (#463). Derived from the collector, never hardcoded — a new
+  // theme-only section (or a new demo variant) moves both sides together.
   const { buildSectionLibrary } = require('../src/sections.js');
-  const libSize = (...layers) => buildSectionLibrary({
-    baseDirs: layers.map((layer) => path.join(PKG, 'themes', layer)),
-  }).entries.length;
+  const libSize = (...layers) => {
+    const library = buildSectionLibrary({
+      baseDirs: layers.map((layer) => path.join(PKG, 'themes', layer)),
+    });
+    return library.entries.length + library.variants.length;
+  };
   assert.strictEqual(builds.neobrutalism.htmlCount, builds.classy.htmlCount, 'neobrutalism = classy page count (no own sections)');
   assert.strictEqual(
     builds.newsflash.htmlCount - builds.classy.htmlCount,
     libSize('newsflash', 'base') - libSize('base'),
-    'newsflash delta = its own showcase entries, nothing else',
+    'newsflash delta = its own showcase entries and their frames, nothing else',
   );
 });
 

@@ -54,6 +54,7 @@ const BLOCKED_LOCAL_PATTERNS = require(path.join(DATA_DIR, 'blocked-local-patter
 
 // Load typo-domain prefixes — common misspellings of major providers
 const TYPO_DOMAIN_PREFIXES = require(path.join(DATA_DIR, 'typo-domains.js'));
+const env = require('../env.js');
 
 // Format regex
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -193,9 +194,9 @@ async function validate(email, options = {}) {
 
   // 7. Mailbox verification (NeverBounce preferred, ZeroBounce fallback)
   if (checks.has('mailbox')) {
-    const provider = process.env.NEVERBOUNCE_API_KEY
+    const provider = env.get('NEVERBOUNCE_API_KEY')
       ? neverbounceProvider
-      : (process.env.ZEROBOUNCE_API_KEY ? zerobounceProvider : null);
+      : (env.get('ZEROBOUNCE_API_KEY') ? zerobounceProvider : null);
 
     if (!provider) {
       result.checks.mailbox = { valid: true, skipped: true, reason: 'No API key', provider: null };

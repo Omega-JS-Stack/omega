@@ -64,6 +64,7 @@ const JSON5 = require('json5');
 const yaml = require('js-yaml');
 const reads = require('@omega.js/devkit/reads');
 const { deepMerge } = require('./merge.js');
+const { registerHeroAnimationTag } = require('./hero-animations.js');
 const Logger = require('@omega.js/devkit/logger');
 
 // The warning sink's default: build-time output stamps the identity tag
@@ -71,11 +72,30 @@ const Logger = require('@omega.js/devkit/logger');
 // Callers that inject a sink (tests, the engine) still own their formatting.
 const logger = new Logger('sections');
 
-// The two tiers share one implementation — only the folder family and
-// filenames differ ({% section %} → _sections/<id>/section.*).
+// The two tiers share one implementation — only the folder family, the
+// filenames ({% section %} → _sections/<id>/section.*) and the gallery url
+// space differ.
+//
+// `gallery` is a kind's whole showcase URL SPACE
+// ([#602](https://github.com/Omega-JS-Stack/omega/issues/602)): `url` is its
+// index, `base` is what its entry pages hang off (`<base>/<id>`, frames at
+// `<base>/<id>/frames/<slug>`), `label` names it on both. The two galleries
+// MIRROR each other — an index, one page per entry, frames beside it — in
+// SEPARATE spaces: components used to live under the section space, which made
+// /test/components read like a second view of /test/sections instead of a
+// library of its own. ONE generator, kind-aware paths: the showcase templates
+// read these off the entry and never compose a url.
 const KINDS = {
-  section: { dirname: '_sections', basename: 'section' },
-  component: { dirname: '_components', basename: 'component' },
+  section: {
+    dirname: '_sections',
+    basename: 'section',
+    gallery: { kind: 'section', url: '/test/sections', base: '/test/sections/section', label: 'Section library' },
+  },
+  component: {
+    dirname: '_components',
+    basename: 'component',
+    gallery: { kind: 'component', url: '/test/components', base: '/test/components', label: 'Component library' },
+  },
 };
 
 // Section ids are kebab-case category paths (marketing/hero) — never
@@ -362,24 +382,36 @@ function collectSectionAssets(baseDirs, options = {}) {
  * contract) or throw (JSON.stringify's escaped quotes inside a token are
  * invalid Liquid). Demo args stay RAW — they liquify at the tag's call site
  * like every real composition.
- *   demo         — [{ label, args?, stage_class? }] variants, rendered live
- *                  by the showcase entry page (args ride the data bridge, so
- *                  json5 defaults still apply underneath — exactly the
- *                  consumer experience); malformed variants warn + drop
+ *   demo         — [{ label, slug, url, argsJson, args?, stage_class? }]
+ *                  variants, each rendered in its own EMBEDDED FRAME page
+ *                  (#463) that the entry page iframes in (args ride the data
+ *                  bridge, so json5 defaults still apply underneath — exactly
+ *                  the consumer experience); malformed variants warn + drop.
+ *                  `slug` is the kebab-cased label, de-duplicated within the
+ *                  entry (-2, -3 …) — it names the frame page's URL segment;
+ *                  `url` is that frame page's permalink; `argsJson` is the
+ *                  escaped authored-args display copy
+ *   url          — the entry page's own permalink, off its KIND's gallery base
+ *                  (#602) — the showcase templates never compose one
+ *   gallery      — that kind's whole url space ({ kind, url, base, label }),
+ *                  so an entry page can name its own library
  *   source       — which layer owns the entry: 'consumer' or the layer dir's
  *                  basename ('classy', 'newsflash')
  *   inherit      — declared §7 inherit lanes, for the docs chip
  *
  * `groups` clusters entries by (kind, category folder) for the index page —
  * sections first, then components, categories alphabetical (the spec §2
- * "the showcase groups by folder automatically").
+ * "the showcase groups by folder automatically"). `variants` is the same demo
+ * variants FLATTENED across every entry ({ kind, id, source, label, slug, url,
+ * gallery, args, stage_class }) — the pagination data of the per-variant frame pages,
+ * one page per item.
  *
  * @param {object} options
  * @param {string[]} options.baseDirs - resolution bases in precedence order
  *   (registerSectionTags' order: consumer dir first, then theme layers)
  * @param {string} [options.consumerDir] - labeled 'consumer' when it wins
  * @param {function} [options.warn] - warning sink (default console.warn)
- * @returns {{ entries: Array<object>, groups: Array<{kind: string, category: string, entries: Array<object>}> }}
+ * @returns {{ entries: Array<object>, groups: Array<{kind: string, category: string, entries: Array<object>}>, variants: Array<object>, galleries: Array<object> }}
  */
 function buildSectionLibrary(options) {
   const warn = options.warn || logger.warn.bind(logger);
@@ -395,6 +427,10 @@ function buildSectionLibrary(options) {
     .replace(/'/g, '&#39;')
     .replace(/{/g, '&#123;');
 
+  // A demo variant's URL segment on its frame page: kebab-case of the label,
+  // de-duplicated within the entry (two "Default"s become default, default-2).
+  const slugify = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'demo';
+
   const normalizeMeta = (meta, label) => {
     const argsTable = Object.entries(meta.args || {}).map(([name, spec]) => ({
       name,
@@ -406,10 +442,22 @@ function buildSectionLibrary(options) {
       if (!Array.isArray(meta.demo)) {
         warn(`showcase ${label}: demo must be an array of { label, args } variants — ignoring`);
       } else {
+        const taken = new Map(); // base slug → how many variants claimed it
         demo = meta.demo.filter((variant) => {
           const ok = variant && typeof variant === 'object' && typeof variant.label === 'string' && variant.label;
           if (!ok) warn(`showcase ${label}: demo variant without a label — dropped`);
           return ok;
+        }).map((variant) => {
+          const base = slugify(variant.label);
+          const seen = (taken.get(base) || 0) + 1;
+          taken.set(base, seen);
+          return {
+            ...variant,
+            slug: seen === 1 ? base : `${base}-${seen}`,
+            argsJson: variant.args && Object.keys(variant.args).length
+              ? escapeHtml(JSON.stringify(variant.args, null, 2))
+              : '',
+          };
         });
       }
     }
@@ -450,7 +498,13 @@ function buildSectionLibrary(options) {
           warn(`showcase: unreadable ${metaPath} (${error.message}) — listing with empty meta`);
         }
       }
-      entries.set(key, { kind, id, source, ...normalizeMeta(meta, key) });
+      // The gallery urls are computed HERE, once (#602): the entry page's own
+      // permalink, and one per demo variant for its frame. Every showcase
+      // template reads them off the entry, so a kind's url space has ONE home.
+      const gallery = KINDS[kind].gallery;
+      const entry = { kind, id, source, gallery, url: `${gallery.base}/${id}`, ...normalizeMeta(meta, key) };
+      entry.demo = entry.demo.map((variant) => ({ ...variant, url: `${entry.url}/frames/${variant.slug}` }));
+      entries.set(key, entry);
     }
   };
 
@@ -475,19 +529,45 @@ function buildSectionLibrary(options) {
     a.kind === b.kind ? a.category.localeCompare(b.category) : (a.kind === 'section' ? -1 : 1)
   ));
 
-  return { entries: sorted, groups };
+  // The frame pages' pagination data (#463): every entry's demo variants,
+  // flattened, each carrying the entry coordinates its own page needs.
+  const variants = sorted.flatMap((entry) => entry.demo.map((variant) => ({
+    kind: entry.kind,
+    id: entry.id,
+    source: entry.source,
+    label: variant.label,
+    slug: variant.slug,
+    url: variant.url,          // the frame page's own permalink (#602)
+    gallery: entry.gallery,    // …and the library it belongs to, for its title
+    args: variant.args,
+    stage_class: variant.stage_class,
+  })));
+
+  // The gallery url spaces themselves (#602) — the index pages select their
+  // own out of this list, so a label or a url has ONE home for the whole
+  // showcase (KINDS above).
+  const galleries = Object.values(KINDS).map((kind) => kind.gallery);
+
+  return { entries: sorted, groups, variants, galleries };
 }
 
 /**
- * Register the {% section %} and {% component %} tags on a LiquidJS engine.
+ * Register the {% section %} and {% component %} tags on a LiquidJS engine —
+ * and, with them, `{% hero_animation %}` (#441): section MARKUP calls it
+ * (`marketing/hero`'s custom demo branch does), so registering the family
+ * without it leaves a tag no engine can parse. One call, one registration
+ * point, and no harness can forget half of it.
  * @param {object} engine - LiquidJS engine (Eleventy's, via amendLibrary)
  * @param {object} options
  * @param {string[]} options.baseDirs - resolution bases in precedence order:
- *   consumer dir first, then theme layers (each probed for _sections/_components)
+ *   consumer dir first, then theme layers (each probed for
+ *   _sections/_components/_hero)
  * @param {function} [options.warn] - warning sink (default console.warn)
  */
 function registerSectionTags(engine, options) {
   const warn = options.warn || logger.warn.bind(logger);
+
+  registerHeroAnimationTag(engine, { baseDirs: options.baseDirs });
 
   for (const [tagName, kind] of Object.entries(KINDS)) {
     const roots = options.baseDirs

@@ -12,8 +12,11 @@ A **brand monorepo**: one brand (`config/omega.json5`), npm workspaces, one dir 
 | `targets/backend/` | backend | `@omega.js/backend` | the `omega:backend` skill → `docs/backend/index.md` |
 | `targets/desktop/` | desktop | `@omega.js/desktop` | the `omega:desktop` skill → `docs/desktop/index.md` |
 | `targets/extension/` | extension | `@omega.js/extension` | the `omega:extension` skill → `docs/extension/index.md` |
+| `targets/<name>/` | custom ([#603](https://github.com/Omega-JS-Stack/omega/issues/603)) | none — the target's own stack | its own README; the contract is [index.md](index.md) § Custom targets |
 
 **Before doing ANY work inside a target, read its framework's guide** — the omega plugin's inject hook loads the matching skill automatically in that target, and the skill points at the guide; architecture, conventions, APIs, and gotchas live there, not here.
+
+A **custom target** is the exception: `targets.<name>: { type: 'custom' }` in the brand config declares a target no framework owns (a Render API, a worker, a script). It has no framework guide and no framework services — everything it can do is what its own `package.json` scripts (`start`, `build`, `test`, `deploy`, `clean`) declare, and the manager runs those.
 
 ## Brand root anatomy
 

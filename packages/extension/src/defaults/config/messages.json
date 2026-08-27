@@ -1,18 +1,20 @@
 {
   appName: {
-    message: '[ site.brand.name ]',
+    message: '[ extension.name ]',
     description: 'The name of the extension.',
   },
   appNameShort: {
-    message: '[ site.brand.name ]',
+    message: '[ extension.name ]',
     description: 'The short name of the extension.',
   },
   appDescription: {
-    message: 'The official [ site.brand.name ] browser extension.',
+    // Seeded from brand.description when it fits the 200-character store cap,
+    // otherwise 'The official <brand> browser extension.'
+    message: '[ extension.description ]',
     description: 'The description of the extension.',
   },
   btnTooltip: {
-    message: '[ site.brand.name ]',
+    message: '[ extension.name ]',
     description: 'Tooltip for the button.',
   },
 }

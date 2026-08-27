@@ -304,6 +304,7 @@ desktop/extension at C4 exactly like icon-renderer.
 |---|---|
 | `data-omega-reveal="up\|fade\|left\|right\|scale"` | reveal once on scroll-in |
 | `data-omega-reveal-stagger="60"` (parent) | staggers child reveals (ms step) |
+| `data-omega-reveal-lead` (the `<main>` shell) | names the wrapper whose FIRST section is the page's lead band: its reveals play from paint, in pure CSS, after a `--omega-reveal-lead-delay` (120ms) beat on a staged compositor layer. Layout plumbing (`themes/base/_layouts/frontend/core/base.html`), never authored per band |
 | `data-omega-countup` | counts to the number already in the markup |
 | `data-omega-rotate="2600"` | children cycle (hero word rotator, quotes) |
 | `data-omega-marquee` + `.omega-marquee__track/__item` | seamless loop — the set is cloned until half the track covers the container (never runs dry), constant px/s (attr value overrides); clones are `aria-hidden` with focusables detabbed (`tabindex=-1`, still mouse-clickable) so interactive sets (newsflash ticker headlines) stay accessible |
@@ -318,6 +319,44 @@ Resilience rules (load-bearing):
 
 - Reveal styles only hide content under the inline `html[data-omega-motion]`
   stamp (head.html) — **no JS means a fully visible page**.
+- **A reveal never waits for the client bundle**
+  ([#585](https://github.com/Omega-JS-Stack/omega/issues/585)). The stamp lands
+  before first paint, so a hidden reveal that waited on the engine's
+  IntersectionObserver was blank text for the whole JS download on a cold
+  cache. Two pure-CSS lanes close that: the LEAD band (the first `<section>`
+  under the `data-omega-reveal-lead` shell) animates in from paint, staggered
+  by CSS `:nth-child` delays; every other reveal auto-resolves itself after
+  `--omega-reveal-wait` (1s) unless the engine stamps
+  `html[data-omega-motion-ready]` first and takes the lane back for scroll
+  reveals. Booting LATE, the engine adopts what the net already resolved, so
+  the stamp can never re-hide text the visitor is reading. **Slow JS can only
+  shorten an animation, never blank a page.** One `omega-reveal-in` keyframe
+  serves both lanes (no `from`, so every direction starts from its own hidden
+  state), and both skip `.omega-float` — the library's ambient loop owns
+  `animation` on the elements it rides, so a floating decorative frame is
+  painted rather than revealed.
+- **The lead band waits a beat, on a staged layer** (#585 follow-up, Ian
+  2026-08-25). An entrance that starts at the very first frame plays while the
+  browser is still fetching fonts and scripts, and it looks it. So the lead
+  lane's delay is `--omega-reveal-lead-delay` (120ms) PLUS its stagger step —
+  after the worst of the load burst, still far ahead of any bundle — and it
+  declares `will-change: opacity, transform` so the compositor layer exists
+  during that beat instead of being built mid-animation. `core/js/core/motion.js`
+  drops the hint when the entrance's own `finished` promise resolves: a hint
+  that outlives its animation is memory reserved for nothing, and waiting on the
+  animation means a bundle arriving mid-entrance cannot cut it short. The safety
+  net stages nothing — it is the lane that usually never plays. **With JS
+  disabled entirely the hint persists** — the CSS-only lane's one accepted cost,
+  and cheaper than the blank hero it replaces.
+- **A band's stagger is ONE number, honoured by both lanes** (#585 F5). The
+  author writes it once, on the cluster: `data-omega-reveal-stagger="70"`. The
+  motion engine reads that attribute and writes `--omega-reveal-delay` per
+  child; the paint-time lane multiplies its `:nth-child` index by
+  `--omega-reveal-step`, and the BUILD mirrors the attribute into that property
+  on the same element ([reveal-stagger.js](../../packages/web/src/reveal-stagger.js),
+  the `omega-reveal-stagger` transform). Before the mirror every lead band
+  staggered at the 90ms fallback while its author had written 40–120ms. A
+  hand-authored `--omega-reveal-step` wins; the mirror never overwrites one.
 - `prefers-reduced-motion` renders final states: reveals resolve instantly,
   count-ups show their target, rotators hold the first word, marquees park.
   EVERY continuous loop in `core/css` and in the theme sheets this package
@@ -331,6 +370,14 @@ Resilience rules (load-bearing):
   their final state. `test/animations.test.js` derives its roster from every
   core and theme sheet that declares `infinite`, so a new unparked loop fails
   the suite.
+- **Autoplaying video parks in JS, because CSS cannot pause one**
+  ([#499](https://github.com/Omega-JS-Stack/omega/issues/499)). The motion
+  engine's scan is the ONE lane: under `prefers-reduced-motion` it strips
+  `autoplay` from every `video[autoplay]`, pauses it, and turns its controls
+  on, so the poster holds and the visitor decides. It applies to every
+  autoplaying band at once (the hero's video demo, `marketing/product-demo`) —
+  a section never forks its own pause. Once parked, a rescan leaves a video
+  the visitor started alone.
 - The PurgeCSS safelist keeps every `omega-`-namespaced selector plus
   Bootstrap's own JS-toggled transition classes (`collapse`/`collapsing`/
   `show`/`showing`/`fade` — `src/assets.js`) because that state is

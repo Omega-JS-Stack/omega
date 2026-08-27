@@ -1,0 +1,64 @@
+---
+layout: frontend/core/base
+
+# One page per demo VARIANT (#463), for both galleries: pagination over the
+# flattened sectionLibrary.variants the engine computes from the layer chain.
+# The entry page embeds these as iframes, so a variant renders in its own
+# document — the section is part of the gallery page, never the whole viewport.
+# The permalink is the variant's own kind-aware url (#602), so a frame always
+# sits beside the entry page that embeds it.
+pagination:
+  data: sectionLibrary.variants
+  size: 1
+  alias: variant
+permalink: "{{ variant.url }}.html"
+eleventyExcludeFromCollections: true
+sitemap:
+  include: false
+# Chrome-less on purpose: the frame carries the theme's real asset bundles
+# (the layout chain owns <head>), and nothing else — nav and footer belong to
+# the gallery page around the iframe, never inside it.
+# …and the OVERLAY chrome with it (#555): a gallery page stacks one frame per
+# variant, so a banner and a chat bubble per frame is the same noise multiplied.
+# Both gate on the config this page bakes, which is why the switch belongs here
+# beside the nav/footer one — no runtime flag, and the gallery page around the
+# frames still shows the real thing.
+# resolved.* refs — the pagination alias reaches frontmatter strings through
+# the resolved scope (the per-page re-render lane), not as a bare name.
+meta:
+  title: "{{ resolved.variant.label }} · {{ resolved.variant.id }} · {{ resolved.variant.gallery.label }}"
+  description: "The {{ resolved.variant.label }} demo variant of the {{ resolved.variant.id }} {{ resolved.variant.kind }}, rendered on its own."
+  breadcrumb: "{{ resolved.variant.gallery.label }}"
+  index: false
+config:
+  theme:
+    nav:
+      enabled: false
+    footer:
+      enabled: false
+  client:
+    consent:
+      enabled: false
+  inbound:
+    chat:
+      providers:
+        chatsy:
+          enabled: false
+---
+
+{% comment %}
+  The embedded-frame page (#463) — ONLY the variant renders here: no masthead,
+  no docs, no sibling variants. Same live render as before (the real tag, the
+  variant's args riding the data bridge over the entry's json5 defaults), just
+  in its own document, so a hero that expects the viewport gets one.
+{% endcomment %}
+
+{% if variant.kind == "section" %}
+  {% section variant.id, data: variant.args %}
+{% else %}
+  <div class="container my-4">
+    <div class="border rounded p-4{% if variant.stage_class %} {{ variant.stage_class }}{% endif %}">
+      {% component variant.id, data: variant.args %}
+    </div>
+  </div>
+{% endif %}

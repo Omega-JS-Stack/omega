@@ -1,8 +1,18 @@
 {% comment %} ── Hero demo capture (input/form/video/custom — optional conversion module) {% endcomment %}
 {% assign demo = args.demo %}
+{% assign hero_demo_on = false %}
+{% if demo.enabled or args.demo_html != blank %}{% assign hero_demo_on = true %}{% endif %}
+{% comment %} demo.placement: side (legacy parity) — the demo sits BESIDE the copy
+instead of centred under the CTAs; anything else keeps the centred stack. {% endcomment %}
+{% assign hero_demo_side = false %}
+{% if hero_demo_on and demo.placement == "side" %}{% assign hero_demo_side = true %}{% endif %}
+{% comment %} A video demo IS the hero visual in EVERY placement (#486) — the
+centred product frame never stacks under one either. {% endcomment %}
+{% assign hero_demo_video = false %}
+{% if demo.enabled and demo.type == "video" %}{% assign hero_demo_video = true %}{% endif %}
 {% capture hero_demo_content %}
   {% if demo.type == "input" %}
-    <div class="card {% if demo.options.class %}{{ demo.options.class }}{% endif %} mx-auto">
+    <div class="card {{ demo.options.class | default: 'mw-md' }} mx-auto">
       <div class="card-body p-3">
         <form id="hero-demo-form" class="d-flex flex-column flex-sm-row justify-content-center gap-2" {% iftruthy demo.options.redirect %}data-redirect="{{ demo.options.redirect }}"{% endiftruthy %} data-form-state="initializing" onsubmit="return false">
           <input
@@ -83,9 +93,34 @@
         </form>
       </div>
     </div>
+  {% elsif demo.type == "video" %}
+    {% comment %} Legacy parity: the player rides omega_video, so the file
+    lazy-loads like every other media on the page. Autoplay is ALWAYS muted —
+    a hero never makes sound nobody asked for — and controls stay on unless
+    the author turns them off, so an unauthored video plays only on click.
+    The flag rides as a STRING both ways: a bare variable holding false/nil
+    falls back to its own literal name at the call site (template-kit's
+    preferLiteral lane), which would mute every video. {% endcomment %}
+    {% if demo.options.autoplay or demo.options.muted %}{% assign video_muted = "true" %}{% else %}{% assign video_muted = "false" %}{% endif %}
+    <div class="{% unless hero_demo_side %}mx-auto {% endunless %}{{ demo.options.class }}">
+      <div class="card overflow-hidden">
+        <div class="ratio ratio-16x9">
+          {% omega_video demo.options.src, class="w-100 d-block object-fit-cover border-0", controls=demo.options.controls, loop=demo.options.loop, autoplay=demo.options.autoplay, muted=video_muted, playsinline="true", preload="metadata", poster=demo.options.poster %}
+        </div>
+      </div>
+    </div>
   {% elsif demo.type == "custom" %}
+    {% comment %} Two ways to fill the custom slot. `demo.name` names a
+    consumer's own animation folder (#441: src/_hero/<name>/, whose style.scss
+    and script.js ride the section asset lanes); `demo.options.content` is
+    finished markup authored at the call site. A named folder wins — it is the
+    more specific answer, and authoring both means one of them is a leftover. {% endcomment %}
     <div id="hero-demo-custom" class="mx-auto {{ demo.options.class }}">
-      {{ demo.options.content }}
+      {% if demo.name %}
+        {% hero_animation demo.name %}
+      {% else %}
+        {{ demo.options.content }}
+      {% endif %}
     </div>
   {% endif %}
 
@@ -94,9 +129,35 @@
   {% endiftruthy %}
 {% endcapture %}
 
-<!-- ═══ Hero ═══ -->
-<section class="omega-hero omega-dotgrid" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
+{% comment %} ── The copy cluster (badge → display → sub → CTAs → meta), captured so
+the side placement can set it BESIDE the demo; the centred default renders it
+in place, unchanged. {% endcomment %}
+{% capture hero_copy %}
+    {% comment %} #513: the optional breadcrumb trail — ordered crumbs above the
+    headline cluster, the LAST one the current page and never a link. Inline
+    list items, so the trail inherits the hero's own alignment (centred by
+    default, start in the side placement) with no new CSS. Authors keep it
+    consistent with the BreadcrumbList JSON-LD foot.html emits; this arg is the
+    on-page trail only and generates none of it. {% endcomment %}
+    {% if args.breadcrumb and args.breadcrumb.size > 0 %}
+      <nav class="small text-muted mb-3" aria-label="Breadcrumb" data-omega-reveal>
+        <ol class="list-unstyled mb-0">
+          {% for crumb in args.breadcrumb %}
+            <li class="d-inline">
+              {% if forloop.last %}
+                <span aria-current="page">{{ crumb.label }}</span>
+              {% elsif crumb.href %}
+                <a href="{{ crumb.href }}">{{ crumb.label }}</a>
+              {% else %}
+                <span>{{ crumb.label }}</span>
+              {% endif %}
+              {% unless forloop.last %}<span class="mx-1" aria-hidden="true">›</span>{% endunless %}
+            </li>
+          {% endfor %}
+        </ol>
+      </nav>
+    {% endif %}
+
     {% iftruthy args.badge.text %}
       {% if args.badge.href %}
         <a class="omega-hero__badge" href="{{ args.badge.href }}" data-omega-reveal>
@@ -114,39 +175,54 @@
       {% endif %}
     {% endiftruthy %}
 
-    <h1 class="omega-display omega-display--hero" data-omega-reveal>
+    {% comment %} #500: the headline's LEVEL is an arg. A page composing the
+    band twice (#496's below-fold dashboard demo) would otherwise ship two h1s
+    — the checklist's one-h1 rule. The classes never change with it: the skin
+    styles .omega-display--hero, not the tag. {% endcomment %}
+    {% assign heading_level = args.heading_level | default: 1 %}
+    <h{{ heading_level }} class="omega-display omega-display--hero" data-omega-reveal>
       {{ args.headline }}<br>
-      {% if args.rotating and args.rotating.size > 0 %}
+      {% comment %} An authored accent wins: the theme's default rotating words
+      survive the deep merge, so a page that writes only headline_accent would
+      otherwise author dead text. {% endcomment %}
+      {% if args.headline_accent != blank %}
+        <em>{{ args.headline_accent }}</em>
+      {% elsif args.rotating and args.rotating.size > 0 %}
         <span class="omega-hero__rotator" data-omega-rotate="2600">
           {%- for word in args.rotating -%}
             <span>{{ word }}</span>
           {%- endfor -%}
         </span>
-      {% else %}
-        <em>{{ args.headline_accent }}</em>
       {% endif %}
-    </h1>
+    </h{{ heading_level }}>
 
     {% iftruthy args.description %}
       <p class="omega-hero__sub" data-omega-reveal>{{ args.description }}</p>
     {% endiftruthy %}
 
+    {% comment %} An authored button class replaces the default; an authored icon
+    leads the label and takes the arrow nudge's place (legacy parity — a button
+    carries ONE glyph). No icon, no class = today's render. {% endcomment %}
+    {% assign primary_btn_class = args.primary_button.class | default: "btn-adaptive" %}
+    {% assign secondary_btn_class = args.secondary_button.class | default: "btn-outline-adaptive" %}
     <div class="omega-hero__ctas" data-omega-reveal>
       {% if args.primary_button.enabled != false and args.primary_button.text %}
-        <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+        <a href="{{ args.primary_button.href }}" class="btn {{ primary_btn_class }} btn-lg{% iffalsy args.primary_button.icon %} omega-hover-nudge{% endiffalsy %}">
+          {% iftruthy args.primary_button.icon %}{% omega_icon args.primary_button.icon, "me-2" %}{% endiftruthy %}
           {{ args.primary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          {% iffalsy args.primary_button.icon %}<span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>{% endiffalsy %}
         </a>
       {% endif %}
       {% iftruthy args.command %}
         <a href="{{ args.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
-          <span class="omega-cmd-prompt">$</span>{{ args.command }}
+          <span class="omega-cmd-prompt">$</span>{{ args.command | escape_once }}
         </a>
       {% endiftruthy %}
       {% if args.secondary_button.enabled != false and args.secondary_button.text %}
-        <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
+        <a href="{{ args.secondary_button.href }}" class="btn {{ secondary_btn_class }} btn-lg{% iffalsy args.secondary_button.icon %} omega-hover-nudge{% endiffalsy %}">
+          {% iftruthy args.secondary_button.icon %}{% omega_icon args.secondary_button.icon, "me-2" %}{% endiftruthy %}
           {{ args.secondary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          {% iffalsy args.secondary_button.icon %}<span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>{% endiffalsy %}
         </a>
       {% endif %}
     </div>
@@ -158,11 +234,28 @@
         {% endfor %}
       </div>
     {% endif %}
+{% endcapture %}
 
-    {% if demo.enabled or args.demo_html != blank %}
-      <div class="mt-4" data-omega-reveal>
-        {% if args.demo_html != blank %}{{ args.demo_html }}{% else %}{{ hero_demo_content }}{% endif %}
+{% comment %} ── The demo module — a slot's finished markup wins over the typed lanes {% endcomment %}
+{% capture hero_demo_module %}{% if args.demo_html != blank %}{{ args.demo_html }}{% else %}{{ hero_demo_content }}{% endif %}{% endcapture %}
+
+<!-- ═══ Hero ═══ -->
+<section class="omega-hero omega-dotgrid{% if hero_demo_side %} omega-hero--side{% endif %}" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    {% if hero_demo_side %}
+      <div class="omega-hero__split">
+        <div class="omega-hero__copy">{{ hero_copy }}</div>
+        <div class="omega-hero__demo" data-omega-reveal="right">
+          {{ hero_demo_module }}
+        </div>
       </div>
+    {% else %}
+      {{ hero_copy }}
+      {% if hero_demo_on %}
+        <div class="mt-4" data-omega-reveal>
+          {{ hero_demo_module }}
+        </div>
+      {% endif %}
     {% endif %}
 
     {% if args.cards and args.cards.size > 0 %}
@@ -172,14 +265,20 @@
             {% iftruthy card.icon %}
               <span class="omega-hero__card-ico">{% omega_icon card.icon %}</span>
             {% endiftruthy %}
-            <span class="omega-hero__card-num">{{ card.number }}</span>
+            {%- comment %} A value is TEXT, never markup (#580). {% endcomment -%}
+            <span class="omega-hero__card-num">{{ card.number | escape_once }}</span>
             <span class="omega-hero__card-label">{{ card.label }}</span>
           </div>
         {% endfor %}
       </div>
     {% endif %}
 
-    {% if args.frame.enabled != false %}
+    {% comment %} #496: a side demo IS the hero visual — the centred frame never
+    renders beside it, authored on or not. #486 extends the same doctrine to a
+    VIDEO demo in any placement: a frame stacked under a centred video is two
+    visuals for one hero. The dashboard mock earns its own band below when a
+    page still wants it (a second section instance). {% endcomment %}
+    {% if args.frame.enabled != false and hero_demo_side == false and hero_demo_video == false %}
       <!-- Floating product frame (pure-CSS product mock; ambient float + tilt) -->
       <div class="omega-hero__frame omega-float" data-omega-reveal="scale" aria-hidden="true">
         <div class="omega-hero__frame-inner">

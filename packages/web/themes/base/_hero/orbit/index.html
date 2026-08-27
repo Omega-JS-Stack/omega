@@ -1,0 +1,30 @@
+{% comment %}
+  `orbit` — the framework's REFERENCE hero animation (#441): what a brand's own
+  `src/_hero/<name>/` folder looks like, and the proof that the slot's three
+  lanes (markup, style.scss, script.js) all land.
+
+  A product card at the centre with four satellites tracking around it: the
+  "one config, every surface" shape, in the theme's own tokens (no colors, no
+  fonts, no sizes of its own — style.scss reads `--omega-*` like every other
+  core surface, so it re-inks with the brand).
+
+  Context-free like a section: the markup renders in an empty scope, so
+  `omega_*` tags work and no page data leaks in. The wrapper the tag emits
+  carries `data-omega-hero="orbit"`, which is what boots script.js.
+
+  Reduced motion is style.scss's branch: the ring parks and every satellite
+  renders at its final position — a still diagram, never a blank box.
+{% endcomment %}
+<div class="omega-orbit" aria-hidden="true">
+  <div class="omega-orbit__ring">
+    <span class="omega-orbit__satellite" style="--omega-orbit-index: 0;">{% omega_icon "globe" %}</span>
+    <span class="omega-orbit__satellite" style="--omega-orbit-index: 1;">{% omega_icon "server" %}</span>
+    <span class="omega-orbit__satellite" style="--omega-orbit-index: 2;">{% omega_icon "desktop" %}</span>
+    <span class="omega-orbit__satellite" style="--omega-orbit-index: 3;">{% omega_icon "puzzle-piece" %}</span>
+  </div>
+
+  <div class="omega-orbit__core">
+    <span class="omega-orbit__pulse"></span>
+    {% omega_icon "cube" %}
+  </div>
+</div>

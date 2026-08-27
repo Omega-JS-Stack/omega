@@ -9,7 +9,7 @@ class ChargebeeAPI {
   constructor(site, apiKey) {
     this.site = site;
     this.baseUrl = `https://${site}.chargebee.com/api/v2`;
-    this.authHeader = 'Basic ' + Buffer.from(`${apiKey}:`).toString('base64');
+    this.authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
   }
 
   /**
@@ -294,6 +294,14 @@ class ChargebeeAPI {
    */
   async updateWebhook(webhookId, updates) {
     const data = await this.makeRequest('POST', `/webhook_endpoints/${webhookId}`, updates);
+    return data?.webhook_endpoint;
+  }
+
+  /**
+   * Delete a webhook endpoint
+   */
+  async deleteWebhook(webhookId) {
+    const data = await this.makeRequest('POST', `/webhook_endpoints/${webhookId}/delete`);
     return data?.webhook_endpoint;
   }
 }

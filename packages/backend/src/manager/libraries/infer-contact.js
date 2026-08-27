@@ -10,6 +10,7 @@
  *   // { firstName, lastName, company, confidence, method }
  */
 const path = require('path');
+const env = require('./env.js');
 
 const PROMPT_PATH = path.join(__dirname, 'prompts', 'infer-contact.md');
 
@@ -21,7 +22,7 @@ const PROMPT_PATH = path.join(__dirname, 'prompts', 'infer-contact.md');
  * @returns {{ firstName: string, lastName: string, company: string, confidence: number, method: string }}
  */
 async function inferContact(email, ctx) {
-  if (process.env.OMEGA_OPENAI_API_KEY) {
+  if (env.get('OMEGA_OPENAI_API_KEY')) {
     const aiResult = await inferContactWithAI(email, ctx);
     if (aiResult) {
       return aiResult;
@@ -43,7 +44,7 @@ async function inferContact(email, ctx) {
  */
 async function inferContactWithAI(email, ctx) {
   try {
-    const ai = ctx.Manager.AI(ctx, process.env.OMEGA_OPENAI_API_KEY);
+    const ai = ctx.Manager.AI(ctx, env.get('OMEGA_OPENAI_API_KEY'));
     const result = await ai.request({
       model: 'gpt-5.4-mini',
       timeout: 60000,

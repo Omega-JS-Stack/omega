@@ -34,6 +34,31 @@ function pick(source, keys) {
   return out;
 }
 
+// The page a conversion happened on, as the attribution touch captured it. Only
+// the providers whose server API READS one take it (`attachPage` below).
+const PAGE_KEYS = ['url', 'referrer'];
+
+/**
+ * Attach the conversion's page to a descriptor — the touch's url, and its
+ * referrer when there is one
+ * ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)).
+ *
+ * The URL is neither payload nor match data, so it rides its own descriptor
+ * member, and only when the touch actually carried one: a server conversion
+ * fires from a webhook or an auth trigger, and an INVENTED url is worse to a
+ * platform than an absent one. A referrer with no url is not half a page.
+ *
+ * @param {object} descriptor - The descriptor being built (mutated).
+ * @param {object} [attribution] - The flat attribution context.
+ */
+function attachPage(descriptor, attribution) {
+  const page = pick(attribution, PAGE_KEYS);
+
+  if (page.url) {
+    descriptor.page = page;
+  }
+}
+
 /**
  * Build one provider's adapter.
  *
@@ -93,4 +118,4 @@ function createAdapter({ provider, consentCategory, attach }) {
   return { provider, CONSENT_CATEGORY: consentCategory, resolve };
 }
 
-module.exports = { createAdapter, pick };
+module.exports = { createAdapter, pick, attachPage };

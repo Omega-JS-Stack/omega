@@ -15,7 +15,7 @@ eleventyExcludeFromCollections: true
 # one title. UJM's blog-taxonomy generator format, kept in-page so a consumer
 # who takes this default page over owns the wording too.
 meta:
-  title: "{{ resolved.tag.name | omega_title_case }} - Blog Tags - {{ site.brand.name }}"
+  title: "{{ resolved.tag.name | omega_title_case }} - Blog Tags - {{ resolved.config.brand.name }}"
   description: "Browse all blog posts tagged with {{ resolved.tag.name | omega_title_case }}."
   breadcrumb: "{{ resolved.tag.name | omega_title_case }}"
 ---

@@ -63,11 +63,16 @@ jobs:
           git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git config --global user.name "$GITHUB_ACTOR"
 
+      # Shallow on purpose (#568): nothing in an omega build reads git HISTORY
+      # — the service worker asks `git rev-parse --short HEAD` (present at
+      # depth 1) and `omega deploy --direct` inits a fresh repo in dist. A
+      # full-history checkout is what took an image-heavy consumer's runner
+      # down with ENOSPC (~4 GB of packed history on a ~14 GB disk).
       - name: Checkout main branch
         uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -111,16 +116,41 @@ jobs:
           restore-keys: |
             omega-imagemin-
 
+      # Tracked files only (#568) — `ls -R` printed node_modules (~45k lines)
+      # and hid the build output in every run, truncating the log exactly when
+      # a failure needed reading.
+      - name: Log repo files
+        working-directory: targets/website
+        run: |
+          echo "Tracked files:"
+          git ls-files
+
+      - name: Log disk usage (before build)
+        working-directory: targets/website
+        run: df -h /
+
       - name: Build
         working-directory: targets/website
         run: |
           npx omega setup && npm run build
+
+      # `if: always()` (#568): this reading is the one that matters when the
+      # build itself is what ran out of room.
+      - name: Log disk usage (after build)
+        if: always()
+        working-directory: targets/website
+        run: df -h /
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GH_TOKEN }}
           publish_dir: targets/website/dist
+          # One commit on gh-pages, forever (#568). Without it the branch grows
+          # by a whole site per deploy, and the deploy action clones it again
+          # before copying the build in. It holds build artifacts only, so
+          # discarding its history is intended.
+          force_orphan: true
 
       # Post-publish edge-cache purge — runs only when the repo has a
       # CLOUDFLARE_TOKEN secret; skips silently otherwise.

@@ -852,6 +852,10 @@ class Verts {
       return this._fallback($el, options);
     }
 
+    // No client id: the provider lane is not attempted at all. Presence of
+    // the client id is the ONE adsense switch (#527) — it decides the manager
+    // managing the account, these units rendering, and the ads.txt record
+    // together, so there is no second gate to read here.
     if (!adsense?.client) {
       return this._fallback($el, options);
     }

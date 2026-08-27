@@ -192,7 +192,12 @@ function checkTargetFiles(recorder, entry) {
   }
 
   if (entry.target === 'backend') {
-    if (fs.existsSync(path.join(entry.path, 'firebase.json'))) {
+    // A custom-server backend (#584) deploys no Cloud Functions, so it has no
+    // firebase.json to carry — the ONE Firebase-only check here, noted rather
+    // than failed. The staged build below is checked in both modes.
+    if (entry.projectType === 'custom') {
+      recorder.note(`${entry.name}: firebase.json`, "skipped — projectType: 'custom' deploys no Cloud Functions");
+    } else if (fs.existsSync(path.join(entry.path, 'firebase.json'))) {
       recorder.pass(`${entry.name}: firebase.json`);
     } else {
       recorder.fail(`${entry.name}: firebase.json`, 'missing');

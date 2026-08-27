@@ -33,7 +33,7 @@ test('/blog/index.json: every post, newest first, index fields only', () => {
   assert.strictEqual(first.desc, 'The first mini post', 'description carried');
   assert.strictEqual(first.date, '2024-01-15', 'machine date');
   assert.deepStrictEqual(first.categories, ['Growth'], 'categories carried');
-  assert.deepStrictEqual(first.tags, ['automation', 'growth-hacks'], 'tags carried');
+  assert.deepStrictEqual(first.tags, ['automation', 'growth-hacks', 'A&R'], 'tags carried');
 
   // Newest first (the posts collection order), so a query's ties read newest first
   assert.strictEqual(index[0].title, 'Second post', 'newest post leads');

@@ -1,8 +1,8 @@
 /**
  * State-retirement migration ([#434](https://github.com/Omega-JS-Stack/omega/issues/434))
  * — the on-disk half of killing the third bucket. `.omega/state.json` held a
- * durable cache of derived data; it is gone. Every fact it carried now lives
- * where it belongs:
+ * durable cache of derived data; that CONTENT is gone. Every fact it carried
+ * now lives where it belongs:
  *
  *   - a provisioned id or a confirmation nothing can re-check → config/omega.json5
  *   - a secret (the GA Measurement Protocol secrets, the VAPID private key) → the brand .env
@@ -10,14 +10,13 @@
  *     platform on the next run, which is what it always did with the cache
  *     sitting unused beside it
  *
- * The ONE key this migration leaves behind is `deploy` — the per-machine
- * deploy record written by `@omega.js/devkit/deploy-record` on every
- * successful deploy verb and read by the testing service. It is neither a
- * provisioned fact nor a secret, it is owned outside the manager, and it
- * keeps its file: a state.json carrying only `deploy` is rewritten, not
- * deleted. deploy-record takes it from there — it adopts that key into
- * `.omega/deploys.json` and removes the emptied file on its next read or
- * write (#449).
+ * The FILE lives on as the per-machine record home, sectioned per fact kind
+ * ([#479](https://github.com/Omega-JS-Stack/omega/issues/479)): `deploy` is
+ * the record `@omega.js/devkit/deploy-record` writes on every successful
+ * deploy verb, and future record kinds join it as siblings. So this migration
+ * owns ONLY the service-keyed sections it retires — every other top-level key
+ * is a record it neither reads nor deletes, and a state.json left holding
+ * nothing but records is rewritten, not deleted.
  *
  * Unlike its Firestore siblings this migration touches only the brand's own
  * files, so it runs without a service account.
@@ -26,21 +25,28 @@
  *   npx omega manage --migration=state-retirement            # prints the plan, writes nothing
  *   npx omega manage --migration=state-retirement --execute  # performs it
  *
- * Idempotent by construction: the executed run deletes (or trims) the file,
+ * Idempotent by construction: the executed run trims (or deletes) the file,
  * so a re-run finds nothing to move and reports a clean no-op.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
-const { writeConfigValues } = require('@omega.js/config');
+const { writeConfigValues, DIR_TARGETS } = require('@omega.js/config');
 
 const { writeEnvValue } = require('../../../lib/env-secret.js');
 const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
 
 const STATE_FILE = join('.omega', 'state.json');
 
-// devkit's deploy record — not this migration's to move (see the header)
-const KEPT_KEYS = new Set(['deploy']);
+// The service-keyed sections the retired state file carried — the only keys
+// this migration reads, moves and removes. Anything else is a machine record
+// (devkit's `deploy` today, other record kinds tomorrow) and survives
+// untouched: an unknown key is never assumed to be dead cache (see the header)
+const RETIRED_SECTIONS = new Set([
+  'advertising', 'analytics', 'campaigns', 'captcha', 'certificates', 'chat',
+  'cloud', 'edge', 'email', 'forms', 'monitoring', 'newsletter', 'payment',
+  'repo', 'search',
+]);
 
 /**
  * Every dot-path in an object that holds a non-object value. Arrays count as
@@ -100,14 +106,19 @@ function planMoves(state, brandConfig = {}) {
 
   // ── analytics: the measurement id is public config, the Measurement
   //    Protocol secret is a secret — the stream id and URI re-derive ─────────
-  for (const [target, stream] of Object.entries(state.analytics?.streams || {})) {
+  for (const [key, stream] of Object.entries(state.analytics?.streams || {})) {
+    // A legacy state file keys the stream by its target DIR (`website`), which
+    // composed straight through would write `targets.website` — a target the
+    // validator rejects. DIR_TARGETS is the one dir→target normalizer (#505);
+    // a key that is already a target name passes through it untouched
+    const target = DIR_TARGETS[key] || key;
     toConfig(
-      `analytics.streams.${target}.measurementId`,
+      `analytics.streams.${key}.measurementId`,
       `targets.${target}.analytics.providers.google.id`,
       stream?.measurementId,
     );
     toEnv(
-      `analytics.streams.${target}.apiSecret`,
+      `analytics.streams.${key}.apiSecret`,
       streamSecretEnvName(target),
       stream?.apiSecret,
     );
@@ -175,14 +186,17 @@ module.exports = async function ensureStateRetirement(context) {
   const moves = planMoves(state, brandConfig);
   const movedFrom = new Set(moves.map((move) => move.from));
   const dropped = leafPaths(state)
-    .filter((path) => !KEPT_KEYS.has(path.split('.')[0]))
+    .filter((path) => RETIRED_SECTIONS.has(path.split('.')[0]))
     .filter((path) => !movedFrom.has(path));
 
-  // Nothing but the kept keys left: an already-retired brand still carrying
-  // its deploy record. Say so instead of rewriting the file every run.
+  // The machine records this migration never touches — what the file keeps
+  const kept = Object.fromEntries(Object.entries(state).filter(([key]) => !RETIRED_SECTIONS.has(key)));
+
+  // Nothing but records left: an already-retired brand. Say so instead of
+  // rewriting the file every run.
   if (moves.length === 0 && dropped.length === 0) {
-    console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} holds only the deploy record — already retired`);
-    return { output: { stateRetirement: { retired: true, kept: Object.keys(state) } } };
+    console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} holds only machine records — already retired`);
+    return { output: { stateRetirement: { retired: true, kept: Object.keys(kept) } } };
   }
 
   // ── The plan, printed the same way in both modes ──────────────────────────
@@ -224,12 +238,11 @@ module.exports = async function ensureStateRetirement(context) {
     process.env[move.env] = move.value;
   }
 
-  // The deploy record outlives the retirement — trim rather than delete when
-  // the brand has one
-  const kept = Object.fromEntries(Object.entries(state).filter(([key]) => KEPT_KEYS.has(key)));
+  // The machine records outlive the retirement — trim rather than delete when
+  // the brand has any
   if (Object.keys(kept).length > 0) {
     jetpack.write(statePath, kept, { jsonIndent: 2 });
-    console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} trimmed to the deploy record ${chalk.dim('(owned by @omega.js/devkit/deploy-record)')}`);
+    console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} trimmed to its machine records: ${chalk.cyan(Object.keys(kept).join(', '))} ${chalk.dim('(the deploy record is owned by @omega.js/devkit/deploy-record)')}`);
   } else {
     jetpack.remove(statePath);
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(STATE_FILE)} deleted`);

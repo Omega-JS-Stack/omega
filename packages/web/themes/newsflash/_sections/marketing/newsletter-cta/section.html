@@ -55,9 +55,6 @@
       <div class="position-relative">
         {% iftruthy args.superheadline.text %}
           <span class="badge bg-body-tertiary p-2 mb-3">
-            {% iftruthy args.superheadline.icon %}
-              {% omega_icon args.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
             {{ args.superheadline.text }}
           </span>
         {% endiftruthy %}

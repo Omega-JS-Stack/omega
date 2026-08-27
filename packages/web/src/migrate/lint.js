@@ -4,11 +4,13 @@
  * a real migration, pre-flight in --check).
  *
  * Known filter/tag names are derived at runtime from the REAL engine
- * registration path (a LiquidJS instance + template-kit's registerLiquid) —
- * the same SSOT the build uses, so the lists can't drift.
+ * registration path (a LiquidJS instance + template-kit's registerLiquid +
+ * the framework's own section/component tags) — the same SSOT the build uses,
+ * so the lists can't drift.
  */
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit');
+const { registerSectionTags } = require('../sections.js');
 
 // Jekyll-only tags with no LiquidJS/engine equivalent — hard findings
 const JEKYLL_ONLY_TAGS = {
@@ -34,6 +36,11 @@ function knownNames() {
   if (registry) return registry;
   const engine = new Liquid({ jekyllInclude: true });
   registerLiquid(engine, {});
+  // The target shape the lane converts INTO (#489): `{% section %}` and its
+  // siblings are registered by the framework, not template-kit, so without
+  // them a fully converted tree could never lint clean. No resolution roots —
+  // the lint asks which NAMES the engine knows, never what they render.
+  registerSectionTags(engine, { baseDirs: [], warn: () => {} });
   const filters = new Set([...Object.keys(engine.filters), ...ELEVENTY_NAMES]);
   const tags = new Set(Object.keys(engine.tags));
   // Block tags close with end<name>; Liquid's own end tags are parser-internal

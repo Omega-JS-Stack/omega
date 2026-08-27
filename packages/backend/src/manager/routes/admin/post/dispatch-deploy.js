@@ -6,6 +6,7 @@
  * surfaces in the response payload as `deployDispatched`.
  */
 const { buildDispatch, dispatchWorkflow } = require('@omega.js/devkit/deploy');
+const env = require('../../../libraries/env.js');
 
 const WORKFLOW = 'build.yml';
 
@@ -23,7 +24,7 @@ module.exports = async function dispatchDeploy(ctx, octokit, settings) {
     const { data } = await octokit.rest.repos.get({ owner, repo });
     const plan = buildDispatch({ owner, repo, workflow: WORKFLOW, ref: data.default_branch });
 
-    await dispatchWorkflow(plan, { token: process.env.GH_TOKEN });
+    await dispatchWorkflow(plan, { token: env.get('GH_TOKEN') });
     settings.deployDispatched = true;
     ctx.log(`dispatchDeploy(): dispatched ${WORKFLOW} on ${owner}/${repo}@${data.default_branch}`);
   } catch (e) {

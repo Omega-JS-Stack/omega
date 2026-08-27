@@ -206,6 +206,14 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     id: result.id,
     orderId: orderId,
     url: result.url,
+    // What the server actually RECEIVED to match this conversion with — key
+    // NAMES only, never a value ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)).
+    // The dev palette reads the browser's side of the same question off the
+    // document; this is the only way to see which of those cookies survived the
+    // trip, which is exactly where a blocked pixel shows up.
+    attribution: {
+      cookies: Object.keys(attribution?.cookies || {}),
+    },
   });
 };
 

@@ -1,5 +1,7 @@
 const powertools = require('node-powertools');
-const staleFallback = require('../stale-fallback.js');
+const fetchFailure = require('../fetch-failure.js');
+const assertRefundLinkage = require('../refund-linkage.js');
+const env = require('../../env.js');
 
 // Lazy singleton Stripe SDK instance
 let stripeInstance = null;
@@ -24,7 +26,7 @@ const Stripe = {
    */
   init() {
     if (!stripeInstance) {
-      const secretKey = process.env.STRIPE_SECRET_KEY;
+      const secretKey = env.get('STRIPE_SECRET_KEY');
 
       if (!secretKey) {
         throw new Error('STRIPE_SECRET_KEY environment variable is required');
@@ -38,15 +40,16 @@ const Stripe = {
 
   /**
    * Fetch the latest resource from Stripe's API
-   * Falls back to the raw webhook payload if the API call fails
+   * Stripe's answer is the only trusted source — a lookup that fails throws the
+   * classified failure ([../fetch-failure.js](../fetch-failure.js)) instead of
+   * degrading to the webhook payload
    *
    * @param {string} resourceType - 'subscription' | 'invoice' | 'session' | 'charge'
    * @param {string} resourceId - Stripe resource ID
-   * @param {object} rawFallback - Fallback data from webhook payload
    * @param {object} context - Additional context (e.g., { admin })
    * @returns {object} Full Stripe resource object
    */
-  async fetchResource(resourceType, resourceId, rawFallback, context) {
+  async fetchResource(resourceType, resourceId, context) {
     const stripe = this.init();
 
     try {
@@ -80,25 +83,13 @@ const Stripe = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      // If the API call fails but we have raw webhook data, use it — flagged and
-      // logged, because the payload is older than the answer we could not get
-      if (rawFallback && Object.keys(rawFallback).length > 0) {
-        return staleFallback(rawFallback, {
-          ctx: context?.ctx,
-          provider: 'stripe',
-          resourceType,
-          resourceId,
-          error: e,
-        });
-      }
-
-      throw e;
+      throw fetchFailure(e, { provider: 'stripe', resourceType, resourceId });
     }
   },
 
   /**
    * Extract the resource a Stripe webhook envelope carries
-   * The caller's stale fallback — the payload to use when the API re-fetch fails
+   * Identifiers only — the payload never drives state ([../fetch-failure.js](../fetch-failure.js))
    *
    * @param {object} raw - Raw Stripe webhook payload
    * @returns {object|null}
@@ -129,14 +120,86 @@ const Stripe = {
   },
 
   /**
-   * Extract refund details from a Stripe charge.refunded webhook payload
+   * What a Stripe refund actually moved, from Stripe's own record of the charge
    * Returns a unified shape so transition handlers stay provider-agnostic
    *
-   * @param {object} raw - Raw Stripe webhook payload
+   * The amounts used to be read off the webhook envelope, so a payload naming an
+   * inflated `amount_refunded` wrote that number onto the order and into the
+   * customer's refund email ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+   * They come from the charge Stripe answered for now: the one-time refund path
+   * already fetched it (`resourceType: 'charge'`), and the subscription path — whose
+   * fetched resource is the SUBSCRIPTION the refunded charge belongs to — reads it
+   * back by the charge id the payload names. An id is an identifier, the same trust
+   * level as the resourceId the event is looked up by; the numbers are Stripe's.
+   *
+   * Two things guard that second lookup: an envelope that names no charge at all
+   * fails PERMANENTLY before the call rather than deferring a malformed shape to
+   * the retry ladder ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)),
+   * and the charge it does answer with has to link back to the subscription the
+   * event is about ([../refund-linkage.js](../refund-linkage.js)).
+   *
+   * @param {object} resource - The resource already fetched from Stripe (the record the charge must link back to)
+   * @param {object} [options] - { raw, eventType, ctx } — the envelope, for the charge id only
+   * @returns {Promise<{ amount: string|null, currency: string, reason: string|null }>}
+   */
+  async getRefundDetails(resource, options = {}) {
+    // The charge the one-time path already fetched IS the answer, and it was
+    // fetched by the event's own resourceId — self-consistent, nothing to link
+    if (resource?.object === 'charge') {
+      return this.toRefundDetails(resource);
+    }
+
+    const chargeId = options.raw?.data?.object?.id || null;
+
+    // A refund envelope that names no charge cannot be looked up, and handing
+    // `undefined` to the SDK threw something that is not a 404 — so the #506 seam
+    // read a malformed envelope as UNREACHABLE and deferred it to the retry
+    // ladder, ten minutes at a time, until the dead-letter ceiling. Nothing about
+    // a shape like this gets better on the sixth attempt
+    // ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)).
+    if (!chargeId) {
+      const failure = new Error(`stripe getRefundDetails(): ${options.eventType || 'refund event'} carries no charge id at data.object.id, so Stripe cannot be asked what came back — the envelope arrived as ${describeEnvelope(options.raw)}`);
+
+      failure.permanent = true;
+
+      throw failure;
+    }
+
+    const charge = await this.fetchResource('charge', chargeId, options);
+
+    // The charge is a SECOND record, keyed by an id the payload chose: without a
+    // link back to the subscription this event is about, an unrelated charge from
+    // the same account would have booked its refund onto this order
+    // ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)). Stripe writes
+    // that link twice — the subscription the charge was made for, and the uid it
+    // was made under — and either one settles it.
+    const link = charge?.subscription
+      ? { field: 'subscription', found: charge.subscription, expected: resource?.id || null }
+      : { field: 'metadata.uid', found: this.getUid(charge || {}), expected: this.getUid(resource || {}) };
+
+    assertRefundLinkage({
+      provider: 'stripe',
+      refundType: 'charge',
+      refundId: chargeId,
+      resourceType: resource?.object || 'resource',
+      resourceId: resource?.id || null,
+      ctx: options.ctx,
+      ...link,
+    });
+
+    return this.toRefundDetails(charge);
+  },
+
+  /**
+   * Read the refund off a charge Stripe answered with
+   *
+   * The transform half of getRefundDetails(), split out because the test provider
+   * is its own API: it holds the charge already and must never reach for Stripe's.
+   *
+   * @param {object} charge - A Stripe charge object
    * @returns {{ amount: string|null, currency: string, reason: string|null }}
    */
-  getRefundDetails(raw) {
-    const charge = raw?.data?.object;
+  toRefundDetails(charge) {
     const amountCents = charge?.amount_refunded;
     const latestRefund = charge?.refunds?.data?.[0];
 
@@ -439,6 +502,27 @@ const Stripe = {
     };
   },
 };
+
+/**
+ * Say what a webhook envelope actually looked like
+ *
+ * A malformed envelope is a programmer/parser error, and the only thing that makes
+ * one debuggable is knowing what arrived instead of what was expected: the event
+ * type, and the keys the object it carried DID have
+ * ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)).
+ *
+ * @param {object|null} raw - The raw Stripe webhook payload
+ * @returns {string}
+ */
+function describeEnvelope(raw) {
+  const object = raw?.data?.object;
+
+  if (!object || typeof object !== 'object') {
+    return `type=${raw?.type || 'unknown'}, data.object=${object === undefined ? 'absent' : JSON.stringify(object)}`;
+  }
+
+  return `type=${raw?.type || 'unknown'}, data.object.object=${object.object || 'unnamed'}, data.object keys=[${Object.keys(object).join(', ')}]`;
+}
 
 /**
  * Map Stripe subscription status to unified status

@@ -13,6 +13,7 @@ const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warnin
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { seed } = require('../../test/seed.js');
 const { createChildLog } = require('../utils/attach-log-file');
+const { refuseWhenCustom } = require('../utils/project-type');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
@@ -439,6 +440,9 @@ function collectDescendantPids(rootPid) {
 
 class EmulatorCommand extends BaseCommand {
   async execute() {
+    // Custom-server mode exports no Cloud Functions to emulate (#584)
+    if (refuseWhenCustom(this.main.firebaseProjectPath, 'emulator')) return;
+
     // The emulator IS the backend's dev leg under brand-root `omega dev`, so it
     // shares the dev-log lane with `omega serve` (they never run together — same
     // ports). The firebase CHILD keeps its own dist/emulator.log (#197).

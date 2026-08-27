@@ -15,9 +15,9 @@
  */
 const { chosenProvider } = require('@omega.js/config');
 
-const { REQUIRES } = require('../../config.js');
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { SendGridAPI } = require('./lib/sendgrid-api.js');
@@ -47,7 +47,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.sendgridApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.campaigns.env);
+      const gate = await requestServiceInput(context, serviceInputSpec('campaigns'));
       if (gate) return gate;
     }
 

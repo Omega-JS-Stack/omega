@@ -6,7 +6,7 @@
  * passes through as custom data. Consent category: 'marketing'.
  */
 
-const { createAdapter, pick } = require('./resolve.js');
+const { createAdapter, pick, attachPage } = require('./resolve.js');
 
 // Meta's click/browser ids live in the user_data (match) block, never in the
 // event's custom data.
@@ -17,6 +17,8 @@ const adapter = createAdapter({
   consentCategory: 'marketing',
   attach: (descriptor, attribution) => {
     Object.assign(descriptor.userData, pick(attribution, ATTRIBUTION_KEYS));
+    // The Conversions API's `event_source_url` (#497) — the transport's to place.
+    attachPage(descriptor, attribution);
   },
 });
 

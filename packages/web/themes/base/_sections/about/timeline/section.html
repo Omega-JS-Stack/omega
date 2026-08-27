@@ -2,13 +2,14 @@
   <div class="container">
     <div class="omega-duo">
       <div class="omega-duo__aside omega-section-head" data-omega-reveal>
-        {% component "heading/section-head", superheadline: args.superheadline.text, headline: args.headline, sub: args.subheadline %}
+        {% component "heading/section-head", superheadline: args.superheadline.text, headline: args.headline, headline_accent: args.headline_accent, sub: args.subheadline %}
       </div>
 
       <div class="omega-timeline" data-omega-reveal-stagger="80">
         {% for item in args.items %}
           <div class="omega-timeline__item" data-omega-reveal>
-            <div class="omega-timeline__year">{{ item.year }}</div>
+            {%- comment %} A value is TEXT, never markup (#580). {% endcomment -%}
+            <div class="omega-timeline__year">{{ item.year | escape_once }}</div>
             <div class="omega-timeline__title">{{ item.title }}</div>
             <p class="omega-timeline__desc">{{ item.description }}</p>
           </div>

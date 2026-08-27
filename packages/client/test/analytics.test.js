@@ -389,6 +389,38 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     broken.setUserProperties({ plan: 'premium' });
   });
 
+  it('identity is main\'s: a renderer-side setUserId raises instead of no-opping (#480)', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    // The preload's surface carries setUserProperties and NO setUserId — main's
+    // auth bridge flips user_id off the same Firebase user, so identity is the
+    // one thing this bridge does not carry.
+    const forwarded = [];
+    const bridge = {
+      event: (name, params) => forwarded.push({ name, params }),
+      setUserProperties: () => {},
+    };
+
+    const renderer = new Analytics({
+      utilities: () => ({ getRuntime: () => 'web' }),
+      isDevelopment: () => false,
+    });
+    renderer.init({ projectId: 'proj-x', bridge });
+
+    assert.throws(
+      () => renderer.setUserId('firebase-uid-1'),
+      /the main process owns identity/,
+      'a renderer that sets an id nothing would ever read must say so',
+    );
+    assert.strictEqual(renderer.userId, null, 'and nothing was stored on the way out');
+
+    // The one path that calls it on every runtime keeps working: identity
+    // crosses no bridge, so the auth callback never reaches the throw.
+    renderer.handleAuthChange({ uid: 'uid-1', providerId: 'google' });
+    assert.strictEqual(renderer.userId, null, 'auth leaves the renderer\'s identity untouched');
+    assert.deepStrictEqual(forwarded, [], 'and fires nothing main already fires');
+  });
+
   it('the seam is the host\'s injected config value alone — a global can never bridge a page', async () => {
     const Manager = getManager();
     const savedConfig = Manager.config;

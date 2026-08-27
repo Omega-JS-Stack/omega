@@ -2,8 +2,8 @@
 layout: frontend/pages/updates/update
 
 meta:
-  title: "Version {{ page.update.version }} - {{ site.brand.name }}"
-  description: "{% capture updateFallback %}Release notes for version {{ page.update.version }} of {{ site.brand.name }}{% endcapture %}{{ page.update.summary | default: updateFallback }}"
+  title: "Version {{ page.update.version }} - {{ resolved.config.brand.name }}"
+  description: "{% capture updateFallback %}Release notes for version {{ page.update.version }} of {{ resolved.config.brand.name }}{% endcapture %}{{ page.update.summary | default: updateFallback }}"
   breadcrumb: "v{{ page.update.version }}"
 ---
 

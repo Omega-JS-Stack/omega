@@ -16,6 +16,7 @@ const VERBS = [
   ['omega company', 'the company workspace: `init` scaffolds one, `adopt <brand>` stamps a brand into it'],
   ['omega test', "run every target's test suites"],
   ['omega update', 'dependency-freshness fan-out over the targets'],
+  ['omega migrate', 'delete retired keys from config/omega.json5 (comments preserved)'],
   ['omega pipeline', 'the live full-cycle test: manage → deploy → verify'],
   ['omega devlog', "the manager's own development log"],
   ['omega version', 'print the installed version'],

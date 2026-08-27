@@ -118,6 +118,74 @@ test('firebase-auth-helpers: a changed iframe markup warns loudly instead of sil
   }
 });
 
+// #548 — nothing was cached: every production build fetched the six files
+// fresh, so one offline (or sandboxed, or rate-limited) build failed the whole
+// run AFTER emitting every page. The fetch is now write-through, and a failure
+// serves the last good copy loudly instead of taking the build down.
+test('firebase-auth-helpers: a fetch failure serves the cached copy with a loud warn (#548)', async () => {
+  const server = http.createServer((request, response) => {
+    response.end(request.url === '/__/auth/iframe' ? '<script src="iframe.js"></script>' : `content of ${request.url}`);
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const cacheDir = tmpOut();
+  const siteData = { cloud: { config: { projectId: 'real-proj' } } };
+
+  // A successful build warms the cache…
+  const warm = await fetchFirebaseAuthHelpers({ siteData, outDir: tmpOut(), logger: silentLogger, baseUrl, cacheDir });
+  assert.equal(warm.cached, false);
+
+  // …and the origin goes away (offline build, sandboxed run, rate limit).
+  // fetch() keeps its socket alive, so the pool is dropped with the listener.
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+
+  const warnings = [];
+  const outDir = tmpOut();
+  const result = await fetchFirebaseAuthHelpers({
+    siteData,
+    outDir,
+    logger: { log: () => {}, warn: (message) => warnings.push(message) },
+    baseUrl,
+    cacheDir,
+  });
+
+  assert.equal(result.skipped, false);
+  assert.equal(result.cached, true, 'the build survives on the cached helpers');
+  for (const file of HELPER_FILES) {
+    assert.ok(fs.existsSync(path.join(outDir, file.local || file.remote)), `${file.local || file.remote} written from cache`);
+  }
+  // Byte-identical to the fetched build, cache breaker and all
+  const expectedHash = crypto.createHash('md5').update('content of /__/auth/iframe.js').digest('hex').slice(0, 8);
+  assert.equal(fs.readFileSync(path.join(outDir, '__/auth/iframe.html'), 'utf8'), `<script src="iframe.js?cb=${expectedHash}"></script>`);
+  assert.equal(fs.readFileSync(path.join(outDir, '__/firebase/init.json'), 'utf8'), 'content of /__/firebase/init.json');
+
+  // The warn names the staleness — a cached helper set is a dated one
+  const warned = warnings.join('\n');
+  assert.match(warned, /cached/i, 'the warn says the helpers came from cache');
+  assert.match(warned, /\d{4}-\d{2}-\d{2}/, 'and dates the copy it served');
+});
+
+test('firebase-auth-helpers: a fetch failure with nothing cached stays fatal (#548)', async () => {
+  const server = http.createServer((request, response) => {
+    response.statusCode = 404;
+    response.end('not found');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const siteData = { cloud: { config: { projectId: 'real-proj' } } };
+    await assert.rejects(
+      () => fetchFirebaseAuthHelpers({ siteData, outDir: tmpOut(), logger: silentLogger, baseUrl, cacheDir: tmpOut() }),
+      /Failed to fetch Firebase auth helper.*HTTP 404/,
+      'a first-ever offline build has nothing to serve — that is still a loud failure',
+    );
+  } finally {
+    server.close();
+  }
+});
+
 test('firebase-auth-helpers: a failing fetch fails the build loudly — and a 4xx fails fast, no retries', async () => {
   const hitsByPath = new Map();
   const server = http.createServer((request, response) => {

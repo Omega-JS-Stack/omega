@@ -908,10 +908,22 @@ main > section.omega-photo-lead-band:first-of-type {
     &:hover {
       color: var(--omega-accent);
 
-      .omega-rowlist__meta {
+      .omega-rowlist__meta,
+      .omega-rowlist__desc {
         color: var(--omega-ink-muted);
       }
     }
+  }
+
+  // The row's secondary line (#563: a competitor's own description) — under
+  // the title, in the row's first cell, never picking up the link weight.
+  .omega-rowlist__desc {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--omega-ink-muted);
+    transition: color var(--omega-speed) var(--omega-ease);
   }
 
   .omega-rowlist__meta {

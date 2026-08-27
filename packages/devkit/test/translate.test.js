@@ -15,6 +15,7 @@ const {
   preserveWhitespace,
   CONTROL,
   BATCH_SIZE,
+  CONCURRENCY,
   resolveProvider,
   DEFAULT_MODELS,
   hashKey,
@@ -74,6 +75,29 @@ test('translateStrings: batches of 25 with the sentinel appended to each', async
   }
 });
 
+test('#604: batches fly CONCURRENCY-wide at once and land back in order', async () => {
+  // Sequential batching made one language a long serial wait: every 25-string
+  // batch paid the model's full latency before the next one was asked.
+  const strings = Array.from({ length: BATCH_SIZE * (CONCURRENCY * 2) }, (_, i) => `s${i}`);
+  let inFlight = 0;
+  let peak = 0;
+
+  const send = async ({ user }) => {
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    const payload = JSON.parse(user.slice(user.indexOf('\n\n') + 2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    inFlight--;
+    return { text: JSON.stringify(payload.map((s) => (s === CONTROL ? s : `${s}·XX`))), usage: { input: 1, output: 1 } };
+  };
+
+  const { result, usage } = await translateStrings({ strings, language: 'es', languageName: 'Spanish', send });
+
+  assert.strictEqual(peak, CONCURRENCY, `${CONCURRENCY} batches were in flight at once, not ${peak}`);
+  assert.deepStrictEqual(result, strings.map((s) => `${s}·XX`), 'completion order never reorders the result');
+  assert.strictEqual(usage.input, CONCURRENCY * 2, 'every batch is still counted');
+});
+
 test('translateStrings: length mismatch retries, then succeeds', async () => {
   let attempts = 0;
   const send = async ({ user }) => {
@@ -88,6 +112,91 @@ test('translateStrings: length mismatch retries, then succeeds', async () => {
   const { result } = await translateStrings({ strings: ['a', 'b'], language: 'es', languageName: 'Spanish', send });
   assert.strictEqual(result.length, 2);
   assert.strictEqual(attempts, 2);
+});
+
+test('#523: a batch the provider keeps collapsing is re-asked in halves, not lost', async () => {
+  // The playground's /blog/ship-the-docs-with-the-diff: 26 out, 25 back, on
+  // every attempt, in BOTH languages, across two runs — a model that merges a
+  // pair of adjacent twins is deterministic, so retrying the same batch can
+  // only fail the same way and the page shipped untranslated. Splitting the
+  // batch separates the pair and every string comes back.
+  const payloadSizes = [];
+  const send = async ({ user }) => {
+    const payload = JSON.parse(user.slice(user.indexOf('\n\n') + 2));
+    payloadSizes.push(payload.length);
+    // The collapse, reproduced: adjacent NEAR-identical strings come back as
+    // one. Exact twins no longer reach a batch (#529 dedupes them), but the
+    // near-twins a headline and its meta description are still adjacent.
+    const out = payload.filter((text, i) => i === 0 || text.slice(0, 20) !== payload[i - 1].slice(0, 20));
+    return { text: JSON.stringify(out), usage: { input: 1, output: 2 } };
+  };
+
+  const TWINS = ['Ship the docs with the diff', 'Ship the docs with the diff — a follow-up'];
+  const strings = Array.from({ length: BATCH_SIZE }, (_, i) => (i === 10 || i === 11 ? TWINS[i - 10] : `s${i}`));
+  const { result, usage } = await translateStrings({ strings, language: 'es', languageName: 'Spanish', send });
+
+  assert.deepStrictEqual(result, strings, 'every string comes back, in its own position');
+  assert.strictEqual(payloadSizes[0], BATCH_SIZE + 1, 'the full batch was asked first');
+  assert.ok(payloadSizes.length > 3, `the collapsing batch was split, not just retried: ${payloadSizes.join(', ')}`);
+  assert.ok(usage.input > 0 && usage.output > 0, 'every call the split made is counted');
+});
+
+test('#523: a single string the provider will not return whole still fails loudly', async () => {
+  // Splitting bottoms out: one string plus the sentinel is unambiguous, so a
+  // provider that still collapses it is broken — the page-language pair is
+  // skipped whole, never shipped half-translated.
+  const send = async ({ user }) => {
+    const payload = JSON.parse(user.slice(user.indexOf('\n\n') + 2));
+    return { text: JSON.stringify(payload.slice(1)), usage: {} };
+  };
+
+  await assert.rejects(
+    translateStrings({ strings: ['a', 'b'], language: 'es', languageName: 'Spanish', send }),
+    /length mismatch/
+  );
+});
+
+test('#529: a repeated string is translated once and fanned back to every occurrence', async () => {
+  // A page sends its title and description once per meta tag — <title>,
+  // og:title, twitter:title — so the failing #523 page shipped each of them
+  // three times, adjacently, in one batch. Every duplicate was AI spend, and
+  // adjacent twins are what the model merges.
+  const calls = [];
+  const strings = [
+    'Ship the docs with the diff',
+    'A post about shipping docs',
+    'Ship the docs with the diff',
+    'A post about shipping docs',
+    'Ship the docs with the diff',
+    'A post about shipping docs',
+    'Read more',
+  ];
+
+  const { result } = await translateStrings({ strings, language: 'es', languageName: 'Spanish', send: fakeSend(calls) });
+
+  assert.deepStrictEqual(result, strings.map((s) => `${s}·XX`), 'every occurrence lands translated, in its own position');
+  assert.strictEqual(calls.length, 1);
+
+  const payload = JSON.parse(calls[0].user.slice(calls[0].user.indexOf('\n\n') + 2));
+  assert.deepStrictEqual(
+    payload,
+    ['Ship the docs with the diff', 'A post about shipping docs', 'Read more', CONTROL],
+    'each unique string is sent exactly once',
+  );
+});
+
+test('#529: dedupe is what fills a batch, so uniques past the batch size still split', async () => {
+  // The dedupe happens BEFORE batching: 60 strings that are 30 unique ride two
+  // batches, not three.
+  const calls = [];
+  const unique = Array.from({ length: BATCH_SIZE + 5 }, (_, i) => `s${i}`);
+  const strings = [...unique, ...unique];
+
+  const { result } = await translateStrings({ strings, language: 'es', languageName: 'Spanish', send: fakeSend(calls) });
+
+  assert.strictEqual(result.length, strings.length, 'every occurrence comes back');
+  assert.deepStrictEqual(result.slice(0, unique.length), result.slice(unique.length), 'both halves got the same translations');
+  assert.strictEqual(calls.length, 2, `${unique.length} uniques is two batches, not ${Math.ceil(strings.length / BATCH_SIZE)}`);
 });
 
 test('translateStrings: altered control sentinel exhausts retries and throws', async () => {

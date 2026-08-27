@@ -30,6 +30,7 @@
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const JSON5 = require('json5');
 
 // Anything with a scheme (https:, mailto:, tel:, data:, javascript:, a brand's
 // own app protocol), a protocol-relative host, or a bare fragment leaves the site.
@@ -41,10 +42,18 @@ const LINK_ATTR = /\s(?:href|src)=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
 // as an href to any HTML-shaped scan).
 const HTML_OUTPUT = /(?:^|\/)[^/.]+$|\.html$/;
 
-// The brand's declared exceptions, relative to the target root. A plain JSON
-// map — source page → the links it is allowed to leave unresolved — because the
-// list is data a human maintains and shrinks, not config the merge chain layers.
-const EXCEPTIONS_FILE = path.join('config', 'link-exceptions.json');
+// Code DISPLAY, not markup (#521): a <pre> block prints escaped source, so the
+// `href=` inside it is characters on the page, not a link the page emits (the
+// section gallery prints a variant's args that way). Real anchors live outside.
+const CODE_DISPLAY = /<pre\b[^>]*>[\s\S]*?<\/pre>/gi;
+
+// The brand's declared exceptions, relative to the target root. A flat map —
+// source page → the links it is allowed to leave unresolved — because the list
+// is data a human maintains and shrinks, not config the merge chain layers.
+// json5 like every other consumer surface (#490): an exception is a last
+// resort, so the reason it exists lives beside it, in a comment.
+const EXCEPTIONS_FILE = path.join('config', 'link-exceptions.json5');
+const LEGACY_EXCEPTIONS_FILE = path.join('config', 'link-exceptions.json');
 
 /** `/foo/` and `/foo` are the same page; `/` is its own. */
 const normalize = (url) => url.replace(/\/+$/, '') || '/';
@@ -95,8 +104,9 @@ function scanLinks(pages, options) {
 
   for (const [id, html] of pages) {
     const dir = dirOf(id);
+    const markup = String(html).replace(CODE_DISPLAY, '');
 
-    for (const match of String(html).matchAll(LINK_ATTR)) {
+    for (const match of markup.matchAll(LINK_ATTR)) {
       const value = match[1] ?? match[2] ?? match[3];
       if (value === undefined) continue;
 
@@ -168,9 +178,18 @@ function applyExceptions(unresolved, exceptions) {
  * @returns {Object<string, string[]>} source page → its allowed dead links
  */
 function loadLinkExceptions(targetRoot) {
-  const file = path.join(targetRoot, EXCEPTIONS_FILE);
-  const declared = jetpack.read(file, 'json');
-  if (declared === undefined) return {};
+  const source = jetpack.read(path.join(targetRoot, EXCEPTIONS_FILE));
+  if (source === undefined) {
+    // A file left at the retired strict-JSON name would silently stop
+    // excusing anything — which reads as a wall of dead links with no cause.
+    if (jetpack.exists(path.join(targetRoot, LEGACY_EXCEPTIONS_FILE)) === 'file') {
+      throw new Error(`${LEGACY_EXCEPTIONS_FILE} is retired — rename it to ${EXCEPTIONS_FILE}, where each entry can carry its reason as a comment`);
+    }
+
+    return {};
+  }
+
+  const declared = JSON5.parse(source);
 
   const valid = declared
     && typeof declared === 'object'
@@ -214,5 +233,7 @@ module.exports = {
   EXTERNAL,
   LINK_ATTR,
   HTML_OUTPUT,
+  CODE_DISPLAY,
   EXCEPTIONS_FILE,
+  LEGACY_EXCEPTIONS_FILE,
 };

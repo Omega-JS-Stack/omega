@@ -94,11 +94,11 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 
 [tasks/package.js](../src/gulp/tasks/package.js):
 
-1. **Pre-hook** — runs `hooks/build:pre.js` if present
+1. **Pre-hook** — runs `hooks/build/pre.js` if present (the flat `hooks/build:pre.js` still resolves as a transition fallback)
 2. **Per-browser manifest normalization** — converts JSON5 → strict JSON for Chrome/Edge/Opera (Firefox tolerates JSON5 but normalized anyway)
 3. **Per-browser asset copy** to `packaged/<browser>/raw/`
 4. **Zip** to `packaged/<browser>/<name>.zip`
-5. **Post-hook** — runs `hooks/build:post.js`
+5. **Post-hook** — runs `hooks/build/post.js`
 6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
 
 ### Manifest compilation rules
@@ -106,9 +106,11 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 The compiled manifest is the source manifest merged with the framework defaults ([src/config/manifest.json](../src/config/manifest.json)), then adjusted per target:
 
 - **Declared beats default.** The defaults only fill keys your `src/manifest.json` never wrote — including arrays. An array you declare REPLACES the default (an empty array ships nothing), which is the only way to drop a framework default such as `externally_connectable`'s dev origin from a production build ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)).
+- **`externally_connectable` defaults to your BRAND origin.** The default `matches` is `<brand.url origin>/*`, plus the resolved dev-website origin in a dev build only. A packaged build used to ship the localhost dev origin alone, so the live brand site could not message the published extension ([#583](https://github.com/Omega-JS-Stack/omega/issues/583)). With no `brand.url`, a build-mode build declares no origin and says so. The scaffolded boot test `test/boot/externally-connectable.test.js` asserts the brand origin against the real packaged manifest.
+- **`homepage_url` is baked from `brand.url`** on every target — the store listing's developer-site link, which nothing emitted before ([#576](https://github.com/Omega-JS-Stack/omega/issues/576)). A value you declare wins; with no `brand.url` the key ships absent.
 - **Icons are pruned to what the build minted** — a manifest pointing at an icon that isn't there is an extension Chrome refuses to load.
 - **chromium / opera** — `background.scripts` dropped (MV3 service worker).
-- **firefox** — `background.service_worker` becomes `background.scripts`; `side_panel` becomes `sidebar_action` (Firefox has no side panel key) and the `sidePanel` permission is dropped; packaging FAILS unless `browser_specific_settings.gecko.id` is set, because Firefox cannot identify, sign, or update an add-on without one ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
+- **firefox** — `background.service_worker` becomes `background.scripts`; `side_panel` becomes `sidebar_action` (Firefox has no side panel key) and the `sidePanel` permission is dropped; `browser_specific_settings.gecko.id` is DERIVED when you declare none — `extension@<brand.url host>`, or `extension@<brand.id>.extension` with no url, and packaging fails only when there are no brand facts at all to derive from ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)). Firefox cannot identify, sign, or update an add-on without an id, so a fresh scaffold builds out of the box — but **declare your own id before the first publish** ([#574](https://github.com/Omega-JS-Stack/omega/issues/574)): it must stay stable across every release, and `brand.url` can change.
 
 ## Build modes
 

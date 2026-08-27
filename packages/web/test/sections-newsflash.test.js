@@ -19,7 +19,7 @@ const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 
 
 test('cp213/#177: newsflash index bands: kept forks in nf vocabulary, stats falls through to base', async () => {
   const pages = await buildWith(nfData);
-  const home = pages.get('/test/components/hero-demo-input'); // rides the index layout
+  const home = pages.get('/about'); // the fixture page that rides the index layout
 
   // marketing/stats fork is DELETED: the BASE band serves, and the
   // data-omega-countup contract newsflash had dropped returns with it.
@@ -58,7 +58,7 @@ test('cp215: news/story-card + news/byline — the posts-driven tile family (com
   assert.ok(!growth.includes('newsflash-story-card'), 'no fork tile on the fallthrough page');
 
   // Index bands: top stories + more-to-chew-on tiles via the same component
-  const home = pages.get('/test/components/hero-demo-input');
+  const home = pages.get('/about'); // rides the index layout
   assert.ok(home.includes('Mini story 16'), 'top-stories tile (slot 3)');
   assert.ok(home.includes('Mini story 03'), 'more-to-chew-on tile (slot 17)');
 });
@@ -68,7 +68,7 @@ test('cp216/#177: rule-head/lede on the kept forks; about and team fall through 
 
   // The link slot renders live: index top-stories and blog/post related both
   // pass link args through the rule-head component (BEM classes).
-  const home = pages.get('/test/components/hero-demo-input');
+  const home = pages.get('/about'); // rides the index layout
   assert.ok(/Top stories<\/h2>[\s\S]{0,200}View all/.test(home), 'top-stories head links View all through the component');
   assert.ok(home.includes('newsflash-rule-head__rule'), 'rule element wears the BEM class');
   const post = pages.get('/blog/first-post');
@@ -146,7 +146,7 @@ test('cp218: the doctrine half that stays — body-called hero deliberately fall
 
 test('cp218/#177: the rail signup card: the kept newsletter-cta fork\'s rail variant', async () => {
   const pages = await buildWith(nfData);
-  const home = pages.get('/test/components/hero-demo-input'); // rides the index layout
+  const home = pages.get('/about'); // the fixture page that rides the index layout
 
   // The old inline card posted to action="/email-subscription" — a page that
   // doesn't exist. The rail variant of the nf newsletter-cta override rides

@@ -5,8 +5,8 @@
  * The refund of a one-time purchase carries the CHARGE that moved the money back
  * and nothing else, so the pipeline asks the library for a charge. The library
  * knew subscriptions, invoices and sessions only — 'charge' fell straight through
- * to "Unknown resource type", so every REAL Stripe one-time refund took the
- * stale-fallback path and logged an error instead of reading the charge back.
+ * to "Unknown resource type", so every REAL Stripe one-time refund failed its
+ * lookup instead of reading the charge back.
  *
  * The SDK is the one thing stubbed here: retrieving a charge needs a live Stripe
  * account. Everything under test runs for real — the branch, the expand, and the
@@ -60,10 +60,9 @@ module.exports = {
         };
 
         const resource = await withStripeSdk(sdkReturning(charge, calls), () => {
-          return Stripe.fetchResource('charge', CHARGE_ID, { id: CHARGE_ID, _fallback: true }, {});
+          return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
-        assert.equal(resource._stale, undefined, 'A charge the API answered must not be flagged stale');
         assert.equal(resource.id, CHARGE_ID, 'The charge itself is the resource');
         assert.equal(resource.metadata.orderId, '1111-2222-3333', 'The charge metadata comes through');
         assert.equal(calls.length, 1, 'The charge should be retrieved once');
@@ -89,7 +88,7 @@ module.exports = {
         };
 
         const resource = await withStripeSdk(sdkReturning(charge, []), () => {
-          return Stripe.fetchResource('charge', CHARGE_ID, {}, {});
+          return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
         assert.equal(Stripe.getUid(resource), '_test-intent-uid', 'The uid should resolve from the PaymentIntent');
@@ -109,7 +108,7 @@ module.exports = {
         };
 
         const resource = await withStripeSdk(sdkReturning(charge, []), () => {
-          return Stripe.fetchResource('charge', CHARGE_ID, {}, {});
+          return Stripe.fetchResource('charge', CHARGE_ID, {});
         });
 
         assert.equal(Stripe.getUid(resource), '_test-charge-uid', 'The charge is the newer record of the two');
@@ -118,8 +117,10 @@ module.exports = {
     },
 
     {
-      name: 'a-failed-retrieve-still-falls-back-to-the-webhook-payload',
+      name: 'a-failed-retrieve-throws-rather-than-answering-with-the-payload',
       async run({ assert }) {
+        // The charge the pipeline acts on is the one Stripe answered with. A
+        // retrieve that fails has no answer to give ([#506]).
         const sdk = {
           charges: {
             retrieve: async () => {
@@ -128,12 +129,17 @@ module.exports = {
           },
         };
 
-        const payload = { id: CHARGE_ID, object: 'charge', metadata: { uid: '_test-charge-uid' } };
+        let threw = null;
 
-        const resource = await withStripeSdk(sdk, () => Stripe.fetchResource('charge', CHARGE_ID, payload, {}));
+        try {
+          await withStripeSdk(sdk, () => Stripe.fetchResource('charge', CHARGE_ID, {}));
+        } catch (e) {
+          threw = e;
+        }
 
-        assert.equal(resource._stale, true, 'An unreachable API still falls back to the payload, flagged');
-        assert.equal(resource.id, CHARGE_ID, 'The webhook payload comes through');
+        assert.ok(threw, 'A failed retrieve must throw');
+        assert.equal(threw.notFound, false, 'An unreachable Stripe is transient, not a charge that does not exist');
+        assert.match(threw.message, /could not be reached/, 'The failure says the lookup never got an answer');
       },
     },
   ],

@@ -2,21 +2,22 @@
 layout: frontend/pages/legal/document
 
 meta:
-  title: "Terms Of Service - {{ site.brand.name }}"
+  title: "Terms Of Service - {{ resolved.config.brand.name }}"
   description: "By accessing and using our products and services, you agree to comply with the Terms of Use listed here."
   breadcrumb: "Terms of Service"
 
-client:
-  exitPopup:
-    enabled: false
+config:
+  client:
+    exitPopup:
+      enabled: false
 ---
 
-{% capture brand %}**{{ site.brand.name | omega_liquify }}**{% endcapture %}
+{% capture brand %}**{{ resolved.config.brand.name | omega_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | omega_liquify }}{% endcapture %}
 
 <p class="omega-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
-Welcome to [{{ site.url }}]({{ site.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"){% if site.brand.company and site.brand.company != site.brand.name %}, a brand that is a part of our parent company, **{{ site.brand.company }}**.{% else %}.{% endif %} By visiting our website ("the website","our website", "the site", or "our site"), using the {{ brand }} application ("the software", "our software", "the application", "our application", "the app", or "our app"), and/or accessing the information, resources, services, and tools we provide, you acknowledge, understand, and agree to accept and adhere to the following {{ breadcrumb }} as stated in this policy. Our Policy applies to all visitors, users, and others who access the Service ("Users").
+Welcome to [{{ resolved.config.url }}]({{ resolved.config.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"){% if resolved.config.brand.company and resolved.config.brand.company != resolved.config.brand.name %}, a brand that is a part of our parent company, **{{ resolved.config.brand.company }}**.{% else %}.{% endif %} By visiting our website ("the website","our website", "the site", or "our site"), using the {{ brand }} application ("the software", "our software", "the application", "our application", "the app", or "our app"), and/or accessing the information, resources, services, and tools we provide, you acknowledge, understand, and agree to accept and adhere to the following {{ breadcrumb }} as stated in this policy. Our Policy applies to all visitors, users, and others who access the Service ("Users").
 
 All third-party trademarks are the property of their respective owners.
 
@@ -24,7 +25,7 @@ Please read these {{ brand }} Terms of Service ("Terms of Service", "Agreement")
 
 Our {{ breadcrumb }} is designed to provide transparency into our services and products, in a format that our users can easily navigate, read, and understand. We are dedicated to providing a fair and high-quality service to you.
 
-"Subscriber" is used to describe a user of a {{ brand }} Product who pays a fee to obtain enhanced features of that {{ brand }} Product. More information about subscriptions can be found on our [pricing page]({{ site.url }}/pricing).
+"Subscriber" is used to describe a user of a {{ brand }} Product who pays a fee to obtain enhanced features of that {{ brand }} Product. More information about subscriptions can be found on our [pricing page]({{ resolved.config.url }}/pricing).
 
 "{{ brand }} Product(s)" is used as shorthand for our services including all {{ brand }} websites used to distribute these services and products published by {{ brand }}. THE ONGOING SUPPLY OF ANY PARTICULAR {{ brand }} PRODUCT IS NOT GUARANTEED. SOME {{ brand }} PRODUCTS HAVE AGE RESTRICTIONS.
 
@@ -66,9 +67,9 @@ It is understood that:
 8. You may not use {{ brand }} for commercial purposes or for the purpose of resale or redistribution, whether or not you charge a fee, unless you have written permission from {{ brand }}.
 9. In using the {{ brand }} application or the {{ brand }} website, you understand that you may be required to view advertisements, view sponsored content, and/or interact, either manually or automatically, with online content including but not limited to other {{ brand }} users and/or their promoted content.
 10. You agree to use {{ brand }} at your own risk and understand that anything that happens to your account(s) you may have with third-party sites and services, including but not limited to the termination, suspension, or limiting of the account before, during, or after your use of {{ brand }}, is not the responsibility of {{ brand }}.
-11. You agree to read and accept the terms of our [Privacy Policy]({{ site.url }}/privacy).
+11. You agree to read and accept the terms of our [Privacy Policy]({{ resolved.config.url }}/privacy).
 12. In compliance with the GDPR, you agree and understand that we only collect data that we deem necessary to offer our services and that you have full right to deletion of the data if requested. You agree that any information you provide is freely given and that you are informed of your choice about providing this data. You agree to provide an unambiguous indication signifying the agreement to the collection and processing of personal data related to you.
-13. You agree that {{ brand }} may collect, use, and disclose your personal data which you have provided in this form, for providing marketing material that you have agreed to receive, in accordance with our [Privacy Policy]({{ site.url }}/privacy).
+13. You agree that {{ brand }} may collect, use, and disclose your personal data which you have provided in this form, for providing marketing material that you have agreed to receive, in accordance with our [Privacy Policy]({{ resolved.config.url }}/privacy).
 14. By using {{ brand }}, you agree to opt in to the tracking of usage data both on the website and in the application for the safety and betterment of our service.
 15. You agree that after {{ brand }} is installed on your computer, it may automatically update itself by installing new and/or revised files relevant to the application.
 16. The sharing of {{ brand }} accounts is strictly prohibited. {{ brand }} accounts with multiple simultaneous logins will be suspended or banned at our discretion.
@@ -87,7 +88,7 @@ We reserve the right to alter the amount or terms of our subscription fees at an
 We reserve the right to charge you for any unauthorized use of your subscription by third parties. We reserve the right to terminate your account without the possibility of a refund if we find that you are violating any portion of this contract.
 
 ### Free Trial Period Eligibility
-The availability and duration of the free trial period are subject to change and may not be available at all times. The current trial and pricing information is available on our [pricing page]({{ site.url }}/pricing).
+The availability and duration of the free trial period are subject to change and may not be available at all times. The current trial and pricing information is available on our [pricing page]({{ resolved.config.url }}/pricing).
 
 If you have not previously benefited from a free trial of our service, you may be eligible to receive a trial period at no cost.
 
@@ -103,13 +104,13 @@ You are eligible for a full refund of the subscription fee if you cancel your su
 
 If your subscription plan did not include a free trial period, you are not eligible for a refund on your subscription fee.
 
-You may cancel your subscription at any time by visiting [{{ site.url }}/account]({{ site.url }}/account) and navigating to the Billing section of your account. Any other method of cancellation including email, phone, or other means will not be accepted unless otherwise stated or required by law.
+You may cancel your subscription at any time by visiting [{{ resolved.config.url }}/account]({{ resolved.config.url }}/account) and navigating to the Billing section of your account. Any other method of cancellation including email, phone, or other means will not be accepted unless otherwise stated or required by law.
 
 Upon cancellation, you will not be charged any further subscription fees. No payments already made in respect of subscriptions will be refunded (wholly or partly).
 
 Any other purchases, including one-time payments, add-ons, or other sales on our site that do not include a free trial period are final and non-refundable once processed.
 
-Should you request a refund, we will determine the eligibility of your refund. If approved, you will be refunded via the same payment method you originally used. Requests can be made using our [refund request form]({{ site.url }}/account#refund).
+Should you request a refund, we will determine the eligibility of your refund. If approved, you will be refunded via the same payment method you originally used. Requests can be made using our [refund request form]({{ resolved.config.url }}/account#refund).
 
 ### Debt Collection
 In the event of an outstanding balance on your account, we reserve the right to engage debt collection agencies to recover the unpaid amount.
@@ -151,4 +152,4 @@ If any provision of this agreement is determined to be invalid, illegal, or unen
 Unless otherwise expressed, {{ brand }} expressly disclaims all warranties and conditions of any kind, whether expressed or implied, including but not limited to, warranties and conditions of merchantability, fitness for a particular purpose, and non-infringement.
 
 ## Contact Information
-If you have any questions, comments, or concerns, please contact us: [{{ site.url }}/contact]({{ site.url }}/contact)
+If you have any questions, comments, or concerns, please contact us: [{{ resolved.config.url }}/contact]({{ resolved.config.url }}/contact)

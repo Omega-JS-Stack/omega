@@ -14,19 +14,28 @@ const Test = {
   },
 
   /**
-   * Fetch resource — test provider has no real API
+   * Fetch resource — the test provider IS its own API
    *
-   * When the requested resourceType doesn't match the fallback (e.g., requesting a subscription
-   * but the fallback is an invoice from invoice.payment_failed), look up the existing resource
-   * from Firestore instead of returning mismatched data.
+   * The one library that may read the event body ([../fetch-failure.js](../fetch-failure.js)):
+   * there is no test provider out there to ask, so its "API records" are the
+   * emulator's own payments-orders plus the body the event carried. A REAL
+   * provider never reads it — that is the trust rule this seam enforces
+   * ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)) — and the route
+   * refuses `provider=test` in production, so nothing outside a test run reaches here.
+   *
+   * When the requested resourceType doesn't match the event's own resource (e.g.,
+   * requesting a subscription but the event carries an invoice from
+   * invoice.payment_failed), look up the existing resource from Firestore instead
+   * of returning mismatched data.
    */
-  async fetchResource(resourceType, resourceId, rawFallback, context) {
-    // If the fallback matches the requested type AND has a UID, return it directly
+  async fetchResource(resourceType, resourceId, context) {
+    const eventResource = this.extractResource(context?.raw) || {};
+
+    // If the event's resource matches the requested type AND has a UID, return it directly
     // When UID is missing (e.g., PAYMENT.SALE events), fall through to Firestore lookup
     // so we can reconstruct a resource with the UID from the order's owner field
-    const fallbackHasUid = rawFallback?.metadata?.uid;
-    if (rawFallback?.object === resourceType && fallbackHasUid) {
-      return rawFallback;
+    if (eventResource.object === resourceType && eventResource.metadata?.uid) {
+      return eventResource;
     }
 
     // Look up the existing resource from payments-orders in Firestore
@@ -47,10 +56,10 @@ const Test = {
         if (resourceType === 'subscription' && data.unified) {
           const reconstructed = buildStripeSubscriptionFromUnified(data.unified, resourceId, context?.eventType, context?.config, data.owner);
 
-          // If the fallback matched the type but lacked UID, overlay the webhook's new state
-          // onto the reconstructed resource, but keep the reconstructed metadata (has uid)
-          if (rawFallback?.object === resourceType) {
-            return { ...rawFallback, metadata: { ...rawFallback.metadata, ...reconstructed.metadata } };
+          // If the event's resource matched the type but lacked UID, overlay its new
+          // state onto the reconstructed resource, but keep the reconstructed metadata (has uid)
+          if (eventResource.object === resourceType) {
+            return { ...eventResource, metadata: { ...eventResource.metadata, ...reconstructed.metadata } };
           }
 
           return reconstructed;
@@ -62,9 +71,9 @@ const Test = {
         if (data.type === 'one-time' && data.unified) {
           const reconstructed = buildStripeOneTimeFromOrder(data, resourceId);
 
-          // Keep the webhook's fresh state, take the metadata only the order has
-          if (rawFallback && Object.keys(rawFallback).length > 0) {
-            return { ...rawFallback, metadata: { ...rawFallback.metadata, ...reconstructed.metadata } };
+          // Keep the event's fresh state, take the metadata only the order has
+          if (Object.keys(eventResource).length > 0) {
+            return { ...eventResource, metadata: { ...eventResource.metadata, ...reconstructed.metadata } };
           }
 
           return reconstructed;
@@ -72,13 +81,14 @@ const Test = {
       }
     }
 
-    // Last resort: return the raw fallback
-    return rawFallback;
+    // Last resort: the event's own resource is all this provider has
+    return eventResource;
   },
 
   /**
    * Extract the resource the webhook envelope carries — delegates to Stripe
-   * (test provider uses Stripe-shaped data)
+   * (test provider uses Stripe-shaped data), and is where its own fetchResource
+   * reads the event body it answers from
    */
   extractResource(raw) {
     return Stripe.extractResource(raw);
@@ -99,10 +109,21 @@ const Test = {
   },
 
   /**
-   * Extract refund details — delegates to Stripe (test provider uses Stripe-shaped data)
+   * Refund details — Stripe's reader over the charge this provider has
+   *
+   * The test provider IS its own API ([../fetch-failure.js](../fetch-failure.js)),
+   * so the charge of record is whichever one it already holds: the fetched
+   * resource when the event resolved to the charge itself, otherwise the event's
+   * own body. Never a real Stripe lookup — there is no Stripe account behind a
+   * test-provider event to answer one
+   * ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
    */
-  getRefundDetails(raw) {
-    return Stripe.getRefundDetails(raw);
+  async getRefundDetails(resource, options = {}) {
+    const charge = resource?.object === 'charge'
+      ? resource
+      : this.extractResource(options.raw);
+
+    return Stripe.toRefundDetails(charge);
   },
 
   /**

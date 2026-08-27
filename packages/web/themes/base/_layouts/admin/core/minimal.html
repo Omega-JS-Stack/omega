@@ -6,18 +6,19 @@ sitemap:
 meta:
   index: false
 
-client:
-  auth:
-    config:
-      policy: "authenticated"
-      roles:
-        admin: true
-  consent:
-    enabled: false
-  chatsy:
-    enabled: false
-  exitPopup:
-    enabled: false
+config:
+  client:
+    auth:
+      config:
+        policy: "authenticated"
+        roles:
+          admin: true
+    consent:
+      enabled: false
+    chatsy:
+      enabled: false
+    exitPopup:
+      enabled: false
 ---
 
 {{ content | omega_content_format }}

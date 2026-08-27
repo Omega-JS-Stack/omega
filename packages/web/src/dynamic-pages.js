@@ -211,7 +211,7 @@ function collectionBlock(collection) {
  * own values always win; this only fills what it left unset.
  * @param {object} collection - a readCollections entry
  * @param {object} data - the document's data cascade (mutated in place)
- * @param {string} [brandName] - site.brand.name, the tail of every page title
+ * @param {string} [brandName] - the brand name (resolved.config.brand.name), the tail of every page title
  */
 function applyDocumentData(collection, data, brandName) {
   data.collection = collectionFacts(collection);
@@ -263,7 +263,7 @@ function collectionPages(collection) {
         block,
         '',
         'meta:',
-        `  title: "${escapeYaml(collection.title)} - {{ site.brand.name }}"`,
+        `  title: "${escapeYaml(collection.title)} - {{ resolved.config.brand.name }}"`,
         `  description: ${yaml(collection.description)}`,
         `  breadcrumb: ${yaml(collection.title)}`,
         '',
@@ -300,7 +300,7 @@ function collectionPages(collection) {
         // and the same per-term format. The term rides the `category`
         // pagination alias, so the meta reads it through `resolved`.
         'meta:',
-        `  title: "{{ resolved.category.name | omega_title_case }} - ${escapeYaml(collection.title)} - {{ site.brand.name }}"`,
+        `  title: "{{ resolved.category.name | omega_title_case }} - ${escapeYaml(collection.title)} - {{ resolved.config.brand.name }}"`,
         `  description: "Browse all ${escapeYaml(collection.title)} in the {{ resolved.category.name | omega_title_case }} category."`,
         '  breadcrumb: "{{ resolved.category.name | omega_title_case }}"',
         '',

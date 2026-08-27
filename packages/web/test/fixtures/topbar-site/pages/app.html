@@ -3,23 +3,24 @@ layout: backend/core/minimal
 permalink: /app
 meta:
   title: App
-theme:
-  header:
-    actions:
-      enabled: true
-      items:
-        - label: Unsized header action
-          href: /unsized
-          icon: bolt
-          color: primary
-        - label: Large header action
-          href: /large
-          size: lg
-        - label: Unsized header dropdown
-          icon: gear
-          dropdown:
-            - label: One
-              href: /one
+config:
+  theme:
+    header:
+      actions:
+        enabled: true
+        items:
+          - label: Unsized header action
+            href: /unsized
+            icon: bolt
+            color: primary
+          - label: Large header action
+            href: /large
+            size: lg
+          - label: Unsized header dropdown
+            icon: gear
+            dropdown:
+              - label: One
+                href: /one
 ---
 
 <p id="app-page-content">Hello from the topbar fixture</p>

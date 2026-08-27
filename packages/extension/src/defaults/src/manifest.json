@@ -60,10 +60,11 @@
     extension_pages: "script-src 'self'; object-src 'self'; worker-src 'self';",
   },
 
-  // Origins allowed to message this extension. DECLARING the key is
-  // authoritative — an empty array ships NO origins at all, including the
-  // framework default that lets your local website talk to the extension.
-  // Leave it out to keep the default.
+  // Origins allowed to message this extension. The framework default is your
+  // brand's own origin (from `brand.url`), plus the local dev website's origin
+  // in a dev build — so the live site can message the published extension.
+  // DECLARING the key is authoritative: it REPLACES that default outright, and
+  // an empty array ships NO origins at all. Leave it out to keep the default.
   // externally_connectable: {
   //   matches: [
   //     'https://example.com/*',
@@ -112,8 +113,13 @@
   // IDs
   browser_specific_settings: {
     gecko: {
-      // REQUIRED for the firefox artifact — packaging FAILS until you set your
-      // own id (Firefox cannot identify, sign, or update an add-on without one).
+      // The firefox artifact needs an add-on id (Firefox cannot identify, sign,
+      // or update an add-on without one). Leave this commented out and the build
+      // DERIVES `extension@<your brand host>` from the brand config — only a
+      // project with no brand facts at all fails. Declare your own before the
+      // FIRST publish: the id must stay stable across releases, an id assigned
+      // at submission can never be changed from a self-hosted build, and
+      // `brand.url` can change.
       // id: 'my-addon@example.com',
       // strict_min_version: '91.0',
       data_collection_permissions: {

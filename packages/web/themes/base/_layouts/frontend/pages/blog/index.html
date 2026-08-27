@@ -5,12 +5,11 @@ layout: frontend/core/base
 hero:
   headline: "Thoughts, news and"
   headline_accent: "stories"
-  subheadline: "The latest from {{ site.brand.name }}: product news, guides, and perspectives."
+  subheadline: "The latest from {{ resolved.config.brand.name }}: product news, guides, and perspectives."
 
 # Newsletter CTA Section
 newsletter_cta:
   superheadline:
-    icon: "envelope"
     text: "Newsletter"
   headline: "Never miss a post"
   subheadline: "Get the latest insights delivered straight to your inbox. No spam, unsubscribe anytime."
@@ -237,7 +236,7 @@ newsletter_cta:
     {% endif %}
 
     <!-- In-Feed Vert (auto placement — the advertising config key gates it) -->
-    {% if site.advertising %}
+    {% if resolved.config.advertising %}
       <div class="row justify-content-center">
         <div class="col-12 col-lg-8">
           {% section "verts/unit", type: "in-feed" %}

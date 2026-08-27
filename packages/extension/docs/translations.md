@@ -39,6 +39,10 @@ Keys with a `message` field:
 
 The `description` field provides context to the translator (helps Claude pick the right translation when a word is ambiguous).
 
+## What the scaffold seeds
+
+`config/messages.json` is scaffolded once (never overwritten) with the brand already rendered in: `appName`, `appNameShort` and `btnTooltip` from `brand.name`, and `appDescription` from `brand.description` when it fits the 200-character Chrome Web Store cap — a longer or absent description falls back to "The official &lt;brand&gt; browser extension." ([#573](https://github.com/Omega-JS-Stack/omega/issues/573)). Edit any of them afterward; setup will not touch them again.
+
 ## Manifest `__MSG_*__` placeholders
 
 `src/manifest.json` references locale keys via `__MSG_<key>__`:

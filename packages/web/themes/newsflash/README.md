@@ -52,9 +52,11 @@ file in the theme must appear here, and every listed path must exist.
 Everything else falls through to base. The scss floor for the fallthrough
 vocabulary comes from classy's token-pure partials (imported in
 `_theme.scss`) painted through this theme's `--omega-*` re-values, with
-editorial overlays on top (`css/components/_panels.scss`, the omega voice
-rules in `css/base/_utilities.scss`, the masthead re-skin of `.omega-nav` in
-`css/layout/_navigation.scss`, and the 404/pricing page css).
+editorial overlays on top (`css/components/_panels.scss` — the marketing set
+pieces, plan cards included, since `marketing/pricing-cards` composes them
+off /pricing too (#531) — the omega voice rules in `css/base/_utilities.scss`,
+the masthead re-skin of `.omega-nav` in `css/layout/_navigation.scss`, and the
+404/pricing page css).
 
 ## Select the theme
 

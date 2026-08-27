@@ -5,14 +5,13 @@ layout: frontend/core/base
 hero:
   headline: "We'd love your"
   headline_accent: "feedback"
-  subheadline: "Help us improve {{ site.brand.name }} by sharing your experience"
+  subheadline: "Help us improve {{ resolved.config.brand.name }} by sharing your experience"
 
 # Feedback Form Section
 feedback_form:
   superheadline:
-    icon: "face-smile"
     text: "Your experience"
-  headline: "How would you rate <em>{{ site.brand.name }}</em>?"
+  headline: "How would you rate <em>{{ resolved.config.brand.name }}</em>?"
   subheadline: "Select a rating and let us know what you think."
   ratings:
     - id: "dislike"
@@ -87,7 +86,7 @@ prerender_icons:
               <!-- Positive feedback? -->
               <div class="mb-4">
                 <label for="feedback-positive" class="form-label fw-semibold">
-                  What do you like about {{ site.brand.name }}?
+                  What do you like about {{ resolved.config.brand.name }}?
                 </label>
                 <textarea class="form-control form-control-lg" id="feedback-positive" name="positive" rows="2"
                   placeholder="Tell us what you enjoy..."
@@ -137,7 +136,7 @@ prerender_icons:
         </div>
         <h3 class="omega-display omega-display--section mb-3" id="review-modal-label">You're <em>awesome</em>!</h3>
         <p class="text-muted mb-3">
-          We're so glad you love {{ site.brand.name }}! Share your experience on a review site to be entered to win a $100 gift card.
+          We're so glad you love {{ resolved.config.brand.name }}! Share your experience on a review site to be entered to win a $100 gift card.
         </p>
         <div class="alert alert-warning text-start small mb-4" role="alert">
           {% omega_icon "circle-exclamation", "me-1" %}

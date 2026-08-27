@@ -46,7 +46,11 @@ module.exports = {
           'CLAUDE.md',
           'docs/README.md',
           'test/README.md',
+          'test/_helpers/connect-trap.js',
           'test/_init.js',
+          'test/_unit/registration.test.js',
+          'test/_unit/rules-posture.test.js',
+          'test/_unit/socket-free.test.js',
         ];
         assert.deepEqual(result.written.slice().sort(), expected);
 
@@ -62,6 +66,54 @@ module.exports = {
         // Marker files ship with the protocol sections intact.
         const env = jetpack.read(path.join(tmp, '.env'));
         assert.ok(env.includes(DEFAULT_MARKER) && env.includes(CUSTOM_MARKER), '.env should carry both section markers');
+      },
+    },
+    {
+      name: 'static-test-lane-scaffolds-socket-free-with-its-preload-wired',
+      async run({ assert }) {
+        // #567: every ported brand hand-copied this lane. It ships from the
+        // defaults tree now — the connect trap, the three skeleton suites, and
+        // the `test` script that preloads the trap into every test process.
+        const tmp = makeTmp();
+        scaffoldDefaults({ outputDir: tmp, logger: quiet });
+
+        const trap = path.join(tmp, 'test', '_helpers', 'connect-trap.js');
+        assert.equal(jetpack.exists(trap), 'file', 'the connect trap is the lane — without it the suite can reach live Firebase');
+
+        // The trap is a PRELOAD: requiring it installs the refusal, and the
+        // skeleton asserts the marker it leaves behind.
+        const trapSource = jetpack.read(trap);
+        assert.ok(trapSource.includes('net.Socket.prototype.connect'), 'the trap must own the one funnel every outbound protocol uses');
+        assert.ok(trapSource.includes('dns.lookup'), 'a resolver call is an escape in its own right');
+
+        // Under `_unit/`: the framework runner skips `_`-prefixed paths, so the
+        // static lane never runs inside the emulator lane.
+        for (const suite of ['registration', 'rules-posture', 'socket-free']) {
+          assert.equal(jetpack.exists(path.join(tmp, 'test', '_unit', `${suite}.test.js`)), 'file', `${suite} skeleton missing`);
+        }
+
+        // The script `omega setup` writes onto the target manifest. Without the
+        // --require the rest of the lane still passes — quietly networked.
+        const script = require('../../package.json').projectScripts.test;
+        assert.ok(script.includes('--require ./test/_helpers/connect-trap.js'), 'the test script does not preload the trap');
+        assert.ok(script.includes("--test 'test/_unit/**/*.test.js'"), 'the test script does not run the static lane');
+      },
+    },
+    {
+      name: 'static-lane-skeletons-are-the-consumers-to-edit',
+      async run({ assert }) {
+        // Copy-if-missing, like every other default: a brand that already has
+        // the lane (every hand-ported one does) is left alone.
+        const tmp = makeTmp();
+        scaffoldDefaults({ outputDir: tmp, logger: quiet });
+
+        const suite = path.join(tmp, 'test', '_unit', 'rules-posture.test.js');
+        jetpack.write(suite, '// the brand pinned its own posture here\n');
+
+        const second = scaffoldDefaults({ outputDir: tmp, logger: quiet });
+
+        assert.equal(jetpack.read(suite), '// the brand pinned its own posture here\n', 'a consumer-edited skeleton must never be clobbered');
+        assert.equal(second.written.length + second.merged.length, 0, 'nothing rewrites on the second run');
       },
     },
     {

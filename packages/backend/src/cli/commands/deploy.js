@@ -5,6 +5,7 @@ const attachLogFile = require('../utils/attach-log-file');
 const stageLocalPackages = require('../utils/stage-local-packages');
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const { refuseWhenCustom } = require('../utils/project-type');
 
 const DEFAULT_REGION = 'us-central1';
 
@@ -12,13 +13,19 @@ class DeployCommand extends BaseCommand {
   async execute() {
     const self = this.main;
 
+    // Custom-server mode has no Cloud Functions to publish (#584) — refuse
+    // before staging, so nothing is written for a deploy that cannot happen.
+    if (refuseWhenCustom(self.firebaseProjectPath, 'deploy')) return;
+
     const logPath = this.getLogsPath('deploy.log');
     attachLogFile(logPath);
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
     // dist/ is staged output (src/dist pillar): a fresh stage carries the
     // composed config + public/ hosting boilerplate across the upload boundary.
-    this.ensureStaged();
+    // `deploy` also drops the .env's dev-only payment rows — a test credential
+    // has no business inside a deployed runtime's env (#586).
+    this.ensureStaged({ deploy: true });
 
     // --only pass-through (e.g. `omega deploy --only hosting` — deploys
     // hosting on Spark plans where functions would demand Blaze)

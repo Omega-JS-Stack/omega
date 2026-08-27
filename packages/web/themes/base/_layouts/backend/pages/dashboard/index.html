@@ -1,37 +1,6 @@
 ---
 layout: backend/core/minimal
 
-theme:
-  header:
-    title:
-      content: "Dashboard"
-      icon: "gauge-high"
-    breadcrumbs:
-      items:
-        - label: Home
-          href: /
-          icon: house
-        - label: Dashboard
-    actions:
-      items:
-        - label: New project
-          icon: plus
-          color: primary
-        - label: Reports
-          icon: chart-line
-          color: adaptive
-          dropdown:
-            - label: Sales report
-              icon: dollar-sign
-              href: /reports/sales
-            - label: Analytics report
-              icon: chart-bar
-              href: /reports/analytics
-            - divider: true
-            - label: Export all
-              icon: download
-              href: /reports/export
-
 sitemap:
   include: false
 meta:
@@ -141,6 +110,37 @@ progress_items:
     name: "Mobile app"
     progress: 90
     color: "success"
+config:
+  theme:
+    header:
+      title:
+        content: "Dashboard"
+        icon: "gauge-high"
+      breadcrumbs:
+        items:
+          - label: Home
+            href: /
+            icon: house
+          - label: Dashboard
+      actions:
+        items:
+          - label: New project
+            icon: plus
+            color: primary
+          - label: Reports
+            icon: chart-line
+            color: adaptive
+            dropdown:
+              - label: Sales report
+                icon: dollar-sign
+                href: /reports/sales
+              - label: Analytics report
+                icon: chart-bar
+                href: /reports/analytics
+              - divider: true
+              - label: Export all
+                icon: download
+                href: /reports/export
 ---
 
 <!-- Dashboard Content -->

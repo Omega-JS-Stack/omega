@@ -15,7 +15,12 @@
  * .omega/company.json inherits its company root's file underneath that.
  * Resolution for a target:
  *
- *   defaults ← company ← brand shared ← brand targets[target] ← local shared ← local targets[target]
+ *   schema defaults ← framework defaults ← company ← brand shared ← brand targets[target] ← local shared ← local targets[target]
+ *
+ * The bottom layer derives from the schema's own `default:` entries
+ * ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)) — the one home
+ * of every default. `options.defaults` sits above it for the cases where a
+ * framework genuinely differs.
  *
  * The company file layers exactly like the brand file (shared, then its
  * targets[target] entry) minus its `brands` key — company plumbing that means
@@ -51,6 +56,7 @@ const { readCompanyRoot } = require('./company.js');
 const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
+const { schemaDefaults } = require('./defaults.js');
 const { resolveInstanceEntry, instanceIdFromDirName, MAIN_INSTANCE } = require('./instances.js');
 
 const FILE_NAME = 'omega.json5';
@@ -286,7 +292,8 @@ function getEnabledTargets(config) {
  *   brand + local files merge whole (targets map included) — the shape tools like
  *   omega-manager's disperse want.
  * @param {object} [options]
- * @param {object} [options.defaults] - Framework defaults, the lowest merge layer.
+ * @param {object} [options.defaults] - Framework defaults, layered directly on
+ *   top of the schema defaults (#478) — only what this framework does differently.
  * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, instance: string, files: { local: string, brand: string|null, company: string|null } }}
  *   `enabled` = whether `target` is listed under `targets` (null when no target
  *   was requested); schema `errors` are returned, not thrown — only secrets and
@@ -348,6 +355,7 @@ function loadConfig(projectDir, target, options) {
 
   const config = target
     ? deepMerge(
+        schemaDefaults(target),
         options.defaults,
         stripTargets(inherited),
         inherited && inherited.targets ? resolveInstanceEntry(inherited.targets[target], instance) : null,
@@ -356,7 +364,7 @@ function loadConfig(projectDir, target, options) {
         stripTargets(local),
         local.targets ? resolveInstanceEntry(local.targets[target], instance) : null,
       )
-    : deepMerge(options.defaults, inherited, brand, local);
+    : deepMerge(schemaDefaults(), options.defaults, inherited, brand, local);
 
   // Keep the merged targets map on the resolved config (presence = enabled)
   if (target && hasTargets) {

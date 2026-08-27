@@ -11,8 +11,40 @@
  *     max:         Number,                // only checked when value present + number
  *     match:       RegExp,                // only checked when value present + string
  *     enum:        [...],                 // only checked when value present
+ *     default:     <value>,               // the framework answer — see below
+ *     pageBare:    true,                  // section root only — see below
  *     description: 'What the field drives.',
  *   }
+ *
+ * `pageBare:` is the page-override allow-list
+ * ([#607](https://github.com/Omega-JS-Stack/omega/issues/607)): a page's
+ * frontmatter overrides config keys under a `config:` parent, and a SECTION
+ * ROOT rule carrying `pageBare: true` is the exception a page may restate
+ * BARE. `meta` is the only one, and a page restating any other section bare
+ * is a build error. configSections() below derives the per-target list of
+ * top-level sections this schema declares — the namespace `config:` holds.
+ *
+ * `default:` is the ONE home of every config default
+ * ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)): defaults.js
+ * builds the merge chain's LOWEST layer from these entries, and the manage
+ * walk materializes any missing block into the brand's omega.json5 with this
+ * description as its guiding comment. A key with no sane framework answer —
+ * owner decisions, tri-states that mean "ask", ids the services provision,
+ * anything secret-shaped — carries NO `default:` and is never materialized.
+ *
+ * The other standing exclusion is the PRESENCE GATE (#425), which means the
+ * sections a service reads presence from: `monitoring.providers.sentry` is the
+ * brand's pick of Sentry, so those SDK knobs carry NO default and keep their
+ * home in @omega.js/monitoring, and `advertising` is the brand's pick of ads
+ * (#527 — the adsense `client` id is the ONE switch, and a materialized
+ * advertising block would switch the web build's automatic vert placements on
+ * for a brand that configured none). Blocks whose services gate on `enabled`
+ * instead — github, cloudflare, searchConsole, slapform, chatsy, replyify —
+ * DO carry the default that states the polarity (`enabled: true`, read
+ * `!== false`), because presence there picks nothing. Role-level switches
+ * beside any providers block (`monitoring.enabled`,
+ * `marketing.campaigns.enabled`) always may. The gating doctrine those three
+ * cases come from lives in docs/shared/config.md.
  *
  * Rules run against the RESOLVED config for a target — target-section keys
  * are overlaid at the top level by loadConfig() (targets.desktop.platforms
@@ -25,12 +57,65 @@
  * config (backend), never from guesses.
  */
 
-const { WINBACK_DURATIONS } = require('./winback.js');
+// The durations a winback coupon can be built for on every provider that
+// supports the offer (#268). Stripe's third option ('repeating') needs a
+// duration_in_months beside it, which is provider surface nothing here asks
+// for. It lives HERE, with the rule that enumerates it, so winback.js can
+// derive its offer defaults from this schema without a require cycle;
+// winback.js re-exports it, so every existing import keeps working.
+const WINBACK_DURATIONS = ['once', 'forever'];
 
-// Canonical target names — the only keys allowed under `targets`.
+// Canonical target names — the FRAMEWORK keys allowed under `targets`.
 // Key presence in a config's `targets` object = "this brand enables this
 // target" (absorbs the legacy brand-config targets ARRAY).
 const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
+
+// A brand also runs targets no framework owns — a Render API, a worker, a
+// script (#603). Those are declared under any OTHER key, and the entry must
+// say so: `targets.api: { type: 'custom' }`. The type is what separates a
+// deliberate custom target from a typo'd framework name, which stays an error.
+// Their verbs come entirely from the target's own package.json scripts; the
+// manager is the one that runs them (docs/manager/index.md).
+const CUSTOM_TARGET_TYPE = 'custom';
+
+/**
+ * Whether a `targets.<key>` entry declares itself custom. The array
+ * (multi-instance) form is custom only when EVERY instance says so — a mixed
+ * array has no honest reading, so the validator fails it.
+ *
+ * @param {object|Array|null|undefined} entry - The raw targets.<key> value.
+ * @returns {boolean} True when the entry is a custom target.
+ */
+function isCustomTargetEntry(entry) {
+  if (Array.isArray(entry)) {
+    return entry.length > 0 && entry.every((instance) => instance?.type === CUSTOM_TARGET_TYPE);
+  }
+  return entry?.type === CUSTOM_TARGET_TYPE;
+}
+
+// What SHAPE the backend target deploys as (#584). Not to be confused with the
+// custom TARGET above: that is a target no framework owns; this is the
+// @omega.js/backend target itself, running its Express app on `PORT` for a
+// container host (Render & co) instead of exporting Cloud Functions. Same
+// framework, same auth middleware, same helpers — a different artifact, and
+// with it no Functions deploy and no emulator lane.
+const BACKEND_PROJECT_TYPES = ['firebase', 'custom'];
+
+/**
+ * The backend target's project type. Reads a `targets.backend` entry or a
+ * RESOLVED backend config alike — a target entry's keys land at the top level
+ * of the resolved view, so `projectType` is in the same place either way.
+ *
+ * Anything that isn't the literal 'custom' reads as 'firebase': the validator
+ * is what makes a nonsense value loud, and a READER must never take a brand
+ * off Cloud Functions on a typo.
+ *
+ * @param {object|null|undefined} entry - targets.backend, or a resolved backend config.
+ * @returns {'firebase'|'custom'}
+ */
+function backendProjectType(entry) {
+  return entry?.projectType === 'custom' ? 'custom' : 'firebase';
+}
 
 // The machine-owned top-level sections identical in every omega.json5 —
 // omega-manager's disperse enumerates THIS list instead of hardcoding
@@ -84,11 +169,29 @@ const SHARED_SCHEMA = [
     description: 'Parent/legal entity name ("Acme Inc"). Legal documents, receipts; falls back to brand.name.',
   },
   {
+    path:        'brand.type',
+    type:        'string',
+    required:    false,
+    description: "The brand's schema.org type ('Organization', 'Corporation', 'LocalBusiness'). @omega.js/web stamps it on the JSON-LD brand node and every @id that cross-references it; unset renders the framework default 'Organization' (#271).",
+  },
+  {
+    path:        'brand.font',
+    type:        'string',
+    required:    false,
+    description: "Display font NAME (no extension, 'CromaSans-ExtraBold') the assets service renders the wordmark + combomark from, resolved against the brand's assets/fonts/ then the system font dirs. Unset = those two logo variants are skipped, not generated with a substitute face.",
+  },
+  {
     path:        'brand.contact.email',
     type:        'string',
     required:    false,
     match:       /@/,
     description: 'Support email surfaced in About / Help / legal pages.',
+  },
+  {
+    path:        'brand.contact.phone',
+    type:        'string',
+    required:    false,
+    description: "Support phone number as it should read. @omega.js/web publishes it as the JSON-LD brand node's `telephone`; unset renders empty.",
   },
   {
     path:        'brand.contact.person.name',
@@ -153,6 +256,80 @@ const SHARED_SCHEMA = [
     description: 'Parent/legal-entity wordmark (brand.company) rendered in the transactional email footer. Omitted from the footer when unset.',
   },
 
+  // ── meta (the site's default page meta — the ONE page-bare section) ──────
+  // #607: a page's `meta:` block is the SITE default's page-level override,
+  // and `meta` is the only config section a page may restate BARE
+  // (`pageBare: true`); every other section a page overrides goes under
+  // `config:`. Merge order @omega.js/web renders: page `meta:` → layout `meta`
+  // defaults → this block → brand.name/brand.description.
+  {
+    path:        'meta',
+    type:        'object',
+    required:    false,
+    pageBare:    true,
+    description: "Default page meta for every page the site builds (@omega.js/web's head): title, description, image, keywords plus the head knobs below. A page (or layout) restates `meta:` BARE in frontmatter to override it — the one config section that may. No value here = the head falls back to brand.name / brand.description.",
+  },
+  {
+    path:        'meta.title',
+    type:        'string',
+    required:    false,
+    description: 'Default <title>/og:title. Unset falls back to brand.name.',
+  },
+  {
+    path:        'meta.description',
+    type:        'string',
+    required:    false,
+    description: 'Default meta description/og:description. Unset falls back to brand.description.',
+  },
+  {
+    path:        'meta.image',
+    type:        'string',
+    required:    false,
+    description: 'Default og:image/twitter:image. Unset falls back to brand.images.social, then brand.images.brandmark.',
+  },
+  {
+    path:        'meta.keywords',
+    type:        'string',
+    required:    false,
+    description: 'Default meta keywords (comma-separated). Unset emits no keywords tag.',
+  },
+  {
+    path:        'meta.index',
+    type:        'boolean',
+    required:    false,
+    description: 'false marks every page noindex AND drops it from sitemap.xml (#564) — the site-wide switch a staging brand flips. Per-page/per-layout `meta.index` overrides it.',
+  },
+  {
+    path:        'meta.viewport',
+    type:        'string',
+    required:    false,
+    description: 'Overrides the framework viewport meta ("width=device-width, initial-scale=1.0, user-scalable=yes, shrink-to-fit=no").',
+  },
+  {
+    path:        'meta.referrer',
+    type:        'string',
+    required:    false,
+    description: 'Overrides the framework referrer policy meta ("strict-origin-when-cross-origin").',
+  },
+  {
+    path:        'meta.twitter_card',
+    type:        'string',
+    required:    false,
+    description: "Twitter card type ('summary_large_image' by default).",
+  },
+  {
+    path:        'meta.og_image_width',
+    type:        'integer',
+    required:    false,
+    description: 'og:image:width for the default image (1200 by default).',
+  },
+  {
+    path:        'meta.og_image_height',
+    type:        'integer',
+    required:    false,
+    description: 'og:image:height for the default image (630 by default).',
+  },
+
   // ── socials ──────────────────────────────────────────────────────────────
   {
     path:        'socials',
@@ -191,6 +368,7 @@ const SHARED_SCHEMA = [
     path:        'cloud.shared',
     type:        'boolean',
     required:    false,
+    default:     false,
     description: 'true = the cloud project is shared with other brands; only per-brand operations run (service-account, sdk-config).',
   },
   {
@@ -201,9 +379,16 @@ const SHARED_SCHEMA = [
     description: "OAuth consent screen support email. Defaults to the AUTHORIZING user's email — the provider rejects any address the caller doesn't own; set only for an owned Google Group.",
   },
   {
+    path:        'cloud.oauthRedirectsConfigured',
+    type:        'boolean',
+    required:    false,
+    description: "true = the Google OAuth client's authorized origins + redirect URIs are configured by hand. The ONE reconcile flag config keeps (#434) — that surface has no API to re-check, so the cloud service asks once, writes the answer back here, and every later run trusts it. Never set it without doing the work: the confirm is the only proof there is.",
+  },
+  {
     path:        'cloud.apiSubdomain',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = skip the api.{domain} hosting custom domain.',
   },
   {
@@ -228,10 +413,28 @@ const SHARED_SCHEMA = [
     description: 'GA4 Measurement ID. Presence-driven: set G-XXXXXXXXXX to enable. Secret lives in process.env.GOOGLE_ANALYTICS_SECRET.',
   },
   {
+    path:        'analytics.providers.google.propertyId',
+    type:        'string',
+    required:    false,
+    description: 'GA4 property id (digits, as the Admin API returns it) — the manager\'s analytics service reconciles the brand\'s data streams and the Firebase link against it, and it gates the whole google half: no propertyId, no google operations. Interactive setup selects/creates the property and writes it back here.',
+  },
+  {
+    path:        'analytics.providers.google.accountId',
+    type:        'string',
+    required:    false,
+    description: "GA account id the property lives under (digits) — the analytics property picker and the console bookmarks read it. A company-managed brand inherits the COMPANY layer's value through the merge chain; a brand-level value always wins.",
+  },
+  {
     path:        'analytics.providers.meta.id',
     type:        'string',
     required:    false,
     description: 'Meta (Facebook) Pixel ID. Presence-driven.',
+  },
+  {
+    path:        'analytics.providers.meta.accountId',
+    type:        'string',
+    required:    false,
+    description: "Meta AD ACCOUNT id ('act_…' or the bare digits) the pixel is created on and found by name against. A non-secret platform id, so it lives here beside google.accountId — the token that reaches the account stays in .env (META_ACCESS_TOKEN).",
   },
   {
     path:        'analytics.providers.tiktok.id',
@@ -239,13 +442,19 @@ const SHARED_SCHEMA = [
     required:    false,
     description: 'TikTok Pixel ID. Presence-driven.',
   },
+  {
+    path:        'analytics.providers.tiktok.accountId',
+    type:        'string',
+    required:    false,
+    description: 'TikTok ADVERTISER id the pixel is created on. Same rule as meta.accountId: the id lives here, TIKTOK_ACCESS_TOKEN stays in .env.',
+  },
 
   // ── advertising ──────────────────────────────────────────────────────────
   {
     path:        'advertising.providers.adsense.client',
     type:        'string',
     required:    false,
-    description: 'AdSense publisher client id (ca-pub-…). Presence-driven: set to enable ad units.',
+    description: 'AdSense publisher client id (ca-pub-…). The ONE adsense switch (#527), presence-driven: set it and the manager service manages the account, the site renders units from it and ads.txt carries the record; leave it out and none of that happens. No second gate — a managed-but-ad-free brand is deliberately inexpressible.',
   },
   {
     path:        'advertising.providers.adsense.displaySlot',
@@ -317,6 +526,7 @@ const SHARED_SCHEMA = [
     path:        'payment.winback.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'The cancel-flow save offer (#268), shown before the cancellation questionnaire. Defaults ON — false is the whole off switch, and the cancel flow goes straight to the questionnaire.',
   },
   {
@@ -325,6 +535,7 @@ const SHARED_SCHEMA = [
     required:    false,
     min:         1,
     max:         100,
+    default:     50,
     description: 'Whole percentage off the next cycle the save offer pitches. Defaults to 50. Mutually exclusive with payment.winback.amount.',
   },
   {
@@ -339,6 +550,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     enum:        WINBACK_DURATIONS,
+    default:     'once',
     description: "How long the accepted offer lasts: 'once' (the next cycle only, the default) or 'forever' (a permanent price cut).",
   },
 
@@ -347,6 +559,7 @@ const SHARED_SCHEMA = [
     path:        'monitoring.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'Role-level switch (default true). false skips the monitoring service outright, whatever the providers block says.',
   },
   {
@@ -385,6 +598,22 @@ const SHARED_SCHEMA = [
     description: 'Fraction of performance traces kept, 0..1. Defaults to 0.1.',
   },
   {
+    path:        'monitoring.providers.sentry.replaysSessionSampleRate',
+    type:        'number',
+    required:    false,
+    min:         0,
+    max:         1,
+    description: 'Browser only: fraction of SESSIONS recorded as a replay, 0..1. Defaults to 0 — replay costs bandwidth and captures the DOM, so it is strictly opt-in; any value above 0 loads the replay integration.',
+  },
+  {
+    path:        'monitoring.providers.sentry.replaysOnErrorSampleRate',
+    type:        'number',
+    required:    false,
+    min:         0,
+    max:         1,
+    description: 'Browser only: fraction of ERRORING sessions recorded as a replay, 0..1. Defaults to 0 (same opt-in gate as replaysSessionSampleRate).',
+  },
+  {
     path:        'monitoring.providers.sentry.scrubEmail',
     type:        'boolean',
     required:    false,
@@ -413,6 +642,13 @@ const SHARED_SCHEMA = [
 
   // ── repo (role: source hosting; provider-discriminated) ─────────────────
   {
+    path:        'repo.providers.github.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: 'false = the repo service skips entirely — no org profile, no repo settings, no GitHub Pages reconciliation; the brand hosts its source somewhere the manager does not touch.',
+  },
+  {
     path:        'repo.providers.github.org',
     type:        'string',
     required:    false,
@@ -428,16 +664,25 @@ const SHARED_SCHEMA = [
     path:        'repo.providers.github.shared',
     type:        'boolean',
     required:    false,
+    default:     false,
     description: 'true = the org is shared with other brands; org-level reconciliation is skipped.',
   },
   {
     path:        'repo.providers.github.private',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'Brand repo visibility (default true).',
   },
 
   // ── edge (role: CDN/DNS edge; provider-discriminated) ────────────────────
+  {
+    path:        'edge.providers.cloudflare.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: 'false = the edge service skips entirely — no zone, DNS, settings, rules, speed-test or worker reconciliation for this brand.',
+  },
   {
     path:        'edge.providers.cloudflare',
     type:        'object',
@@ -470,6 +715,7 @@ const SHARED_SCHEMA = [
     path:        'forms.providers.slapform.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = the slapform service skips and the contact page has no form endpoint.',
   },
   {
@@ -488,12 +734,14 @@ const SHARED_SCHEMA = [
     path:        'forms.providers.slapform.updateFormInfo',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = the form is shared and managed by another brand; its name/settings are left alone.',
   },
   {
     path:        'forms.providers.slapform.plan',
     type:        'object',
     required:    false,
+    default:     { id: 'grandmaster', name: 'Grandmaster' },
     description: 'Tier granted to the form-owner account ({ id, name }) — Slapform-operator only.',
   },
 
@@ -502,6 +750,7 @@ const SHARED_SCHEMA = [
     path:        'inbound.chat.providers.chatsy.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = no chat widget boots and the chatsy service skips.',
   },
   {
@@ -509,6 +758,12 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: 'Chatsy agent id. The manager writes it back here; @omega.js/client boots the widget from it.',
+  },
+  {
+    path:        'inbound.chat.providers.chatsy.accountId',
+    type:        'string',
+    required:    false,
+    description: "Chatsy owner-account uid the agent belongs to — the account whose subscription the chat service reconciles to `plan`. The service resolves it from the agent itself; set it only when the agent's owner is provisioned elsewhere.",
   },
   {
     path:        'inbound.chat.providers.chatsy.templateAgentId',
@@ -520,12 +775,14 @@ const SHARED_SCHEMA = [
     path:        'inbound.chat.providers.chatsy.updateAgentInfo',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = the agent is shared and managed by another brand; its settings/knowledge are left alone.',
   },
   {
     path:        'inbound.chat.providers.chatsy.plan',
     type:        'object',
     required:    false,
+    default:     { id: 'max', name: 'Max' },
     description: 'Tier granted to the agent-owner account ({ id, name }) — Chatsy-operator only.',
   },
   {
@@ -544,6 +801,7 @@ const SHARED_SCHEMA = [
     path:        'inbound.email.providers.replyify.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = the replyify service skips.',
   },
   {
@@ -562,12 +820,14 @@ const SHARED_SCHEMA = [
     path:        'inbound.email.providers.replyify.updateAgentInfo',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = the agent is shared and managed by another brand; its filter/knowledge are left alone.',
   },
   {
     path:        'inbound.email.providers.replyify.plan',
     type:        'object',
     required:    false,
+    default:     { id: 'max', name: 'Max' },
     description: 'Tier granted to the agent-owner account ({ id, name }) — Replyify-operator only.',
   },
   {
@@ -579,15 +839,24 @@ const SHARED_SCHEMA = [
 
   // ── search (role: search-engine surfaces; provider-discriminated) ────────
   {
+    path:        'search.providers.searchConsole.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: 'false = the search service skips entirely — the property is never verified and no sitemap is submitted (submitSitemap only turns the sitemap half off).',
+  },
+  {
     path:        'search.providers.searchConsole.submitSitemap',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'false = skip sitemap submission to Google Search Console.',
   },
   {
     path:        'search.providers.searchConsole.sitemapPaths',
     type:        'array',
     required:    false,
+    default:     ['/sitemap.xml'],
     description: "Sitemap paths submitted as https://{domain}{path} (default ['/sitemap.xml']).",
   },
 
@@ -597,6 +866,12 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     description: 'Commit-digest devlog pipeline (@omega.js/manager devlog): enabled + providers.ghostii (orgs, lookbackDays, publish settings).',
+  },
+  {
+    path:        'devlog.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'true PUBLISHES AI-written commit-digest posts to the brand\'s live website. Case 3 (docs/shared/config.md): the literal true is the only ON, absence is off, and no default is materialized — publishing is never implicit.',
   },
 
   // ── seo ──────────────────────────────────────────────────────────────────
@@ -659,6 +934,7 @@ const SHARED_SCHEMA = [
     path:        'marketing.campaigns.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'Role-level switch for email marketing (default true). false skips the campaigns service and the backend contact sync.',
   },
   {
@@ -671,6 +947,7 @@ const SHARED_SCHEMA = [
     path:        'marketing.newsletter.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'Role-level switch for the newsletter (default true). false skips the newsletter service and the backend subscriber sync.',
   },
   {
@@ -689,7 +966,8 @@ const SHARED_SCHEMA = [
     path:        'marketing.prune.enabled',
     type:        'boolean',
     required:    false,
-    description: 'Monthly cold-contact prune across both providers. OPT-IN: nothing runs unless this is explicitly true.',
+    default:     true,
+    description: 'Monthly cold-contact prune across both providers. ON by default (Ian 2026-08-22) and materialized into every brand config — false is the per-brand off switch.',
   },
 
   // ── blog ─────────────────────────────────────────────────────────────────
@@ -723,6 +1001,7 @@ const SHARED_SCHEMA = [
     path:        'directory.enabled',
     type:        'boolean',
     required:    false,
+    default:     false,
     description: 'true opts the brand into the directory push. Default false — participation is never implicit.',
   },
 
@@ -780,12 +1059,14 @@ const SHARED_SCHEMA = [
     path:        'translation.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'Master switch (default true). Translation only runs when languages is non-empty.',
   },
   {
     path:        'translation.default',
     type:        'string',
     required:    false,
+    default:     'en',
     description: "Source language code (default 'en'). Drives <html lang>, og:locale, and the default hreflang.",
   },
   {
@@ -823,6 +1104,7 @@ const SHARED_SCHEMA = [
     path:        'client.consent.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: 'The consent banner + the provider-script gate (default true). false ships NO banner — legal only for a site that loads no analytics/marketing provider at all.',
   },
   {
@@ -844,7 +1126,7 @@ const SHARED_SCHEMA = [
     path:        'targets',
     type:        'object',
     required:    false,
-    description: 'Key presence = target enabled; values = target-scoped config (any shared key inside overrides it) — an object, or an array of id\'d instances (multi-instance targets). Unknown keys are errors.',
+    description: "Key presence = target enabled; values = target-scoped config (any shared key inside overrides it) — an object, or an array of id'd instances (multi-instance targets). Framework keys are web/backend/desktop/extension/mobile; any other key must declare `type: 'custom'` (#603), a target the manager drives entirely through its own package.json scripts. Anything else is an error.",
   },
 ];
 
@@ -921,6 +1203,13 @@ const TARGET_SCHEMAS = {
     // parent, github, reviews, marketing, blog, dataRequest moved to
     // SHARED_SCHEMA (#277); a targets.backend block still overrides them
     // through the merge chain.
+    {
+      path:        'projectType',
+      type:        'string',
+      required:    false,
+      enum:        BACKEND_PROJECT_TYPES,
+      description: "How this backend RUNS and deploys (#584). 'firebase' (default) exports Cloud Functions; 'custom' runs the same app as an Express server on `PORT` for a container host (Render & co) — no Functions deploy, no emulator lane, and the target's own `deploy` script is the publish lane. Everything else — the auth middleware, the routes, the schemas, every helper — is identical in both modes.",
+    },
     {
       path:        'auth.signup.maxPerIpPerDay',
       type:        'integer',
@@ -1014,15 +1303,15 @@ const TARGET_SCHEMAS = {
     },
   ],
 
-  // Store listings drive the extension page's site.extension map and the
-  // curated site.targets.extension view (#85).
+  // Store listings ARE the extension page's declaration and the curated
+  // site.targets.extension view (#85, #610 — no second copy in web config).
   extension: [
     {
       path:        'listings.chrome.url',
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Chrome Web Store listing URL. Feeds site.extension.chrome on the extension page.',
+      description: "Chrome Web Store listing URL. Feeds site.targets.extension.listings.chrome — the /extension page's button and its /extension/chrome shortlink.",
     },
     {
       path:        'listings.chrome.state',
@@ -1035,7 +1324,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Firefox Add-ons (AMO) listing URL. Feeds site.extension.firefox.',
+      description: 'Firefox Add-ons (AMO) listing URL. Feeds site.targets.extension.listings.firefox.',
     },
     {
       path:        'listings.firefox.state',
@@ -1048,7 +1337,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Microsoft Edge Add-ons listing URL. Feeds site.extension.edge.',
+      description: 'Microsoft Edge Add-ons listing URL. Feeds site.targets.extension.listings.edge.',
     },
     {
       path:        'listings.edge.state',
@@ -1061,7 +1350,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Opera Add-ons listing URL. Feeds site.extension.opera.',
+      description: 'Opera Add-ons listing URL. Feeds site.targets.extension.listings.opera.',
     },
     {
       path:        'listings.opera.state',
@@ -1074,7 +1363,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'App Store (Safari extension) listing URL. Feeds site.extension.safari.',
+      description: 'App Store (Safari extension) listing URL. Feeds site.targets.extension.listings.safari.',
     },
     {
       path:        'listings.safari.state',
@@ -1087,7 +1376,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Brave listing URL (Chrome Web Store serves Brave). Feeds site.extension.brave.',
+      description: 'Brave listing URL (Chrome Web Store serves Brave). Feeds site.targets.extension.listings.brave.',
     },
     {
       path:        'listings.brave.state',
@@ -1101,4 +1390,26 @@ const TARGET_SCHEMAS = {
   mobile: [],
 };
 
-module.exports = { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN };
+/** The top-level sections a rule array declares — `targets` is scoping machinery. */
+const sectionsOf = (rules) => [...new Set(rules.map((rule) => rule.path.split('.')[0]))].filter((section) => section !== 'targets');
+
+/**
+ * The config sections a target's RESOLVED config can hold (#607) — the
+ * namespace a page's `config:` block overrides, and the namespace a page may
+ * not restate bare. Per-target, because a target's refinements land at the
+ * top level: `app` is a desktop section, and a web layout's own `app:` block
+ * (the deep-link interstitial) is page data, not config.
+ * @param {string} [target] - target name; omitted = the shared sections only
+ * @returns {string[]} section names, sorted
+ */
+function configSections(target) {
+  return [...new Set([...sectionsOf(SHARED_SCHEMA), ...sectionsOf(TARGET_SCHEMAS[target] || [])])].sort();
+}
+
+// The sections a page MAY restate bare (`pageBare: true` on the section root).
+const PAGE_BARE_SECTIONS = [...SHARED_SCHEMA, ...Object.values(TARGET_SCHEMAS).flat()]
+  .filter((rule) => rule.pageBare)
+  .map((rule) => rule.path)
+  .sort();
+
+module.exports = { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN, WINBACK_DURATIONS, configSections, PAGE_BARE_SECTIONS };

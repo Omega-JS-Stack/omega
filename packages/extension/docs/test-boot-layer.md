@@ -79,17 +79,18 @@ The runner looks for the consumer's Chrome-loadable build in this order:
 
 1. `OMEGA_TEST_BOOT_DIR` env var (absolute path) — full override
 2. `<consumer>/packaged/chromium/raw/` — default. This is what @omega.js/extension's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
-3. `<consumer>/dist/` — fallback for non-standard pipelines
+3. `<consumer>/dist/` — for non-standard pipelines (and the framework's own fixture extension, which is authored as strict JSON)
 
-The intermediate `<consumer>/dist/` typically has a JSON5 manifest (framework-authored source style) which Chrome can't parse. If the runner picks `dist/` and finds JSON5, you get an actionable error:
+**A directory qualifies only when its `manifest.json` is STRICT JSON** — what Chrome can actually parse. Existence alone used to qualify, and the intermediate `<consumer>/dist/` (JSON5, the framework-authored source style) exists after any dev run or `omega clean`, so an unbuilt project loaded that copy and hard-failed every boot test instead of skipping ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). A JSON5 `dist/` is passed over and named in the skip.
+
+An explicitly named `OMEGA_TEST_BOOT_DIR` is a decision, not a fallback, so a manifest Chrome can't parse THERE is still an actionable failure:
 
 ```
 ✗ boot tests aborted: dist/manifest.json is not strict JSON.
   Chrome requires manifest.json to have no comments, no trailing commas, no single quotes.
   Parser error: Expected property name or '}' in JSON at position 4
-  If you see this, the runner picked an intermediate dist/ output instead of a
-  packaged/<browser>/raw/ output. Run `npm run build` to produce the packaged dir,
-  or set OMEGA_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.
+  OMEGA_TEST_BOOT_DIR names this directory explicitly — point it at a
+  packaged/<browser>/raw/ output, or unset it and run `npm run build`.
 ```
 
 Most consumers don't need to think about this — `npm run build && npx omega test` works.
@@ -118,12 +119,13 @@ This catches real ship-breakers (broken locale references, missing bundles) befo
 
 ## Skipping the build before boot tests
 
-Boot tests assume `packaged/chromium/raw/` exists. They don't auto-trigger `npm run build` (that would slow the test loop). If the directory is missing, you get:
+Boot tests assume `packaged/chromium/raw/` exists. They don't auto-trigger `npm run build` (that would slow the test loop). If no candidate carries a strict-JSON manifest, you get:
 
 ```
-○ boot tests skipped (no manifest.json found in any of:
+○ boot tests skipped (no strict-JSON manifest.json found in any of:
     /path/to/project/packaged/chromium/raw
     /path/to/project/dist
+  /path/to/project/dist/manifest.json exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)
   — run `npm run build` first to produce packaged/chromium/raw/)
 ```
 

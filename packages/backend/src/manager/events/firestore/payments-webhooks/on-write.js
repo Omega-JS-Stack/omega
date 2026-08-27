@@ -11,7 +11,9 @@ const User = require('../../../helpers/user.js');
  *
  * Processes pending webhook events:
  * 1. Loads the provider library
- * 2. Fetches the latest resource from the provider API (not the stale webhook payload)
+ * 2. Fetches the resource from the provider API — the ONLY trusted source, never
+ *    the object the webhook payload carried (a lookup that cannot be answered
+ *    refuses or defers, it never processes)
  * 3. Branches on event.category to transform + write:
  *    - subscription → toUnifiedSubscription → users/{uid}.subscription + payments-orders/{orderId}
  *    - one-time    → toUnifiedOneTime → payments-orders/{orderId}
@@ -45,14 +47,29 @@ module.exports = async ({ ctx, change, context }) => {
   let passThruOrderId = null;
   let library = null;
 
+  // Whether this event was REFUSED — a terminal decision, taken before anything is
+  // written. The failure path reads it: a refusal that could not even record itself
+  // must not fall back to writing a doc the PAYLOAD named
+  // ([#535](https://github.com/Omega-JS-Stack/omega/issues/535)).
+  let refused = false;
+
   try {
     const provider = dataAfter.provider;
-    let uid = dataAfter.owner;
+    // What the event's own payload claimed about whose subscription this is. It
+    // is a CLAIM, not the answer: once the lookup succeeds, the provider's record
+    // is what steers the write and this is only what that is checked against
+    // ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)).
+    const payloadUid = dataAfter.owner;
+    let uid = payloadUid;
     const raw = dataAfter.raw;
     const eventType = dataAfter.event?.type;
     const category = dataAfter.event?.category;
     const resourceType = dataAfter.event?.resourceType;
     const resourceId = dataAfter.event?.resourceId;
+    // The refund's OWN id, which the parser keeps beside the resource the refund
+    // reversed — an identifier, and the key its details are looked up by
+    // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+    const refundId = dataAfter.event?.refundId || null;
 
     ctx.log(`Processing webhook ${eventId}: provider=${provider}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
 
@@ -68,47 +85,153 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown provider library: ${provider}`);
     }
 
-    // Fetch the latest resource from the provider API
-    // This ensures we always work with the most current state, not stale webhook data
-    const rawFallback = extractRawResource(library, raw) || {};
-    const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, ctx, eventType, config: Manager.config });
+    // Fetch the resource from the provider API. Its answer is the ONLY thing this
+    // pipeline acts on: the object the webhook carried is whatever the caller
+    // posted, and letting it stand in for a lookup that failed let unverified data
+    // drive real subscription state and real conversions
+    // ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)). So a failed
+    // lookup produces no resource at all — only which KIND of failure it was.
+    let resource;
 
-    // A flagged resource is the webhook's own payload, not the API's answer — say which
-    const source = resource._stale ? 'stale-fallback (webhook payload, provider API unreachable)' : 'provider API';
+    // What a refund actually moved. It rides in the same block because it is the
+    // same kind of thing: an amount read out of the envelope is an amount the
+    // caller chose, and it was landing on the order record, the customer's refund
+    // email and the refund conversion
+    // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)). The provider
+    // answers for it too — from the resource already in hand, or from a lookup of
+    // the refund's own record — and a lookup that fails is classified by the same
+    // seam as the one above.
+    const isRefund = transitions.REFUND_EVENTS.includes(eventType);
+    let refundDetails = null;
+
+    try {
+      resource = await library.fetchResource(resourceType, resourceId, { admin, ctx, eventType, raw, config: Manager.config });
+
+      if (isRefund && library.getRefundDetails) {
+        refundDetails = await library.getRefundDetails(resource, { raw, refundId, eventType, resourceType, ctx });
+      }
+    } catch (e) {
+      // The provider answered, and the record it answered with belongs to another
+      // order: the refund lookup's key came from the payload, and an unrelated
+      // refund id from the same merchant account imported another customer's
+      // numbers onto this one ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)).
+      // No retry can relate two unrelated records, so it is refused and
+      // acknowledged — the same terminal shape as every other decision here.
+      if (e.refundNotLinked) {
+        refused = true;
+
+        await acknowledgeRefusal(webhookRef, refuseRefundNotLinked({ ctx, error: e, eventId, eventType, provider, uid }), { ctx, eventId, eventType, provider, uid });
+
+        return;
+      }
+
+      // Unreachable is not "gone": the answer exists and this attempt could not read
+      // it, so the event DEFERS — the throw marks the doc failed and the retry sweep
+      // (events/cron/frequent/retry-failed-webhooks.js) is the reconciliation path.
+      if (!e.notFound) {
+        throw e;
+      }
+
+      // The provider affirmatively does not have it. Nothing will ever make this
+      // event processable, so it is refused and acknowledged rather than redelivered
+      // forever — the same terminal-decision shape as the refusals below.
+      //
+      // The failure names the lookup that actually missed, which is not always the
+      // event's own resource: a refund's details come from a lookup of their own
+      // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
+      refused = true;
+
+      await acknowledgeRefusal(webhookRef, refuseResourceNotFound({
+        ctx,
+        error: e,
+        eventId,
+        eventType,
+        provider,
+        resourceType: e.resourceType || resourceType,
+        resourceId: e.resourceId || resourceId,
+        uid,
+      }), { ctx, eventId, eventType, provider, uid });
+
+      return;
+    }
 
     // v2 resources spell the field `status`, v1 sale resources spell it `state` —
     // reading only the first reported `status=unknown` on a fetch that plainly
     // succeeded, which is exactly the confusion this line exists to prevent
     // ([#347](https://github.com/Omega-JS-Stack/omega/issues/347)).
     const resourceStatus = resource.status ?? resource.state ?? 'unknown';
-    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resourceStatus}, source=${source}`);
+    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resourceStatus}, source=provider API`);
 
-    // Resolve UID from the fetched resource if not available from webhook parse
-    // This handles events like PAYMENT.SALE where the Sale object doesn't carry custom_id
-    // but the parent subscription (fetched via fetchResource) does
-    if (!uid && library.getUid) {
-      uid = library.getUid(resource);
-      ctx.log(`UID resolved from fetched resource: uid=${uid || 'null'}, provider=${provider}, resourceType=${resourceType}`);
+    // The lookup answered, so the record it answered with is what says who this
+    // event belongs to. Every provider's resource carries the uid we put on it —
+    // Stripe `metadata.uid`, PayPal `custom_id`, Chargebee `meta_data`/`cf_uid` —
+    // and reading the payload's uid instead let an event naming a REAL resource
+    // steer that resource's write onto whatever uid the caller typed
+    // ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)). It also covers
+    // what this block was originally for: events like PAYMENT.SALE, whose payload
+    // carries no custom_id at all while the parent subscription does.
+    const providerUid = library.getUid ? library.getUid(resource) : null;
 
-      // Update the webhook doc with the resolved UID so it's persisted for debugging
-      if (uid) {
+    // Chargebee hosted-page checkouts don't forward subscription[meta_data] to the
+    // subscription, so the record answers no uid at all — but the hosted page's
+    // pass_thru_content holds ours, and it is a record of the PROVIDER's, not the
+    // caller's. It used to be consulted only when the payload claimed nothing
+    // (`!uid`), i.e. never in the one case where a claim needed checking: a forged
+    // uid on a not-yet-backfilled subscription steered unchecked
+    // ([#533](https://github.com/Omega-JS-Stack/omega/issues/533)).
+    let resolvedFromPassThru = false;
+
+    if (providerUid) {
+      // The payload's claim is only ever a cross-check now, and a claim that
+      // contradicts the provider is refused outright — not silently corrected to
+      // the provider's uid, because an event that lies about its owner has
+      // nothing left in it worth acting on.
+      if (payloadUid && payloadUid !== providerUid) {
+        refused = true;
+
+        await acknowledgeRefusal(webhookRef, refuseUidMismatch({ ctx, eventId, eventType, provider, resourceType, resourceId, payloadUid, providerUid, source: 'record' }), { ctx, eventId, eventType, provider, uid });
+
+        return;
+      }
+
+      if (uid !== providerUid) {
+        uid = providerUid;
+        ctx.log(`UID resolved from fetched resource: uid=${uid}, provider=${provider}, resourceType=${resourceType}`);
+
+        // Update the webhook doc with the resolved UID so it's persisted for debugging
         await webhookRef.set({ owner: uid }, { merge: true });
       }
-    }
+    } else {
+      const passThruResult = library.resolveUidFromHostedPage
+        ? await library.resolveUidFromHostedPage(resourceId, ctx)
+        : null;
 
-    // Fallback: resolve UID from the hosted page's pass_thru_content
-    // Chargebee hosted page checkouts don't forward subscription[meta_data] to the subscription,
-    // but pass_thru_content is stored on the hosted page and contains our UID + orderId
-    let resolvedFromPassThru = false;
-    if (!uid && library.resolveUidFromHostedPage) {
-      const passThruResult = await library.resolveUidFromHostedPage(resourceId, ctx);
-      if (passThruResult) {
+      if (passThruResult?.uid) {
+        // The hosted page answered, so it is the record that steers — and a payload
+        // that contradicts it earns the same refusal a contradicted record does.
+        if (payloadUid && payloadUid !== passThruResult.uid) {
+          refused = true;
+
+          await acknowledgeRefusal(webhookRef, refuseUidMismatch({ ctx, eventId, eventType, provider, resourceType, resourceId, payloadUid, providerUid: passThruResult.uid, source: 'hosted-page' }), { ctx, eventId, eventType, provider, uid });
+
+          return;
+        }
+
         uid = passThruResult.uid;
         passThruOrderId = passThruResult.orderId || null;
         resolvedFromPassThru = true;
         ctx.log(`UID resolved from hosted page pass_thru_content: uid=${uid}, orderId=${passThruOrderId}, resourceId=${resourceId}`);
 
         await webhookRef.set({ owner: uid }, { merge: true });
+      } else if (payloadUid) {
+        // Nothing left to check against: the record carries no uid, and no other
+        // record of this provider's answered either — the hosted-page scan covers
+        // only the last 25, so a miss honestly means "not in the window", never
+        // "not this uid", and refusing on it would break every older hosted-page
+        // checkout. The payload steers, which is the pre-#509 behavior — so the
+        // line that says so is the only warning a human gets that this write was
+        // never cross-checked.
+        ctx.warn(`UID FALLBACK: ${eventType} (${provider}) — ${resourceType} ${resourceId} carries no uid metadata and no other ${provider} record answered for it, so the event's own payload steers this write unchecked (uid=${payloadUid}, event=${eventId})`);
       }
     }
 
@@ -139,7 +262,7 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw });
+    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails });
 
     // Mark webhook as completed (include transition name + any refusal for auditing/testing).
     // Both are written on EVERY pass, so a reprocess that now finds its order clears
@@ -168,11 +291,34 @@ module.exports = async ({ ctx, change, context }) => {
     // Mark as failed with error message, counting the attempt — the frequent cron's
     // sweep re-flips a failed doc to pending until this count reaches its ceiling
     // (events/cron/frequent/retry-failed-webhooks.js)
+    //
+    // Unless the failure is PERMANENT: a malformed envelope is a programmer/parser
+    // error, not a provider that could not be reached, and deferring it burned the
+    // whole ladder before dead-lettering something the first attempt already knew
+    // was unprocessable ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)).
+    // Dead-lettered where it stands, so the sweep leaves it for the human it needs.
     await webhookRef.set({
       status: 'failed',
       error: e.message || String(e),
       retryCount: (dataAfter.retryCount || 0) + 1,
+      ...(e.permanent ? { deadLetter: true } : {}),
     }, { merge: true });
+
+    if (e.permanent) {
+      ctx.error(`PERMANENT FAILURE: webhook ${eventId} (provider=${dataAfter.provider}, event=${dataAfter.event?.type || 'unknown'}) cannot be processed by any retry — dead-lettered on its first attempt: ${e.message}`);
+    }
+
+    // A REFUSED event is already terminal: the decision was made, and the only thing
+    // that failed is the stamp recording it. The payload-derived intent write below
+    // is the one doc a refused forgery could still reach — named by the caller, not
+    // by anything the provider confirmed — so a refusal writes nothing else at all,
+    // and the retry sweep re-lands the stamp on the next pass
+    // ([#535](https://github.com/Omega-JS-Stack/omega/issues/535)).
+    if (refused) {
+      ctx.warn(`Webhook ${eventId} was REFUSED and its refusal stamp did not land (${e.message}) — nothing else is written for a refused event, and the retry sweep re-lands the stamp`);
+
+      return;
+    }
 
     // A throw before the orderId was resolved (a fetchResource failure, an
     // unresolvable UID) would otherwise leave the intent pending forever — resolve
@@ -205,12 +351,115 @@ module.exports = async ({ ctx, change, context }) => {
 };
 
 /**
+ * Acknowledge an event the pipeline decided not to act on
+ *
+ * A refusal is a DECISION, not a failure: the doc completes so the provider stops
+ * redelivering an event nothing here will ever act on, the retry ladder is left
+ * untouched, and the stamp on the event's own doc — which already carries the
+ * payload as delivered (`raw`) — is what a human reconciles from. The one shape
+ * every terminal refusal taken before processing writes.
+ *
+ * It is also where the family REPORTS itself
+ * ([#550](https://github.com/Omega-JS-Stack/omega/issues/550)): a refusal is an
+ * attack signal, and a stamp plus a log line is only ever read by someone
+ * already looking. One capture at the shared seam, so every reason reports
+ * exactly once and a new one inherits it for free — never a capture per catch.
+ *
+ * @param {object} webhookRef - The event's own Firestore document reference
+ * @param {object} refusal - The stamp from the refuse*() that decided it
+ * @param {object} event - What the report names the refusal by
+ * @param {object} event.ctx - Assistant instance
+ * @param {string} event.eventId - The webhook doc id (the provider's event id)
+ * @param {string} event.eventType - The provider's event name
+ * @param {string} event.provider - The provider that sent it
+ * @param {string|null} event.uid - The owner the event resolved to, if any
+ */
+async function acknowledgeRefusal(webhookRef, refusal, { ctx, eventId, eventType, provider, uid }) {
+  const refusedAt = powertools.timestamp(new Date(), { output: 'string' });
+
+  reportRefusal(ctx, {
+    message: `Payment webhook refused: ${refusal.reason} (${eventType} from ${provider}, event=${eventId})`,
+    refusal: refusal,
+    eventId: eventId,
+    eventType: eventType,
+    provider: provider,
+    uid: uid,
+  });
+
+  await webhookRef.set({
+    status: 'completed',
+    transition: null,
+    refusal: refusal,
+    metadata: {
+      completed: {
+        timestamp: refusedAt,
+        timestampUNIX: powertools.timestamp(refusedAt, { output: 'unix' }),
+      },
+    },
+  }, { merge: true });
+}
+
+/**
+ * Report a refusal to the error reporter, as a warning
+ *
+ * The ONE place this pipeline assembles a capture. `libraries.sentry` is the
+ * backend's one capture handle (helpers/context/respond.js reads the same one)
+ * and is null whenever no DSN is configured, so the optional chain IS the no-op.
+ * WARNING, not an exception: nothing here failed — the pipeline made a decision,
+ * correctly.
+ *
+ * IDS ONLY, per the scrub rules ([docs/shared/monitoring.md]): the refusal stamp
+ * the refuse*() built is what rides, plus the event's own identifiers. The
+ * payload never does, and no email is assembled at all, so there is nothing for
+ * the scrub to take out.
+ *
+ * Reported BEFORE the stamp is written, deliberately: a refusal whose stamp
+ * could not land ([#535](https://github.com/Omega-JS-Stack/omega/issues/535)) is
+ * more alarming than one that did, not less.
+ *
+ * @param {object} ctx - Assistant instance
+ * @param {object} options
+ * @param {string} options.message - What the dashboard shows as the title
+ * @param {object} options.refusal - The stamp from the refuse*() that decided it
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
+ * @param {string|null} options.uid - The owner the event resolved to, if any
+ * @param {object} [options.extra] - Ids beyond the stamp's own, if the refusal has any
+ */
+function reportRefusal(ctx, { message, refusal, eventId, eventType, provider, uid, extra = {} }) {
+  ctx.Manager.libraries.sentry?.captureMessage?.(message, {
+    level: 'warning',
+    // Searchable on the dashboard: the reason groups the family, the provider
+    // says who sent it, and the event id is what a human looks the delivery up
+    // by in the provider's own dashboard.
+    tags: {
+      refusal: refusal.reason,
+      provider: provider,
+      eventId: eventId,
+    },
+    ...(uid ? { user: { id: uid } } : {}),
+    extra: {
+      ...refusal,
+      eventId: eventId,
+      eventType: eventType,
+      provider: provider,
+      uid: uid || null,
+      ...extra,
+    },
+  });
+}
+
+/**
  * Read the resource out of a webhook envelope
  *
  * Every provider nests it somewhere else — Stripe at data.object, Chargebee at
- * content.<type>, PayPal at resource — so each library names its own shape. Reading
- * Stripe's here degraded every other provider's stale fallback to nothing, and a
- * Chargebee API re-fetch failure threw instead of falling back at all.
+ * content.<type>, PayPal at resource — so each library names its own shape.
+ *
+ * IDENTIFIERS ONLY. What comes back is the caller's own object, so it may name
+ * which order a failed event belongs to and nothing more; the state a resource is
+ * IN comes from the provider's lookup, never from here
+ * ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
  *
  * The Stripe-shaped default below serves the null-library case only (the library
  * failed to load); every provider library, test included, exports extractResource().
@@ -272,7 +521,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  *   caller stamps back on the event doc: the transition detected, and the refusal
  *   when the pipeline declined to act on the event at all.
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, raw }) {
+async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails }) {
   const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
@@ -295,13 +544,6 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     // detected at all. Processing continues, but the unguarded window is visible.
     ctx.warn(`Webhook ${eventId} has no orderId (provider=${provider}, ${resourceType} ${resourceId}) — the staleness guard cannot run, so an out-of-order delivery for this resource would be applied as-is`);
   }
-
-  // Unified refund details from the provider library (keeps the order record and
-  // the transition handlers provider-agnostic). Every refund path needs them: the
-  // subscription email's amount, the one-time refund's record on the order, and
-  // the refusal below.
-  const isRefund = transitions.REFUND_EVENTS.includes(eventType);
-  const refundDetails = (isRefund && library.getRefundDetails) ? library.getRefundDetails(raw) : null;
 
   // A refund UPDATES a purchase — it can never DEFINE one. With no order record
   // behind it, the refund event used to be read as a fresh purchase definition:
@@ -652,6 +894,123 @@ function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, event
 }
 
 /**
+ * Refuse an event whose resource the provider does not have
+ *
+ * The lookup is the trust boundary: the provider answered, and its answer was that
+ * this resource does not exist. The object the webhook carried says otherwise, but
+ * it is only what the caller posted — processing off it is exactly the hole this
+ * refusal closes ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
+ *
+ * Acknowledged, not failed: no retry could ever turn a resource the provider does
+ * not have into one it does, so the doc completes and the provider stops
+ * redelivering an event nothing here will ever act on. Nothing else is written —
+ * no subscription, no order, no intent, no conversion — and the stamp on the
+ * event's own doc, which already holds the payload as delivered (`raw`), is what a
+ * human reconciles from.
+ *
+ * @param {object} options
+ * @param {object} options.ctx - Assistant instance
+ * @param {Error} options.error - The classified failure the lookup threw
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
+ * @param {string} options.resourceType - The parsed event's resource type
+ * @param {string} options.resourceId - The resource the provider does not have
+ * @param {string|null} options.uid - The owner the event parsed to, if any
+ * @returns {{ reason: string, resourceType: string, resourceId: string }} The refusal stamp for the event doc
+ */
+function refuseResourceNotFound({ ctx, error, eventId, eventType, provider, resourceType, resourceId, uid }) {
+  ctx.error(`RESOURCE NOT FOUND: ${eventType} (${provider}) named ${resourceType} ${resourceId}, which ${provider} does not have — refusing to process the event off the object its payload carried (event=${eventId}, owner=${uid || 'null'}): ${error.message}. Stamped on payments-webhooks/${eventId} as refusal.reason=resource-not-found`);
+
+  return {
+    reason: 'resource-not-found',
+    resourceType: resourceType,
+    resourceId: resourceId,
+  };
+}
+
+/**
+ * Refuse an event whose payload claims a different owner than the provider's record
+ *
+ * The lookup succeeded, so the provider named the uid this resource belongs to.
+ * The payload named another one. Only one of the two can be acted on, and the
+ * payload is whatever the caller posted — so an event naming a REAL subscription
+ * with a forged metadata uid used to move that subscription onto the forged uid
+ * ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)).
+ *
+ * Refused, not corrected: the provider's uid is the trustworthy half, but an event
+ * that lies about its owner has nothing left in it worth writing, and quietly
+ * processing it under the real owner would hide the forgery. Acknowledged rather
+ * than failed, for the same reason as every other terminal decision here — no
+ * retry can make the payload agree with the record.
+ *
+ * @param {object} options
+ * @param {object} options.ctx - Assistant instance
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
+ * @param {string} options.resourceType - The parsed event's resource type
+ * @param {string} options.resourceId - The resource the event named
+ * @param {string} options.payloadUid - The owner the payload claimed
+ * @param {string} options.providerUid - The owner the provider's record carries
+ * @param {string} options.source - Which of the provider's records answered ('record' | 'hosted-page')
+ * @returns {{ reason: string, payloadUid: string, providerUid: string, source: string }} The refusal stamp for the event doc
+ */
+function refuseUidMismatch({ ctx, eventId, eventType, provider, resourceType, resourceId, payloadUid, providerUid, source }) {
+  const answered = source === 'hosted-page'
+    ? `whose ${provider} hosted page's pass_thru_content names uid=${providerUid}`
+    : `whose ${provider} record belongs to uid=${providerUid}`;
+
+  ctx.error(`UID MISMATCH: ${eventType} (${provider}) named ${resourceType} ${resourceId}, ${answered}, but the event's payload claims uid=${payloadUid} — refusing to write a resource onto an owner the provider does not agree with (event=${eventId}). Stamped on payments-webhooks/${eventId} as refusal.reason=uid-mismatch: an event that names a real resource under the wrong owner is a forgery until proven otherwise, and needs manual reconciliation`);
+
+  return {
+    reason: 'uid-mismatch',
+    payloadUid: payloadUid,
+    providerUid: providerUid,
+    source: source,
+  };
+}
+
+/**
+ * Refuse a refund whose record belongs to a different order
+ *
+ * The refund's numbers come from the provider, looked up by an id the PAYLOAD
+ * carried ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)) — and an
+ * id is only self-consistent when what it names is also what gets written. A
+ * refund id is not: pair a real sale with an unrelated refund id from the same
+ * merchant account and another customer's amount, currency and reason land on this
+ * order, its email and its refund conversion
+ * ([#532](https://github.com/Omega-JS-Stack/omega/issues/532)).
+ *
+ * So the record has to point back at the resource the event named
+ * ([../../../libraries/payment/refund-linkage.js](../../../libraries/payment/refund-linkage.js)),
+ * and one that points elsewhere is refused: acknowledged rather than failed, for
+ * the same reason as every other terminal decision here — no retry can relate two
+ * unrelated records.
+ *
+ * @param {object} options
+ * @param {object} options.ctx - Assistant instance
+ * @param {Error} options.error - The linkage failure the lookup threw
+ * @param {string} options.eventId - The webhook doc id (the provider's event id)
+ * @param {string} options.eventType - The provider's event name
+ * @param {string} options.provider - The provider that sent it
+ * @param {string|null} options.uid - The owner the event parsed to, if any
+ * @returns {{ reason: string, refundType: string, refundId: string, resourceType: string, resourceId: string, linkedTo: string }} The refusal stamp for the event doc
+ */
+function refuseRefundNotLinked({ ctx, error, eventId, eventType, provider, uid }) {
+  ctx.error(`REFUND NOT LINKED: ${eventType} (${provider}) named ${error.resourceType} ${error.resourceId}, but the ${error.refundType} ${error.refundId} its payload pointed at names ${error.field} ${error.linkedTo} — refusing to record another record's refund on this order (event=${eventId}, owner=${uid || 'null'}). Stamped on payments-webhooks/${eventId} as refusal.reason=refund-not-linked: a refund id the caller chose that resolves to someone else's record is a forgery until proven otherwise, and needs manual reconciliation`);
+
+  return {
+    reason: 'refund-not-linked',
+    refundType: error.refundType,
+    refundId: error.refundId,
+    resourceType: error.resourceType,
+    resourceId: error.resourceId,
+    linkedTo: error.linkedTo,
+  };
+}
+
+/**
  * Refuse to create a user doc for a uid this project has no auth user for
  *
  * The event is acknowledged — the route answered 2xx when it stored it, and the
@@ -672,39 +1031,27 @@ function refuseRefundWithoutOrder({ ctx, resource, refundDetails, eventId, event
 function refuseUserWithoutAuth({ ctx, eventId, eventType, provider, uid, orderId }) {
   ctx.warn(`USER WITHOUT AUTH: ${eventType} (${provider}) resolved to uid=${uid}, which has no auth user in this project and no user doc — refusing to create one from a payment event (event=${eventId}, order=${orderId || 'null'}). Stamped on payments-webhooks/${eventId} as refusal.reason=user-without-auth: the checkout behind this event belongs to another project, typically a local QA run against the emulator with real test-mode keys`);
 
+  const refusal = { reason: 'user-without-auth' };
+
   // The stamp is the record; this is the alarm. A log line in Cloud Logging is
   // only ever read by someone already looking, and the whole point of the guard
   // is that nobody knows to look — money moved somewhere for a uid this project
   // does not have (Ian 2026-08-20).
   //
-  // `libraries.sentry` is the backend's ONE capture handle (helpers/context/
-  // respond.js reads the same one) and is null whenever no DSN is configured, so
-  // the optional chain IS the no-op. WARNING, not an exception: nothing here
-  // failed — the pipeline made a decision, correctly. Only the uid rides, the
-  // join key back to the account; no email is assembled at all, so there is
-  // nothing for the PII scrub to take out ([docs/shared/monitoring.md]).
-  ctx.Manager.libraries.sentry?.captureMessage?.(`Payment webhook refused: user without auth (uid=${uid})`, {
-    level: 'warning',
-    tags: {
-      refusal: 'user-without-auth',
-      provider: provider,
-    },
-    user: {
-      id: uid,
-    },
-    extra: {
-      reason: 'user-without-auth',
-      uid: uid,
-      eventId: eventId,
-      eventType: eventType,
-      provider: provider,
-      orderId: orderId || null,
-    },
+  // Reported through the same helper the acknowledged family uses (#550), from
+  // here rather than there: this refusal is decided mid-processing and stamped by
+  // the completion write, so it never passes acknowledgeRefusal().
+  reportRefusal(ctx, {
+    message: `Payment webhook refused: user without auth (uid=${uid})`,
+    refusal: refusal,
+    eventId: eventId,
+    eventType: eventType,
+    provider: provider,
+    uid: uid,
+    extra: { orderId: orderId || null },
   });
 
-  return {
-    reason: 'user-without-auth',
-  };
+  return refusal;
 }
 
 /**

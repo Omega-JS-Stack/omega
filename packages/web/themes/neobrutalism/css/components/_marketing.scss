@@ -1,8 +1,9 @@
 // Neobrutalism Theme: Marketing bands
 // The BASE marketing sections (omega-* markup, structure from the classy
 // floor in _theme.scss) painted neobrutalist: the ink-framed logo marquee,
-// oversized color-block stats, and the full-bleed ink CTA panel. These
-// overlays land AFTER the floor in the bundle, so they win every collision.
+// oversized color-block stats, the plan cards, and the full-bleed ink CTA
+// panel. These overlays land AFTER the floor in the bundle, so they win
+// every collision.
 
 // ============================================
 // Trusted-by (marketing/trusted-by): ink-framed marquee strip
@@ -166,4 +167,78 @@
       color: #111111;
     }
   }
+}
+
+// ============================================
+// Plan cards (marketing/pricing-cards + /pricing): ink frames on hard
+// shadows, the popular plan goes yellow
+// ============================================
+// In the MAIN bundle, not the pricing page sheet ([#531]): the homepage plan
+// band composes the same cards, and a page-scoped skin left them bare there.
+.omega-price-card {
+  // The frame + offset shadow come from the theme's .card treatment; prices
+  // and names go chunky display.
+  .omega-price-card__name {
+    font-family: $nb-font-display;
+    font-weight: 900;
+  }
+
+  .omega-price-card__tagline {
+    font-family: $nb-font-mono;
+    font-size: 0.8rem;
+  }
+
+  .omega-price-card__price {
+    font-family: $nb-font-display;
+  }
+
+  .omega-price-card__currency {
+    font-weight: 900;
+  }
+
+  .omega-price-card__amount {
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+
+  .omega-price-card__per {
+    font-family: $nb-font-mono;
+  }
+
+  .price-per-unit {
+    font-weight: 700;
+  }
+}
+
+// Popular plan: signature yellow fill + thicker frame, ink text throughout
+.omega-price-card--popular {
+  background: var(--nb-accent-yellow);
+  color: #111111;
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+
+  .omega-price-card__tagline,
+  .omega-price-card__billing,
+  .omega-price-card__tier-note {
+    color: #111111;
+  }
+}
+
+// "Most popular": the mono ink flag pinned over the card's top edge
+.omega-price-card__popular {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-family: $nb-font-mono;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0;
+  background: #111111;
+  color: var(--nb-accent-yellow);
+  border-color: #111111;
 }

@@ -1,4 +1,5 @@
 const uuid = require('uuid');
+const env = require('../../../libraries/env.js');
 
 let Module = {
   init: async function (Manager, data) {
@@ -36,7 +37,7 @@ let Module = {
         // label: '',
       });
 
-      const namespace = ctx.request.data.namespace || process.env.OMEGA_NAMESPACE;
+      const namespace = ctx.request.data.namespace || env.get('OMEGA_NAMESPACE');
       ctx.request.data.version = `${ctx.request.data.version || '5'}`.replace('v', '');
       ctx.request.data.name = ctx.request.data.name || ctx.request.data.input;
 

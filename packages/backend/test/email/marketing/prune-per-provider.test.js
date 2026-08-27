@@ -1,6 +1,6 @@
 /**
- * Marketing prune test — the opt-in gate on the cron entry
- * ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)), then the
+ * Marketing prune test — the default-on gate on the cron entry
+ * ([#551](https://github.com/Omega-JS-Stack/omega/issues/551)), then the
  * per-provider lanes: each provider's OWN engagement decides that provider's
  * removals ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)).
  *
@@ -231,9 +231,13 @@ function subscription({ email, received = NEWSLETTER_RECEIVED_FLOOR, openRate = 
 
 const NEWSLETTER_ENABLED = { campaigns: { enabled: true }, newsletter: { enabled: true } };
 
-// Both providers live, and the prune explicitly opted in — the only shape that
-// deletes anything ([#422](https://github.com/Omega-JS-Stack/omega/issues/422)).
-const PRUNE_OPTED_IN = { ...NEWSLETTER_ENABLED, prune: { enabled: true } };
+// Both providers live, and the prune switched on explicitly — the same shape the
+// schema materializes into every brand config (`marketing.prune.enabled`,
+// default true since Ian 2026-08-22).
+const PRUNE_ENABLED = { ...NEWSLETTER_ENABLED, prune: { enabled: true } };
+
+// The per-brand off switch: the ONE value that stops the monthly run.
+const PRUNE_DISABLED = { ...NEWSLETTER_ENABLED, prune: { enabled: false } };
 
 // Paid-ness is whatever resolveSubscription() calls active — the subscription_paid
 // segment's two conditions (plan not basic AND status active), not a local rule.
@@ -649,11 +653,44 @@ module.exports = {
       },
     },
 
-    // ─── 10. The cron entry is OPT-IN (#422) ───
-    // A framework that deletes a consumer's contacts unless told not to is the
-    // wrong default: nothing runs without an explicit marketing.prune.enabled.
+    // ─── 10. The cron entry reads a DEFAULT-ON switch (#551) ───
+    // `marketing.prune.enabled` carries the schema default `true` (Ian
+    // 2026-08-22), and the entry read it `!== true` — the opt-in polarity of
+    // [#422](https://github.com/Omega-JS-Stack/omega/issues/422), left behind
+    // when the default flipped. Any Manager.config assembled outside
+    // loadConfig()'s materialization then silently skipped the monthly run
+    // ([#551](https://github.com/Omega-JS-Stack/omega/issues/551)).
     {
-      name: 'entry: a marketing block with no prune key books zero deletions',
+      name: 'entry: a marketing block with no prune key still runs every lane',
+
+      async run() {
+        const { admin, writes } = buildAdmin();
+        const { ctx } = buildAssistant();
+        const deleted = [];
+        const removals = [];
+        const sent = [];
+
+        await onPruneDay(() => withProviders({
+          sendgrid: sendgridSeam([contact('cold@gmail.com', 'sg_1')], deleted),
+          beehiiv: {
+            listSubscriptions: async () => ({
+              success: true,
+              subscriptions: [subscription({ email: 'cold@gmail.com' })],
+            }),
+            removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
+          },
+          env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
+        }, () => cron({ Manager: buildManager(NEWSLETTER_ENABLED, sent), ctx, libraries: { admin } })));
+
+        assert.deepStrictEqual(deleted, ['sg_1'], `An unmentioned prune is ON, so the SendGrid lane deletes, got ${JSON.stringify(deleted)}`);
+        assert.deepStrictEqual(removals, ['cold@gmail.com'], `An unmentioned prune is ON, so the Beehiiv lane deletes, got ${JSON.stringify(removals)}`);
+        assert.strictEqual(sent.length, 1, `The re-engagement campaign sends, got ${sent.length}`);
+        assert.strictEqual(writes.length, 2, `Both lanes log their run doc, got ${JSON.stringify(writes.map((write) => write.path))}`);
+      },
+    },
+
+    {
+      name: 'entry: prune.enabled = false books zero deletions',
 
       async run() {
         const { admin, writes } = buildAdmin();
@@ -672,11 +709,11 @@ module.exports = {
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => cron({ Manager: buildManager(NEWSLETTER_ENABLED, sent), ctx, libraries: { admin } })));
+        }, () => cron({ Manager: buildManager(PRUNE_DISABLED, sent), ctx, libraries: { admin } })));
 
-        assert.deepStrictEqual(deleted, [], `An unconfigured prune deletes no SendGrid contact, got ${JSON.stringify(deleted)}`);
-        assert.deepStrictEqual(removals, [], `An unconfigured prune deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`);
-        assert.deepStrictEqual(sent, [], `An unconfigured prune sends no re-engagement campaign, got ${JSON.stringify(sent)}`);
+        assert.deepStrictEqual(deleted, [], `A brand that opted out deletes no SendGrid contact, got ${JSON.stringify(deleted)}`);
+        assert.deepStrictEqual(removals, [], `A brand that opted out deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`);
+        assert.deepStrictEqual(sent, [], `A brand that opted out sends no re-engagement campaign, got ${JSON.stringify(sent)}`);
         assert.strictEqual(writes.length, 0, `Nothing ran, so nothing is logged, got ${JSON.stringify(writes)}`);
         assert.ok(
           calls.logs.some((line) => line.includes('Marketing prune: disabled')),
@@ -705,7 +742,7 @@ module.exports = {
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => cron({ Manager: buildManager(PRUNE_OPTED_IN, sent), ctx, libraries: { admin } })));
+        }, () => cron({ Manager: buildManager(PRUNE_ENABLED, sent), ctx, libraries: { admin } })));
 
         assert.deepStrictEqual(deleted, ['sg_1'], `The SendGrid lane still deletes, got ${JSON.stringify(deleted)}`);
         assert.deepStrictEqual(removals, ['cold@gmail.com'], `The Beehiiv lane still deletes, got ${JSON.stringify(removals)}`);

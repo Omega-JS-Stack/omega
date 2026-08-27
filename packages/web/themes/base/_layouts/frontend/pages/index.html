@@ -2,10 +2,6 @@
 layout: frontend/core/base
 
 #### THEME CONFIG ####
-theme:
-  main:
-    class: "pt-0"
-
 # Page sections: extracted to _sections/marketing/* (hero, trusted-by, bento,
 # product-demo, showcase, stats — each section.json5 owns the defaults;
 # consumers override by owning the composition in their page BODY — page
@@ -35,10 +31,14 @@ testimonials:
 # CTA Section — the ink band
 cta:
   headline: "Ready to build something people remember?"
-  subheadline: "Join thousands of teams already shipping with {{ site.brand.name }}."
+  subheadline: "Join thousands of teams already shipping with {{ resolved.config.brand.name }}."
   primary_button:
     text: "Start free today"
     href: "/signup"
+config:
+  theme:
+    main:
+      class: "pt-0"
 ---
 {% composition %}
 {% section "marketing/hero", data: resolved.hero %}
@@ -46,6 +46,10 @@ cta:
 {% section "marketing/trusted-by", data: resolved.trusted_by %}
 <!-- ═══ Bento ═══ -->
 {% section "marketing/bento", data: resolved.bento %}
+<!-- ═══ Plan cards (#493) — the catalog itself, right under the WHY band.
+     plans/annual bridge from resolved.pricing: ONE pricing source, and a
+     brand with no published catalog renders no band. ═══ -->
+{% section "marketing/pricing-cards", data: resolved.pricing_cards, plans: resolved.pricing.plans, annual: resolved.pricing.billing.annually %}
 <!-- ═══ Product demo (optional video tabs) ═══ -->
 {% section "marketing/product-demo", data: resolved.product_demo %}
 <!-- ═══ Showcase (optional alternating rows) ═══ -->

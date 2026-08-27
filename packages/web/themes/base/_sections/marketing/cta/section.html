@@ -1,41 +1,44 @@
-<section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %}>
-  <div class="container">
-    <div class="omega-cta omega-ink-panel" data-omega-reveal="scale">
-      {% iftruthy args.superheadline.text %}
-        <span class="omega-micro d-block mb-3">{{ args.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="omega-cta__headline">{% if args.headline_accent != blank %}
-        {{ args.headline }}
-        <em>{{ args.headline_accent }}</em>
-      {% else %}{{ args.headline }}{% endif %}</h2>
-      {% iftruthy args.subheadline %}
-        <p class="omega-cta__sub">{{ args.subheadline }}</p>
-      {% endiftruthy %}
-      <div class="omega-cta__ctas">
-        {% iftruthy args.primary_button.text %}
-          <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-            {{ args.primary_button.text }}
-            <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
-          </a>
+{% if args.enabled %}
+  <section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %}>
+    <div class="container">
+      <div class="omega-cta omega-ink-panel" data-omega-reveal="scale">
+        {% iftruthy args.superheadline.text %}
+          <span class="omega-micro d-block mb-3">{{ args.superheadline.text }}</span>
         {% endiftruthy %}
-        {% iftruthy args.command %}
-          <a href="{{ args.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
-            <span class="omega-cmd-prompt">$</span>{{ args.command }}
-          </a>
+        <h2 class="omega-cta__headline">{% if args.headline_accent != blank %}
+          {{ args.headline }}
+          <em>{{ args.headline_accent }}</em>
+        {% else %}{{ args.headline }}{% endif %}</h2>
+        {% iftruthy args.subheadline %}
+          <p class="omega-cta__sub">{{ args.subheadline }}</p>
         {% endiftruthy %}
-        {% iftruthy args.secondary_button.text %}
-          {% if args.secondary_button.nudge %}
-            <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
-              {{ args.secondary_button.text }}
+        <div class="omega-cta__ctas">
+          {% iftruthy args.primary_button.text %}
+            <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+              {{ args.primary_button.text }}
               <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
             </a>
-          {% else %}
-            <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
-              {{ args.secondary_button.text }}
+          {% endiftruthy %}
+          {% iftruthy args.command %}
+            <a href="{{ args.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
+              {%- comment %} A shell command is TEXT, never markup (#580). {% endcomment -%}
+              <span class="omega-cmd-prompt">$</span>{{ args.command | escape_once }}
             </a>
-          {% endif %}
-        {% endiftruthy %}
+          {% endiftruthy %}
+          {% iftruthy args.secondary_button.text %}
+            {% if args.secondary_button.nudge %}
+              <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
+                {{ args.secondary_button.text }}
+                <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+              </a>
+            {% else %}
+              <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+                {{ args.secondary_button.text }}
+              </a>
+            {% endif %}
+          {% endiftruthy %}
+        </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+{% endif %}

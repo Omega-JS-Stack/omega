@@ -108,10 +108,12 @@ function trackPayment({ category, transitionName, eventType, unified, order, use
       event: resolved.event,
       params: buildParams({ resolved, currency, provider }),
       attribution: buildAttributionContext(order?.attribution),
+      // The doc goes in whole: the ONE reader takes every match parameter off
+      // it, so this call site never decides which key an address lives under
+      // ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)).
       identity: buildIdentity({
         uid,
-        email: userDoc?.auth?.email,
-        telephone: userDoc?.personal?.telephone,
+        user: userDoc,
         request: order?.request,
       }),
       trackingConsent: order?.trackingConsent,

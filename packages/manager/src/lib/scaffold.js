@@ -18,7 +18,6 @@
  */
 
 const path = require('node:path');
-const { randomBytes, randomUUID } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
@@ -27,6 +26,11 @@ const { TARGET_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
 // SSOT, cp137) — the stub is just a canonical render with generated Omega
 // keys, so a scaffolded .env and a reordered one have the same shape.
 const { renderCanonicalEnv } = require('./env-order.js');
+// What gets generated (the env schema's `generated` entries) and how a value
+// is serialized (the disperse .env writer) — the same two SSOTs writeEnvValue
+// rides.
+const { generatedEnvKeys } = require('@omega.js/config');
+const { envLine } = require('../services/disperse/write/env.js');
 // The heal's value is the SSOT for the manage script — a scaffolded brand
 // must never be born needing the migration the heal just learned (#229)
 const { MANAGE_SCRIPT } = require('./package-scripts.js');
@@ -66,6 +70,9 @@ function renderOmegaConfig(answers) {
     `      email: ${JSON.stringify(answers.email)},`,
     '    },',
     '  },',
+    '',
+    '  // Social handles (platform: "handle") — each entry lights its footer icon, its JSON-LD sameAs entry, and a /<platform> shortlink.',
+    '  socials: {},',
     '',
     '  // Project-owned theme — seeded at onboarding, yours to change.',
     '  theme: {',
@@ -225,19 +232,16 @@ function renderGitignore() {
 }
 
 function renderEnvStub(answers) {
-  const generated = {
-    OMEGA_ADMIN_KEY: randomBytes(32).toString('base64url'),
-    OMEGA_WEBHOOK_KEY: randomBytes(32).toString('base64url'),
-    OMEGA_NAMESPACE: randomUUID(),
-  };
-
   return renderCanonicalEnv({
     header: [
       `# ${answers.name} — brand secrets (gitignored; loaded before every omega run).`,
       '# Uncomment and fill what this brand uses. Services without their credentials',
       '# skip cleanly, so add these as the brand adopts each service.',
     ],
-    entries: new Map(Object.entries(generated).map(([key, value]) => [key, { raw: `${key}=${value}` }])),
+    // The generated keys and their line form come from the SSOTs the
+    // manage-time mint uses too (#569), so a brand born here and a brand
+    // healed by the env-keys op carry byte-identical shapes.
+    entries: new Map(Object.entries(generatedEnvKeys()).map(([key, generate]) => [key, { raw: envLine(key, generate()) }])),
   });
 }
 

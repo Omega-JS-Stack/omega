@@ -47,7 +47,7 @@ EDGE_API_KEY="..."
 2. Generate JWT credentials at "Manage API Keys"
 3. `FIREFOX_EXTENSION_ID` matches the `id` field in your manifest's `browser_specific_settings.gecko.id`
 
-> **`browser_specific_settings.gecko.id` is required to BUILD, not just to publish.** Packaging the firefox target fails with an actionable error until `src/manifest.json` declares one — Firefox cannot identify, sign, or update an add-on without it. The same pass translates the chrome-only panel keys (`side_panel` → `sidebar_action`, `sidePanel` permission dropped), so the firefox artifact is a real firefox artifact ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
+> **Declare `browser_specific_settings.gecko.id` before your FIRST publish.** Packaging no longer waits for it: with none declared, the firefox pass DERIVES `extension@<brand.url host>` (or `extension@<brand.id>.extension` when the brand has no url) and builds, failing only when there are no brand facts at all to derive from — so a fresh scaffold produces an artifact out of the box. Declare your own anyway before you submit: the id must stay stable across every release, an id assigned at submission time can never be changed from a self-hosted build, and `brand.url` can change under a derived one ([#574](https://github.com/Omega-JS-Stack/omega/issues/574)). The same pass translates the chrome-only panel keys (`side_panel` → `sidebar_action`, `sidePanel` permission dropped), so the firefox artifact is a real firefox artifact ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)).
 
 ### Microsoft Edge Add-ons
 
@@ -95,8 +95,11 @@ For automated releases, store credentials as encrypted GitHub Actions secrets. A
     CHROME_CLIENT_SECRET:  ${{ secrets.CHROME_CLIENT_SECRET }}
     CHROME_REFRESH_TOKEN:  ${{ secrets.CHROME_REFRESH_TOKEN }}
     # ...same for FIREFOX_*, EDGE_*
+    GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}
   run: npm run build
 ```
+
+**The store credentials are not the only secret CI needs.** A dispatched run has no `.env`, so `GOOGLE_ANALYTICS_SECRET` — the Measurement Protocol secret the build BAKES into `build.js` — only reaches the build through the workflow env. Without it, a CI-published extension shipped an empty secret and sent no analytics events, silently ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)). The scaffolded `publish.yml` injects it, and a build-mode build of a brand that HAS `analytics.providers.google.id` fails loudly when the secret is empty rather than publishing a dead sender.
 
 Same pattern EM uses for its desktop apps. Each store does its own review afterward (Chrome / Firefox: hours to a few days; Edge: typically same day).
 

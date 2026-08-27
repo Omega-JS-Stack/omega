@@ -1,19 +1,24 @@
 {
-  description: 'The hairline feature grid — mixed-size tiles (span: big/tall/wide) with typed demo bodies (type: code/terminal/split/brand/default), closing on the optional cta_button. Empty items suppresses the band. superheadline accepts a string or { icon, text } (no schema type on purpose).',
+  description: 'The hairline feature grid — mixed-size tiles (span: big/tall/wide) with typed demo bodies (type: code/terminal/split/brand/default), closing on the optional cta_button. Give a tile an href and the WHOLE tile becomes one anchor (the linked-card listing: hubs, category indexes) — its body carries no nested anchors. numbered: true counts the tiles as process steps. Empty items suppresses the band. superheadline accepts a string or { text } (no schema type on purpose).',
 
   args: {
-    superheadline: { description: 'string or { icon, text } — both render as the micro label; the icon rides the shared omega_icon mechanism' },
+    superheadline: { description: 'string or { text } — both render as the micro label, words only' },
     headline: 'string',
+    headline_accent: 'string',
     subheadline: 'string',
-    items: 'array',
+    items: 'array', // [{ title, description, icon, span, type, href }] — href turns that tile into ONE anchor
+    numbered: { type: 'boolean', description: 'auto-numbers the tiles 1..N by position as an ordinal chip (process steps); reordering renumbers itself' },
     config_demo: 'object',
     cta_button: { type: 'object', description: 'the closing CTA under the grid — { text, href, enabled }; enabled: false suppresses it' },
   },
 
   defaults: {
-    superheadline: 'Why {{ site.brand.name }}',
+    superheadline: 'Why {{ resolved.config.brand.name }}',
     headline: "Everything you need. <em>Nothing you don't.</em>",
-    subheadline: 'A complete foundation that stays out of your way: configure once, ship everywhere.',
+    // No sub line by default: an ABSENT subheadline renders NOTHING. A band
+    // the brand authors inherits no words it never wrote (the demo line lives
+    // in the gallery variant below, where sample content belongs).
+    subheadline: '',
     items: [
       {
         type: 'code',
@@ -49,7 +54,7 @@
       },
     ],
     // The fake-config demo panel inside the 'code' tile (previously hardcoded
-    // {{ site.brand.* }} in markup — now args, per context-freeness). label
+    // {{ resolved.config.brand.* }} in markup — now args, per context-freeness). label
     // is the comment line above the snippet — generic by default (pass B: no
     // framework filename in a theme's voice); a brand that wants its real
     // config named passes its own. The 'terminal' tile's mock lines are
@@ -57,18 +62,67 @@
     // to a generic npm session.
     config_demo: {
       label: '// one config, every target',
-      name: '{{ site.brand.name }}',
-      color: '{{ site.brand.color | default: "#2563EB" }}',
+      name: '{{ resolved.config.brand.name }}',
+      color: '{{ resolved.config.brand.color | default: "#2563EB" }}',
     },
   },
 
   // Showcase variants (spec §9)
   demo: [
-    { label: 'Default grid' },
+    {
+      label: 'Default grid',
+      args: {
+        subheadline: 'A complete foundation that stays out of your way: configure once, ship everywhere.',
+      },
+    },
+    {
+      // Demo hrefs point at pages EVERY brand build writes — a default page
+      // may never link a route the build never wrote (#427).
+      label: 'Linked tiles — a hub listing',
+      args: {
+        superheadline: { text: 'Start here' },
+        headline: 'Everything, one grid',
+        subheadline: 'Each tile is the link: the whole card clicks through.',
+        items: [
+          {
+            icon: 'tag',
+            title: 'What it costs',
+            description: 'Every plan, and what each one includes.',
+            href: '/pricing',
+          },
+          {
+            icon: 'users',
+            title: 'Who we are',
+            description: 'The people behind the product.',
+            href: '/about',
+          },
+          {
+            icon: 'envelope',
+            title: 'Talk to us',
+            description: 'Questions, demos, and anything else.',
+            href: '/contact',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Numbered process',
+      args: {
+        superheadline: { text: 'How it works' },
+        headline: 'Four steps, start to live',
+        numbered: true,
+        items: [
+          { icon: 'comments', title: 'Discover', description: 'We listen before we draw anything.' },
+          { icon: 'pen-ruler', title: 'Design', description: 'The shape of the thing, agreed up front.' },
+          { icon: 'hammer', title: 'Build', description: 'Shipped in weekly slices you can see.' },
+          { icon: 'rocket', title: 'Launch', description: 'Live, measured, and handed over.' },
+        ],
+      },
+    },
     {
       label: 'Three tiles, icon eyebrow + closing CTA',
       args: {
-        superheadline: { icon: 'bolt', text: 'The short list' },
+        superheadline: { text: 'The short list' },
         headline: 'The essentials',
         subheadline: 'A tighter grid: layout self-adjusts to the item count.',
         cta_button: { text: 'See every feature', href: '/pricing' },

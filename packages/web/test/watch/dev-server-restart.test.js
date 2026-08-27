@@ -28,9 +28,9 @@ const { registerTemplateWatchTargets, devServerOptions } = require('../../src/co
 
 // A rebuild is chokidar's write-settle window plus one build of this (tiny)
 // fixture; the deadline is the point at which "the edit never landed" is the
-// only remaining explanation. It scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
-const POLL_MS = 50;
+// only remaining explanation. It scales with the lane's load knob (#211) and
+// with this machine's measured contention (#615).
+const { POLL_MS, buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done
 // — the restart, if one is coming, rides the END of the rebuild (Eleventy
 // reloads the server after write), so the assertions wait for silence first.
@@ -114,11 +114,15 @@ async function startDevServer(t, fixture) {
   // Eleventy re-runs the config callback ONLY on a config reset — counting the
   // runs is how a reset is told apart from an incremental rebuild.
   const configRuns = { count: 0 };
+  // What the watcher actually did, for a timeout's failure message (#615).
+  const builds = buildRecorder();
   const elev = new Eleventy(fixture.src, fixture.out, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
       configRuns.count += 1;
+      eleventyConfig.on('eleventy.before', builds.onStart);
+      eleventyConfig.on('eleventy.after', builds.onFinish);
       eleventyConfig.setServerOptions(devServerOptions(fixture.out));
       registerTemplateWatchTargets(eleventyConfig, { onRescans: () => {} });
       return configureOmega(eleventyConfig, {
@@ -156,11 +160,7 @@ async function startDevServer(t, fixture) {
     page,
     /** Wait for the rebuild to land, then for the watch loop to go quiet. */
     async settleAfter(pattern) {
-      const deadline = Date.now() + REBUILD_DEADLINE_MS;
-      while (!pattern.test(page()) && Date.now() < deadline) {
-        await sleep(POLL_MS);
-      }
-      assert.match(page(), pattern, 'the edit landed in the rendered page');
+      await waitForRebuild({ read: page, pattern, message: 'the edit landed in the rendered page', builds });
 
       for (let quiet = 0; quiet < SETTLE_QUIET_POLLS;) {
         await sleep(POLL_MS);

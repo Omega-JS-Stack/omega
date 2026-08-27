@@ -40,6 +40,7 @@ const Logger = require('@omega.js/devkit/logger');
 const { frameworkDependencyNames, frameworkDepsPattern } = require('@omega.js/devkit/framework-deps');
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
+const { collectHeroAnimations } = require('./hero-animations.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
 const { resolvePathPrefix, prefixCss } = require('./path-prefix.js');
 const { checkThemeVocabulary } = require('./theme-vocabulary.js');
@@ -148,12 +149,13 @@ function resolvePageAsset(map, base) {
  * @param {string} options.coreDir - the core layer root (for __main_assets__)
  * @param {string} options.outDir - the site output dir (_site)
  * @param {string} options.clientEntry - path to @omega.js/client's entry (aliased as `@omega.js/client`)
- * @param {string[]} [options.sectionRoots] - section/component resolution bases
- *   (consumer dir, then theme layers — registerSectionTags' order). Feeds the
- *   spec §7 asset lanes: every entry's section.scss compiles into the main
- *   sheet via `omega:sections` (PurgeCSS self-trims unused ones) and every
- *   section.js bundles into the main bundle behind DOM-presence init
- *   (data-omega-section/-component attributes, boot.js bootSections)
+ * @param {string[]} [options.sectionRoots] - section/component/hero-animation
+ *   resolution bases (consumer dir, then theme layers — registerSectionTags'
+ *   order). Feeds the spec §7 asset lanes: every entry's section.scss (and
+ *   every `_hero/<name>/style.scss`, #441) compiles into the main sheet via
+ *   `omega:sections` (PurgeCSS self-trims unused ones) and every section.js /
+ *   `script.js` bundles into the main bundle behind DOM-presence init
+ *   (data-omega-section/-component/-hero attributes, boot.js bootSections)
  * @param {string} [options.pathPrefix] - the base path the built site is served
  *   under (#355): emitted stylesheets' `url()` targets are written under it.
  *   Manifest URLs stay root-relative — the HTML pass mounts them (src/path-prefix.js)
@@ -172,16 +174,35 @@ async function buildAssets(options) {
   // Explicit (resolveThemeLayers output) — a consumer-local theme dir can't
   // be recognized by its parent dir, so callers name the theme roots.
   const themeRoots = options.themeRoots;
-  const sectionAssets = collectSectionAssets(options.sectionRoots || []);
+  // The §7 asset lanes: every resolved section/component, plus the hero
+  // animations (#441), which ride the SAME lanes by design — one
+  // `{ kind, id, scss, js }` list, so the sass importer and the bundle's
+  // registry take a hero folder with no special case.
+  const sectionAssets = [
+    ...collectSectionAssets(options.sectionRoots || []),
+    ...collectHeroAnimations(options.sectionRoots || []),
+  ];
 
   if (options.only !== 'css') {
     // ---- JS entries: layered union of page modules + the main bundle
     const jsDirs = options.layers.map((layer) => path.join(layer, 'js')).filter((dir) => fs.existsSync(dir));
+    // The framework's own layers — theme roots + core (the js/modules lane
+    // below is theirs alone, and the #469 orphan guard answers to consumer
+    // files only).
+    const frameworkLayers = new Set([...themeRoots, options.coreDir]);
     const entryPoints = {};
     const keyBySpecifier = new Map();
+    // #469: the CONSUMER files isPageEntry passed over, minus the `_` partials
+    // it rejects by name. Judged against the bundle graph below.
+    const consumerJsDirs = jsDirs.filter((dir) => !frameworkLayers.has(path.dirname(dir)));
+    const notEntries = [];
 
     for (const [rel, abs] of collectLayered(jsDirs, /^pages\/.*\.js$/)) {
-      if (!isPageEntry(rel)) continue;
+      if (!isPageEntry(rel)) {
+        const partial = path.basename(rel).startsWith('_');
+        if (!partial && consumerJsDirs.some((dir) => abs.startsWith(`${dir}${path.sep}`))) notEntries.push(abs);
+        continue;
+      }
       const key = pageKey(rel);
       entryPoints[`pages/${key}`] = `omega-boot:${abs}`;
       keyBySpecifier.set(abs, ['pages', key]);
@@ -212,18 +233,19 @@ async function buildAssets(options) {
             `import mod from ${JSON.stringify(args.path)};`,
             `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
           ];
-          // §7 section-JS lane: the main stub imports every section.js and
-          // registers the id → init map; bootSections inits per
-          // [data-omega-<kind>="<id>"] element after the main boot.
+          // §7 section-JS lane: the main stub imports every section.js (and
+          // every hero animation's script.js, #441) and registers the id → init
+          // map; bootSections inits per [data-omega-<kind>="<id>"] element
+          // after the main boot.
           const jsEntries = isMain ? sectionAssets.filter((entry) => entry.js) : [];
           if (jsEntries.length) {
             lines[0] = `import { bootMain, bootSections } from ${JSON.stringify(bootRuntime)};`;
-            const registry = { section: [], component: [] };
+            const registry = { section: [], component: [], hero: [] };
             jsEntries.forEach((entry, i) => {
               lines.push(`import sectionInit${i} from ${JSON.stringify(entry.js)};`);
               registry[entry.kind].push(`${JSON.stringify(entry.id)}: sectionInit${i}`);
             });
-            lines.push(`bootSections({ section: { ${registry.section.join(', ')} }, component: { ${registry.component.join(', ')} } });`);
+            lines.push(`bootSections({ section: { ${registry.section.join(', ')} }, component: { ${registry.component.join(', ')} }, hero: { ${registry.hero.join(', ')} } });`);
           }
           return { resolveDir: path.dirname(args.path), contents: lines.join('\n') };
         });
@@ -276,6 +298,30 @@ async function buildAssets(options) {
       else manifest.js.pages[spec[1]] = url;
     }
 
+    // ---- Orphaned page modules (#469): a consumer `js/pages/` file that is
+    // neither an ENTRY nor an INPUT of one is dead code — the build stays green
+    // and the page it was written for ships with no JS. The legacy UJM shape
+    // (js/pages/dashboard/agents/edit.js, 4 segments) lands here every time.
+    // The bundle graph is the judge, not the path: deep helpers are legitimate
+    // (payment/checkout/modules/, dashboard/account/sections/) and stay silent
+    // because their page entry imports them. Framework layers are out of scope
+    // — a production build strips `@dev-only` blocks BEFORE esbuild records
+    // inputs, so core's dev-block-only helpers read as orphans there.
+    const bundled = new Set(Object.keys(result.metafile.inputs).map((input) => path.resolve(input)));
+    const orphans = notEntries.filter((abs) => !bundled.has(abs));
+    if (orphans.length) {
+      const warn = options.warn || logger.warn.bind(logger);
+      warn(
+        `js/pages/ modules NOTHING loads — not page entries, and no entry imports them, so these `
+        + `pages ship with no JS: ${orphans.join(', ')}\n`
+        + `  the fix for a FAMILY of pages: one \`[name]\` wildcard entry serving every URL under it `
+        + `(js/pages/blog/[slug].js, or js/pages/dashboard/agents/[id]/index.js deeper)\n`
+        + `  the fix for ONE page: a page entry is an \`index.js\` at any depth (js/pages/dashboard/agents/edit/index.js), `
+        + `or a flat file of 3 segments or fewer (js/pages/dashboard/agents.js)\n`
+        + `  a deliberate helper is imported by its page entry, or named with a leading underscore (js/pages/legal/_document.js)`,
+      );
+    }
+
     // ---- Legacy module bundles: <layer>/js/modules/*.js → the FIXED URL
     // /assets/js/modules/<name>.bundle.js. The redirect layout scripts these
     // directly (omega_cachebreak query param), so they are never content-hashed
@@ -289,7 +335,6 @@ async function buildAssets(options) {
     // the whole build, and one that didn't succeeded into the wrong lane.
     // Consumer shared code goes in `js/libs/`, which the main/page bundles
     // import normally (docs/web/libs.md).
-    const frameworkLayers = new Set([...themeRoots, options.coreDir]);
     const frameworkJsDirs = options.layers
       .filter((layer) => frameworkLayers.has(layer))
       .map((layer) => path.join(layer, 'js'))
@@ -524,10 +569,11 @@ async function purgeCss(options) {
 /**
  * Sass importer synthesizing `omega:sections` — the §7 css lane. The module
  * body is a generated @use list over every layer-resolved section.scss /
- * component.scss (deterministic kind+id order), so core main.scss pulls the
+ * component.scss / hero style.scss (deterministic kind+id order), so core main.scss pulls the
  * whole library with ONE line and PurgeCSS self-trims sections a site never
  * renders. Empty library → empty module (the @use is always safe).
  * @param {Array<{scss: string|null}>} sectionAssets - collectSectionAssets output
+ *   plus collectHeroAnimations' (#441 — one lane, same shape)
  * @returns {object}
  */
 function sectionsImporter(sectionAssets) {

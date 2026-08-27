@@ -2,85 +2,17 @@
 // The theme forks no pricing layout (#177 phase 3): the BASE page renders
 // (omega-price-card grid, omega-billing-toggle, the omega-band enterprise
 // strip, the feature-comparison table, the FAQ duo) and this file dresses it
-// neobrutalist: ink-framed cards on offset shadows, the yellow "Most popular"
-// plan, the framed comparison ledger. Structure comes from the classy floor
-// partials in the main bundle; these page rules land after and win. The hard
-// square BILLING TOGGLE is not here: it renders on the account page too, so
-// its skin lives in css/components/_billing-toggle.scss, in the main bundle
-// ([#236]). Compiles standalone: theme tokens + mixins via loadPaths.
+// neobrutalist: the framed comparison ledger and the enterprise strip.
+// Structure comes from the classy floor partials in the main bundle; these
+// page rules land after and win. The hard square BILLING TOGGLE is not here:
+// it renders on the account page too, so its skin lives in
+// css/components/_billing-toggle.scss, in the main bundle ([#236]) — and the
+// PLAN CARDS left for the same reason ([#531]): marketing/pricing-cards
+// composes them on the homepage, so their skin lives in
+// css/components/_marketing.scss. Compiles standalone: theme tokens + mixins
+// via loadPaths.
 @use 'config' as *;
 @import 'css/base/mixins';
-
-// ============================================
-// Plan cards: ink frames on hard shadows, the popular plan goes yellow
-// ============================================
-.omega-price-card {
-  // The frame + offset shadow come from the theme's .card treatment; prices
-  // and names go chunky display.
-  .omega-price-card__name {
-    font-family: $nb-font-display;
-    font-weight: 900;
-  }
-
-  .omega-price-card__tagline {
-    font-family: $nb-font-mono;
-    font-size: 0.8rem;
-  }
-
-  .omega-price-card__price {
-    font-family: $nb-font-display;
-  }
-
-  .omega-price-card__currency {
-    font-weight: 900;
-  }
-
-  .omega-price-card__amount {
-    font-weight: 900;
-    letter-spacing: -0.02em;
-  }
-
-  .omega-price-card__per {
-    font-family: $nb-font-mono;
-  }
-
-  .price-per-unit {
-    font-weight: 700;
-  }
-}
-
-// Popular plan: signature yellow fill + thicker frame, ink text throughout
-.omega-price-card--popular {
-  background: var(--nb-accent-yellow);
-  color: #111111;
-  @include nb-border($nb-border-width-lg);
-  @include nb-shadow(lg);
-
-  .omega-price-card__tagline,
-  .omega-price-card__billing,
-  .omega-price-card__tier-note {
-    color: #111111;
-  }
-}
-
-// "Most popular": the mono ink flag pinned over the card's top edge
-.omega-price-card__popular {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: auto;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  font-family: $nb-font-mono;
-  font-weight: 700;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 0;
-  background: #111111;
-  color: var(--nb-accent-yellow);
-  border-color: #111111;
-}
 
 // ============================================
 // Enterprise strip: hard-framed band

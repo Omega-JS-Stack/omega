@@ -3,7 +3,7 @@
 //
 // Registered ONCE, from the global module (core/js/main.js), so it is armed on
 // every page before any page module runs. The auth pages and the
-// /test/components styleguide each used to wire this themselves with their own
+// /test/styleguide page each used to wire this themselves with their own
 // querySelectorAll loop, which meant two copies of the behavior and neither one
 // seeing input groups rendered after boot. Delegation covers both.
 

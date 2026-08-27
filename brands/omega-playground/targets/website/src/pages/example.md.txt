@@ -20,8 +20,7 @@ Liquid form.
 #   permalink                       the URL, when it isn't the file path
 #   meta                            title / description / image for the <head>
 #   schema                          structured data (JSON-LD) for this page
-#   theme                           per-page theme overrides (nav, footer…)
-#   client                          per-page @omega.js/client settings (auth…)
+#   config                          per-page omega.json5 overrides (theme, client…)
 #   sitemap                         false keeps the page out of sitemap.xml
 #   append                          extra markup appended for this page
 #   redirect                        url / querystring for the redirect layout
@@ -31,7 +30,9 @@ Liquid form.
 #
 # Any OTHER key is content-in-frontmatter, a lane that does not exist. The
 # build strips it before rendering and warns; sections never see it. Content
-# lives in the page BODY, below, as {% section %} calls.
+# lives in the page BODY, below, as {% section %} calls. A config section
+# (theme, client, analytics…) restated BARE is a build ERROR — those go under
+# `config:`, and `meta` is the one section that keeps its bare spelling.
 layout: frontend/core/base
 permalink: /example
 meta:
@@ -54,7 +55,7 @@ meta:
 {% endcomment %}
 
 {% comment %} Inline form: simple values, which are real Liquid expressions. {% endcomment %}
-{% section "marketing/hero", headline: "Everything you need", description: "Built with {{ site.brand.name }}." %}
+{% section "marketing/hero", headline: "Everything you need", description: "Built with {{ resolved.config.brand.name }}." %}
 
 {% comment %} No args at all: the section renders its own defaults. {% endcomment %}
 {% section "marketing/stats" %}
@@ -75,7 +76,7 @@ items:
 {% comment %} Slots pass finished MARKUP where a string won't do. {% endcomment %}
 {% section "marketing/hero" %}
   {% slot demo_html %}
-    <div class="my-demo">{% omega_icon "rocket" %} {{ site.brand.name }}</div>
+    <div class="my-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ────────────────────────────────────────────────────────────────────────────

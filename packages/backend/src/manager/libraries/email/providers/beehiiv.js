@@ -6,6 +6,7 @@
 const fetch = require('wonderful-fetch');
 const Manager = require('../../../index.js');
 const { FIELDS, resolveFieldValues } = require('../constants.js');
+const env = require('../../env.js');
 
 const BASE_URL = 'https://api.beehiiv.com/v2';
 
@@ -27,7 +28,7 @@ const SUBSCRIPTION_MAX_PAGES = 500;
 
 function headers() {
   return {
-    'Authorization': `Bearer ${process.env.BEEHIIV_API_KEY}`,
+    'Authorization': `Bearer ${env.get('BEEHIIV_API_KEY')}`,
   };
 }
 

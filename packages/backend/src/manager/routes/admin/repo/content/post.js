@@ -4,6 +4,7 @@
  */
 const { Octokit } = require('@octokit/rest');
 const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+const env = require('../../../../libraries/env.js');
 
 module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
@@ -18,7 +19,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   }
 
   // Check for GitHub configuration
-  if (!process.env.GH_TOKEN) {
+  if (!env.has('GH_TOKEN')) {
     return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
@@ -32,7 +33,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
   // Setup Octokit
   const octokit = new Octokit({
-    auth: process.env.GH_TOKEN,
+    auth: env.get('GH_TOKEN'),
   });
 
   // Check for required values

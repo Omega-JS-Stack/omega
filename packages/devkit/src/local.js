@@ -476,9 +476,48 @@ function releaseWatchLock(monorepoRoot) {
 }
 
 /**
+ * The monorepo a brand's `@omega.js/*` dependencies actually resolve INTO, or
+ * null when they come from the registry.
+ *
+ * Asks resolution, never the manifest: a `file:` spec can be stale, an install
+ * can overwrite a link, and npm-workspace hoisting puts the copy at the brand
+ * root rather than the target. The first dependency of any target that lands
+ * in a `packages/<name>` directory under a monorepo root answers the question
+ * — a brand is linked as a whole, never one target at a time ([#587](https://github.com/Omega-JS-Stack/omega/issues/587)).
+ * @param {string} brandRoot - Brand root path.
+ * @returns {string|null} Absolute monorepo root, or null for a registry install.
+ */
+function resolveLinkedMonorepo(brandRoot) {
+  for (const targetDir of discoverTargets(brandRoot)) {
+    for (const entry of frameworkPackagesOf(targetDir)) {
+      const realDir = resolvePackageRealDir(entry.name, targetDir);
+      if (!isLocalCheckout(realDir)) {
+        continue;
+      }
+
+      // <root>/packages/<name> — the layout packageDir() writes and every
+      // link points at.
+      const monorepoRoot = path.dirname(path.dirname(realDir));
+      if (isMonorepoRoot(monorepoRoot)) {
+        return monorepoRoot;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Spawn the monorepo's src→dist watch (`npm start` at the monorepo root) as a
- * child process, unless one is already running (lock held by a live process —
- * the watch script itself takes the lock).
+ * SESSION-SCOPED child, unless one is already running (lock held by a live
+ * process — the watch script itself takes the lock).
+ *
+ * Session-scoped means the watch dies with the process that started it: the
+ * `exit` hook below fires on every ordinary end, including the deliberate
+ * `process.exit()` a caller's own Ctrl-C shutdown makes. Callers keep their own
+ * signal policy (a dev server exits on SIGINT, the brand-root orchestrator
+ * stops its legs first) — the watch's death is wired HERE, once, so no caller
+ * re-implements it ([#587](https://github.com/Omega-JS-Stack/omega/issues/587)).
  * @param {object} options
  * @param {string} options.monorepoRoot - Monorepo root path.
  * @param {object} [options.logger] - Logger with log (silent when omitted).
@@ -510,6 +549,16 @@ function startMonorepoWatch(options) {
   };
   forward(child.stdout);
   forward(child.stderr);
+
+  // Session-scoped: no orphaned watcher outlives the session that spawned it.
+  process.on('exit', () => {
+    try {
+      child.kill('SIGTERM');
+    } catch (e) {
+      // Already gone
+    }
+  });
+
   logger && logger.log(`Monorepo watch started (pid ${child.pid}) — src→dist rebuilds are live`);
 
   return { alreadyRunning: false, pid: child.pid, child };
@@ -1536,6 +1585,7 @@ module.exports = {
   frameworkPackagesOf,
   linkLocalPackages,
   restoreRegistrySpecs,
+  resolveLinkedMonorepo,
   startMonorepoWatch,
   startVendorPropagation,
   readLiveWatchPid,

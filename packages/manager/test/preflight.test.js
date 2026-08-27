@@ -95,6 +95,19 @@ test('preflight: service when-gate false → no finding (disabled edge)', () => 
   assert.equal(finding, null);
 });
 
+// #527 — the advertising gate is the client id alone: the `enabled` key it
+// used to read beside it is deleted, so a config still carrying it must not
+// silence the preflight ask for the account the service still manages.
+test('preflight: the advertising when-gate is client presence, not a second switch (#527)', () => {
+  const withClient = { advertising: { providers: { adsense: { client: 'ca-pub-1', enabled: false } } } };
+  const finding = checkService('advertising', REQUIRES.advertising, withClient, EMPTY_STORE);
+  assert.ok(finding, 'a configured client id asks for its credentials');
+  assert.deepEqual(finding.missingEnv.map((entry) => entry.name), ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']);
+
+  const noClient = { advertising: { providers: { adsense: {} } } };
+  assert.equal(checkService('advertising', REQUIRES.advertising, noClient, EMPTY_STORE), null, 'no client id, nothing to ask for');
+});
+
 test('preflight: missing env → finding naming the exact vars', () => {
   const finding = checkService('edge', REQUIRES.edge, {}, EMPTY_STORE);
   assert.ok(finding);

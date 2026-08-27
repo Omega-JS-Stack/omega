@@ -10,8 +10,6 @@ const fetch = require('wonderful-fetch');
 // between the served tools and src without going stale on hardcoded numbers
 const TOOLS = require('../../src/mcp/tools.js');
 
-const MCP_ENDPOINT = 'http://localhost:5002/omega/mcp';
-
 function parseSSE(text) {
   const lines = text.split('\n');
   let lastData = null;
@@ -29,7 +27,18 @@ function parseSSE(text) {
   return JSON.parse(text);
 }
 
-async function mcpRequest(method, params, bearerToken) {
+/**
+ * The MCP endpoint on the lane THIS run booted — resolved from the same port
+ * map the runner's http client uses, never a literal
+ * ([#511](https://github.com/Omega-JS-Stack/omega/issues/511)).
+ * @param {object} config - The test context's resolved config.
+ * @returns {string} The lane's /omega/mcp URL.
+ */
+function mcpEndpoint(config) {
+  return `${config.apiUrl}/omega/mcp`;
+}
+
+async function mcpRequest(config, method, params, bearerToken) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json, text/event-stream',
@@ -46,7 +55,7 @@ async function mcpRequest(method, params, bearerToken) {
     params: params || {},
   });
 
-  const text = await fetch(MCP_ENDPOINT, {
+  const text = await fetch(mcpEndpoint(config), {
     method: 'POST',
     headers: headers,
     body: body,
@@ -64,9 +73,9 @@ module.exports = {
   tests: [
     {
       name: 'admin sees every built-in tool',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/list', {}, key);
+        const response = await mcpRequest(config, 'tools/list', {}, key);
 
         assert.ok(response?.result?.tools, 'Should return tools list');
 
@@ -82,11 +91,11 @@ module.exports = {
 
     {
       name: 'user with roles.admin sees all tools (DB role promotion)',
-      async run({ assert, accounts }) {
+      async run({ assert, accounts, config }) {
         const adminUserKey = accounts.admin?.privateKey;
         assert.ok(adminUserKey, 'Admin test account should have a privateKey');
 
-        const response = await mcpRequest('tools/list', {}, adminUserKey);
+        const response = await mcpRequest(config, 'tools/list', {}, adminUserKey);
 
         assert.ok(response?.result?.tools, 'Should return tools list');
 
@@ -102,11 +111,11 @@ module.exports = {
 
     {
       name: 'user sees only user + public tools',
-      async run({ assert, accounts }) {
+      async run({ assert, accounts, config }) {
         const userKey = accounts.basic?.privateKey;
         assert.ok(userKey, 'Test account should have a privateKey');
 
-        const response = await mcpRequest('tools/list', {}, userKey);
+        const response = await mcpRequest(config, 'tools/list', {}, userKey);
 
         assert.ok(response?.result?.tools, 'Should return tools list');
 
@@ -133,9 +142,9 @@ module.exports = {
 
     {
       name: 'unauthenticated gets 401 (triggers OAuth flow)',
-      async run({ assert }) {
+      async run({ assert, config }) {
         try {
-          const response = await mcpRequest('tools/list', {});
+          const response = await mcpRequest(config, 'tools/list', {});
           // If we got here, check for Unauthorized error
           assert.equal(response?.error, 'Unauthorized', 'Should return Unauthorized');
         } catch (error) {
@@ -147,9 +156,9 @@ module.exports = {
 
     {
       name: 'admin can call an admin tool',
-      async run({ assert }) {
+      async run({ assert, config }) {
         const key = process.env.OMEGA_ADMIN_KEY;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'health_check',
           arguments: {},
         }, key);
@@ -162,9 +171,9 @@ module.exports = {
 
     {
       name: 'user cannot call an admin tool',
-      async run({ assert, accounts }) {
+      async run({ assert, accounts, config }) {
         const userKey = accounts.basic?.privateKey;
-        const response = await mcpRequest('tools/call', {
+        const response = await mcpRequest(config, 'tools/call', {
           name: 'firestore_read',
           arguments: { path: 'users/test' },
         }, userKey);
@@ -177,9 +186,9 @@ module.exports = {
 
     {
       name: 'unauthenticated cannot call any tool (gets 401)',
-      async run({ assert }) {
+      async run({ assert, config }) {
         try {
-          const response = await mcpRequest('tools/call', {
+          const response = await mcpRequest(config, 'tools/call', {
             name: 'get_user',
             arguments: {},
           });

@@ -1,14 +1,14 @@
 ---
 layout: frontend/pages/payment/confirmation
 
-theme:
-  css:
-    bundle: "classy"
-
 meta:
-  title: "Confirmation - {{ site.brand.name }}"
-  description: "Your order has been confirmed on {{ site.brand.name }}."
+  title: "Confirmation - {{ resolved.config.brand.name }}"
+  description: "Your order has been confirmed on {{ resolved.config.brand.name }}."
   breadcrumb: "Confirmation"
+config:
+  theme:
+    css:
+      bundle: "classy"
 ---
 
 {{ content | omega_content_format }}

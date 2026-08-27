@@ -180,8 +180,18 @@ function setupScripts() {
   // Ensure the project is private (extensions should never be published to npm)
   project.private = true;
 
-  // Save the project
-  jetpack.write(path.join(process.cwd(), 'package.json'), project);
+  // Save the project — npm's own shape, trailing newline included. `jetpack.write`
+  // emits none, and this used to write unconditionally, so every build (clean &&
+  // setup && gulp) re-stripped the newline a consumer's editor or lint hook put
+  // back. Identical content is not a write (#572).
+  const projectPath = path.join(process.cwd(), 'package.json');
+  const contents = `${JSON.stringify(project, null, 2)}\n`;
+
+  if (jetpack.read(projectPath) === contents) {
+    return;
+  }
+
+  jetpack.write(projectPath, contents);
 }
 
 function checkLocality() {
@@ -288,3 +298,5 @@ async function migrateHooksToNestedStructure() {
     logger.log(`✅ Migrated ${migratedCount} hook file(s) to new nested structure`);
   }
 }
+
+module.exports.setupScripts = setupScripts;

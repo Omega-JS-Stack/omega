@@ -33,6 +33,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
    - `npx omega test project:routes/custom` — only consumer project tests matching a path
    - `npx omega test backend:rules project:routes` — multiple targets compose (runs both selections)
    - Pass `--extended` (or prefix `TEST_EXTENDED_MODE=true`) for tests that hit real external APIs (SendGrid, OpenAI, etc.). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM; @omega.js/backend propagates it to BOTH the runner subprocess and the live emulator. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md#extended-mode-test_extended_mode).
+   - Pass `--lane=<name>` for an OPT-IN lane: suites that exist only for a real external service, unreachable by any other run, each behind a gate that prints one skip line rather than failing. Today: `--lane=stripe-live`, which creates test-mode fixtures, forwards REAL Stripe webhooks into the emulator with `stripe listen`, and opens only for an `sk_test_` secret resolved through the ONE env reader (`STRIPE_SECRET_KEY_DEV`). See [docs/test-framework.md](../../packages/backend/docs/test-framework.md#opt-in-lanes---lane).
 6. `npx omega deploy` — deploy Cloud Functions to Firebase
 7. `npx omega logs:read` / `npx omega logs:tail` — Cloud Function logs from Google Cloud Logging
 
@@ -56,9 +57,54 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 For the directory layout of both the @omega.js/backend library and consumer projects, see [docs/directory-structure.md](../../packages/backend/docs/directory-structure.md).
 
+### Custom-server mode — `projectType: 'custom'` ([#584](https://github.com/Omega-JS-Stack/omega/issues/584))
+
+**The brand's config is the switch**, not an init flag: `targets.backend.projectType` in `config/omega.json5` (`'firebase'` — the default — or `'custom'`), resolved by `Manager.init()` off the loaded config, so a consumer's `src/index.js` stays the same two lines in both modes. An explicit `init(exports, { projectType })` still wins for a caller that means to override it.
+
+Custom mode is the SAME backend: the same routes, the same schemas, the same auth middleware, the same helper factories, the same `.env` — served by the Express app on `process.env.PORT` (`setupCustomServer`) for a container host (Render & co) instead of exported as Cloud Functions. `firebase-functions` is not even loaded (`Manager.libraries.functions` is `null`); `firebase-admin` still is, so Firestore, Auth and the rest of the Admin SDK work exactly as before.
+
+What it takes away is the **Firebase lane**, and `src/cli/utils/project-type.js` is the ONE home of that list. Each verb refuses loudly, names the mode, names the lane that replaces it, and exits 1 — a refusal that read green would look like a deploy that happened:
+
+| Verb | In custom mode |
+|---|---|
+| `omega deploy` | REFUSED — a custom backend publishes through its host; put that command in this target's `deploy` script, which the brand-root `omega deploy` runs |
+| `omega serve` | REFUSED — `npm start` boots the server on `PORT` |
+| `omega emulator` | REFUSED — there are no Cloud Functions to emulate |
+| `omega test` | REFUSED — the emulator lane needs Cloud Functions; `npm test` runs the target's static suite ([#567](https://github.com/Omega-JS-Stack/omega/issues/567)) |
+| `omega setup` | Runs, minus the Firebase-only half ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)) — see below |
+| `omega build`, everything else | Unchanged — a custom backend stages `src/` → `dist/` like any other |
+
+**`omega setup` scaffolds no Firebase-only artifact** in custom mode ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)): no `firebase.json` (deploy targets + emulator config), no `firestore.rules`, no `database.rules.json`, no `storage.rules`, no `firestore.indexes.json` — and no compiled `dist/firestore.rules`, which nothing in this mode deploys. The checks that maintain those files (every firebase.json check, the rules and index seeds, the live index sync) come off the run with them; the same `project-type.js` table names both lists. Everything else is the identical setup — the config, `.firebaserc`, `.env`, the service account, the project directories, the defaults. Skipping is not deleting: a custom project that authored a `firebase.json` (or rules) of its own keeps it exactly as written, migrations included.
+
+The brand-root side of it — how the manager deploys, tests and boots a custom backend — is in [deploys.md](../shared/deploys.md) and [manager/index.md](../manager/index.md).
+
+### The env reader (`libraries/env.js`) — #581
+
+Every framework read of a brand-supplied env key goes through ONE reader; nothing under `src/manager/` touches `process.env.<KEY>` directly except the runtime's own vars (`FIREBASE_CONFIG`, `FUNCTIONS_EMULATOR`, `GCLOUD_PROJECT`, the `OMEGA_*_PORT` map, the test-mode switches).
+
+- `env.get('KEY')` — the resolved value, empty reading as absent. A key the env schema does not declare **throws** (`UnknownEnvKeyError`): a typo used to resolve to `undefined` forever.
+- `env.has('KEY')` — the switch every optional provider gates on.
+- `env.require('KEY')` — value or `MissingEnvKeyError` (code 500) naming the key and the fix.
+- `env.assertRequired('backend')` — the **boot guard**, run by `Manager.init()`: every required key of the schema, validated in ONE pass, with ONE error listing everything missing. A brand's backend refuses to boot in **every environment**, development included — the keys are one `npx omega manage` away, and booting without them only moves the crash to a customer's first order email ([#569](https://github.com/Omega-JS-Stack/omega/issues/569)). The single advisory lane is a process with no consumer `config/omega.json5` — the framework booting itself, where there is no brand for a manage run to have minted keys into; it warns and continues. The self-test fixture is brand-shaped, so `omega test` seeds its required keys from the fixture's own config values (`ensureFixtureEnv`), the same way manage mints a real brand's.
+
+- `env.environment()` — the runtime environment (`testing` › `production` › `development`), and the SSOT `Manager.getEnvironment()` returns. It lives here because the provider libraries below hold no Manager handle. "No signal" resolves to **production**: a deployed Cloud Function has no `FUNCTIONS_EMULATOR` and often no `ENVIRONMENT`.
+
+**Dev-suffixed payment secrets** ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)) — the reader is where the DEV/LIVE split is enforced, so every payment library gets it without knowing the twins exist:
+
+- **Outside production, a `<KEY>_DEV` twin wins.** `env.get('STRIPE_SECRET_KEY')` returns `STRIPE_SECRET_KEY_DEV` when it is set, so a brand's local emulator never touches the live payment account (a local test purchase used to be able to charge a real card). The four twins are Stripe's secret key and webhook secret, PayPal's client secret, and Chargebee's API key.
+- **In production a `_DEV` key reads as absent**, whatever the cascade holds — and `omega deploy` strips those rows from the uploaded `.env` before the upload (`stageFunctions({ deploy: true })`, keyed off the schema's `devEnvKeys()`; every local lane re-stages without the flag, so the emulator keeps its twins).
+- **A LIVE-shaped credential outside production is refused** — `LiveSecretOutsideProductionError` (code 500) naming the key, the environment, and the `_DEV` fix, never the value. The shape is schema data (`liveShape`), declared where the provider stamps one: Stripe's `sk_live_`/`rk_live_`, Chargebee's `live_`. PayPal's halves carry no live/sandbox marker, so PayPal is protected by its twin alone.
+
+The key inventory (owner, targets, generated-or-third-party, required, dev twin, description) lives in `@omega.js/config`'s env schema — the same list the manager mints from and composes `targets/backend/.env` from: [docs/shared/config.md](../shared/config.md).
+
 ### Test framework
 
-`npx omega test` runs the project's suites (scope `framework:` or `full:` to include the framework's own) against a **real Firebase emulator** (real Firestore/Auth — never mocked). Suites are organized by concern (`test/routes/`, `test/events/`, `test/rules/`, …) rather than runtime layers. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
+A consumer project has **two test lanes**, and `omega setup` scaffolds both.
+
+- **Emulator lane** — `npm run test:emulator` (`npx omega test`) runs the project's suites (scope `framework:` or `full:` to include the framework's own) against a **real Firebase emulator** (real Firestore/Auth — never mocked). Suites are organized by concern (`test/routes/`, `test/events/`, `test/rules/`, …) rather than runtime layers. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
+- **Static lane** — `npm test` (`npm run test:static`) is plain `node --test` over `test/_unit/**/*.test.js`, with `test/_helpers/connect-trap.js` **preloaded into every test process**: it replaces `net.Socket.prototype.connect` and `dns.lookup` with a throw, so a suite that requires the framework tree can never reach live Firebase with whatever `.env` and `.omega/secrets/` carry. No emulator, no network, no credentials ([#567](https://github.com/Omega-JS-Stack/omega/issues/567)).
+
+The static lane ships as skeletons the brand OWNS and edits — `registration.test.js` (index.js boots the installed framework; every dispatched route resolves and its imports load), `rules-posture.test.js` (every Firestore/Storage path the brand opens is declared in the suite, so adding a rule is deliberate), `socket-free.test.js` (the trap is loaded, and refuses). They pass on a freshly scaffolded target. Both lanes live under `test/`: the `_`-prefixed dirs are invisible to the framework's discovery, so the static suites never run inside the emulator lane.
 
 ### Test coverage
 
@@ -74,8 +120,8 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `emulator` | Start Firebase emulators (auth/firestore/functions/database/storage); fronts the public hosting port with the mkcert HTTPS proxy (`--no-https` for plain http). A stop takes the whole family: firebase-tools puts each java emulator in its OWN process group, so the stop path signals the pids it recorded at boot, sweeps whatever orphaned outside that record, and only then verifies the ports came back free. A boot that never comes up takes the same path before it reports ([#304](https://github.com/Omega-JS-Stack/omega/issues/304)) |
 | `serve` | Local Firebase serve (with auto Stripe webhook forwarding if keys set) |
 | `watch` | Auto-reload functions on file change |
-| `deploy` | Deploy Cloud Functions to Firebase |
-| `test` | Run the project's test suites against an emulator (`framework:` / `full:` reach the framework suite) |
+| `deploy` | Deploy Cloud Functions to Firebase. REFUSED on a `projectType: 'custom'` target — see [Custom-server mode](#custom-server-mode--projecttype-custom-584) |
+| `test` | Run the project's test suites against an emulator (`framework:` / `full:` reach the framework suite). REFUSED in custom mode — `npm test` is the lane |
 | `update` | Dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
 | `mcp` | Start the stdio MCP server (for Claude Code / Claude Desktop). Supports `--token <key>` for user-level connections |
 | `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal (emulator unless `--production`) |
@@ -84,11 +130,12 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `logs:read` / `logs:tail` | Cloud Function logs from Google Cloud Logging |
 | `stripe` | Standalone Stripe CLI webhook forwarding |
 | `indexes` | Sync deployed Firestore indexes into `firestore.indexes.json` (aliases `indexes:get`, `firestore:indexes:get`) |
+| `migrate:rules` | The one-time move of a legacy `firestore.rules` onto the compiled model — run ALONE and deliberately, because it changes what the live project enforces. `setup` defers to it instead of healing the tree on the way to a deploy ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)). Alias `migrate:firestore-rules` |
 | `clean` | Remove node_modules + lockfile and reinstall (alias `clean:npm`) |
 | `version` | Print @omega.js/backend version |
 | `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1. The listing is GENERATED from the same command table the dispatcher reads (`src/cli/command-table.js`) — it cannot drift from what actually dispatches |
 
-`setup` also regenerates the OMEGA-managed block in `database.rules.json` and seeds (or migrates) the brand's `firestore.rules` source (see [Firestore rules: compiled, not managed](#firestore-rules-compiled-not-managed)); the `(vX.Y.Z)` stamp in the marker header — and in the compiled firestore artifact's header — is `RULES_VERSION`, a rules SCHEMA version that bumps only when generated rule semantics change (never the package version). Its one home is `src/cli/utils/compile-rules.js`.
+`setup` also regenerates the OMEGA-managed block in `database.rules.json` and seeds (or migrates) the brand's `firestore.rules` source — except on a brand that has DEFERRED the compiled-rules migration, where it reports and changes nothing (see [Firestore rules: compiled, not managed](#firestore-rules-compiled-not-managed)); the `(vX.Y.Z)` stamp in the marker header — and in the compiled firestore artifact's header — is `RULES_VERSION`, a rules SCHEMA version that bumps only when generated rule semantics change (never the package version). Its one home is `src/cli/utils/compile-rules.js`.
 
 ## Firestore rules: compiled, not managed
 
@@ -115,7 +162,7 @@ firestore.rules                                  ← the brand's, pure rules lan
 - **The hooks are gone.** `protectedFields()` and `canWriteUser()` (the 0.36.0 model) retired with rules v3: no lint, no re-seed, no injection. Setup strips a hook still carrying its shipped default body, KEEPS a customized one as an ordinary brand function (reported loudly — nothing calls it now), renames calls to the helpers v3 renamed, and refreshes the seed header.
 - **The framework helpers** (`templates/firestore.framework.rules` is the SSOT). The naming convention is the API: **`is*` is a predicate** about the caller or about this write — `isAuthenticated()`, `isUser(identity)`, `isOwner()`, `isAdmin()`, `isEmailVerified()`, `isWritingAny(fields)`, `isWritingField(field)`, `isCreatingField(field)`, `isUpdatingField(field)`, `isWritingFrameworkField()` — and **`get*` hands back a value** to compare against: `getAuthUid()`, `getAuthEmail()`, `getRoles()`, `getExistingData()`, `getIncomingData()`. Four things to know: `getRoles()` bills ONE document read per call and is the only helper that costs anything (so every `isAdmin()` costs one too); `isEmailVerified()` reads the AUTH TOKEN (`request.auth.token.get('email_verified', false)`) and no stored field — unforgeable, unbilled, and true on the caller's very first request; `isUser()`'s EMAIL arm requires that verified token (anyone can sign up claiming any address, so an unproven claim never matches an email-keyed doc) while its uid arm does not; and `isOwner()` reads the STORED `owner` once the document exists and the INCOMING one on a create, so an update can never hand ownership to whoever is writing. `getExistingData()` reads an ABSENT document as the empty map — `resource` is null on a create and reading through it errors, which denies the whole rule, so this is what makes every field helper mean the same thing on create and on update. Field lists are TOP-LEVEL: protecting `xp.total` means listing `'xp'`.
 - **The framework's `match /users/{uid}` declares `read` and `create, update`, never `write`.** `allow write` covers delete too, and a delete carries no incoming data for the field guard to read — so an owner deleting their own user document used to be denied by an evaluation ERROR. Naming the two ops the rule means leaves delete to the admin catch-all, denied by the rule. A brand tightening that block names the same ops (`allow write` beside it would widen, and the compiler says so).
-- **Migration**: setup detects a legacy `// ========== OMEGA Rules (vX.Y.Z) ==========` block, extracts the non-managed region into the new source ONCE, and retargets `firebase.json`; a 0.36.0 hook-era file migrates the same way, once.
+- **Migration**: `npx omega migrate:rules` detects a legacy `// ========== OMEGA Rules (vX.Y.Z) ==========` block, extracts the non-managed region into the new source ONCE, and retargets `firebase.json`; a 0.36.0 hook-era file migrates the same way, once. It is a RUN-ALONE verb, never a setup side effect ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)): while `firebase.json` still names the brand's own rules file, that brand deploys the legacy posture deliberately, and adopting the compiled artifact changes what the live project enforces (the framework half joins, and a legacy `allow write` becomes `allow create, update` — a client deleting its own user doc flips allowed → denied). Both setup checks DEFER there: they print the deferral plus this pointer, report deferred (not failed, not fixed), and continue. Once `firebase.json` points at `dist/firestore.rules`, setup heals the source exactly as before.
 - **`database.rules.json` keeps the marker model** and `storage.rules` stays a copy-if-missing deny-all scaffold — SETTLED ([#351](https://github.com/Omega-JS-Stack/omega/issues/351), 2026-08-18): neither has a framework half a brand needs to tighten, RTDB rules are a JSON tree with no function language to splice (the brand owns its sibling keys outright), and compiling either would add machinery with no merge semantics to buy. The three rules surfaces deliberately run three models.
 
 See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.md) and [docs/cli-logs.md](../../packages/backend/docs/cli-logs.md) for full flag references.

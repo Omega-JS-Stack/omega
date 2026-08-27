@@ -1,15 +1,6 @@
 ---
 layout: frontend/core/base
 
-theme:
-  post:
-    image:
-      class: "img-fluid rounded-3 w-100 my-5"
-
-client:
-  socialSharing:
-    enabled: true
-
 author_section:
   author_position: "Staff Writer"
 
@@ -20,7 +11,6 @@ related_posts:
 
 newsletter:
   superheadline:
-    icon: "envelope"
     text: "Newsletter"
   headline: "Stay in the"
   headline_accent: "loop"
@@ -29,6 +19,14 @@ newsletter:
     text: "Submit"
   form:
     placeholder: "jonsnow@gmail.com"
+config:
+  theme:
+    post:
+      image:
+        class: "img-fluid rounded-3 w-100 my-5"
+  client:
+    socialSharing:
+      enabled: true
 ---
 
 {% comment %}
@@ -51,7 +49,7 @@ newsletter:
   frontmatter. The opt-out also travels to the mid-article JS insertion lane
   (pages/blog/[slug].js) through data-omega-verts on the article. {% endcomment %}
 {% assign _verts_on = false %}
-{% if site.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
+{% if resolved.config.advertising and resolved.verts != false %}{% assign _verts_on = true %}{% endif %}
 
 <!-- Article Header & Content -->
 <article{% unless _verts_on %} data-omega-verts="false"{% endunless %}>
@@ -152,7 +150,7 @@ newsletter:
               {% endunless %}
             {% endfor %}
           {% for tag in tags %}
-            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm">{% omega_icon "tag", "me-1" %}{{ tag }}</a>
+            <a href="{{ resolved.config.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm">{% omega_icon "tag", "me-1" %}{{ tag }}</a>
           {% endfor %}
         </div>
       </div>
@@ -213,7 +211,7 @@ newsletter:
 <section class="pt-0">
   <div class="container">
     {% capture related_head %}{{ resolved.related_posts.headline }}{% iftruthy resolved.related_posts.headline_accent %} {{ resolved.related_posts.headline_accent }}{% endiftruthy %}{% endcapture %}
-    {% component "heading/rule-head", text: related_head, link_text: "View all", link_href: site.url | append: "/blog" %}
+    {% component "heading/rule-head", text: related_head, link_text: "View all", link_href: resolved.config.url | append: "/blog" %}
     <div class="row g-4">
       <!-- Loop through posts based on configured limit -->
       {% assign count = 0 %}
@@ -224,7 +222,7 @@ newsletter:
             {% assign count = count | plus: 1 %}
             <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
               {% capture rt %}{% omega_readtime post.content %}{% endcapture %}
-              {% component "news/story-card", url: site.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
+              {% component "news/story-card", url: resolved.config.url | append: post.url, id: post.post.id, kicker: post.post.categories[0] | default: "" | omega_title_case, title: post.post.title, author: post.post.author, date: post.date | date: "%b %d, %Y", readtime: rt, generated: post.generated %}
             </div>
           {% endif %}
         {% endif %}

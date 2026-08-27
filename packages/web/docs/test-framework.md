@@ -48,19 +48,21 @@ npx omega test pages           # project scope, filtered to test/pages*
 
 Every `href`/`src` in `dist/**/*.html` must land on something the same build wrote ([src/link-resolver.js](../src/link-resolver.js)). Nothing else in a build reads a link and asks whether the far end exists, so a nav pointing at pages that stopped being generated used to ship green.
 
-Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dist/foo.html` or `dist/foo/index.html`, an asset path is the file itself, a relative value resolves against its emitting page's directory, and a trailing slash is the same page. A directory is **not** a page — `/blog` needs `blog.html` or `blog/index.html`, never just `dist/blog/`. Anything with a scheme (`https:`, `mailto:`, `tel:`, `data:`, a brand's own app protocol), a protocol-relative host, or a bare `#fragment` leaves the site and is skipped.
+Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dist/foo.html` or `dist/foo/index.html`, an asset path is the file itself, a relative value resolves against its emitting page's directory, and a trailing slash is the same page. A directory is **not** a page — `/blog` needs `blog.html` or `blog/index.html`, never just `dist/blog/`. Anything with a scheme (`https:`, `mailto:`, `tel:`, `data:`, a brand's own app protocol), a protocol-relative host, or a bare `#fragment` leaves the site and is skipped. Code DISPLAY is skipped too ([#521](https://github.com/Omega-JS-Stack/omega/issues/521)): a `<pre>` block prints escaped source, so an `href=` inside it is characters on the page — a docs snippet, or the section gallery's copyable args block — never a link the page emits.
 
-**Exceptions are a last resort, declared per SOURCE PAGE** in `config/link-exceptions.json` at the target root — no file at all is the state a brand should be in:
+**Exceptions are a last resort, declared per SOURCE PAGE** in `config/link-exceptions.json5` at the target root — no file at all is the state a brand should be in:
 
-```json
+```json5
 {
-  "admin.html": ["/admin/legacy-report"]
+  // #488: the tag cloud links a slug the taxonomy page is not emitted at.
+  'blog/tags.html': ['/blog/tags/a-and-r'],
 }
 ```
 
 - The key is the dist-relative page emitting the link; the values are the site-absolute URLs it may leave unresolved. **Any other page linking at the same URL still fails**, so a brand page never rides on a declared gap.
 - **A declared exception that has started resolving is itself a failure** — an exception standing over a fixed link is a mask over the next regression at that URL, so the list has to shrink when the break is fixed.
-- A malformed file is a hard error, never a silently empty map.
+- The file is json5 ([#490](https://github.com/Omega-JS-Stack/omega/issues/490)) because an exception has to carry the reason it exists **beside it**, in a comment — a rationale kept in a worksheet somewhere never travels with the list.
+- A malformed file is a hard error, never a silently empty map — and a file left at the retired `config/link-exceptions.json` name fails loudly with the rename instead of quietly excusing nothing.
 
 `@omega.js/web`'s own default pages resolve with **zero exceptions** ([#427](https://github.com/Omega-JS-Stack/omega/issues/427), guarded by the framework suite's `default-page-links` test through the same resolver), so anything the check reports in a brand is the brand's.
 

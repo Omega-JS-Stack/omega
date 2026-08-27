@@ -15,11 +15,11 @@
  * Each handler caches its read step to .omega/cache/cloudflare/{op}.json.
  */
 const chalk = require('chalk').default;
-const { REQUIRES } = require('../../config.js');
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('./lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
-const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 
 // Operations allowed for subdomain projects (zone-level settings are skipped)
 const SUBDOMAIN_OPERATIONS = new Set(['zone', 'dns-records']);
@@ -34,7 +34,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.cloudflareApi) {
-      const gate = await ensureEnvSecrets(context, REQUIRES.edge.env);
+      const gate = await requestServiceInput(context, serviceInputSpec('edge'));
       if (gate) return gate;
     }
 

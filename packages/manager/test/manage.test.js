@@ -266,9 +266,11 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // REAL pipeline — proves the DEFAULTS merge doesn't resurrect the entry)
   assert.equal(report.results.advertising.status, 'skipped');
   assert.match(report.results.advertising.reason, /no advertising\.providers\.adsense/);
-  // No monitoring section configured → clean skip
+  // No monitor CHOSEN → clean skip. The role-level switch is a schema default
+  // (#478) so `monitoring.enabled` is always present; the pick still is not —
+  // a default under `providers.sentry` would opt every brand in.
   assert.equal(report.results.monitoring.status, 'skipped');
-  assert.match(report.results.monitoring.reason, /no monitoring config/);
+  assert.match(report.results.monitoring.reason, /no monitoring\.providers entry/);
   // No SendGrid API key in the environment → clean skip
   assert.equal(report.results.campaigns.status, 'skipped');
   assert.match(report.results.campaigns.reason, /SENDGRID_API_KEY/);

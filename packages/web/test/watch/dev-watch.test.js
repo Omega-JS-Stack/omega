@@ -22,9 +22,9 @@ const { registerTemplateWatchTargets } = require('../../src/commands/dev.js');
 
 // A rebuild is chokidar's write-settle window (150ms) plus one build of the
 // fixture; the deadline is the point at which "the edit never landed" is the
-// only remaining explanation. It scales with the lane's load knob (#211).
-const REBUILD_DEADLINE_MS = require('../lib/deadlines.js').rebuildDeadlineMs();
-const POLL_MS = 50;
+// only remaining explanation. It scales with the lane's load knob (#211) and
+// with this machine's measured contention (#615).
+const { POLL_MS, buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
 // Consecutive quiet polls (no build running) that mean the watch loop is done.
 const DRAIN_QUIET_POLLS = 20;
 
@@ -155,11 +155,15 @@ async function startWatch(t, fixture) {
   // Eleventy re-runs the config callback ONLY on a config reset — counting
   // the runs is how a reset is told apart from an incremental rebuild.
   const configRuns = { count: 0 };
+  // What the watcher actually did, for a timeout's failure message (#615).
+  const builds = buildRecorder();
   const elev = new Eleventy(fixture.src, fixture.out, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
       configRuns.count += 1;
+      eleventyConfig.on('eleventy.before', builds.onStart);
+      eleventyConfig.on('eleventy.after', builds.onFinish);
       registerTemplateWatchTargets(eleventyConfig, {
         consumerDir: fixture.src,
         activeTheme: ACTIVE_THEME,
@@ -203,16 +207,8 @@ async function startWatch(t, fixture) {
   return {
     page,
     configRuns,
-    async pageBecomes(pattern, message, file) {
-      const deadline = Date.now() + REBUILD_DEADLINE_MS;
-      let rendered = page(file);
-
-      while (!pattern.test(rendered) && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-        rendered = page(file);
-      }
-
-      assert.match(rendered, pattern, message);
+    pageBecomes(pattern, message, file) {
+      return waitForRebuild({ read: () => page(file), pattern, message, builds });
     },
   };
 }

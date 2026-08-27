@@ -1,6 +1,7 @@
 const moment = require('moment');
 const _ = require('lodash');
 const { inferContact } = require('../../../libraries/infer-contact.js');
+const { trackSignup } = require('../../../libraries/analytics/signup.js');
 const { validate: validateEmail, isDisposable, ALL_CHECKS } = require('../../../libraries/email/validation.js');
 const prepare = require('../../../libraries/email/prepare.js');
 
@@ -15,8 +16,9 @@ const POLL_INTERVAL_MS = 500;
  * 2. Validate (reject only if flags.signupProcessed is already true)
  * 3. Gather all data (client details, inferred contact)
  * 4. Write everything to user doc in one merge
- * 5. Process affiliate referral (writes to referrer's doc)
- * 6. Send welcome emails + add to marketing lists (non-blocking)
+ * 5. Fire the server half of sign_up (the one post-auth request that has the match data)
+ * 6. Process affiliate referral (writes to referrer's doc)
+ * 7. Send welcome emails + add to marketing lists (non-blocking)
  */
 module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
@@ -78,10 +80,32 @@ module.exports = async ({ ctx, user, settings, libraries }) => {
   await admin.firestore().doc(`users/${uid}`)
     .set(userRecord, { merge: true });
 
-  // 5. Process affiliate referral (writes to referrer's doc, not this user's)
+  // 5. The SERVER half of `sign_up` (non-blocking)
+  //
+  // THIS is the request that half was waiting for
+  // ([#577](https://github.com/Omega-JS-Stack/omega/issues/577)): the auth
+  // trigger it used to fire from has no HTTP request behind it, so it reached
+  // Meta and TikTok with no IP, no user agent, no `_fbc`/`_fbp`/`_ttp` and an
+  // attribution the browser had not posted yet. Everything it lacked is here —
+  // the request's own pair, and the cookies the client sent inside
+  // `attribution` (the checkout intent's shape). `flags.signupProcessed`, which
+  // this route already refuses a second time, is the once-per-account gate, and
+  // the doc it reads was written a line ago, so there is nothing to race.
+  trackSignup({
+    Manager: ctx.Manager,
+    ctx: ctx,
+    authUser: authUser,
+    userRecord: userRecord,
+    request: {
+      ip: ctx.request.geolocation?.ip || null,
+      userAgent: ctx.request.client?.userAgent || null,
+    },
+  });
+
+  // 6. Process affiliate referral (writes to referrer's doc, not this user's)
   await processAffiliate(ctx, uid, email, settings);
 
-  // 6. Send emails + marketing (awaited so the function stays alive)
+  // 7. Send emails + marketing (awaited so the function stays alive)
   // Gate marketing sync on explicit consent — never add a user to marketing lists without it
   if (userRecord.consent?.marketing?.status === 'granted') {
     await syncMarketingContact(ctx, uid, email);

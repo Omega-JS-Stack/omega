@@ -9,14 +9,6 @@
 layout: ports/recipe
 permalink: /recipes/the-best-brown-butter-chocolate-chip-cookies
 date: 2024-06-01
-advertising:
-  providers:
-    adsense:
-      client: "ca-pub-PORTSTEST"
-      displaySlot: "1111111111"
-      inArticleSlot: "2222222222"
-      multiplexSlot: "3333333333"
-
 recipe:
   id: 1764775196
   title: "The Best Brown Butter Chocolate Chip Cookies"
@@ -95,6 +87,14 @@ recipe:
     - "The brown butter can be made a few days in advance and stored in the refrigerator."
     - "These cookies are best when chilled for at least an hour before baking to prevent spreading."
     - "The large dough balls help keep the cookies extra soft."
+config:
+  advertising:
+    providers:
+      adsense:
+        client: "ca-pub-PORTSTEST"
+        displaySlot: "1111111111"
+        inArticleSlot: "2222222222"
+        multiplexSlot: "3333333333"
 ---
 
 Nothing beats the aroma and taste of homemade chocolate chip cookies warm from the oven. These **brown butter chocolate chip cookies** take everything you love about classic cookies and elevate them with the rich, nutty depth that only brown butter can provide.

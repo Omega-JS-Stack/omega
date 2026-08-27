@@ -1,29 +1,30 @@
 ---
 layout: core/root
 
-# The smallest possible fork (#177): body markup is IDENTICAL to the base
-# core/base. The only delta is the head block loading the theme's display
-# faces (Archivo / Space Grotesk / Space Mono); when the faces are vendored
-# like newsflash's, this fork dies and the base shell serves.
-theme:
-  head:
-    content: |
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" media="print" onload="this.media='all'">
-  body:
-    class: "d-flex flex-column min-vh-100"
+config:
+  # The smallest possible fork (#177): body markup is IDENTICAL to the base
+  # core/base. The only delta is the head block loading the theme's display
+  # faces (Archivo / Space Grotesk / Space Mono); when the faces are vendored
+  # like newsflash's, this fork dies and the base shell serves.
+  theme:
+    head:
+      content: |
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" media="print" onload="this.media='all'">
+    body:
+      class: "d-flex flex-column min-vh-100"
 ---
 
 <!-- Nav (controlled by page/layout front matter) -->
-{% unless resolved.theme.nav.enabled == false %}
+{% unless resolved.config.theme.nav.enabled == false %}
   {%- include frontend/sections/nav.html -%}
 {% endunless %}
 
 <!-- Main Content -->
-<main id="main-content" class="flex-fill {{ resolved.theme.main.class | omega_liquify }}" aria-label="Main content">
+<main id="main-content" class="flex-fill {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
   {{ content | omega_content_format }}
 </main>
 
 <!-- Footer (controlled by page/layout front matter) -->
-{% unless resolved.theme.footer.enabled == false %}
+{% unless resolved.config.theme.footer.enabled == false %}
   {%- include frontend/sections/footer.html -%}
 {% endunless %}

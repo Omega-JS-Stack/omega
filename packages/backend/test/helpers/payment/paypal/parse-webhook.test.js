@@ -384,6 +384,7 @@ module.exports = {
         assert.equal(result.category, 'subscription', 'Subscription refund → subscription');
         assert.equal(result.resourceType, 'subscription', 'Should fetch subscription');
         assert.equal(result.resourceId, 'I-SUB-REFUND', 'Resource ID should be subscription ID');
+        assert.equal(result.refundId, 'REFUND-123', 'The refund\'s own id survives the reassignment — its amounts are looked up by it ([#510])');
         assert.equal(result.uid, 'user-refund', 'UID from custom_id');
       },
     },
@@ -408,6 +409,7 @@ module.exports = {
         assert.equal(result.category, 'one-time', 'No billing agreement → one-time refund');
         assert.equal(result.resourceType, 'sale', 'The sale the refund reversed is the resource');
         assert.equal(result.resourceId, 'SALE-OT', 'Resource ID should be the sale ID');
+        assert.equal(result.refundId, 'REFUND-OT', 'The refund\'s own id survives the reassignment — its amounts are looked up by it ([#510])');
         assert.equal(result.uid, 'user-onetime-refund', 'UID from custom_id');
       },
     },
@@ -630,6 +632,7 @@ module.exports = {
         });
 
         assert.equal(result.resourceId, 'CAPTURE-EXPLICIT', 'An explicit capture_id wins over the link');
+        assert.equal(result.refundId, 'REFUND-V2', 'The refund\'s own id survives the reassignment — its amounts are looked up by it ([#510])');
         assert.equal(result.uid, 'user-capture', 'UID from custom_id');
       },
     },
