@@ -1,8 +1,8 @@
 // Payment Checkout Page
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getProviders, getProductById } from '__main_assets__/js/libs/payment-config.js';
-import { fetchTrialEligibility, warmupServer, createPaymentIntent } from './modules/api.js';
-import { state, buildBindingsState, resolveProvider, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
+import { getProviders, getProductById, PAYMENT_WARMUP_ROUTE } from '__main_assets__/js/libs/payment-config.js';
+import { fetchTrialEligibility, createPaymentIntent } from './modules/api.js';
+import { state, buildBindingsState, resolveProvider, FREQUENCIES, getAvailableFrequencies, TRIAL_ELIGIBILITY_UNKNOWN } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
@@ -19,7 +19,20 @@ import { checkoutDevSection } from './modules/dev-section.js';
 
 const logger = createLogger('checkout');
 
+// How long the trial spot may hold its skeleton before the page settles on the
+// fallback answer. Past this the visitor is told something rather than watching
+// a shimmer, and the money line still resolves exactly ONCE
+// ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
+const ELIGIBILITY_TIMEOUT_MS = 8000;
+
+// What the race hands back when the deadline beat the server
+const TIMED_OUT = Symbol('trial-eligibility-timeout');
+
 let formManager = null;
+
+// Whether paintOrder() has run. Until it has, the order root has no honest
+// value to publish (see updateUI).
+let orderPainted = false;
 
 // Module
 export default () => {
@@ -30,9 +43,38 @@ export default () => {
   });
 };
 
-// Update UI via bindings (single source of truth)
+// Update UI via bindings (single source of truth).
+//
+// Before the order half has landed, this redraws the build-config half ALONE:
+// a shopper switching cadence while eligibility is in flight would otherwise
+// write "$10.00 due today" into the total and watch it flip to "$0.00" plus a
+// trial note when the answer arrived — exactly the flip rule 3 forbids (#637).
 function updateUI() {
+  if (!orderPainted) {
+    paintStatic();
+    return;
+  }
+
   omega.bindings().update(buildBindingsState());
+}
+
+// Everything the build config already knows — the product, the plan tiles and
+// their prices, the frequency radios, the pay buttons. No user data goes into
+// it, so it paints before anything is awaited (#637, rule 1).
+function paintStatic() {
+  const { checkout } = buildBindingsState();
+
+  omega.bindings().update({ checkout });
+}
+
+// The half only the server can answer: the trial spot and the money line. Its
+// own bindings root is what kept those skeletons up through the paint above,
+// so this writes them ONCE, with the answer already in (#637, rule 3).
+function paintOrder() {
+  const { order, auth } = buildBindingsState();
+
+  orderPainted = true;
+  omega.bindings().update({ order, auth });
 }
 
 // Show fatal error and hide checkout content
@@ -92,30 +134,6 @@ async function initializeCheckout() {
     }
     state.product = product;
 
-    // Wait for auth state to settle before any authorized calls
-    await new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
-
-    // Fire-and-forget server warmup
-    warmupServer();
-
-    // Parallel fetch: trial eligibility + reCAPTCHA
-    const [trialResult, recaptchaResult] = await Promise.allSettled([
-      fetchTrialEligibility(),
-      initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey),
-    ]);
-
-    /* @dev-only:start */
-    {
-      const _dev_preDelay = urlParams.get('_dev_preDelay');
-      if (_dev_preDelay) {
-        const delayMs = parseInt(_dev_preDelay, 10) || 5000;
-        logger.warn(`Artificial pre-delay: ${delayMs}ms`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        logger.warn('Pre-delay complete');
-      }
-    }
-    /* @dev-only:end */
-
     // Resolve frequency: URL param if valid, otherwise longest available term
     const available = getAvailableFrequencies(product);
     if (frequencyParam && FREQUENCIES.includes(frequencyParam) && available.includes(frequencyParam)) {
@@ -125,33 +143,11 @@ async function initializeCheckout() {
       state.frequency = available[available.length - 1] || 'annually';
     }
 
-    // Trial eligibility
-    let trialEligible = trialResult.status === 'fulfilled' ? trialResult.value : false;
-
-    /* @dev-only:start */
-    {
-      // The dev palette's trial-eligibility override, a URL param like every
-      // other checkout dev control. The read lives INSIDE the block, so
-      // production never looks and the literal never reaches a real bundle
-      // (#245) — the last triple-gate violation on this page.
-      if (omega.isDevelopment()) {
-        const _dev_trialEligible = urlParams.get('_dev_trialEligible');
-        if (_dev_trialEligible) {
-          trialEligible = _dev_trialEligible === 'true';
-        }
-      }
-    }
-    /* @dev-only:end */
-
-    // Only eligible if product also supports trials
-    state.trialEligible = trialEligible && (product.trial?.days > 0);
-
     // Check payment methods are available
     const hasPaymentMethods = !!(
       state.providers?.stripe?.publishableKey
       || state.providers?.chargebee?.site
       || state.providers?.paypal?.clientId
-      || state.providers?.coinbase?.enabled
     );
 
     if (!hasPaymentMethods) {
@@ -159,30 +155,150 @@ async function initializeCheckout() {
       return;
     }
 
-    // Log reCAPTCHA status
-    if (recaptchaResult.status === 'rejected') {
-      console.warn('reCAPTCHA initialization failed:', recaptchaResult.reason);
-    }
+    // Paint everything the build config knows, before a single wait (#637).
+    // Nothing below this line is allowed to hold the page's copy hostage.
+    paintStatic();
 
-    // Update UI with loaded data
-    updateUI();
-
-    // Setup form and events
+    // Setup form and events — gated, so the pay buttons stay disabled until
+    // both async answers are in (#637, rule 5)
     setupForm();
 
     // Sync radio button to match URL frequency
     formManager.setData({ frequency: state.frequency });
 
-    // Track begin_checkout
-    trackBeginCheckout(state);
+    // Fire-and-forget server warmup. No auth: the backend's middleware answers
+    // a wakeup before it authenticates, so this costs nothing on either end
+    // (docs/client/index.md § the wakeup ping).
+    omega.request(PAYMENT_WARMUP_ROUTE, { wakeup: true });
 
-    // Create/reset abandoned cart tracker (fire-and-forget, authenticated only)
-    trackAbandonedCart(product, state);
+    // reCAPTCHA loads on its own clock; the page never waits on it
+    initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey)
+      .catch((error) => console.warn('reCAPTCHA initialization failed:', error))
+      .then(() => formManager.resolveGate('recaptcha'));
+
+    // The money line. A subscription must ask the server whether this visitor
+    // may trial, which is the ONE thing here that still waits for auth (the
+    // route is asked about a specific user). A one-time buy has no trial to be
+    // eligible for, so there is no question, no request, and no wait: its total
+    // is build config like everything else and it paints now (#637).
+    const answered = product.type === 'subscription'
+      ? resolveTrialEligibility(urlParams, product)
+      : noTrialToAsk();
+
+    // Two-argument then, deliberately: the rejection handler sees a failed
+    // ANSWER only, never a failure inside settleOrder — which has already armed
+    // the form by the time it can throw, so the gate is never resolved twice.
+    answered.then(() => settleOrder(), (error) => failOrder(error));
+
+    // The load-time tracking wants the signed-in user, which is its own wait —
+    // never the money line's.
+    authSettled().then(() => {
+      // Track begin_checkout
+      trackBeginCheckout(state);
+
+      // Create/reset abandoned cart tracker (fire-and-forget, authenticated only)
+      trackAbandonedCart(product, state);
+    });
 
   } catch (error) {
     console.error('Checkout initialization failed:', error);
     showError(error.message || 'Failed to load checkout. Please refresh the page and try again.');
   }
+}
+
+// Finish the order half now that its answer is in. The form arms FIRST, on
+// purpose: a paint that throws must never leave a visitor looking at a pay
+// button that can no longer arm (#637, rule 5). Both run in the same tick, so
+// nothing renders between them.
+function settleOrder() {
+  formManager.resolveGate('eligibility');
+  paintOrder();
+}
+
+// The order half never landed at all. Arm the form anyway, then say what
+// happened — an error a visitor can act on beats a dead button.
+function failOrder(error) {
+  formManager.resolveGate('eligibility');
+  console.error('Checkout could not price the order:', error);
+  showError(error.message || 'Failed to load checkout. Please refresh the page and try again.');
+}
+
+// A one-time buy has no trial to be eligible for, so the answer is a known no
+// — nothing is asked and nothing waits.
+async function noTrialToAsk() {
+  state.trialEligibility = false;
+  state.trialEligible = false;
+}
+
+// Auth settle, as a promise. Two things want the signed-in user: the
+// eligibility route, and the load-time tracking. Neither waits on the other.
+function authSettled() {
+  return new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
+}
+
+// Ask the server whether this visitor may trial, bounded by ELIGIBILITY_TIMEOUT_MS
+// (#637, rule 4). A deadline that wins leaves the answer UNKNOWN, which is not
+// the same as "not eligible": the display below quotes no trial, and api.js's
+// trialForPayload() still asks the intent route for one.
+async function resolveTrialEligibility(urlParams, product) {
+  let deadline;
+  const answer = await Promise.race([
+    askTrialEligibility(urlParams),
+    new Promise((resolve) => { deadline = setTimeout(() => resolve(TIMED_OUT), ELIGIBILITY_TIMEOUT_MS); }),
+  ]);
+  clearTimeout(deadline);
+
+  let trialEligibility = answer;
+
+  if (answer === TIMED_OUT) {
+    logger.warn(`Trial eligibility did not answer within ${ELIGIBILITY_TIMEOUT_MS}ms — the answer is unknown: no trial is quoted, the intent still asks for one`);
+    trialEligibility = TRIAL_ELIGIBILITY_UNKNOWN;
+  }
+
+  /* @dev-only:start */
+  {
+    // The dev palette's trial-eligibility override, a URL param like every
+    // other checkout dev control. The read lives INSIDE the block, so
+    // production never looks and the literal never reaches a real bundle
+    // (#245) — the last triple-gate violation on this page.
+    if (omega.isDevelopment()) {
+      const _dev_trialEligible = urlParams.get('_dev_trialEligible');
+      if (_dev_trialEligible) {
+        trialEligibility = _dev_trialEligible === 'true';
+      }
+    }
+  }
+  /* @dev-only:end */
+
+  state.trialEligibility = trialEligibility;
+
+  // Only a CONFIRMED yes is displayed, and only if the product sells a trial:
+  // an unknown answer quotes the full amount due today, because rule 3 never
+  // shows a price the server has not confirmed.
+  state.trialEligible = trialEligibility === true && (product.trial?.days > 0);
+}
+
+// The request half of the answer above: the auth wait plus the route call.
+async function askTrialEligibility(urlParams) {
+  /* @dev-only:start */
+  {
+    // The slow-backend rehearsal (#342), applied to the ONE wait the page still
+    // has: the trial spot and the money line hold their skeletons this long, and
+    // a delay past ELIGIBILITY_TIMEOUT_MS rehearses the fallback too.
+    const _dev_preDelay = urlParams.get('_dev_preDelay');
+    if (_dev_preDelay) {
+      const delayMs = parseInt(_dev_preDelay, 10) || 5000;
+      logger.warn(`Artificial pre-delay: ${delayMs}ms`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      logger.warn('Pre-delay complete');
+    }
+  }
+  /* @dev-only:end */
+
+  // Wait for auth state to settle before any authorized calls
+  await authSettled();
+
+  return fetchTrialEligibility();
 }
 
 // Setup FormManager and event listeners
@@ -193,6 +309,12 @@ function setupForm() {
     submittingText: 'Processing...',
     submittedText: 'Redirecting...',
   });
+
+  // Nothing may be paid for until the page knows what it is charging: the
+  // trial answer prices the order, and reCAPTCHA is what the intent route
+  // verifies. ready() below is held until both land (#637, rule 5).
+  formManager.addGate('eligibility');
+  formManager.addGate('recaptcha');
 
   // Frequency changes
   formManager.on('change', ({ name, value }) => {

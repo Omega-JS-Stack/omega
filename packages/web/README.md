@@ -307,6 +307,21 @@ cache not named `<brand>-<cacheBreaker>`. A project that explicitly disables
 the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 (`unregisterAll()`).
 
+## The page paint contract
+
+Every page this framework ships, and every page a brand builds on it, obeys one
+contract about its first frame ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)):
+static content paints immediately and no page hides its DOM waiting for auth
+(the global auth policy owns redirects); user data arrives through
+`data-omega-bind` with skeletons, filled by @omega.js/client at auth settle; an
+answer the visitor acts on — trial eligibility, the current plan, the price
+being charged — keeps a skeleton on that spot alone and resolves ONCE, never
+flipping between two answers; every network wait behind visible copy has a
+deadline and a named fallback state; and every form's submit control stays
+disabled until its `FormManager` gates resolve. The rules, the worked checkout
+example, and the four questions to read a page against them:
+[docs/web/page-contract.md](../../docs/web/page-contract.md).
+
 ## Architecture
 
 - **Layered layouts** — layer chain `consumer _layouts → active theme →

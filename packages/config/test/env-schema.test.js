@@ -38,8 +38,12 @@ const MANAGER_LANE_KEYS = [
   'GOOGLE_ANALYTICS_SECRET_WEB', 'GOOGLE_ANALYTICS_SECRET_BACKEND',
   'GOOGLE_ANALYTICS_SECRET_DESKTOP', 'GOOGLE_ANALYTICS_SECRET_EXTENSION',
   'GOOGLE_ANALYTICS_SECRET_MOBILE',
-  'OMEGA_OPENAI_API_KEY', 'OMEGA_ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
-  'COINBASE_API_KEY', 'NEVERBOUNCE_API_KEY', 'ZEROBOUNCE_API_KEY', 'APOLLO_API_KEY',
+  // #639 retired the OMEGA_-prefixed AI twins outright — a DELIBERATE shrink
+  // (one key per provider), so the floor drops them with it
+  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
+  // #636 removed COINBASE_API_KEY and APOLLO_API_KEY outright — a dead pair
+  // no reader ever existed for, so the floor drops them with the schema
+  'NEVERBOUNCE_API_KEY', 'ZEROBOUNCE_API_KEY',
 ];
 
 // What disperse composed into targets/backend/.env before the schema — the
@@ -47,13 +51,12 @@ const MANAGER_LANE_KEYS = [
 const BACKEND_COMPOSED_FLOOR = [
   'GH_TOKEN',
   'OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE',
-  'OMEGA_OPENAI_API_KEY', 'OMEGA_ANTHROPIC_API_KEY',
   'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
-  'STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY', 'COINBASE_API_KEY',
+  'STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY',
   'META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN',
   'CLOUDFLARE_TOKEN', 'RECAPTCHA_SECRET_KEY',
   'SENDGRID_API_KEY', 'BEEHIIV_API_KEY', 'NEVERBOUNCE_API_KEY', 'ZEROBOUNCE_API_KEY',
-  'UNSUBSCRIBE_HMAC_KEY', 'APOLLO_API_KEY',
+  'UNSUBSCRIBE_HMAC_KEY',
 ];
 
 test('every entry carries the full rule shape', () => {
@@ -108,6 +111,18 @@ test('names are unique and every group is used', () => {
   assert.deepEqual(unused, [], 'every declared group owns at least one key');
 });
 
+// #636 — a key with no reader is not an inventory entry, it is a prompt for a
+// credential nothing will ever use. COINBASE_API_KEY named a payment provider
+// that does not exist (the backend's payment providers are stripe, paypal,
+// chargebee and test) and APOLLO_API_KEY named an enrichment lane nobody
+// wrote. Both are gone — schema row, `_.env` placeholder, config stub and all.
+test('the dead keys are gone — no reader, no entry (#636)', () => {
+  for (const name of ['COINBASE_API_KEY', 'APOLLO_API_KEY']) {
+    assert.equal(envSchemaEntry(name), undefined, `${name} has no reader anywhere — it must not be declared`);
+    assert.ok(!envKeysForTarget('backend').includes(name), `${name} must not compose into targets/backend/.env`);
+  }
+});
+
 test('every key the manager lanes carried resolves to an entry', () => {
   const missing = MANAGER_LANE_KEYS.filter((name) => !envSchemaEntry(name));
   assert.deepEqual(missing, [], `keys with no schema entry: ${missing.join(', ')}`);
@@ -152,7 +167,6 @@ test('the dev-suffixed payment twins are declared, optional, and named after the
 
   assert.deepEqual(twins.map((entry) => entry.name), [
     'STRIPE_SECRET_KEY_DEV',
-    'STRIPE_WEBHOOK_SECRET_DEV',
     'PAYPAL_CLIENT_SECRET_DEV',
     'CHARGEBEE_API_KEY_DEV',
   ]);
@@ -170,7 +184,6 @@ test('the dev-suffixed payment twins are declared, optional, and named after the
 test('devEnvKeys()/devEnvKeyMap(): the deploy exclusion set and the base → twin lookup', () => {
   assert.deepEqual(devEnvKeys(), [
     'STRIPE_SECRET_KEY_DEV',
-    'STRIPE_WEBHOOK_SECRET_DEV',
     'PAYPAL_CLIENT_SECRET_DEV',
     'CHARGEBEE_API_KEY_DEV',
   ]);
@@ -218,4 +231,20 @@ test('envKeysByGroup(): file groups render, runtime keys never reach a brand .en
   assert.equal(runtime.file, false);
   assert.ok(byGroup.runtime.includes('GOOGLE_ANALYTICS_SECRET'));
   assert.ok(!envKeysForTarget('backend').includes('GOOGLE_ANALYTICS_SECRET'));
+});
+
+test('one AI key per provider — the OMEGA_-prefixed twins are gone', () => {
+  // #639: the legacy split (a company-wide OMEGA_* fallback beside the
+  // brand's bare key) is retired. The company-wide value lives in the COMPANY
+  // layer of the .env cascade under the SAME name, never a second key.
+  assert.equal(envSchemaEntry('OMEGA_OPENAI_API_KEY'), undefined);
+  assert.equal(envSchemaEntry('OMEGA_ANTHROPIC_API_KEY'), undefined);
+
+  for (const name of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY']) {
+    const entry = envSchemaEntry(name);
+    assert.equal(entry.owner, 'backend', `${name} is the backend framework's own key`);
+    assert.equal(entry.secret, true);
+    assert.equal(entry.required, false, `${name} is optional — nobody mints it`);
+    assert.ok(envKeysForTarget('backend').includes(name), `${name} composes into the backend .env`);
+  }
 });

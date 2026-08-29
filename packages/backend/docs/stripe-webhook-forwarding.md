@@ -17,12 +17,4 @@ If any prerequisite is missing, webhook forwarding is silently skipped with an i
 
 The forwarding URL is: `http://localhost:{hostingPort}/omega/payments/webhook?provider=stripe&key={OMEGA_WEBHOOK_KEY}`
 
-## Signature verification locally
-
-`STRIPE_WEBHOOK_SECRET` turns on the route's Stripe signature check ([payment-system.md](payment-system.md#webhook-verification)). The Stripe CLI signs forwarded events with **its own** secret, not the Dashboard endpoint's, so a local run sets:
-
-```bash
-stripe listen --print-secret
-```
-
-and puts that `whsec_…` value in `functions/.env`. Leaving `STRIPE_WEBHOOK_SECRET` unset keeps the route on the key-only path (a warn per provider per instance) — the right setting for a brand not yet migrated.
+The key on that URL is the whole check — a forwarded delivery is verified exactly like a real one, and the backend holds no Stripe signing secret ([payment-system.md](payment-system.md#webhook-verification)).

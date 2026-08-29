@@ -110,7 +110,6 @@
       stripe: { publishableKey: null },
       paypal: { clientId: null },
       chargebee: { site: null },
-      coinbase: { enabled: false },
     },
     products: [
       {

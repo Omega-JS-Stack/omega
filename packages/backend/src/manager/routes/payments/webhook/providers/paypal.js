@@ -3,13 +3,6 @@
  * Extracts, validates, and categorizes webhook event data from PayPal
  *
  * PayPal webhook events: https://developer.paypal.com/api/rest/webhooks/event-names/
- *
- * No verifySignature() yet, so these events are gated by `?key=` alone. PayPal's
- * scheme (POST /v1/notifications/verify-webhook-signature with the PAYPAL-*
- * transmission headers) needs the WEBHOOK ID of the endpoint the event arrived
- * on — @omega.js/manager's payment service creates that endpoint and knows the
- * id, but nothing plumbs it to the backend (no config field, no env var). TODO:
- * carry the id into the backend's environment, then verify here.
  */
 
 // Events we process, mapped to their category
@@ -56,7 +49,7 @@ module.exports = {
    * Extracts event data and determines category, resource type, resource ID, and UID
    *
    * @param {object} req - The raw HTTP request
-   * @returns {object} { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid }
+   * @returns {object} { eventId, eventType, category, resourceType, resourceId, chargeId, refundId, raw, uid }
    */
   parseWebhook(req) {
     const event = req.body;
@@ -78,6 +71,12 @@ module.exports = {
     // the key its amounts are looked up by
     // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
     let refundId = null;
+    // THIS charge's own id — PayPal's sale id, where a subscription event names
+    // one. The resourceId is the billing agreement, constant for the whole
+    // subscription, so it can never key a single charge
+    // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). A one-time
+    // purchase has exactly one charge and the order names it.
+    let chargeId = null;
 
     if (eventType.startsWith('BILLING.SUBSCRIPTION.')) {
       // Subscription lifecycle events
@@ -97,6 +96,7 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = billingAgreementId; // This is the subscription ID
+        chargeId = resource.id || null; // The sale — one per recurring charge
 
         uid = parseUidFromCustomId(resource.custom_id);
       } else {
@@ -121,6 +121,9 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = billingAgreementId;
+        // The sale this refund reversed, so the refund names the same id that
+        // charge was recorded under ([#656]).
+        chargeId = resource.sale_id || null;
       } else {
         // No billing agreement behind it — this is the refund of a one-time
         // purchase, and the sale it reversed is the resource the event carries.
@@ -160,6 +163,7 @@ module.exports = {
       category: category,
       resourceType: resourceType,
       resourceId: resourceId,
+      chargeId: chargeId,
       refundId: refundId,
       raw: event,
       uid: uid,

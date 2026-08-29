@@ -78,7 +78,8 @@ class Manager {
 
   // Make an API request: `omega.request('/omega/user/token', { method: 'POST', body: {} })`.
   // Route-relative paths resolve through getApiUrl(); pass `auth: false` for public routes,
-  // `output: 'complete'` for { status, ok, headers, data, properties }.
+  // `output: 'complete'` for { status, ok, headers, data, properties }, and
+  // `wakeup: true` for a fire-and-forget ping that warms a cold backend.
   request(url, options) {
     return this._request(url, options);
   }

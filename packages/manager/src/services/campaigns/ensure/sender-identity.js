@@ -8,10 +8,60 @@
  *
  * CAN-SPAM requires a physical mailing address — brand.address in
  * omega.json5. omega-manager silently stamped the company's address on
- * every brand; the port warns until a real one is configured.
+ * every brand; the port ASKS for the brand's own (#635) and warns only when
+ * nobody can be asked.
  */
 const chalk = require('chalk').default;
-const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { input } = require('@omega.js/devkit/prompt');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+const { confirmSetup, landValue } = require('../../../lib/config-flow.js');
+
+// The five fields brand.address carries. Only the three SendGrid cannot
+// create a sender without are required — an address with no region or postal
+// code is a real address in plenty of countries.
+const ADDRESS_FIELDS = [
+  { key: 'line1', message: 'Street address:', required: true },
+  { key: 'city', message: 'City:', required: true },
+  { key: 'region', message: 'State / region:' },
+  { key: 'postalCode', message: 'Postal code:' },
+  { key: 'country', message: 'Country:', required: true },
+];
+
+/**
+ * Ask for the brand's mailing address and land it as ONE brand.address object
+ * (#635). Five fields behind ONE gate — asking the Provide / Skip / Disable
+ * question per field would be the same question five times. The campaigns
+ * service already gated on its API key, so this gate is about the address.
+ *
+ * @param {Object} context - Handler context.
+ * @returns {Promise<Object|null>} The landed address, or null when the user
+ *   stepped aside or left a required field empty.
+ */
+async function askBrandAddress(context) {
+  const action = await confirmSetup(context, {
+    label: 'Mailing address (CAN-SPAM)',
+    instructions: ['Every marketing email must carry a physical mailing address — it lands in brand.address'],
+    disablePath: 'marketing.campaigns.enabled',
+  });
+  if (action !== 'yes') {
+    return null;
+  }
+
+  const address = {};
+  for (const field of ADDRESS_FIELDS) {
+    const value = (await input({ message: field.message }) || '').trim();
+    if (!value) {
+      if (field.required) {
+        return null;
+      }
+      continue;
+    }
+    address[field.key] = value;
+  }
+
+  landValue(context, 'brand.address', address);
+  return address;
+}
 
 module.exports = async function ensureSenderIdentity(context) {
   const { sendgridApi: api, brandConfig, options = {} } = context;
@@ -40,9 +90,16 @@ module.exports = async function ensureSenderIdentity(context) {
   }
 
   // The physical address is required for creation — and it must be the
-  // brand's own (no company default to fall back on)
-  const address = brandConfig.brand?.address;
-  if (!address?.line1 || !address?.city || !address?.country) {
+  // brand's own (no company default to fall back on), so a run that can ask
+  // ASKS for it here rather than warning and stepping aside (#635).
+  const complete = (candidate) => Boolean(candidate?.line1 && candidate?.city && candidate?.country);
+
+  let address = brandConfig.brand?.address;
+  if (!complete(address) && canPrompt(options)) {
+    address = await askBrandAddress(context);
+  }
+
+  if (!complete(address)) {
     console.log(`      ${chalk.yellow('⚠')} No sender ${chalk.cyan(fromEmail)} yet, and CAN-SPAM requires a physical mailing address`);
     console.log(`      ${chalk.dim('→')} Set brand.address (line1, city, region, postalCode, country) in omega.json5, then rerun`);
     return { status: 'warned', output: { senderIdentity: { fromEmail, missingAddress: true } } };

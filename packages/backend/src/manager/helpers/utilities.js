@@ -2,6 +2,8 @@ let nanoId;
 let _;
 let sanitizeHtml;
 
+const { projectUserForLog } = require('./middleware.js');
+
 function Utilities(Manager) {
   const self = this;
 
@@ -340,10 +342,11 @@ Utilities.prototype.getDocumentWithOwnerUser = function (path, options) {
     // Create the resolved user
     const userResolved = Manager.User(user).properties;
 
-    // Log the user
+    // Log the user — the allow-listed projection on both, never the document:
+    // it carries api.privateKey ([#632](https://github.com/Omega-JS-Stack/omega/issues/632))
     if (options.log) {
-      console.log('User:', user);
-      console.log('User (resolved):', userResolved);
+      console.log('User:', projectUserForLog(user));
+      console.log('User (resolved):', projectUserForLog(userResolved));
     }
 
     // Resolve with schema

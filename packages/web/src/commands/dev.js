@@ -1015,4 +1015,8 @@ async function linkBrandToMonorepo() {
   if (watch.child) {
     process.on('SIGINT', () => process.exit(0));
   }
+
+  // The same gate the brand-root boot uses (#670): nothing reads a dist while
+  // a fresh watch's initial prepare is still rewriting it.
+  await watch.ready;
 }

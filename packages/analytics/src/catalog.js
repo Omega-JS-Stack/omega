@@ -7,6 +7,22 @@
  * canonical params; each adapter translates into its provider's own dialect,
  * because there is no unified cross-provider signature (Ian's constraint).
  *
+ * MANDATORY BEFORE ANY EDIT BELOW (Ian 2026-08-27): every provider `name`,
+ * `kind` and param shape in this file is checked LIVE against the platform's
+ * own specification, never from memory. Open all four, read the event you are
+ * touching, and confirm the name is spelled as the platform spells it, that
+ * `kind: 'standard'` only claims an event the platform lists, and that the
+ * shaper sends the parameters the platform documents for that event:
+ *   GA4        https://support.google.com/analytics/answer/9267735
+ *   Meta       https://www.facebook.com/business/help/402791146561655
+ *   TikTok     https://ads.tiktok.com/help/article/standard-events-parameters
+ *   GA4 dedupe https://support.google.com/analytics/answer/12313109
+ * A platform renames and retires events (TikTok retired CompletePayment for
+ * Purchase); a mapping that was right when written can be wrong today. The
+ * fourth link is the one that binds a PARAM rather than a name: GA4
+ * deduplicates `purchase` on `transaction_id`, so a money event's id is one
+ * CHARGE's ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+ *
  * Entry shape:
  *   params     — the canonical param contract, documentation for callers.
  *                Drawn from the EXISTING call sites so a rewired site sends
@@ -34,8 +50,9 @@
  * The canonical param vocabulary is GA4-flavoured (flat params plus an `items`
  * array), because that is what the live call sites and the backend's payment
  * webhook already build — so GA4 is pass-through and the maps live where the
- * other two platforms genuinely disagree: their commerce vocabulary
- * (content_ids/content_id, num_items, price) and Search's `search_string`.
+ * other two platforms genuinely disagree: their commerce vocabulary (Meta's
+ * `content_ids` + `num_items`, TikTok's `contents` array) and Search's
+ * `search_string`.
  */
 
 // Drop keys a caller did not supply — a provider payload carrying
@@ -67,17 +84,25 @@ function metaCommerce(params) {
   });
 }
 
-// TikTok's commerce vocabulary: a single content_id with its own price/quantity.
+// TikTok's commerce vocabulary: a `contents` ARRAY of product objects, plus the
+// order's own content_type/value/currency. The pixel reference documents exactly
+// this shape — `ttq.track('AddToCart', { contents: [{ content_id, content_name,
+// quantity, price }], content_type: 'product', value, currency })`, with
+// `contents` "a list of content objects that represent relevant products in a
+// web event with product information" — and the flat single-item
+// `content_id`/`price`/`quantity` this sent before appears nowhere in it
+// ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
 function tiktokCommerce(params) {
   const items = Array.isArray(params.items) ? params.items : [];
-  const first = items[0] || {};
 
   return compact({
-    content_id: first.item_id,
+    contents: items.length ? items.map((item) => compact({
+      content_id: item.item_id,
+      content_name: item.item_name,
+      price: item.price,
+      quantity: item.quantity,
+    })) : undefined,
     content_type: items.length ? 'product' : undefined,
-    content_name: first.item_name,
-    price: first.price,
-    quantity: first.quantity,
     currency: params.currency,
     value: params.value,
   });
@@ -95,12 +120,18 @@ function metaAudienceSignal(params) {
 
 function tiktokAudienceSignal(params) {
   // TikTok's per-item `price` and `quantity` come off with the value: zeroing
-  // one field while the amount rides in another is not a zero-value signal.
-  // Meta's shaper carries neither by construction, and this matches it — what
-  // is left is who and which plan, which is the whole point of the audience.
-  const { price, quantity, ...signal } = tiktokCommerce(params);
+  // one field while the amount rides inside `contents` is not a zero-value
+  // signal. Meta's shaper carries neither by construction, and this matches it —
+  // what is left is who and which plan, which is the whole point of the audience.
+  const signal = tiktokCommerce(params);
 
-  return { ...signal, value: 0 };
+  return compact({
+    ...signal,
+    contents: signal.contents
+      ? signal.contents.map(({ price, quantity, ...content }) => content)
+      : undefined,
+    value: 0,
+  });
 }
 
 // Both ad platforms call the query `search_string`; GA4 calls it `search_term`.
@@ -229,15 +260,18 @@ const CATALOG = {
     },
   },
 
-  // The pricing page's monthly/yearly switch — a plan VIEW, not a cart action,
-  // so the ad platforms read it as content rather than commerce (no items[]).
+  // The pricing page's monthly/yearly switch. Both platforms define ViewContent
+  // as a PAGE or product view (Meta: "a visit to a web page you care about";
+  // TikTok: "when a visitor views a specific page") and a toggle is neither, so
+  // all three read it as the custom event it is
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   pricing_toggle: {
     params: ['billing_type'],
     placement: 'client',
     providers: {
       ga4: { name: 'pricing_toggle', kind: 'custom' },
-      meta: { name: 'ViewContent', kind: 'standard' },
-      tiktok: { name: 'ViewContent', kind: 'standard' },
+      meta: { name: 'PricingToggle', kind: 'custom' },
+      tiktok: { name: 'PricingToggle', kind: 'custom' },
     },
   },
 
@@ -273,29 +307,50 @@ const CATALOG = {
 
   // ─── Commerce (server truth) ───
 
-  // Server is the truth: the backend's payment webhook owns the revenue, and it
-  // owns GA4 outright. The BROWSER half is the retargeting signal the ad
-  // platforms need ([#386](https://github.com/Omega-JS-Stack/omega/issues/386)):
-  // the confirmation page fires meta + tiktok only, carrying the same dedupe
-  // event id the webhook sends, so each platform counts ONE purchase.
+  // Server is the truth: the backend's payment webhook owns the revenue. The
+  // BROWSER half is the retargeting signal the ad platforms need
+  // ([#386](https://github.com/Omega-JS-Stack/omega/issues/386)) — and GA4's
+  // too, since GA4 deduplicates `purchase` on `transaction_id`: both halves
+  // name the ORDER, so the browser adds the session, the campaign and the
+  // client id, and GA4 still counts one purchase
+  // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). All three
+  // carry the same `<canonical>.<order id>` dedupe id for the two platforms
+  // that key on one.
   purchase: {
     params: COMMERCE_PARAMS,
     placement: 'both',
     providers: {
       ga4: { name: 'purchase', kind: 'standard' },
       meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
-      tiktok: { name: 'CompletePayment', kind: 'standard', map: tiktokCommerce },
+      // TikTok RETIRED CompletePayment: `Purchase` — "when a visitor makes a
+      // purchase" — is the standard event its live list names, and the only one
+      // it documents `value`/`currency` for ([#652]).
+      tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
 
+  // A trial checkout's own conversion, and the SECOND event with a browser half
+  // ([#654](https://github.com/Omega-JS-Stack/omega/issues/654)): the
+  // confirmation page fired `purchase` for every checkout, so a $0 trial sent a
+  // browser Purchase beside this trial_start. The names, not the amounts, were
+  // the defect — two different event names never deduplicate, so each platform
+  // counted the pair as two conversions. The browser half is meta + tiktok —
+  // GA4's trial_start is a custom event the server owns outright, and there is
+  // no revenue for GA4 to deduplicate here.
+  //
+  // Value 0 on both platforms: a trial charges nothing, and both spell that out
+  // (Meta `fbq('track', 'StartTrial', { value: '0.00', currency: 'USD' })`).
   trial_start: {
     params: COMMERCE_PARAMS,
-    placement: 'server',
+    placement: 'both',
     providers: {
       // GA4 has no trial_start in its standard set — an explicit custom event.
       ga4: { name: 'trial_start', kind: 'custom' },
       meta: { name: 'StartTrial', kind: 'standard', map: metaCommerce },
-      tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
+      // TikTok's own StartTrial — "when a customer begins a free trial for your
+      // product or service" — replaces the Subscribe this claimed, which TikTok
+      // defines as subscribing, paid subscriptions included ([#652]).
+      tiktok: { name: 'StartTrial', kind: 'standard', map: tiktokCommerce },
     },
   },
 
@@ -306,16 +361,17 @@ const CATALOG = {
   // GA4 hears its standard `purchase`, because this is where the money finally
   // moves and revenue belongs in the revenue report; the pair `is_trial: true` +
   // `is_recurring: false` is what marks it inside that stream, so the conversion
-  // is still countable on its own. The ad platforms already heard
-  // `StartTrial`/`Subscribe` at trial start, and this is that subscription
-  // starting to pay — their own standard Subscribe.
+  // is still countable on its own. The ad platforms already heard `StartTrial`
+  // at trial start, and every REAL CHARGE is a Purchase to both of them — the
+  // one event each documents `value` + `currency` for (Ian's money-event table,
+  // [#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   trial_convert: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard' },
-      meta: { name: 'Subscribe', kind: 'standard', map: metaCommerce },
-      tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
 
@@ -381,13 +437,21 @@ const CATALOG = {
     },
   },
 
+  // A renewal and a recovered payment are CHARGES, so both ad platforms hear
+  // Purchase for the real amount. Neither is a Subscribe: Meta defines that as
+  // "the START of a paid subscription", and month two starts nothing — the
+  // mapping counted a new subscriber every month
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)). GA4 keeps its
+  // standard `purchase` with `is_recurring`, and its `transaction_id` is THIS
+  // charge's, never the subscription's, or GA4 dedupes every renewal after the
+  // first away ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
   subscription_renew: {
     params: COMMERCE_PARAMS,
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard', map: ga4Recurring },
-      meta: { name: 'Subscribe', kind: 'standard', map: metaCommerce },
-      tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
 
@@ -396,20 +460,25 @@ const CATALOG = {
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard', map: ga4Recurring },
-      meta: { name: 'Subscribe', kind: 'standard', map: metaCommerce },
-      tiktok: { name: 'Subscribe', kind: 'standard', map: tiktokCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
 
   // ─── Engagement ───
 
+  // Meta's Lead is exactly this ("a submission of information by a customer with
+  // the understanding that they may be contacted at a later date"), and TikTok's
+  // SubmitForm is the standard event for a form; its Contact means "when a
+  // visitor contacts you", which a lead form is not
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   generate_lead: {
     params: ['lead_source', 'subject'],
     placement: 'client',
     providers: {
       ga4: { name: 'generate_lead', kind: 'standard' },
       meta: { name: 'Lead', kind: 'standard' },
-      tiktok: { name: 'Contact', kind: 'standard' },
+      tiktok: { name: 'SubmitForm', kind: 'standard' },
     },
   },
 
@@ -445,23 +514,32 @@ const CATALOG = {
     },
   },
 
+  // Meta's SubmitApplication is "an application for a product, service or
+  // program you offer... a credit card, educational program or job" — feedback
+  // applies for nothing, so Meta hears a custom event. TikTok's SubmitForm
+  // ("when a visitor submits a form") fits as it stands
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   feedback_submit: {
     params: ['feedback_rating'],
     placement: 'client',
     providers: {
       ga4: { name: 'feedback_submit', kind: 'custom' },
-      meta: { name: 'SubmitApplication', kind: 'standard' },
+      meta: { name: 'FeedbackSubmit', kind: 'custom' },
       tiktok: { name: 'SubmitForm', kind: 'standard' },
     },
   },
 
+  // A click through to a review page is neither Meta's Lead (a submission of
+  // information) nor TikTok's Contact (a visitor contacting you), so both hear
+  // the canonical event as a custom one
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   review_click: {
     params: ['review_url'],
     placement: 'client',
     providers: {
       ga4: { name: 'review_click', kind: 'custom' },
-      meta: { name: 'Lead', kind: 'standard' },
-      tiktok: { name: 'Contact', kind: 'standard' },
+      meta: { name: 'ReviewClick', kind: 'custom' },
+      tiktok: { name: 'ReviewClick', kind: 'custom' },
     },
   },
 
@@ -495,14 +573,17 @@ const CATALOG = {
     },
   },
 
-  // The share panel's copy-to-clipboard half.
+  // The share panel's copy-to-clipboard half. ClickButton is on NEITHER
+  // platform's standard list — TikTok's own set runs AddPaymentInfo … ViewContent
+  // and never names it — so this is a custom event on both, under the canonical
+  // name ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
   copy_link: {
     params: ['content_type', 'item_id'],
     placement: 'client',
     providers: {
       ga4: { name: 'copy_link', kind: 'custom' },
       meta: { name: 'CopyLink', kind: 'custom' },
-      tiktok: { name: 'ClickButton', kind: 'standard' },
+      tiktok: { name: 'CopyLink', kind: 'custom' },
     },
   },
 
@@ -530,13 +611,18 @@ const CATALOG = {
 
   // ─── Exit popup ───
 
+  // The popup trio, all custom on both ad platforms
+  // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)): a popup is not
+  // a page view (TikTok's ViewContent is "when a visitor views a specific
+  // page"), a click is not Meta's Lead ("a submission of information"), and
+  // ClickButton is not on TikTok's standard list at all.
   exit_popup_show: {
     params: ['event_category', 'event_label', 'page_path'],
     placement: 'client',
     providers: {
       ga4: { name: 'exit_popup_show', kind: 'custom' },
       meta: { name: 'ExitPopupShow', kind: 'custom' },
-      tiktok: { name: 'ViewContent', kind: 'standard' },
+      tiktok: { name: 'ExitPopupShow', kind: 'custom' },
     },
   },
 
@@ -545,8 +631,8 @@ const CATALOG = {
     placement: 'client',
     providers: {
       ga4: { name: 'exit_popup_click', kind: 'custom' },
-      meta: { name: 'Lead', kind: 'standard' },
-      tiktok: { name: 'ClickButton', kind: 'standard' },
+      meta: { name: 'ExitPopupClick', kind: 'custom' },
+      tiktok: { name: 'ExitPopupClick', kind: 'custom' },
     },
   },
 
@@ -556,7 +642,7 @@ const CATALOG = {
     providers: {
       ga4: { name: 'exit_popup_dismiss', kind: 'custom' },
       meta: { name: 'ExitPopupDismiss', kind: 'custom' },
-      tiktok: { name: 'ViewContent', kind: 'standard' },
+      tiktok: { name: 'ExitPopupDismiss', kind: 'custom' },
     },
   },
 

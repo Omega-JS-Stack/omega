@@ -96,16 +96,6 @@ config:
     <span class="fw-semibold">Google Pay</span>
   </button>
 
-  <!-- Crypto Button -->
-  <button type="submit" class="btn btn-outline-adaptive payment-button d-flex align-items-center justify-content-center"
-          data-payment-method="crypto"
-          data-action="pay-crypto"
-          data-omega-bind="@show checkout.paymentMethods.crypto"
-          hidden>
-    {% omega_icon "bitcoin", "me-2 fa-lg" %}
-    <span class="fw-semibold">Crypto</span>
-  </button>
-
   <p class="omega-checkout__terms small mb-0">
     By purchasing, you agree to our <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.
   </p>
@@ -270,12 +260,25 @@ config:
                 Billed <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$-- monthly</span>
               </div>
 
+              <!-- The trial spot (#637). Which of the two notes below belongs
+                   here is a question only the server can answer, so the spot
+                   holds a SKELETON until it does and then renders once — never
+                   the guarantee flipping into the trial line a moment later.
+                   The placeholder is what is up first, and the `order` root
+                   landing is what takes it away. -->
+              <div class="omega-checkout__note mt-3 omega-binding-skeleton"
+                   data-omega-bind="@hide order">
+                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "gift", "fa-sm" %}</span>
+                <span>Checking your plan</span>
+              </div>
+
               <!-- Subscription note — the BRAND's guarantee copy (#273: a
                    refund window is a policy the framework cannot know), shown
                    when no trial replaces it. No stated guarantee, no note. -->
               {% iftruthy resolved.pricing.guarantee %}
                 <div class="omega-checkout__note mt-3"
-                     data-omega-bind="@show !checkout.trial.show">
+                     data-omega-bind="@show !order.trial.show"
+                     hidden>
                   <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "shield-halved", "fa-sm" %}</span>
                   <span>{{ resolved.pricing.guarantee }}</span>
                 </div>
@@ -283,10 +286,10 @@ config:
 
               <!-- Free Trial Note -->
               <div class="omega-checkout__note omega-checkout__note--ok mt-3"
-                   data-omega-bind="@show checkout.trial.show"
+                   data-omega-bind="@show order.trial.show"
                    hidden>
                 <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "gift", "fa-sm" %}</span>
-                <span data-omega-bind="@text checkout.trial.message"></span>
+                <span data-omega-bind="@text order.trial.message"></span>
               </div>
             </div>
           </div>
@@ -345,7 +348,7 @@ config:
             <button class="omega-checkout__rowtoggle d-lg-none" type="button"
                     data-bs-toggle="collapse" data-bs-target="#collapse-summary" aria-expanded="true">
               <span class="omega-micro">Order summary</span>
-              <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text checkout.pricing.total">$--</span>
+              <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text order.total">$--</span>
               {% omega_icon "chevron-down", "fa-xs omega-checkout__rowtoggle-chev" %}
             </button>
 
@@ -404,23 +407,23 @@ config:
                 </div>
 
                 <div class="omega-receipt__row omega-checkout__row-ok"
-                     data-omega-bind="@show checkout.trial.hasFreeTrial"
+                     data-omega-bind="@show order.trial.hasFreeTrial"
                      hidden>
                   <span class="omega-micro">Free trial</span>
-                  <span>-$<span data-omega-bind="@text checkout.trial.discountAmount"></span></span>
+                  <span>-$<span data-omega-bind="@text order.trial.discountAmount"></span></span>
                 </div>
 
-                <div class="omega-receipt__row omega-receipt__row--total omega-binding-skeleton" data-omega-bind="@show checkout">
+                <div class="omega-receipt__row omega-receipt__row--total omega-binding-skeleton" data-omega-bind="@show order">
                   <span class="omega-micro">Total due today</span>
-                  <span class="omega-receipt__total" data-omega-bind="@text checkout.pricing.total">$--</span>
+                  <span class="omega-receipt__total" data-omega-bind="@text order.total">$--</span>
                 </div>
               </div>
 
               <!-- Subscription Terms -->
               <p class="omega-checkout__fineprint small mb-0"
-                 data-omega-bind="@show checkout.pricing.showTerms"
+                 data-omega-bind="@show order.showTerms"
                  hidden>
-                <span data-omega-bind="@text checkout.pricing.termsText"></span>
+                <span data-omega-bind="@text order.termsText"></span>
               </p>
             </div>
           </div>

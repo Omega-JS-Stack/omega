@@ -13,8 +13,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
+
 const { acquireTikTokToken } = require('../src/services/analytics/lib/tiktok-auth.js');
-const { exchangeAuthCode, TIKTOK_PORTAL_URL } = require('../src/services/analytics/lib/tiktok-api.js');
+const { exchangeAuthCode, TIKTOK_APP_URL, isAuthUrlFor, parseAuthCode } = require('../src/services/analytics/lib/tiktok-api.js');
 const { TIKTOK_PIXEL } = require('../src/services/analytics/lib/pixel-specs.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
@@ -78,16 +80,17 @@ test('tiktok-auth: the one-pass authorization pastes the secret, walks the porta
       prompt: { pressEnterToOpen: async (url, label) => { opened.push([url, label]); return true; } },
     });
     await tty.answer('TikTok app secret', 'app-secret-value\r');
-    await tty.answer('auth_code', 'AUTHCODE123\r');
+    await tty.answer('Advertiser authorization URL', 'https://business-api.tiktok.com/portal/auth?app_id=7300000000000000000&state=your_custom_params&redirect_uri=https%3A%2F%2Fitwcreativeworks.com\r');
+    await tty.answer('redirect URL', 'AUTHCODE123\r');
     const ok = await run;
 
     assert.equal(ok, true);
     // Exchanged inline, with the app id from config
     assert.deepEqual(exchanged, [{ appId: '7300000000000000000', secret: 'app-secret-value', authCode: 'AUTHCODE123' }]);
-    // The portal was OFFERED, never auto-opened, and carries the app id
-    assert.equal(opened.length, 1);
-    assert.match(opened[0][0], /^https:\/\/business-api\.tiktok\.com\/portal\/auth\?/);
-    assert.match(opened[0][0], /app_id=7300000000000000000/);
+    // The app page was OFFERED (never auto-opened), then the PASTED authorization URL
+    assert.equal(opened.length, 2);
+    assert.equal(opened[0][0], 'https://business-api.tiktok.com/portal/apps/7300000000000000000');
+    assert.equal(opened[1][0], 'https://business-api.tiktok.com/portal/auth?app_id=7300000000000000000&state=your_custom_params&redirect_uri=https%3A%2F%2Fitwcreativeworks.com');
 
     // ONLY the long-lived token is persisted — the secret was mint-time only
     const env = fs.readFileSync(path.join(context.brandRoot, '.env'), 'utf8');
@@ -140,7 +143,8 @@ test('tiktok-auth: a failed exchange warns and writes nothing — the walk conti
       prompt: { pressEnterToOpen: async () => true },
     });
     await tty.answer('TikTok app secret', 'secret\r');
-    await tty.answer('auth_code', 'BAD\r');
+    await tty.answer('Advertiser authorization URL', 'https://business-api.tiktok.com/portal/auth?app_id=7300000000000000000&state=your_custom_params&redirect_uri=https%3A%2F%2Fitwcreativeworks.com\r');
+    await tty.answer('redirect URL', 'BAD\r');
     const ok = await run;
 
     assert.equal(ok, false);
@@ -154,7 +158,7 @@ test('tiktok-auth: a failed exchange warns and writes nothing — the walk conti
   }
 });
 
-test('tiktok-auth: no app id in config → the pass ends with the guidance, no prompt for a secret', async () => {
+test('tiktok-auth: no app id + headless → the pass ends, nothing asked and nothing landed', async () => {
   delete process.env.TIKTOK_ACCESS_TOKEN;
   const context = makeContext({
     brandRoot: makeBrandRoot('{\n  brand: { id: "b" },\n  analytics: { providers: { tiktok: {} } },\n}\n'),
@@ -162,17 +166,53 @@ test('tiktok-auth: no app id in config → the pass ends with the guidance, no p
   });
   context.brandConfig.analytics.providers.tiktok = {};
 
+  const ok = await acquireTikTokToken(context, TIKTOK_PIXEL, {
+    gate: false,
+    // The secret must never be asked for without an app id to exchange with
+    prompt: { password: () => { throw new Error('must not ask for the secret'); } },
+  });
+
+  assert.equal(ok, false);
+  // Nothing landed in config either — a headless run never prompts
+  assert.doesNotMatch(readConfigSource(context.brandRoot), /appId/);
+  cleanupRoot(context);
+});
+
+test('tiktok-auth: a missing app id is ASKED for, lands in omega.json5, and the SAME pass mints the token', async () => {
+  delete process.env.TIKTOK_ACCESS_TOKEN;
+  const opened = [];
+  const exchanged = [];
+  const context = makeContext({
+    brandRoot: makeBrandRoot('{\n  brand: { id: "b" },\n  analytics: { providers: { tiktok: {} } }, // the app id lands here\n}\n'),
+    tiktokExchange: async (params) => { exchanged.push(params); return 'minted-token'; },
+  });
+  context.brandConfig.analytics.providers.tiktok = {};
+
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
   const tty = openTtyPrompt();
   try {
-    const ok = await acquireTikTokToken(context, TIKTOK_PIXEL, {
+    const run = acquireTikTokToken(context, TIKTOK_PIXEL, {
       gate: false,
-      // The secret must never be asked for without an app id to exchange with
-      prompt: { password: () => { throw new Error('must not ask for the secret'); } },
+      prompt: { pressEnterToOpen: async () => true },
     });
-    assert.equal(ok, false);
-    // Nothing landed in config either — the id is the developer's to supply
-    assert.doesNotMatch(readConfigSource(context.brandRoot), /appId/);
+    await tty.answer('TikTok developer app id', '7399999999999999999\r');
+    await tty.answer('TikTok app secret', 'app-secret-value\r');
+    await tty.answer('Advertiser authorization URL', 'https://business-api.tiktok.com/portal/auth?app_id=7399999999999999999&state=your_custom_params&redirect_uri=https%3A%2F%2Fitwcreativeworks.com\r');
+    await tty.answer('redirect URL', 'AUTHCODE123\r');
+    const ok = await run;
+
+    assert.equal(ok, true);
+    // The developer-portal page is where an app id comes from
+    assert.deepEqual(opened, ['https://business-api.tiktok.com/portal/apps']);
+    // Landed in config (comment-preserving) and in memory
+    assert.match(readConfigSource(context.brandRoot), /appId: "7399999999999999999"/);
+    assert.match(readConfigSource(context.brandRoot), /\/\/ the app id lands here/);
+    assert.equal(context.brandConfig.analytics.providers.tiktok.appId, '7399999999999999999');
+    // ...and the mint continued in the SAME pass, on the id just entered
+    assert.deepEqual(exchanged, [{ appId: '7399999999999999999', secret: 'app-secret-value', authCode: 'AUTHCODE123' }]);
+    assert.match(fs.readFileSync(path.join(context.brandRoot, '.env'), 'utf8'), /TIKTOK_ACCESS_TOKEN="minted-token"/);
   } finally {
+    setBrowserOpener(null);
     tty.close();
     cleanupRoot(context);
   }
@@ -202,13 +242,18 @@ test('tiktok-api: a non-zero code on the exchange is an error, never a silent em
   );
 });
 
-test('tiktok-api: the portal URL is built from the app id (and the redirect uri when configured)', () => {
-  assert.equal(
-    TIKTOK_PORTAL_URL({ appId: '73' }),
-    'https://business-api.tiktok.com/portal/auth?app_id=73&state=omega',
-  );
-  assert.equal(
-    TIKTOK_PORTAL_URL({ appId: '73', redirectUri: 'https://brand.test/cb' }),
-    'https://business-api.tiktok.com/portal/auth?app_id=73&state=omega&redirect_uri=https%3A%2F%2Fbrand.test%2Fcb',
-  );
+test('tiktok-api: the setup opens the APP PAGE and takes the app\'s own authorization URL — never a built one', () => {
+  assert.equal(TIKTOK_APP_URL('7676623375900344340'), 'https://business-api.tiktok.com/portal/apps/7676623375900344340');
+  const auth = 'https://business-api.tiktok.com/portal/auth?app_id=7676623375900344340&state=your_custom_params&redirect_uri=https%3A%2F%2Fitwcreativeworks.com';
+  assert.equal(isAuthUrlFor(auth, '7676623375900344340'), true);
+  assert.equal(isAuthUrlFor(auth, '1'), false);
+  assert.equal(isAuthUrlFor('https://business-api.tiktok.com/portal/apps/7676623375900344340', '7676623375900344340'), false);
+  assert.equal(isAuthUrlFor('not a url', '7676623375900344340'), false);
+});
+
+test('tiktok-api: the auth_code is read out of the pasted redirect URL, or taken bare', () => {
+  assert.equal(parseAuthCode('https://itwcreativeworks.com/?auth_code=ABC123&code=ABC123&state=your_custom_params'), 'ABC123');
+  assert.equal(parseAuthCode('ABC123'), 'ABC123');
+  assert.equal(parseAuthCode('https://itwcreativeworks.com/?state=x'), '');
+  assert.equal(parseAuthCode(''), '');
 });

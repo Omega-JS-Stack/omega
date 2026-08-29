@@ -8,7 +8,10 @@
  *   dns.dmarcReports   — { rua: [...], ruf: [...] } report addresses (no default)
  *   dns.bimiLogo       — BIMI logo URL (no default; record only emitted when set)
  *   dns.sendgrid       — { id, whitelabel } domain-auth CNAMEs (no default;
- *                        the campaigns service (SendGrid) owns these values)
+ *                        the campaigns service (SendGrid) owns these values),
+ *                        plus `linkBrandingValid` — NOT config, the live answer
+ *                        the ensure handler reads off SendGrid and folds in
+ *                        ([#646](https://github.com/Omega-JS-Stack/omega/issues/646))
  *   dns.records        — custom records (verification TXTs like Ahrefs go here)
  */
 const chalk = require('chalk').default;
@@ -118,7 +121,25 @@ function buildRequiredRecords(domain, dnsConfig, isSubdomainProject = false, ema
     const sgHost = `u${sendgrid.id}.${sendgrid.whitelabel}.sendgrid.net`;
     addDefault({ type: 'CNAME', name: `emailauth.${domain}`, content: sgHost, proxied: false, comment: 'SendGrid email authentication' });
     addDefault({ type: 'CNAME', name: `${sendgrid.id}.${domain}`, content: 'sendgrid.net', proxied: false, comment: 'SendGrid URL branding' });
-    addDefault({ type: 'CNAME', name: `emailurl.${domain}`, content: 'sendgrid.net', proxied: false, comment: 'SendGrid URL tracking' });
+    // PROXIED, alone among the SendGrid records — but only ONCE SENDGRID SAYS
+    // THE BRANDED LINK IS VALID
+    // ([#646](https://github.com/Omega-JS-Stack/omega/issues/646)). SendGrid
+    // rewrites every link in a transactional email through this host, and it
+    // serves NO certificate of its own: `https://emailurl.<domain>` fails
+    // certificate validation on every legacy brand checked (2026-08-27), so a
+    // click could only ever land on `http://` first and the browser warned the
+    // recipient that the site is insecure. Cloudflare's proxy terminates TLS at
+    // the edge with the zone's own certificate and forwards to sendgrid.net, so
+    // the hop is HTTPS end to end.
+    //
+    // ORDER MATTERS on a NEW domain: SendGrid validates link branding by looking
+    // this record up as a CNAME to sendgrid.net, and a proxied record answers
+    // with Cloudflare's addresses instead — so flipping the proxy on before
+    // validation locks the branding out of ever validating. `linkBrandingValid`
+    // is the live answer the ensure handler reads off SendGrid's
+    // `GET /v3/whitelabel/links`: grey-cloud until that says `valid: true`, and
+    // the rerun converges once it does (docs/shared/breaking-changes.md).
+    addDefault({ type: 'CNAME', name: `emailurl.${domain}`, content: 'sendgrid.net', proxied: sendgrid.linkBrandingValid === true, comment: 'SendGrid URL tracking' });
     addDefault({ type: 'CNAME', name: `s1._domainkey.${domain}`, content: `s1.domainkey.${sgHost}`, proxied: false, comment: 'Sendgrid DKIM key' });
     addDefault({ type: 'CNAME', name: `s2._domainkey.${domain}`, content: `s2.domainkey.${sgHost}`, proxied: false, comment: 'Sendgrid DKIM key' });
   }
@@ -353,11 +374,18 @@ function txtKind(content = '') {
 // DIFF RECORDS - main entry point used by ensure handler
 // =============================================================================
 
-function diffRecords({ records, brandConfig, domain, isSubdomainProject }) {
-  const dnsConfig = brandConfig?.edge?.providers?.cloudflare?.dns;
+function diffRecords({ records, brandConfig, domain, isSubdomainProject, linkBrandingValid = false }) {
+  let dnsConfig = brandConfig?.edge?.providers?.cloudflare?.dns;
 
   if (!dnsConfig && !isSubdomainProject) {
     return null;
+  }
+
+  // SendGrid's live word on the branded link rides IN on the sendgrid block —
+  // the same shape `{ id, whitelabel }` arrive in, so the record builder reads
+  // one object and stays pure ([#646]).
+  if (dnsConfig?.sendgrid) {
+    dnsConfig = { ...dnsConfig, sendgrid: { ...dnsConfig.sendgrid, linkBrandingValid } };
   }
 
   // For subdomain projects, filter records to only those belonging to this subdomain

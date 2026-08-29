@@ -15,6 +15,9 @@ const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { fieldsFor, segmentsFor } = require('../src/lib/backend-marketing.js');
 const { buildQueryDsl } = require('../src/services/campaigns/lib/segment-query.js');
 const service = require('../src/services/campaigns/index.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+const DOWN = '\x1B[B';
 
 // Tests must never see real credentials from the shell environment
 delete process.env.SENDGRID_API_KEY;
@@ -364,6 +367,59 @@ test('campaigns: missing sender without brand.address warns with CAN-SPAM guidan
   assert.equal(api.callsTo('createVerifiedSender').length, 0);
 });
 
+test('campaigns: a missing brand.address is ASKED for behind ONE gate and lands as one object (#635)', async () => {
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getVerifiedSenders: [],
+    createVerifiedSender: { id: 10, from_email: FROM_EMAIL, verified: true },
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ address: null }), { sendgrid: api, serviceData: { listId: 'lst_1' }, brandRoot });
+    await tty.answer('Set up now?', '\r');                       // ONE gate for all five fields
+    await tty.answer('Street address', '500 Fixture Ave\r');
+    await tty.answer('City', 'Testville\r');
+    await tty.answer('State / region', 'CA\r');
+    await tty.answer('Postal code', '90210\r');
+    await tty.answer('Country', 'USA\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    // The pass continued on the address just entered
+    assert.deepEqual(api.callsTo('createVerifiedSender')[0].args[0].address, {
+      street: '500 Fixture Ave', street2: '', city: 'Testville', state: 'CA', zip: '90210', country: 'USA',
+    });
+    // ...and it landed as ONE brand.address object, comments intact
+    const written = readConfigSource(brandRoot);
+    assert.match(written, /500 Fixture Ave/);
+    assert.match(written, /Testville/);
+    assert.match(written, /\/\/ stays single-quoted/);
+  } finally {
+    tty.close();
+  }
+});
+
+test('campaigns: skipping the address gate keeps the CAN-SPAM warn and writes nothing (#635)', async () => {
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const api = fakeSendgrid({ ...convergedResponses(), getVerifiedSenders: [] });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ address: null }), { sendgrid: api, serviceData: { listId: 'lst_1' }, brandRoot });
+    await tty.answer('Set up now?', `${DOWN}\r`);                 // Skip for now
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.output.senderIdentity.missingAddress, true);
+    assert.equal(api.callsTo('createVerifiedSender').length, 0);
+    assert.doesNotMatch(readConfigSource(brandRoot), /address/);
+  } finally {
+    tty.close();
+  }
+});
+
 // ─── list ────────────────────────────────────────────────────────────────────
 
 test('campaigns: a configured listId is verified and kept', async () => {
@@ -506,14 +562,19 @@ test('campaigns: a rejected segment PATCH falls back to delete + recreate', asyn
 
 // ─── event-webhook ───────────────────────────────────────────────────────────
 
-test('campaigns: missing OMEGA_WEBHOOK_KEY warns', async () => {
-  const api = fakeSendgrid(convergedResponses());
+test('campaigns: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook is managed, never skipped (#635)', async () => {
+  const api = fakeSendgrid({ ...convergedResponses(), updateEventWebhookSettings: {} });
 
-  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, webhookKey: false });
+  await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, webhookKey: false });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.eventWebhook.missingWebhookKey, true);
-  assert.equal(api.callsTo('getEventWebhookSettings').length, 0);
+  // OMEGA mints its own key, so the run never steps aside for it
+  const minted = process.env.OMEGA_WEBHOOK_KEY;
+  assert.match(minted, /^[A-Za-z0-9_-]{43}$/);
+  // ...and the freshly minted key is what the forwarder URL is built from
+  assert.equal(api.callsTo('getEventWebhookSettings').length, 1);
+  assert.deepEqual(api.callsTo('updateEventWebhookSettings').map((c) => c.args), [
+    [{ url: `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=sendgrid&key=${minted}` }],
+  ]);
 });
 
 test('campaigns: no parent configured → nothing to point the webhook at', async () => {
@@ -571,8 +632,6 @@ test('campaigns: dry-run on a fully drifted brand performs zero mutations', asyn
 });
 
 // ─── domain-auth: interactive validation poll ────────────────────────────────
-
-const { openTtyPrompt } = require('./lib/interactive.js');
 
 test('campaigns: interactive run polls validation until DNS propagates', async () => {
   let validations = 0;

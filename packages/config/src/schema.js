@@ -448,6 +448,12 @@ const SHARED_SCHEMA = [
     required:    false,
     description: 'TikTok ADVERTISER id the pixel is created on. Same rule as meta.accountId: the id lives here, TIKTOK_ACCESS_TOKEN stays in .env.',
   },
+  {
+    path:        'analytics.providers.tiktok.appId',
+    type:        'string',
+    required:    false,
+    description: "TikTok DEVELOPER APP id the access-token mint authorizes through (#448) — public config, so the manager can walk the portal without asking twice; setup writes it back here (#635). The app secret is pasted once and never saved, and the token lands in .env (TIKTOK_ACCESS_TOKEN).",
+  },
 
   // ── advertising ──────────────────────────────────────────────────────────
   {
@@ -485,6 +491,18 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: "In-house ads source: 'self' (this brand's backend serves its own `ads` inventory), 'company' (the parent company's api — resolved via company.url), or a full base URL used verbatim. Presence-driven — unset disables house units.",
+  },
+  {
+    path:        'advertising.fallback',
+    type:        'string|boolean',
+    required:    false,
+    description: "The role a provider miss falls through to — 'inhouse' renders the house unit, false (or absent) ends the ladder at the built-in promo. Role-level, beside `providers` (docs/web/ads-system.md).",
+  },
+  {
+    path:        'advertising.tags',
+    type:        'array',
+    required:    false,
+    description: "This brand's contextual tags (['music', 'audio-tools']) — the targeting match input a house unit sends with its serve request unless the include passes its own. No user tracking.",
   },
 
   // ── company ──────────────────────────────────────────────────────────────
@@ -675,6 +693,32 @@ const SHARED_SCHEMA = [
     description: 'Brand repo visibility (default true).',
   },
 
+  // ── domain (two roles: registrar + mailbox; provider-keyed, #425) ────────
+  {
+    path:        'domain.providers',
+    type:        'object',
+    required:    false,
+    description: "The brand's REGISTRAR, named as the one KEY under it ({ namecheap: {} }) — presence picks it, and no entry means nothing chosen, so the domain service skips. The provider set is open; the entry may be empty.",
+  },
+  {
+    path:        'domain.providers.namecheap',
+    type:        'object',
+    required:    false,
+    description: 'Namecheap as the registrar — the one provider whose nameservers the domain service points at the Cloudflare zone via API (NAMECHEAP_USERNAME + NAMECHEAP_API_KEY in .env). An empty object is the whole declaration; every other registrar gets manual instructions.',
+  },
+  {
+    path:        'domain.email.providers',
+    type:        'object',
+    required:    false,
+    description: "The brand's MAILBOX provider, named as the one KEY under it ({ cloudflare: {} } | { squarespace: {} } | { privateemail: {} }) — presence picks it; no entry leaves the edge service's email-routing operations off.",
+  },
+  {
+    path:        'domain.email.forwarding',
+    type:        'array',
+    required:    false,
+    description: "Address forwarding rules ([{ from: 'support' | '*', to: 'inbox@example.com' }]) the mailbox provider reconciles. Role-level and provider-agnostic.",
+  },
+
   // ── edge (role: CDN/DNS edge; provider-discriminated) ────────────────────
   {
     path:        'edge.providers.cloudflare.enabled',
@@ -708,6 +752,12 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: 'Classic reCAPTCHA site key rendered client-side. Public by design — the secret half stays in .env (RECAPTCHA_SECRET_KEY).',
+  },
+  {
+    path:        'captcha.providers.recaptcha.domainsConfirmed',
+    type:        'array',
+    required:    false,
+    description: "Domains the owner has confirmed on the classic reCAPTCHA key (the API cannot read the key's domain list, so the confirmation is the record). Machine-written: the captcha service stamps a domain here once, and finding it is what keeps later runs from asking again.",
   },
 
   // ── forms (role: form handling; provider-discriminated) ──────────────────
@@ -858,6 +908,44 @@ const SHARED_SCHEMA = [
     required:    false,
     default:     ['/sitemap.xml'],
     description: "Sitemap paths submitted as https://{domain}{path} (default ['/sitemap.xml']).",
+  },
+  {
+    path:        'search.providers.searchConsole.gaLinked',
+    type:        'boolean',
+    required:    false,
+    description: 'true = the owner has associated this Search Console property with the brand\'s GA property (no API exists for the link, so the confirmation is the record). Machine-written: the search service stamps it after the interactive association, and finding it is what keeps later runs from asking again.',
+  },
+
+  // ── certificates (role: code signing; provider-discriminated) ────────────
+  {
+    path:        'certificates.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'false = the certificates service skips entirely — no bundle ids, no signing certificates, no provisioning profiles for this brand. Absent reads as ON for brands with a desktop/mobile target (the service still skips one with neither).',
+  },
+  {
+    path:        'certificates.providers.apple.bundleIdPrefix',
+    type:        'string',
+    required:    false,
+    description: "Reverse-DNS prefix the brand's bundle id is composed from ('com.mycompany' + brand.id → com.mycompany.my.brand). The brand's own answer — the onboard wizard seeds it and setup asks for it (#635); unset, the Apple operations have no id to reconcile.",
+  },
+  {
+    path:        'certificates.providers.apple.capabilities',
+    type:        'array',
+    required:    false,
+    description: "App Store Connect capabilities enabled on the bundle id (['APPLE_ID_AUTH']). Unset uses the framework set.",
+  },
+  {
+    path:        'certificates.providers.apple.profiles',
+    type:        'array',
+    required:    false,
+    description: 'Certificate types that get a provisioning profile per applicable platform (IOS_DISTRIBUTION, MAC_APP_DISTRIBUTION, DEVELOPER_ID_APPLICATION_G2). Unset uses the framework set.',
+  },
+  {
+    path:        'certificates.providers.apple.certificates',
+    type:        'array',
+    required:    false,
+    description: "Certificate types managed for the Apple Developer account ([{ type, manual }]) — `manual: true` marks the ones Apple's API cannot create, which the Account Holder downloads from the portal. Unset uses the framework set.",
   },
 
   // ── devlog (role: commit-digest publishing; provider-discriminated) ──────
@@ -1052,6 +1140,14 @@ const SHARED_SCHEMA = [
     required:    false,
     enum:        ['system', 'light', 'dark'],
     description: "Default appearance. 'system' follows the OS; a user's runtime choice persists in storage and wins.",
+  },
+
+  // ── ai ───────────────────────────────────────────────────────────────────
+  {
+    path:        'ai.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The manager's AI-provider setup gate ([#639](https://github.com/Omega-JS-Stack/omega/issues/639)): the `ai` service asks once for OPENAI_API_KEY / ANTHROPIC_API_KEY. `false` is the permanent opt-out the gate's Disable lands; absence means ask. No default is materialized — a brand that never answers is never re-shaped.",
   },
 
   // ── translation ──────────────────────────────────────────────────────────

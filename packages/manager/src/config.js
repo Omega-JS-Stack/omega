@@ -267,9 +267,6 @@ const MANAGER_DEFAULTS = {
       chargebee: {
         site: null,
       },
-      coinbase: {
-        enabled: false,
-      },
     },
     products: [], // [{ id, name, type: 'subscription'|'one-time', prices: { monthly, annually, once }, trial: { days }, ... }]
   },
@@ -629,6 +626,7 @@ const SERVICE_ORDER = [
   'directory',       // brand's own entry pushed into the PARENT project's brands collection (opt-in; no cross-service deps)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
+  'ai',              // AI provider keys asked into the brand .env — BEFORE disperse composes the backend's own
   'disperse',        // signing artifacts + composed .env files land in the targets (after certificates, before update builds)
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every target
@@ -802,6 +800,10 @@ const OPERATIONS = {
     { name: 'profiles', ensure: true },     // Provisioning profiles per platform × cert type
   ],
 
+  ai: [
+    { name: 'keys', ensure: true },  // The provider API keys, asked once through the shared setup contract (#639)
+  ],
+
   disperse: [
     { name: 'certs', write: true },  // Signing artifacts copied into desktop/mobile targets' certs dirs
     { name: 'env', write: true },    // Each target's gitignored .env composed (brand env + stream secrets + signing paths)
@@ -890,6 +892,13 @@ const GOOGLE_ENV = [
   { name: 'GOOGLE_CLIENT_ID', label: 'Google OAuth client ID', url: 'https://console.cloud.google.com/apis/credentials', hint: 'A Desktop-app OAuth client — the one Google identity every service shares' },
   { name: 'GOOGLE_CLIENT_SECRET', label: 'Google OAuth client secret', url: 'https://console.cloud.google.com/apis/credentials' },
 ];
+
+// The key every webhook route compares — OMEGA's OWN (`generated:` in the env
+// schema), so the setup contract MINTS it rather than asking (#635). Declared
+// by each service whose webhook operations build a forwarder URL from it, so
+// one that runs before the workspace service did still has it. `gates: false`:
+// nothing to acquire means nothing for preflight to gate on.
+const WEBHOOK_KEY_ENV = { name: 'OMEGA_WEBHOOK_KEY', label: 'Omega webhook key', gates: false };
 
 const REQUIRES = {
   edge: {
@@ -1037,6 +1046,7 @@ const REQUIRES = {
       && chosenProvider(config.marketing?.campaigns?.providers) === 'sendgrid',
     env: [
       { name: 'SENDGRID_API_KEY', label: 'SendGrid API key', url: 'https://app.sendgrid.com/settings/api_keys', prompted: true },
+      WEBHOOK_KEY_ENV,
     ],
     scopes: [],
   },
@@ -1049,6 +1059,7 @@ const REQUIRES = {
       && chosenProvider(config.marketing?.newsletter?.providers) === 'beehiiv',
     env: [
       { name: 'BEEHIIV_API_KEY', label: 'Beehiiv API key', url: 'https://app.beehiiv.com/settings/workspace/api', prompted: true },
+      WEBHOOK_KEY_ENV,
     ],
     scopes: [],
   },
@@ -1106,6 +1117,7 @@ const REQUIRES = {
         disablePath: 'payment.providers.chargebee',
         when: (config) => config.payment?.providers?.chargebee !== false,
       },
+      WEBHOOK_KEY_ENV,
     ],
     scopes: [],
   },
@@ -1146,6 +1158,37 @@ const REQUIRES = {
       && config.inbound?.email?.providers?.replyify?.enabled !== false,
     env: [
       { name: 'REPLYIFY_SERVICE_ACCOUNT', label: "Replyify's service-account JSON path", hint: 'Absolute, or relative to the brand root', prompted: true, gates: false },
+    ],
+    scopes: [],
+  },
+
+  // ONE key per provider (#639): the OMEGA_-prefixed twins are gone, so the
+  // bare name is the only home and a company-wide key is simply the COMPANY
+  // layer of the .env cascade. Both are OPTIONAL (`gates: false`) — a brand
+  // that calls neither provider must never be gated on a key it will not use,
+  // and the ai service asks for them in place.
+  ai: {
+    why: 'lets the backend call OpenAI/Anthropic (contact inference, content + newsletter generation)',
+    label: 'AI providers',
+    disablePath: 'ai.enabled',
+    when: (config) => config.ai?.enabled !== false,
+    env: [
+      {
+        name: 'OPENAI_API_KEY',
+        label: 'OpenAI API key',
+        url: 'https://platform.openai.com/api-keys',
+        hint: 'A secret key on the account that should be billed for the brand\'s OpenAI calls',
+        prompted: true,
+        gates: false,
+      },
+      {
+        name: 'ANTHROPIC_API_KEY',
+        label: 'Anthropic API key',
+        url: 'https://console.anthropic.com/settings/keys',
+        hint: 'A workspace API key — the Claude Code subscription login is a separate thing and needs no key',
+        prompted: true,
+        gates: false,
+      },
     ],
     scopes: [],
   },

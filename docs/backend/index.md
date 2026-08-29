@@ -57,6 +57,12 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 For the directory layout of both the @omega.js/backend library and consumer projects, see [docs/directory-structure.md](../../packages/backend/docs/directory-structure.md).
 
+### The wakeup short-circuit
+
+Any request carrying `wakeup` in its data (query or body) is answered `{ wakeup: true }` by the middleware and goes no further ([helpers/middleware.js](../../packages/backend/src/manager/helpers/middleware.js)). The check runs BEFORE the route module is loaded and before the caller is authenticated, so the request costs one cold start and nothing else. There is no dedicated ping route and none is needed: every route is the same warm-up at the same price.
+
+The frontend half is `omega.request(url, { wakeup: true })` ([docs/client/index.md](../client/index.md)) — @omega.js/web fires it from `/pricing` and `/payment/checkout` so the intent POST does not pay for the cold start ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
+
 ### Custom-server mode — `projectType: 'custom'` ([#584](https://github.com/Omega-JS-Stack/omega/issues/584))
 
 **The brand's config is the switch**, not an init flag: `targets.backend.projectType` in `config/omega.json5` (`'firebase'` — the default — or `'custom'`), resolved by `Manager.init()` off the loaded config, so a consumer's `src/index.js` stays the same two lines in both modes. An explicit `init(exports, { projectType })` still wins for a caller that means to override it.
@@ -91,7 +97,7 @@ Every framework read of a brand-supplied env key goes through ONE reader; nothin
 
 **Dev-suffixed payment secrets** ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)) — the reader is where the DEV/LIVE split is enforced, so every payment library gets it without knowing the twins exist:
 
-- **Outside production, a `<KEY>_DEV` twin wins.** `env.get('STRIPE_SECRET_KEY')` returns `STRIPE_SECRET_KEY_DEV` when it is set, so a brand's local emulator never touches the live payment account (a local test purchase used to be able to charge a real card). The four twins are Stripe's secret key and webhook secret, PayPal's client secret, and Chargebee's API key.
+- **Outside production, a `<KEY>_DEV` twin wins.** `env.get('STRIPE_SECRET_KEY')` returns `STRIPE_SECRET_KEY_DEV` when it is set, so a brand's local emulator never touches the live payment account (a local test purchase used to be able to charge a real card). The three twins are Stripe's secret key, PayPal's client secret, and Chargebee's API key.
 - **In production a `_DEV` key reads as absent**, whatever the cascade holds — and `omega deploy` strips those rows from the uploaded `.env` before the upload (`stageFunctions({ deploy: true })`, keyed off the schema's `devEnvKeys()`; every local lane re-stages without the flag, so the emulator keeps its twins).
 - **A LIVE-shaped credential outside production is refused** — `LiveSecretOutsideProductionError` (code 500) naming the key, the environment, and the `_DEV` fix, never the value. The shape is schema data (`liveShape`), declared where the provider stamps one: Stripe's `sk_live_`/`rk_live_`, Chargebee's `live_`. PayPal's halves carry no live/sandbox marker, so PayPal is protected by its twin alone.
 
@@ -249,7 +255,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 
 - [docs/verts.md](../../packages/backend/docs/verts.md) — house verts module (adblock-safe ad system): `verts` collection, public `GET /omega/verts/serve` (self-contained HTML unit, 204 no-fill) + fail-closed `GET /omega/verts/redirect`, admin CRUD, in-memory inventory cache (~5 min TTL), contextual targeting × weight selection
 - [docs/admin-post-route.md](../../packages/backend/docs/admin-post-route.md) — `POST/PUT /admin/post` blog creation via GitHub (image extraction + resize at ingest + `@post/` rewriting). Also the publish target for the Ghostii article engine (`libraries/content/ghostii.js`).
-- [docs/payment-system.md](../../packages/backend/docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, provider interface, webhook verification (the shared key plus each provider's native signature), product config, test provider
+- [docs/payment-system.md](../../packages/backend/docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, provider interface, webhook verification (the shared `?key=` param, the one check), product config, test provider
 - [docs/paypal-sandbox-qa.md](../../packages/backend/docs/paypal-sandbox-qa.md) — the live PayPal sandbox QA drive: standing fixtures (creds, webhook, the trial-free `proof-press` product — listed on /pricing on purpose, the hand-made sandbox buyer — PayPal has no account-creation API), the subscription sale → refund sequence, and the gotchas
 - [docs/marketing-campaigns.md](../../packages/backend/docs/marketing-campaigns.md) — campaign CRUD routes, recurring campaigns, generator pipeline (newsletter), newsletter-driven blog article (`content.article.enabled`), template-owned schemas, asset hosting, seed campaigns
 - [docs/consent.md](../../packages/backend/docs/consent.md) — marketing consent capture: canonical `consent.{legal,marketing}` user-doc shape, signup-form capture, account-page toggle, HMAC unsub link (cross-provider unsub + re-add on resubscribe), admin contact-DELETE revoke mirror, SendGrid+Beehiiv webhook receivers, parent forwarder (`/marketing/webhook/forward`), library-level consent gate in `email.add()`/`email.sync()` (revoked-only skip), migration script template
@@ -262,7 +268,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/usage-rate-limiting.md](../../packages/backend/docs/usage-rate-limiting.md) — usage tracking, monthly/daily caps, `setUser()` + mirrors for proxy usage, reset schedule
 - [docs/ai-library.md](../../packages/backend/docs/ai-library.md) — `Manager.AI()` unified entry for OpenAI + Anthropic (text via `.request()`, images via `.image()` → `gpt-image-2`)
 - [docs/marketing-fields.md](../../packages/backend/docs/marketing-fields.md) — adding custom fields to SendGrid + Beehiiv via the @omega.js/backend/OMEGA SSOT pair
-- [docs/stripe-webhook-forwarding.md](../../packages/backend/docs/stripe-webhook-forwarding.md) — auto-started Stripe CLI forwarding for local dev, and the CLI's own signing secret a locally verified run needs
+- [docs/stripe-webhook-forwarding.md](../../packages/backend/docs/stripe-webhook-forwarding.md) — auto-started Stripe CLI forwarding for local dev, and the shared key the forwarded deliveries carry
 
 ### Testing & CLI
 

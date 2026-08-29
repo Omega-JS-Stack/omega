@@ -56,6 +56,7 @@ input, not its implementation. The legacy repos stay read-only reference
 | URL prefix | `/backend-manager/*` | `/omega/*` (also `/omega_api/*` on the direct function URL) | Repoint every first-party caller. The old prefix still resolves — a deliberate external-client alias, see [Deliberate compatibility that REMAINS](#deliberate-compatibility-that-remains) |
 | Per-request object | `BackendAssistant`; handler signature `module.exports = async ({ assistant, settings, analytics }) => …` | `RouteContext`; handler signature `module.exports = async ({ ctx, settings, analytics }) => …` | Rename the destructured argument and every `assistant.` call site (`ctx.respond`, `ctx.log`, `ctx.request`) in each custom route, event, and cron handler |
 | Environment | `BACKEND_MANAGER_KEY`, `BACKEND_MANAGER_WEBHOOK_KEY`, `BEM_TEST_RUNNER`, `BEM_HTTPS_PORT` | `OMEGA_ADMIN_KEY`, `OMEGA_WEBHOOK_KEY`, `OMEGA_TEST_RUNNER`, `OMEGA_HTTPS_PORT` | Rename in `.env`, in CI secrets, and in anything that reads them. Values carry over unchanged |
+| AI provider keys | TWO names per provider: `BACKEND_MANAGER_OPENAI_API_KEY` (the company-wide fallback) beside a bare `OPENAI_API_KEY` (the brand's own), and the same pair for Anthropic. The provider preferred the bare one and fell back to the prefixed; `inferContact` read ONLY the prefixed one | ONE name per provider: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` ([#639](https://github.com/Omega-JS-Stack/omega/issues/639)). Every reader takes the bare name through the one env reader; the OMEGA-era `OMEGA_OPENAI_API_KEY` / `OMEGA_ANTHROPIC_API_KEY` twins are removed outright, with no dual-read | Rename `BACKEND_MANAGER_OPENAI_API_KEY` (or `OMEGA_OPENAI_API_KEY`) to `OPENAI_API_KEY` in `.env` and CI secrets, same for Anthropic, and delete the old rows. A key that served EVERY brand moves to the COMPANY `.env` under that same bare name — the cascade is the fallback, never a second key. An interactive `npx omega manage` asks for both once (the `ai` service) and writes them for you |
 | CLI | `bm` / `bem` / `backend-manager` / `mgr` bins | `omega` / `omg` / `mgr` (one dispatcher; a backend's `functions/` dir resolves to the backend CLI) | Replace the bin name in npm scripts and workflows |
 | `test/*` routes | Every route under `routes/test/` served at its production URL | The whole `test/` route folder 404s outside dev/testing, with zero carve-outs; contract in the backend's `docs/routes.md` ([#238](https://github.com/Omega-JS-Stack/omega/issues/238)) | Use `/omega/health` for liveness (a real route, public, no input echoed) — not `/omega/test/health`. A brand whose own `routes/test/*` route must serve in production moves it out of the `test/` folder; debug routes belong in `test/` and are gated by default |
 | Test discovery | The BEM runner discovered plain `.js` files under `test/` | `discoverTests()` matches `*.test.js` only (`packages/backend/src/test/runner.js`) — a `test/<name>.js` file is invisible, and the run reports zero tests with no error ([#481](https://github.com/Omega-JS-Stack/omega/issues/481)) | Rename every ported test file to `<name>.test.js`; a suite left on the old spelling goes silently dark |
@@ -144,7 +145,7 @@ input, not its implementation. The legacy repos stay read-only reference
 | CLI default | A bare `omega` / `mgr` at a brand root RAN the whole service walk (omega-manager's default command) | Every verb is named: `omega manage` is the walk (one name, no alias), `omega dev` the local stack, `omega deploy` the publish. A bare `omega` prints help and touches nothing ([#229](https://github.com/Omega-JS-Stack/omega/issues/229)) | Replace bare `omega`/`mgr` invocations with `omega manage` in scripts, cron, and CI. A brand still carrying `manage: 'omega'` must be walked ONCE by hand — `npx omega manage` — because its own `npm run manage` would print help; that walk heals the script to `omega manage` |
 | Publish | Per-framework release scripts and `npu sync` | `omega deploy` on every target — deliberate, never triggered by a push; at a brand root it fans out (backend → web → extension/desktop) | Replace publish scripts with `omega deploy`; contract in [deploys.md](deploys.md) |
 | Dependency updates | Framework self-update + peer-dependency auto-install at setup | The explicit `omega update` verb (report first, `--apply` installs, majors opt-in) | Run it deliberately — [updates.md](updates.md) |
-| Environment prefixes | `BACKEND_MANAGER_*`, `BEM_*`, framework-specific names | `OMEGA_*` | Rename in `.env`, CI secrets, and every reader. Each framework's `_.env` template is the current list — `npx omega setup` refreshes it |
+| Environment prefixes | `BACKEND_MANAGER_*`, `BEM_*`, framework-specific names | `OMEGA_*` — except a THIRD-PARTY credential, which keeps the vendor's own name (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`); `OMEGA_*` is for the keys OMEGA itself mints or owns | Rename in `.env`, CI secrets, and every reader. Each framework's `_.env` template is the current list — `npx omega setup` refreshes it |
 | Default/Custom file markers | The marker grammar in `_.env`, `_.gitignore`, `AGENTS.md` | **UNCHANGED — this is not legacy.** The Default/Custom marker grammar is the live defaults-engine mechanism that merges framework-owned lines into consumer-owned files | Leave the markers alone in migrated files; `omega setup` rewrites the Default block and preserves everything under Custom |
 
 ## One provider shape — `role.providers.<provider>` ([#425](https://github.com/Omega-JS-Stack/omega/issues/425))
@@ -273,6 +274,34 @@ every doc changed together, and nothing dual-reads `apps/`.
 | This monorepo's brand folder | `apps/sandbox-brand`, `apps/omega-playground`, `apps/newsflash-brand` | `brands/<same>` | Monorepo-internal — nothing for a consumer brand to do |
 | CI base-path helper ([#455](https://github.com/Omega-JS-Stack/omega/issues/455)) | `require('@omega.js/web/deploy').appPathPrefix()` — called by name from the scaffolded `.github/workflows/build.yml` | `targetPathPrefix()` — same signature, same behavior | A brand whose workflow still calls the old name re-scaffolds it (`npx omega manage` rewrites the workflows it owns) at its migration session; no alias exists |
 | Config merge-layer word ([#455](https://github.com/Omega-JS-Stack/omega/issues/455)) | The per-target-dir layer was the **app layer**: docs said `… ← app shared ← app targets.<type>`, `loadConfig()`/`composeTargetConfig()` returned `files.app`, and `resolveEnvChain()` returned `{ app, brand, company }` | The **local layer** — `… ← local shared ← local targets.<type>`, `files.local`, `{ local, brand, company }` | Nothing in an authored `omega.json5` changes (the layer is positional — no `app:` key ever existed). Code reading `files.app` or `chain.app` renames the key; no alias exists |
+
+## One DNS flip — `emailurl.<domain>` rides the Cloudflare proxy ([#646](https://github.com/Omega-JS-Stack/omega/issues/646))
+
+Links inside a transactional email opened with the browser's insecure-site
+warning on every brand not yet on OMEGA. The cause, confirmed live on
+2026-08-27: SendGrid rewrites every link through the branded link host
+`emailurl.<domain>`, that host serves NO certificate of its own
+(`https://emailurl.<legacy domain>` fails certificate validation, while plain
+HTTP answers), and the account's link branding carries no SSL setting at all —
+every one of its 36 entries is `valid: true`, `legacy: false`, with no `ssl`
+field. So a click could only ever land on an `http://` hop first, and Chrome
+said so. The edge service's DNS default now creates that one record
+**proxied**, so Cloudflare terminates TLS at the edge with the zone's own
+certificate and forwards to sendgrid.net.
+
+**The flip is ORDERED, and the DNS ensure enforces the order itself.** SendGrid
+validates a branded link by resolving `emailurl.<domain>` as a CNAME to
+sendgrid.net, and a proxied record answers with Cloudflare's addresses instead
+— so proxying first locks a NEW domain's branding out of ever validating. Every
+run the edge service reads `GET /v3/whitelabel/links` and only writes
+`proxied: true` when SendGrid reports that host `valid: true`; until then the
+record stays grey-clouded and the run warns, naming the record and saying to
+rerun `omega manage` once SendGrid has validated. Nothing to sequence by hand:
+validate the link in SendGrid, rerun, and the record flips.
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `emailurl.<domain>` CNAME → `sendgrid.net` | Grey-clouded (`proxied: false`), so the click resolved straight to SendGrid over HTTP | Orange-clouded (`proxied: true`) once SendGrid reports the link branding valid — the only SendGrid record that is; `emailauth`, the `<sendgrid id>` owner CNAME and both DKIM keys stay grey, because SendGrid validates those by CNAME lookup | **Per legacy brand, once**: run `npx omega manage` for a brand the edge service owns — an already-validated branding (every live ITW brand) flips on that run; a branding still pending stays grey with a warning, and the rerun after SendGrid validates flips it. By hand elsewhere: validate the branded link in SendGrid FIRST, then turn the proxy ON for `emailurl.<domain>` in Cloudflare |
 
 ## Deliberate compatibility that REMAINS
 

@@ -93,8 +93,11 @@ Usage.prototype.init = function (ctx, options) {
       self.user.usage = foundUsage ? foundUsage : self.user.usage;
     }
 
-    // Log
-    self.log(`Usage.init(): Got user`, self.user);
+    // Log — the counters this user arrived with, never the document holding them:
+    // it carries api.privateKey, consent and attribution, and a backend line lands
+    // in Cloud Logging for the whole retention window
+    // ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+    self.log(`Usage.init(): Got user ${self.user?.auth?.uid || 'unauthenticated'}`, self.user?.usage);
 
     // Set initialized to true
     self.initialized = true;
@@ -280,8 +283,8 @@ Usage.prototype.increment = function (name, value, options) {
     }
   });
 
-  // Log the updated user
-  self.log(`Usage.init(): Incremented ${name} for user`, self.user);
+  // Log the counter this moved — not the whole user document (#632)
+  self.log(`Usage.init(): Incremented ${name} for ${self.user?.auth?.uid || 'unauthenticated'}`, _.get(self.user, `usage.${name}`));
 
   return self;
 };
@@ -303,8 +306,8 @@ Usage.prototype.set = function (name, value) {
   // Set the value
   _.set(self.user, resolved, value);
 
-  // Log the updated user
-  self.log(`Usage.init(): Set ${name} for user`, self.user);
+  // Log the counter this set — not the whole user document (#632)
+  self.log(`Usage.init(): Set ${name} for ${self.user?.auth?.uid || 'unauthenticated'}`, _.get(self.user, `usage.${name}`));
 
   return self;
 };

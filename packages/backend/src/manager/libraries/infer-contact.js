@@ -2,7 +2,7 @@
  * Shared contact inference library
  *
  * Infers first/last name and company from an email address using AI.
- * Requires OMEGA_OPENAI_API_KEY to be set.
+ * Requires OPENAI_API_KEY to be set.
  *
  * Usage:
  *   const { inferContact } = require('./libraries/infer-contact.js');
@@ -22,14 +22,14 @@ const PROMPT_PATH = path.join(__dirname, 'prompts', 'infer-contact.md');
  * @returns {{ firstName: string, lastName: string, company: string, confidence: number, method: string }}
  */
 async function inferContact(email, ctx) {
-  if (env.get('OMEGA_OPENAI_API_KEY')) {
+  if (env.get('OPENAI_API_KEY')) {
     const aiResult = await inferContactWithAI(email, ctx);
     if (aiResult) {
       return aiResult;
     }
     ctx?.log(`inferContact: AI returned null for ${email} — falling back to empty result`);
   } else {
-    ctx?.log(`inferContact: OMEGA_OPENAI_API_KEY not set — skipping AI inference for ${email}`);
+    ctx?.log(`inferContact: OPENAI_API_KEY not set — skipping AI inference for ${email}`);
   }
 
   return { firstName: '', lastName: '', company: '', confidence: 0, method: 'none' };
@@ -44,7 +44,7 @@ async function inferContact(email, ctx) {
  */
 async function inferContactWithAI(email, ctx) {
   try {
-    const ai = ctx.Manager.AI(ctx, env.get('OMEGA_OPENAI_API_KEY'));
+    const ai = ctx.Manager.AI(ctx, env.get('OPENAI_API_KEY'));
     const result = await ai.request({
       model: 'gpt-5.4-mini',
       timeout: 60000,

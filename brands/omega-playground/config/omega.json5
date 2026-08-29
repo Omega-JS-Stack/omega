@@ -36,6 +36,11 @@
       // sender derives offers@<this domain> and auto-verifies off the
       // subdomain's own domain authentication.
       email: "support@playground.omegajs.dev",
+      // The human who signs the personal-signoff emails (welcome, nudge,
+      // checkup). Schema-declared; #640 moves it to email.signoff.person.
+      person: {
+        name: "Ian Wiedenman",
+      },
     },
     // PLACEHOLDER address (CAN-SPAM footer) — Ian's real business address at launch.
     address: {
@@ -165,7 +170,7 @@
     providers: {
       google: { id: null, accountId: "377753992", propertyId: "545069570" },
       meta: { id: "2285141245555388", accountId: "79317725" },
-      tiktok: { id: "DA4G5FRC77U2AAK83590", accountId: "7271818614041247745" },
+      tiktok: { id: "DA4G5FRC77U2AAK83590", accountId: "7271818614041247745", appId: "7676623375900344340", },
     },
   },
 
@@ -199,7 +204,6 @@
       stripe: { publishableKey: "pk_test_51T32RbReHWMUiO2TIWCU72ATxikGDMo1a3Byl7ZiEOdDHSKsiW9v6JwRyC7BCBK8AvhTJxWpsn3dpppwdZv73lIp00oBCyjnfg" },
       paypal: { clientId: "BAAjk48TKd_AqC0VqD4dzqif8PfxWULRx6VqwoGd8PV4mJMK_OxBUXYiPhMl1kIPqzVpDgk80nAoaW73Z0" },
       chargebee: { site: null },
-      coinbase: { enabled: false },
     },
     products: [
       // Demo catalog — ids, limits, prices, and provider ids are the

@@ -364,7 +364,6 @@ module.exports = {
           '# ========== Default Values ==========',
           'STRIPE_SECRET_KEY="sk_live_fixture"',
           'STRIPE_SECRET_KEY_DEV="sk_test_fixture"',
-          '# STRIPE_WEBHOOK_SECRET_DEV=',
           'CHARGEBEE_API_KEY_DEV="test_fixture"',
           'OMEGA_ADMIN_KEY="fixture-admin-key"',
           '',

@@ -31,8 +31,7 @@ function Anthropic(ctx, key) {
   self.user = ctx?.user;
   self.key = key
     || self.Manager?.config?.anthropic?.key
-    || env.get('ANTHROPIC_API_KEY')
-    || env.get('OMEGA_ANTHROPIC_API_KEY');
+    || env.get('ANTHROPIC_API_KEY');
 
   // Running counter across every call this provider instance makes. Each call
   // reports its OWN usage — this is the instance total.
@@ -52,7 +51,7 @@ Anthropic.prototype.request = async function (options) {
   options.timeout = options.timeout || 120000;
 
   if (!self.key) {
-    throw new Error('Anthropic API key not configured (set OMEGA_ANTHROPIC_API_KEY)');
+    throw new Error('Anthropic API key not configured (set ANTHROPIC_API_KEY)');
   }
 
   // Lazy-require the SDK so projects that don't use Anthropic don't need it installed

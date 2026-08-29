@@ -5,11 +5,16 @@
  *
  * Subdomain projects only touch records belonging to the subdomain (apex
  * records are owned by the parent brand).
+ *
+ * One record's desired shape is not config at all: `emailurl.<domain>` is
+ * proxied only once SendGrid has VALIDATED the branded link, so this handler
+ * asks SendGrid before it diffs ([#646]).
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { diffRecords } = require('../lib/dns-records-helpers.js');
+const { SendGridAPI } = require('../../campaigns/lib/sendgrid-api.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureDnsRecords(context) {
@@ -25,7 +30,8 @@ module.exports = async function ensureDnsRecords(context) {
   cacheRead(brandRoot, 'dns-records', { count: records.length, records });
 
   // === DIFF ===
-  const diff = diffRecords({ records, brandConfig, domain, isSubdomainProject });
+  const linkBrandingValid = await isLinkBrandingValid(context);
+  const diff = diffRecords({ records, brandConfig, domain, isSubdomainProject, linkBrandingValid });
   if (!diff) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     return;
@@ -111,3 +117,53 @@ module.exports = async function ensureDnsRecords(context) {
     output: { dns: output },
   };
 };
+
+/**
+ * Has SendGrid VALIDATED the branded link host for this brand's domain?
+ *
+ * SendGrid validates `emailurl.<domain>` by resolving it as a CNAME to
+ * sendgrid.net, and a Cloudflare-proxied record answers with the edge's own
+ * addresses instead — so proxying it BEFORE validation locks the branding out
+ * of ever validating, and every emailed link stays broken. This is the read
+ * that keeps the flip in order: grey-cloud until `GET /v3/whitelabel/links`
+ * reports `valid: true` for the host, then the next run flips it
+ * ([#646](https://github.com/Omega-JS-Stack/omega/issues/646)).
+ *
+ * No API key, no entry, or an unreachable SendGrid all answer NO: the
+ * unproxied record is the safe half of the pair (a plain-HTTP hop, which is
+ * where every brand already is), while a wrong YES is unrecoverable without a
+ * hand edit.
+ *
+ * @param {object} context - The service context (tests inject `sendgridApi`)
+ * @returns {Promise<boolean>}
+ */
+async function isLinkBrandingValid(context) {
+  const { brandConfig, domain, isSubdomainProject } = context;
+  const sendgrid = brandConfig?.edge?.providers?.cloudflare?.dns?.sendgrid;
+
+  // No SendGrid records to gate: none configured, or a subdomain project, whose
+  // record set stops at the GitHub Pages pair (the apex belongs to the parent).
+  if (isSubdomainProject || !sendgrid?.id || !sendgrid?.whitelabel) {
+    return false;
+  }
+
+  const api = context.sendgridApi || (process.env.SENDGRID_API_KEY ? new SendGridAPI() : null);
+  const host = `emailurl.${domain}`;
+
+  let valid = false;
+  if (api) {
+    try {
+      const links = await api.getBrandedLinks();
+      const branding = (links || []).find((link) => `${link.subdomain}.${link.domain}`.toLowerCase() === host.toLowerCase());
+      valid = branding?.valid === true;
+    } catch (error) {
+      console.log(`      ${chalk.yellow('⚠')} Could not read SendGrid link branding${chalk.dim(`: ${error.message}`)}`);
+    }
+  }
+
+  if (!valid) {
+    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(`CNAME ${host}`)} stays unproxied — SendGrid has not validated the branded link${api ? '' : ' (no SENDGRID_API_KEY)'}. Rerun ${chalk.cyan('omega manage')} once it has, and the record flips to proxied so emailed links land on HTTPS.`);
+  }
+
+  return valid;
+}

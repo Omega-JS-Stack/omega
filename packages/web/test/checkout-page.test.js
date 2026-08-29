@@ -30,7 +30,8 @@ const JS_HOOKS = [
   'data-form-state="initializing"',
 ];
 
-const PAYMENT_METHODS = ['card', 'paypal', 'apple-pay', 'google-pay', 'crypto'];
+// #636: there is no coinbase provider, so no crypto button either.
+const PAYMENT_METHODS = ['card', 'paypal', 'apple-pay', 'google-pay'];
 const FREQUENCIES = ['annually', 'monthly', 'weekly', 'daily'];
 
 test('contract: every JS selector the checkout page binds survives the redesign', async () => {
@@ -185,7 +186,7 @@ test('#370: the folded rows speak desktop\'s vocabulary, and the summary folds w
   assert.ok(summaryRow, 'the summary folds to a one-line row like the others');
   assert.match(summaryRow[0], /data-bs-target="#collapse-summary"/, 'and that row is the summary\'s own');
   assert.match(summaryRow[0], /<span class="omega-micro">Order summary<\/span>/, 'labeled the way the card is named, at every width');
-  assert.match(summaryRow[0], /@text checkout\.pricing\.total/, 'and the folded row carries the total due today');
+  assert.match(summaryRow[0], /@text order\.total/, 'and the folded row carries the total due today (the `order` root, so it waits for eligibility — #637)');
   assert.match(summaryRow[0], /omega-checkout__rowtoggle-chev/, 'chevron and all');
   assert.match(summaryRow[0], /aria-expanded="true"/, 'it starts open, so it is marked expanded');
   assert.ok(!summaryRow[0].includes('collapsed'), 'and it never wears Bootstrap\'s closed-toggle class');

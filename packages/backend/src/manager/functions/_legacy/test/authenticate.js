@@ -1,3 +1,5 @@
+const { projectUserForLog } = require('../../../helpers/middleware.js');
+
 let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
@@ -29,7 +31,7 @@ let Module = {
       });
 
       ctx.log('Request:', ctx.request.data);
-      ctx.log('Result user:', user);
+      ctx.log('Result user:', projectUserForLog(user));
       return res.status(200).json({status: 200, user: user });
     });
   }

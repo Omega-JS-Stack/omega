@@ -17,23 +17,61 @@
  * cannot reach this client. Treat a first live run as the proving run.
  */
 const API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
-const PORTAL_BASE = 'https://business-api.tiktok.com/portal/auth';
+// Where a developer app (and so its app id) is created — the page the setup
+// walks to when a brand has no `analytics.providers.tiktok.appId` yet (#635).
+const TIKTOK_APPS_URL = 'https://business-api.tiktok.com/portal/apps';
 
 /**
- * The portal page a human authorizes the app on. The app's own redirect URI
- * receives `auth_code` in its query string; when the brand names it in config
- * it is passed through, otherwise the app's default applies.
+ * The app's own page in the developer portal. Its Basic Information shows the
+ * "Advertiser authorization URL" TikTok built for the app (app id, state, and
+ * the redirect URI configured ON the app), so the setup opens THIS page and the
+ * human clicks that link there (Ian 2026-08-27): the redirect URI is the app's
+ * setting, never brand config, and manage never asks for it.
  *
- * @param {object} params
- * @param {string} params.appId - The TikTok developer app id (public config).
- * @param {string} [params.redirectUri] - The app's configured redirect URI.
- * @returns {string} The authorization URL.
+ * @param {string} appId - The TikTok developer app id (public config).
+ * @returns {string} The app page URL.
  */
-function TIKTOK_PORTAL_URL({ appId, redirectUri }) {
-  const query = `app_id=${encodeURIComponent(appId)}&state=omega`;
-  return redirectUri
-    ? `${PORTAL_BASE}?${query}&redirect_uri=${encodeURIComponent(redirectUri)}`
-    : `${PORTAL_BASE}?${query}`;
+// The portal's authorization endpoint — what the app page's "Advertiser
+// authorization URL" starts with. Only used to check a pasted URL is that link.
+const TIKTOK_AUTH_BASE = 'https://business-api.tiktok.com/portal/auth';
+
+/**
+ * Whether a pasted URL is the app's own advertiser authorization link.
+ *
+ * @param {string} url - The pasted URL.
+ * @param {string} appId - The app id it must carry.
+ * @returns {boolean}
+ */
+function isAuthUrlFor(url, appId) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}` === TIKTOK_AUTH_BASE && parsed.searchParams.get('app_id') === String(appId);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The auth_code out of a pasted redirect URL, or the bare code when the human
+ * pasted just that.
+ *
+ * @param {string} pasted - A redirect URL carrying `auth_code`, or the code.
+ * @returns {string} The code, or '' when neither.
+ */
+function parseAuthCode(pasted) {
+  if (!pasted) {
+    return '';
+  }
+  try {
+    return new URL(pasted).searchParams.get('auth_code') || '';
+  } catch {
+    // Not a URL: the bare code
+    return pasted;
+  }
+}
+
+function TIKTOK_APP_URL(appId) {
+  return `${TIKTOK_APPS_URL}/${encodeURIComponent(appId)}`;
 }
 
 /**
@@ -116,4 +154,4 @@ class TikTokBusinessAPI {
   }
 }
 
-module.exports = { TikTokBusinessAPI, exchangeAuthCode, TIKTOK_PORTAL_URL };
+module.exports = { TikTokBusinessAPI, exchangeAuthCode, TIKTOK_APP_URL, TIKTOK_APPS_URL, TIKTOK_AUTH_BASE, isAuthUrlFor, parseAuthCode };

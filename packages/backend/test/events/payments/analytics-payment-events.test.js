@@ -29,6 +29,7 @@ const analytics = require('../../../src/manager/events/firestore/payments-webhoo
 const paypalProvider = require('../../../src/manager/routes/payments/webhook/providers/paypal.js');
 const chargebeeProvider = require('../../../src/manager/routes/payments/webhook/providers/chargebee.js');
 const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
+const testProvider = require('../../../src/manager/routes/payments/webhook/providers/test.js');
 
 // A renewed paid subscription — no transition, money moved
 function renewedSubscription() {
@@ -259,8 +260,9 @@ module.exports = {
         assert.equal(resolved.isRecurring, false, 'nothing was ever charged');
 
         // The sweep derives this same id for a lapse, which collapses a race on the
-        // two platforms that deduplicate. It is NOT what keeps GA4 honest — GA4
-        // deduplicates nothing across sources — a cancelled subscription simply
+        // two platforms that key on an event id. It is NOT what keeps GA4 honest —
+        // GA4 deduplicates ecommerce on `transaction_id`, and a lapse is a CUSTOM
+        // event with no such dedupe ([#656]) — a cancelled subscription simply
         // leaves the sweep's `status == active` candidate query.
         assert.equal(
           analytics.resolveEventId(resolved, { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } }),
@@ -646,6 +648,230 @@ module.exports = {
           analytics.resolveEventId(converted, { id: '_other-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } }),
           'trial_convert._test-sub-analytics',
           'a redelivery on another order id is still the same one conversion',
+        );
+      },
+    },
+
+    {
+      // [#656]: `transaction_id` was the SUBSCRIPTION id, which never changes —
+      // and GA4 deduplicates `purchase` on it
+      // (https://support.google.com/analytics/answer/12313109), so it counted the
+      // first charge of a subscription and dropped every renewal after it.
+      name: 'two-renewals-of-one-subscription-are-two-transaction-ids',
+      async run({ assert }) {
+        const resolved = resolveRenewal('invoice.payment_succeeded');
+
+        const september = analytics.buildParams({
+          resolved, currency: 'USD', provider: 'stripe',
+          order: { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_september' } } } },
+          chargeId: 'in_september',
+        });
+        const october = analytics.buildParams({
+          resolved, currency: 'USD', provider: 'stripe',
+          order: { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_october' } } } },
+          chargeId: 'in_october',
+        });
+
+        assert.equal(september.transaction_id, 'in_september', 'the invoice IS the charge');
+        assert.equal(october.transaction_id, 'in_october');
+        assert.notEqual(september.transaction_id, october.transaction_id, 'two charges are two transactions to GA4');
+        assert.notEqual(september.transaction_id, '_test-sub-analytics', 'and neither is the subscription id');
+      },
+    },
+
+    {
+      // The one id both halves can compute. The confirmation page holds the order
+      // id and nothing else, and GA4 collapses the two halves on it ([#656]).
+      name: 'a-first-purchase-and-a-trial-start-name-the-order-the-browser-also-holds',
+      async run({ assert }) {
+        const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
+
+        const firstPurchase = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', renewedSubscription(), {});
+        assert.equal(
+          analytics.buildParams({ resolved: firstPurchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
+          '_test-order',
+        );
+
+        const trialStart = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', subscriptionInTrial(), {});
+        assert.equal(trialStart.event, 'trial_start');
+        assert.equal(
+          analytics.buildParams({ resolved: trialStart, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
+          '_test-order',
+          'the trial checkout the browser half is about',
+        );
+
+        // A one-time buy has exactly one charge, and the order names it.
+        const oneTime = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
+        assert.equal(
+          analytics.buildParams({ resolved: oneTime, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
+          '_test-order',
+        );
+      },
+    },
+
+    {
+      name: 'a-refund-names-the-charge-it-reverses-and-a-charge-event-never-falls-back-to-the-order',
+      async run({ assert }) {
+        const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_september' } } } };
+
+        const refund = analytics.resolvePaymentEvent('subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {}, { amount: 9.99 });
+
+        assert.equal(
+          analytics.buildParams({ resolved: refund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_september' }).transaction_id,
+          'in_september',
+          'GA4 nets a refund against the transaction id of the charge it reverses',
+        );
+
+        // No charge id in the payload: the WEBHOOK delivery, never the order —
+        // the order is the collapse [#656] exists to undo.
+        assert.equal(
+          analytics.buildParams({ resolved: resolveRenewal('invoice.payment_succeeded'), currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
+          'evt_september',
+        );
+      },
+    },
+
+    {
+      // A one-time order has exactly ONE charge, and no provider names it on the
+      // refund — every one-time refund branch hands the pipeline a null chargeId.
+      // So the refund names the ORDER, which is the id the purchase it reverses
+      // was reported under, and GA4 nets the two ([#656]).
+      name: 'a-one-time-refund-nets-against-the-purchase-it-reverses',
+      async run({ assert }) {
+        const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_refund' } } } };
+
+        const purchase = analytics.resolvePaymentEvent('one-time', 'purchase-completed', 'checkout.session.completed', completedPurchase(), {});
+        const refund = analytics.resolvePaymentEvent(
+          'one-time', 'purchase-refunded', 'charge.refunded', completedPurchase(), {},
+          { amount: 99, currency: 'USD', reason: null }
+        );
+
+        const purchaseId = analytics.buildParams({ resolved: purchase, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id;
+        const refundId = analytics.buildParams({ resolved: refund, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id;
+
+        assert.equal(purchaseId, '_test-order');
+        assert.equal(refundId, purchaseId, 'GA4 nets a one-time refund only if it names the same transaction');
+        assert.notEqual(refundId, 'evt_refund', 'the refund webhook delivery would net against nothing');
+
+        // A SUBSCRIPTION refund keeps the charge id: its renewals are separate
+        // charges, so the order id would net October's reversal against the
+        // first purchase.
+        const renewalRefund = analytics.resolvePaymentEvent(
+          'subscription', 'payment-refunded', 'charge.refunded', renewedSubscription(), {},
+          { amount: 9.99, currency: 'USD', reason: null }
+        );
+
+        assert.equal(
+          analytics.buildParams({ resolved: renewalRefund, currency: 'USD', provider: 'stripe', order, chargeId: 'in_october' }).transaction_id,
+          'in_october',
+        );
+      },
+    },
+
+    {
+      // The outcomes that are NOT charges keep naming their subject: each is a
+      // GA4 custom event with no dedupe of its own.
+      name: 'the-events-that-are-not-charges-still-name-the-subscription',
+      async run({ assert }) {
+        const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_cancel' } } } };
+        const cancelled = { ...renewedSubscription(), status: 'cancelled' };
+
+        const resolved = analytics.resolvePaymentEvent('subscription', 'subscription-cancelled', 'customer.subscription.deleted', cancelled, {}, null, renewedSubscription());
+
+        assert.equal(resolved.event, 'subscription_cancel');
+        assert.equal(
+          analytics.buildParams({ resolved, currency: 'USD', provider: 'stripe', order, chargeId: null }).transaction_id,
+          '_test-sub-analytics',
+        );
+      },
+    },
+
+    {
+      // Every provider has to hand the pipeline an id for the charge, or the
+      // renewal branch above has nothing to key on ([#656]).
+      name: 'every-provider-exposes-its-own-per-charge-id-on-the-parsed-event',
+      async run({ assert }) {
+        const stripe = stripeProvider.parseWebhook({
+          body: {
+            id: 'evt_stripe',
+            type: 'invoice.payment_succeeded',
+            data: { object: { id: 'in_september', billing_reason: 'subscription_cycle', parent: { subscription_details: { subscription: 'sub_1', metadata: { uid: 'u1' } } } } },
+          },
+        });
+
+        assert.equal(stripe.resourceId, 'sub_1', 'the resource is still the subscription to fetch');
+        assert.equal(stripe.chargeId, 'in_september', 'and the invoice is the charge');
+
+        const paypal = paypalProvider.parseWebhook({
+          body: {
+            id: 'WH-paypal',
+            event_type: 'PAYMENT.SALE.COMPLETED',
+            resource: { id: 'SALE-september', billing_agreement_id: 'I-1', custom_id: 'uid:u1' },
+          },
+        });
+
+        assert.equal(paypal.resourceId, 'I-1', 'the billing agreement is the subscription');
+        assert.equal(paypal.chargeId, 'SALE-september', 'and the sale is the charge');
+
+        const chargebee = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_chargebee',
+            event_type: 'subscription_renewed',
+            content: { subscription: { id: 'cb_sub_1' }, invoice: { id: 'inv_september' } },
+          },
+        });
+
+        assert.equal(chargebee.resourceId, 'cb_sub_1');
+        assert.equal(chargebee.chargeId, 'inv_september', 'Chargebee names the renewal invoice');
+
+        // ONLY the renewal's. A `subscription_created` payload carries the
+        // checkout's first invoice (test/fixtures/chargebee/webhook-subscription-created.json),
+        // and that charge is the ORDER's — the id the browser half sends too.
+        const chargebeeCreated = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_created',
+            event_type: 'subscription_created',
+            content: { subscription: { id: 'cb_sub_1' }, invoice: { id: 'inv_first' } },
+          },
+        });
+
+        assert.equal(chargebeeCreated.chargeId, null, 'a first charge is the order\'s, never the invoice\'s');
+
+        // The test provider IS Stripe's parser, so it carries the same id.
+        assert.equal(testProvider.parseWebhook({
+          body: {
+            id: 'evt_test',
+            type: 'invoice.payment_succeeded',
+            data: { object: { id: 'in_test', billing_reason: 'subscription_cycle', parent: { subscription_details: { subscription: 'sub_1' } } } },
+          },
+        }).chargeId, 'in_test');
+
+        // A subscription's lifecycle events name no charge at all — the first
+        // purchase is the order's, and that is the branch that must not guess.
+        assert.equal(stripeProvider.parseWebhook({
+          body: { id: 'evt_created', type: 'customer.subscription.created', data: { object: { id: 'sub_1', metadata: { uid: 'u1' } } } },
+        }).chargeId, null);
+      },
+    },
+
+    {
+      // [#654]: the confirmation page fired `purchase` for a TRIAL checkout while
+      // this fired `trial_start`. Different event names never deduplicate, so a $0
+      // trial produced a browser Purchase carrying the plan's price beside the
+      // server's StartTrial. Both halves now say trial_start, keyed on the order —
+      // the only id a browser can compute.
+      name: 'a-trial-start-keys-its-dedupe-id-on-the-order-like-its-browser-twin',
+      async run({ assert }) {
+        const order = { id: '_test-order', metadata: { updatedBy: { event: { id: 'evt_checkout' } } } };
+
+        const trialStart = analytics.resolvePaymentEvent('subscription', 'new-subscription', 'customer.subscription.created', subscriptionInTrial(), {});
+
+        assert.equal(trialStart.event, 'trial_start');
+        assert.equal(analytics.resolveEventId(trialStart, order), 'trial_start._test-order', 'the id the confirmation page will send');
+        assert.notEqual(
+          analytics.resolveEventId(trialStart, order),
+          'trial_start.evt_checkout',
+          'the webhook delivery is not derivable in a browser, so it can never key a two-sided event',
         );
       },
     },

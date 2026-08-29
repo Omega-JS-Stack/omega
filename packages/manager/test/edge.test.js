@@ -14,6 +14,7 @@ const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 
 // Tests must never see a real token from the shell environment
 delete process.env.CLOUDFLARE_TOKEN;
+delete process.env.SENDGRID_API_KEY;
 
 const DOMAIN = 'fixture-brand.test';
 const ZONE = { id: 'zone-1', name: DOMAIN, status: 'active' };
@@ -386,6 +387,14 @@ test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC
   assert.equal(byName(`emailauth.${DOMAIN}`).content, 'u123.wl001.sendgrid.net');
   assert.equal(byName(`s1._domainkey.${DOMAIN}`).content, 's1.domainkey.u123.wl001.sendgrid.net');
   assert.equal(byName(`123.${DOMAIN}`).content, 'sendgrid.net');
+
+  // #646: the branded LINK host is the one SendGrid record that rides the proxy
+  // — and only once SendGrid says the branding is VALID (the flip's own test
+  // below). Unvalidated, it stays grey-clouded like every other SendGrid record.
+  assert.equal(byName(`emailurl.${DOMAIN}`).proxied, false, 'no validity in the config block, no proxy');
+  assert.equal(byName(`emailauth.${DOMAIN}`).proxied, false);
+  assert.equal(byName(`123.${DOMAIN}`).proxied, false);
+  assert.equal(byName(`s1._domainkey.${DOMAIN}`).proxied, false);
   const spf = full.find((r) => r.type === 'TXT' && r.content.includes('v=spf1'));
   assert.ok(spf.content.includes('include:spf.privateemail.com'));
   assert.ok(spf.content.endsWith('-all"'));
@@ -393,6 +402,54 @@ test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC
   // TXT customs are ADDITIVE: the apex verification token coexists with the
   // SPF default (a custom apex TXT must never suppress SPF)
   assert.equal(full.filter((r) => r.type === 'TXT' && r.name === DOMAIN).length, 2);
+});
+
+// #646: SendGrid rewrites every transactional link through `emailurl.<domain>`
+// and serves NO certificate for it, so the record has to ride Cloudflare's
+// proxy for the click to land on HTTPS. But SendGrid VALIDATES the branding by
+// resolving that name as a CNAME to sendgrid.net, and a proxied record answers
+// with the edge's addresses instead — so flipping the proxy on first locks the
+// branding out of ever validating. The live answer decides, per run.
+test('dns helpers: the branded link host is proxied only once SendGrid validates it (#646)', () => {
+  const dnsConfig = (linkBrandingValid) => ({
+    sendgrid: { id: '123', whitelabel: 'wl001', ...(linkBrandingValid === undefined ? {} : { linkBrandingValid }) },
+  });
+  const emailurl = (config) => buildRequiredRecords(DOMAIN, config, false, null)
+    .find((r) => r.name === `emailurl.${DOMAIN}`);
+
+  assert.equal(emailurl(dnsConfig(true)).proxied, true, 'validated: the click lands on HTTPS at the edge');
+  assert.equal(emailurl(dnsConfig(false)).proxied, false, 'not validated: grey-cloud, or the CNAME lookup never resolves');
+  assert.equal(emailurl(dnsConfig()).proxied, false, 'and an unanswered read is a NO — a wrong proxy needs a hand edit to undo');
+});
+
+test('dns-records: the emailurl record follows SendGrid\'s link-branding validity (#646)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+
+  const run = async (links) => {
+    const config = brandConfig();
+    config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
+
+    const api = fakeApi({
+      responses: {
+        'GET /zones/zone-1/dns_records': [],
+        'POST /zones/zone-1/dns_records': { id: 'new' },
+      },
+    });
+    await ensureDns(handlerContext(config, api, {
+      sendgridApi: { getBrandedLinks: async () => links },
+    }));
+
+    return api.calls.find((c) => c.method === 'POST' && c.body.name === `emailurl.${DOMAIN}`);
+  };
+
+  const validated = await run([{ domain: DOMAIN, subdomain: 'emailurl', valid: true }]);
+  assert.equal(validated.body.proxied, true, 'SendGrid resolved the CNAME — the proxy is safe to turn on');
+
+  const pending = await run([{ domain: DOMAIN, subdomain: 'emailurl', valid: false }]);
+  assert.equal(pending.body.proxied, false, 'still validating — a proxied record would answer with Cloudflare IPs');
+
+  const absent = await run([{ domain: 'other-brand.test', subdomain: 'emailurl', valid: true }]);
+  assert.equal(absent.body.proxied, false, 'another brand\'s branding says nothing about this one');
 });
 
 test('dns-records: drift creates missing, updates SPF enforcement, deletes obsolete MX + wrong A', async () => {

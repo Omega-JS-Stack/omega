@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { ENV_SCHEMA, envFileGroups } = require('@omega.js/config/env-schema');
+const { ENV_SCHEMA, envFileGroups, generatedEnvKeys } = require('@omega.js/config/env-schema');
 const { REQUIRES, SERVICE_ORDER, serviceInputSpec } = require('../src/config.js');
 const { requestServiceInput } = require('../src/lib/service-input.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
@@ -246,6 +246,135 @@ test('service-input: entry-level `when` drops inputs this brand does not need', 
   assert.deepEqual(gate.missingEnv, [VAR]);
 });
 
+// ─── the mint lane (generated keys) ──────────────────────────────────────────
+
+const GENERATED = 'OMEGA_WEBHOOK_KEY';
+
+test('service-input: a GENERATED key is minted in place — no gate, no paste', async () => {
+  cleanup(GENERATED);
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+  const tty = openTtyPrompt();
+  try {
+    const captured = captureLog(() => requestServiceInput(
+      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+      { ...fakeSpec([{ name: GENERATED, label: 'Omega webhook key' }]), service: 'payment' },
+    ));
+    // Nothing to answer: OMEGA mints this one for itself
+    const gate = await captured.result;
+
+    assert.equal(gate, null);
+    assert.match(process.env[GENERATED], /^[A-Za-z0-9_-]{43}$/);
+    const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
+    assert.match(env, new RegExp(`^${GENERATED}="[A-Za-z0-9_-]{43}"$`, 'm'));
+    // Names only — the value is never printed
+    const text = captured.lines.join('\n');
+    assert.match(text, new RegExp(`${GENERATED} minted into the brand .env`));
+    assert.ok(!text.includes(process.env[GENERATED]), 'the minted value is never printed');
+    // Nothing was disabled and no gate ran
+    assert.doesNotMatch(readConfigSource(brandRoot), /enabled/);
+  } finally {
+    tty.close();
+    cleanup(GENERATED);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
+test('service-input: a generated key is minted even on a headless run — nobody has to be asked', async () => {
+  cleanup(GENERATED);
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+  try {
+    const gate = await requestServiceInput(
+      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+      { ...fakeSpec([{ name: GENERATED }]), service: 'campaigns' },
+    );
+
+    assert.equal(gate, null);
+    assert.ok(process.env[GENERATED]);
+  } finally {
+    cleanup(GENERATED);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
+test('service-input: a generated key beside a pasted one mints the first and still asks for the second', async () => {
+  cleanup(GENERATED, VAR);
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+  const tty = openTtyPrompt();
+  try {
+    const run = requestServiceInput(
+      { brandRoot, brandConfig: {}, brandId: 'b', options: {} },
+      fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
+    );
+    await tty.answer('Set up now?', '\r');
+    await tty.answer(`Paste ${VAR}`, 'pasted-value\r');
+    const gate = await run;
+
+    assert.equal(gate, null);
+    assert.ok(process.env[GENERATED]);
+    assert.equal(process.env[VAR], 'pasted-value');
+  } finally {
+    tty.close();
+    cleanup(GENERATED, VAR);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
+test('service-input: a dry run PLANS the mint, writes nothing, and never calls it a missing secret', async () => {
+  cleanup(GENERATED);
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n}\n');
+
+  const captured = captureLog(() => requestServiceInput(
+    { brandRoot, brandConfig: {}, brandId: 'b', options: { dryRun: true } },
+    { ...fakeSpec([{ name: GENERATED }]), service: 'newsletter' },
+  ));
+  const gate = await captured.result;
+
+  try {
+    assert.equal(gate.skip, true);
+    // The reason NAMES the key and says who produces it...
+    assert.match(gate.reason, new RegExp(`${GENERATED} will be minted on a real run`));
+    // ...but it is not a missing secret: the 🔑 section must never tell anyone
+    // to paste a key only OMEGA can produce
+    assert.deepEqual(gate.missingEnv, []);
+    assert.equal(process.env[GENERATED], undefined);
+    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
+    assert.match(captured.lines.join('\n'), new RegExp(`would mint ${GENERATED}`));
+  } finally {
+    cleanup(GENERATED);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
+test('service-input: DISABLE beside a generated key leaves NO minted secret behind', async () => {
+  cleanup(GENERATED, VAR);
+  const brandRoot = makeBrandRoot('{\n  brand: { id: "b" },\n  fake: {},\n}\n');
+  const brandConfig = { brand: { id: 'b' }, fake: {} };
+
+  const tty = openTtyPrompt();
+  try {
+    const run = requestServiceInput(
+      { brandRoot, brandConfig, brandId: 'b', options: {} },
+      fakeSpec([{ name: GENERATED }, { name: VAR, label: 'Fake token' }]),
+    );
+    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`);          // Disable (stop prompting)
+    const gate = await run;
+
+    assert.equal(gate.disabled, true);
+    // The gate runs BEFORE the mint: a brand that just opted out never gains
+    // a secret it did not ask for
+    assert.equal(process.env[GENERATED], undefined);
+    assert.equal(fs.existsSync(path.join(brandRoot, '.env')), false);
+    // ...and the key nobody can paste is not reported as one to paste
+    assert.deepEqual(gate.missingEnv, [VAR]);
+  } finally {
+    tty.close();
+    cleanup(GENERATED, VAR);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
 // ─── the sweep ───────────────────────────────────────────────────────────────
 
 const SRC_DIR = path.join(__dirname, '..', 'src');
@@ -298,6 +427,52 @@ test('sweep: every credential a service actually reads is declared in the REQUIR
     .map((entry) => `${entry.owner}: ${entry.name}`);
 
   assert.deepEqual(undeclared, [], 'declare these in src/config.js REQUIRES so the shared setup contract can ask for them');
+});
+
+test('sweep: every GENERATED key a service reads is declared in THAT service\'s REQUIRES entry', () => {
+  // The mint lane's half of the registry contract (#635). A generated key has
+  // nobody to paste it, so a service that reads one must declare it — that
+  // declaration is the only thing that makes the setup contract mint it before
+  // the service's operations run. Derived, not listed: the service names come
+  // from the source tree, the key names from the env schema.
+  const servicesDir = path.join(SRC_DIR, 'services');
+  const generated = Object.keys(generatedEnvKeys());
+
+  const undeclared = [];
+  for (const service of fs.readdirSync(servicesDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+    const sources = sourceFiles(path.join(servicesDir, service.name));
+
+    for (const name of generated) {
+      // A literal read is what binds the service to the key; env-keys' own
+      // `process.env[name]` walk over the whole set is not one service's need
+      const reads = sources.some(([, text]) => text.includes(`process.env.${name}`)
+        || text.includes(`process.env[${JSON.stringify(name)}]`));
+      if (!reads) {
+        continue;
+      }
+
+      const declared = (REQUIRES[service.name]?.env || []).some((input) => input.name === name);
+      if (!declared) {
+        undeclared.push(`${service.name}: ${name}`);
+      }
+    }
+  }
+
+  assert.deepEqual(undeclared, [], 'declare these in src/config.js REQUIRES so the setup contract mints them before the service runs');
+});
+
+test('sweep: the mint has exactly ONE home', () => {
+  // Both lanes (the workspace env-keys op, the setup contract) go through
+  // lib/env-secret.js's mintGeneratedKey — a second hand-rolled
+  // generate + write + export would drift in wording and in what it exports.
+  // Prose ABOUT the mint is not a second mint, so each line is read up to its
+  // comment marker — the registry annotates its env-keys op with that wording
+  const homes = sourceFiles(SRC_DIR)
+    .filter(([, text]) => text.split('\n')
+      .some((line) => line.split('//')[0].includes('minted into the brand .env')))
+    .map(([file]) => file);
+
+  assert.deepEqual(homes, ['lib/env-secret.js'], 'the mint is mintGeneratedKey — never a second copy');
 });
 
 test('sweep: every REQUIRES entry can run the three-outcome gate', () => {

@@ -237,23 +237,22 @@ module.exports = {
       },
     },
 
-    // ─── The forwarder's secret ───
+    // ─── The forwarder's readiness ───
 
     {
-      name: 'the-signing-secret-is-read-out-of-the-cli-line-that-carries-it',
+      name: 'the-forwarder-is-ready-only-on-the-cli-line-that-says-so',
 
       async run() {
-        // `stripe listen` prints the endpoint secret once, in a sentence. That
-        // secret is what the route verifies every forwarded delivery against, so
-        // missing it would silently drop the run onto the key-only path — green,
-        // and proving nothing about signatures.
+        // The tunnel exists only once `stripe listen` says it does — resolving
+        // earlier would let a trigger fire into nothing. That same line also
+        // carries the CLI's signing secret, which is why it is never logged.
         assert.equal(
-          lane.readWebhookSecret('> Ready! You are using Stripe API Version [2024-06-20]. Your webhook signing secret is whsec_abc123XYZ (^C to quit)'),
-          'whsec_abc123XYZ',
-          'the secret is read out of the ready line',
+          lane.isReadyLine('> Ready! You are using Stripe API Version [2024-06-20]. Your webhook signing secret is whsec_abc123XYZ (^C to quit)'),
+          true,
+          'the ready line opens the gate',
         );
-        assert.equal(lane.readWebhookSecret('2026-08-25 22:00:00  --> customer.subscription.created [evt_1]'), null, 'a delivery line carries none');
-        assert.equal(lane.readWebhookSecret(''), null, 'and neither does an empty one');
+        assert.equal(lane.isReadyLine('2026-08-25 22:00:00  --> customer.subscription.created [evt_1]'), false, 'a delivery line does not');
+        assert.equal(lane.isReadyLine(''), false, 'and neither does an empty one');
       },
     },
 

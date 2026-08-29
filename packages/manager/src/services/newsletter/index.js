@@ -10,7 +10,8 @@
  * prints the exact values to copy when none matches.
  *
  * Auth: BEEHIIV_API_KEY in the brand .env; the webhook operation
- * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
+ * additionally needs OMEGA_WEBHOOK_KEY, which the setup MINTS through the
+ * shared contract (it is OMEGA's own key, #635). No API key → clean skip.
  */
 const { chosenProvider } = require('@omega.js/config');
 
@@ -44,9 +45,15 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.beehiivApi) {
-      const gate = await requestServiceInput(context, serviceInputSpec('newsletter'));
+      const gate = await requestServiceInput(context, serviceInputSpec('newsletter', { names: ['BEEHIIV_API_KEY'] }));
       if (gate) return gate;
     }
+
+    // The webhook key is OMEGA's OWN (#635): the shared helper mints it in
+    // place when this service runs before the workspace one did, so the
+    // webhook operation can read it unconditionally.
+    const webhookKeyGate = await requestServiceInput(context, serviceInputSpec('newsletter', { names: ['OMEGA_WEBHOOK_KEY'] }));
+    if (webhookKeyGate) return webhookKeyGate;
 
     // Tests inject a fake client via context.beehiivApi
     return {

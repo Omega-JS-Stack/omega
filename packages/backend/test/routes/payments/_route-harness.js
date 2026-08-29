@@ -1,8 +1,8 @@
 /**
  * Shared harness for the payments-route suites that call a handler DIRECTLY.
  *
- * The technique is webhook-signature.test.js's, lifted to the routes that also
- * need a `user`: a real ctx from Manager.RouteContext(), a real user built the
+ * The technique, for the routes that need a `user`: a real ctx from
+ * Manager.RouteContext(), a real user built the
  * way `ctx.authenticate()` builds one (Manager.User(doc).properties, then the
  * `authenticated` flag it sets outside the schema), and only `res` as a
  * stand-in — the external sink respond() writes to, per the no-mock doctrine.

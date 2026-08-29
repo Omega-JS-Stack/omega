@@ -390,7 +390,7 @@ module.exports = {
 
         const event = body.data[0];
 
-        assert.equal(event.event, 'CompletePayment', 'the catalog names the TikTok event');
+        assert.equal(event.event, 'Purchase', 'the catalog names the TikTok event — Purchase, since CompletePayment was retired ([#652])');
         assert.equal(event.event_id, 'purchase._test-webhook-event');
         assert.equal(event.user.email, sha256('buyer@example.com'), 'TikTok takes the email hashed too');
         assert.equal(event.user.phone, sha256('+15550102030'), 'TikTok\'s spec is the E.164 number, plus included');
@@ -400,7 +400,7 @@ module.exports = {
         assert.equal(event.user.ttclid, 'TT-CLICK', 'the click id is a match key like any other in 2.0');
         assert.equal(event.user.ip, IP);
         assert.equal(event.user.user_agent, USER_AGENT);
-        assert.equal(event.properties.content_id, 'premium', 'TikTok commerce is single-item');
+        assert.equal(event.properties.contents[0].content_id, 'premium', 'TikTok commerce rides its documented `contents` array ([#652])');
         assert.equal(event.properties.value, 9.99);
 
         // The v1.2 nesting is GONE, not duplicated alongside — a body carrying
@@ -904,9 +904,9 @@ module.exports = {
           assert.equal(tiktok.name, native, `${event} reaches TikTok as ${native}`);
           assert.equal(tiktok.kind, 'custom');
           assert.equal(tiktok.payload.value, 0, 'TikTok cannot subtract revenue either');
-          assert.equal(tiktok.payload.content_id, 'premium');
-          assert.equal(tiktok.payload.price, undefined, 'the per-item price would put the amount back on the wire');
-          assert.equal(tiktok.payload.quantity, undefined, 'so it comes off with the value, like Meta\'s signal');
+          assert.equal(tiktok.payload.contents[0].content_id, 'premium');
+          assert.equal(tiktok.payload.contents[0].price, undefined, 'the per-item price would put the amount back on the wire');
+          assert.equal(tiktok.payload.contents[0].quantity, undefined, 'so it comes off with the value, like Meta\'s signal');
 
           // The bodies that would go on the wire carry the same zero.
           const body = conversions.buildMetaBody({ descriptor: meta, identity: {}, eventId: `${event}._test-webhook-event` });
@@ -928,7 +928,8 @@ module.exports = {
       async run({ assert, ctx, Manager }) {
         // The one [#407] addition where money actually moved, so unlike the four
         // above it carries a full mapping: GA4's standard purchase (revenue
-        // belongs in the revenue report) and each ad platform's own Subscribe.
+        // belongs in the revenue report) and each ad platform's Purchase, which
+        // is what every real charge is to them (Ian's money-event table, [#652]).
         const results = deliver({
           ctx,
           Manager,
@@ -943,8 +944,8 @@ module.exports = {
         assert.equal(google.payload.is_trial, true, 'the flag pair is what marks it inside GA4 purchase');
         assert.equal(google.payload.is_recurring, false);
 
-        assert.equal(descriptorFor(results, 'meta').name, 'Subscribe');
-        assert.equal(descriptorFor(results, 'tiktok').name, 'Subscribe');
+        assert.equal(descriptorFor(results, 'meta').name, 'Purchase');
+        assert.equal(descriptorFor(results, 'tiktok').name, 'Purchase');
       },
     },
 
@@ -963,7 +964,7 @@ module.exports = {
 
         assert.equal(calls.length, 0, `an emulator run must reach no platform: ${calls.map((call) => call.url).join(', ')}`);
 
-        for (const [provider, native] of [['meta', 'Purchase'], ['tiktok', 'CompletePayment']]) {
+        for (const [provider, native] of [['meta', 'Purchase'], ['tiktok', 'Purchase']]) {
           assert.equal(outcomeFor(results, provider), 'blocked (dev)', `${provider} says it was blocked, not that it sent`);
           assert.equal(descriptorFor(results, provider).name, native, `${provider} still resolves — the dev trace names what WOULD have fired`);
 

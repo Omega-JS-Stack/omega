@@ -275,7 +275,17 @@ module.exports = async (options = {}) => {
   // it just gave.
   const linkedMonorepo = resolveLinkedMonorepo(brandRoot);
   if (linkedMonorepo) {
-    startMonorepoWatch({ monorepoRoot: linkedMonorepo, logger: { log: (line) => console.log(chalk.dim(`   ${line}`)) } });
+    const watch = startMonorepoWatch({ monorepoRoot: linkedMonorepo, logger: { log: (line) => console.log(chalk.dim(`   ${line}`)) } });
+
+    // A fresh watch's initial prepare rewrites every package's dist, and a
+    // target booting into that rewrite loads a half-written CLI (#670). The
+    // legs wait for the pass to land; an already-running watch has none.
+    if (!watch.alreadyRunning) {
+      const outcome = await watch.ready;
+      if (outcome === 'ready') {
+        console.log(chalk.dim('   monorepo watch: initial prepare done'));
+      }
+    }
   } else {
     console.log(chalk.dim('   ⚑ frameworks come from the registry — no monorepo watch to run (a linked brand starts one here)'));
   }

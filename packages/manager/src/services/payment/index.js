@@ -14,13 +14,16 @@
  * offer the setup flow (lib/provider-setup.js — dashboard browser open,
  * public keys land in omega.json5, secrets in the brand .env); otherwise
  * the provider is skipped per-operation with a dim note. The service only
- * skips when NO provider is configured. The webhook operations
- * additionally need OMEGA_WEBHOOK_KEY.
+ * skips when NO provider is configured. The webhook operations additionally
+ * need OMEGA_WEBHOOK_KEY, which the setup MINTS through the shared contract
+ * (it is OMEGA's own key, #635) rather than asking anyone for.
  *
  * --provider=stripe|paypal|chargebee narrows the run to one provider's
  * operations (omega-manager's flag, unchanged).
  */
+const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { requestServiceInput } = require('../../lib/service-input.js');
 const { StripeAPI } = require('./lib/stripe-api.js');
 const { PayPalAPI } = require('./lib/paypal-api.js');
 const { ChargebeeAPI } = require('./lib/chargebee-api.js');
@@ -100,6 +103,12 @@ module.exports.run = createServiceRunner({
           : 'no payment provider configured (STRIPE_SECRET_KEY, paypal.clientId + PAYPAL_CLIENT_SECRET, or chargebee.site + CHARGEBEE_API_KEY)',
       };
     }
+
+    // The webhook key is OMEGA's OWN (#635): the shared helper mints it in
+    // place when this service runs before the workspace one did, so every
+    // webhook operation below can read it unconditionally.
+    const gate = await requestServiceInput(context, serviceInputSpec('payment', { names: ['OMEGA_WEBHOOK_KEY'] }));
+    if (gate) return gate;
 
     // Stripe account ID → state (dashboard deep-links for the radar/disputes
     // guidance; omega-manager's bookmark service reads it too). Non-fatal.

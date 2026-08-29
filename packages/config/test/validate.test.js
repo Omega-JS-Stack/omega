@@ -688,3 +688,69 @@ test('targets.backend.projectType takes firebase or custom, and nothing else', (
     `an unknown project type must be loud and name the options: ${wrong.errors.join(' | ')}`,
   );
 });
+
+
+// ─── undeclared paths (#636) ───
+
+// The validator only ever checked the paths the schema DECLARES, so a key the
+// schema had never heard of — a typo, or a live path nobody declared (the whole
+// `certificates` section was one) — passed in silence. It is a WARNING, never
+// an error: a brand's config outliving one framework version must not fail its
+// build, and the point is to surface the gap.
+test('an undeclared leaf warns once, naming the path', () => {
+  const { warnings, errors } = validateConfig({ ...VALID, brand: { ...VALID.brand, nickname: 'sandy' } });
+
+  assert.deepStrictEqual(errors, [], 'an unknown key never fails the config');
+  assert.equal(warnings.length, 1, `exactly one warning: ${warnings.join(' | ')}`);
+  assert.ok(warnings[0].includes('brand.nickname'), `the warning names the path: ${warnings[0]}`);
+  assert.ok(warnings[0].includes('schema.js'), 'the warning says where a real key gets declared');
+});
+
+test('a fully declared config warns about nothing', () => {
+  const declared = {
+    ...VALID,
+    theme: { id: 'classy', appearance: 'system' },
+    captcha: { providers: { recaptcha: { siteKey: '6Lc-key', domainsConfirmed: ['brand.test'] } } },
+    certificates: { enabled: true, providers: { apple: { bundleIdPrefix: 'com.acme' } } },
+    domain: { providers: { namecheap: {} } },
+    advertising: { fallback: 'inhouse', tags: ['news'] },
+  };
+
+  assert.deepStrictEqual(validateConfig(declared).warnings, []);
+});
+
+test('a declared object/array rule covers everything beneath it', () => {
+  // brand.address is declared as an object — its fields are the brand's own
+  // postal shape, not schema paths, and an empty section a schema declares
+  // BELOW is not an undeclared leaf either.
+  const { warnings } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, address: { line1: '1 Main St', city: 'Springfield' } },
+    certificates: {},
+  });
+
+  assert.deepStrictEqual(warnings, []);
+});
+
+test('a target entry\'s own keys are never undeclared — that namespace is the targets check\'s', () => {
+  const { warnings } = validateConfig({
+    ...VALID,
+    targets: { web: { whateverThePageWants: true }, api: { type: 'custom', port: 8080 } },
+  });
+
+  assert.deepStrictEqual(warnings, [], 'targets.<name>.* is open by design (custom targets, per-framework keys)');
+});
+
+// The point of the check: run it against every brand in this repo. A path a
+// brand actually uses and the schema does not declare is a hole to fill, not a
+// warning to live with — #636 filled the ones this found.
+test('the in-repo brands carry no undeclared paths', () => {
+  const path = require('node:path');
+  const { loadConfig } = require('../src/load.js');
+
+  for (const brand of ['sandbox-brand', 'omega-playground', 'newsflash-brand']) {
+    const { warnings } = loadConfig(path.join(__dirname, '..', '..', '..', 'brands', brand));
+
+    assert.deepStrictEqual(warnings, [], `${brand}: ${warnings.join(' | ')}`);
+  }
+});

@@ -19,6 +19,13 @@
  * prompt: the missing keys print as a loud skip line and ride back as the
  * machine-readable `missingEnv` list the run summary's 🔑 section aggregates.
  *
+ * One class of input is never PASTED: a key OMEGA mints for ITSELF (the env
+ * schema's `generated:` set) has nobody to ask, so it is minted in place and
+ * never appears in `missingEnv` (#635). When it is the only thing missing no
+ * gate opens at all, headless runs included; when a pasted key is missing
+ * beside it the gate runs FIRST and the mint happens only past it, so
+ * "Disable permanently" never leaves a minted secret behind.
+ *
  * WHAT each service needs is the REQUIRES registry's to say (src/config.js —
  * one home, checked up front by lib/preflight.js and asked for here through
  * `serviceInputSpec(name)`); the env schema (@omega.js/config, #581) is what
@@ -29,8 +36,9 @@
  */
 const chalk = require('chalk').default;
 
-const { canPrompt } = require('./run-gates.js');
-const { writeEnvValue } = require('./env-secret.js');
+const { generatedEnvKeys } = require('@omega.js/config');
+const { canPrompt, dryRunPlan } = require('./run-gates.js');
+const { writeEnvValue, mintGeneratedKey } = require('./env-secret.js');
 const { confirmSetup, readTriState } = require('./config-flow.js');
 
 /**
@@ -60,8 +68,6 @@ async function requestServiceInput(context, spec, deps = {}) {
     return null;
   }
 
-  const names = missing.map((input) => input.name);
-
   // Already opted out (#33): the value — or any ancestor section — is `false`.
   // Every service gates on its own key too; this is the backstop that keeps a
   // disabled service from ever reaching a prompt.
@@ -69,16 +75,57 @@ async function requestServiceInput(context, spec, deps = {}) {
     return {
       skip: true,
       reason: `${spec.disablePath} is disabled — delete the line in omega.json5 to be asked again`,
-      missingEnv: names,
+      missingEnv: missing.map((input) => input.name),
       disabled: true,
     };
   }
+
+  // A key OMEGA mints for itself (the env schema's `generated:` set, #581) is
+  // MINTED, not pasted: there is nobody to ask for it, so it never joins the
+  // 🔑 "add these to your .env" list — the two kinds of missing input split
+  // here and are handled apart (#635).
+  const generated = generatedEnvKeys();
+  const mintable = missing.filter((input) => generated[input.name]);
+  const pending = missing.filter((input) => !generated[input.name]);
+
+  const mintAll = () => {
+    for (const input of mintable) {
+      mintGeneratedKey(context.brandRoot, input.name, { indent: '    ' });
+    }
+  };
+
+  // A dry run says what a real run would mint and writes nothing, exactly as
+  // the workspace env-keys op does.
+  if (options.dryRun) {
+    for (const input of mintable) {
+      dryRunPlan(`mint ${input.name} into the brand .env`);
+    }
+  }
+
+  // Nothing a human could supply is missing: mint and proceed, no gate, on a
+  // headless run too.
+  if (pending.length === 0) {
+    if (options.dryRun) {
+      // Named, but NOT as missingEnv — telling someone to paste a key only
+      // OMEGA can produce would be a lie the 🔑 section then repeats.
+      return {
+        skip: true,
+        reason: `${mintable.map((input) => input.name).join(', ')} will be minted on a real run`,
+        missingEnv: [],
+      };
+    }
+
+    mintAll();
+    return null;
+  }
+
+  const names = pending.map((input) => input.name);
 
   if (!canPrompt(options)) {
     // Loud: a run that cannot ask still says exactly which keys it wants and
     // where they go, instead of a bare "skipped".
     console.log(`    ${chalk.yellow('🔑')} ${spec.label} needs ${chalk.bold(names.join(', '))} ${chalk.dim('— not in the brand .env')}`);
-    for (const input of missing) {
+    for (const input of pending) {
       if (input.url) {
         console.log(`      ${chalk.dim(`→ ${input.name}: mint it at ${input.url}`)}`);
       }
@@ -120,9 +167,14 @@ async function requestServiceInput(context, spec, deps = {}) {
     };
   }
 
+  // Past the gate: only NOW are OMEGA's own keys minted, so a "Disable
+  // permanently" never leaves a freshly minted secret in a brand that just
+  // said it wants none of this.
+  mintAll();
+
   const prompt = { ...require('@omega.js/devkit/prompt'), ...deps.prompt };
 
-  for (const input of missing) {
+  for (const input of pending) {
     const label = input.label || input.name;
     if (input.hint) {
       console.log(`      ${chalk.dim(input.hint)}`);

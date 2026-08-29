@@ -20,4 +20,5 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 - **Singleton, always.** Never `new Manager()`, never pass the instance through function params or module-level variables.
 - **Keep Firebase imports lazy** — the dynamic imports are what keeps consumer bundles small; do not convert them to static imports.
 - **`resolveSubscription()` stays unified with `@omega.js/backend`'s `User.resolveSubscription()`** — subscription-state logic is identical frontend and backend, so a change here is a cross-stack change.
+- **The runtime is what makes the page paint contract possible** — bindings fill at auth settle, `bindings.update()` defers by ROOT key, and `FormManager`'s gates hold a submit control until its answers land. Read `docs/web/page-contract.md` before changing any of the three.
 - **Prove changes from a consumer.** `npm run prepare` plus the package tests are necessary, not sufficient; verify end to end inside a linked web, desktop, or extension app (`docs/shared/local-dev.md`).

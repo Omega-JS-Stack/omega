@@ -4,20 +4,14 @@ const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 const env = require('../../../libraries/env.js');
 
-// Providers already warned about running key-only, so the notice lands once per
-// instance instead of once per event
-const keyOnlyWarned = new Set();
-
 /**
  * POST /payments/webhook?provider=stripe&key=XXX
  * Receives payment provider webhooks, validates them, and saves to Firestore
  * The Firestore onWrite trigger handles async processing
  *
  * This handler is provider-agnostic. Each provider module defines:
- *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid }
+ *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, chargeId, refundId, raw, uid }
  *   - isSupported(eventType) — returns true for events we should process
- *   - verifySignature(req) — optional; verifies the provider's native signature
- *     over the raw bytes, returning { status: 'verified' | 'invalid' | 'unconfigured' }
  */
 module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
@@ -61,24 +55,6 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
-  // Verify the provider's native signature — the key param above is a defense
-  // layer, not the boundary. A provider that ships a signing scheme verifies
-  // strictly once its secret is configured; without it the route stays on the
-  // key-only path and says so. Nothing is parsed or stored before this passes.
-  if (providerModule.verifySignature) {
-    const verification = providerModule.verifySignature(ctx.ref.req);
-
-    if (verification.status === 'invalid') {
-      ctx.error(`Rejected ${provider} webhook: signature verification failed (${verification.reason})`);
-      return ctx.respond('Invalid signature', { code: 401 });
-    }
-
-    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(provider)) {
-      keyOnlyWarned.add(provider);
-      ctx.warn(`${provider} webhooks are running key-only: ${verification.reason}. Set it to verify every event's signature.`);
-    }
-  }
-
   // Parse the webhook using the provider
   let parsed;
   try {
@@ -87,7 +63,7 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     return ctx.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
   }
 
-  const { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid } = parsed;
+  const { eventId, eventType, category, resourceType, resourceId, chargeId, refundId, raw, uid } = parsed;
 
   ctx.log(`Parsed webhook: eventId=${eventId}, eventType=${eventType}, category=${category || 'null'}, resourceType=${resourceType || 'null'}, uid=${uid || 'null'}, api_version=${raw?.api_version || 'unknown'}`);
 
@@ -138,6 +114,12 @@ module.exports = async ({ ctx, Manager, libraries }) => {
         category: category,
         resourceType: resourceType,
         resourceId: resourceId,
+        // THIS charge's own id (Stripe/Chargebee invoice, PayPal sale), where a
+        // subscription event names one. The resourceId is the subscription, which
+        // never changes, so only this can key a single charge — and GA4
+        // deduplicates `purchase` on the id it is sent
+        // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656))
+        chargeId: chargeId || null,
         // The refund's own id, where the parser separates it from the resource the
         // refund reversed — the key the trigger looks its amounts up by
         // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510))

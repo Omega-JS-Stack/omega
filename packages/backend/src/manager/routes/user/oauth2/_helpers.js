@@ -167,6 +167,32 @@ function decryptState(encryptedState) {
   return JSON.parse(decrypted);
 }
 
+/**
+ * The ONE line a provider's identity check may log
+ * ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
+ *
+ * Every provider used to hand `ctx.log` the token exchange RESPONSE, which
+ * carries the access token, the refresh token and (Google) the id token — so a
+ * brand's Cloud Logging held live third-party credentials for the whole
+ * retention window, readable by anyone with a log-viewer role. The decoded
+ * profile and the provider's identity response went the same way, and those are
+ * the user's PII.
+ *
+ * What a log needs is WHICH provider, WHOSE account, and whether the exchange
+ * came back with a token. Nothing on this line is a credential or a person, and
+ * one home for the format keeps the three providers from drifting apart.
+ *
+ * @param {object} ctx - The route context (the log sink)
+ * @param {object} options
+ * @param {string} options.provider - The provider key ('google', 'discord', …)
+ * @param {string|null} [options.uid] - The account the identity is being linked to
+ * @param {object} [options.tokenizeResult] - The token exchange response — READ for
+ *   whether it succeeded, never logged
+ */
+function logIdentityCheck(ctx, { provider, uid, tokenizeResult }) {
+  ctx.log(`verifyIdentity(): provider=${provider}, uid=${uid || 'null'}, tokenExchange=${tokenizeResult?.access_token ? 'succeeded' : 'failed'}`);
+}
+
 module.exports = {
   STATE_TTL_MINUTES,
   STATE_KEY,
@@ -175,6 +201,7 @@ module.exports = {
   generateCsrfToken,
   encryptState,
   decryptState,
+  logIdentityCheck,
   // Re-export utilities for handlers
   fetch,
   arrayify,

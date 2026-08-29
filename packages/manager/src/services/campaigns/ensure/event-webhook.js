@@ -38,8 +38,10 @@ module.exports = async function ensureEventWebhook(context) {
   }
 
   if (!process.env.OMEGA_WEBHOOK_KEY) {
-    console.log(`      ${chalk.yellow('⚠')} No OMEGA_WEBHOOK_KEY in the brand .env — the forwarder URL can't be built`);
-    return { status: 'warned', output: { eventWebhook: { missingWebhookKey: true } } };
+    // Unreachable by design (#635): the key is OMEGA's own (`generated:` in
+    // the env schema) and the campaigns service's setup mints it through the
+    // shared contract before any operation runs. Absent here = broken wiring.
+    throw new Error('OMEGA_WEBHOOK_KEY absent after the campaigns setup ran — its REQUIRES entry or its requestServiceInput call is missing');
   }
 
   const parentHost = parent === 'self'

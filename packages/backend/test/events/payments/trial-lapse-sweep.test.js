@@ -79,7 +79,9 @@ module.exports = {
       // A trial whose outcome a payment webhook already resolved was already
       // reported at the moment it happened. The sweep still stamps the outcome —
       // that is state correction — but reporting it again would be a second
-      // conversion, and GA4 has no cross-source deduplication to save us.
+      // conversion: GA4 deduplicates a `purchase` on `transaction_id`, and this
+      // path has no invoice to name, so the two reports would arrive under two
+      // different ids ([#656]).
       name: 'the-sweep-never-reports-an-outcome-a-webhook-already-resolved',
       async run({ assert }) {
         const nowUNIX = Math.floor(Date.now() / 1000);

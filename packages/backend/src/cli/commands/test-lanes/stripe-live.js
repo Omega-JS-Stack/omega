@@ -279,17 +279,16 @@ async function ensureFixtures({ stripe, fixtures, log }) {
 /**
  * Start `stripe listen`, forwarding real deliveries into the local webhook route
  *
- * The signing secret it prints is what the route verifies against, so it is
- * captured and handed to the caller — never logged. Resolves once the CLI is
- * ready, so a trigger can never fire before the tunnel exists.
+ * Resolves once the CLI reports itself ready, so a trigger can never fire
+ * before the tunnel exists.
  *
  * @param {object} options
  * @param {string} options.stripePath - The Stripe CLI binary
  * @param {string} options.apiKey - The test secret key
  * @param {string} options.forwardUrl - The local webhook endpoint
  * @param {function} options.log - Where the CLI's own lines go
- * @param {number} [options.timeoutMs] - How long to wait for the secret
- * @returns {Promise<{ webhookSecret: string, stop: function }>}
+ * @param {number} [options.timeoutMs] - How long to wait for readiness
+ * @returns {Promise<{ stop: function }>}
  */
 function startForwarding({ stripePath, apiKey, forwardUrl, log, timeoutMs = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -304,22 +303,24 @@ function startForwarding({ stripePath, apiKey, forwardUrl, log, timeoutMs = 3000
       if (settled) return;
       settled = true;
       stop();
-      reject(new Error(`stripe listen did not report a signing secret within ${timeoutMs}ms`));
+      reject(new Error(`stripe listen did not report itself ready within ${timeoutMs}ms`));
     }, timeoutMs);
 
     const onLine = (line) => {
-      const secret = readWebhookSecret(line);
+      const ready = isReadyLine(line);
 
-      if (secret && !settled) {
+      if (ready && !settled) {
         settled = true;
         clearTimeout(timer);
-        resolve({ webhookSecret: secret, stop });
+        resolve({ stop });
         return;
       }
 
-      // The secret line is the ONE line held back — everything else is the CLI
-      // narrating deliveries, which is what a human watching this lane wants.
-      if (!secret) {
+      // The ready line is the ONE line held back — it carries the CLI's own
+      // signing secret, which nothing here reads and nothing may print.
+      // Everything else is the CLI narrating deliveries, which is what a human
+      // watching this lane wants.
+      if (!ready) {
         log(line);
       }
     };
@@ -341,14 +342,13 @@ function startForwarding({ stripePath, apiKey, forwardUrl, log, timeoutMs = 3000
 }
 
 /**
- * The webhook signing secret in a line of `stripe listen` output, if it holds one
+ * Whether a line of `stripe listen` output is the one announcing the tunnel is up
  *
  * @param {string} line - One line of CLI output
- * @returns {string|null} The `whsec_…` secret, or null
+ * @returns {boolean}
  */
-function readWebhookSecret(line) {
-  const match = `${line}`.match(/whsec_[A-Za-z0-9]+/);
-  return match ? match[0] : null;
+function isReadyLine(line) {
+  return /Ready!/.test(`${line}`);
 }
 
 /**
@@ -425,7 +425,7 @@ module.exports = {
   findSatisfyingPrice,
   ensureFixtures,
   startForwarding,
-  readWebhookSecret,
+  isReadyLine,
   forwardUrl,
   trigger,
   skipLine,

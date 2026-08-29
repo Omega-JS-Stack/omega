@@ -267,8 +267,14 @@ function isNewerThanSweep(freshStampUNIX, sweepReadUNIX) {
  * the only one this backstop has anything new to say about.
  *
  * The subscription-keyed event id collapses a genuine race on the two platforms that
- * deduplicate; this guard is what keeps GA4 honest, because GA4 has no cross-source
- * deduplication at all.
+ * key on an event id; this guard is what keeps GA4 honest, because GA4 deduplicates
+ * a `purchase` on `transaction_id` alone — and this path has no invoice to name, so
+ * a conversion reported twice would arrive under two different ids and count twice
+ * ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+ *
+ * Which makes this the ONE documented exception to "`transaction_id` is a charge's
+ * id, never the subscription's": this path has no invoice to name, and the outcome
+ * stamp keeps it to one fire (docs/shared/analytics.md).
  *
  * The subscription passed in is the one read BEFORE the lapse write — the paid
  * product that lapsed, not the `basic` the sweep resets it to.

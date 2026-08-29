@@ -32,9 +32,12 @@
  * in the file are updated in place wherever they live; new keys land in the
  * "Default Values" section (npx omega push-secrets only pushes that section);
  * everything else — comments, blanks, the Custom section — is preserved
- * verbatim. A missing .env is created with the two section markers. Values
- * normalize to double-quoted form with newlines escaped as \n (dotenv
- * expands them back), so multi-line blobs stay line-safe.
+ * verbatim. Composing a file also means CLEARING it (#636): a composed key the
+ * brand root no longer sets is dropped from the target, so a credential the
+ * brand retired stops being served from a file disperse wrote it into.
+ * A missing .env is created with the two section markers. Values normalize to
+ * double-quoted form with newlines escaped as \n (dotenv expands them back),
+ * so multi-line blobs stay line-safe.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -135,12 +138,14 @@ function parseEntries(content) {
 
 /**
  * Apply `updates` to .env content: replace existing keys in place, append
- * missing ones into the Default Values section. Returns the new content
- * plus which keys were written (changed) and which were appended.
+ * missing ones into the Default Values section, and CLEAR every key named in
+ * `removals` (#636). Returns the new content plus which keys were written
+ * (changed), which were appended, and which were removed.
  */
-function updateEnvContent(content, updates) {
+function updateEnvContent(content, updates, removals) {
   const entries = parseEntries(content);
   const written = [];
+  const removed = [];
   const seen = new Set();
 
   // Every occurrence is replaced — dotenv lets the LAST duplicate win, so
@@ -184,10 +189,24 @@ function updateEnvContent(content, updates) {
     written.push(...appended);
   }
 
+  // A key the composition no longer has a value for stops being served: every
+  // occurrence goes (the same dotenv duplicate rule as above). Only a line
+  // CARRYING a value is touched — a `# KEY=` placeholder or an empty `KEY=""`
+  // is the key's documented home, which is what a fresh template hands over.
+  const clearing = new Set((removals || []).filter((key) => !(key in updates)));
+  const kept = entries.filter((entry) => {
+    if (!entry.key || !clearing.has(entry.key) || !parseEnv(entry.lines.join('\n'))[entry.key]) {
+      return true;
+    }
+    if (!removed.includes(entry.key)) removed.push(entry.key);
+    return false;
+  });
+
   return {
-    content: entries.map((entry) => entry.lines.join('\n')).join('\n'),
+    content: kept.map((entry) => entry.lines.join('\n')).join('\n'),
     written,
     appended,
+    removed,
   };
 }
 
@@ -266,33 +285,47 @@ module.exports = async (context) => {
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    // ─── Apply ────────────────────────────────────────────────────────────
+    const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : null;
+
+    // Composed keys the brand root no longer sets (#636). Only an EXISTING
+    // file can carry a stale value, and only the composed set is disperse's to
+    // clear — a key it never writes is the target's own business.
+    const clears = existing !== null && spec.composeEnv
+      ? envKeysForTarget(entry.target).filter((name) => !process.env[name])
+      : [];
+
+    if (Object.keys(updates).length === 0 && clears.length === 0) {
       console.log(`      ${chalk.dim(`⊘ ${envRel} — no values to compose`)}`);
       currentCount++;
       continue;
     }
 
-    // ─── Apply ────────────────────────────────────────────────────────────
-    const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : null;
     const result = existing === null
-      ? { content: freshEnvContent(updates), written: Object.keys(updates), appended: Object.keys(updates) }
-      : updateEnvContent(existing, updates);
+      ? { content: freshEnvContent(updates), written: Object.keys(updates), appended: Object.keys(updates), removed: [] }
+      : updateEnvContent(existing, updates, clears);
 
-    if (result.written.length === 0) {
+    if (result.written.length === 0 && result.removed.length === 0) {
       console.log(`      ${chalk.dim(`✓ ${envRel} (current)`)}`);
       currentCount++;
       continue;
     }
 
+    // Key NAMES only, never values (the .env is all secrets)
+    const summary = [
+      result.written.length > 0 ? `${result.written.length} keys: ${result.written.join(', ')}` : null,
+      result.removed.length > 0 ? `cleared: ${result.removed.join(', ')}` : null,
+    ].filter(Boolean).join(' · ');
+
     if (options.dryRun) {
-      console.log(`      ${chalk.cyan('[DRY RUN]')} Would write ${chalk.cyan(envRel)} ${chalk.dim(`(${result.written.join(', ')})`)}`);
-      files[envRel] = { planned: result.written };
+      console.log(`      ${chalk.cyan('[DRY RUN]')} Would write ${chalk.cyan(envRel)} ${chalk.dim(`(${summary})`)}`);
+      files[envRel] = { planned: result.written, cleared: result.removed };
       continue;
     }
 
     jetpack.write(envPath, result.content);
-    console.log(`      ${chalk.green('✓')} ${chalk.cyan(envRel)} ${chalk.dim(`(${result.written.length} keys: ${result.written.join(', ')})`)}`);
-    files[envRel] = { written: result.written };
+    console.log(`      ${chalk.green('✓')} ${chalk.cyan(envRel)} ${chalk.dim(`(${summary})`)}`);
+    files[envRel] = { written: result.written, cleared: result.removed };
     updated++;
   }
 

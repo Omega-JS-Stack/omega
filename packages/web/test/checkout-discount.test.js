@@ -129,7 +129,7 @@ async function applyCode(code, answer, product = PRODUCT, { trialEligible = fals
     state: bundle.state,
     calls,
     renders,
-    bindings: bundle.buildBindingsState().checkout,
+    bindings: bundle.buildBindingsState(),
   };
 }
 
@@ -161,10 +161,10 @@ test('discount: a percent code prices the receipt against the percent', async ()
   // two must stay computed the same way.
   const { bindings } = await applyCode('save20', { valid: true, code: 'SAVE20', percent: 20, duration: 'once' });
 
-  assert.strictEqual(bindings.discount.hasDiscount, true, 'the receipt shows a discount row');
-  assert.strictEqual(bindings.discount.label, '20%', 'labelled by the percent it takes off');
-  assert.strictEqual(bindings.discount.amount, '20.00', '20% of $100');
-  assert.strictEqual(bindings.pricing.total, '$80.00', 'and the total is what the card will be charged');
+  assert.strictEqual(bindings.checkout.discount.hasDiscount, true, 'the receipt shows a discount row');
+  assert.strictEqual(bindings.checkout.discount.label, '20%', 'labelled by the percent it takes off');
+  assert.strictEqual(bindings.checkout.discount.amount, '20.00', '20% of $100');
+  assert.strictEqual(bindings.order.total, '$80.00', 'and the total is what the card will be charged');
 });
 
 test('discount: an amount code is money off, not an undefined percent', async () => {
@@ -179,11 +179,11 @@ test('discount: an amount code is money off, not an undefined percent', async ()
   assert.strictEqual(state.discountAmount, 10, 'the amount is what the receipt prices against');
   assert.strictEqual(state.discountPercent, 0, 'there is no percent in this shape');
 
-  assert.strictEqual(bindings.discount.hasDiscount, true, 'the receipt shows the discount the backend WILL charge');
-  assert.strictEqual(bindings.discount.amount, '10.00', '$10 off the first charge');
-  assert.strictEqual(bindings.discount.label, 'WELCOME10OFF', 'labelled by the code — "$10.00" beside "-$10.00" says it twice');
-  assert.strictEqual(bindings.pricing.total, '$90.00', '$100 less $10 due today');
-  assert.match(bindings.pricing.termsText, /first payment only/, 'and the first-payment-only note still rides along');
+  assert.strictEqual(bindings.checkout.discount.hasDiscount, true, 'the receipt shows the discount the backend WILL charge');
+  assert.strictEqual(bindings.checkout.discount.amount, '10.00', '$10 off the first charge');
+  assert.strictEqual(bindings.checkout.discount.label, 'WELCOME10OFF', 'labelled by the code — "$10.00" beside "-$10.00" says it twice');
+  assert.strictEqual(bindings.order.total, '$90.00', '$100 less $10 due today');
+  assert.match(bindings.order.termsText, /first payment only/, 'and the first-payment-only note still rides along');
 
   assert.ok(!JSON.stringify(bindings).includes('undefined'), 'no binding renders the word undefined');
 });
@@ -195,13 +195,13 @@ test('discount: a once code discounts today and leaves the renewal at list price
   const percent = await applyCode('welcome15', { valid: true, code: 'WELCOME15', percent: 15, duration: 'once' });
 
   assert.strictEqual(percent.state.discountDuration, 'once', 'the server\'s duration reaches the state');
-  assert.strictEqual(percent.bindings.pricing.total, '$85.00', 'the discount comes off today');
-  assert.match(percent.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'the terms line quotes the list-price renewal we will actually charge');
+  assert.strictEqual(percent.bindings.order.total, '$85.00', 'the discount comes off today');
+  assert.match(percent.bindings.order.termsText, /renew on .* for \$100\.00/, 'the terms line quotes the list-price renewal we will actually charge');
 
   const amount = await applyCode('welcome10off', { valid: true, code: 'WELCOME10OFF', amount: 10, duration: 'once' });
 
-  assert.strictEqual(amount.bindings.pricing.total, '$90.00', 'the flat shape comes off today the same way');
-  assert.match(amount.bindings.pricing.termsText, /renew on .* for \$100\.00/, 'and its terms line leaves the renewal at list price too');
+  assert.strictEqual(amount.bindings.order.total, '$90.00', 'the flat shape comes off today the same way');
+  assert.match(amount.bindings.order.termsText, /renew on .* for \$100\.00/, 'and its terms line leaves the renewal at list price too');
 });
 
 test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)', async () => {
@@ -218,17 +218,17 @@ test('discount: a trial + a once code quotes the DISCOUNTED first charge (#254)'
     { trialEligible: true },
   );
 
-  assert.strictEqual(bindings.pricing.total, '$0.00', 'nothing is due today — it is a free trial');
-  assert.match(bindings.pricing.termsText, /charged \$85\.00/, 'the first charge after the trial carries the discount');
-  assert.match(bindings.pricing.termsText, /renews at \$100\.00/, 'and every renewal after it is list price');
+  assert.strictEqual(bindings.order.total, '$0.00', 'nothing is due today — it is a free trial');
+  assert.match(bindings.order.termsText, /charged \$85\.00/, 'the first charge after the trial carries the discount');
+  assert.match(bindings.order.termsText, /renews at \$100\.00/, 'and every renewal after it is list price');
 });
 
 test('discount: a trial with no code quotes list price, unchanged (#254)', async () => {
   const { bindings } = await applyCode('nope', { valid: false }, TRIAL_PRODUCT, { trialEligible: true });
 
-  assert.strictEqual(bindings.discount.hasDiscount, false, 'no discount was applied');
-  assert.match(bindings.pricing.termsText, /charged \$100\.00/, 'so the first charge is the list price');
-  assert.ok(!/renews at/.test(bindings.pricing.termsText), 'and there is no second price to explain');
+  assert.strictEqual(bindings.checkout.discount.hasDiscount, false, 'no discount was applied');
+  assert.match(bindings.order.termsText, /charged \$100\.00/, 'so the first charge is the list price');
+  assert.ok(!/renews at/.test(bindings.order.termsText), 'and there is no second price to explain');
 });
 
 test('trial: the length is the catalog\'s number, never a framework constant (#273)', async () => {
@@ -239,12 +239,12 @@ test('trial: the length is the catalog\'s number, never a framework constant (#2
   const short = { ...PRODUCT, trial: { days: 3 } };
   const { bindings } = await applyCode('nope', { valid: false }, short, { trialEligible: true });
 
-  assert.strictEqual(bindings.trial.message, 'Start your 3-day free trial today!', 'the message states the real length');
+  assert.strictEqual(bindings.order.trial.message, 'Start your 3-day free trial today!', 'the message states the real length');
 
   const renewal = new Date();
   renewal.setDate(renewal.getDate() + 3);
   const formatted = renewal.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  assert.ok(bindings.pricing.termsText.includes(formatted), 'and the first charge lands 3 days out, not 7');
+  assert.ok(bindings.order.termsText.includes(formatted), 'and the first charge lands 3 days out, not 7');
 });
 
 test('discount: a code the server rejects still lands the error message', async () => {
@@ -256,8 +256,8 @@ test('discount: a code the server rejects still lands the error message', async 
   assert.strictEqual(state.discountCode, null, 'nothing is carried into the intent call');
   assert.strictEqual(state.discountPercent, 0, 'and the receipt keeps full price');
   assert.strictEqual(state.discountAmount, 0, 'in either shape');
-  assert.strictEqual(bindings.discount.hasDiscount, false, 'so the receipt shows no discount row');
-  assert.strictEqual(bindings.pricing.total, '$100.00', 'and charges full price');
+  assert.strictEqual(bindings.checkout.discount.hasDiscount, false, 'so the receipt shows no discount row');
+  assert.strictEqual(bindings.order.total, '$100.00', 'and charges full price');
 });
 
 test('discount: an empty code asks for one instead of calling the server', async () => {

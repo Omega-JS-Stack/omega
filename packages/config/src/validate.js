@@ -22,6 +22,9 @@
  *     losing its settings silently
  *   - secret-shaped keys are always errors (see secrets.js) — loadConfig
  *     additionally hard-fails on them before any merge happens
+ *   - keys the schema does not declare are WARNINGS (#636): the walker only
+ *     ever visits declared paths, so a typo — or a live path nobody declared —
+ *     used to pass in silence
  */
 
 const { TARGETS, isCustomTargetEntry, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
@@ -204,6 +207,44 @@ function validateAuthDomain(config) {
 }
 
 /**
+ * The LEAF paths of a resolved config the schema does not declare (#636).
+ *
+ * A rule declares its own path AND everything beneath it — an `object`/`array`
+ * rule is a declared subtree (brand.address's postal fields, an open provider
+ * map), which is what keeps a brand's own data out of this list. An empty
+ * object/array is itself a leaf, declared when the schema declares anything
+ * below it (`certificates: {}` against certificates.enabled).
+ *
+ * The `targets` subtree is skipped whole: those keys belong to a framework or,
+ * for a custom target (#603), to the brand — the targets-sanity check above is
+ * what polices that namespace.
+ *
+ * @param {object} config - The resolved config object.
+ * @param {object[]} schema - Rule array in the schema.js entry format.
+ * @returns {string[]} Undeclared leaf paths, in config order.
+ */
+function findUndeclaredPaths(config, schema) {
+  const declared = schema.map((rule) => rule.path);
+  const found = [];
+
+  const walk = (value, path) => {
+    if (isPlainObject(value) && Object.keys(value).length > 0) {
+      Object.keys(value).forEach((key) => walk(value[key], `${path}.${key}`));
+      return;
+    }
+    if (!declared.some((rule) => rule === path || path.startsWith(`${rule}.`) || rule.startsWith(`${path}.`))) {
+      found.push(path);
+    }
+  };
+
+  Object.keys(isPlainObject(config) ? config : {})
+    .filter((key) => key !== 'targets')
+    .forEach((key) => walk(config[key], key));
+
+  return found;
+}
+
+/**
  * Validate a resolved config: shared schema + optional target refinements +
  * targets-key sanity + secret-shaped-key detection.
  * @param {object} config - The resolved config object.
@@ -297,6 +338,19 @@ function validateConfig(config, options) {
   const winback = config ? getPath(config, 'payment.winback') : undefined;
   if (isPlainObject(winback) && typeof winback.percent === 'number' && typeof winback.amount === 'number') {
     errors.push('config.payment.winback sets both percent and amount — a save offer is one shape or the other, never both');
+  }
+
+  // ─── undeclared paths (#636) ───────────────────────────────────────────
+  // A warning, never an error: a brand config outliving one framework version
+  // must still build, and the finding is what closes the gap — either the key
+  // is dead, or the schema owes it a rule.
+  const undeclared = findUndeclaredPaths(config, schema);
+  if (undeclared.length > 0) {
+    warnings.push(
+      'config carries keys the schema does not declare — nothing reads them, so a typo looks exactly like a '
+      + `feature. Remove them, or give each one a rule in @omega.js/config's schema.js `
+      + `(docs/shared/config.md → Validation): ${undeclared.join(', ')}`,
+    );
   }
 
   // ─── retired keys (#142) ───────────────────────────────────────────────

@@ -1,4 +1,5 @@
 const fetch = require('wonderful-fetch');
+const { logIdentityCheck } = require('../_helpers.js');
 
 module.exports = {
   provider: 'spotify',
@@ -25,22 +26,24 @@ module.exports = {
     return { revoked: false, reason: 'Spotify does not support token revocation' };
   },
 
-  async verifyIdentity(tokenizeResult, Manager, ctx) {
-    ctx.log('verifyIdentity(): tokenizeResult', tokenizeResult);
+  async verifyIdentity(tokenizeResult, Manager, ctx, uid) {
+    // Provider, owner, outcome — never the token response, and never the identity
+    // the API answers with ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
+    logIdentityCheck(ctx, { provider: this.provider, uid: uid, tokenizeResult: tokenizeResult });
 
     // Get identity from Spotify API
     const identityResponse = await fetch('https://api.spotify.com/v1/me', {
       timeout: 60000,
       response: 'json',
       tries: 1,
-      log: true,
+      // NO `log: true`: wonderful-fetch prints its whole configuration, headers
+      // included, and this request's authorization header IS the access token
+      // ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
       cacheBreaker: false,
       headers: {
         authorization: `${tokenizeResult.token_type} ${tokenizeResult.access_token}`,
       },
     });
-
-    ctx.log('verifyIdentity(): identityResponse', identityResponse);
 
     // Check if exists
     const snap = await Manager.libraries.admin.firestore().collection('users')

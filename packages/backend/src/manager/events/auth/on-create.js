@@ -63,7 +63,11 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   // goes missing later ([#405](https://github.com/Omega-JS-Stack/omega/issues/405))
   const userRecord = buildUserDoc({ Manager: Manager, user: user, tag: 'auth:on-create' });
 
-  ctx.log(`onCreate: Creating user doc for ${user.uid}`, userRecord);
+  // The UID and nothing else. The doc carries the email, the name, the signup IP
+  // and the geolocation, and a backend line lands in Cloud Logging for the whole
+  // retention window — so none of it rides this line
+  // ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
+  ctx.log(`onCreate: Creating user doc for ${user.uid}`);
 
   // Write user doc with retry
   try {

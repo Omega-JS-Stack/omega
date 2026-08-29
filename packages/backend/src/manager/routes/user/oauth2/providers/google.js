@@ -1,5 +1,6 @@
 const fetch = require('wonderful-fetch');
 const { jwtDecode } = require('jwt-decode');
+const { logIdentityCheck } = require('../_helpers.js');
 
 module.exports = {
   provider: 'google',
@@ -40,12 +41,13 @@ module.exports = {
     return { revoked: true };
   },
 
-  async verifyIdentity(tokenizeResult, Manager, ctx) {
-    ctx.log('verifyIdentity(): tokenizeResult', tokenizeResult);
+  async verifyIdentity(tokenizeResult, Manager, ctx, uid) {
+    // Provider, owner, outcome — never the token response, and never the decoded
+    // profile ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)).
+    logIdentityCheck(ctx, { provider: this.provider, uid: uid, tokenizeResult: tokenizeResult });
 
     // Decode token
     const decoded = jwtDecode(tokenizeResult.id_token);
-    ctx.log('verifyIdentity(): decoded', decoded);
 
     // Require email scope for proper identity verification
     if (!decoded.email) {

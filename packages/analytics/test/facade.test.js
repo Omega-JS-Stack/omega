@@ -220,8 +220,9 @@ test('a providers restriction fires only the half this side owns', () => {
   const transport = recordingTransport();
   reset({ transport });
 
-  // The purchase pixel: the backend owns GA4 (revenue truth, and GA4 has no
-  // cross-source dedupe), the browser owns the two platforms that deduplicate.
+  // A half naming the providers it owns. (The live purchase pixel names all
+  // three — GA4 dedupes on transaction_id, [#656] — so this is the mechanism
+  // under test, not that page's policy.)
   const result = analytics.event(
     'purchase',
     { transaction_id: 'ORD-1', value: 10, currency: 'USD', items: [{ item_id: 'pro' }] },

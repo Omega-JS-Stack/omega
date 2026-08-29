@@ -58,8 +58,8 @@ test('the live call sites the audit found all resolve — none can throw at rewi
 
   // Spot check on the shape, not just the presence.
   const facebook = meta.resolve('pricing_toggle', { billing_type: 'yearly' });
-  assert.strictEqual(facebook.name, 'ViewContent');
-  assert.strictEqual(facebook.kind, 'standard');
+  assert.strictEqual(facebook.name, 'PricingToggle');
+  assert.strictEqual(facebook.kind, 'custom');
   assert.strictEqual(facebook.payload.billing_type, 'yearly');
 
   // GA4-only entries stay GA4-only: a spam signal never reaches an ad platform.
@@ -67,13 +67,56 @@ test('the live call sites the audit found all resolve — none can throw at rewi
   assert.strictEqual(tiktok.resolve('contact_form_spam', {}), null);
 });
 
-test('TikTok ViewContent and ClickButton are declared standard everywhere', () => {
+// The 2026-08-27 live cross-check ([#652]): every `standard` claim is spelled
+// the way the platform's own list spells it, and a name the platform does not
+// list may only be `custom`. The rosters below are the live pages verbatim:
+//   Meta   https://www.facebook.com/business/help/402791146561655
+//   TikTok https://ads.tiktok.com/help/article/standard-events-parameters
+const META_STANDARD = [
+  'AddPaymentInfo', 'AddToCart', 'AddToWishlist', 'CompleteRegistration', 'Contact',
+  'CustomizeProduct', 'Donate', 'FindLocation', 'InitiateCheckout', 'Lead', 'PageView',
+  'Purchase', 'Schedule', 'Search', 'StartTrial', 'SubmitApplication', 'Subscribe',
+  'ViewContent',
+];
+
+const TIKTOK_STANDARD = [
+  'AddPaymentInfo', 'AddToCart', 'AddToWishlist', 'ApplicationApproval',
+  'CompleteRegistration', 'Contact', 'CustomizeProduct', 'Download', 'FindLocation',
+  'InitiateCheckout', 'Purchase', 'Schedule', 'Search', 'StartTrial',
+  'SubmitApplication', 'SubmitForm', 'Subscribe', 'ViewContent',
+];
+
+test('a standard mapping only ever claims a name its platform actually lists', () => {
   for (const [name, entry] of Object.entries(CATALOG)) {
-    const mapping = entry.providers.tiktok;
-    if (mapping && ['ViewContent', 'ClickButton'].includes(mapping.name)) {
-      assert.strictEqual(mapping.kind, 'standard', `${name} → TikTok ${mapping.name} is a standard web event`);
+    for (const [provider, roster] of [['meta', META_STANDARD], ['tiktok', TIKTOK_STANDARD]]) {
+      const mapping = entry.providers[provider];
+
+      if (mapping && mapping.kind === 'standard') {
+        assert.ok(roster.includes(mapping.name), `${name} → ${provider} ${mapping.name} is on the platform's standard list`);
+      }
     }
   }
+});
+
+test('the names the platforms retired or never had are gone from the catalog', () => {
+  // TikTok retired CompletePayment for Purchase, and ClickButton is on NEITHER
+  // roster — both were claimed as `standard` until the live check ([#652]).
+  const claimed = Object.values(CATALOG)
+    .flatMap((entry) => Object.values(entry.providers))
+    .map((mapping) => mapping.name);
+
+  assert.strictEqual(claimed.includes('CompletePayment'), false, 'CompletePayment is retired');
+  assert.strictEqual(claimed.includes('ClickButton'), false, 'ClickButton was never a standard event');
+
+  // Meta's Subscribe means "the START of a paid subscription", which is what
+  // `purchase` and `trial_start` already say — so it is deliberately unused,
+  // and a renewal is a Purchase (Ian's money-event table).
+  const metaNames = Object.values(CATALOG)
+    .map((entry) => entry.providers.meta)
+    .filter(Boolean)
+    .map((mapping) => mapping.name);
+
+  assert.strictEqual(metaNames.includes('Subscribe'), false, 'Meta Subscribe stays unused');
 });
 
 test('the dropped and renamed names are gone', () => {
@@ -139,7 +182,10 @@ test('a pixel method is named by exactly one mapping', () => {
 // ─── Commerce mapping ───
 
 const PURCHASE_PARAMS = {
-  transaction_id: 'sub_123',
+  // One CHARGE's id — the order on a first purchase, the provider's invoice id
+  // on a renewal. NEVER the subscription id, which GA4 would dedupe every later
+  // charge away on ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+  transaction_id: 'ORD-1',
   value: 49.99,
   currency: 'USD',
   items: [{ item_id: 'pro', item_name: 'Pro Plan', item_category: 'subscription', price: 49.99, quantity: 1 }],
@@ -148,19 +194,22 @@ const PURCHASE_PARAMS = {
   payment_provider: 'stripe',
 };
 
-test('purchase maps to Purchase/CompletePayment with value and currency intact', () => {
+test('purchase maps to Purchase on both ad platforms, with value and currency intact', () => {
   const google = ga4.resolve('purchase', PURCHASE_PARAMS);
   assert.strictEqual(google.name, 'purchase');
   assert.strictEqual(google.kind, 'standard');
   assert.deepEqual(google.payload.items, PURCHASE_PARAMS.items, 'GA4 keeps its own items array');
   assert.strictEqual(google.payload.value, 49.99);
   assert.strictEqual(google.payload.currency, 'USD');
-  assert.strictEqual(google.payload.transaction_id, 'sub_123');
+  // GA4 deduplicates `purchase` on transaction_id, so the param is not optional
+  // decoration — it is the key the browser and the webhook halves collapse on
+  // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+  assert.strictEqual(google.payload.transaction_id, 'ORD-1');
 
   const facebook = meta.resolve('purchase', PURCHASE_PARAMS);
   assert.strictEqual(facebook.name, 'Purchase');
   assert.strictEqual(facebook.kind, 'standard');
-  assert.strictEqual(facebook.payload.value, 49.99);
+  assert.strictEqual(facebook.payload.value, 49.99, 'Meta REQUIRES value and currency on a Purchase');
   assert.strictEqual(facebook.payload.currency, 'USD');
   assert.deepEqual(facebook.payload.content_ids, ['pro'], 'Meta speaks content_ids, not items');
   assert.strictEqual(facebook.payload.content_name, 'Pro Plan');
@@ -168,30 +217,89 @@ test('purchase maps to Purchase/CompletePayment with value and currency intact',
   assert.strictEqual(facebook.payload.items, undefined, 'GA4 vocabulary does not leak into Meta');
 
   const tt = tiktok.resolve('purchase', PURCHASE_PARAMS);
-  assert.strictEqual(tt.name, 'CompletePayment');
+  assert.strictEqual(tt.name, 'Purchase', 'TikTok retired CompletePayment');
   assert.strictEqual(tt.kind, 'standard');
   assert.strictEqual(tt.payload.value, 49.99);
   assert.strictEqual(tt.payload.currency, 'USD');
-  assert.strictEqual(tt.payload.content_id, 'pro', 'TikTok speaks a single content_id');
-  assert.strictEqual(tt.payload.price, 49.99);
-  assert.strictEqual(tt.payload.quantity, 1);
+  assert.strictEqual(tt.payload.content_type, 'product');
+  assert.deepEqual(
+    tt.payload.contents,
+    [{ content_id: 'pro', content_name: 'Pro Plan', price: 49.99, quantity: 1 }],
+    'TikTok speaks a contents array of product objects — the shape its pixel reference documents',
+  );
+  assert.strictEqual(tt.payload.content_id, undefined, 'and the flat single-item shape is gone');
+  assert.strictEqual(tt.payload.price, undefined);
 });
 
-test('the recurring events ride GA4 purchase with is_recurring set', () => {
+test('every item rides TikTok\'s contents array, not just the first', () => {
+  // The flat shape could only ever describe items[0]; `contents` is a list.
+  const tt = tiktok.resolve('purchase', {
+    ...PURCHASE_PARAMS,
+    items: [
+      { item_id: 'pro', item_name: 'Pro Plan', price: 40, quantity: 1 },
+      { item_id: 'addon', item_name: 'Extra Seat', price: 9.99, quantity: 2 },
+    ],
+  });
+
+  assert.deepEqual(tt.payload.contents, [
+    { content_id: 'pro', content_name: 'Pro Plan', price: 40, quantity: 1 },
+    { content_id: 'addon', content_name: 'Extra Seat', price: 9.99, quantity: 2 },
+  ]);
+});
+
+test('a trial start is StartTrial on both ad platforms, and the browser may fire it', () => {
+  // TikTok's Subscribe ("subscribes... including paid subscriptions") said a
+  // trial was a subscription; StartTrial is the event both platforms define for
+  // "a customer begins a free trial" ([#652]). The browser half exists because a
+  // trial checkout used to fire `purchase` there ([#654]).
+  const params = { ...PURCHASE_PARAMS, transaction_id: 'ORD-1', value: 0, is_trial: true };
+
+  assert.strictEqual(entryFor('trial_start').placement, 'both');
+
+  const facebook = meta.resolve('trial_start', params);
+  assert.strictEqual(facebook.name, 'StartTrial');
+  assert.strictEqual(facebook.kind, 'standard');
+  assert.strictEqual(facebook.payload.value, 0, 'a trial charges nothing');
+  assert.strictEqual(facebook.payload.currency, 'USD');
+
+  const tt = tiktok.resolve('trial_start', params);
+  assert.strictEqual(tt.name, 'StartTrial');
+  assert.strictEqual(tt.kind, 'standard');
+  assert.strictEqual(tt.payload.value, 0);
+  assert.strictEqual(tt.payload.currency, 'USD');
+
+  // GA4's trial_start is a custom event: no standard purchase to deduplicate,
+  // so the server owns it outright and the browser half names ads only.
+  const google = ga4.resolve('trial_start', params);
+  assert.strictEqual(google.name, 'trial_start');
+  assert.strictEqual(google.kind, 'custom');
+});
+
+test('the recurring events ride GA4 purchase with is_recurring set, and Purchase on the ad platforms', () => {
   for (const name of ['subscription_renew', 'payment_recovered']) {
     const google = ga4.resolve(name, { ...PURCHASE_PARAMS, is_recurring: false });
     assert.strictEqual(google.name, 'purchase', `${name} → GA4 purchase`);
     assert.strictEqual(google.payload.is_recurring, true, `${name} is flagged recurring for GA4`);
 
-    assert.strictEqual(meta.resolve(name).name, 'Subscribe');
-    assert.strictEqual(tiktok.resolve(name).name, 'Subscribe');
+    // Every real charge is a Purchase: Meta's Subscribe means the START of a
+    // paid subscription, so a renewal counted a new subscriber every month
+    // ([#652]).
+    const facebook = meta.resolve(name, PURCHASE_PARAMS);
+    assert.strictEqual(facebook.name, 'Purchase', `${name} → Meta Purchase`);
+    assert.strictEqual(facebook.payload.value, 49.99, 'for the real amount');
+    assert.strictEqual(facebook.payload.currency, 'USD');
+
+    const tt = tiktok.resolve(name, PURCHASE_PARAMS);
+    assert.strictEqual(tt.name, 'Purchase', `${name} → TikTok Purchase`);
+    assert.strictEqual(tt.payload.value, 49.99);
+    assert.strictEqual(tt.payload.currency, 'USD');
   }
 });
 
 // The four subscription lifecycle moments the 2026-08-20 coverage audit found
 // dark or mislabeled ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
 
-test('a trial conversion is a purchase to GA4 and a Subscribe to the ad platforms', () => {
+test('a trial conversion is a purchase everywhere — the first real charge', () => {
   const params = { ...PURCHASE_PARAMS, is_trial: true, is_recurring: false };
 
   const google = ga4.resolve('trial_convert', params);
@@ -202,14 +310,16 @@ test('a trial conversion is a purchase to GA4 and a Subscribe to the ad platform
   assert.strictEqual(google.payload.is_recurring, false, 'a conversion is the FIRST payment, never a renewal');
 
   const facebook = meta.resolve('trial_convert', params);
-  assert.strictEqual(facebook.name, 'Subscribe', 'Meta already heard StartTrial — this is the subscription starting to pay');
+  assert.strictEqual(facebook.name, 'Purchase', 'Meta already heard StartTrial — and money moving is a Purchase');
   assert.strictEqual(facebook.kind, 'standard');
+  assert.strictEqual(facebook.payload.value, 49.99, 'the amount actually charged');
   assert.deepEqual(facebook.payload.content_ids, ['pro']);
 
   const tt = tiktok.resolve('trial_convert', params);
-  assert.strictEqual(tt.name, 'Subscribe');
+  assert.strictEqual(tt.name, 'Purchase');
   assert.strictEqual(tt.kind, 'standard');
-  assert.strictEqual(tt.payload.content_id, 'pro');
+  assert.strictEqual(tt.payload.value, 49.99);
+  assert.deepEqual(tt.payload.contents, [{ content_id: 'pro', content_name: 'Pro Plan', price: 49.99, quantity: 1 }]);
 });
 
 // The exclusion-audience half ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)).
@@ -228,9 +338,9 @@ test('a cancellation and a refund reach the ad platforms as zero-value audience 
     assert.strictEqual(tt.name, native, `${name} → TikTok ${native}`);
     assert.strictEqual(tt.kind, 'custom');
     assert.strictEqual(tt.payload.value, 0, 'TikTok cannot subtract revenue either');
-    assert.strictEqual(tt.payload.content_id, 'pro');
-    assert.strictEqual(tt.payload.price, undefined, 'the per-item price would put the amount back on the wire');
-    assert.strictEqual(tt.payload.quantity, undefined, 'and Meta\'s signal carries neither, by construction');
+    assert.deepEqual(tt.payload.contents, [{ content_id: 'pro', content_name: 'Pro Plan' }], 'who and which plan is the whole point of the audience');
+    assert.strictEqual(tt.payload.contents[0].price, undefined, 'the per-item price would put the amount back on the wire');
+    assert.strictEqual(tt.payload.contents[0].quantity, undefined, 'and Meta\'s signal carries neither, by construction');
   }
 
   // GA4 is where the money is netted, so it keeps the real number.
@@ -271,6 +381,46 @@ test('a plan change carries the plan it came from', () => {
   assert.strictEqual(google.payload.previous_item_name, 'Starter');
   assert.strictEqual(google.payload.previous_value, 9.99);
   assert.strictEqual(google.payload.items[0].item_id, 'pro', 'and items[] is still the plan they moved TO');
+});
+
+// ─── The live-spec cross-check's "wrong meaning" rows ([#652]) ───
+
+test('an interaction the platforms do not define is a custom event under its canonical name', () => {
+  // Each of these claimed a standard event whose OWN definition says something
+  // else: Meta's SubmitApplication is "an application for a product, service or
+  // program", its Lead "a submission of information", and both platforms'
+  // ViewContent a page view. A toggle, a popup and a click are none of those.
+  const rows = [
+    ['feedback_submit', 'meta', 'FeedbackSubmit'],
+    ['pricing_toggle', 'meta', 'PricingToggle'],
+    ['pricing_toggle', 'tiktok', 'PricingToggle'],
+    ['review_click', 'meta', 'ReviewClick'],
+    ['review_click', 'tiktok', 'ReviewClick'],
+    ['copy_link', 'tiktok', 'CopyLink'],
+    ['exit_popup_show', 'tiktok', 'ExitPopupShow'],
+    ['exit_popup_click', 'meta', 'ExitPopupClick'],
+    ['exit_popup_click', 'tiktok', 'ExitPopupClick'],
+    ['exit_popup_dismiss', 'tiktok', 'ExitPopupDismiss'],
+  ];
+
+  const adapters = { meta: meta, tiktok: tiktok };
+
+  for (const [name, provider, native] of rows) {
+    const descriptor = adapters[provider].resolve(name, {});
+
+    assert.strictEqual(descriptor.name, native, `${name} → ${provider} ${native}`);
+    assert.strictEqual(descriptor.kind, 'custom', `${name} → ${provider} is a custom event, honestly declared`);
+  }
+});
+
+test('a lead form is a form submit to TikTok, and still a Lead to Meta', () => {
+  // TikTok's Contact is "when a visitor contacts you"; a lead form is its
+  // SubmitForm. Meta's Lead — "a submission of information by a customer with
+  // the understanding that they may be contacted" — is exactly this event.
+  assert.strictEqual(tiktok.resolve('generate_lead', { lead_source: 'pricing' }).name, 'SubmitForm');
+  assert.strictEqual(tiktok.resolve('generate_lead', {}).kind, 'standard');
+  assert.strictEqual(meta.resolve('generate_lead', {}).name, 'Lead');
+  assert.strictEqual(ga4.resolve('generate_lead', {}).name, 'generate_lead');
 });
 
 test('search hands the ad platforms search_string, GA4 search_term', () => {

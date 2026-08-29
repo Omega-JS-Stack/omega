@@ -465,6 +465,27 @@ function stageMonorepo() {
   return root;
 }
 
+/** Poll until spawned holds count children (the boot spawns them across ticks). */
+async function waitForSpawn(count) {
+  const deadline = Date.now() + 2000;
+  while (spawned.length < count) {
+    if (Date.now() > deadline) {
+      throw new Error(`only ${spawned.length} of ${count} children spawned`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return spawned[count - 1];
+}
+
+/**
+ * Say what a real watch says once its initial prepare has landed (#670): the
+ * roster line the count comes from, then every package's ready line.
+ */
+function reportWatchReady(child, packages) {
+  child.stdout.emit('data', `Watching ${packages.length} packages (src→dist): ${packages.join(', ')}\n`);
+  packages.forEach((name) => child.stdout.emit('data', `[${name}] [17:47:26] 'prepare-package': Ready for changes!\n`));
+}
+
 /** Exit hooks registered during fn, removed again; returns them. */
 async function exitHooksAddedBy(fn) {
   const before = process.listeners('exit');
@@ -484,7 +505,20 @@ test('#587: a locally-linked brand boots the monorepo watch — after the manage
   linkedMonorepo = monorepo;
 
   try {
-    await bootDev(root);
+    const booting = bootDev(root);
+    const watchChild = await waitForSpawn(1);
+
+    // #670: a fresh watch rewrites every dist in its initial prepare pass, so
+    // the legs stay down until it reports ready — a leg booting into that
+    // rewrite loads a half-written CLI.
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+      `spawn:${path.basename(monorepo)}`,
+    ], 'no leg boots while the watch is still preparing');
+
+    reportWatchReady(watchChild, ['backend', 'web']);
+    await booting;
 
     assert.deepStrictEqual(boot, [
       'sweep:@omega.js/backend,@omega.js/web',

@@ -11,7 +11,8 @@
  * sibling brands share the account.
  *
  * Auth: SENDGRID_API_KEY in the brand .env; the event-webhook operation
- * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
+ * additionally needs OMEGA_WEBHOOK_KEY, which the setup MINTS through the
+ * shared contract (it is OMEGA's own key, #635). No API key → clean skip.
  */
 const { chosenProvider } = require('@omega.js/config');
 
@@ -47,9 +48,15 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.sendgridApi) {
-      const gate = await requestServiceInput(context, serviceInputSpec('campaigns'));
+      const gate = await requestServiceInput(context, serviceInputSpec('campaigns', { names: ['SENDGRID_API_KEY'] }));
       if (gate) return gate;
     }
+
+    // The webhook key is OMEGA's OWN (#635): the shared helper mints it in
+    // place when this service runs before the workspace one did, so the
+    // webhook operation can read it unconditionally.
+    const webhookKeyGate = await requestServiceInput(context, serviceInputSpec('campaigns', { names: ['OMEGA_WEBHOOK_KEY'] }));
+    if (webhookKeyGate) return webhookKeyGate;
 
     // Tests inject fake clients via context.sendgridApi / context.cloudflareApi.
     // Cloudflare is only needed while the domain still has to be DNS-verified;

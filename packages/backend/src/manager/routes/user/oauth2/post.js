@@ -122,7 +122,7 @@ async function processTokenize({ ctx, settings }) {
   }
 
   // Verify identity with provider
-  const verifiedIdentity = await oauth2Provider.verifyIdentity(tokenResponse, Manager, ctx)
+  const verifiedIdentity = await oauth2Provider.verifyIdentity(tokenResponse, Manager, ctx, stateData.uid)
     .catch(e => e);
 
   if (verifiedIdentity instanceof Error) {

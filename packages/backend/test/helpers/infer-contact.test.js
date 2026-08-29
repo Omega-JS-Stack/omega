@@ -67,9 +67,9 @@ module.exports = {
     {
       name: 'infer-contact-no-ai-returns-none',
       async run({ assert }) {
-        // Without OMEGA_OPENAI_API_KEY, should return empty result
-        const originalKey = process.env.OMEGA_OPENAI_API_KEY;
-        delete process.env.OMEGA_OPENAI_API_KEY;
+        // Without OPENAI_API_KEY, should return empty result
+        const originalKey = process.env.OPENAI_API_KEY;
+        delete process.env.OPENAI_API_KEY;
 
         try {
           const result = await inferContact('alice.wonderland@example.com');
@@ -81,7 +81,50 @@ module.exports = {
           assert.equal(result.confidence, 0, 'Confidence should be 0');
         } finally {
           if (originalKey) {
-            process.env.OMEGA_OPENAI_API_KEY = originalKey;
+            process.env.OPENAI_API_KEY = originalKey;
+          }
+        }
+      },
+    },
+
+    // ─── inferContact: the ONE key name (#639) ───
+    // The prefixed OMEGA_OPENAI_API_KEY is gone: the bare name is the only
+    // one, and a company-wide value reaches it through the .env cascade's
+    // company layer under that same name.
+
+    {
+      name: 'infer-contact-reads-the-bare-openai-key',
+      async run({ assert }) {
+        const originalKey = process.env.OPENAI_API_KEY;
+        process.env.OPENAI_API_KEY = 'openai-key-fixture';
+
+        let handedKey = null;
+        const ctx = {
+          log: () => {},
+          error: () => {},
+          Manager: {
+            AI: (_ctx, key) => {
+              handedKey = key;
+              return {
+                request: async () => ({
+                  content: { firstName: 'john', lastName: 'smith', company: 'acme', confidence: 0.9 },
+                }),
+              };
+            },
+          },
+        };
+
+        try {
+          const result = await inferContact('john.smith@acme.com', ctx);
+
+          assert.equal(handedKey, 'openai-key-fixture', 'OPENAI_API_KEY reaches the AI factory');
+          assert.equal(result.method, 'ai', 'the AI path ran');
+          assert.equal(result.firstName, 'John', 'the inferred name comes back capitalized');
+        } finally {
+          if (originalKey) {
+            process.env.OPENAI_API_KEY = originalKey;
+          } else {
+            delete process.env.OPENAI_API_KEY;
           }
         }
       },
@@ -95,8 +138,8 @@ module.exports = {
       timeout: 30000,
 
       async run({ assert, Manager, skip }) {
-        if (!process.env.OMEGA_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
-          return skip('OMEGA_OPENAI_API_KEY not set');
+        if (!process.env.OPENAI_API_KEY) {
+          return skip('OPENAI_API_KEY not set');
         }
 
         const ctx = Manager.RouteContext();

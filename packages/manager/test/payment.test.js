@@ -303,7 +303,9 @@ test('payment: manager defaults — enabled, null public keys, radar rules, NO c
   assert.equal(DEFAULTS.payment.providers.stripe.radar.length, 9);
   assert.equal(DEFAULTS.payment.providers.paypal.clientId, null);
   assert.equal(DEFAULTS.payment.providers.chargebee.site, null);
-  assert.equal(DEFAULTS.payment.providers.coinbase.enabled, false);
+  // #636: the coinbase stub is gone — there is no coinbase provider in the
+  // backend's payment lane, so the default only advertised one that isn't
+  assert.ok(!('coinbase' in DEFAULTS.payment.providers));
   assert.deepEqual(DEFAULTS.payment.products, []);
   // De-ITW pins: no company Stripe org ID; product images come from
   // brand.images.brandmark, not a hardcoded company CDN
@@ -716,19 +718,25 @@ test('stripe-webhook: dry run on a legacy twin reads only', async () => {
   assert.deepEqual(stripe.mutations(), []);
 });
 
-test('payment: missing OMEGA_WEBHOOK_KEY → warned, webhooks never listed', async () => {
-  const stripe = fakeStripe(stripeConverged());
+test('payment: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook is managed, never skipped (#635)', async () => {
+  const responses = stripeConverged();
+  responses.listWebhookEndpoints = { data: [] };
+  responses.createWebhookEndpoint = { id: 'we_new' };
+  const stripe = fakeStripe(responses);
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
-  const result = await runService(config, {
+  await runService(config, {
     stripe, webhookKey: false,
     confirmed: true,
   });
 
-  assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.stripeWebhook, { skipped: 'no OMEGA_WEBHOOK_KEY' });
-  assert.equal(stripe.callsTo('listWebhookEndpoints').length, 0);
-  assert.deepEqual(stripe.mutations(), []);
+  // OMEGA mints its own key, so the run never steps aside for it
+  const minted = process.env.OMEGA_WEBHOOK_KEY;
+  assert.match(minted, /^[A-Za-z0-9_-]{43}$/);
+  // ...and the freshly minted key is what the webhook URL is built from
+  assert.deepEqual(stripe.callsTo('createWebhookEndpoint').map((c) => c.args), [
+    [`https://api.${DOMAIN}/omega/payments/webhook?provider=stripe&key=${minted}`, STRIPE_EVENTS],
+  ]);
 });
 
 test('payment: firebase.shared brand → webhook operations skip without touching the API', async () => {

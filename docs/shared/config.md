@@ -32,14 +32,14 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   meta:           { title, description, image, keywords, index, viewport, referrer, twitter_card, og_image_width, og_image_height },   // #607: the site's DEFAULT page meta (@omega.js/web's head). The one section a page may restate BARE in frontmatter (`pageBare: true`); unset title/description fall back to brand.name/brand.description
   repo:           { providers: { github: { enabled, org, repo, shared, private } } },
   edge:           { providers: { cloudflare: { enabled, zone, dns, settings, rules, cacheRules, speedTest, workers } } },
-  captcha:        { providers: { recaptcha: { project, siteKey } } },
-  search:         { providers: { searchConsole: { enabled, submitSitemap, sitemapPaths } } },   // #546: each `enabled` is the service's own switch, default ON — false skips that whole service
+  captcha:        { providers: { recaptcha: { project, siteKey, domainsConfirmed: [] } } },   // domainsConfirmed: machine-written — the classic key's domain list has no API, so the captcha service records the owner's confirmation here and stops asking
+  search:         { providers: { searchConsole: { enabled, submitSitemap, sitemapPaths, gaLinked } } },   // #546: each `enabled` is the service's own switch, default ON — false skips that whole service. gaLinked: machine-written — the Search Console ↔ GA association has no API, so the confirmation is the record
   forms:          { providers: { slapform: { enabled, formId, templateFormId, updateFormInfo, plan } } },
   inbound:        { chat:  { providers: { chatsy:   { enabled, agentId, accountId, templateAgentId, updateAgentInfo, plan, sponsorshipsUrl, settings } } },
                     email: { providers: { replyify: { enabled, agentId, templateAgentId, updateAgentInfo, plan, discount } } } },
-  analytics:      { providers: { google: { id, propertyId, accountId }, meta: { id, accountId }, tiktok: { id, accountId } } },   // #524: the pixel/measurement id is the RUNTIME value; propertyId/accountId are the platform ids the manager reconciles against (never secrets — tokens stay in .env)
-  advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec). #527: `client` is the ONE adsense switch — its presence drives the managed account, the ad units and the ads.txt record together (no `units`, no `enabled`)
-  payment:        { providers: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
+  analytics:      { providers: { google: { id, propertyId, accountId }, meta: { id, accountId }, tiktok: { id, accountId, appId } } },   // #524: the pixel/measurement id is the RUNTIME value; propertyId/accountId are the platform ids the manager reconciles against (never secrets — tokens stay in .env). tiktok.appId: the DEVELOPER APP the token mint authorizes through (#448/#635) — public config; the app secret is pasted once and never saved
+  advertising:    { providers: { adsense: { client, displaySlot, inArticleSlot, inFeedSlot, multiplexSlot }, inhouse: { source } }, fallback, tags: [] },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec). #527: `client` is the ONE adsense switch — its presence drives the managed account, the ad units and the ads.txt record together (no `units`, no `enabled`). Role-level: `fallback: 'inhouse'` is the lane a provider miss falls through to (false/absent ends at the built-in promo), `tags` are the brand's contextual targeting tags
+  payment:        { providers: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site } }, products: […], winback: { enabled, percent, amount, duration } },   // winback = the cancel-flow save offer (#268), on by default at 50% off the next cycle — see below
   monitoring:     { enabled, providers: { sentry: { org, dsn, environment, sampleRate, tracesSampleRate, replaysSessionSampleRate, replaysOnErrorSampleRate, scrubEmail, attachScreenshot, bundlePatterns: [] } } },   // #425: the monitor is a KEY under `providers`. dsn presence IS the runtime enable signal; environment unset = the host's gate names it; scrubEmail defaults true (email OFF), attachScreenshot is desktop-only, bundlePatterns + the two replay rates browser-only (replay defaults to 0 — opt-in, #485). docs/shared/monitoring.md
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
@@ -51,6 +51,8 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // `targets.backend` to hold them (presence there would enable the target). A
   // `targets.backend.<same key>` block still overrides any of them.
   parent:         'self' | 'https://parent.example.com' | false,   // webhook parent topology; false = shared webhook account owned elsewhere
+  domain:         { providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips
+  certificates:   { enabled, providers: { apple: { bundleIdPrefix, capabilities: [], profiles: [], certificates: [] } } },   // Apple signing for desktop/mobile targets. bundleIdPrefix is the brand's own answer ('com.mycompany' + brand.id composes the bundle id); the credentials live in .env (APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID)
   github:         { user, website },             // GitHub identity for the brand (content identity; repo.providers.github is the source-hosting home)
   reviews:        { enabled, sites: [] },
   marketing:      { campaigns: { enabled, providers: { sendgrid: { listId } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: packages/backend/docs/marketing-campaigns.md § Contact Pruning
@@ -295,6 +297,12 @@ own list derives from it, so a new key is **one entry**, never four edits.
   (the only target .env that ships with a deploy artifact and so cannot walk up to the
   brand layer) from the entries naming `backend`. Other targets read brand values
   through the cascade above, so their `targets` entries are documentation.
+- **Disperse CLEARS what it composes** ([#636](https://github.com/Omega-JS-Stack/omega/issues/636)):
+  a composed key the brand root no longer sets is REMOVED from `targets/backend/.env` on
+  the next run — every occurrence, and only lines carrying a VALUE (a `# KEY=` placeholder
+  or an empty `KEY=""` is the key's documented home and stays). A credential the brand
+  retired stops being served by the target it was composed into. Idempotent; a dry run
+  reports the clear by key name, never by value.
 - **`group:` picks the .env section**, and `ENV_GROUPS` owns the file order plus each
   section's comment. A group marked `file: false` (the `runtime` group) never reaches a
   brand `.env` at all — those keys resolve some other way (from config at boot, from
@@ -318,7 +326,6 @@ The split is a `<KEY>_DEV` twin, declared as a normal schema entry carrying `dev
 | Key | Twin |
 |---|---|
 | `STRIPE_SECRET_KEY` | `STRIPE_SECRET_KEY_DEV` |
-| `STRIPE_WEBHOOK_SECRET` | `STRIPE_WEBHOOK_SECRET_DEV` |
 | `PAYPAL_CLIENT_SECRET` | `PAYPAL_CLIENT_SECRET_DEV` |
 | `CHARGEBEE_API_KEY` | `CHARGEBEE_API_KEY_DEV` |
 
@@ -338,6 +345,27 @@ renders as a `# KEY=` placeholder in a brand `.env` and composes into
   value. It is declared only where the provider stamps a shape — Stripe's
   `sk_live_`/`rk_live_`, Chargebee's `live_`. **PayPal's halves carry no live/sandbox
   marker**, so PayPal is protected by its twin alone.
+
+### One key per AI provider — #639
+
+`OPENAI_API_KEY` and `ANTHROPIC_API_KEY`. There is no second name for either.
+
+| Key | Owner | Read by | Asked at |
+|---|---|---|---|
+| `OPENAI_API_KEY` | `backend` | Contact inference, content + newsletter generation, the `chatgpt` translation provider | `manage` — the `ai` service's setup gate |
+| `ANTHROPIC_API_KEY` | `backend` | The backend's Anthropic provider (SVG generation, tool loops) | `manage` — the `ai` service's setup gate |
+
+- **The company-wide fallback is the COMPANY LAYER, never a second key** (Ian
+  2026-08-27). The legacy pair (`BACKEND_MANAGER_OPENAI_API_KEY`, then
+  `OMEGA_OPENAI_API_KEY`) existed so one company key could serve every brand; the
+  `.env` cascade already does that — put the value in the company `.env` and every
+  brand under it resolves it, with a brand `.env` overriding. The prefixed names are
+  gone from the schema, the `_.env` templates and every reader; migration row in
+  [breaking-changes.md](breaking-changes.md).
+- **Both are optional and neither gates a run.** The `ai` service declares them
+  `gates: false`, so preflight never blocks on them and a brand that calls one
+  provider is never nagged about the other. `ai.enabled: false` (what the gate's
+  Disable lands) stops the ask for good.
 
 Who derives from it:
 
@@ -479,6 +507,14 @@ Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../../_attic/p
 `validateConfig(config, { target })` = shared schema + that target's refinements
 (`TARGET_SCHEMAS[target]`), run against the RESOLVED config. `brand.id` (URL-scheme-safe
 slug) and `brand.name` are the only universally required fields.
+
+**Undeclared keys WARN** ([#636](https://github.com/Omega-JS-Stack/omega/issues/636)):
+every leaf path of the resolved config no rule declares comes back as ONE warning naming
+them — never an error, because a brand config that outlives a framework version must still
+build. A rule of type `object`/`array` declares its whole subtree (a brand's postal
+address, an open provider map), and the `targets` namespace is exempt: those keys belong to
+a framework, or to a custom target. A finding is a hole to fill — either the key is dead,
+or the schema owes it a rule.
 
 **authDomain is the brand's own host** (cp268): when `cloud.config.authDomain` is set it
 must equal the resolved brand host: the instance's own `url` when it has one, else

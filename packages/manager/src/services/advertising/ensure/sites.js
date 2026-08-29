@@ -24,13 +24,15 @@ module.exports = async function ensureSites(context) {
   const { adsenseApi, accountId, domain, options = {} } = context;
 
   const sitesUrl = `https://adsense.google.com/adsense/u/0/${accountId}/sites/list?url=${domain}`;
-  const matchesDomain = (entry) => entry.domain === domain || entry.domain === `www.${domain}`;
+  // AdSense lists sites at the apex only, so an apex entry covers every
+  // subdomain of it (#631)
+  const matchesDomain = (entry) => entry.domain === domain || entry.domain === `www.${domain}` || domain.endsWith(`.${entry.domain}`);
 
   const sites = await adsenseApi.listSites(accountId);
   const site = sites.find(matchesDomain);
 
   if (site) {
-    return reportSite(site, sitesUrl);
+    return reportSite(site, sitesUrl, domain);
   }
 
   console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(domain)} is not added to AdSense ${chalk.dim('(no API exists to add it)')}`);
@@ -51,7 +53,7 @@ module.exports = async function ensureSites(context) {
     });
 
     if (result.success && result.result) {
-      return reportSite(result.result, sitesUrl);
+      return reportSite(result.result, sitesUrl, domain);
     }
   }
 
@@ -62,16 +64,21 @@ module.exports = async function ensureSites(context) {
 
 /**
  * Report a present site's approval state (READY = success, anything else =
- * warned with the console deep-link).
+ * warned with the console deep-link). A parent-domain match reports the
+ * apex's state and says so (#631).
  */
-function reportSite(site, sitesUrl) {
+function reportSite(site, sitesUrl, domain) {
   const state = site.state || 'STATE_UNSPECIFIED';
   const display = STATES[state] || { status: 'warned', label: state };
+  const covered = site.domain !== domain && domain.endsWith(`.${site.domain}`);
+  const subject = covered
+    ? `${chalk.cyan(domain)} is covered by ${chalk.cyan(site.domain)}`
+    : chalk.cyan(site.domain);
 
   if (display.status === 'success') {
-    console.log(`      ${chalk.green('✓')} ${chalk.cyan(site.domain)}: ${display.label}`);
+    console.log(`      ${chalk.green('✓')} ${subject}: ${display.label}`);
   } else {
-    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(site.domain)}: ${display.label}`);
+    console.log(`      ${chalk.yellow('⚠')} ${subject}: ${display.label}`);
     console.log(`      ${chalk.dim('→')} ${chalk.cyan(sitesUrl)}`);
   }
 
@@ -86,6 +93,7 @@ function reportSite(site, sitesUrl) {
         domain: site.domain,
         state,
         autoAdsEnabled: site.autoAdsEnabled,
+        ...(covered ? { coveredBy: site.domain } : {}),
       },
     },
   };

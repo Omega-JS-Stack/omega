@@ -158,9 +158,13 @@ async function loadPricingPage(account) {
     matchMedia: () => ({ matches: false }),
   };
 
+  // Every omega.request the page makes — today that is the wakeup ping alone
+  const requests = [];
+
   globalThis.__omegaClient = {
     config: { analytics: { providers: {} } },
     dom: () => ({ ready: async () => {} }),
+    request: async (url, options = {}) => { requests.push({ url, options }); },
     auth: () => ({
       listen: (options, handler) => handler({ account: account }),
       resolveSubscription: (candidate) => resolveSubscription(candidate),
@@ -197,6 +201,7 @@ async function loadPricingPage(account) {
 
   return {
     tracked,
+    requests,
     button: (planId) => buttons.find((button) => button.dataset.planId === planId),
     /** Click one plan's button and report where the browser was sent. */
     navigate(planId) {
@@ -291,4 +296,14 @@ test('pricing CTA: a one-time product and a visitor with no subscription still c
     'https://brand.test/payment/checkout?product=pro&frequency=monthly',
     'and the checkout path is exactly what it was',
   );
+});
+
+test('#637: the pricing page warms the backend on load', async () => {
+  // Every plan button on this page leads to checkout, whose first call is the
+  // intent route — so the wakeup goes out now rather than at the click.
+  const { requests } = await loadPricingPage(VISITOR);
+
+  const wakeup = requests.find((request) => request.options.wakeup);
+  assert.ok(wakeup, 'the page fires the shared client wakeup helper');
+  assert.equal(wakeup.url, '/omega/payments/intent', 'aimed at the route checkout is about to need');
 });

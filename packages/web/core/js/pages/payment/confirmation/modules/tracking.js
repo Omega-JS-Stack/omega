@@ -1,20 +1,40 @@
-// The confirmation page's purchase PIXEL — the browser half of a `purchase`
+// The confirmation page's conversion PIXEL — the browser half of the checkout
 // ([#386](https://github.com/Omega-JS-Stack/omega/issues/386)).
 //
-// The backend's payment webhook is the TRUTH: it sees what the provider
-// actually charged, and it owns GA4 outright, because GA4 has no cross-source
-// event deduplication. What only a browser can give is the RETARGETING signal —
-// Meta's and TikTok's pixels tie the conversion to the ad click that is sitting
-// in this page's cookies — so this half fires those two, and no more.
+// The backend's payment webhook is the TRUTH: it sees what the provider actually
+// charged. What only a browser can give is the RETARGETING signal — Meta's and
+// TikTok's pixels tie the conversion to the ad click sitting in this page's
+// cookies — and, for GA4, the session, the campaign and the client id a webhook
+// has none of.
 //
-// Both halves carry the SAME dedupe id, or each platform counts two purchases:
+// TWO THINGS THIS HALF GETS RIGHT, both found on 2026-08-27:
 //
-//   THE DEDUPE ID IS `purchase.<order id>`
+//  1. A TRIAL CHECKOUT IS NOT A PURCHASE
+//     ([#654](https://github.com/Omega-JS-Stack/omega/issues/654)). The intent
+//     route sets `?track=true` for EVERY checkout, trials included, so a $0 trial
+//     used to fire a browser `purchase` while the webhook fired `trial_start`.
+//     The AMOUNT was never the defect — the intent route already puts `amount=0`
+//     on a trial confirmation URL (`routes/payments/intent/post.js`) — the NAME
+//     was: two different event names never deduplicate, so each platform counted
+//     the browser half as a second conversion beside the server's trial. A trial
+//     order fires `trial_start` with value 0; everything else fires `purchase`.
+//  2. GA4 BELONGS ON THE PURCHASE HALF
+//     ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). GA4
+//     deduplicates `purchase` on `transaction_id`
+//     (https://support.google.com/analytics/answer/12313109), and both halves
+//     send the ORDER id — so the browser adds its attribution and GA4 still
+//     counts one purchase. `trial_start` is a GA4 CUSTOM event with no such
+//     dedupe, so its browser half names the ad platforms only and the server
+//     keeps GA4 to itself.
+//
+// Both halves carry the SAME dedupe id, or each platform counts two conversions:
+//
+//   THE DEDUPE ID IS `<canonical>.<order id>`
 //
 // which is the ORDER-ID branch of the backend's own derivation
-// (`events/firestore/payments-webhooks/analytics.js` resolveEventId keys a
-// payment event on the webhook delivery, `<canonical>.<webhook event id>`,
-// falling back to the order id — the only half of that a browser holds).
+// (`events/firestore/payments-webhooks/analytics.js` resolveEventId keys the two
+// browser-twinned events, `purchase` and `trial_start`, on the order — the only
+// id a browser can compute).
 import omega from '@omega.js/client';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES } from '../../checkout/modules/state.js';
@@ -28,32 +48,45 @@ import { FREQUENCIES } from '../../checkout/modules/state.js';
 // list of cadences checkout actually SELLS — the same list the bindings and the
 // verification poll read, and the confirmation page's stand-in for checkout's
 // `state.product.type === 'subscription'`, which the redirect never carries.
-export function buildItems(state) {
+//
+// `price` is the conversion's own amount, passed in rather than read off the
+// state: the intent route already sends `amount=0` on a trial checkout, so this
+// default and the trial's explicit 0 agree today. DEFENSIVE — the conversion's
+// value has ONE source in this file, so a confirmation URL that ever carried the
+// plan's price on a trial could not put it on the item either ([#654]).
+export function buildItems(state, price = state.amount) {
   return [{
     item_id: state.productId,
     item_name: state.productName || state.productId,
     item_category: FREQUENCIES.includes(state.frequency) ? 'subscription' : 'one-time',
     item_variant: state.frequency,
-    price: state.amount,
+    price: price,
     quantity: 1,
   }];
 }
 
-// Fire the canonical purchase for the two platforms that deduplicate on it.
+// Fire the canonical conversion for this order — see the header for which.
 function trackPurchase(state) {
-  event('purchase', {
+  const canonical = state.hasFreeTrial ? 'trial_start' : 'purchase';
+  // A trial charges nothing. The intent route already sends `amount=0` for one,
+  // so this is DEFENSIVE: the value a trial reports is 0 here whatever the
+  // confirmation URL says ([#654]).
+  const value = state.hasFreeTrial ? 0 : state.amount;
+
+  event(canonical, {
+    // The same id the webhook sends, and the key GA4 collapses the two halves on.
     transaction_id: state.orderId,
-    value: state.amount,
+    value: value,
     currency: state.currency,
-    items: buildItems(state),
+    items: buildItems(state, value),
     payment_provider: state.paymentMethod,
     payment_frequency: state.frequency,
     is_trial: state.hasFreeTrial,
   }, {
-    // GA4 is the webhook's (see the header) — naming the two here is what keeps
-    // this half from double-counting revenue in the property.
-    providers: ['meta', 'tiktok'],
-    eventId: `purchase.${state.orderId}`,
+    // GA4 rides the purchase half (it dedupes on transaction_id) but never the
+    // trial half, where its event is custom and the server owns it outright.
+    providers: state.hasFreeTrial ? ['meta', 'tiktok'] : ['ga4', 'meta', 'tiktok'],
+    eventId: `${canonical}.${state.orderId}`,
   });
 }
 

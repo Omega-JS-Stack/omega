@@ -13,6 +13,9 @@
  *   getApiUrl()          -> base API url (required for route-relative paths)
  *   getIdToken(force)    -> fresh Firebase ID token, or null when signed out
  *   onProperties(props)  -> optional; called with the parsed omega-properties object
+ *
+ * `wakeup: true` is the one option that changes the SHAPE of the call: it warms
+ * a cold backend and returns nothing (see the branch below).
  */
 
 import { createLogger } from './logger.js';
@@ -35,6 +38,17 @@ function createRequest(deps) {
     const target = url.startsWith('/')
       ? `${deps.getApiUrl()}${url}`
       : url;
+
+    // A wakeup is a fire-and-forget ping that warms a cold backend, nothing
+    // more: @omega.js/backend's middleware sees `wakeup` in the request data
+    // and answers it BEFORE it loads a route or authenticates, so every route
+    // costs the same and none of them runs. Nothing is read back, no token is
+    // minted, and a dead network resolves like a live one — the caller is not
+    // waiting on an answer.
+    if (options.wakeup) {
+      fetch(withWakeupParam(target), { method: 'GET' }).catch(() => {});
+      return;
+    }
 
     const headers = { ...(options.headers || {}) };
 
@@ -164,6 +178,12 @@ async function parseBody(response) {
   }
 
   return response.text();
+}
+
+// The param rides the URL because a wakeup is a GET, and the middleware reads
+// it from the request data it merges the query string into.
+function withWakeupParam(url) {
+  return `${url}${url.includes('?') ? '&' : '?'}wakeup=true`;
 }
 
 function hasHeader(headers, name) {

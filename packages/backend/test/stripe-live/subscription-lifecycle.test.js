@@ -45,7 +45,6 @@ module.exports = {
           skip('the stripe-live lane is not open');
         }
 
-        assert.ok(process.env.STRIPE_WEBHOOK_SECRET, 'the lane hands the forwarder\'s signing secret to the run — without it the route would fall back to key-only and prove nothing about signatures');
         assert.ok(process.env.STRIPE_CLI_PATH, 'the lane hands down the Stripe CLI it found, which is what fires the triggers');
       },
     },

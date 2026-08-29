@@ -22,6 +22,7 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 - **Read the guide before editing.** Layers, the frontmatter allow-list, and the section contract each have rules that are not guessable from the file tree.
 - **🚫 Never run a consumer's `omega dev`** — it is the user's long-running process. Assume it is up; ask the user to start it if it is not.
 - **Grep the logs FIRST.** Every verb tees its whole run to the app's `logs/` — `dev.log`, `build.log`, `test.log`, truncated per launch and ANSI-stripped. `tail`/`grep` them; restarting the dev server or re-running a build to see output it already wrote is never the move (`docs/shared/logging.md`).
+- **Every page obeys the page paint contract** — static content paints immediately, user data arrives through bindings with skeletons, an answer the visitor acts on resolves ONCE, every wait has a deadline and a named fallback, and a form's submit control is gated until its answers land: `docs/web/page-contract.md`.
 - **Consumer page frontmatter is meta-only** and content keys are stripped with a build warning. Content belongs in sections.
 - **Compose, never hand-roll HTML.** `/test/sections` (dev builds only) is the auto-generated gallery of every RESOLVED section and component: the entry page carries the args contract and embeds each demo variant as its own frame page. Read it before writing markup for a page — `docs/web/sections.md` §9.
 - **Secrets never enter `config/omega.json5`** — `.env` only; the config validator hard-fails secret-shaped keys.

@@ -216,6 +216,18 @@ class SendGridAPI {
     });
   }
 
+  // ========== Link branding ==========
+
+  /**
+   * Every branded LINK host on the account — the `emailurl.<domain>` CNAME
+   * SendGrid rewrites transactional links through. Each entry carries its own
+   * `valid`, which is SendGrid's word on whether it has resolved the record
+   * (`{ domain, subdomain, valid, dns: { domain_cname, owner_cname } }`).
+   */
+  async getBrandedLinks() {
+    return this.makeRequest('/whitelabel/links');
+  }
+
   /** Asks SendGrid to check the DNS records for a domain authentication. */
   async validateDomain(domainId) {
     return this.makeRequest(`/whitelabel/domains/${domainId}/validate`, {

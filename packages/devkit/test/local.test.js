@@ -306,12 +306,13 @@ test('#587: a registry-installed brand resolves into no monorepo at all', () => 
   }
 });
 
-test('startMonorepoWatch declines to double-start when the lock is held', () => {
+test('startMonorepoWatch declines to double-start when the lock is held', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lock-test-'));
   try {
     local.acquireWatchLock(scratch); // held by us — a live process
-    const result = local.startMonorepoWatch({ monorepoRoot: scratch });
+    const { ready, ...result } = local.startMonorepoWatch({ monorepoRoot: scratch });
     assert.deepEqual(result, { alreadyRunning: true, pid: process.pid, child: null });
+    await ready; // no initial prepare of our own to wait for (#670)
     local.releaseWatchLock(scratch);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

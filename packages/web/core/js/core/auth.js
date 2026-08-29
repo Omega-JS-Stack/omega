@@ -249,6 +249,53 @@ function updateAuthLinks() {
   });
 }
 
+// The in-flight marker for the post-auth signup request
+// ([#633](https://github.com/Omega-JS-Stack/omega/issues/633)). The account doc's
+// flag cannot hold the gate alone: the route polls for the user doc and infers the
+// contact before it writes the flag, so every page load inside that window reads an
+// unprocessed doc and posts again. It only ever gates a post that IS in flight: a
+// send that failed clears it on the spot (below), and a marker that outlived its
+// window expires (see the TTL). It is held through the client's storage module —
+// under the `temporary.` prefix, because it is transient state and not a
+// preference — which wraps every browser access itself, so private mode needs no
+// guard here.
+const SIGNUP_METADATA_MARKER = 'temporary.signupMetadata';
+
+// A marker older than this counts as absent. The storage module is backed by
+// localStorage, which outlives the tab that wrote it: without an expiry, a crash
+// between marking the post in flight and hearing back would gate this account for
+// good. Ten minutes is far longer than the route's poll-and-infer window and far
+// shorter than the user is willing to wait for the account it feeds.
+const SIGNUP_MARKER_TTL_MS = 10 * 60 * 1000;
+
+// The marker is per uid — a shared browser must not let one account's in-flight post
+// silence the next account's. No uid (an account doc read that produced no auth.uid,
+// and no signed-in user to ask) means no marker, which is the behaviour that shipped
+// before this gate existed.
+function signupMetadataMarkerKey(account) {
+  const uid = account?.auth?.uid || omega.auth?.().getUser?.()?.uid;
+
+  return uid ? `${SIGNUP_METADATA_MARKER}.${uid}` : null;
+}
+
+// A marker gates only while it is FRESH: an expired one is dropped on read and
+// reads as absent, so the post it was holding back goes out.
+function readSignupMetadataMarker(key) {
+  const marked = omega.storage().get(key, 0);
+
+  if (!marked) {
+    return false;
+  }
+
+  if (Date.now() - marked > SIGNUP_MARKER_TTL_MS) {
+    omega.storage().remove(key);
+
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Send user metadata to server (affiliate, UTM params, etc.)
  *
@@ -265,6 +312,10 @@ function updateAuthLinks() {
  * @returns {Promise<void>}
  */
 export async function sendUserSignupMetadata(account) {
+  // Declared out here so the catch below can clear it: a post that never landed
+  // must not leave the gate closed behind it.
+  let markerKey = null;
+
   try {
     // Skip on auth pages to avoid blocking redirect (metadata will be sent on destination page)
     const pagePath = document.documentElement.getAttribute('data-page-path');
@@ -278,12 +329,29 @@ export async function sendUserSignupMetadata(account) {
     // client-only localStorage flag. Fire whenever the doc shows signup is unprocessed; the
     // server is idempotent and rejects if it was already processed.
     const signupProcessed = account?.flags?.signupProcessed === true;
+    markerKey = signupMetadataMarkerKey(account);
 
     /* @dev-only:start */
     logger.log('signupProcessed:', signupProcessed);
     /* @dev-only:end */
 
+    // The doc caught up: the marker did its job and is done. A marker that
+    // outlives the flag would silence a retry the doc still needs (the other
+    // place it is cleared is a failed post, in the catch below).
     if (signupProcessed) {
+      if (markerKey) {
+        omega.storage().remove(markerKey);
+      }
+
+      return;
+    }
+
+    // A post for this uid is already in flight (or landed and the doc has not caught
+    // up yet). Every page load in that window used to re-post and collect a
+    // "Signup has already been processed" 400.
+    if (markerKey && readSignupMetadataMarker(markerKey)) {
+      logger.log('Skipping user metadata — a signup post is already in flight for this account');
+
       return;
     }
 
@@ -315,6 +383,12 @@ export async function sendUserSignupMetadata(account) {
     // Log
     logger.log('Sending user metadata:', payload);
 
+    // Mark the post in flight BEFORE it goes out: the doc's flag lands seconds
+    // later, and a navigation in between is exactly what re-fired this request.
+    if (markerKey) {
+      omega.storage().set(markerKey, Date.now());
+    }
+
     // Make API call to send signup metadata (route resolves via getApiUrl;
     // usage from the omega-properties header syncs into bindings automatically)
     const response = await omega.request('/omega/user/signup', {
@@ -323,17 +397,27 @@ export async function sendUserSignupMetadata(account) {
       body: payload,
     });
 
-    // Log — the server set flags.signupProcessed on the doc, so the next page load's
-    // state.account reflects it and this won't fire again. No client-side flag needed.
+    // Log — the server set flags.signupProcessed on the doc, so the next page load
+    // that reads it clears the marker above and this never fires again.
     logger.log('User metadata sent successfully:', response);
   } catch (error) {
     logger.error('Error sending user metadata:', error);
-    // Don't throw - we don't want to block the signup flow. The doc still shows
-    // signupProcessed=false, so a refresh / next page load retries automatically.
+    // Don't throw - we don't want to block the signup flow. The marker only holds
+    // the gate for a post that DID its work: the server's "already processed" 400
+    // means the doc's flag is landing right behind it, so the marker stays and the
+    // next page load that reads the flag clears it. Every other failure (a dead
+    // network, a 5xx) never processed anything, so the marker is cleared here and
+    // the next page load retries ([#633](https://github.com/Omega-JS-Stack/omega/issues/633)).
+    const alreadyProcessed = error?.code === 400 && `${error.message}`.includes('already been processed');
+    if (markerKey && !alreadyProcessed) {
+      omega.storage().remove(markerKey);
+    }
 
     /* @dev-only:start */
     omega.utilities().showNotification(
-      `[DEV] Failed to send signup metadata. Will retry on next page load (flags.signupProcessed is still false).`,
+      alreadyProcessed
+        ? `[DEV] Signup metadata was already processed. The marker holds until flags.signupProcessed lands.`
+        : `[DEV] Failed to send signup metadata. The in-flight marker was cleared — the next page load retries.`,
       { type: 'warning', timeout: 1000 }
     );
     /* @dev-only:end */

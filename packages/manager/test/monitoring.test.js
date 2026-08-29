@@ -12,7 +12,10 @@ const assert = require('node:assert/strict');
 
 const { SERVICE_ORDER, OPERATIONS } = require('../src/config.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 const service = require('../src/services/monitoring/index.js');
+
+const DOWN = '\x1B[B';
 
 // Tests must never see real credentials from the shell environment
 delete process.env.SENTRY_AUTH_TOKEN;
@@ -258,6 +261,53 @@ test('monitoring: multiple orgs without monitoring.providers.sentry.org warns an
   assert.equal(result.output.projects.orgUnresolved, true);
   assert.deepEqual(api.mutations(), []);
   assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
+});
+
+test('monitoring: an ambiguous org is ASKED for and the pick lands in omega.json5 (#635)', async () => {
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const api = fakeSentry({
+    getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b', links: { regionUrl: 'https://eu.sentry.io' } }],
+    getTeams: [{ slug: 'fixture-brand' }],
+    getProjects: [],
+    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+    getProjectKeys: keysFor('web'),
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ targets: { web: {} } }), { sentry: api, brandRoot });
+    await tty.answer('Select Sentry organization:', `${DOWN}\r`); // org-b
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.state.org, 'org-b');
+    // The pick is the org every org-scoped call is then made against
+    assert.deepEqual(api.callsTo('createProject').map(({ args }) => args[0]), ['org-b']);
+    assert.deepEqual(api.regionUrls, ['https://eu.sentry.io']);
+    // ...and it landed in config (comments intact), so nothing asks again
+    const written = readConfigSource(brandRoot);
+    assert.match(written, /org: "org-b"/);
+    assert.match(written, /\/\/ stays single-quoted/);
+  } finally {
+    tty.close();
+  }
+});
+
+test('monitoring: a token that sees NO org has nothing to ask about — the warn stands (#635)', async () => {
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const api = fakeSentry({ getOrganizations: [] });
+
+  const tty = openTtyPrompt();
+  try {
+    const result = await runService(brandConfig(), { sentry: api, brandRoot });
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.output.projects.orgUnresolved, true);
+    assert.deepEqual(api.mutations(), []);
+    assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
+  } finally {
+    tty.close();
+  }
 });
 
 test('monitoring: a configured org the token cannot see warns honestly', async () => {

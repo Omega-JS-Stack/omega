@@ -36,7 +36,7 @@ module.exports = async ({ ctx, user, settings, libraries }) => {
     return ctx.respond('Admin required', { code: 403 });
   }
 
-  ctx.log(`signup(): Starting for ${uid}`, settings);
+  ctx.log(`signup(): Starting for ${uid}, settings keys=${keyNames(settings)}`);
 
   // 1. Poll for user doc to exist (wait for onCreate to complete)
   const userDoc = await pollForUserDoc(ctx, uid);
@@ -75,7 +75,7 @@ module.exports = async ({ ctx, user, settings, libraries }) => {
     existingDoc: userDoc,
   });
 
-  ctx.log(`signup(): Writing user record for ${uid}`, userRecord);
+  ctx.log(`signup(): Writing user record for ${uid}, keys=${keyNames(userRecord)}`);
 
   await admin.firestore().doc(`users/${uid}`)
     .set(userRecord, { merge: true });
@@ -145,6 +145,24 @@ async function pollForUserDoc(ctx, uid) {
 }
 
 /**
+ * The top-level key names of a payload, for a log line that must not carry the payload.
+ *
+ * The incoming settings and the record signup writes are both made of the fields a user
+ * document is made of — the api keys buildUserRecord() deliberately preserves, the consent
+ * records, the request IP, the attribution — and a backend line lands in Cloud Logging for
+ * the whole retention window ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+ * The SHAPE is what a log reader needs; the values belong at `ctx.debug` or nowhere.
+ *
+ * @param {*} value - Any payload (a non-object reads as nothing)
+ * @returns {string} Comma-joined top-level key names, or '(none)'
+ */
+function keyNames(value) {
+  const keys = value && typeof value === 'object' ? Object.keys(value) : [];
+
+  return keys.length ? keys.join(', ') : '(none)';
+}
+
+/**
  * Build the complete user record to write at signup completion.
  *
  * Returns the WHOLE merged document (written without {merge}), layered deepest-first:
@@ -163,6 +181,12 @@ async function pollForUserDoc(ctx, uid) {
 function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, existingDoc }) {
   const Manager = ctx.Manager;
 
+  // The resolved geolocation: the request's own headers over whatever the client sent.
+  const geolocation = {
+    ...(settings.context?.geolocation || {}),
+    ...ctx.request.geolocation,
+  };
+
   // Inferred name/company (from AI/regex on the email) — only set when present.
   const personal = {};
   if (inferred?.firstName || inferred?.lastName) {
@@ -175,6 +199,15 @@ function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, ex
     personal.company = { name: inferred.company };
   }
 
+  // Location from the request geolocation — only the fields nobody has filled in yet.
+  const location = locationFromGeolocation(geolocation, {
+    ...(existingDoc?.personal?.location || {}),
+    ...(settings.personal?.location || {}),
+  });
+  if (Object.keys(location).length) {
+    personal.location = location;
+  }
+
   // Layer 1: full schema shape (every leaf present with defaults).
   const schemaShape = Manager.User({ auth: { uid, email } }).properties;
 
@@ -184,10 +217,7 @@ function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, ex
     flags: { signupProcessed: true },
     activity: {
       ...settings.context,
-      geolocation: {
-        ...(settings.context?.geolocation || {}),
-        ...ctx.request.geolocation,
-      },
+      geolocation: geolocation,
       client: {
         ...ctx.request.client,
         ...(settings.context?.client || {}),
@@ -212,6 +242,32 @@ function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, ex
   // Deep-merge: schema (base) ← existing doc (real values win) ← signup data (owned fields win).
   // _.merge mutates its first arg, so start from a fresh object.
   return _.merge({}, schemaShape, existingDoc || {}, signupData);
+}
+
+/**
+ * The `personal.location` fields the request's geolocation can fill.
+ *
+ * The header-derived country/region/city landed in `activity.geolocation` and nowhere else, so
+ * `personal.location` — the address half of the ad-platform match keys
+ * (`libraries/analytics/match-data.js`) and the email merge fields — stayed empty on every
+ * account ([#638](https://github.com/Omega-JS-Stack/omega/issues/638)).
+ *
+ * The fill is per-field and never overwrites: an IP guess loses to anything the user set, in the
+ * incoming settings or in the existing doc. Nothing to fill returns an EMPTY object, so the
+ * write carries no `personal.location` key at all rather than a map of nulls.
+ */
+function locationFromGeolocation(geolocation, existingLocation) {
+  const location = {};
+
+  for (const field of ['country', 'region', 'city']) {
+    if (existingLocation?.[field] || !geolocation?.[field]) {
+      continue;
+    }
+
+    location[field] = geolocation[field];
+  }
+
+  return location;
 }
 
 /**
@@ -599,3 +655,7 @@ function sendFeedbackEmail(ctx, uid, firstName) {
       return result;
     });
 }
+
+// Exported for unit tests (pure, no I/O).
+module.exports.locationFromGeolocation = locationFromGeolocation;
+module.exports.keyNames = keyNames;

@@ -70,6 +70,10 @@ module.exports = async ({ ctx, change, context }) => {
     // reversed — an identifier, and the key its details are looked up by
     // ([#510](https://github.com/Omega-JS-Stack/omega/issues/510)).
     const refundId = dataAfter.event?.refundId || null;
+    // THIS charge's own id, where the event names one — the id one charge is
+    // reported to the platforms under
+    // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+    const chargeId = dataAfter.event?.chargeId || null;
 
     ctx.log(`Processing webhook ${eventId}: provider=${provider}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
 
@@ -262,7 +266,7 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails });
+    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails });
 
     // Mark webhook as completed (include transition name + any refusal for auditing/testing).
     // Both are written on EVERY pass, so a reprocess that now finds its order clears
@@ -521,7 +525,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  *   caller stamps back on the event doc: the transition detected, and the refusal
  *   when the pipeline declined to act on the event at all.
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails }) {
+async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails }) {
   const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
@@ -704,7 +708,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // needs the plan it came from, and a trial's outcome is only legible against the prior term
   // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
   if (shouldRunHandlers) {
-    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, provider, ctx });
+    trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, provider, chargeId, ctx });
   }
 
   // A persisted discount belongs to the subscription it was applied to, and to

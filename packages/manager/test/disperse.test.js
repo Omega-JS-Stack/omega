@@ -379,7 +379,6 @@ test('env: the dev-suffixed payment secrets reach the backend target .env (#586)
   setEnv({
     STRIPE_SECRET_KEY: 'sk_live_fixture',
     STRIPE_SECRET_KEY_DEV: 'sk_test_fixture',
-    STRIPE_WEBHOOK_SECRET_DEV: 'whsec_fixture_dev',
     PAYPAL_CLIENT_SECRET_DEV: 'pp-sandbox-fixture',
     CHARGEBEE_API_KEY_DEV: 'test_fixture',
   });
@@ -395,7 +394,6 @@ test('env: the dev-suffixed payment secrets reach the backend target .env (#586)
     assert.ok(envKeysForTarget('backend').includes(name), `${name} is part of the backend composition`);
   }
   assert.match(env, /^STRIPE_SECRET_KEY_DEV="sk_test_fixture"$/m);
-  assert.match(env, /^STRIPE_WEBHOOK_SECRET_DEV="whsec_fixture_dev"$/m);
   assert.match(env, /^PAYPAL_CLIENT_SECRET_DEV="pp-sandbox-fixture"$/m);
   assert.match(env, /^CHARGEBEE_API_KEY_DEV="test_fixture"$/m);
   // The live half still travels — the deploy stage is what drops the twins
@@ -431,6 +429,83 @@ test('env: dry-run reports the plan without touching the file', async () => {
   assert.equal(result.output.env.updated, 0);
   assert.deepEqual(result.output.env.files['targets/desktop/.env'].planned, ['GOOGLE_ANALYTICS_SECRET']);
   assert.equal(jetpack.read(join(brand.root, 'targets', 'desktop', '.env')), DESKTOP_TEMPLATE);
+});
+
+// ─── clearing (#636) ─────────────────────────────────────────────────────────
+
+// The writer only ever wrote the keys that HAD a value, and never cleared one,
+// so a key the brand root un-set stayed live in the target it had been composed
+// into (seen live: TIKTOK_ACCESS_TOKEN commented out at the root, still valued
+// in targets/backend/.env). Composing a file means owning what it carries.
+test('env: a schema key the brand root un-sets is CLEARED from the target it composed into', async () => {
+  setEnv({ TIKTOK_ACCESS_TOKEN: 'tt-token', STRIPE_SECRET_KEY: 'sk_fixture' });
+  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
+  const config = brandConfig({ targets: { backend: {} } });
+  const envPath = join(brand.root, 'targets', 'backend', '.env');
+
+  await runService(brand, { config });
+  assert.match(jetpack.read(envPath), /^TIKTOK_ACCESS_TOKEN="tt-token"$/m);
+
+  // The root drops the key — the target must stop serving the value
+  setEnv({ STRIPE_SECRET_KEY: 'sk_fixture' });
+  const cleared = await runService(brand, { config });
+
+  const env = jetpack.read(envPath);
+  assert.doesNotMatch(env, /^TIKTOK_ACCESS_TOKEN=/m, `the key is gone from the file: ${env}`);
+  assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m, 'the keys the root still sets are untouched');
+  assert.deepEqual(cleared.output.env.files['targets/backend/.env'].cleared, ['TIKTOK_ACCESS_TOKEN'], 'the run reports the key it cleared, by name');
+
+  // Idempotent: nothing left to clear, nothing rewritten
+  const before = statSync(envPath).mtimeMs;
+  const again = await runService(brand, { config });
+  assert.equal(again.output.env.updated, 0);
+  assert.equal(again.output.env.current, 1);
+  assert.equal(statSync(envPath).mtimeMs, before);
+});
+
+test('env: dry-run reports the clear without touching the file', async () => {
+  setEnv({ TIKTOK_ACCESS_TOKEN: 'tt-token' });
+  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
+  const config = brandConfig({ targets: { backend: {} } });
+  const envPath = join(brand.root, 'targets', 'backend', '.env');
+
+  await runService(brand, { config });
+  const composed = jetpack.read(envPath);
+
+  setEnv();
+  const result = await runService(brand, { config, options: { dryRun: true } });
+
+  assert.equal(result.output.env.updated, 0);
+  assert.deepEqual(result.output.env.files['targets/backend/.env'].cleared, ['TIKTOK_ACCESS_TOKEN']);
+  assert.equal(jetpack.read(envPath), composed, 'a dry run writes nothing');
+});
+
+test('updateEnvContent: a cleared key drops every occurrence, placeholders and other keys stay', () => {
+  const content = [
+    '# ========== Default Values ==========',
+    '# TIKTOK_ACCESS_TOKEN=',
+    'GH_TOKEN="stale"',
+    'KEEP="mine"',
+    'EMPTY=""',
+    'GH_TOKEN="stale-two"',
+  ].join('\n');
+
+  const result = updateEnvContent(content, {}, ['GH_TOKEN', 'TIKTOK_ACCESS_TOKEN', 'EMPTY', 'NEVER_THERE']);
+
+  assert.deepEqual(result.removed, ['GH_TOKEN'], 'only a key the file carries WITH a value is cleared');
+  assert.equal(result.content, [
+    '# ========== Default Values ==========',
+    '# TIKTOK_ACCESS_TOKEN=',
+    'KEEP="mine"',
+    'EMPTY=""',
+  ].join('\n'), 'the commented placeholder and the empty line are the key\'s documented home, not drift');
+});
+
+test('updateEnvContent: a key being written is never cleared in the same pass', () => {
+  const result = updateEnvContent('GH_TOKEN="stale"', { GH_TOKEN: 'fresh' }, ['GH_TOKEN']);
+
+  assert.deepEqual(result.removed, []);
+  assert.equal(result.content, 'GH_TOKEN="fresh"');
 });
 
 // ─── updateEnvContent unit — the multi-line replacement hazard ───────────────

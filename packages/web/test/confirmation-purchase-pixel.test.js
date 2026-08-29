@@ -15,6 +15,21 @@
  *  3. NO DEDUPE ID. A browser half and a server half of the same purchase with
  *     no shared id are two purchases to Meta and TikTok.
  *
+ * Two more landed on 2026-08-27, and each has its case below too:
+ *
+ *  4. A TRIAL CHECKOUT FIRED A PURCHASE
+ *     ([#654](https://github.com/Omega-JS-Stack/omega/issues/654)). `?track=true`
+ *     rides EVERY checkout, so a $0 trial sent a browser Purchase while the
+ *     webhook sent `trial_start`. The value was already 0 (the intent route puts
+ *     `amount=0` on a trial's confirmation URL); the NAME was the defect — two
+ *     different event names never deduplicate, so each platform counted the
+ *     browser half as a second conversion on top of the server's trial.
+ *  5. GA4 WAS LEFT OFF THE PURCHASE
+ *     ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). GA4
+ *     deduplicates `purchase` on `transaction_id`, so the browser half can carry
+ *     the session and the campaign a webhook has none of, and GA4 still counts
+ *     one purchase.
+ *
  * The module is browser code behind two bundler aliases, so the harness drives
  * the REAL file through esbuild — and through the REAL catalog, adapters and
  * guarded transport, so what the page globals receive is what a live pixel
@@ -136,21 +151,25 @@ async function trackOnce(state) {
   return page;
 }
 
-test('#386: the purchase pixel fires again, to the platforms that dedupe', async (t) => {
+test('#386/#656: the purchase pixel fires to all three, GA4 included', async (t) => {
   t.after(clearPage);
 
   const { tracked } = await trackOnce(purchaseState());
 
   assert.deepStrictEqual(
     tracked.map(([provider]) => provider),
-    ['fbq', 'ttq'],
-    'Meta and TikTok get the retargeting signal — and GA4 does NOT: the webhook owns the revenue there, and GA4 has no cross-source dedupe, so a browser copy would be a second purchase',
+    ['gtag', 'fbq', 'ttq'],
+    'Meta and TikTok get the retargeting signal, and GA4 gets the browser attribution it deduplicates against the webhook on transaction_id (#656)',
   );
 
-  const [meta, tiktok] = tracked;
+  const [google, meta, tiktok] = tracked;
+  assert.strictEqual(google[1], 'event');
+  assert.strictEqual(google[2], 'purchase');
+  assert.strictEqual(google[3].transaction_id, 'ORD-1', 'the id the webhook sends too — GA4 collapses the two halves on it');
+  assert.strictEqual(google[3].value, 19, 'and the browser half carries the real amount');
   assert.strictEqual(meta[1], 'track', 'Purchase is one of Meta\'s standard events');
   assert.strictEqual(meta[2], 'Purchase');
-  assert.strictEqual(tiktok[1], 'CompletePayment', 'TikTok\'s own name for the same conversion');
+  assert.strictEqual(tiktok[1], 'Purchase', 'TikTok retired CompletePayment for its own Purchase (#652)');
 });
 
 test('#386: both halves name the same dedupe id, derived from the order', async (t) => {
@@ -158,13 +177,49 @@ test('#386: both halves name the same dedupe id, derived from the order', async 
 
   const { tracked } = await trackOnce(purchaseState());
 
-  const [meta, tiktok] = tracked;
+  const [, meta, tiktok] = tracked;
 
-  // The backend keys a payment event `<canonical>.<webhook event id>`, falling
-  // back to the order id (payments-webhooks/analytics.js resolveEventId). The
-  // order id is the only half of that a browser holds.
+  // The backend keys the two browser-twinned events on the ORDER
+  // (payments-webhooks/analytics.js resolveEventId) — the only id a browser holds.
   assert.deepStrictEqual(meta.at(-1), { eventID: 'purchase.ORD-1' }, 'Meta deduplicates on (event_name, event_id)');
   assert.deepStrictEqual(tiktok.at(-1), { event_id: 'purchase.ORD-1' }, 'and TikTok on event_id');
+});
+
+test('#654: a trial checkout fires trial_start with value 0 — never a purchase', async (t) => {
+  t.after(clearPage);
+
+  const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
+
+  assert.deepStrictEqual(
+    tracked.map(([provider]) => provider),
+    ['fbq', 'ttq'],
+    'the ad platforms only: GA4\'s trial_start is a custom event with no dedupe, and the webhook owns it',
+  );
+
+  const [meta, tiktok] = tracked;
+
+  assert.strictEqual(meta[2], 'StartTrial', 'Meta\'s own event for the start of a free trial');
+  assert.strictEqual(meta[3].value, 0, 'a trial charges nothing, whatever amount the confirmation URL carried');
+  assert.strictEqual(meta[3].currency, 'USD');
+  assert.deepStrictEqual(meta.at(-1), { eventID: 'trial_start.ORD-1' }, 'and the id the webhook now derives the same way');
+
+  assert.strictEqual(tiktok[1], 'StartTrial');
+  assert.strictEqual(tiktok[2].value, 0);
+  assert.deepStrictEqual(tiktok.at(-1), { event_id: 'trial_start.ORD-1' });
+});
+
+test('#654: a trial never sends a Purchase to any platform', async (t) => {
+  t.after(clearPage);
+
+  // The state's `amount: 19` is DEFENSIVE, not what a live trial arrives with:
+  // the intent route already puts `amount=0` on a trial's confirmation URL. The
+  // fixture proves the pixel's own guard, not the URL's.
+  const { tracked } = await trackOnce(purchaseState({ hasFreeTrial: true }));
+
+  const names = JSON.stringify(tracked);
+
+  assert.strictEqual(names.includes('Purchase'), false, `a $0 trial must book no purchase anywhere: ${names}`);
+  assert.strictEqual(names.includes('19'), false, 'nor the plan price nobody was charged');
 });
 
 test('#386: a one-time buy is not a subscription (the frequency-string bug)', async (t) => {
@@ -175,7 +230,7 @@ test('#386: a one-time buy is not a subscription (the frequency-string bug)', as
   // subscription — the same truthiness bug the receipt copy carried (#282).
   const { tracked } = await trackOnce(purchaseState({ frequency: 'once' }));
 
-  const [meta] = tracked;
+  const [, meta] = tracked;
   assert.strictEqual(meta[3].content_type, 'product', 'the item still rides as a product');
 
   const { tracked: subscription } = await trackOnce(purchaseState({ frequency: 'monthly' }));

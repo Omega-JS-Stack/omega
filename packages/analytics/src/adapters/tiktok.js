@@ -1,9 +1,10 @@
 /**
  * TikTok adapter — the TikTok Pixel and the Events API.
  *
- * TikTok's commerce vocabulary is single-item (content_id + price + quantity),
- * so those entries carry a `map()` in the catalog; everything else passes
- * through as properties. Consent category: 'marketing'.
+ * TikTok's commerce vocabulary is a `contents` array of product objects
+ * (content_id + content_name + price + quantity) beside the order's
+ * content_type/value/currency, so those entries carry a `map()` in the catalog;
+ * everything else passes through as properties. Consent category: 'marketing'.
  */
 
 const { createAdapter, pick, attachPage } = require('./resolve.js');

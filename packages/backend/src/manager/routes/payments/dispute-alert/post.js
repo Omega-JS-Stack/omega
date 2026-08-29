@@ -4,10 +4,6 @@ const powertools = require('node-powertools');
 const safeCompare = require('../../../helpers/safe-compare.js');
 const env = require('../../../libraries/env.js');
 
-// Providers already warned about running key-only, so the notice lands once per
-// instance instead of once per alert
-const keyOnlyWarned = new Set();
-
 /**
  * POST /payments/dispute-alert?provider=chargeblast&key=XXX
  * Receives dispute alert webhooks (e.g., from Chargeblast), validates them,
@@ -19,8 +15,6 @@ const keyOnlyWarned = new Set();
  *
  * This handler is provider-agnostic. Each provider module defines:
  *   - normalize(body) — extracts the standard dispute alert shape
- *   - verifySignature(req) — optional; verifies the provider's native signature
- *     over the raw bytes, returning { status: 'verified' | 'invalid' | 'unconfigured' }
  */
 module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
@@ -42,25 +36,6 @@ module.exports = async ({ ctx, Manager, libraries }) => {
     providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
   } catch (e) {
     return ctx.respond(`Unknown alert provider: ${provider}`, { code: 400 });
-  }
-
-  // Verify the provider's native signature — the key param above is a defense
-  // layer, not the boundary. A dispute alert drives refunds and force-cancels,
-  // so a provider that ships a signing scheme verifies strictly once its secret
-  // is configured; without it the route stays on the key-only path and says so.
-  // Nothing is normalized or stored before this passes ([#212]).
-  if (providerModule.verifySignature) {
-    const verification = providerModule.verifySignature(ctx.ref.req);
-
-    if (verification.status === 'invalid') {
-      ctx.error(`Rejected ${provider} dispute alert: signature verification failed (${verification.reason})`);
-      return ctx.respond('Invalid signature', { code: 401 });
-    }
-
-    if (verification.status === 'unconfigured' && !keyOnlyWarned.has(provider)) {
-      keyOnlyWarned.add(provider);
-      ctx.warn(`${provider} dispute alerts are running key-only: ${verification.reason}. Set it to verify every alert's signature.`);
-    }
   }
 
   // Normalize the payload using the provider

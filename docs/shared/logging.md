@@ -23,6 +23,27 @@ emulator (`FUNCTIONS_EMULATOR`) and latched once-per-process everywhere else, an
 `omega dev` leg output collapses consecutive duplicate lines into one plus a
 `(repeated N×)` note.
 
+### PII and secrets
+
+**A log line names a user by address or uid, never by serializing the document.** A user
+document carries `api.privateKey`, the consent records, the signup IP and the attribution,
+and a backend line lands in Cloud Logging for the whole retention window — one
+`JSON.stringify(user)` stores a live credential there in plain text
+([#632](https://github.com/Omega-JS-Stack/omega/issues/632)). The rule covers every object
+a caller hands in, not just user docs: log the identifier, not the payload — a payload's
+SHAPE (its top-level key names, a count) is fair game when the line needs it. A secret that
+has to be acknowledged at all renders through backend's `redactSecret()`
+(`***<last 4> (<n> chars)`), and a fat payload worth having while debugging goes to the
+`debug` level above, never to `log`.
+
+**A third party's credential is a credential.** An OAuth token exchange response holds the
+access, refresh and id tokens; the identity a provider answers with is the user's PII. Both
+used to ride `ctx.log` on every OAuth2 link
+([#641](https://github.com/Omega-JS-Stack/omega/issues/641)) — a line names the provider,
+the uid and whether the exchange succeeded, and nothing else. The same rule reaches an
+HTTP helper's own switches: `wonderful-fetch`'s `log: true` prints its whole configuration,
+headers included, so it never rides a request whose `authorization` header is the token.
+
 ### The two surfaces
 
 - **Build-time** (CLI, gulp, tests, the manager's services): the devkit logger prints a

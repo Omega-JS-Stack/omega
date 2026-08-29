@@ -15,7 +15,7 @@
  *
  * Run: npx omega test backend:routes/payments/webhook-stripe-refund-one-time
  */
-const { callHandler, withEnvironment } = require('./_route-harness.js');
+const { callHandler } = require('./_route-harness.js');
 
 const handler = require('../../../src/manager/routes/payments/webhook/post.js');
 const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
@@ -45,10 +45,9 @@ const refundEvent = (id, charge) => ({
   data: { object: charge },
 });
 
-// Deliver key-only: the signature gate is proven in webhook-signature.test.js,
-// and this suite is about which events get through the door at all.
+// This suite is about which events get through the door at all.
 function deliver(Manager, event) {
-  return withEnvironment({ STRIPE_WEBHOOK_SECRET: null }, () => callHandler({
+  return callHandler({
     Manager,
     handler,
     functionName: 'payments-webhook',
@@ -57,7 +56,7 @@ function deliver(Manager, event) {
       body: event,
       rawBody: Buffer.from(JSON.stringify(event)),
     },
-  }));
+  });
 }
 
 module.exports = {

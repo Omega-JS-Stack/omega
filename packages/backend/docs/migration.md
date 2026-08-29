@@ -19,7 +19,6 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 | `stripe.secret_key` or `stripe.key` | `STRIPE_SECRET_KEY` |
 | `chargebee.site` | `CHARGEBEE_SITE` |
 | `chargebee.api_key` or `chargebee.key` | `CHARGEBEE_API_KEY` |
-| `coinbase.api_key` or `coinbase.key` | `COINBASE_API_KEY` |
 | `cloudflare.token` or `cloudflare.key` | `CLOUDFLARE_TOKEN` |
 | `recaptcha.secret_key` or `recaptcha.key` | `RECAPTCHA_SECRET_KEY` |
 | `sendgrid.api_key` or `sendgrid.key` | `SENDGRID_API_KEY` |
@@ -56,7 +55,6 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | `Manager.config.paypal.client_secret` | `process.env.PAYPAL_CLIENT_SECRET` |
 | `Manager.config.chargebee.site` | `process.env.CHARGEBEE_SITE` |
 | `Manager.config.chargebee.api_key` | `process.env.CHARGEBEE_API_KEY` |
-| `Manager.config.coinbase.api_key` | `process.env.COINBASE_API_KEY` |
 | `Manager.config.cloudflare.token` | `process.env.CLOUDFLARE_TOKEN` |
 | `Manager.config.recaptcha.secret_key` | `process.env.RECAPTCHA_SECRET_KEY` |
 | `Manager.config.beehiiv.api_key` | `process.env.BEEHIIV_API_KEY` |

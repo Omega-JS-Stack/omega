@@ -24,6 +24,7 @@ const { API_BASE } = require('../src/services/certificates/lib/apple-api.js');
 const { PORTAL_CREATE_URL } = require('../src/services/certificates/lib/manual-walkthrough.js');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { openTtyPrompt } = require('./lib/interactive.js');
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const service = require('../src/services/certificates/index.js');
 
 // Tests must never see real credentials from the shell environment
@@ -680,6 +681,50 @@ test('certificates: a missing bundle ID is created with the APPLE_ID_AUTH consen
   assert.deepEqual(result.state.bundleId, { identifier: BUNDLE_IDENTIFIER, id: 'bundle-new', platforms: ['MACOS'] });
 });
 
+test('certificates: a missing bundleIdPrefix is ASKED for and the pass continues on it (#635)', async () => {
+  const root = makeBrandRoot('{\n  brand: { id: "fixture-brand" },\n  certificates: { providers: { apple: {} } }, // the prefix lands here\n}\n');
+  const client = fakeApple({
+    bundleIds: [],
+    'POST bundleIds': { data: bundleRecord('bundle-new') },
+    'POST bundleIdCapabilities': { data: { id: 'cap-new' } },
+  });
+
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ apple: { bundleIdPrefix: null } }), { root, client, operations: ONLY('bundle-ids') });
+    await tty.answer('Apple bundle id prefix', 'com.fixture\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    // The pass continued on the prefix just entered
+    assert.deepEqual(result.output.bundleIds, { created: true });
+    assert.equal(client.mutations()[0].body.data.attributes.identifier, BUNDLE_IDENTIFIER);
+    // ...and it landed in config, comments intact, so nothing asks again
+    const written = readConfigSource(root);
+    assert.match(written, /bundleIdPrefix: "com\.fixture"/);
+    assert.match(written, /\/\/ the prefix lands here/);
+    assert.deepEqual(opened, ['https://developer.apple.com/account/resources/identifiers/list']);
+  } finally {
+    setBrowserOpener(null);
+    tty.close();
+  }
+});
+
+test('certificates: no bundleIdPrefix on a headless run is a warned skip, never an error (#635)', async () => {
+  const root = makeBrandRoot('{\n  brand: { id: "fixture-brand" },\n}\n');
+  const client = fakeApple({ bundleIds: [] });
+
+  const result = await runService(brandConfig({ apple: { bundleIdPrefix: null } }), { root, client, operations: ONLY('bundle-ids') });
+
+  assert.equal(result.status, 'warned');
+  assert.deepEqual(result.output.bundleIds, { skipped: 'no bundleIdPrefix' });
+  assert.deepEqual(client.mutations(), []);
+  // Nothing was written for a value nobody was asked for
+  assert.doesNotMatch(readConfigSource(root), /bundleIdPrefix/);
+});
+
 test('certificates: a missing capability on an existing bundle ID is added', async () => {
   const client = fakeApple({
     bundleIds: [bundleRecord()],
@@ -706,16 +751,6 @@ test('certificates: mobile + desktop targets derive both platforms', async () =>
   );
 
   assert.deepEqual(result.state.bundleId.platforms, ['IOS', 'MACOS']);
-});
-
-test('certificates: an unset bundleIdPrefix is a config error', async () => {
-  const result = await runService(
-    brandConfig({ apple: { bundleIdPrefix: null } }),
-    { root: stageBrand(), client: fakeApple(), operations: ONLY('bundle-ids') },
-  );
-
-  assert.equal(result.status, 'error');
-  assert.match(result.error, /bundleIdPrefix/);
 });
 
 test('certificates: bundle-id policy — reverse-DNS derivation + dash-to-dot composition', () => {

@@ -43,7 +43,7 @@ const CANONICAL_TOP_LEVEL_ORDER = [
   'marketing', 'blog', 'devlog', 'reviews', 'seo', 'search',
   'dataRequest', 'forms', 'inbound',
   'server', 'assets', 'directory',
-  'certificates', 'theme', 'translation', 'client', 'migrations', 'targets',
+  'certificates', 'theme', 'ai', 'translation', 'client', 'migrations', 'targets',
 ];
 
 /**

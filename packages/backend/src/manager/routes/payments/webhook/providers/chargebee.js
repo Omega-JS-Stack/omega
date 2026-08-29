@@ -9,11 +9,6 @@
  *   event_type: "subscription_created",
  *   content: { subscription: {...}, customer: {...}, invoice: {...} }
  * }
- *
- * No verifySignature(): Chargebee does not sign webhook payloads. Its own
- * authentication mechanism for an endpoint is the credentials carried on the
- * webhook URL — which is what `?key=<OMEGA_WEBHOOK_KEY>` already is, so these
- * events are key-only by design, not by omission.
  */
 
 const ChargebeeLib = require('../../../../libraries/payment/providers/chargebee.js');
@@ -66,7 +61,7 @@ module.exports = {
    * Parse a Chargebee webhook request
    *
    * @param {object} req - The raw HTTP request
-   * @returns {object} { eventId, eventType, category, resourceType, resourceId, raw, uid }
+   * @returns {object} { eventId, eventType, category, resourceType, resourceId, chargeId, raw, uid }
    */
   parseWebhook(req) {
     const event = req.body;
@@ -86,12 +81,26 @@ module.exports = {
     let resourceType = null;
     let resourceId = null;
     let uid = null;
+    // THIS charge's own id — Chargebee's invoice id, which rides the renewal and
+    // refund payloads. The resourceId is the subscription, constant for its whole
+    // life, so it can never key a single charge
+    // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). A one-time
+    // purchase has exactly one charge and the order names it.
+    let chargeId = null;
 
     if (SUBSCRIPTION_EVENTS.has(eventType)) {
       // Subscription lifecycle events
       category = 'subscription';
       resourceType = 'subscription';
       resourceId = subscription?.id || null;
+      // The RENEWAL's invoice, and only that one. `subscription_created` carries
+      // an invoice too — the checkout's first one (test/fixtures/chargebee/
+      // webhook-subscription-created.json) — but that charge is reported under
+      // the ORDER id, the one id the confirmation page can compute as well
+      // ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). Naming it
+      // here would have this hand the pipeline a charge id for an event whose
+      // transaction is keyed on the order.
+      chargeId = eventType === 'subscription_renewed' ? (invoice?.id || null) : null;
       uid = extractUid(subscription, customer);
 
     } else if (eventType === 'payment_failed') {
@@ -115,6 +124,8 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = subscription.id;
+        // The invoice the reversed charge was paid against ([#656]).
+        chargeId = invoice?.id || null;
         uid = extractUid(subscription, customer);
       } else if (invoice) {
         // No subscription — the refund of a one-time purchase, resolved through
@@ -149,6 +160,7 @@ module.exports = {
       category: category,
       resourceType: resourceType,
       resourceId: resourceId,
+      chargeId: chargeId,
       raw: event,
       uid: uid,
     };

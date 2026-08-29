@@ -18,7 +18,6 @@ const PROVIDER_NAMES = {
   stripe: 'Stripe',
   paypal: 'PayPal',
   chargebee: 'Chargebee',
-  coinbase: 'Coinbase',
 };
 
 // Events that show the price summary table

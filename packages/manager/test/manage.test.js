@@ -298,6 +298,10 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Web-only fixture → no desktop/mobile target to sign for
   assert.equal(report.results.certificates.status, 'skipped');
   assert.match(report.results.certificates.reason, /no desktop or mobile target/);
+  // No AI provider keys in the environment and no TTY to paste them → clean
+  // skip naming both (#639; neither key gates the run — they are optional)
+  assert.equal(report.results.ai.status, 'skipped');
+  assert.match(report.results.ai.reason, /OPENAI_API_KEY, ANTHROPIC_API_KEY/);
   // No parasite SEO content configured → clean skip with sidecar guidance
   assert.equal(report.results.seo.status, 'skipped');
   assert.match(report.results.seo.reason, /no SEO content configured/);
@@ -325,7 +329,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'ai', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

@@ -36,9 +36,9 @@ const CONTROLS = [
     options: [['annually', 'Annually'], ['monthly', 'Monthly'], ['weekly', 'Weekly'], ['daily', 'Daily']],
   },
   {
-    // The slow-boot rehearsal (#342): the page sleeps this long before it
-    // resolves the frequency, so the loading state is something you can look at
-    // rather than a frame that flashes past.
+    // The slow-boot rehearsal (#342): the page sleeps this long before the
+    // trial answer lands (#637), so the trial spot and the money line hold
+    // their skeletons long enough to look at rather than flashing past.
     param: '_dev_preDelay',
     label: 'Pre-delay',
     options: [['', '(none)'], ['3000', '3s'], ['5000', '5s'], ['10000', '10s']],

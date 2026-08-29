@@ -7,6 +7,16 @@ import omega from '@omega.js/client';
 // All supported billing frequencies
 export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];
 
+// The third answer a trial-eligibility check can produce, and it is NOT the
+// same as "not eligible": the check timed out or failed, so nobody knows. The
+// DISPLAY reads it conservatively (no trial quoted, the full amount due today
+// — rule 3 never quotes a price the server has not confirmed), while the
+// intent payload still ASKS for the trial, because the route re-checks and
+// silently downgrades a buyer who does not qualify. Losing a trial to a slow
+// network would cost a qualifying buyer their offer for nothing
+// (Ian 2026-08-27, [#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
+export const TRIAL_ELIGIBILITY_UNKNOWN = 'unknown';
+
 // Minimal mutable state
 export const state = {
   // From config (stored once, never transformed)
@@ -24,6 +34,9 @@ export const state = {
   // How far the code reaches: 'once' (the first payment only, what every
   // configured code is) vs a duration that rides every renewal (#254)
   discountDuration: null,
+  // The server's answer: true, false, or TRIAL_ELIGIBILITY_UNKNOWN
+  trialEligibility: TRIAL_ELIGIBILITY_UNKNOWN,
+  // What the page DISPLAYS, which is only ever a confirmed yes
   trialEligible: false,
 
   // UI state
@@ -53,7 +66,7 @@ export function resolveProvider(paymentMethod) {
     return 'stripe';
   }
 
-  const map = { paypal: 'paypal', crypto: 'coinbase' };
+  const map = { paypal: 'paypal' };
   return map[paymentMethod] || paymentMethod;
 }
 
@@ -136,19 +149,6 @@ export function buildBindingsState() {
           ? `${formatCurrency(cyclePrice)} ${frequencyLabels[cycle] || cycle}`
           : `${formatCurrency(prices.subtotal)} one-time`,
         subtotal: formatCurrency(prices.subtotal),
-        total: formatCurrency(prices.total),
-        totalDueText: `${formatCurrency(prices.total)} due today`,
-        showTerms: isSubscription,
-        termsText: buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount),
-      },
-      trial: {
-        show: hasFreeTrial,
-        hasFreeTrial: hasFreeTrial && prices.total === 0,
-        // The length is the CATALOG's, never a framework constant (#273): a
-        // trial the product doesn't sell fails `hasFreeTrial` and the sentence
-        // never renders, so there is no number left to invent.
-        message: hasFreeTrial ? `Start your ${product.trial.days}-day free trial today!` : '',
-        discountAmount: prices.trialDiscountAmount.toFixed(2),
       },
       discount: {
         hasDiscount: hasDiscount,
@@ -168,11 +168,30 @@ export function buildBindingsState() {
         paypal: !!state.providers?.paypal?.clientId,
         applePay: false,
         googlePay: false,
-        crypto: state.providers?.coinbase?.enabled === true,
       },
       error: {
         show: state.error.show,
         message: state.error.message,
+      },
+    },
+    // The half the SERVER decides (#637). Its own bindings root because a root
+    // key is this system's unit of deferral: the page's build-config paint
+    // publishes `checkout` alone, which leaves every spot below still wearing
+    // its skeleton until trial eligibility has answered. Everything here reads
+    // differently depending on that one answer, so it is written exactly once.
+    order: {
+      total: formatCurrency(prices.total),
+      totalDueText: `${formatCurrency(prices.total)} due today`,
+      showTerms: isSubscription,
+      termsText: buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount),
+      trial: {
+        show: hasFreeTrial,
+        hasFreeTrial: hasFreeTrial && prices.total === 0,
+        // The length is the CATALOG's, never a framework constant (#273): a
+        // trial the product doesn't sell fails `hasFreeTrial` and the sentence
+        // never renders, so there is no number left to invent.
+        message: hasFreeTrial ? `Start your ${product.trial.days}-day free trial today!` : '',
+        discountAmount: prices.trialDiscountAmount.toFixed(2),
       },
     },
     auth: {

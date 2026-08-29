@@ -26,7 +26,7 @@
  *
  * AI mode requires:
  *   OMEGA_ADMIN_KEY   — authenticates with Ghostii + parent server
- *   OPENAI_API_KEY        — Ghostii uses OpenAI internally (or OMEGA_OPENAI_API_KEY)
+ *   OPENAI_API_KEY        — Ghostii uses OpenAI internally
  *   PARENT_API_URL        — or set `parent` in config/omega.json5 (for $parent sources)
  *
  * Default mode requires: nothing.

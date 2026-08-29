@@ -232,7 +232,7 @@ Transactional.prototype.send = async function (settings) {
   const admin = self.admin;
   const ctx = self.ctx;
 
-  ctx.log(`Email.send(): to=${JSON.stringify(settings.to)}, subject=${settings.subject}, template=${settings.template}`);
+  ctx.log(`Email.send(): to=${describeRecipients(settings.to)}, subject=${settings.subject}, template=${settings.template}`);
 
   const email = await self.build(settings);
 
@@ -251,7 +251,11 @@ Transactional.prototype.send = async function (settings) {
   const send = await sendgrid.send(email).catch(e => e);
 
   if (send instanceof Error) {
-    const details = send?.response?.body?.errors || send;
+    // SendGrid's own `errors` array is the diagnostic. A network-level failure rejects
+    // with the raw axios error instead, whose `config` echoes the request — headers and
+    // all, the API key included — so the fallback is the message, never the error whole
+    // ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+    const details = send?.response?.body?.errors || send?.response?.body || send.message;
     ctx.error('Email send failed:', details);
     throw errorWithCode(`Failed to send email: ${JSON.stringify(details)}`, 500);
   }
@@ -301,6 +305,29 @@ function normalizeRecipients(input) {
   }
 
   return result;
+}
+
+/**
+ * Render recipients for a LOG line — addresses only, never the object itself.
+ *
+ * Callers may hand `to` a whole user document (the order and welcome senders do),
+ * and that document carries api.privateKey, consent, IP and attribution. A backend
+ * log line lands in Cloud Logging and stays for the retention window, so the line
+ * names its recipient the way the rest of the framework does: by address, or by uid
+ * when that is all the caller knew
+ * ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+ *
+ * Goes through normalizeRecipients() so the log agrees with what actually gets sent.
+ *
+ * @param {*} input - Whatever the caller passed as to/cc/bcc
+ * @returns {string} Comma-joined addresses/uids, or '(none)'
+ */
+function describeRecipients(input) {
+  const described = normalizeRecipients(input)
+    .map(entry => entry.email || (entry._uid ? `uid:${entry._uid}` : null))
+    .filter(Boolean);
+
+  return described.length ? described.join(', ') : '(none)';
 }
 
 async function resolveRecipients(recipients, admin, ctx) {

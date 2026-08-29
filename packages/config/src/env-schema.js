@@ -309,25 +309,6 @@ const ENV_SCHEMA = [
     description: 'Stripe TEST secret key (sk_test_…) — the backend uses it instead of STRIPE_SECRET_KEY outside production, so a local emulator can never charge a real card. Never uploaded by a deploy.',
   },
   {
-    name:        'STRIPE_WEBHOOK_SECRET',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    secret:      true,
-    required:    false,
-    description: "Signing secret of the brand's Stripe webhook endpoint — the backend verifies every delivery against it.",
-  },
-  {
-    name:        'STRIPE_WEBHOOK_SECRET_DEV',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    devOf:       'STRIPE_WEBHOOK_SECRET',
-    secret:      true,
-    required:    false,
-    description: "Signing secret a local run verifies against — the one `stripe listen --print-secret` prints, which is never the live endpoint's. Never uploaded by a deploy.",
-  },
-  {
     name:        'PAYPAL_CLIENT_SECRET',
     owner:       'payment',
     targets:     ['backend'],
@@ -365,24 +346,6 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     description: "Chargebee TEST-site API key (test_…) — the backend uses it instead of CHARGEBEE_API_KEY outside production. Never uploaded by a deploy.",
-  },
-  {
-    name:        'COINBASE_API_KEY',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    secret:      true,
-    required:    false,
-    description: 'Coinbase Commerce API key — crypto charges and their webhook verification.',
-  },
-  {
-    name:        'CHARGEBLAST_WEBHOOK_SECRET',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    secret:      true,
-    required:    false,
-    description: 'Chargeblast signing secret — the backend verifies dispute-alert deliveries against it.',
   },
   {
     name:        'SLAPFORM_SERVICE_ACCOUNT',
@@ -467,24 +430,9 @@ const ENV_SCHEMA = [
   },
 
   // ── backend service keys ─────────────────────────────────────────────────
-  {
-    name:        'OMEGA_OPENAI_API_KEY',
-    owner:       'backend',
-    targets:     ['backend'],
-    group:       'backend-services',
-    secret:      true,
-    required:    false,
-    description: "OMEGA's own OpenAI key — the brand-agnostic fallback the backend's AI provider uses when the brand supplies none.",
-  },
-  {
-    name:        'OMEGA_ANTHROPIC_API_KEY',
-    owner:       'backend',
-    targets:     ['backend'],
-    group:       'backend-services',
-    secret:      true,
-    required:    false,
-    description: "OMEGA's own Anthropic key — the brand-agnostic fallback beside OMEGA_OPENAI_API_KEY.",
-  },
+  // ONE key per AI provider ([#639](https://github.com/Omega-JS-Stack/omega/issues/639)):
+  // the OMEGA_-prefixed twins are gone. A company-wide key is the COMPANY
+  // layer of the .env cascade under the SAME name — never a second key name.
   {
     name:        'OPENAI_API_KEY',
     owner:       'backend',
@@ -492,7 +440,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
-    description: "The brand's own OpenAI key — wins over the OMEGA_* fallback wherever the backend calls OpenAI.",
+    description: 'The OpenAI key wherever the backend calls OpenAI — the brand .env wins, a company .env serves every brand that sets none.',
   },
   {
     name:        'ANTHROPIC_API_KEY',
@@ -501,7 +449,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
-    description: "The brand's own Anthropic key — wins over the OMEGA_* fallback wherever the backend calls Anthropic.",
+    description: 'The Anthropic key wherever the backend calls Anthropic — the brand .env wins, a company .env serves every brand that sets none.',
   },
   {
     name:        'NEVERBOUNCE_API_KEY',
@@ -520,15 +468,6 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     description: 'ZeroBounce API key — the email-validation provider used when NeverBounce is unset.',
-  },
-  {
-    name:        'APOLLO_API_KEY',
-    owner:       'backend',
-    targets:     ['backend'],
-    group:       'backend-services',
-    secret:      true,
-    required:    false,
-    description: 'Apollo API key — contact enrichment behind the backend\'s inbound lead handling.',
   },
 
   // ── machine-owned: written by a service on its first real run ────────────

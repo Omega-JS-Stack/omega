@@ -11,11 +11,15 @@
  * is published into `process.env` too, so the same run's disperse composes it
  * into targets/backend/.env — the key is live one manage after the gap, not
  * two. Values are never printed: the run says WHICH key it minted, never what.
+ *
+ * The mint itself is lib/env-secret.js's `mintGeneratedKey` — shared with the
+ * setup contract, which mints a single key for a service that reached it
+ * before this op ran (#635).
  */
 const chalk = require('chalk').default;
 
 const { generatedEnvKeys } = require('@omega.js/config');
-const { writeEnvValue } = require('../../../lib/env-secret.js');
+const { mintGeneratedKey } = require('../../../lib/env-secret.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async (context) => {
@@ -25,7 +29,7 @@ module.exports = async (context) => {
   const planned = [];
   const present = [];
 
-  for (const [name, generate] of Object.entries(generatedEnvKeys())) {
+  for (const name of Object.keys(generatedEnvKeys())) {
     if (process.env[name]) {
       present.push(name);
       continue;
@@ -37,15 +41,12 @@ module.exports = async (context) => {
       continue;
     }
 
-    const value = generate();
-    writeEnvValue(brandRoot, name, value);
-    process.env[name] = value;
+    // The mint — and its success line — live once, in lib/env-secret.js, so
+    // this op and the setup contract report an identical key identically
+    mintGeneratedKey(brandRoot, name);
     minted.push(name);
   }
 
-  if (minted.length > 0) {
-    console.log(`      ${chalk.green('✓')} minted ${chalk.cyan(minted.join(', '))} into the brand .env`);
-  }
   if (present.length > 0) {
     console.log(`      ${chalk.green('✓')} generated keys (${present.length} present)`);
   }

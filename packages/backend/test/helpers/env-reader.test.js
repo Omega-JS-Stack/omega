@@ -231,10 +231,7 @@ module.exports = {
           assert.strictEqual(env.has('STRIPE_SECRET_KEY_DEV'), false);
         });
 
-        // The other three twins answer the same way
-        withEnv({ ...DEVELOPMENT, STRIPE_WEBHOOK_SECRET: 'whsec_plain', STRIPE_WEBHOOK_SECRET_DEV: 'whsec_dev' }, () => {
-          assert.strictEqual(env.get('STRIPE_WEBHOOK_SECRET'), 'whsec_dev');
-        });
+        // The other two twins answer the same way
         withEnv({ ...DEVELOPMENT, PAYPAL_CLIENT_SECRET: 'pp-plain', PAYPAL_CLIENT_SECRET_DEV: 'pp-sandbox' }, () => {
           assert.strictEqual(env.get('PAYPAL_CLIENT_SECRET'), 'pp-sandbox');
         });

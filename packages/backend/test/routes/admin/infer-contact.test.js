@@ -2,7 +2,7 @@
  * Test: POST /admin/infer-contact
  * Tests the admin infer-contact endpoint for inferring names from email addresses
  *
- * AI inference tests only run when TEST_EXTENDED_MODE is set (requires OMEGA_OPENAI_API_KEY)
+ * AI inference tests only run when TEST_EXTENDED_MODE is set (requires OPENAI_API_KEY)
  */
 module.exports = {
   description: 'Admin infer contact',

@@ -6,7 +6,7 @@
  * normalized tools interface end-to-end. Costs real API credits; uses the
  * cheapest models.
  *
- * Requires OMEGA_ANTHROPIC_API_KEY / OMEGA_OPENAI_API_KEY
+ * Requires ANTHROPIC_API_KEY / OPENAI_API_KEY
  * in the runner environment.
  */
 const Anthropic = require('../../src/manager/libraries/ai/providers/anthropic.js');
@@ -59,7 +59,7 @@ module.exports = {
     {
       name: 'anthropic-two-step-tool-loop',
       timeout: 120000,
-      skip: skipReason(['OMEGA_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY']),
+      skip: skipReason(['ANTHROPIC_API_KEY']),
 
       async run({ assert }) {
         const provider = new Anthropic(directAssistant());
@@ -114,7 +114,7 @@ module.exports = {
     {
       name: 'openai-two-step-tool-loop',
       timeout: 120000,
-      skip: skipReason(['OMEGA_OPENAI_API_KEY', 'OPENAI_API_KEY']),
+      skip: skipReason(['OPENAI_API_KEY']),
 
       async run({ assert }) {
         const provider = new OpenAI(directAssistant());

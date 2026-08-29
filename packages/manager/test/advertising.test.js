@@ -45,6 +45,14 @@ function fakeAdsense({ sites = [] } = {}) {
   return api;
 }
 
+/** Capture console.log lines around a run (the reported line is console output). */
+function captureLog() {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => { lines.push(args.join(' ')); };
+  return { lines, restore: () => { console.log = original; } };
+}
+
 function runService(config, { adsense, options = {}, brandRoot } = {}) {
   return service.run({
     brandId: 'fixture-brand',
@@ -142,6 +150,48 @@ test('advertising: a www-prefixed AdSense entry matches the bare domain', async 
 
   assert.equal(result.status, 'success');
   assert.equal(result.output.sites.domain, `www.${DOMAIN}`);
+});
+
+// #631 — AdSense lists sites at the apex only, so the apex entry covers every
+// subdomain of it: a subdomain brand must read its parent's state, not warn
+// that it is missing.
+test('advertising: an apex AdSense entry covers a subdomain brand (#631)', async () => {
+  const sub = `playground.${DOMAIN}`;
+  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'GETTING_READY', autoAdsEnabled: true }] });
+
+  const log = captureLog();
+  let result;
+  try {
+    result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
+  } finally {
+    log.restore();
+  }
+
+  assert.equal(result.status, 'warned'); // the matched entry's state is reported as-is
+  assert.equal(result.output.sites.domain, DOMAIN); // the matched entry's domain
+  assert.equal(result.output.sites.state, 'GETTING_READY');
+  assert.equal(result.output.sites.coveredBy, DOMAIN);
+  // The reported line says the match is a parent, not the brand's own domain
+  assert.ok(
+    log.lines.some((line) => new RegExp(`${sub}.*is covered by.*${DOMAIN}`).test(line)),
+    `expected a covered-by line, got:\n${log.lines.join('\n')}`,
+  );
+});
+
+test('advertising: a suffix that is not a parent domain does not cover the brand (#631)', async () => {
+  const sub = `playground.${DOMAIN}`;
+  const api = fakeAdsense({
+    sites: [
+      { domain: `not${DOMAIN}`, state: 'READY' }, // unrelated apex
+      { domain: 'brand.test', state: 'READY' }, // a string suffix of fixture-brand.test, but not a parent
+    ],
+  });
+
+  const result = await runService(brandConfig({ url: `https://${sub}` }), { adsense: api });
+
+  assert.equal(result.status, 'warned');
+  assert.equal(result.output.sites.domain, sub);
+  assert.equal(result.output.sites.state, null);
 });
 
 test('advertising: non-READY approval states are warned, not failed', async () => {

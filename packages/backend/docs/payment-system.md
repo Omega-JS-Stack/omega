@@ -272,7 +272,7 @@ Two transitions are deliberately log-only:
 - `checkout-declined` — the user is standing at the checkout watching the decline. No email, and no analytics either: no money moved.
 - `cancellation-removed` — the `order` template has no copy for a withdrawn cancellation, and an unknown event falls back to the `confirmation` variant, which would show a subscriber a "total paid today" they were never charged. Sending the wrong email is worse than sending none, so the HANDLER stays a record until the template carries the copy. Analytics is a separate concern and does fire: a withdrawn cancellation is a retention win ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
 
-**`subscription-cancelled` inside the trial term is a lapse, not churn** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). The transition and its email are unchanged (the subscription did cancel), but analytics books `trial_lapse`, because a customer who never paid cannot be lost revenue. It reaches that branch on every provider: Chargebee ends a trial with no card on file by cancelling it, and a Stripe or PayPal subscriber may simply quit mid-trial. The check reads the unified term the way the `payment-failed` lapse does, never a provider name. What stops the sweep telling the same story again is that a cancelled subscription drops out of its `status == active` candidate query; the subscription-keyed event id both paths derive only collapses a race on Meta and TikTok, since GA4 deduplicates nothing across sources.
+**`subscription-cancelled` inside the trial term is a lapse, not churn** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). The transition and its email are unchanged (the subscription did cancel), but analytics books `trial_lapse`, because a customer who never paid cannot be lost revenue. It reaches that branch on every provider: Chargebee ends a trial with no card on file by cancelling it, and a Stripe or PayPal subscriber may simply quit mid-trial. The check reads the unified term the way the `payment-failed` lapse does, never a provider name. What stops the sweep telling the same story again is that a cancelled subscription drops out of its `status == active` candidate query; the subscription-keyed event id both paths derive only collapses a race on Meta and TikTok — GA4 deduplicates ecommerce on `transaction_id`, and `trial_lapse` is a custom event it never dedupes at all ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
 
 **A trial that already lapsed is not booked twice.** The provider suspends the subscription at the failed charge, which is where the lapse is reported, then exhausts dunning and cancels what it was holding. That second webhook books **nothing**: its prior state is a suspension whose term never moved past the trial's end, so the outcome it carries was told already, and booking it added paid-churn revenue plus a Meta/TikTok audience signal behind a customer who never paid. A subscriber who converted and lapsed on dunning months later is untouched by the rule, because their term did move.
 
@@ -451,8 +451,6 @@ module.exports = {
 module.exports = {
   isSupported(eventType) { return boolean; },
   parseWebhook(req) { return { eventId, eventType, category, resourceType, resourceId, refundId, raw, uid }; },
-  // Optional — the provider's native signature, checked over the raw bytes
-  verifySignature(req) { return { status: 'verified' | 'invalid' | 'unconfigured', reason }; },
 };
 ```
 
@@ -673,7 +671,7 @@ No email is sent from here — the sweep is state correction.
 
 **Why the sweep reports at all.** For PayPal this is the ONLY place a trial's outcome is ever known: PayPal fires no trial-end event, so the webhook pipeline is never told and the trial funnel had no signal whatsoever ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
 
-**And why it cannot double-count.** The guard is the term: a conversion the payment webhook already saw moved `expires` out past the trial's end, and a lapse it saw left the subscription suspended or cancelled, which this sweep's `status == active` query never selects. So a candidate still inside its trial is exactly one no webhook resolved, and it is the only one the sweep reports — the outcome is still STAMPED either way, because that is state correction. Both paths key the event id on the subscription (`trial_convert.<resourceId>`), which collapses a genuine race on the two platforms that deduplicate; the term guard is what keeps GA4 honest, since GA4 has no cross-source deduplication.
+**And why it cannot double-count.** The guard is the term: a conversion the payment webhook already saw moved `expires` out past the trial's end, and a lapse it saw left the subscription suspended or cancelled, which this sweep's `status == active` query never selects. So a candidate still inside its trial is exactly one no webhook resolved, and it is the only one the sweep reports — the outcome is still STAMPED either way, because that is state correction. Both paths key the event id on the subscription (`trial_convert.<resourceId>`), which collapses a genuine race on the two platforms that key on an event id; the term guard is what keeps GA4 honest, since GA4 deduplicates a `purchase` on `transaction_id` and the two paths cannot name the same one — the webhook has the invoice, this sweep has only the subscription ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
 
 The candidate query needs a composite index on `users`, registered in `src/cli/commands/setup-tests/helpers/required-indexes.js` (the SSOT for required indexes).
 
@@ -687,36 +685,15 @@ Its candidate query (`subscription.payment.provider` + `subscription.cancellatio
 
 ## Webhook Verification
 
-Two layers gate `POST /payments/webhook`:
+ONE layer gates `POST /payments/webhook`, and the dispute-alert route beside it: **the shared key** — `?key=<OMEGA_WEBHOOK_KEY>`, compared in constant time. Every provider rides it, a mismatch is a 401 before anything else runs, and nothing is parsed or stored until it passes.
 
-1. **The shared key** — `?key=<OMEGA_WEBHOOK_KEY>`, compared in constant time. Every provider rides it, and a mismatch is a 401 before anything else runs.
-2. **The provider's native signature** — a webhook provider may export `verifySignature(req)`, which the route runs before the payload is parsed or stored.
-
-| Provider | Native verification | Secret |
-|---|---|---|
-| `stripe` | The `stripe-signature` header checked against the raw bytes (`constructEvent`, which also enforces Stripe's timestamp tolerance, so a captured event cannot be replayed) | `STRIPE_WEBHOOK_SECRET` |
-| `paypal` | None yet — PayPal's scheme needs the endpoint's webhook ID, and nothing carries it into the backend | — |
-| `chargebee` | None — Chargebee does not sign payloads; credentials on the webhook URL are its mechanism, which the shared key already is | — |
-| `test` | None by design — its events are fabricated locally, and the route answers 403 in production | — |
-
-The dispute-alert route runs the same layer: its Chargeblast provider verifies the Svix headers (`svix-id`/`svix-timestamp`/`svix-signature`, HMAC over the raw bytes, 5-minute replay tolerance) when its secret is set.
-
-| Provider | Native verification | Secret |
-|---|---|---|
-| `chargeblast` (dispute-alert) | Svix signature over the raw bytes | `CHARGEBLAST_WEBHOOK_SECRET` |
-
-The fail mode is per provider, per configuration:
-
-- **Secret configured** → strict. A missing signature, a payload the signature does not cover, or a request that arrived without its raw bytes (only delivered bytes can be verified — re-serializing the parsed body would check a guess) is a 401, logged with the reason.
-- **Secret not configured** → the key-only path, with one warn per provider per instance naming the variable to set.
-
-Verification never needs the provider's API key: `STRIPE_WEBHOOK_SECRET` is the endpoint's signing secret from the Stripe Dashboard, or the one `stripe listen --print-secret` prints for a locally forwarded run ([stripe-webhook-forwarding.md](stripe-webhook-forwarding.md)).
+Provider signing secrets are deliberately not part of this: no provider verifies a native signature, and the backend holds no signing secret for one ([#634](https://github.com/Omega-JS-Stack/omega/issues/634)). The key is the boundary, which is why it is a minted, brand-owned value and why a manage run leaves exactly one endpoint carrying it.
 
 ## Test Provider
 
 The `test` provider generates Stripe-shaped data and auto-fires webhooks to the local server. Only available in non-production environments. Use `provider: 'test'` in intent requests during testing. The test webhook provider delegates to Stripe's parser since it generates Stripe-shaped payloads.
 
-Both doors enforce that: the intent side throws inside `intent/providers/test.js`, and `POST /payments/webhook?provider=test` answers 403 in production (the webhook providers receive only the raw request, so the route's dispatch layer carries the guard). Real providers are unaffected — a provider dashboard points at `POST /omega/payments/webhook?provider=<provider>&key=<OMEGA_WEBHOOK_KEY>`, where the shared key is the outer layer and the provider's own signature is the boundary ([Webhook Verification](#webhook-verification)).
+Both doors enforce that: the intent side throws inside `intent/providers/test.js`, and `POST /payments/webhook?provider=test` answers 403 in production (the webhook providers receive only the raw request, so the route's dispatch layer carries the guard). Real providers are unaffected — a provider dashboard points at `POST /omega/payments/webhook?provider=<provider>&key=<OMEGA_WEBHOOK_KEY>`, where the shared key is the boundary ([Webhook Verification](#webhook-verification)).
 
 ### Discounts and the first charge
 
@@ -780,8 +757,8 @@ Every scenario in [#212](https://github.com/Omega-JS-Stack/omega/issues/212)'s s
 | 6 | trial: claim, convert, cancel mid-trial, lapse | `journey-payments-trial.test.js`, `journey-payments-trial-cancel.test.js`, `trial-lapse-sweep.test.js`, `trial-lapse-sweep-staleness.test.js`, `routes/payments/trial-eligibility.test.js` |
 | 7 | dunning: decline → retry → recovery → cancel | `journey-payments-decline.test.js`, `journey-payments-suspend.test.js`, `journey-payments-failure.test.js`, `journey-payments-winback-decline.test.js`; rules 3, 3b, 4, 5 |
 | 8 | payment-method update mid-subscription | `webhook-ordering.test.js` (`a-payment-method-update-refreshes-state-and-emails-nobody`), `routes/payments/portal.test.js`, `portal-return-url.test.js` |
-| 9 | chargebacks / disputes → forced cancel | `journey-payments-dispute.test.js` (end to end), `routes/payments/dispute-alert.test.js`, `dispute-alert-signature.test.js`, `dispute-email-status.test.js`, `dedup-race.test.js` |
-| 10 | webhook robustness: duplicates, ordering, unknown types, signatures | `webhook-ordering.test.js`, `dedup-race.test.js`, `webhook-retry-sweep.test.js`, `webhook-atomic-writes.test.js`, `routes/payments/webhook.test.js`, `webhook-signature.test.js`, `test-processor-doc-shape.test.js`; real signatures in `test/stripe-live/subscription-lifecycle.test.js` (opt-in lane) |
+| 9 | chargebacks / disputes → forced cancel | `journey-payments-dispute.test.js` (end to end), `routes/payments/dispute-alert.test.js`, `dispute-email-status.test.js`, `dedup-race.test.js` |
+| 10 | webhook robustness: duplicates, ordering, unknown types | `webhook-ordering.test.js`, `dedup-race.test.js`, `webhook-retry-sweep.test.js`, `webhook-atomic-writes.test.js`, `routes/payments/webhook.test.js`, `test-processor-doc-shape.test.js`; real deliveries in `test/stripe-live/subscription-lifecycle.test.js` (opt-in lane) |
 | 11 | abandoned checkout — no residue | `journey-payments-abandoned.test.js` |
 | 12 | account deletion with an active subscription | `test/routes/user/delete.test.js` (deletion is REFUSED while a paid subscription stands) |
 | 13 | one-time: purchase, refund, re-purchase | `journey-payments-one-time.test.js`, `journey-payments-one-time-decline.test.js`, `journey-payments-one-time-failure.test.js`, `journey-payments-one-time-refund.test.js`, `routes/payments/intent-one-time-metadata.test.js`, `webhook-stripe-refund-one-time.test.js` |

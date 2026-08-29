@@ -20,7 +20,7 @@
  *
  * Run: npx omega test backend:routes/payments/webhook-stripe-invoice
  */
-const { callHandler, withEnvironment } = require('./_route-harness.js');
+const { callHandler } = require('./_route-harness.js');
 
 const handler = require('../../../src/manager/routes/payments/webhook/post.js');
 const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
@@ -35,10 +35,9 @@ const renewalEvent = (id) => ({
   data: { object: FIXTURE_INVOICE_RENEWAL },
 });
 
-// Deliver key-only: the signature gate is proven in webhook-signature.test.js,
-// and this suite is about which event types get through the door at all.
+// This suite is about which event types get through the door at all.
 function deliver(Manager, event) {
-  return withEnvironment({ STRIPE_WEBHOOK_SECRET: null }, () => callHandler({
+  return callHandler({
     Manager,
     handler,
     functionName: 'payments-webhook',
@@ -47,7 +46,7 @@ function deliver(Manager, event) {
       body: event,
       rawBody: Buffer.from(JSON.stringify(event)),
     },
-  }));
+  });
 }
 
 module.exports = {

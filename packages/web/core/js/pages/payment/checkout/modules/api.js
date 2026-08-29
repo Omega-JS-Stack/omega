@@ -3,8 +3,12 @@ import fetch from 'wonderful-fetch';
 import { getRecaptchaToken } from '../../../../libs/recaptcha.js';
 import { readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
 import omega from '@omega.js/client';
+import { TRIAL_ELIGIBILITY_UNKNOWN } from './state.js';
 
-// Check trial eligibility via backend endpoint
+// Check trial eligibility via backend endpoint. Three answers, never two: a
+// check that could not run reports UNKNOWN, which the display and the payload
+// read differently (see state.js's TRIAL_ELIGIBILITY_UNKNOWN and
+// trialForPayload below).
 export async function fetchTrialEligibility() {
   try {
     const response = await omega.request(`/omega/payments/trial-eligibility`, {
@@ -12,10 +16,10 @@ export async function fetchTrialEligibility() {
     });
 
     console.log('Trial eligibility:', response);
-    return response.eligible || false;
+    return response.eligible === true;
   } catch (e) {
-    console.warn('Trial eligibility check failed, assuming eligible:', e);
-    return true;
+    console.warn('Trial eligibility check failed — the answer is unknown:', e);
+    return TRIAL_ELIGIBILITY_UNKNOWN;
   }
 }
 
@@ -31,12 +35,20 @@ export async function validateDiscountCode(code) {
   return response;
 }
 
-// Fire-and-forget server warmup
-export function warmupServer() {
-  fetch(`${omega.getApiUrl()}/omega/payments/intent`, {
-    method: 'GET',
-    query: { wakeup: 'true' },
-  }).catch(() => {});
+// What the intent route is ASKED for, which is not always what the page showed
+// (Ian 2026-08-27, #637). A confirmed answer is sent as it stands. An UNKNOWN
+// answer still asks for the trial the product sells: the route re-checks
+// eligibility against the buyer's own order history and silently downgrades
+// anyone who does not qualify, so asking costs a non-qualifying buyer nothing
+// and NOT asking costs a qualifying one their offer over a slow network. The
+// display stayed conservative either way, so nobody is quoted a price they are
+// not charged.
+export function trialForPayload(state) {
+  if (state.trialEligibility === TRIAL_ELIGIBILITY_UNKNOWN) {
+    return state.product?.trial?.days > 0;
+  }
+
+  return state.trialEligible;
 }
 
 // Create payment intent and return { url }
@@ -65,7 +77,7 @@ export async function createPaymentIntent({ state, provider, formData }) {
     provider,
     productId: state.product.id,
     frequency: state.frequency,
-    trial: state.trialEligible,
+    trial: trialForPayload(state),
     attribution: attribution,
     // The tracking-consent snapshot rides along verbatim — the intent doc stores it
     // beside attribution and the order fold copies it, so a conversion knows what

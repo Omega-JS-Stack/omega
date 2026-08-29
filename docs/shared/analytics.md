@@ -78,8 +78,12 @@ dependency of every framework.
 
 **A fire may also carry options**: `event(name, params, { eventId, providers })`. `eventId`
 is the platform dedupe key both halves of a two-sided event name (Meta's fourth pixel
-argument `eventID`, TikTok's `event_id`; GA4 has no such thing). `providers` restricts a fire
-to the providers THIS side owns — which is how the two `both` events avoid double-counting.
+argument `eventID`, TikTok's `event_id`). GA4 has no event-id slot — it deduplicates
+ecommerce on the `transaction_id` PARAM instead
+([Google](https://support.google.com/analytics/answer/12313109),
+[#656](https://github.com/Omega-JS-Stack/omega/issues/656)), which is why both halves of a
+`purchase` send the same one. `providers` restricts a fire to the providers THIS side owns —
+which is how a `both` event splits without double-counting.
 
 **An unknown event name is a programmer error.** It throws in development (a typo must not
 silently cost a conversion) and is logged-and-skipped in production, where the throw would
@@ -130,6 +134,24 @@ custom event so a provider "has coverage" ships junk into an ad account nobody w
 read. Equally, a mapping must be HONEST — several pre-OMEGA call sites claimed standard
 names their platform does not define, and those are `custom` here.
 
+**Every name, kind and param is checked LIVE against the platform's own spec before it is
+written or changed** (Ian 2026-08-27,
+[#652](https://github.com/Omega-JS-Stack/omega/issues/652)) — never from memory, because a
+platform renames and retires events (TikTok retired `CompletePayment` for `Purchase`, and
+`ClickButton` was never on its standard list at all). The four pages sit in the catalog
+header so no edit can miss them:
+
+| Spec | What it settles |
+|---|---|
+| [GA4 recommended events](https://support.google.com/analytics/answer/9267735) | Which canonical names are GA4 standards |
+| [Meta standard events](https://www.facebook.com/business/help/402791146561655) | The exact wire name, and what each event MEANS (Purchase requires `value` + `currency`) |
+| [TikTok standard events](https://ads.tiktok.com/help/article/standard-events-parameters) | The current standard roster and its recommended params |
+| [GA4 transaction_id dedupe](https://support.google.com/analytics/answer/12313109) | The one PARAM that binds: one id per charge |
+
+A `kind: 'standard'` may only ever claim a name the platform lists; anything else is
+`custom`, under the canonical event's own PascalCase name. `packages/analytics/test/catalog.test.js`
+pins both rosters, so a mapping that drifts off them fails.
+
 **Adding an event is one catalog entry plus a test.** The entry lands in `catalog.js` under
 its section, and `packages/analytics/test/catalog.test.js` gets the resolve case that proves
 the mapping (name, kind, and the payload each provider receives). The shape guards —
@@ -141,7 +163,7 @@ catalog, so a malformed entry fails without new test code.
 PRESENT/imperative form — `trial_start`, `subscription_cancel`, `user_delete`, never the past
 tense of the fact ([#416](https://github.com/Omega-JS-Stack/omega/issues/416)) — because that
 is how GA4, Meta and TikTok all name a conversion; a platform's own standard WIRE name stays
-verbatim wherever a mapping uses one (Meta `StartTrial`, TikTok `Subscribe`), but a PascalCase
+verbatim wherever a mapping uses one (Meta and TikTok both spell it `StartTrial`), but a PascalCase
 wire WE coin for a `custom` mapping obeys the same tense rule as the canonical it carries
 (`SubscriptionCancel`, `Refund`, never the past-tense form). Action buckets
 stay buckets — `user_billing_action`, `user_refund_request`, `user_section_view` carry an
@@ -159,9 +181,9 @@ BOTH.**
 
 | Placement | Why | Examples |
 |---|---|---|
-| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `trial_start`, `trial_convert`, `trial_lapse`, `subscription_cancel`, `subscription_uncancel`, `subscription_plan_change`, `subscription_renew`, `payment_recovered`, `user_delete` |
+| `server` | The browser cannot be trusted for revenue, and the outcome is only known where it happened | `refund`, `trial_convert`, `trial_lapse`, `subscription_cancel`, `subscription_uncancel`, `subscription_plan_change`, `subscription_renew`, `payment_recovered`, `user_delete` |
 | `client` | The event IS the interaction — nothing server-side ever sees it | `view_item`, `add_to_cart`, `begin_checkout`, `add_payment_info`, `page_view`, `file_download`, the exit-popup, consent, notification-permission and account-navigation events |
-| `both` | Ad platforms need the browser signal for retargeting AND the server signal for truth | `sign_up`, `purchase` |
+| `both` | Ad platforms need the browser signal for retargeting AND the server signal for truth | `sign_up`, `purchase`, `trial_start` |
 
 When both halves fire, both must carry the SAME event id so the platform collapses them into
 one conversion (Meta's deduplication, TikTok's `event_id`). Sending both without the id is
@@ -169,13 +191,35 @@ double-counting; sending only the server half loses the retargeting signal — w
 the hole the commented-out purchase pixel left
 ([#302](https://github.com/Omega-JS-Stack/omega/issues/302)).
 
-**GA4 has no cross-source deduplication**, so each `both` event names ONE owner per provider,
-and the two events split it the opposite way:
+**GA4 deduplicates `purchase` on `transaction_id`** — web streams only, and never on an
+empty string ([Google](https://support.google.com/analytics/answer/12313109)). It has no
+event-id slot, so which providers each half owns is decided per event, and the three `both`
+events split it three different ways:
 
 | Event | The dedupe id | Browser half | Server half |
 |---|---|---|---|
 | `sign_up` | `sign_up.<uid>` — the uid is the only thing both sides hold before either fires | GA4 + Meta + TikTok (`libs/auth/tracking.js`) | Meta + TikTok (`routes/user/signup` → `libraries/analytics/signup.js`, the post-auth request — never the auth trigger, which has no request behind it, [#577](https://github.com/Omega-JS-Stack/omega/issues/577)) |
-| `purchase` | `purchase.<order id>` — the order-id branch of the webhook's own `<canonical>.<webhook event id>` derivation | Meta + TikTok (`pages/payment/confirmation/modules/tracking.js`) | GA4 + Meta + TikTok (`events/firestore/payments-webhooks/analytics.js`) |
+| `purchase` | `purchase.<order id>` for the ad platforms, and the same `<order id>` as `transaction_id` for GA4 | GA4 + Meta + TikTok (`pages/payment/confirmation/modules/tracking.js`) | GA4 + Meta + TikTok (`events/firestore/payments-webhooks/analytics.js`) |
+| `trial_start` | `trial_start.<order id>` | Meta + TikTok (`pages/payment/confirmation/modules/tracking.js`) — GA4's `trial_start` is a CUSTOM event with no dedupe, so the server keeps it | GA4 + Meta + TikTok (`events/firestore/payments-webhooks/analytics.js`) |
+
+GA4 rides the browser purchase because the id makes it safe, and the browser is where the
+session, the campaign and the `client_id` are — a webhook has none of them
+([#656](https://github.com/Omega-JS-Stack/omega/issues/656)). And the browser half fires
+`trial_start`, not `purchase`, on a trial checkout: `?track=true` rides EVERY checkout, and
+two different event NAMES never deduplicate, so the old browser Purchase collapsed into
+nothing and each platform counted it as a second conversion beside the server's trial. The
+value was never the defect — the intent route already sends `amount=0` on a trial's
+confirmation URL ([#654](https://github.com/Omega-JS-Stack/omega/issues/654)).
+
+**`transaction_id` is ONE CHARGE's id, never the subscription's** (Ian 2026-08-27):
+
+| The charge | The id | Why |
+|---|---|---|
+| First purchase — a paid checkout, a one-time buy, or a trial start | the ORDER id | The only id the confirmation page holds, so both halves match |
+| Renewal, recovery, trial conversion | the provider's own charge id (Stripe/Chargebee invoice, PayPal sale), carried on the webhook event as `chargeId` | A subscription bills against one order forever; the subscription id collapsed every renewal after the first into a GA4 duplicate |
+| Refund | the id of the charge it reverses — the provider's `chargeId` on a subscription, the ORDER id on a one-time buy (its single charge, and no provider names one on the refund) | So GA4 nets the two |
+| Everything else (cancel, uncancel, plan change, lapse) | the subscription id | A GA4 CUSTOM event with no dedupe, and the subscription really is its subject |
+| THE EXCEPTION — the trial-lapse sweep's own `trial_convert` (`events/cron/daily/trial-lapse-sweep.js`) | the subscription id | The provider never announced the charge (PayPal fires no trial-end event at all), so this path has no invoice to name. `trial.outcome` is stamped once, which keeps it to one fire |
 
 Revenue is the server's, because a browser cannot be trusted with it; a registration's GA4
 count is the browser's, because that is where the funnel it belongs to lives.

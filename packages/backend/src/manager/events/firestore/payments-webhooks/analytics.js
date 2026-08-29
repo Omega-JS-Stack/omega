@@ -85,9 +85,12 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * @param {object|null} [options.before] - The subscription as it stood BEFORE this event
  * @param {string} options.uid - The owner
  * @param {string} options.provider - The provider that sent the webhook
+ * @param {string|null} [options.chargeId] - THIS charge's own provider id, where the
+ *   event names one (Stripe/Chargebee invoice, PayPal sale) — the id one charge is
+ *   reported under ([#656](https://github.com/Omega-JS-Stack/omega/issues/656))
  * @param {object} options.ctx - The event context
  */
-function trackPayment({ category, transitionName, eventType, unified, order, userDoc, refundDetails, before, uid, provider, ctx }) {
+function trackPayment({ category, transitionName, eventType, unified, order, userDoc, refundDetails, before, uid, provider, chargeId, ctx }) {
   const Manager = ctx.Manager;
   const config = Manager.config;
 
@@ -106,7 +109,7 @@ function trackPayment({ category, transitionName, eventType, unified, order, use
 
     deliverConversion({
       event: resolved.event,
-      params: buildParams({ resolved, currency, provider }),
+      params: buildParams({ resolved, currency, provider, order, chargeId }),
       attribution: buildAttributionContext(order?.attribution),
       // The doc goes in whole: the ONE reader takes every match parameter off
       // it, so this call site never decides which key an address lives under
@@ -130,9 +133,9 @@ function trackPayment({ category, transitionName, eventType, unified, order, use
  * The canonical commerce params every money event carries.
  * GA4's vocabulary IS the canonical one; Meta and TikTok reshape it in the catalog.
  */
-function buildParams({ resolved, currency, provider }) {
+function buildParams({ resolved, currency, provider, order, chargeId }) {
   return {
-    transaction_id: resolved.resourceId,
+    transaction_id: resolveTransactionId({ resolved, order, chargeId }),
     value: resolved.value,
     currency: currency,
     items: [{
@@ -156,17 +159,95 @@ function buildParams({ resolved, currency, provider }) {
   };
 }
 
+// The money events with a BROWSER half. Both halves can only ever agree on the
+// ORDER — the browser holds nothing else — and both are the FIRST charge of that
+// order, so the order id names exactly one charge here.
+const ORDER_KEYED_EVENTS = ['purchase', 'trial_start'];
+
+// The events that report a charge the ORDER cannot name: a subscription bills
+// again and again against one order, so each of these carries the provider's own
+// id for the charge it is about.
+const CHARGE_KEYED_EVENTS = ['trial_convert', 'subscription_renew', 'payment_recovered', 'refund'];
+
+/**
+ * The `transaction_id` this fire carries — ONE id per CHARGE, never the
+ * subscription's (Ian 2026-08-27,
+ * [#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+ *
+ * GA4 deduplicates `purchase` on `transaction_id`
+ * (https://support.google.com/analytics/answer/12313109), and `trial_convert`,
+ * `subscription_renew` and `payment_recovered` all ride GA4's standard
+ * `purchase`. The subscription id this used to send is CONSTANT for the life of
+ * the subscription, so GA4 counted the first charge and dropped every renewal
+ * after it as a duplicate: recurring revenue read as one charge per subscriber.
+ *
+ * So the id is the charge's:
+ *   - first purchase (a paid checkout, a one-time buy, or a trial start) — the
+ *     ORDER id, which the confirmation page holds too, so the browser half and
+ *     the webhook half deduplicate into one purchase instead of two;
+ *   - renewal, recovery and trial conversion — the provider's own id for that
+ *     charge (Stripe/Chargebee invoice, PayPal sale);
+ *   - refund — the id of the charge it reverses, so GA4 nets the two.
+ *
+ * A ONE-TIME refund is the exception to that last line: a one-time order has
+ * exactly ONE charge, the purchase it reverses was reported under the order id,
+ * and no provider names a charge on its one-time refund at all — so it names the
+ * order and GA4 nets the two. Only one-time: a subscription bills again and
+ * again against one order, so an order-keyed refund would net a renewal's
+ * reversal against the first purchase.
+ *
+ * A charge event whose payload names no charge id falls back to the WEBHOOK
+ * delivery, never to the order: the delivery is unique per charge, and the order
+ * is the collapse this fixes. THE ONE KNOWN GAP: a refund of a SUBSCRIPTION's
+ * first charge names that first invoice, while the purchase it reverses was
+ * recorded under the order id — nothing in the refund payload can tell a first
+ * invoice from a renewal's, so GA4 books the refund without netting it.
+ *
+ * Everything else (a cancellation, an uncancel, a plan change, a lapsed trial)
+ * is a GA4 CUSTOM event with no dedupe of its own, and its subject really is the
+ * subscription — so those keep naming it.
+ *
+ * @param {object} options
+ * @param {object} options.resolved - The resolved payment event
+ * @param {object} [options.order] - The order doc this event is about
+ * @param {string|null} [options.chargeId] - The provider's id for this charge
+ * @returns {string|undefined}
+ */
+function resolveTransactionId({ resolved, order, chargeId }) {
+  if (ORDER_KEYED_EVENTS.includes(resolved.event)) {
+    return order?.id || resolved.resourceId;
+  }
+
+  if (CHARGE_KEYED_EVENTS.includes(resolved.event)) {
+    // The one-time refund: the order names the single charge it reverses, and
+    // that purchase was reported under the order id.
+    if (resolved.event === 'refund' && resolved.category === 'one-time') {
+      return order?.id || resolved.resourceId;
+    }
+
+    return chargeId || order?.metadata?.updatedBy?.event?.id || resolved.resourceId;
+  }
+
+  return resolved.resourceId;
+}
+
 /**
  * The platform dedupe id for this fire.
  *
- * `purchase` is keyed on the ORDER, because it is the one payment event with a
- * BROWSER twin: the confirmation page fires its own purchase pixel ([#386]) and
- * the only id it can possibly compute is `purchase.<orderId>` — the webhook's
- * event id never reaches a browser. Two different ids for the one purchase is a
- * double count, which is the whole thing dedupe exists to prevent. Reusing an
- * order id is safe here: Meta's and TikTok's dedupe windows are ~48h, and the
- * only way one order sees a second `purchase` is a win-back weeks or months
- * later, long outside any window.
+ * `purchase` and `trial_start` are keyed on the ORDER, because they are the
+ * payment events with a BROWSER twin: the confirmation page fires its own pixel
+ * ([#386]) and the only id it can possibly compute is `<canonical>.<orderId>` —
+ * the webhook's event id never reaches a browser. Two different ids for one
+ * conversion is a double count, which is the whole thing dedupe exists to
+ * prevent. `trial_start` joined this branch with
+ * [#654](https://github.com/Omega-JS-Stack/omega/issues/654): the browser used
+ * to fire `purchase` for a trial checkout while this fired `trial_start`, and
+ * two different event NAMES never deduplicate at all, so a $0 trial booked the
+ * plan's price as browser revenue. Both halves now say trial_start, and the
+ * webhook-delivery fallback that used to key this is gone — a browser cannot
+ * derive it. Reusing an order id is safe: Meta's and TikTok's dedupe windows are
+ * ~48h, and the only way one order sees a second purchase is a win-back weeks or
+ * months later, long outside any window.
  *
  * Everything else keys on the WEBHOOK delivery. A subscription renews against
  * the same order id month after month, so an order-keyed id would have the
@@ -175,8 +256,8 @@ function buildParams({ resolved, currency, provider }) {
  * webhook carries the same id, which is exactly what dedupe is for.
  */
 function resolveEventId(resolved, order) {
-  if (resolved.event === 'purchase') {
-    return `purchase.${order?.id}`;
+  if (ORDER_KEYED_EVENTS.includes(resolved.event)) {
+    return `${resolved.event}.${order?.id}`;
   }
 
   // A trial has exactly ONE outcome, and two different paths can be the one to see
@@ -223,7 +304,10 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
   // Compute actual amount paid (accounting for trial and discount)
   const value = resolveActualValue(price, isTrial, order?.discount);
 
-  const base = { productId, productName, frequency, resourceId, isTrial };
+  // `category` rides along: a refund's transaction id turns on it (a one-time
+  // order names one charge, a subscription names many —
+  // [#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+  const base = { category, productId, productName, frequency, resourceId, isTrial };
 
   // --- Refunds (both categories) ---
   // Detected off the TRANSITION rather than the event type, so the transition
@@ -551,5 +635,6 @@ module.exports = {
   resolvePaymentEvent,
   isPaymentEvent,
   buildParams,
+  resolveTransactionId,
   resolveEventId,
 };

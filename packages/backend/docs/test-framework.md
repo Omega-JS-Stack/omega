@@ -255,7 +255,7 @@ Lanes are unreachable by anything else. `test/<lane>/` is excluded from discover
 
 ### `--lane=stripe-live`
 
-Runs the payment pipeline against REAL Stripe test-mode events: real objects in a test account, real deliveries, real signatures, forwarded into the local emulator by `stripe listen`.
+Runs the payment pipeline against REAL Stripe test-mode events: real objects in a test account, real deliveries, forwarded into the local emulator by `stripe listen`.
 
 The gate, in order — any failure is one skip line:
 
@@ -268,9 +268,9 @@ The gate, in order — any failure is one skip line:
 npx omega test --lane=stripe-live
 ```
 
-What the lane does on the way in: creates the Stripe products and prices the brand's catalogue needs, **idempotently** and tagged `metadata.omega_lane`, so a rerun reuses the first run's objects. The fixtures match on interval + amount because that is all `resolvePriceId()` matches on — a config that has drifted from the account fails here rather than at a customer's checkout. Then it starts `stripe listen --forward-to <hosting>/omega/payments/webhook?provider=stripe`, captures the endpoint signing secret it prints, and hands it to the runner as `STRIPE_WEBHOOK_SECRET` so every forwarded delivery is verified for real.
+What the lane does on the way in: creates the Stripe products and prices the brand's catalogue needs, **idempotently** and tagged `metadata.omega_lane`, so a rerun reuses the first run's objects. The fixtures match on interval + amount because that is all `resolvePriceId()` matches on — a config that has drifted from the account fails here rather than at a customer's checkout. Then it starts `stripe listen --forward-to <hosting>/omega/payments/webhook?provider=stripe&key=<OMEGA_WEBHOOK_KEY>` and waits for the CLI's own ready line before firing anything, so no trigger can land before the tunnel exists.
 
-**Nothing prints a secret.** The gate's refusals name the KEY and the fix; the signing secret rides to the child by env and is held back from the forwarder's own output.
+**Nothing prints a secret.** The gate's refusals name the KEY and the fix; the CLI's ready line carries a signing secret nothing here reads, and it is held back from the forwarder's own output.
 
 The gate and the fixture plan are pure functions with their own offline suite (`test/cli/stripe-live-lane.test.js`), so the safety property is proven on every normal run without an account, a CLI, or the network.
 

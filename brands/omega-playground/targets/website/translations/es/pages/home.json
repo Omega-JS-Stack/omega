@@ -94,10 +94,6 @@
   "35f7b67cf493": "Web · Backend · Escritorio · Extensión",
   "ec11b2d3e93a": "Ejecutándose en infraestructura real",
   "667f2661c3aa": "Cada cuenta aquí es desechable",
-  "62c8c85195e2": "$ omega build",
-  "012fda4eb07c": "sitio web · backend · escritorio · extensión",
-  "a66894db9943": "una configuración, cuatro superficies",
-  "4be7c9636a86": " publicado · y nada de esto es producción",
   "389e2b77a8a7": "Ejecutándose, ahora mismo.",
   "272ad853f19f": "Cada framework y cada integración, en funcionamiento en vivo — para que puedas explorarlo antes de construir sobre él.",
   "55bd3ef5f405": "Un stack, cuatro superficies",
@@ -166,10 +162,6 @@
   "29af43b5cede": "impresiones de prueba, generadas inmediatamente",
   "ef2d127de37b": "5",
   "c0527d0a6cc9": " 1 ",
-  "0ffe6fc7f2b8": "es donde el stack de OMEGA corre en abierto: builds reales, inicios de sesión reales, checkouts reales — sobre una marca que nadie tiene que mantener.",
-  "d1af827b41ab": "Por qué existe",
-  "cd3b87a58765": "Cambia un hex en omega.json5 y se retinta solo: botones, enlaces, destacados, anillos de foco.",
-  "21ff52e940cc": "te crea una cuenta de prueba en un minuto: inicia sesión, suscríbete, cancela y observa cómo se comporta OMEGA cuando está conectado de verdad.",
   "254efbbf1998": "Enlaces sociales",
   "1720d8eaff79": "Github",
   "bcd18ead5fa8": "Twitter",
@@ -177,5 +169,10 @@
   "bad57ef7837c": "Instagram",
   "d41f5b4977ee": "Facebook",
   "8fa3899e9b32": "Linkedin",
-  "053bc65874ad": "Discord"
+  "053bc65874ad": "Discord",
+  "5b79f125f754": "OMEGA Playground es donde el stack OMEGA corre al descubierto: builds reales, inicios de sesión reales, checkouts reales — con una marca que nadie tiene que mantener.",
+  "339a1acdc17a": "Una configuración en el centro, cuatro superficies a su alrededor",
+  "011733f84d4e": "Por qué existe OMEGA Playground",
+  "7cd73a129c1d": "Cambia un hex en omega.json5 y OMEGA Playground se rediseña solo: botones, enlaces, resaltados, anillos de enfoque.",
+  "8d09aab90070": "OMEGA Playground te crea una cuenta de prueba en un minuto: inicia sesión, suscríbete, cancela y observa cómo se comporta OMEGA cuando está conectado de verdad."
 }

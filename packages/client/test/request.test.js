@@ -108,6 +108,44 @@ describe('Request Module', () => {
     assert.strictEqual(calls[0].options.headers['Authorization'], undefined);
   });
 
+  it('wakeup: the ping carries the param, skips the token, and never awaits a body', async () => {
+    const calls = fetchStub([{ headers: { 'content-type': 'application/json' }, json: { wakeup: true } }]);
+    let tokenAsked = false;
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => { tokenAsked = true; return 'id-token-123'; },
+    });
+
+    const answer = await request('/omega/payments/intent', { wakeup: true });
+
+    assert.strictEqual(calls[0].url, 'https://api.example.com/omega/payments/intent?wakeup=true', 'the param the backend middleware reads rides the url');
+    assert.strictEqual(calls[0].options.method, 'GET', 'a wakeup is a GET');
+    assert.strictEqual(tokenAsked, false, 'the middleware answers a wakeup before it authenticates, so no token is minted for it');
+    assert.strictEqual(answer, undefined, 'nothing is read back — the caller is not waiting on an answer');
+  });
+
+  it('wakeup: an existing query string keeps its params', async () => {
+    const calls = fetchStub([{ text: 'ok' }]);
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => null,
+    });
+
+    await request('https://api.example.com/omega/payments/intent?product=premium', { wakeup: true });
+
+    assert.strictEqual(calls[0].url, 'https://api.example.com/omega/payments/intent?product=premium&wakeup=true');
+  });
+
+  it('wakeup: a dead network resolves instead of throwing', async () => {
+    global.fetch = async () => { throw new Error('network down'); };
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => null,
+    });
+
+    await request('/omega/payments/intent', { wakeup: true });
+  });
+
   it('should throw on non-ok responses with code, message, and data attached', async () => {
     fetchStub([{
       ok: false,

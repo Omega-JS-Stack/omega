@@ -72,8 +72,8 @@
  *
  * AI mode requires:
  *   OMEGA_ADMIN_KEY   — authenticates with parent as admin
- *   OPENAI_API_KEY        — structure provider (or OMEGA_OPENAI_API_KEY)
- *   ANTHROPIC_API_KEY     — SVG provider (or OMEGA_ANTHROPIC_API_KEY)
+ *   OPENAI_API_KEY        — structure provider
+ *   ANTHROPIC_API_KEY     — SVG provider
  *   PARENT_API_URL        — or set `parent` in config/omega.json5
  *
  * Fixture mode requires: nothing.

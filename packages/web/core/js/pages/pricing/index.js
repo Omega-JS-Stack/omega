@@ -1,5 +1,6 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
+import { PAYMENT_WARMUP_ROUTE } from '__main_assets__/js/libs/payment-config.js';
 import omega from '@omega.js/client';
 import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -13,6 +14,12 @@ export default () => {
     setupBillingToggle();
     setupPlanButtons();
     setupCurrentPlanIndicator();
+
+    // Warm the backend the moment the page loads: every plan button leads to
+    // checkout, and checkout's first call is the intent route. Fire-and-forget
+    // and unauthenticated — the backend answers a wakeup before it loads a
+    // route ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
+    omega.request(PAYMENT_WARMUP_ROUTE, { wakeup: true });
 
     // Setup promo countdown (wait until mouse is not over nav)
     waitForNavUnhover();

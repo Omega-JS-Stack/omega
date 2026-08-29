@@ -69,6 +69,10 @@ export class FormManager {
     this._isDirty = false;
     this._permanentlyDisabled = new Set();
 
+    // Gates the form must wait on before ready() may arm it (see addGate)
+    this._gates = new Set();
+    this._readyPending = false;
+
     // Event listeners
     this._listeners = {
       change: [],
@@ -234,6 +238,61 @@ export class FormManager {
   }
 
   /**
+   * Hold ready() open until a named answer lands. A page whose submit control
+   * must not arm until an async answer is in (checkout waits on trial
+   * eligibility and reCAPTCHA) registers one gate per answer BEFORE it calls
+   * ready(): the form stays `initializing` with its submit controls disabled,
+   * and the LAST gate to resolve is what runs the ready() the page asked for.
+   *
+   * Gates belong to the initializing window only. Adding one to a form the
+   * user can already submit would disable a live control behind their back,
+   * so it fails loudly instead.
+   */
+  addGate(name) {
+    if (this.state !== 'initializing') {
+      throw new Error(`FormManager: addGate("${name}") after the form left initializing — gates are registered before ready() (state: ${this.state})`);
+    }
+
+    this._gates.add(name);
+    this._setSubmitDisabled(true);
+
+    /* @dev-only:start */
+    {
+      logger.log('Gate added:', name, [...this._gates]);
+    }
+    /* @dev-only:end */
+
+    return this;
+  }
+
+  /**
+   * Mark a gate answered. When it is the last one and ready() was already
+   * asked for, the form arms now.
+   *
+   * A name that opened no gate is a programmer error, not a no-op: a typo
+   * would silently leave the form gated forever, and a second resolve of the
+   * same gate means two callers each believe they own it.
+   */
+  resolveGate(name) {
+    if (!this._gates.delete(name)) {
+      throw new Error(`FormManager: resolveGate("${name}") names no open gate — it was never added, or it already resolved`);
+    }
+
+    /* @dev-only:start */
+    {
+      logger.log('Gate resolved:', name, 'remaining:', [...this._gates]);
+    }
+    /* @dev-only:end */
+
+    if (this._gates.size === 0 && this._readyPending) {
+      this._readyPending = false;
+      this.ready();
+    }
+
+    return this;
+  }
+
+  /**
    * Transition to ready state
    */
   ready() {
@@ -242,6 +301,20 @@ export class FormManager {
       logger.log('ready() called');
     }
     /* @dev-only:end */
+
+    // A gate still open holds the form where it is — resolveGate() calls this
+    // again once the last answer lands.
+    if (this._gates.size > 0) {
+      this._readyPending = true;
+
+      /* @dev-only:start */
+      {
+        logger.log('ready() held by gates:', [...this._gates]);
+      }
+      /* @dev-only:end */
+
+      return;
+    }
 
     this._setState('ready');
     this._setDisabled(false);
@@ -818,6 +891,17 @@ export class FormManager {
         return;
       }
       $el.disabled = disabled;
+    });
+  }
+
+  /**
+   * Disable/enable the submit controls alone — what a gate guards. The rest of
+   * the form stays live so the page can still be read and its options changed
+   * while the answer the gate waits for is in flight.
+   */
+  _setSubmitDisabled(disabled) {
+    this._getSubmitButtons().forEach(($btn) => {
+      $btn.disabled = disabled;
     });
   }
 

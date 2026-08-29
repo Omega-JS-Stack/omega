@@ -1,15 +1,10 @@
 /**
  * Stripe webhook provider
- * Verifies, extracts, and categorizes webhook event data from Stripe
+ * Extracts and categorizes webhook event data from Stripe
  *
  * Each event is mapped to a category (subscription or one-time) and includes
  * the resource type + ID needed to fetch the latest state from Stripe's API.
  */
-const env = require('../../../../libraries/env.js');
-
-// The Stripe SDK, loaded on first verification. Signature checking is a keyed
-// hash over the payload — it needs the endpoint secret, never the API key.
-let stripeSdk;
 
 // Invoice events, successful and failed. A renewal produces NO subscription
 // transition (active → active, same product), so the invoice event is the only
@@ -56,57 +51,18 @@ module.exports = {
   },
 
   /**
-   * Verify Stripe's `stripe-signature` header against the delivered bytes
-   *
-   * The shared `?key=` param is a defense layer; this is the boundary. It runs
-   * strictly whenever STRIPE_WEBHOOK_SECRET is set — the endpoint's signing
-   * secret from the Stripe Dashboard, or `stripe listen --print-secret` for a
-   * forwarded local run. Unset, the route stays on the key-only path.
-   *
-   * @param {object} req - The raw HTTP request
-   * @returns {object} { status, reason }
-   *   - status: 'verified' | 'invalid' | 'unconfigured'
-   */
-  verifySignature(req) {
-    const secret = env.get('STRIPE_WEBHOOK_SECRET');
-
-    if (!secret) {
-      return { status: 'unconfigured', reason: 'STRIPE_WEBHOOK_SECRET is not set' };
-    }
-
-    const signature = req.headers?.['stripe-signature'];
-
-    if (!signature) {
-      return { status: 'invalid', reason: 'no stripe-signature header' };
-    }
-
-    // Only the delivered bytes can be verified — re-serializing req.body would
-    // check a guess. GCF/Firebase requests carry rawBody.
-    if (!req.rawBody) {
-      return { status: 'invalid', reason: 'raw request body unavailable' };
-    }
-
-    stripeSdk = stripeSdk || require('stripe');
-
-    try {
-      // Also enforces Stripe's timestamp tolerance, so a captured event cannot be replayed
-      stripeSdk.webhooks.constructEvent(req.rawBody, signature, secret);
-
-      return { status: 'verified' };
-    } catch (e) {
-      return { status: 'invalid', reason: e.message };
-    }
-  },
-
-  /**
    * Parse a Stripe webhook request
    * Extracts event data and determines category, resource type, resource ID, and UID
    *
    * @param {object} req - The raw HTTP request
-   * @returns {object} { eventId, eventType, category, resourceType, resourceId, raw, uid }
+   * @returns {object} { eventId, eventType, category, resourceType, resourceId, chargeId, raw, uid }
    *   - category: 'subscription' | 'one-time' | null (null = skip)
    *   - resourceType: 'subscription' | 'invoice' | 'session' | 'charge'
    *   - resourceId: ID to fetch from provider API
+   *   - chargeId: THIS charge's own id, where a subscription event names one —
+   *     Stripe's invoice id. The resourceId is the subscription, which is
+   *     constant for its whole life, so it can never key a single charge
+   *     ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
    */
   parseWebhook(req) {
     const event = req.body;
@@ -124,6 +80,10 @@ module.exports = {
     let resourceType = null;
     let resourceId = null;
     let uid = null;
+    // The invoice this event is about, when it is about one. A one-time purchase
+    // has exactly one charge and the order names it, so only the SUBSCRIPTION
+    // branches fill this in ([#656]).
+    let chargeId = null;
 
     if (eventType.startsWith('customer.subscription.')) {
       // Subscription lifecycle events — always subscription category
@@ -146,6 +106,8 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = subscriptionId;
+        // The invoice IS the charge — one per renewal, recovery and conversion.
+        chargeId = dataObject.id || null;
         uid = dataObject.parent?.subscription_details?.metadata?.uid
           || dataObject.subscription_details?.metadata?.uid
           || dataObject.metadata?.uid
@@ -184,11 +146,15 @@ module.exports = {
         category = 'subscription';
         resourceType = 'subscription';
         resourceId = subscriptionId;
+        // The invoice the reversed charge was paid against, so the refund can
+        // name the same id GA4 recorded that charge under ([#656]).
+        chargeId = invoiceId || null;
       } else if (invoiceId) {
         // Has invoice — likely subscription-related, will resolve via fetchResource
         category = 'subscription';
         resourceType = 'invoice';
         resourceId = invoiceId;
+        chargeId = invoiceId;
       } else {
         // One-time payment refund — no subscription, no invoice, so the charge
         // itself is the resource. Dropping it (category = null) meant the refund
@@ -208,6 +174,7 @@ module.exports = {
       category: category,
       resourceType: resourceType,
       resourceId: resourceId,
+      chargeId: chargeId,
       raw: event,
       uid: uid,
     };

@@ -344,7 +344,6 @@ function OpenAI(ctx, key) {
     || self.Manager?.config?.openai?.global
     || self.Manager?.config?.openai?.main
     || env.get('OPENAI_API_KEY')
-    || env.get('OMEGA_OPENAI_API_KEY')
 
   // Running counter across every call this provider instance makes. Each call
   // reports its OWN usage (see attemptRequest) — this is the instance total.

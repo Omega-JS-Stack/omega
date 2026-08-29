@@ -427,14 +427,19 @@ test('newsletter: no webhook yet → created with the exact consent-pipeline pay
   assert.equal(result.output.webhook.created, true);
 });
 
-test('newsletter: missing OMEGA_WEBHOOK_KEY warns', async () => {
-  const api = fakeBeehiiv(convergedResponses());
+test('newsletter: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook is managed, never skipped (#635)', async () => {
+  const api = fakeBeehiiv({ ...convergedResponses(), updateWebhook: {} });
 
-  const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
+  await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
 
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.webhook.missingWebhookKey, true);
-  assert.equal(api.callsTo('listWebhooks').length, 0);
+  // OMEGA mints its own key, so the run never steps aside for it
+  const minted = process.env.OMEGA_WEBHOOK_KEY;
+  assert.match(minted, /^[A-Za-z0-9_-]{43}$/);
+  // ...and the freshly minted key is what the forwarder URL is built from
+  assert.equal(api.callsTo('listWebhooks').length, 1);
+  assert.deepEqual(api.callsTo('updateWebhook')[0].args, [
+    PUB_ID, 'wh_1', { url: `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=beehiiv&key=${minted}` },
+  ]);
 });
 
 test('newsletter: no parent configured → nothing to point the webhook at', async () => {

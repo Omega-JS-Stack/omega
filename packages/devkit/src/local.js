@@ -507,6 +507,56 @@ function resolveLinkedMonorepo(brandRoot) {
   return null;
 }
 
+// Bound on the wait for a fresh watch's initial prepare: a package that never
+// reports must delay a boot, never strand it.
+const WATCH_READY_TIMEOUT_MS = 120000;
+
+/**
+ * Readiness tracker for the monorepo watch's initial prepare, fed the watch's
+ * own stdout lines.
+ *
+ * The watch announces its roster (`Watching N packages (src→dist): ...`) and
+ * every package prints `'prepare-package': Ready for changes!` behind its
+ * `[name]` prefix once its first src→dist pass has landed — so "every dist is
+ * written" is exactly "N distinct prefixes have reported"
+ * ([#670](https://github.com/Omega-JS-Stack/omega/issues/670)). A package
+ * repeats that line on every later rebuild, so DISTINCT prefixes are counted:
+ * one chatty package can never stand in for one still preparing.
+ * @returns {{push: function, isReady: function, pending: function}} push(line)
+ *   consumes one stdout line; pending() names the roster entries yet to report.
+ */
+function createWatchReadyTracker() {
+  let expected = null;
+  let roster = [];
+  const reported = new Set();
+
+  return {
+    push(line) {
+      const text = line.trim();
+
+      // The shared-package roster line (`Watching N shared packages ...`)
+      // is a different watch with no ready lines — it must not set N.
+      const rosterMatch = /^Watching (\d+) packages \(src→dist\): (.+)$/.exec(text);
+      if (rosterMatch) {
+        expected = Number(rosterMatch[1]);
+        roster = rosterMatch[2].split(',').map((name) => name.trim());
+        return;
+      }
+
+      const readyMatch = /^\[([^\]]+)\].*'prepare-package': Ready for changes!$/.exec(text);
+      if (readyMatch) {
+        reported.add(readyMatch[1].trim());
+      }
+    },
+    isReady() {
+      return expected !== null && reported.size >= expected;
+    },
+    pending() {
+      return roster.filter((name) => !reported.has(name));
+    },
+  };
+}
+
 /**
  * Spawn the monorepo's src→dist watch (`npm start` at the monorepo root) as a
  * SESSION-SCOPED child, unless one is already running (lock held by a live
@@ -518,10 +568,20 @@ function resolveLinkedMonorepo(brandRoot) {
  * signal policy (a dev server exits on SIGINT, the brand-root orchestrator
  * stops its legs first) — the watch's death is wired HERE, once, so no caller
  * re-implements it ([#587](https://github.com/Omega-JS-Stack/omega/issues/587)).
+ *
+ * A FRESH watch rewrites every package's dist as it runs its initial prepare
+ * pass, so `ready` gates that pass: a caller awaits it before booting anything
+ * that loads those dists ([#670](https://github.com/Omega-JS-Stack/omega/issues/670)).
+ * It resolves when every watched package has reported ready, when the watch
+ * child exits before reporting, or after WATCH_READY_TIMEOUT_MS with one
+ * warning naming the stragglers — it never rejects, and resolves with which of
+ * the three settled it ('ready' | 'exit' | 'timeout') so a caller only claims
+ * success on 'ready'. An already-running watch has no initial pass to wait
+ * for, so its `ready` is resolved with 'ready'.
  * @param {object} options
  * @param {string} options.monorepoRoot - Monorepo root path.
  * @param {object} [options.logger] - Logger with log (silent when omitted).
- * @returns {{alreadyRunning: boolean, pid: number|null, child: object|null}}
+ * @returns {{alreadyRunning: boolean, pid: number|null, child: object|null, ready: Promise<'ready'|'exit'|'timeout'>}}
  */
 function startMonorepoWatch(options) {
   const { monorepoRoot, logger } = options;
@@ -529,7 +589,7 @@ function startMonorepoWatch(options) {
   const livePid = readLiveWatchPid(monorepoRoot);
   if (livePid) {
     logger && logger.log(`Monorepo watch already running (pid ${livePid}) — leaving it be`);
-    return { alreadyRunning: true, pid: livePid, child: null };
+    return { alreadyRunning: true, pid: livePid, child: null, ready: Promise.resolve('ready') };
   }
 
   const child = spawn('npm', ['start'], { cwd: monorepoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -550,6 +610,43 @@ function startMonorepoWatch(options) {
   forward(child.stdout);
   forward(child.stderr);
 
+  const tracker = createWatchReadyTracker();
+  let settleReady;
+  const ready = new Promise((resolve) => {
+    settleReady = resolve;
+  });
+  const readyTimer = setTimeout(() => {
+    const stragglers = tracker.pending();
+    watchLogger.warn(`Initial prepare still running after ${WATCH_READY_TIMEOUT_MS / 1000}s${stragglers.length > 0 ? ` (${stragglers.join(', ')})` : ''} — continuing anyway`);
+    settleReady('timeout');
+  }, WATCH_READY_TIMEOUT_MS);
+  // Never the reason a process stays alive: the watch child already holds the
+  // loop open for as long as the session wants it.
+  readyTimer.unref();
+
+  // Its OWN line buffering, beside the forwarding above: readiness matches a
+  // line's tail and a chunk boundary can split one. A smeared LOG line is
+  // cosmetic, where a missed ready line would hold a boot for the full timeout.
+  let pending = '';
+  child.stdout.on('data', (chunk) => {
+    pending += chunk;
+    const lines = pending.split('\n');
+    pending = lines.pop();
+    lines.forEach((line) => tracker.push(line));
+    if (tracker.isReady()) {
+      clearTimeout(readyTimer);
+      settleReady('ready');
+    }
+  });
+
+  // A watch that dies before it reports — a lost lock race, a spawn that never
+  // ran — has no pass left to wait for, so its exit settles the wait instead of
+  // parking a boot on the full timeout.
+  child.on('exit', () => {
+    clearTimeout(readyTimer);
+    settleReady('exit');
+  });
+
   // Session-scoped: no orphaned watcher outlives the session that spawned it.
   process.on('exit', () => {
     try {
@@ -561,7 +658,7 @@ function startMonorepoWatch(options) {
 
   logger && logger.log(`Monorepo watch started (pid ${child.pid}) — src→dist rebuilds are live`);
 
-  return { alreadyRunning: false, pid: child.pid, child };
+  return { alreadyRunning: false, pid: child.pid, child, ready };
 }
 
 /**
@@ -1586,6 +1683,7 @@ module.exports = {
   linkLocalPackages,
   restoreRegistrySpecs,
   resolveLinkedMonorepo,
+  createWatchReadyTracker,
   startMonorepoWatch,
   startVendorPropagation,
   readLiveWatchPid,

@@ -361,7 +361,7 @@ class TestCommand extends BaseCommand {
       log: (line) => this.log(chalk.gray(`  [${laneModule.LANE}] ${line}`)),
     });
 
-    const { webhookSecret, stop } = await laneModule.startForwarding({
+    const { stop } = await laneModule.startForwarding({
       stripePath: stripePath,
       apiKey: decision.key,
       forwardUrl: laneModule.forwardUrl({ hostingPort: emulatorPorts.hosting, webhookKey: testConfig.webhookKey }),
@@ -371,12 +371,8 @@ class TestCommand extends BaseCommand {
     this.log(chalk.gray(`  [${laneModule.LANE}] forwarding real test-mode webhooks to localhost:${emulatorPorts.hosting}\n`));
 
     return {
-      // The signing secret rides to the child by env and is never printed: the
-      // route verifies every forwarded delivery against it, which is the whole
-      // point of running real events through the real door.
       env: {
         [laneModule.LANE_ENV]: laneModule.LANE,
-        STRIPE_WEBHOOK_SECRET: webhookSecret,
         STRIPE_CLI_PATH: stripePath,
       },
       stop: stop,

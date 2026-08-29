@@ -55,8 +55,10 @@ module.exports = async function ensureStripeWebhook(context) {
   }
 
   if (!process.env.OMEGA_WEBHOOK_KEY) {
-    console.log(`      ${chalk.yellow('⚠')} OMEGA_WEBHOOK_KEY not set in the brand .env — webhook not managed`);
-    return { status: 'warned', output: { stripeWebhook: { skipped: 'no OMEGA_WEBHOOK_KEY' } } };
+    // Unreachable by design (#635): the key is OMEGA's own (`generated:` in
+    // the env schema) and the payment service's setup mints it through the
+    // shared contract before any operation runs. Absent here = broken wiring.
+    throw new Error('OMEGA_WEBHOOK_KEY absent after the payment setup ran — its REQUIRES entry or its requestServiceInput call is missing');
   }
 
   const desiredUrl = buildWebhookUrl(brandConfig, 'stripe');

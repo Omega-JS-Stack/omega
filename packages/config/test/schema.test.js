@@ -299,6 +299,49 @@ test('devlog.enabled is declared — case 3, no materialized default (#553)', ()
   );
 });
 
+// #636 — the per-key sweep found live config paths the schema never declared:
+// the certificates service reads the whole `certificates` block, the captcha
+// and search services WRITE their confirmations back into the brand file, the
+// domain service picks the registrar by the KEY under `domain.providers`, the
+// TikTok mint reads the developer app id (#635), and the client's verts read
+// the advertising fallback + tags. Undeclared means no type, no description,
+// and no validator finding when one of them is misspelled.
+test('the paths services read and write back are declared (#636)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+
+  const expected = {
+    'certificates.enabled': 'boolean',
+    'certificates.providers.apple.bundleIdPrefix': 'string',
+    'certificates.providers.apple.capabilities': 'array',
+    'certificates.providers.apple.profiles': 'array',
+    'certificates.providers.apple.certificates': 'array',
+    'captcha.providers.recaptcha.domainsConfirmed': 'array',
+    'domain.providers.namecheap': 'object',
+    'analytics.providers.tiktok.appId': 'string',
+    'search.providers.searchConsole.gaLinked': 'boolean',
+    'advertising.fallback': 'string|boolean',
+    'advertising.tags': 'array',
+  };
+
+  for (const [path, type] of Object.entries(expected)) {
+    const rule = rules.get(path);
+    assert.ok(rule, `missing ${path}`);
+    assert.equal(rule.type, type, `${path} declares its shape`);
+    assert.equal(rule.required, false, `${path} is the brand's own answer, never demanded`);
+    assert.ok(rule.description, `${path} documents what it drives`);
+    // No materialized default: these are owner decisions (the Apple prefix, the
+    // registrar) and machine-written confirmations. A default would write the
+    // block into every brand's omega.json5 — a certificates block in a
+    // website-only brand, a registrar in a brand that owns no domain.
+    assert.ok(!('default' in rule), `${path} must not materialize a default`);
+  }
+
+  assert.equal(schemaDefaults('desktop').certificates, undefined, 'nothing certificates lands in the defaults layer');
+  assert.equal(schemaDefaults('web').domain, undefined, 'nothing domain lands in the defaults layer');
+});
+
 // ─── backendProjectType (#584) ───
 
 test('backendProjectType reads the backend target entry, firebase unless it says custom', () => {
