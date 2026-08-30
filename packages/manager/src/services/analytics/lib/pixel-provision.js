@@ -109,12 +109,12 @@ async function provisionPixel(context, spec) {
   // twice; when it didn't (a configured accountId), the acquire owns it
   if (!await acquirePixelToken(context, spec, gated ? { gate: false } : {})) {
     console.log(`      ${chalk.dim('→')} ${spec.label} not created — rerun with ${chalk.cyan(spec.envVar)} set (or set ${chalk.cyan(`analytics.providers.${spec.key}: false`)} to stop asking)`);
-    return { status: 'warned', output: { [spec.key]: { pixelId: null, tokenConfigured: false } } };
+    return { status: 'warned', reason: `${spec.label} not created — no ${spec.envVar}`, output: { [spec.key]: { pixelId: null, tokenConfigured: false } } };
   }
 
   const accountId = provider.accountId || await resolvePixelAccount(context, spec);
   if (!accountId) {
-    return { status: 'warned', output: { [spec.key]: { pixelId: null, tokenConfigured: true } } };
+    return { status: 'warned', reason: `${spec.label} not created — no account resolved`, output: { [spec.key]: { pixelId: null, tokenConfigured: true } } };
   }
 
   const api = context[spec.apiKey];

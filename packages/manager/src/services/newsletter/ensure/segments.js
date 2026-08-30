@@ -53,6 +53,7 @@ module.exports = async function ensureSegments(context) {
 
   const warned = (created = []) => ({
     status: 'warned',
+    reason: `${missing.length} segment(s) missing: ${missing.map((s) => s.name).join(', ')}`,
     output: { segments: { total: BEEHIIV_SEGMENTS.length, missing: missing.map((s) => s.name), ...(created.length ? { created } : {}) } },
   });
 
@@ -133,6 +134,7 @@ module.exports = async function ensureSegments(context) {
   console.log(`      ${chalk.yellow('⚠')} ${remaining.length} segment(s) still missing: ${remaining.map((s) => s.name).join(', ')}`);
   return {
     status: 'warned',
+    reason: `${remaining.length} segment(s) still missing: ${remaining.map((s) => s.name).join(', ')}`,
     output: { segments: { total: BEEHIIV_SEGMENTS.length, missing: remaining.map((s) => s.name), ...(created.length ? { created } : {}) } },
   };
 };

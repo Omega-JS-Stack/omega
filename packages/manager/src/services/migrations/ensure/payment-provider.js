@@ -96,6 +96,7 @@ function createProviderRenameFix(legacy, current) {
 module.exports = async function ensurePaymentProvider(context) {
   const output = {};
   let status;
+  const warnings = [];
 
   for (const target of TARGETS) {
     const result = await runMigration(context, {
@@ -120,10 +121,11 @@ module.exports = async function ensurePaymentProvider(context) {
 
     if (result.status === 'warned') {
       status = 'warned';
+      warnings.push(`${target.collection}: ${result.reason}`);
     }
   }
 
-  return status ? { output, status } : { output };
+  return status ? { output, status, reason: warnings.join('; ') } : { output };
 };
 
 module.exports.TARGETS = TARGETS;

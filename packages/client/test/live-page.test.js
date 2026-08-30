@@ -31,6 +31,47 @@ function failure(message, code) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// The tab-visibility seam: `document.hidden` plus the visibilitychange
+// listeners the poller arms, swapped onto the shared fake document the same
+// way triggers.test.js captures its click handler.
+function fakeVisibility() {
+  const { addEventListener, removeEventListener, hidden } = global.document;
+  const handlers = new Set();
+
+  global.document.hidden = false;
+  global.document.addEventListener = (type, handler) => {
+    if (type === 'visibilitychange') {
+      handlers.add(handler);
+    }
+  };
+  global.document.removeEventListener = (type, handler) => {
+    if (type === 'visibilitychange') {
+      handlers.delete(handler);
+    }
+  };
+
+  // What the browser does on a tab change: flip the flag, then tell whoever asked.
+  const change = (next) => {
+    global.document.hidden = next;
+    handlers.forEach((handler) => handler());
+  };
+
+  return {
+    hide: () => change(true),
+    show: () => change(false),
+    listeners: () => handlers.size,
+    restore: () => {
+      global.document.addEventListener = addEventListener;
+      global.document.removeEventListener = removeEventListener;
+      if (hidden === undefined) {
+        delete global.document.hidden;
+      } else {
+        global.document.hidden = hidden;
+      }
+    },
+  };
+}
+
 describe('live-page', () => {
 
   before(async () => {
@@ -294,6 +335,54 @@ describe('live-page', () => {
       const after = answers.length;
       t.mock.timers.tick(10000);
       assert.strictEqual(answers.length, after, 'and a stopped poller reads nothing more');
+    });
+
+    it('pauses its cadence in a hidden tab and resumes with one immediate read', async (t) => {
+      // Same faked clock as the cadence case above: what is pinned here is
+      // WHICH ticks land, so the ticks are the poller's, not the wall's.
+      t.mock.timers.enable({ apis: ['setInterval'] });
+      const visibility = fakeVisibility();
+
+      const answers = [];
+      const fetcher = async (path) => { answers.push(path); return {}; };
+      const poller = createFeedPoller({ feeds: { board: { path: '/board', every: 20 } }, fetcher });
+
+      await poller.start();
+      assert.strictEqual(answers.length, 1, 'the first pass reads once');
+
+      t.mock.timers.tick(40);
+      assert.strictEqual(answers.length, 3, 'and a visible tab keeps its cadence');
+
+      visibility.hide();
+      const covered = answers.length;
+      t.mock.timers.tick(2000);
+      assert.strictEqual(answers.length, covered, 'a covered tab reads nothing, however long it stays covered');
+
+      visibility.show();
+      assert.strictEqual(answers.length, covered + 1, 'coming back reads ONCE, immediately');
+
+      t.mock.timers.tick(40);
+      assert.strictEqual(answers.length, covered + 3, 'and the cadence runs again from there');
+
+      poller.stop();
+      visibility.restore();
+    });
+
+    it('lets go of the visibility listener when it stops', async (t) => {
+      // The runner's clock again, so a failed assertion below cannot leave a
+      // live interval holding the whole file open.
+      t.mock.timers.enable({ apis: ['setInterval'] });
+      const visibility = fakeVisibility();
+      const fetcher = async () => ({});
+      const poller = createFeedPoller({ feeds: { board: { path: '/board', every: 20 } }, fetcher });
+
+      await poller.start();
+      assert.strictEqual(visibility.listeners(), 1, 'a running poller watches the tab');
+
+      poller.stop();
+      assert.strictEqual(visibility.listeners(), 0, 'and a stopped one leaves nothing listening');
+
+      visibility.restore();
     });
 
     it('a stop() during the first pass keeps the timers from ever arming', async () => {

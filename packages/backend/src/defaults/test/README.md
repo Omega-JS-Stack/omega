@@ -1,6 +1,6 @@
 # Project tests
 
-This project has **two test lanes**, both scaffolded by `npx omega setup`.
+This project has **two test lanes**, both scaffolded by the OMEGA verbs.
 
 | Lane | Command | What it is |
 |---|---|---|

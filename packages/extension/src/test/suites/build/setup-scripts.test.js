@@ -1,11 +1,11 @@
-// Build-layer tests for setup's package.json write (#572).
+// Build-layer tests for ensure-target's package.json write (#572).
 //
-// `jetpack.write(path, object)` serializes with no trailing newline, and setup
+// `jetpack.write(path, object)` serializes with no trailing newline, and the write
 // rewrote the consumer's package.json unconditionally — so every `npm run build`
-// (clean && setup && gulp) re-stripped the newline npm itself writes, and the
+// re-stripped the newline npm itself writes, and the
 // consumer's lint hook or editor put it back, forever.
 //
-// setup.js reads its project from cwd at REQUIRE time, so each test stages a
+// setupScripts defaults to the cwd project, so each test stages a
 // temp project, chdirs into it, and requires the command fresh — the same model
 // as package-task.test.js's inProject().
 
@@ -14,7 +14,7 @@ const fs   = require('fs');
 const os   = require('os');
 
 const SRC        = path.join(__dirname, '..', '..', '..');
-const SETUP_PATH = path.join(SRC, 'commands', 'setup.js');
+const SETUP_PATH = path.join(SRC, 'commands', 'lib', 'ensure-target.js');
 
 const CONSUMER_PKG = {
   name: 'staged-ext',
@@ -52,7 +52,7 @@ async function inProject(dir, fn) {
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'setup — the consumer package.json write',
+  description: 'ensure-target — the consumer package.json write',
   tests: [
     {
       name: 'the written package.json ends with exactly one trailing newline (#572)',

@@ -17,6 +17,7 @@ const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { ensureTarget } = require('./lib/ensure-target.js');
 const { consumerPaths } = require('../consumer.js');
 const { checkDistLinks, loadLinkExceptions, EXCEPTIONS_FILE } = require('../link-resolver.js');
 
@@ -28,6 +29,10 @@ module.exports = async function (options) {
   // Tee the whole run to <targetRoot>/logs/test.log (#197) — the file to grep
   // after a failure instead of scrolling scrollback.
   attachLogFile(path.join(paths.root, 'logs', 'test.log'));
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target.
+  ensureTarget({ projectDir: paths.root, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
   // ---- C5 scope (bare = project only; the framework suite is explicit)
   const scope = parseTestScope((options._ || []).slice(1), {

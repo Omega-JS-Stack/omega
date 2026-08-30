@@ -26,6 +26,7 @@
  * Values are never printed. Errors name the KEY and the fix.
  */
 const { envSchemaEntry, requiredEnvKeys, devEnvKeyMap } = require('@omega.js/config');
+const { checkEnvRules } = require('@omega.js/config/env-rules');
 
 /**
  * The runtime environment — the SINGLE SOURCE OF TRUTH the Manager's
@@ -67,7 +68,7 @@ function environment() {
 function remedy(entry) {
   return entry && typeof entry.generated === 'function'
     ? 'Run `npx omega manage` at the brand root (it mints the key), then redeploy the backend.'
-    : 'Add it to the brand .env and run `npx omega manage` (disperse composes it into the backend), then redeploy.';
+    : 'Add it to the brand .env, then redeploy: every backend verb composes dist/.env from the cascade.';
 }
 
 /**
@@ -205,6 +206,47 @@ function assertRequired(target = 'backend') {
 }
 
 /**
+ * Validate every key this brand's OWN config made mandatory — the schema's
+ * `requiredWhen` rules ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)).
+ *
+ * `assertRequired` above covers the keys OMEGA needs no matter what a brand
+ * configures. This is the other half: a config path that is set makes its key
+ * mandatory (a GA4 Measurement ID with no Measurement Protocol secret sends no
+ * events; a reCAPTCHA site key with no secret half 403s every protected POST).
+ * The rule is declared once in the env schema and evaluated by ONE checker
+ * shared with the manager's manage-time pass — this reader only decides what a
+ * violation costs, which the caller in index.js resolves: production refuses,
+ * everything else warns and continues.
+ *
+ * Violations name the BRAND-LEVEL key (GOOGLE_ANALYTICS_SECRET_BACKEND, not
+ * the GOOGLE_ANALYTICS_SECRET it is delivered as), because that is the name a
+ * human puts in the brand .env.
+ *
+ * @param {object} config - The resolved omega.json5 config.
+ * @param {string} [target] - The target whose rules to check.
+ * @throws {Error} MissingConditionalEnvKeysError (code 500) naming every key
+ *   and the config path that made it mandatory.
+ */
+function assertRules(config, target = 'backend') {
+  // The checker answers for BOTH schema rules; the unconditional `required`
+  // half is assertRequired's above, and reporting a key twice in one boot
+  // would just be noise.
+  const violations = checkEnvRules(config, process.env, { target })
+    .filter((violation) => violation.rule === 'requiredWhen');
+  if (violations.length === 0) { return; }
+
+  const named = violations.map(({ key, path }) => (path ? `${key} (required by ${path})` : key)).join(', ');
+  const error = new Error(
+    `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the .env cascade: ${named}. `
+    + `${remedy(envSchemaEntry(violations[0].key))}`,
+  );
+  error.name = 'MissingConditionalEnvKeysError';
+  error.code = 500;
+  error.keys = violations.map((violation) => violation.key);
+  throw error;
+}
+
+/**
  * Whether a boot that FAILED assertRequired() may warn and continue instead
  * of refusing. Exactly one lane qualifies: a process with no consumer
  * omega.json5 is not a brand's backend at all — it is the framework booting
@@ -230,5 +272,6 @@ module.exports = {
   has,
   require: require_,
   assertRequired,
+  assertRules,
   guardIsAdvisory,
 };

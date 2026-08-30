@@ -8,9 +8,9 @@
  * Presence is judged on the RESOLVED value (`process.env`, which manage
  * already layered shell > brand .env > company .env), so a company-managed
  * brand never shadows its company's value with a fresh one. A minted value
- * is published into `process.env` too, so the same run's disperse composes it
- * into targets/backend/.env — the key is live one manage after the gap, not
- * two. Values are never printed: the run says WHICH key it minted, never what.
+ * is published into `process.env` too, so the same run's builds compose it
+ * into their targets — the key is live one manage after the gap, not two.
+ * Values are never printed: the run says WHICH key it minted, never what.
  *
  * The mint itself is lib/env-secret.js's `mintGeneratedKey` — shared with the
  * setup contract, which mints a single key for a service that reached it

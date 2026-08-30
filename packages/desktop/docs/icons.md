@@ -76,4 +76,4 @@ config/icons/macos/dmg.png      # mac-only by definition
 
 ## Bundled defaults
 
-@omega.js/desktop ships its own `icon.png`, `tray.png`, `dmg.png` for each platform in `<@omega.js/desktop>/src/defaults/config/icons/<platform>/`. These are the final fallback when neither the consumer nor a global file provides anything — so a fresh `npx omega setup` project produces a buildable app with the generic @omega.js/desktop icon out of the box.
+@omega.js/desktop ships its own `icon.png`, `tray.png`, `dmg.png` for each platform in `<@omega.js/desktop>/src/defaults/config/icons/<platform>/`. These are the final fallback when neither the consumer nor a global file provides anything — so a freshly scaffolded project produces a buildable app with the generic @omega.js/desktop icon out of the box.

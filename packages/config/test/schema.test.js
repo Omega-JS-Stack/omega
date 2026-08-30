@@ -342,6 +342,46 @@ test('the paths services read and write back are declared (#636)', () => {
   assert.equal(schemaDefaults('web').domain, undefined, 'nothing domain lands in the defaults layer');
 });
 
+// #649 — the seven SendGrid unsubscribe (ASM) group ids the backend's send path
+// attaches. They were hardcoded in the backend, so a brand on any other SendGrid
+// account sent with ids that do not exist there. The ids are per ACCOUNT: the
+// campaigns service provisions each group by name and writes its id here.
+test('the SendGrid unsubscribe group ids are declared, one row per group (#649)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+
+  const keys = ['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal'];
+
+  for (const key of keys) {
+    const path = `marketing.campaigns.providers.sendgrid.groups.${key}`;
+    const rule = rules.get(path);
+    assert.ok(rule, `missing ${path}`);
+    assert.equal(rule.type, 'integer', `${path} is an ASM group id`);
+    assert.equal(rule.required, false, `${path} is machine-written, never demanded`);
+    assert.ok(rule.description, `${path} documents which email it gates`);
+    // No materialized default: the id belongs to the brand's own SendGrid
+    // account, so a written-in answer would be another account's group.
+    assert.ok(!('default' in rule), `${path} must not materialize a default`);
+  }
+
+  assert.equal(schemaDefaults('backend').marketing?.campaigns?.providers?.sendgrid?.groups, undefined, 'no group ids land in the defaults layer');
+
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  const groups = Object.fromEntries(keys.map((key, i) => [key, 100 + i]));
+  assert.deepEqual(
+    validateConfig({ ...base, marketing: { campaigns: { providers: { sendgrid: { groups } } } } }).errors,
+    [],
+    'the shape the campaigns service writes back validates clean',
+  );
+  assert.ok(
+    validateConfig({ ...base, marketing: { campaigns: { providers: { sendgrid: { groups: { ...groups, orders: '16223' } } } } } }).errors
+      .some((e) => e.includes('config.marketing.campaigns.providers.sendgrid.groups.orders has wrong type')),
+    'a stringified id is caught — SendGrid answers ids as numbers',
+  );
+});
+
 // ─── backendProjectType (#584) ───
 
 test('backendProjectType reads the backend target entry, firebase unless it says custom', () => {

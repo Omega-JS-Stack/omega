@@ -74,6 +74,7 @@ test('needsInteractiveSkip: warned return with the #32 marker under the operatio
   const withNote = needsInteractiveSkip('billing', 'pick a billing account', 'nothing configured');
   assert.deepEqual(withNote, {
     status: 'warned',
+    reason: 'needs an interactive run',
     output: {
       billing: {
         note: 'nothing configured',
@@ -85,6 +86,7 @@ test('needsInteractiveSkip: warned return with the #32 marker under the operatio
   const withoutNote = needsInteractiveSkip('cloudMessaging', 'paste the VAPID keys');
   assert.deepEqual(withoutNote, {
     status: 'warned',
+    reason: 'needs an interactive run',
     output: {
       cloudMessaging: {
         needsInteractive: 'paste the VAPID keys',

@@ -31,7 +31,7 @@ module.exports = async ({ brandRoot, brand }) => {
   const claude = ensureClaudePointer(brandRoot);
   if (claude === 'content-bearing') {
     console.log(`      ${chalk.yellow('⚠')} CLAUDE.md carries content — move it into AGENTS.md (below the import) and reduce CLAUDE.md to the one-line \`${CLAUDE_POINTER}\` pointer`);
-    return { status: 'warned', output: { guide, agents, claude } };
+    return { status: 'warned', reason: 'CLAUDE.md carries content — move it into AGENTS.md', output: { guide, agents, claude } };
   }
   console.log(`      ${chalk.green('✓')} CLAUDE.md ${claude === 'created' ? 'created as' : 'is'} the \`${CLAUDE_POINTER}\` pointer`);
 

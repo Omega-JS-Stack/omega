@@ -254,11 +254,23 @@ module.exports = {
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.oneTimeProduct.id, discount: ONE_TIME_CODE }),
+          // A cadence the caller had no business sending on a one-time product —
+          // the shape the live checkout really sent
+          // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)). The
+          // route is what decides a one-time buy bills on `once`.
+          settings: checkoutSettings({ productId: state.oneTimeProduct.id, frequency: 'annually', discount: ONE_TIME_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.equal(amountFromUrl(sent.body.url), String(expected), `The confirmation URL should quote $${expected}, not the full $${price}`);
+
+        // What the caller asked for never reaches the record: the intent doc is
+        // what the webhook and every reader after it read back (#668)
+        const intentDoc = await firestore.get(`payments-intents/${sent.body.orderId}`);
+
+        assert.equal(intentDoc.frequency, 'once', `A one-time intent should record 'once', got '${intentDoc.frequency}'`);
+        assert.equal(new URL(sent.body.url).searchParams.get('frequency'), 'once', 'And the confirmation URL should say the same');
+        assert.equal(new URL(sent.body.url).searchParams.get('type'), 'one-time', 'The confirmation URL should name the product type outright');
 
         const webhookDoc = await waitForWebhook(waitFor, firestore, eventIdFor(sent.body.id));
         const session = webhookDoc.raw?.data?.object;

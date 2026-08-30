@@ -57,7 +57,7 @@ Only when auditing the @omega.js/desktop repo itself. Mirrored across the four f
 | ID | Sev | Check |
 |----|-----|-------|
 | F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, guide skeleton, shared env/test conventions) in sync with UJM / @omega.js/backend / BXM; deviations are deliberate and documented |
-| F-02 | HIGH | Consumer-shipped defaults in sync — what `npx omega setup` scaffolds (`src/defaults/`) matches current conventions and docs |
+| F-02 | HIGH | Consumer-shipped defaults in sync — what `ensureTarget()` scaffolds (`src/defaults/`, every verb) matches current conventions and docs |
 | F-03 | MED | Docs completeness — every `docs/*.md` indexed in the framework guide; every lib module has a doc; no "(planned)" links for things that have shipped |
 | F-04 | HIGH | `npx omega test mgr:` green before treating the audit as complete |
 

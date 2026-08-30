@@ -25,6 +25,16 @@ const logger = createLogger('request');
 
 const PROPERTIES_HEADER = 'omega-properties';
 
+// The route every wakeup aims at, on every surface. ONE home because a wakeup
+// never runs a route: @omega.js/backend's middleware answers it before it loads
+// one, so the path is a label rather than a destination, and every caller
+// naming "the route I am about to need" would be a dozen spellings of the same
+// warm function. `/omega/health` is the public, input-free liveness probe — the
+// one route whose name means exactly what this call does, and the only one that
+// would still be harmless if the short-circuit ever stopped short-circuiting
+// ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+const WAKEUP_ROUTE = '/omega/health';
+
 // Delay between retry attempts (options.tries)
 const RETRY_DELAY = 500;
 
@@ -197,10 +207,5 @@ function isRawBody(body) {
     || (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer);
 }
 
-export { createRequest, mergeUsageIntoBindings };
+export { createRequest, mergeUsageIntoBindings, WAKEUP_ROUTE };
 export default createRequest;
-
-// For non-ES6 environments (desktop main, extension service worker via require)
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createRequest, mergeUsageIntoBindings };
-}

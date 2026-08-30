@@ -8,6 +8,7 @@
 // - No BXM-specific storage - Web Manager handles auth state internally
 
 import { registerTrigger } from '@omega.js/client/modules/triggers.js';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import LoggerLite from './logger-lite.js';
 
 // The auth sub-modules of the identity tag — these lines are about auth, not
@@ -22,6 +23,14 @@ const broadcastLogger = new LoggerLite('auth:broadcast');
  */
 export async function syncWithBackground(context) {
   const { extension, omega } = context;
+
+  // Warm the backend before the auth wait below. When this sync needs a token,
+  // background answers it by POSTing `/omega/user/token` — the extension's
+  // first backend call, on a function that is cold on the first surface a user
+  // opens. Fire-and-forget and unauthenticated: the backend answers a wakeup
+  // before it loads a route or authenticates
+  // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+  omega.request(WAKEUP_ROUTE, { wakeup: true });
 
   try {
     // Wait for @omega.js/client auth state to settle FIRST (prevents race conditions)

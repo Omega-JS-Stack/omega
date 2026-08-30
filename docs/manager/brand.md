@@ -40,12 +40,11 @@ npm run manage -- --service=<name>  # reconcile one service (workspace, repo, cl
 npm run deploy                      # DELIBERATE publish fan-out: each target's own deploy, backend first
 ```
 
-The scripts are the named verbs (`omega manage`, `omega dev`, `omega deploy`) — a bare `omega` prints help and runs nothing. `npm start`'s boot reconciles the LOCAL lane only (workspace, assets, disperse); `npm run manage` is the full setup.
+The scripts are the named verbs (`omega manage`, `omega dev`, `omega deploy`) — a bare `omega` prints help and runs nothing. `npm start`'s boot reconciles the LOCAL lane only (workspace, assets, disperse); `npm run manage` is the full setup. There is no per-target setup step to remember ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)): a target's verbs scaffold and heal its framework-owned files on first run, so a fresh brand goes `npm install` → `npm start`.
 
 Run from a **target root** (`targets/<target>/`):
 
 ```bash
-npx omega setup      # validate config + scaffold/heal framework-owned files
 npx omega dev        # this target's dev server/build watch
 npx omega test       # the target's test suites
 npx omega deploy     # DELIBERATE publish for this target (commits never auto-deploy)
@@ -86,4 +85,4 @@ When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` 
 - **Secrets never enter omega.json5** — `.env` / `.omega/secrets/` only.
 - **Deploys are deliberate**: only `omega deploy` publishes. Commits and pushes never auto-publish.
 - **Don't start long-running dev processes the user may already be running** (`npm run dev`, emulators) — assume theirs is up and GREP THE LOGS; every surface already wrote its output to disk.
-- **Framework-owned file sections** (marked `Default Values` / `OMEGA Rules` blocks) are rewritten by `omega setup` — put customizations in the marked custom sections only. One exception, by design: a backend target's `firestore.rules` is YOURS end to end — it is compiled with the framework half into `dist/firestore.rules` (never edit that), and a match block you write whose path names a framework block's is MERGED into it (your condition ANDs onto the framework's, for every op you both name), which is how the brand tightens a framework rule. See [docs/backend/index.md](../backend/index.md) § Firestore rules.
+- **Framework-owned file sections** (marked `Default Values` / `OMEGA Rules` blocks) are rewritten by the target's own verbs when they scaffold — put customizations in the marked custom sections only. One exception, by design: a backend target's `firestore.rules` is YOURS end to end — it is compiled with the framework half into `dist/firestore.rules` (never edit that), and a match block you write whose path names a framework block's is MERGED into it (your condition ANDs onto the framework's, for every op you both name), which is how the brand tightens a framework rule. See [docs/backend/index.md](../backend/index.md) § Firestore rules.

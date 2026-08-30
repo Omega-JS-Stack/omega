@@ -14,12 +14,13 @@
  * What a custom target does NOT get is every framework service op — there is
  * no framework to reconcile. Discovery leaves `entry.target` null, so the
  * `filter((entry) => entry.target)` every service already applies skips them
- * by construction; the two deliberate exceptions read `entry.custom`:
- *   - env disperse (services/disperse/write/env.js) composes the brand .env
- *     into the target, because a non-OMEGA target has no @omega.js/config to
- *     walk the cascade with;
- *   - the workspace service recognizes the dir (agent docs, settings, the
- *     structure check) instead of warning it unmapped.
+ * by construction; the ONE deliberate exception reads `entry.custom`: the
+ * workspace service recognizes the dir (agent docs, settings, the structure
+ * check) instead of warning it unmapped. Nothing is composed into its own .env
+ * file (#678); it INHERITS the brand keys instead — manage.js loads the env
+ * chain into process.env before it spawns anything, so a custom target started
+ * by `omega dev`/`omega deploy` has them. A standalone run inside the target
+ * dir does not: there is no @omega.js/config in there to walk the cascade.
  */
 const path = require('node:path');
 const chalk = require('chalk').default;

@@ -453,7 +453,7 @@ shared plumbing, and `test/rules/brand-merge.test.js` the worked example.
 
 **Realtime Database rules** ride the same emulator through the same library, but
 not through the `rules` client, which is Firestore-only. `test/rules/sessions.test.js`
-loads `templates/database.rules.json` — the very file `omega setup` ships to a
+loads `templates/database.rules.json` — the very file `ensureTarget()` ships to a
 brand, so there is no copy to drift — into its OWN emulator project, reads the
 Database emulator's port off `OMEGA_DATABASE_PORT`, and drives the tree with
 `context.database()`. The separate project id matters: the RTDB emulator keys a

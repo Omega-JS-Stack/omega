@@ -51,7 +51,7 @@ const BRAND_RULES_FILE = 'firestore.rules';
 const COMPILED_RULES_FILE = 'dist/firestore.rules';
 
 // The deliberate, run-alone step that moves a brand onto the compiled model —
-// never a side effect of `omega setup`
+// never a side effect of another verb
 // ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
 const RULES_MIGRATION_COMMAND = 'npx omega migrate:rules';
 
@@ -560,7 +560,7 @@ function compiledHeader() {
  */
 function compileRules(options) {
   if (isLegacyMarkerFile(options.brandSource)) {
-    throw new Error(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — compiling it would emit a duplicate-function ruleset that cannot load. Run \`npx omega setup\` to migrate it (your custom rules are kept).`);
+    throw new Error(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — compiling it would emit a duplicate-function ruleset that cannot load. Run \`npx omega migrate:rules\` to migrate it (your custom rules are kept).`);
   }
 
   const framework = jetpack.read(FRAMEWORK_RULES_TEMPLATE);
@@ -644,17 +644,18 @@ function compileFirestoreRules(options) {
 
   const seededFallback = !jetpack.exists(sourcePath);
   if (seededFallback) {
-    onWarn(`No ${BRAND_RULES_FILE} at the target root — compiling the framework half against the shipped defaults. Run \`npx omega setup\` to seed your own.`);
+    onWarn(`No ${BRAND_RULES_FILE} at the target root — compiling the framework half against the shipped defaults. Any verb seeds your own.`);
   }
 
   const brandSource = seededFallback ? jetpack.read(BRAND_RULES_SEED) : jetpack.read(sourcePath);
 
-  // Which command actually moves this tree forward: setup migrates a source
-  // whose brand already deploys the compiled artifact, but a brand still
-  // pointing firebase.json at its own file has deferred, and only the run-alone
-  // verb touches it ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
+  // Which command actually moves this tree forward: the target checks
+  // (`omega test`) migrate a source whose brand already deploys the compiled
+  // artifact, but a brand still pointing firebase.json at its own file has
+  // deferred, and only the run-alone verb touches it
+  // ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
   const deferred = deferredRulesTarget({ projectDir });
-  const nextStep = deferred ? RULES_MIGRATION_COMMAND : 'npx omega setup';
+  const nextStep = deferred ? RULES_MIGRATION_COMMAND : 'npx omega test';
 
   if (isLegacyMarkerFile(brandSource)) {
     onWarn(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — refusing to write a duplicate-function ${COMPILED_RULES_FILE} that cannot load. Run \`${nextStep}\` to migrate it (your custom rules are kept).`);
@@ -993,7 +994,7 @@ function collapseBlankRuns(text) {
  * half alone — the legacy posture, deliberately kept. Migrating it flips what
  * the live project enforces (the framework half joins, and `allow write`
  * becomes `allow create, update`), so it is a one-time step a human runs alone,
- * never something `omega setup` heals on the way to a deploy
+ * never something another verb heals on the way to a deploy
  * ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
  *
  * A target naming nothing, or naming a file that is not there, has deferred

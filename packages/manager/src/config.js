@@ -14,8 +14,9 @@
  *
  * now runs here, plus the workspace service (brand structure/config
  * health) the monorepo world added. disperse is the remnant of its old
- * self (signing artifacts + composed target .env files — the config
- * dispersal dissolved into the omega.json5 hierarchy), and bookmark +
+ * self (signing artifacts — the config dispersal dissolved into the
+ * omega.json5 hierarchy, the .env composition into the delivery step every
+ * verb runs, #678), and bookmark +
  * the beehiiv segment automation talk to the companion Chrome extension
  * in extension/ (the last piece, ported with it). Onboarding is the
  * `onboard` wizard and company mode rides runCompany.
@@ -616,7 +617,7 @@ const SERVICE_ORDER = [
   'search',          // needs the edge zone (DNS verification) + the GA property (association)
   'advertising',     // domain present in the AdSense account + approval state (read-only API)
   'monitoring',      // error-monitoring project per target + DSN writeback (Sentry provider; own API, no cross-service deps)
-  'campaigns',       // email marketing (SendGrid provider): domain auth (DNS via the edge zone), sender, list, fields, segments, webhook
+  'campaigns',       // email marketing (SendGrid provider): domain auth (DNS via the edge zone), sender, list, unsubscribe groups, fields, segments, webhook
   'newsletter',      // newsletter publication (Beehiiv provider): access, fields, segments (verify-only), webhook
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
   'forms',           // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
@@ -626,8 +627,8 @@ const SERVICE_ORDER = [
   'directory',       // brand's own entry pushed into the PARENT project's brands collection (opt-in; no cross-service deps)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
-  'ai',              // AI provider keys asked into the brand .env — BEFORE disperse composes the backend's own
-  'disperse',        // signing artifacts + composed .env files land in the targets (after certificates, before update builds)
+  'ai',              // AI provider keys asked into the brand .env — the ONE file every target's runtime env composes from
+  'disperse',        // signing artifacts land in the targets (after certificates, before update builds)
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every target
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
@@ -641,10 +642,13 @@ const SERVICE_ORDER = [
 // starts in about a second instead of waiting on the cloud services.
 // NOT in this list = manage lane by construction: a new service can never
 // slow the boot by default, and promoting one is a deliberate edit here.
+// It is the DELIVERY lane too (#678): brand-root `omega deploy` runs this
+// same list before it fans out, so a publish never ships inputs a manage run
+// happened to be current on. One constant, two triggers.
 const BOOT_SERVICES = [
   'workspace',       // brand structure + config health — a broken brand must not serve
   'assets',          // derived logo/icon variants the targets read from their own dirs
-  'disperse',        // composed .env files + signing artifacts land in the targets
+  'disperse',        // signing artifacts land in the targets
 ];
 
 // =============================================================================
@@ -656,11 +660,13 @@ const OPERATIONS = {
     { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-target)
     { name: 'defaults', ensure: true },   // Schema-defaulted blocks the brand file lacks are materialized (#478)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
-    { name: 'scripts', ensure: true },    // Root scripts say `omega` (legacy omega-manager healed) + a deploy script exists
+    { name: 'scripts', ensure: true },    // Root scripts say `omega` + deploy exists; target scripts fill from framework projectScripts (#675)
     { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
+    { name: 'workflows', ensure: true },  // Composed .github/workflows/<target>-*.yml for targets the config no longer enables are removed (#636)
     { name: 'env-keys', ensure: true },   // Brand-generated keys (the OMEGA_* trio + UNSUBSCRIBE_HMAC_KEY) minted into the brand .env when the cascade has none (#569)
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
+    { name: 'env-rules', ensure: true },  // Keys the brand's own config makes mandatory (the schema's requiredWhen) — WARNS, never fails (#626)
     { name: 'translation-sdk', ensure: true }, // Translating web targets declare + install @anthropic-ai/claude-agent-sdk (#168)
   ],
 
@@ -735,6 +741,7 @@ const OPERATIONS = {
     { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
     { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
     { name: 'list', ensure: true },            // The brand's marketing list (id written back to omega.json5)
+    { name: 'unsubscribe-groups', ensure: true }, // The account's ASM groups, matched by name (ids written back to omega.json5)
     { name: 'custom-fields', ensure: true },   // @omega.js/backend custom fields (@omega.js/backend's marketing SSOT)
     { name: 'segments', ensure: true },        // @omega.js/backend segments (query_dsl diffed; __temp_ orphans swept)
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent @omega.js/backend forwarder (min-diff PATCH)
@@ -791,6 +798,7 @@ const OPERATIONS = {
     { name: 'icons', write: true },         // macOS .icns + Windows .ico app icons (composited icon.png when the templates op made one)
     { name: 'social-icons', write: true },  // Brandmark-on-white social profile icons
     { name: 'favicons', write: true },      // Web favicon set + site.webmanifest
+    { name: 'reconcile', write: true },     // Derived files the brand's current sources no longer name are deleted (#636)
   ],
 
   certificates: [
@@ -806,7 +814,6 @@ const OPERATIONS = {
 
   disperse: [
     { name: 'certs', write: true },  // Signing artifacts copied into desktop/mobile targets' certs dirs
-    { name: 'env', write: true },    // Each target's gitignored .env composed (brand env + stream secrets + signing paths)
   ],
 
   seo: [
@@ -1039,7 +1046,7 @@ const REQUIRES = {
   },
 
   campaigns: {
-    why: 'reconciles domain auth, the sender, the list, fields, segments, and the event webhook via the SendGrid API',
+    why: 'reconciles domain auth, the sender, the list, unsubscribe groups, fields, segments, and the event webhook via the SendGrid API',
     label: 'SendGrid',
     disablePath: 'marketing.campaigns.enabled',
     when: (config) => config.marketing?.campaigns?.enabled !== false

@@ -15,10 +15,20 @@ function gulpCommand(task) {
 }
 
 // Default step implementations — required lazily so requiring a plan never
-// loads the whole command surface (setup.js reads the consumer package at load).
+// loads the whole command surface.
+//
+// There is no `setup` step any more (#675): the local half runs inside the gulp
+// `defaults` task, which is the first step of every gulp build. What the plans
+// still need before signing is the Apple artifacts (#678) — `certs`.
 const RUNNERS = {
   clean: (options) => require('../commands/clean.js')(options),
-  setup: (options) => require('../commands/setup.js')(options),
+  certs: () => {
+    const Manager = new (require('../build.js'));
+    require('./deliver-certs.js').deliverTargetCerts({
+      projectDir: Manager.getRootPath('project'),
+      logger: Manager.logger('certs'),
+    });
+  },
   'validate-certs': (options) => require('../commands/validate-certs.js')(options),
   gulp: (options, step) => execute(gulpCommand(step.task), { log: true }),
 };

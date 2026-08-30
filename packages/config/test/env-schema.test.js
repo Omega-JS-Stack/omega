@@ -13,13 +13,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  ENV_SCHEMA, ENV_GROUPS, TARGETS,
-  envSchemaEntry, envKeysForTarget, envKeysByGroup, generatedEnvKeys, requiredEnvKeys,
+  ENV_SCHEMA, ENV_GROUPS, TARGETS, DELIVERY_MODES,
+  envSchemaEntry, envKeysForTarget, envKeysByGroup, envFileGroups, generatedEnvKeys, requiredEnvKeys,
   devEnvKeys, devEnvKeyMap,
 } = require('../src/index.js');
 
 // The union of the three manager lanes as they stood before the schema
-// (lib/env-generated.js, lib/env-order.js's groups, disperse's ENV_MAP) — a
+// (lib/env-generated.js, lib/env-order.js's groups, the retired disperse
+// service's ENV_MAP) — a
 // floor, not a ceiling: the schema may grow, never silently shrink.
 const MANAGER_LANE_KEYS = [
   'OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE', 'UNSUBSCRIBE_HMAC_KEY',
@@ -246,5 +247,133 @@ test('one AI key per provider — the OMEGA_-prefixed twins are gone', () => {
     assert.equal(entry.secret, true);
     assert.equal(entry.required, false, `${name} is optional — nobody mints it`);
     assert.ok(envKeysForTarget('backend').includes(name), `${name} composes into the backend .env`);
+  }
+});
+
+// ─── Delivery: the composer's filter (#678) ───
+
+test('deliverAs: the per-target GA4 secrets rename on delivery, and only there', () => {
+  const renamed = ENV_SCHEMA.filter((entry) => entry.deliverAs);
+
+  assert.deepEqual(renamed.map((entry) => entry.name), [
+    'GOOGLE_ANALYTICS_SECRET_WEB',
+    'GOOGLE_ANALYTICS_SECRET_BACKEND',
+    'GOOGLE_ANALYTICS_SECRET_DESKTOP',
+    'GOOGLE_ANALYTICS_SECRET_EXTENSION',
+    'GOOGLE_ANALYTICS_SECRET_MOBILE',
+  ]);
+
+  for (const entry of renamed) {
+    assert.equal(entry.deliverAs, 'GOOGLE_ANALYTICS_SECRET', `${entry.name}: delivers under the runtime name`);
+    assert.equal(entry.targets.length, 1, `${entry.name}: names exactly the target whose stream it is`);
+    assert.equal(entry.name, `GOOGLE_ANALYTICS_SECRET_${entry.targets[0] === 'web' ? 'WEB' : entry.targets[0].toUpperCase()}`,
+      `${entry.name}: the suffix IS the target it delivers to`);
+  }
+});
+
+test('the OAuth2 client family is a FILE key: a human writes it into the brand .env (#678)', () => {
+  const entry = envSchemaEntry('OAUTH2_GOOGLE_CLIENT_ID');
+
+  assert.ok(entry, 'the family resolves through its pattern');
+  assert.deepEqual(entry.targets, ['backend']);
+  assert.equal(entry.group, 'backend-services', 'it lives in a file group, so the composer delivers it');
+  assert.equal(envFileGroups().some((group) => group.id === entry.group), true);
+  assert.doesNotMatch(entry.description, /runtime/i, 'nothing resolves it at runtime any more');
+});
+
+// ─── Delivery + the presence rules (#627 / #626) ───
+
+test('every declared delivery is a known mode, for a target the entry names', () => {
+  for (const entry of ENV_SCHEMA) {
+    const where = entry.name || String(entry.match);
+    if (!('delivery' in entry)) continue;
+
+    assert.equal(typeof entry.delivery, 'object', `${where}: delivery is an object keyed by target`);
+    assert.ok(Object.keys(entry.delivery).length > 0, `${where}: an empty delivery says nothing — omit it instead`);
+
+    for (const [target, mode] of Object.entries(entry.delivery)) {
+      assert.ok(entry.targets.includes(target), `${where}: delivers to ${target}, so ${target} must be one of its targets`);
+      assert.ok(DELIVERY_MODES.includes(mode), `${where}: "${mode}" is not one of ${DELIVERY_MODES.join('/')}`);
+      // A bake ends up readable by anyone who unpacks the app
+      if (mode === 'bake') {
+        assert.equal(entry.publicAtRest, true, `${where}: bakes into the ${target} artifact, so it must declare publicAtRest`);
+      }
+    }
+  }
+});
+
+test('publicAtRest is declared only where something actually bakes', () => {
+  for (const entry of ENV_SCHEMA) {
+    if (!('publicAtRest' in entry)) continue;
+    const where = entry.name || String(entry.match);
+
+    assert.equal(entry.publicAtRest, true, `${where}: publicAtRest is a declaration, never a false`);
+    assert.ok(Object.values(entry.delivery || {}).includes('bake'), `${where}: nothing bakes it — drop the declaration`);
+  }
+
+  // The sanctioned baked keys, and only those
+  const baked = ENV_SCHEMA.filter((entry) => entry.publicAtRest).map((entry) => entry.name);
+  assert.deepEqual(baked, ['GOOGLE_ANALYTICS_SECRET_DESKTOP', 'GOOGLE_ANALYTICS_SECRET_EXTENSION']);
+});
+
+test('the two lanes a brand actually feeds declare how every key reaches them', () => {
+  const fileGroups = new Set(envFileGroups().map((group) => group.id));
+
+  for (const entry of ENV_SCHEMA) {
+    if (!fileGroups.has(entry.group)) continue;
+
+    for (const target of ['web', 'backend']) {
+      if (!entry.targets.includes(target)) continue;
+      const where = entry.name || String(entry.match);
+      assert.ok(entry.delivery && entry.delivery[target], `${where}: names ${target} but never says how it gets there`);
+    }
+  }
+
+  // The backend is the one target that ships an .env with its artifact
+  const backendModes = new Set(ENV_SCHEMA.filter((entry) => entry.delivery?.backend).map((entry) => entry.delivery.backend));
+  assert.deepEqual([...backendModes], ['env']);
+});
+
+test('the nine Windows cloud-signing keys the desktop workflow injects are declared (#627)', () => {
+  const added = [
+    'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT',
+    'SSLCOM_USERNAME', 'SSLCOM_PASSWORD', 'SSLCOM_CREDENTIAL_ID',
+    'DIGICERT_API_KEY', 'DIGICERT_KEYPAIR_ALIAS',
+  ];
+
+  for (const name of added) {
+    const entry = envSchemaEntry(name);
+    assert.ok(entry, `${name}: the desktop workflow consumes it, so the schema declares it`);
+    assert.equal(entry.group, 'desktop-publishing', `${name}: renders beside the other signing keys`);
+    assert.deepEqual(entry.targets, ['desktop']);
+    assert.equal(entry.secret, true);
+    assert.equal(entry.required, false, `${name}: only a brand on that signing provider ever sets it`);
+    assert.deepEqual(entry.delivery, { desktop: 'ci' });
+  }
+
+  assert.ok(added.every((name) => envKeysByGroup()['desktop-publishing'].includes(name)));
+});
+
+test('requiredWhen names a config path, one direction only', () => {
+  const ruled = ENV_SCHEMA.filter((entry) => entry.requiredWhen);
+
+  assert.deepEqual(ruled.map((entry) => [entry.name, entry.requiredWhen]), [
+    ['RECAPTCHA_SECRET_KEY', 'captcha.providers.recaptcha.siteKey'],
+    ['SENTRY_AUTH_TOKEN', 'monitoring.providers.sentry.dsn'],
+    ['SNAPCRAFT_STORE_CREDENTIALS', 'platforms.linux.snap.enabled'],
+    ['GOOGLE_ANALYTICS_SECRET_WEB', 'analytics.providers.google.id'],
+    ['GOOGLE_ANALYTICS_SECRET_BACKEND', 'analytics.providers.google.id'],
+    ['GOOGLE_ANALYTICS_SECRET_DESKTOP', 'analytics.providers.google.id'],
+    ['GOOGLE_ANALYTICS_SECRET_EXTENSION', 'analytics.providers.google.id'],
+  ]);
+
+  // The parked mobile target carries NO rule (#627 review, B1): MAM has no
+  // mint, no delivery and no target, so a rule on its key could only warn —
+  // forever, for every GA-configured brand, with nothing a human could do.
+  assert.equal(envSchemaEntry('GOOGLE_ANALYTICS_SECRET_MOBILE').requiredWhen, undefined);
+
+  for (const entry of ruled) {
+    assert.match(entry.requiredWhen, /^[a-z][A-Za-z0-9.]+$/, `${entry.name}: a dotted config path`);
+    assert.equal(entry.required, false, `${entry.name}: a conditional requirement is never an unconditional one`);
   }
 });

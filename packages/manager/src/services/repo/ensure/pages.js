@@ -67,6 +67,6 @@ module.exports = async function ensurePages(context) {
     return { status: 'success', state: { pages: { domain } } };
   } catch (error) {
     console.log(`      ${chalk.red('✗')} Pages configuration failed${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { pages: { error: error.message } } };
+    return { status: 'warned', reason: 'GitHub Pages configuration failed', output: { pages: { error: error.message } } };
   }
 };

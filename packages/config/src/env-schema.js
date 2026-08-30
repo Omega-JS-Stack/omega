@@ -7,8 +7,9 @@
  * or a human pastes it from a third party, whether it is required, and what
  * it does. Everything that used to hand-keep its own list derives from here —
  * the manager's mint lane (the keys with a `generated` function), its
- * canonical .env grouping, disperse's backend composition, and the backend's
- * env reader (libraries/env.js), which refuses to boot without a required key.
+ * canonical .env grouping, the per-verb target delivery (composeTargetEnv in
+ * env.js), and the backend's env reader (libraries/env.js), which refuses to
+ * boot without a required key.
  *
  * Entry format mirrors schema.js's rule objects:
  *
@@ -27,6 +28,15 @@
  *                                          // outside production (see below)
  *     liveShape:   /^sk_live_/,            // the pattern a LIVE credential
  *                                          // matches — refused outside production
+ *     deliverAs:   'GOOGLE_ANALYTICS_SECRET', // the name it lands under in the
+ *                                          // target's composed .env (see below)
+ *     delivery:    { backend: 'env' },      // HOW it reaches each target
+ *     publicAtRest: true,                  // …and, for a bake, that anyone who
+ *                                          // unpacks the app may read it
+ *     requiredWhen: 'analytics.providers.google.id', // the config path that
+ *                                          // makes it mandatory
+ *     machineLocal: true,                  // a developer-machine value (a local
+ *                                          // path): never published to CI
  *     description: 'What the key drives.',
  *   }
  *
@@ -37,17 +47,26 @@
  * only a key OMEGA can produce may be `required` — refusing every boot over a
  * secret nobody can mint would be a hostage note, not a guard.
  *
- * `targets:` is the composition domain: disperse composes the backend's own
- * .env (the ONLY target whose .env ships with a deploy artifact and so cannot
- * walk up to the brand layer) from the keys whose targets include `backend`.
- * Every other target reads brand values through the runtime cascade, so their
- * `targets` entries are documentation.
+ * `targets:` is the composition domain: composeTargetEnv (env.js) composes a
+ * target's own .env from the company/brand layers' keys whose targets include
+ * it — the backend's is the ONLY one that ships with a deploy artifact and so
+ * cannot walk up to the brand layer at runtime. Every other target reads brand
+ * values through the runtime cascade, so their `targets` entries are mostly
+ * documentation.
  *
  * `group:` picks the .env section the key renders into. A group with
  * `file: false` never reaches a brand .env at all — the backend resolves those
- * keys some other way (from config at boot, from disperse's per-target stream
- * lane, from the developer's own shell) — so they are neither rendered as
- * placeholders nor composed from the brand layer.
+ * keys some other way (from config at boot, from the target's own .env, from
+ * the developer's own shell) — so they are neither rendered as placeholders
+ * nor composed from the brand layer.
+ *
+ * `deliverAs:` is the RENAME on delivery: the key is written into a brand .env
+ * under its own name (the per-target GA4 secrets are `GOOGLE_ANALYTICS_SECRET_
+ * <TARGET>` there, because one brand holds one per stream) and reaches its
+ * target under `deliverAs` (`GOOGLE_ANALYTICS_SECRET` — a target only ever has
+ * one stream). applyDeliverAs (env.js) is the one place it happens, on every
+ * verb: composed into dist/.env for the backend, loaded into process.env at
+ * CLI boot for the others. Absent = delivered under its own name.
  *
  * `devOf:` marks a DEV-SUFFIXED twin — `<BASE>_DEV`, the value the backend
  * uses outside production ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)).
@@ -62,8 +81,39 @@
  * declared only where the provider actually stamps one (Stripe's `sk_live_` /
  * `rk_live_`, Chargebee's `live_`); PayPal's halves are opaque, so PayPal is
  * protected by its twin alone.
+ *
+ * `delivery:` is HOW the key reaches each target it names — the declaration
+ * that replaced three unrelated hand-kept lists
+ * ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)):
+ *
+ *   - `'env'`  — read from the composed .env at runtime (the backend, the one
+ *                target whose artifact ships an env file).
+ *   - `'ci'`   — the generated workflow injects it into the runner env for the
+ *                build step.
+ *   - `'bake'` — the build writes the value INTO the shipped artifact, because
+ *                a packaged app (desktop, extension) runs with no .env. A bake
+ *                implies its `'ci'` half: the workflow injects, then the build
+ *                bakes. Anyone who unpacks the app can read a baked value, so
+ *                a baking entry must declare `publicAtRest: true` — the
+ *                renderer REFUSES to bake a `secret: true` entry without it.
+ *
+ * A target absent from `delivery` gets nothing: no workflow line, no bake, no
+ * repo secret. env-delivery.js is the ONE reader — every workflow secrets
+ * block, bake list and push-secrets set derives from these declarations, so a
+ * new key is one entry here and nothing else.
+ *
+ * `requiredWhen:` is the CONDITIONAL requirement
+ * ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): a dotted
+ * omega.json5 path whose truthy value makes the key mandatory (a GA4
+ * Measurement ID with no Measurement Protocol secret ships a build that sends
+ * no events, silently). One-directional and PRESENCE ONLY — never a check on
+ * the value's shape. checkEnvRules (env-rules.js) is the ONE evaluator of it
+ * and of `required`; consumers decide the severity.
  */
 const { randomBytes, randomUUID } = require('node:crypto');
+
+// The three ways a key reaches a target (#627) — see the header.
+const DELIVERY_MODES = ['env', 'ci', 'bake'];
 
 // One entry per .env section, in canonical file order — the manager's
 // canonical-order lane renders from this list. `comment` is the boxed header,
@@ -100,14 +150,30 @@ const ENV_GROUPS = [
   { id: 'payment', comment: 'Payment providers (payment service; public halves live in omega.json5)' },
   { id: 'service-accounts', comment: 'Operator service accounts (forms/chat/email/server/assets services) — paths to service-account JSON files' },
   { id: 'apple', comment: 'Apple signing (certificates service — desktop/mobile targets)' },
+  {
+    id: 'desktop-publishing',
+    comment: 'Windows signing + Snap Store publishing (desktop target) — the Apple half is its own section above',
+    notes: [
+      'Windows: the EV token PIN, the cert thumbprint path and signtool, read by the',
+      'windows-sign CI job. Linux: the snapcraft credentials blob (`snapcraft export-login -`).',
+    ],
+  },
+  {
+    id: 'extension-stores',
+    comment: 'Extension store publishing (extension target: Chrome Web Store, Firefox Add-ons, Edge Add-ons)',
+  },
   { id: 'fontawesome', comment: 'Font Awesome Pro (icons) — path to the local Pro package dir' },
-  { id: 'backend-services', comment: 'Backend service keys (composed into targets/backend/.env by disperse)' },
+  { id: 'backend-services', comment: 'Backend service keys (composed into targets/backend/dist/.env by the env composer)' },
+  {
+    id: 'testing',
+    comment: 'Test-lane credentials (every target) — optional; a suite that needs one skips without it',
+  },
   {
     id: 'machine',
     comment: 'Auto-generated and persisted on the first real run — machine-owned, leave unset',
     notes: [
       'The GA4 Measurement Protocol secrets are per target (the analytics service resolves',
-      "one per stream; disperse composes each target its own GOOGLE_ANALYTICS_SECRET), and the",
+      "one per stream; the composer delivers each target its own GOOGLE_ANALYTICS_SECRET), and the",
       'VAPID private key is the half the Firebase console only ever shows you once.',
     ],
   },
@@ -123,11 +189,12 @@ const ENV_SCHEMA = [
   {
     name:        'OMEGA_ADMIN_KEY',
     owner:       'workspace',
-    targets:     ['backend'],
+    targets:     ['backend', 'desktop'],
     group:       'omega',
     generated:   () => randomBytes(32).toString('base64url'),
     secret:      true,
     required:    true,
+    delivery:    { backend: 'env' },
     description: 'Grants admin on the brand backend: the header every privileged call carries, and the seed the OAuth2 state cipher derives from.',
   },
   {
@@ -138,6 +205,7 @@ const ENV_SCHEMA = [
     generated:   () => randomBytes(32).toString('base64url'),
     secret:      true,
     required:    true,
+    delivery:    { backend: 'env' },
     description: 'Authenticates third-party webhook deliveries (payments, marketing) — the `key` query parameter every webhook route compares.',
   },
   {
@@ -148,6 +216,7 @@ const ENV_SCHEMA = [
     generated:   () => randomUUID(),
     secret:      true,
     required:    true,
+    delivery:    { backend: 'env' },
     description: "The brand's UUID namespace — every deterministic id the backend mints (uuid route, analytics client ids) derives from it.",
   },
   {
@@ -158,6 +227,7 @@ const ENV_SCHEMA = [
     generated:   () => randomBytes(32).toString('hex'),
     secret:      true,
     required:    true,
+    delivery:    { backend: 'env' },
     description: 'Signs the unsubscribe link in every email the backend sends, and verifies the signature when a recipient follows one.',
   },
 
@@ -165,11 +235,12 @@ const ENV_SCHEMA = [
   {
     name:        'GH_TOKEN',
     owner:       'repo',
-    targets:     ['backend'],
+    targets:     ['web', 'backend', 'desktop'],
     group:       'github',
     secret:      true,
     required:    false,
-    description: 'GitHub token for repo + seo work and the backend\'s content/admin routes (blog commits, workflow dispatch). `gh auth login` serves the manager instead; the deployed backend needs the token.',
+    delivery:    { web: 'ci', backend: 'env', desktop: 'ci' },
+    description: 'GitHub token for repo + seo work and the backend\'s content/admin routes (blog commits, workflow dispatch); the web target publishes CI secrets with it and the desktop target cuts releases and mirrors downloads with it. `gh auth login` serves the manager instead; the deployed backend needs the token.',
   },
   {
     name:        'CLOUDFLARE_TOKEN',
@@ -178,6 +249,7 @@ const ENV_SCHEMA = [
     group:       'cloudflare',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'Cloudflare API token with Zone edit — the edge service and every DNS-writing flow, plus the backend\'s cache-purge calls.',
   },
   {
@@ -223,6 +295,7 @@ const ENV_SCHEMA = [
     group:       'captcha',
     secret:      false,
     required:    false,
+    delivery:    { web: 'ci' },
     description: "Public half of the brand's classic reCAPTCHA pair — the web target renders it into forms.",
   },
   {
@@ -232,6 +305,8 @@ const ENV_SCHEMA = [
     group:       'captcha',
     secret:      true,
     required:    false,
+    requiredWhen: 'captcha.providers.recaptcha.siteKey',
+    delivery:    { backend: 'env' },
     description: 'Secret half of the reCAPTCHA pair — the backend verifies submitted tokens with it.',
   },
   {
@@ -241,6 +316,7 @@ const ENV_SCHEMA = [
     group:       'captcha',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'hCaptcha secret for brands on hCaptcha instead of reCAPTCHA — the backend verifies form submissions with it.',
   },
   {
@@ -250,6 +326,7 @@ const ENV_SCHEMA = [
     group:       'pixels',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'Business Manager system-user token with ads_management: creates the Meta pixel and signs the conversions the backend sends.',
   },
   {
@@ -259,6 +336,7 @@ const ENV_SCHEMA = [
     group:       'pixels',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'TikTok Business token: creates the pixel on the advertiser account and signs the events the backend sends.',
   },
   {
@@ -268,6 +346,7 @@ const ENV_SCHEMA = [
     group:       'monitoring',
     secret:      true,
     required:    false,
+    requiredWhen: 'monitoring.providers.sentry.dsn',
     description: 'Personal Sentry auth token with project+team write scopes — the monitoring service provisions projects and uploads source maps with it.',
   },
   {
@@ -277,6 +356,7 @@ const ENV_SCHEMA = [
     group:       'email-marketing',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'SendGrid API key — every transactional and campaign email the backend sends, and the contact lists the campaigns service reconciles.',
   },
   {
@@ -286,6 +366,7 @@ const ENV_SCHEMA = [
     group:       'email-marketing',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'Beehiiv API key — newsletter subscriptions and the publication the newsletter service reconciles.',
   },
   {
@@ -295,6 +376,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     liveShape:   /^(sk|rk)_live_/,
     description: 'Stripe secret key — the backend creates checkout sessions, subscriptions, and refunds with it.',
   },
@@ -306,6 +388,7 @@ const ENV_SCHEMA = [
     devOf:       'STRIPE_SECRET_KEY',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'Stripe TEST secret key (sk_test_…) — the backend uses it instead of STRIPE_SECRET_KEY outside production, so a local emulator can never charge a real card. Never uploaded by a deploy.',
   },
   {
@@ -315,6 +398,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'Secret half of the PayPal app credentials (the client id is public and lives in omega.json5).',
   },
   {
@@ -325,6 +409,7 @@ const ENV_SCHEMA = [
     devOf:       'PAYPAL_CLIENT_SECRET',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: "Secret half of the PayPal SANDBOX app — the backend uses it outside production (pair it with the sandbox client id on the local config layer). PayPal credentials carry no live/sandbox marker, so this twin is the only split. Never uploaded by a deploy.",
   },
   {
@@ -334,6 +419,7 @@ const ENV_SCHEMA = [
     group:       'payment',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     liveShape:   /^live_/,
     description: 'Chargebee API key for the brand site (the site name is public and lives in omega.json5).',
   },
@@ -345,6 +431,7 @@ const ENV_SCHEMA = [
     devOf:       'CHARGEBEE_API_KEY',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: "Chargebee TEST-site API key (test_…) — the backend uses it instead of CHARGEBEE_API_KEY outside production. Never uploaded by a deploy.",
   },
   {
@@ -399,6 +486,7 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    delivery:    { desktop: 'ci' },
     description: 'App Store Connect API issuer id — notarization of the desktop build.',
   },
   {
@@ -408,6 +496,7 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    delivery:    { desktop: 'ci' },
     description: 'App Store Connect API key id — also names the .p8 file the certificates service places (AuthKey_<id>.p8).',
   },
   {
@@ -417,7 +506,288 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    delivery:    { desktop: 'ci' },
     description: 'Apple Developer team id the desktop build signs under.',
+  },
+  {
+    name:        'CSC_LINK',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'apple',
+    secret:      false,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with — unset, the build derives it from a delivered config/certs/developer-id-application.p12, then falls back to the Keychain.',
+  },
+  {
+    name:        'APPLE_API_KEY',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'apple',
+    secret:      false,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Path to the App Store Connect API key (.p8) notarization uses — unset, the build derives it from a delivered config/certs/AuthKey_<APPLE_API_KEY_ID>.p8.',
+  },
+
+  // ── desktop-publishing — the Windows + Linux halves of a desktop release ──
+  {
+    name:        'WIN_EV_TOKEN_PATH',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      false,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Thumbprint/path of the EV code-signing certificate on the self-hosted Windows runner (platforms.win.signing.strategy = self-hosted).',
+  },
+  {
+    name:        'WIN_CSC_KEY_PASSWORD',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'SafeNet token PIN the Windows signing job unlocks the EV token with.',
+  },
+  {
+    name:        'SIGNTOOL_PATH',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      false,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Path to signtool.exe on the Windows runner.',
+  },
+  // The cloud signing providers (platforms.win.signing.strategy = cloud): the
+  // windows-sign job injects all three sets and the configured provider is the
+  // one that consumes its own ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)).
+  {
+    name:        'AZURE_TENANT_ID',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Azure Trusted Signing: the directory (tenant) the signing account lives in.',
+  },
+  {
+    name:        'AZURE_CLIENT_ID',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Azure Trusted Signing: the app registration the signing job authenticates as.',
+  },
+  {
+    name:        'AZURE_CLIENT_SECRET',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Azure Trusted Signing: the client secret of AZURE_CLIENT_ID.',
+  },
+  {
+    name:        'AZURE_TRUSTED_SIGNING_ENDPOINT',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Azure Trusted Signing: the regional endpoint the signing account was created in.',
+  },
+  {
+    name:        'SSLCOM_USERNAME',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'SSL.com eSigner account the cloud signing job authenticates with.',
+  },
+  {
+    name:        'SSLCOM_PASSWORD',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'Password of the SSL.com eSigner account.',
+  },
+  {
+    name:        'SSLCOM_CREDENTIAL_ID',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'SSL.com eSigner credential id naming which certificate in the account signs.',
+  },
+  {
+    name:        'DIGICERT_API_KEY',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'DigiCert KeyLocker API key the cloud signing job authenticates with.',
+  },
+  {
+    name:        'DIGICERT_KEYPAIR_ALIAS',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    delivery:    { desktop: 'ci' },
+    description: 'DigiCert KeyLocker keypair alias naming which certificate in the account signs.',
+  },
+  {
+    name:        'SNAPCRAFT_STORE_CREDENTIALS',
+    owner:       'certificates',
+    targets:     ['desktop'],
+    group:       'desktop-publishing',
+    secret:      true,
+    required:    false,
+    requiredWhen: 'platforms.linux.snap.enabled',
+    delivery:    { desktop: 'ci' },
+    description: 'Snap Store credentials blob (`snapcraft export-login -`) the Linux publish job uses — required only when platforms.linux.snap.enabled.',
+  },
+
+  // ── extension-stores — one credential set per browser store ──────────────
+  {
+    name:        'CHROME_EXTENSION_ID',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Chrome Web Store item id the publish verb uploads to.',
+  },
+  {
+    name:        'CHROME_CLIENT_ID',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'OAuth client id of the Chrome Web Store API credential.',
+  },
+  {
+    name:        'CHROME_CLIENT_SECRET',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      true,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'OAuth client secret of the Chrome Web Store API credential.',
+  },
+  {
+    name:        'CHROME_REFRESH_TOKEN',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      true,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Refresh token the Chrome Web Store API credential mints its access tokens from.',
+  },
+  {
+    name:        'FIREFOX_EXTENSION_ID',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Firefox Add-ons id the publish verb uploads to.',
+  },
+  {
+    name:        'FIREFOX_API_KEY',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Firefox Add-ons API key (JWT issuer) from addons.mozilla.org.',
+  },
+  {
+    name:        'FIREFOX_API_SECRET',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      true,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Firefox Add-ons API secret the JWT is signed with.',
+  },
+  {
+    name:        'EDGE_PRODUCT_ID',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Microsoft Edge Add-ons product id the publish verb uploads to.',
+  },
+  {
+    name:        'EDGE_CLIENT_ID',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      false,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Edge Add-ons API client id.',
+  },
+  {
+    name:        'EDGE_API_KEY',
+    owner:       'certificates',
+    targets:     ['extension'],
+    group:       'extension-stores',
+    secret:      true,
+    required:    false,
+    delivery:    { extension: 'ci' },
+    description: 'Edge Add-ons API key the publish request authenticates with.',
+  },
+
+  // ── testing — the credentials an opt-in test lane needs ──────────────────
+  {
+    name:        'OMEGA_TEST_FIREBASE_ADMIN_KEY',
+    owner:       'backend',
+    targets:     ['web', 'backend', 'desktop', 'extension'],
+    group:       'testing',
+    secret:      true,
+    required:    false,
+    delivery:    { web: 'ci', backend: 'env' },
+    description: 'Path to a service-account JSON the extended test lanes mint custom tokens with — absent, those suites skip with a reason (GOOGLE_APPLICATION_CREDENTIALS is the fallthrough).',
+  },
+  {
+    name:        'OMEGA_TEST_USER_UID',
+    owner:       'backend',
+    targets:     ['web', 'backend', 'desktop', 'extension'],
+    group:       'testing',
+    secret:      false,
+    required:    false,
+    delivery:    { web: 'ci', backend: 'env' },
+    description: "Uid the extended test lanes sign in as — each framework's suite defaults to its own (`desktop-test-user` and siblings).",
   },
   {
     name:        'OMEGA_FONTAWESOME_ROOT',
@@ -426,6 +796,8 @@ const ENV_SCHEMA = [
     group:       'fontawesome',
     secret:      false,
     required:    false,
+    delivery:    { web: 'ci', desktop: 'ci', extension: 'ci' },
+    machineLocal: true,
     description: "Filesystem path to the developer's local Font Awesome Pro package — machine-local, so it never travels to CI (the free set is the fallthrough).",
   },
 
@@ -436,11 +808,12 @@ const ENV_SCHEMA = [
   {
     name:        'OPENAI_API_KEY',
     owner:       'backend',
-    targets:     ['backend'],
+    targets:     ['web', 'backend', 'extension'],
     group:       'backend-services',
     secret:      true,
     required:    false,
-    description: 'The OpenAI key wherever the backend calls OpenAI — the brand .env wins, a company .env serves every brand that sets none.',
+    delivery:    { web: 'ci', backend: 'env' },
+    description: 'The OpenAI key wherever the backend calls OpenAI, and what the shared translation engine needs when translation.providers names chatgpt (the default "claude" provider needs none) — the brand .env wins, a company .env serves every brand that sets none.',
   },
   {
     name:        'ANTHROPIC_API_KEY',
@@ -449,6 +822,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'The Anthropic key wherever the backend calls Anthropic — the brand .env wins, a company .env serves every brand that sets none.',
   },
   {
@@ -458,6 +832,7 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'NeverBounce API key — the first-choice email-validation provider on signup and marketing sync.',
   },
   {
@@ -467,7 +842,18 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
+    delivery:    { backend: 'env' },
     description: 'ZeroBounce API key — the email-validation provider used when NeverBounce is unset.',
+  },
+  {
+    match:       /^OAUTH2_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/,
+    owner:       'backend',
+    targets:     ['backend'],
+    group:       'backend-services',
+    secret:      true,
+    required:    false,
+    delivery:    { backend: 'env' },
+    description: "Per-provider OAuth2 client credentials for the backend's user-connection routes (OAUTH2_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET) — pasted into the brand .env from each provider's console; the provider set is open, so the family is a pattern.",
   },
 
   // ── machine-owned: written by a service on its first real run ────────────
@@ -487,6 +873,7 @@ const ENV_SCHEMA = [
     group:       'machine',
     secret:      true,
     required:    false,
+    delivery:    { desktop: 'ci' },
     description: "Password of the desktop signing certificate the certificates service created — electron-builder reads it at package time.",
   },
   {
@@ -501,47 +888,63 @@ const ENV_SCHEMA = [
   {
     name:        'GOOGLE_ANALYTICS_SECRET_WEB',
     owner:       'analytics',
-    targets:     [],
+    targets:     ['web'],
     group:       'machine',
     secret:      true,
     required:    false,
-    description: "Measurement Protocol secret of the web target's GA4 stream — disperse composes it into that target as GOOGLE_ANALYTICS_SECRET.",
+    requiredWhen: 'analytics.providers.google.id',
+    delivery:    { web: 'ci' },
+    deliverAs:   'GOOGLE_ANALYTICS_SECRET',
+    description: "Measurement Protocol secret of the web target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
   },
   {
     name:        'GOOGLE_ANALYTICS_SECRET_BACKEND',
     owner:       'analytics',
-    targets:     [],
+    targets:     ['backend'],
     group:       'machine',
     secret:      true,
     required:    false,
-    description: "Measurement Protocol secret of the backend target's GA4 stream — disperse composes it into that target as GOOGLE_ANALYTICS_SECRET.",
+    requiredWhen: 'analytics.providers.google.id',
+    delivery:    { backend: 'env' },
+    deliverAs:   'GOOGLE_ANALYTICS_SECRET',
+    description: "Measurement Protocol secret of the backend target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
   },
   {
     name:        'GOOGLE_ANALYTICS_SECRET_DESKTOP',
     owner:       'analytics',
-    targets:     [],
+    targets:     ['desktop'],
     group:       'machine',
     secret:      true,
+    publicAtRest: true,
     required:    false,
-    description: "Measurement Protocol secret of the desktop target's GA4 stream — disperse composes it into that target as GOOGLE_ANALYTICS_SECRET.",
+    requiredWhen: 'analytics.providers.google.id',
+    delivery:    { desktop: 'bake' },
+    deliverAs:   'GOOGLE_ANALYTICS_SECRET',
+    description: "Measurement Protocol secret of the desktop target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
   },
   {
     name:        'GOOGLE_ANALYTICS_SECRET_EXTENSION',
     owner:       'analytics',
-    targets:     [],
+    targets:     ['extension'],
     group:       'machine',
     secret:      true,
+    publicAtRest: true,
     required:    false,
-    description: "Measurement Protocol secret of the extension target's GA4 stream — disperse composes it into that target as GOOGLE_ANALYTICS_SECRET.",
+    requiredWhen: 'analytics.providers.google.id',
+    delivery:    { extension: 'bake' },
+    deliverAs:   'GOOGLE_ANALYTICS_SECRET',
+    description: "Measurement Protocol secret of the extension target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
   },
   {
     name:        'GOOGLE_ANALYTICS_SECRET_MOBILE',
     owner:       'analytics',
-    targets:     [],
+    targets:     ['mobile'],
     group:       'machine',
     secret:      true,
     required:    false,
-    description: "Measurement Protocol secret of the mobile target's GA4 stream — disperse composes it into that target as GOOGLE_ANALYTICS_SECRET.",
+    // No requiredWhen: MAM is parked (hard rule 4) — nothing mints, delivers or reads this key, so a rule here could only warn forever.
+    deliverAs:   'GOOGLE_ANALYTICS_SECRET',
+    description: "Measurement Protocol secret of the mobile target's GA4 stream — delivered as GOOGLE_ANALYTICS_SECRET on every verb (composed into dist/.env for backend, loaded into process.env for the others).",
   },
 
   // ── runtime-resolved: never hand-written into a brand .env ───────────────
@@ -552,7 +955,7 @@ const ENV_SCHEMA = [
     group:       'runtime',
     secret:      true,
     required:    false,
-    description: "A target's own Measurement Protocol secret — disperse writes it into each target .env from the brand-level GOOGLE_ANALYTICS_SECRET_<TARGET>, so it is never composed from a brand key of the same name.",
+    description: "A target's own Measurement Protocol secret — the delivery renames the brand-level GOOGLE_ANALYTICS_SECRET_<TARGET> to this name (deliverAs), so it is never composed from a brand key of the same name.",
   },
   {
     name:        'PAYPAL_CLIENT_ID',
@@ -581,15 +984,6 @@ const ENV_SCHEMA = [
     required:    false,
     description: "Developer tooling credential (`claude setup-token`) the claude-code AI provider falls back to — deliberately never composed into a brand's target .env.",
   },
-  {
-    match:       /^OAUTH2_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/,
-    owner:       'backend',
-    targets:     ['backend'],
-    group:       'runtime',
-    secret:      true,
-    required:    false,
-    description: "Per-provider OAuth2 client credentials for the backend's user-connection routes (OAUTH2_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET) — the provider set is open, so the family is a pattern.",
-  },
 ];
 
 /** The groups that render into a real .env file, in canonical file order. */
@@ -610,9 +1004,25 @@ function envSchemaEntry(name) {
 }
 
 /**
- * The keys a target's own .env carries, in schema order — disperse's backend
- * composition. Pattern families and schema-only groups are excluded: neither
- * has a fixed name in a brand .env to compose FROM.
+ * Whether a key is a developer-machine value (`machineLocal: true`) that no
+ * CI-secrets publisher may send ([#454](https://github.com/Omega-JS-Stack/omega/issues/454)).
+ *
+ * @param {string} name - The env var name.
+ * @returns {boolean}
+ */
+function isMachineLocal(name) {
+  const entry = envSchemaEntry(name);
+  return Boolean(entry && entry.machineLocal);
+}
+
+/**
+ * The NAMED keys a target reads, in schema order — the rendering lane's list
+ * (which placeholders a brand .env carries, in which section). Pattern
+ * families are excluded because they have no fixed name to render.
+ *
+ * NOT the delivery filter: composeTargetEnv (env.js) is, and it honors the
+ * pattern families and `deliverAs` this list cannot express
+ * ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)).
  *
  * @param {string} target - Target name ('backend', 'web', …).
  * @returns {string[]} Env var names.
@@ -691,8 +1101,10 @@ function envKeysByGroup() {
 module.exports = {
   ENV_SCHEMA,
   ENV_GROUPS,
+  DELIVERY_MODES,
   envFileGroups,
   envSchemaEntry,
+  isMachineLocal,
   envKeysForTarget,
   generatedEnvKeys,
   requiredEnvKeys,

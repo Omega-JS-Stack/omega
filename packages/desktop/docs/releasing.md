@@ -14,7 +14,7 @@ End-to-end walkthrough for cutting a signed + notarized + published release of a
 
 Why three? Auto-update feeds and marketing downloads MUST be publicly accessible (no auth headers in `electron-updater` or in `<a href>`). Your app source can stay private. The two public repos contain only binaries — no source code.
 
-`npx omega setup` auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
+`npx omega deploy`'s precheck auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
 
 ```jsonc
 releases: {
@@ -48,15 +48,18 @@ See [`docs/signing.md`](signing.md) for full cert setup details.
 ```bash
 cd <your-app>
 npm i @omega.js/desktop --save-dev
-npx omega setup
+npx omega build
 ```
 
-`setup`:
+Every verb runs `ensureTarget()` first ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)):
 1. Ensures peer deps (`gulp`, `electron`, `electron-builder`) are installed.
 2. Writes @omega.js/desktop's `projectScripts` into your `package.json` (`start`, `build`, `release`, `test`).
 3. Copies framework defaults (config, builder yml, hooks, scaffold src/, build/) — merging `.env` and `.gitignore` so user customizations are preserved.
-4. Validates signing prereqs (warns if missing — non-fatal).
-5. Pushes secrets from `.env` → GitHub Actions if `GH_TOKEN` is present.
+
+`npx omega deploy` adds the network half as a precheck (`--no-secrets` opts out):
+
+- Validates signing prereqs (warns if missing — non-fatal).
+- Pushes secrets from `.env` → GitHub Actions if `GH_TOKEN` is present.
 
 Now drop your cert files:
 
@@ -80,10 +83,10 @@ APPLE_API_ISSUER="00000000-0000-0000-0000-000000000000"
 APPLE_TEAM_ID="XXXXXXXXXX"
 ```
 
-Re-run setup to push the now-populated secrets to GitHub:
+Deploy to push the now-populated secrets to GitHub:
 
 ```bash
-npx omega setup
+npx omega deploy
 ```
 
 You should see ✓ for each secret in the output.
@@ -126,7 +129,7 @@ CI handles the cross-platform matrix. The default workflow (`.github/workflows/b
 
 ```
 build (matrix: macos-latest, windows-latest, ubuntu-latest)
-  └─ npm ci → npx omega setup → platform-specific signing
+  └─ npm ci → npm run release:local → platform-specific signing
 windows-sign (only if platforms.win.signing.strategy != "local")
   └─ runs on a self-hosted runner with EV USB token (or hosted windows-latest for cloud strategy)
   └─ signs + uploads release artifacts

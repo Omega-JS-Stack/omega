@@ -27,7 +27,9 @@ const OAUTH_REDIRECTS_PATH = 'cloud.oauthRedirectsConfigured';
 module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandConfig, brandRoot, projectId, domain, options = {} } = context;
 
-  let warned = false;
+  // What warned, by name (#643) — the run summary prints these as the
+  // operation's reason
+  const warnings = [];
   let needsInteractive = null; // #32: set when a step steps aside for lack of a TTY
 
   // === Identity Platform (upgrade only when the config GET says it's absent) ===
@@ -51,7 +53,7 @@ module.exports = async function ensureAuthentication(context) {
     if (!config) {
       console.log(`      ${chalk.yellow('⚠')} Could not get Identity Platform config`);
       console.log(`      ${chalk.dim('→')} Enable Identity Platform in the Firebase Console, then rerun`);
-      return { status: 'warned', output: { authentication: { error: 'no identity config' } } };
+      return { status: 'warned', reason: 'no Identity Platform config — enable it in the Firebase Console', output: { authentication: { error: 'no identity config' } } };
     }
   } else {
     console.log(`      ${chalk.green('✓')} Identity Platform enabled`);
@@ -136,7 +138,7 @@ module.exports = async function ensureAuthentication(context) {
     if (projectNumber && clientProjectNumber !== projectNumber) {
       console.log(`      ${chalk.yellow('⚠')} Google sign-in has the WRONG OAuth client (project ${clientProjectNumber}, expected ${projectNumber})`);
       console.log(`      ${chalk.dim('→')} Delete Google sign-in in the Firebase Console and re-enable it: ${chalk.cyan(firebaseAuthUrl)}`);
-      warned = true;
+      warnings.push('Google sign-in has the wrong OAuth client');
     } else {
       console.log(`      ${chalk.green('✓')} Google sign-in enabled`);
       enabled.push('google');
@@ -154,7 +156,7 @@ module.exports = async function ensureAuthentication(context) {
   } else if (googleConfig?.enabled) {
     console.log(`      ${chalk.yellow('⚠')} Google sign-in enabled but OAuth credentials missing (corrupted config)`);
     console.log(`      ${chalk.dim('→')} Delete Google sign-in and re-enable it: ${chalk.cyan(firebaseAuthUrl)}`);
-    warned = true;
+    warnings.push('Google sign-in is missing its OAuth credentials');
   } else {
     // No API to create the OAuth client — manual enable in the console
     console.log(`      ${chalk.yellow('⚠')} Google sign-in not enabled — requires one-time manual setup`);
@@ -164,7 +166,7 @@ module.exports = async function ensureAuthentication(context) {
     } else {
       console.log(`      ${chalk.dim('→')} ${chalk.cyan(firebaseAuthUrl)}`);
     }
-    warned = true;
+    warnings.push('Google sign-in not enabled — one-time manual setup');
   }
 
   // === OAuth client redirect URIs (no API — instructions + confirm until done) ===
@@ -200,13 +202,13 @@ module.exports = async function ensureAuthentication(context) {
         writeBrandConfig(context, { [OAUTH_REDIRECTS_PATH]: true });
         console.log(`      ${chalk.green('✓')} OAuth client redirect URIs confirmed`);
       } else {
-        warned = true;
+        warnings.push('OAuth client redirect URIs not confirmed');
       }
     } else {
       console.log(`      ${chalk.dim('→')} ${chalk.cyan(gcpCredentialsUrl)}`);
       console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
       needsInteractive = 'confirm the OAuth client origins + redirect URIs (the run opens the console for you)';
-      warned = true;
+      warnings.push('OAuth client redirect URIs not confirmed');
     }
   } else if (googleClientId) {
     console.log(`      ${chalk.green('✓')} OAuth client redirect URIs configured`);
@@ -237,7 +239,8 @@ module.exports = async function ensureAuthentication(context) {
   }
 
   return {
-    status: warned ? 'warned' : 'success',
+    status: warnings.length > 0 ? 'warned' : 'success',
+    ...(warnings.length > 0 ? { reason: warnings.join('; ') } : {}),
     output: {
       authentication: {
         enabled,

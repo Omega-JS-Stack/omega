@@ -15,7 +15,8 @@
 //   aliases     — other argv tokens that select this command
 //   args        — optional positional-argument map: `{ <arg>: [<arg aliases>] }`
 //   description — the help line
-//   default     — the command a bare `omega` runs (exactly one entry)
+//   default     — the command a bare `omega` runs (no entry claims it since
+//                 #675 retired setup: a bare `omega` prints help)
 //   match       — optional custom resolver; returns a truthy value passed to run()
 //   run         — (self, matched) => the command's execute()
 //
@@ -25,7 +26,6 @@ const VersionCommand = require('./commands/version');
 const ClearCommand = require('./commands/clear');
 const CwdCommand = require('./commands/cwd');
 const BuildCommand = require('./commands/build');
-const SetupCommand = require('./commands/setup');
 const InstallCommand = require('./commands/install');
 const ServeCommand = require('./commands/serve');
 const DeployCommand = require('./commands/deploy');
@@ -112,12 +112,6 @@ const COMMANDS = [
     name: 'build',
     description: 'stage src/ into dist/',
     run: (self) => new BuildCommand(self).execute(),
-  },
-  {
-    name: 'setup',
-    default: true,
-    description: 'validate + heal the target',
-    run: (self) => new SetupCommand(self).execute(),
   },
   {
     name: 'install',
@@ -222,7 +216,9 @@ const COMMANDS = [
   },
 ];
 
-// The command a bare `omega` runs.
+// The command a bare `omega` runs — undefined when nothing claims the slot,
+// which is the state since `setup` was retired (#675). The dispatcher falls
+// back to the help listing.
 function defaultCommand() {
   return COMMANDS.find((command) => command.default);
 }

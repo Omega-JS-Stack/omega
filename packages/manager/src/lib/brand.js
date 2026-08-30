@@ -20,8 +20,7 @@
  * (`targets.<name>: { type: 'custom' }`) and its dir carries no framework. It
  * is marked `custom: true` with `target` left NULL, which is what makes every
  * framework service's `filter((entry) => entry.target)` skip it for free —
- * only the two ops that must see it (env disperse, the workspace service)
- * read the flag.
+ * only the ONE op that must see it (the workspace service) reads the flag.
  *
  * A backend entry also carries `projectType` (#584) — 'firebase' (Cloud
  * Functions) or 'custom' (the same backend as its own server on a container

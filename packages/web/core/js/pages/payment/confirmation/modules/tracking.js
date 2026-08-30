@@ -37,17 +37,20 @@
 // id a browser can compute).
 import omega from '@omega.js/client';
 import { event } from '__main_assets__/js/libs/analytics.js';
-import { FREQUENCIES } from '../../checkout/modules/state.js';
+import { FREQUENCIES, ONE_TIME_FREQUENCY } from '../../checkout/modules/state.js';
 
 // Build the canonical items array for the purchase.
 //
-// The category comes from WHAT WAS BOUGHT, never from the truthiness of the
-// frequency string: checkout sends `frequency=once` for a one-time purchase, so
-// `state.frequency ? 'subscription' : 'one-time'` called every one of them a
-// subscription (#282 is the same bug in the receipt copy). FREQUENCIES is the
-// list of cadences checkout actually SELLS — the same list the bindings and the
-// verification poll read, and the confirmation page's stand-in for checkout's
-// `state.product.type === 'subscription'`, which the redirect never carries.
+// The category comes from WHAT WAS BOUGHT, and the redirect the intent route
+// builds now says so outright — `type=subscription|one-time`, the one field here
+// that needs no inferring ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+// The cadence is the FALLBACK, for a confirmation URL minted before the type was
+// sent: reading the truthiness of the frequency string called every one-time buy a
+// subscription, because checkout sends `frequency=once` for one (#282 is the same
+// bug in the receipt copy), so the fallback reads FREQUENCIES — the cadences
+// checkout actually SELLS, the same list the bindings and the verification poll
+// read. A stale link that carries a cadence for a one-time product (the live buy
+// reached this file as `frequency=annually`) is classified by the type regardless.
 //
 // `price` is the conversion's own amount, passed in rather than read off the
 // state: the intent route already sends `amount=0` on a trial checkout, so this
@@ -55,11 +58,15 @@ import { FREQUENCIES } from '../../checkout/modules/state.js';
 // value has ONE source in this file, so a confirmation URL that ever carried the
 // plan's price on a trial could not put it on the item either ([#654]).
 export function buildItems(state, price = state.amount) {
+  const isSubscription = state.type
+    ? state.type === 'subscription'
+    : FREQUENCIES.includes(state.frequency);
+
   return [{
     item_id: state.productId,
     item_name: state.productName || state.productId,
-    item_category: FREQUENCIES.includes(state.frequency) ? 'subscription' : 'one-time',
-    item_variant: state.frequency,
+    item_category: isSubscription ? 'subscription' : 'one-time',
+    item_variant: isSubscription ? state.frequency : ONE_TIME_FREQUENCY,
     price: price,
     quantity: 1,
   }];

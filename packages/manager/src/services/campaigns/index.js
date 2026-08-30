@@ -1,13 +1,14 @@
 /**
  * Campaigns service (SendGrid provider) — the brand's email-marketing infrastructure: domain
  * authentication (DKIM/SPF CNAMEs written via Cloudflare), a verified sender
- * for Single Sends, the brand's marketing list, @omega.js/backend's custom fields and
+ * for Single Sends, the brand's marketing list, the unsubscribe groups
+ * @omega.js/backend sends through, @omega.js/backend's custom fields and
  * segments (from @omega.js/backend's SSOT), and the account-global Event
  * Webhook pointed at the parent @omega.js/backend's forwarder.
  *
  * Runs after cloudflare (the zone must exist for the DKIM records). The
  * whole service reconciles one SendGrid account per brand-or-company — the
- * fields/segments/webhook operations converge to the same result when
+ * groups/fields/segments/webhook operations converge to the same result when
  * sibling brands share the account.
  *
  * Auth: SENDGRID_API_KEY in the brand .env; the event-webhook operation

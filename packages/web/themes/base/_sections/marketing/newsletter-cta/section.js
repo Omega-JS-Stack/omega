@@ -13,6 +13,7 @@
  * the backend decides.
  */
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { initializeRecaptcha, getRecaptchaToken } from '__main_assets__/js/libs/recaptcha.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -29,7 +30,16 @@ export default (el) => {
     recaptchaWarmup = recaptchaWarmup || initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey);
     return recaptchaWarmup;
   };
-  $form.addEventListener('focusin', warmup, { once: true });
+
+  // The backend warms on that same first interaction, and not on load: this
+  // band rides most pages, so a passive visitor would ping a function they are
+  // never going to POST to. A focus IS the intent, and the submit behind it is
+  // `/omega/marketing/contact`
+  // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+  $form.addEventListener('focusin', () => {
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
+    warmup();
+  }, { once: true });
 
   const formManager = new FormManager($form, {
     allowResubmit: false,

@@ -28,7 +28,7 @@
  * return a reorder that changed any effective value.
  */
 
-const { envFileGroups, envKeysByGroup } = require('@omega.js/config');
+const { envFileGroups, envKeysByGroup, envLine } = require('@omega.js/config');
 
 /**
  * The canonical .env sections: every schema group that renders into a file,
@@ -230,4 +230,7 @@ function applyEnvOrder(content, { defaultHeader = [] } = {}) {
   return { content: rendered, changed: rendered !== content, duplicatesCollapsed };
 }
 
-module.exports = { canonicalEnvGroups, renderCanonicalEnv, applyEnvOrder };
+// `envLine` is @omega.js/config's serializer, re-exported so the manager's
+// writebacks keep one import — the escaping rules live there, with the
+// composer that has to read them back.
+module.exports = { canonicalEnvGroups, envLine, renderCanonicalEnv, applyEnvOrder };

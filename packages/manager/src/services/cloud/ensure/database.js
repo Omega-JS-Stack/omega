@@ -55,6 +55,6 @@ module.exports = async function ensureDatabase(context) {
     }
 
     console.log(`      ${chalk.yellow('⚠')} Could not create database${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { database: { error: error.message } } };
+    return { status: 'warned', reason: 'could not create the Realtime Database', output: { database: { error: error.message } } };
   }
 };

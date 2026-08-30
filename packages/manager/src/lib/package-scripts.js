@@ -58,4 +58,30 @@ function healPackageScripts(pkg) {
   return { scripts, changes };
 }
 
-module.exports = { healPackageScripts, DEPLOY_SCRIPT, START_SCRIPT, MANAGE_SCRIPT };
+/**
+ * Fill a TARGET manifest's missing scripts from its framework's own
+ * `projectScripts` declaration. Fill-missing ONLY — a consumer's customized
+ * value is never overwritten. This is the onboard→dev cycle break (#675): the
+ * framework's ensureTarget writes these on the first verb run, but the dev
+ * fan-out reaches that verb THROUGH these scripts, so a freshly scaffolded
+ * target needs them before any verb has ever run.
+ *
+ * @param {Object} pkg - parsed target package.json
+ * @param {Object} projectScripts - the framework package's projectScripts map
+ * @returns {{ scripts: Object, changes: string[] }}
+ */
+function healTargetScripts(pkg, projectScripts) {
+  const scripts = { ...((pkg || {}).scripts || {}) };
+  const changes = [];
+
+  for (const [key, value] of Object.entries(projectScripts || {})) {
+    if (!scripts[key]) {
+      scripts[key] = value;
+      changes.push(`${key}: '${value}'`);
+    }
+  }
+
+  return { scripts, changes };
+}
+
+module.exports = { healPackageScripts, healTargetScripts, DEPLOY_SCRIPT, START_SCRIPT, MANAGE_SCRIPT };

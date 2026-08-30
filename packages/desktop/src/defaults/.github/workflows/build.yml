@@ -16,6 +16,13 @@ env:
   OMEGA_IS_PUBLISH: 'true'
   OMEGA_IS_SERVER:  'true'
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  # Every CI-delivered key of the env schema, GENERATED (#627): one
+  # `KEY: ${{ secrets.KEY }}` line per `delivery: { desktop: 'ci' | 'bake' }`
+  # entry (@omega.js/config's env-delivery.js), re-rendered by every verb's
+  # ensureTarget. Signing, notarization, store and analytics credentials all
+  # arrive here, workflow-wide — the jobs and steps below consume them without
+  # restating one. Add a key to the schema, not to this file.
+  {{ githubSecrets }}
 
 concurrency:
   group: ${{ github.ref }}
@@ -129,12 +136,6 @@ jobs:
       - if: matrix.os != 'windows-latest'
         run: sfw npm ci
 
-      - if: matrix.os == 'windows-latest'
-        shell: cmd
-        run: npx omega setup
-      - if: matrix.os != 'windows-latest'
-        run: npx omega setup
-
       # macOS — decode signing assets from secrets, then sign + notarize + publish.
       # `npx omega push-secrets` uploads .p12 / .p8 files as base64-encoded secrets;
       # the workflow decodes them back to disk for electron-builder + notarytool to read.
@@ -143,14 +144,14 @@ jobs:
           mkdir -p config/certs
           echo "${{ secrets.CSC_LINK }}"      | base64 --decode > config/certs/dev-id.p12
           echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > config/certs/AuthKey.p8
+      # The two file-path OVERRIDES of the workflow env: electron-builder and
+      # notarytool read these as paths, and the step above just decoded the
+      # base64 secrets of the same name to disk. Every other credential comes
+      # from the generated env block.
       - if: matrix.os == 'macos-latest'
         env:
           CSC_LINK:         config/certs/dev-id.p12
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY:    config/certs/AuthKey.p8
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID:    ${{ secrets.APPLE_TEAM_ID }}
         run: npm run release:local
 
       # Linux — install snapcraft when (a) the consumer hasn't explicitly disabled snap
@@ -161,8 +162,6 @@ jobs:
       # no snap publish attempt and no failure.
       - name: Install Snapcraft (Linux, when snap enabled + creds present)
         if: matrix.os == 'ubuntu-latest'
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           # (a) Config check — explicit `enabled: false` opts out; missing/true opts in.
           # `@omega.js/desktop/config` is the vendored @omega.js/config loader — resolves
@@ -187,8 +186,6 @@ jobs:
 
       # Linux — no signing
       - if: matrix.os == 'ubuntu-latest'
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: npm run release:local
 
       # Windows — package (build + electron-builder package) unsigned. We do NOT publish
@@ -199,6 +196,13 @@ jobs:
         shell: cmd
         env:
           OMEGA_SKIP_WIN_SIGN: 'true'
+          # The workflow env carries the mac signing cert (CSC_LINK is the
+          # base64 .p12 the mac job decodes); electron-builder would otherwise
+          # try to sign the Windows build with it. Empty reads as UNSET — the
+          # build's sanitize pass drops it — so this step packages unsigned, as
+          # it always did. windows-sign signs separately.
+          CSC_LINK: ''
+          CSC_KEY_PASSWORD: ''
         run: npm run package
 
       - if: matrix.os == 'windows-latest'
@@ -251,23 +255,11 @@ jobs:
     defaults:
       run:
         shell: cmd
-    env:
-      # Self-hosted EV USB token signing — these tell signtool which cert to use and
-      # how to authenticate to the SafeNet driver. Set in the consumer's .env and
-      # pushed to GH Actions secrets via `npx omega push-secrets`.
-      WIN_EV_TOKEN_PATH:                ${{ secrets.WIN_EV_TOKEN_PATH }}
-      WIN_CSC_KEY_PASSWORD:             ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-      SIGNTOOL_PATH:                    ${{ secrets.SIGNTOOL_PATH }}
-      # Cloud-provider env vars — only one set is consumed depending on `signing.windows.cloud.provider` in config:
-      AZURE_TENANT_ID:                  ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID:                  ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET:              ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_TRUSTED_SIGNING_ENDPOINT:   ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
-      SSLCOM_USERNAME:                  ${{ secrets.SSLCOM_USERNAME }}
-      SSLCOM_PASSWORD:                  ${{ secrets.SSLCOM_PASSWORD }}
-      SSLCOM_CREDENTIAL_ID:             ${{ secrets.SSLCOM_CREDENTIAL_ID }}
-      DIGICERT_API_KEY:                 ${{ secrets.DIGICERT_API_KEY }}
-      DIGICERT_KEYPAIR_ALIAS:           ${{ secrets.DIGICERT_KEYPAIR_ALIAS }}
+    # Signing credentials — self-hosted EV USB token (WIN_EV_TOKEN_PATH,
+    # WIN_CSC_KEY_PASSWORD, SIGNTOOL_PATH) and the cloud providers (only the set
+    # `platforms.win.signing.cloud.provider` names is consumed) — all arrive
+    # through the workflow's generated env block. Set them in the brand .env and
+    # push with `npx omega push-secrets`.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

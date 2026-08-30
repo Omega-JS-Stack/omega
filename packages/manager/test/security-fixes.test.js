@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { writeEnvValue } = require('../src/lib/env-secret.js');
-const { envLine } = require('../src/services/disperse/write/env.js');
+const { envLine } = require('../src/lib/env-order.js');
 const { redactWebhookUrl, buildWebhookUrl } = require('../src/services/payment/lib/payment-utils.js');
 const { GoogleOAuth2Client } = require('../src/lib/google-auth.js');
 

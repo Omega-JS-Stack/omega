@@ -13,6 +13,7 @@ const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findBrandRoot } = require('@omega.js/config');
+const { ensureTarget } = require('./lib/ensure-target.js');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { resolveStaticDirs } = require('../static-assets.js');
@@ -52,6 +53,10 @@ module.exports = async function (options) {
   if (options.logFile !== false) {
     attachLogFile(path.join(paths.root, 'logs', 'build.log'));
   }
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target.
+  ensureTarget({ projectDir: paths.root, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
   const siteData = loadSiteData(paths.root);
   const brandRoot = findBrandRoot(paths.root);

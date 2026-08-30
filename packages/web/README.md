@@ -15,7 +15,6 @@ migrate → 2,556 pages, ~3.2× the whole Jekyll pipeline).**
 
 ```bash
 # In a consumer project (scaffolded scripts call these):
-npx omega setup     # scaffold/refresh defaults + sync package.json scripts
 npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   port: website convention 4000, auto-bumps +1 when taken (N7);
                     #   --port=N or config ports.website PINS it (busy = hard error)
@@ -77,7 +76,7 @@ npx omega audit /pricing --min-performance=90
 npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme contract + translate
 ```
 
-A bare consumer (`omega setup` in an empty dir, edit brand in
+A bare consumer (`omega build` in an empty dir, edit brand in
 config/omega.json5) builds the full ~56-page default set in under 2 s.
 
 Corpus-scale benching lives in [_attic/spikes/bakeoff-eleventy](../../_attic/spikes/bakeoff-eleventy)
@@ -390,8 +389,8 @@ example, and the four questions to read a page against them:
   development → global module), page stub → `bootPage(mod)` (awaits the main
   boot, then `mod({ manager, options })` — the UJM page-module contract,
   with `manager` the frontend Manager wrapper carrying mode helpers).
-- **Scaffolding (`omega setup`)** — devkit's defaults engine over
-  `scaffold/`: marker-section merges live-sync .gitignore/.env/AGENTS.md
+- **Scaffolding (`ensureTarget()`, every verb)** — devkit's defaults engine over
+  `scaffold/`: marker-section merges live-sync .gitignore/AGENTS.md
   (Custom sections preserved verbatim; CLAUDE.md is the one-line `@AGENTS.md`
   pointer, copied when missing), config/omega.json5 seeds then
   JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +

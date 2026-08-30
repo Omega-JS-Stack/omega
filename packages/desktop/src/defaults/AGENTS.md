@@ -90,10 +90,10 @@ In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.log
 
 Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/`: real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test. Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live). See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
 
-<!-- Everything above this marker is owned by the framework and rewritten on every `npx omega setup`. Add your project-specific notes below — they are preserved across setups. -->
+<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
 
 # ========== Custom Values ==========
 
 ## Project-specific notes
 
-Add anything specific to THIS project here. Edits below this line are preserved across `npx omega setup` runs.
+Add anything specific to THIS project here. Edits below this line are preserved across framework re-syncs.

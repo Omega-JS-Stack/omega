@@ -77,17 +77,20 @@ module.exports = {
       },
     },
     {
-      name: 'no command defaults to setup',
+      name: 'no command prints help and runs nothing (#675 — setup is retired)',
       run: async (ctx) => {
-        let invoked = false;
-        stubCommand('setup', async () => { invoked = true; });
+        const Main = freshCli();
+        const lines = [];
+        const origLog = console.log;
+        console.log = (...args) => lines.push(args.join(' '));
         try {
-          const Main = freshCli();
           await new Main().process({ _: [] });
-          ctx.expect(invoked).toBe(true);
         } finally {
-          unstub('setup');
+          console.log = origLog;
         }
+
+        ctx.expect(lines.join('\n')).toContain('Usage: omega <command>');
+        ctx.expect(lines.join('\n').includes('  setup')).toBe(false);
       },
     },
     {

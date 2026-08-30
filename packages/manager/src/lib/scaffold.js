@@ -25,12 +25,10 @@ const { TARGET_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
 // The canonical group list + renderer live in env-order.js (the ordering
 // SSOT, cp137) — the stub is just a canonical render with generated Omega
 // keys, so a scaffolded .env and a reordered one have the same shape.
-const { renderCanonicalEnv } = require('./env-order.js');
-// What gets generated (the env schema's `generated` entries) and how a value
-// is serialized (the disperse .env writer) — the same two SSOTs writeEnvValue
-// rides.
+const { renderCanonicalEnv, envLine } = require('./env-order.js');
+// What gets generated (the env schema's `generated` entries) — with
+// env-order.js's serializer above, the same two SSOTs writeEnvValue rides.
 const { generatedEnvKeys } = require('@omega.js/config');
-const { envLine } = require('../services/disperse/write/env.js');
 // The heal's value is the SSOT for the manage script — a scaffolded brand
 // must never be born needing the migration the heal just learned (#229)
 const { MANAGE_SCRIPT } = require('./package-scripts.js');
@@ -273,10 +271,10 @@ ${targetList}
 
 1. \`npm install\` — each target declares its framework (workspace link in a
    monorepo; standalone pre-publish: \`npx mgr i local\` inside each target).
-2. Per target: \`cd targets/<dir> && npx omega setup\` — the framework scaffolds its
-   consumer interior.
-3. Fill in \`.env\` as the brand adopts external services.
-4. \`npm run manage\` — reconcile everything; rerun any time.
+2. Fill in \`.env\` as the brand adopts external services.
+3. \`npm run manage\` — reconcile everything; rerun any time.
+4. \`npm start\` (\`npx omega dev\`) — boot the local stack; each target's verbs
+   scaffold its consumer interior on first run.
 `;
 }
 

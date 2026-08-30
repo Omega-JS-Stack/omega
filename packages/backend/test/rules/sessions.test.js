@@ -20,9 +20,9 @@ const jetpack = require('fs-jetpack');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
 const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
 
-// The REAL shipped ruleset, read straight from templates/ — the same file
-// `omega setup` copies into a brand's target root as `database.rules.json`
-// (src/cli/commands/setup.js). No test copy exists to drift out of sync.
+// The REAL shipped ruleset, read straight from templates/ — the same file the
+// verbs' scaffold copies into a brand's target root as `database.rules.json`
+// (src/cli/utils/ensure-target.js). No test copy exists to drift out of sync.
 const DATABASE_RULES = path.resolve(__dirname, '..', '..', 'templates', 'database.rules.json');
 
 // Its own emulator project, so the ruleset this suite loads (and the data it

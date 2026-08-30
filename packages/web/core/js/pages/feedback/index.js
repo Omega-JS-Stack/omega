@@ -6,11 +6,19 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
+    // Warm the backend the moment the page loads: the only thing this page
+    // does is POST `/omega/user/feedback`, so the visitor's first click is the
+    // one that would pay for a cold function. Fire-and-forget and
+    // unauthenticated — the backend answers a wakeup before it loads a route
+    // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
+
     // Initialize when DOM is ready
     await omega.dom().ready();
 

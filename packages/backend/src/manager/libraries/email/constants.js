@@ -7,61 +7,62 @@
 
 // Template shortcut map — callers use readable paths instead of SendGrid IDs
 // Paths mirror the email website structure: {category}/{subcategory}/{name}
-// Group shortcut map — SendGrid ASM group IDs
-// Rename these in SendGrid dashboard to match the comments
-const GROUPS = {
-  'orders': 16223,         // @omega.js/backend - Order Updates
-  'hello': 35092,          // @omega.js/backend - Onboarding
-  'account': 25927,        // @omega.js/backend - Account
-  'marketing': 25928,      // @omega.js/backend - Marketing & Promotions
-  'security': 35093,       // @omega.js/backend - Security
-  'newsletter': 28096,     // @omega.js/backend - Newsletter
-  'internal': 35094,       // @omega.js/backend - Internal Alerts
-};
+// Unsubscribe-group (ASM) KEYS — the SSOT for which groups exist. The ids are
+// per SendGrid ACCOUNT, so they are NOT code: the manager's campaigns service
+// provisions the groups by name and writes each id into config at
+// marketing.campaigns.providers.sendgrid.groups.<key>, which prepare.js reads
+// at send time. A hardcoded id here belonged to whoever's account created it
+// ([#649](https://github.com/Omega-JS-Stack/omega/issues/649)).
+const GROUP_KEYS = ['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal'];
 
-// Semantic sender categories — pass `sender: 'orders'` to auto-resolve from address, display name, and ASM group
+// The group every send falls back to when its sender category names none
+const DEFAULT_GROUP_KEY = 'account';
+
+// Semantic sender categories — pass `sender: 'orders'` to auto-resolve from address,
+// display name, and unsubscribe group (`group` names a GROUP_KEYS key; prepare.js
+// resolves it to the account's id from config)
 const SENDERS = {
   // Payment receipts, failed/recovered, cancellation, plan changes, refunds, trial ending
   orders: {
     localPart: 'orders',
     displayName: '{brand} Orders',
-    group: GROUPS['orders'],
+    group: 'orders',
   },
   // Warm onboarding: welcome, 7-day checkup, feedback request
   hello: {
     localPart: 'hello',
     displayName: '{brand}',
-    group: GROUPS['hello'],
+    group: 'hello',
   },
   // Transactional account actions: deletion, data requests
   account: {
     localPart: 'account',
     displayName: '{brand} Account',
-    group: GROUPS['account'],
+    group: 'account',
   },
   // Promotions, discounts, win-back, abandoned cart, app download link
   marketing: {
     localPart: 'offers',
     displayName: '{brand}',
-    group: GROUPS['marketing'],
+    group: 'marketing',
   },
   // Forgot password, 2FA, password reset
   security: {
     localPart: 'security',
     displayName: '{brand} Security',
-    group: GROUPS['security'],
+    group: 'security',
   },
   // Monthly newsletters, feature announcements, industry news
   newsletter: {
     localPart: 'newsletter',
     displayName: '{brand}',
-    group: GROUPS['newsletter'],
+    group: 'newsletter',
   },
   // Dispute alerts, system notifications sent to brand contact
   internal: {
     localPart: 'alerts',
     displayName: '{brand} Alerts',
-    group: GROUPS['internal'],
+    group: 'internal',
   },
 };
 
@@ -486,7 +487,8 @@ function resolveFieldValues(userDoc, config) {
 }
 
 module.exports = {
-  GROUPS,
+  GROUP_KEYS,
+  DEFAULT_GROUP_KEY,
   SENDERS,
   FIELDS,
   SEGMENTS,

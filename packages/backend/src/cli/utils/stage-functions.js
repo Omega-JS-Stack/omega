@@ -8,9 +8,10 @@
  *   config layers         → dist/config/omega.json5 (composeTargetConfig —
  *                           brand⊕local flattened; the deployed runtime cannot
  *                           walk up past the upload boundary, cp100e)
- *   .env                  → dist/.env               (verbatim copy — disperse
- *                           composes brand-level values into the LOCAL .env now;
- *                           a DEPLOY stage drops the schema's `_DEV` rows, #586)
+ *   env cascade           → dist/.env               (COMPOSED: composeTargetEnv —
+ *                           company ← brand ← target, filtered to the keys the
+ *                           env schema names for `backend`; a DEPLOY stage
+ *                           drops the schema's `_DEV` rows, #586)
  *   .nvmrc                → dist/.nvmrc
  *   service-account.json  → dist/service-account.json (target root, else the
  *                           brand's .omega/secrets/ — the key's ONE home)
@@ -39,7 +40,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, findBrandRoot, devEnvKeys } = require('@omega.js/config');
+const { composeTargetConfig, composeTargetEnv, serializeEnv, resolveEnvChain, findBrandRoot, devEnvKeys } = require('@omega.js/config');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
 const { isCustomProject } = require('./project-type');
 
@@ -79,8 +80,7 @@ function resolveServiceAccountPath(projectDir) {
  * env, one stale `ENVIRONMENT` away from serving real customers with it. The
  * key list is the schema's (`devEnvKeys()`), never a copy.
  *
- * Assignments only: a `# KEY=` placeholder carries no value and stays, so the
- * artifact's .env keeps the shape `omega setup` templated.
+ * Assignments only: a comment line carries no value and stays.
  *
  * @param {string} content - The authored .env content.
  * @returns {string} The same content minus every dev-only assignment.
@@ -115,10 +115,10 @@ function stageFunctions(options) {
 
   const targetPackage = jetpack.read(path.join(projectDir, 'package.json'), 'json');
   if (!targetPackage) {
-    throw new Error(`No package.json at ${projectDir} — a backend target's manifest lives at the TARGET ROOT (src/dist pillar); run npx omega setup first`);
+    throw new Error(`No package.json at ${projectDir} — a backend target's manifest lives at the TARGET ROOT (src/dist pillar); run an OMEGA verb from a backend target root first`);
   }
   if (!jetpack.exists(srcDir)) {
-    throw new Error(`No src/ under ${projectDir} — backend targets are src-first: authored code lives in src/ and dist/ is staged output (run npx omega setup to scaffold, or move your functions code into src/)`);
+    throw new Error(`No src/ under ${projectDir} — backend targets are src-first: authored code lives in src/ and dist/ is staged output (any verb scaffolds one, or move your functions code into src/)`);
   }
 
   // The FRAMEWORK package is not a target: its own root carries a package.json
@@ -193,19 +193,26 @@ function stageFunctions(options) {
   );
   staged.push('config/omega.json5 (composed)');
 
+  // ─── Composed .env — the artifact's own env (#678) ───────────────────────
+  //     The brand root's .env is the ONE file humans and the manager edit;
+  //     the target's own .env is an optional per-key override. Every verb
+  //     that stages composes this file, so a brand-root key reaches the
+  //     upload without anyone remembering to run a manage first.
+  const composed = composeTargetEnv({ targetDir: projectDir, target: 'backend' });
+  const envContent = serializeEnv(composed.values);
+  jetpack.write(path.join(distDir, '.env'), options.deploy ? stripDevEnvRows(envContent) : envContent);
+
+  // Key NAMES and the layer each came from — never a value (the .env is all
+  // secrets)
+  const delivered = Object.keys(composed.values).map((key) => `${key} (${composed.sources[key]})`);
+  staged.push(`.env (composed from the cascade${options.deploy ? ', dev-only keys stripped for the upload' : ''})`);
+  log(`Composed dist/.env — ${delivered.length} keys: ${delivered.join(', ') || 'none'}`);
+
   // ─── Target-root files that ride the artifact ────────────────────────────────
-  for (const file of ['.env', '.nvmrc']) {
-    const source = path.join(projectDir, file);
-    if (!jetpack.exists(source)) continue;
-
-    if (file === '.env' && options.deploy) {
-      jetpack.write(path.join(distDir, file), stripDevEnvRows(jetpack.read(source)));
-      staged.push('.env (dev-only keys stripped for the upload)');
-      continue;
-    }
-
-    jetpack.copy(source, path.join(distDir, file), { overwrite: true });
-    staged.push(file);
+  const nvmrc = path.join(projectDir, '.nvmrc');
+  if (jetpack.exists(nvmrc)) {
+    jetpack.copy(nvmrc, path.join(distDir, '.nvmrc'), { overwrite: true });
+    staged.push('.nvmrc');
   }
 
   // ─── Firestore rules: the brand's source + the framework half, compiled ───
@@ -234,8 +241,30 @@ function stageFunctions(options) {
 }
 
 /**
+ * The .env layers ABOVE the target that feed the composed dist/.env — the
+ * brand root's and the company root's, resolved through the chain
+ * (@omega.js/config resolveEnvChain), never a hard-coded `../../.env`. The
+ * target's own .env is watched by name with the other target-root inputs.
+ *
+ * A standalone target has neither, so the list is empty
+ * ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)).
+ *
+ * @param {string} projectDir - The target root.
+ * @returns {Array<{ layer: string, path: string }>} Absolute .env paths.
+ */
+function envWatchInputs(projectDir) {
+  const chain = resolveEnvChain(projectDir);
+
+  return [
+    { layer: 'brand', path: chain.brand },
+    { layer: 'company', path: chain.company },
+  ].filter((input) => input.path);
+}
+
+/**
  * Watch every STAGE INPUT and re-stage on change — src/, the target manifest,
- * .env/.nvmrc/SA, firestore.rules, and the config layers (target + brand
+ * .env/.nvmrc/SA, the brand-root and company .env (the composed dist/.env's
+ * upper layers), firestore.rules, and the config layers (target + brand
  * omega.json5, brand secrets). The Firebase emulator watches dist/ natively,
  * so a re-stage IS the hot reload: a brand-config edit reaches the running
  * emulator without a restart, and so does a brand rules edit (the re-stage
@@ -280,6 +309,14 @@ function watchAndStage(options) {
     if (TARGET_ROOT_INPUTS.has(filename)) restage(filename)();
   });
 
+  // The composed .env's upper layers — a brand-root edit restages exactly like
+  // a target .env edit, so a running dev server picks the new key up (#678)
+  for (const input of envWatchInputs(projectDir)) {
+    watch(path.dirname(input.path), (event, filename) => {
+      if (filename === '.env') restage(`${input.layer} .env`)();
+    });
+  }
+
   // Config layers: the target's own config/ and the brand's config/ + secrets
   const brandRoot = findBrandRoot(projectDir);
   watch(path.join(projectDir, 'config'), restage('local config'));
@@ -296,4 +333,4 @@ function watchAndStage(options) {
   };
 }
 
-module.exports = { stageFunctions, watchAndStage, resolveServiceAccountPath, PRESERVE };
+module.exports = { stageFunctions, watchAndStage, envWatchInputs, resolveServiceAccountPath, PRESERVE };

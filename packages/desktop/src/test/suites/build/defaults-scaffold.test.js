@@ -1,4 +1,4 @@
-// Build-layer tests for the setup defaults scaffold — copyDefaults now runs through
+// Build-layer tests for ensure-target's defaults scaffold — copyDefaults runs through
 // the shared devkit defaults engine; these tests run the REAL copyDefaults (@omega.js/desktop's
 // actual file map) into a temp consumer dir and verify the wiring: `_.` renames,
 // `_mas/` archive skip, workflow templating, preserve-if-exists, marker merges,
@@ -10,7 +10,8 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 
 const Manager = require('../../../build.js');
-const { copyDefaults } = require('../../../commands/setup.js');
+const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
+const { copyDefaults } = require('../../../commands/lib/ensure-target.js');
 const package = Manager.getPackage('main');
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
@@ -27,7 +28,10 @@ module.exports = {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         await copyDefaults(tmp);
 
-        ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
+        // No `.env` scaffolds ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+        // a target .env is a human-only override; keys live in the brand root
+        // .env and every verb delivers them.
+        ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
         // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
         // the one-line `@AGENTS.md` pointer.
@@ -44,6 +48,42 @@ module.exports = {
       },
     },
     {
+      // GitHub runs workflows from the repo ROOT only, so the per-target copy a
+      // brand monorepo used to get never fired (#265) — and the #627 secrets
+      // block was rendering into that dead file. Web and the extension compose
+      // into the brand root; desktop now does too.
+      name: 'brand target scaffolds NO per-target .github/ — its CI composes into the brand root (#265)',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
+        const brandRoot = path.join(tmp, 'brand');
+        jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const targetDir = path.join(brandRoot, 'targets', 'desktop');
+        jetpack.dir(targetDir);
+
+        await copyDefaults(targetDir);
+
+        ctx.expect(jetpack.exists(path.join(targetDir, '.github'))).toBe(false);
+
+        const composed = path.join(brandRoot, '.github', 'workflows', 'desktop-build.yml');
+        ctx.expect(jetpack.exists(composed)).toBe('file');
+
+        const contents = jetpack.read(composed);
+        // Runs from the repo root, scoped to this target
+        ctx.expect(contents).toContain('working-directory: targets/desktop');
+        // The template pass runs on the COMPOSED copy too: the generated env
+        // block is there, and no raw token survives — the composed file is the
+        // only one CI executes, so an unrendered token would break every build.
+        ctx.expect(contents).toContain(renderSecretsBlock('desktop', { indent: '  ' }));
+        ctx.expect(contents.includes('{{ githubSecrets }}')).toBe(false);
+        ctx.expect(contents).toContain(String(package.omega.nodeRuntime));
+        ctx.expect(contents.includes('{{ versions')).toBe(false);
+
+        // Idempotent: a rerun updates that one file, never adds another.
+        await copyDefaults(targetDir);
+        ctx.expect(jetpack.list(path.join(brandRoot, '.github', 'workflows'))).toEqual(['desktop-build.yml']);
+      },
+    },
+    {
       name: 'preserve-if-exists: consumer files are never overwritten',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
@@ -54,20 +94,20 @@ module.exports = {
       },
     },
     {
-      name: '.env re-scaffold: custom values survive, user default-section keys migrate to custom',
+      name: '.gitignore re-scaffold: custom lines survive the marker merge',
       run: async (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(
-          path.join(tmp, '.env'),
-          `${DEFAULT_MARKER}\nUSER_ADDED_KEY="mine"\n\n${CUSTOM_MARKER}\nCUSTOM_KEY="kept"\n`
+          path.join(tmp, '.gitignore'),
+          `${DEFAULT_MARKER}\nuser-added-dir/\n\n${CUSTOM_MARKER}\nmy-secret-dir/\n`
         );
         await copyDefaults(tmp);
 
-        const env = jetpack.read(path.join(tmp, '.env'));
-        const customPart = env.slice(env.indexOf(CUSTOM_MARKER));
-        ctx.expect(customPart).toContain('CUSTOM_KEY="kept"');
+        const gitignore = jetpack.read(path.join(tmp, '.gitignore'));
+        const customPart = gitignore.slice(gitignore.indexOf(CUSTOM_MARKER));
+        ctx.expect(customPart).toContain('my-secret-dir/');
         // Not in @omega.js/desktop's defaults → migrated below the Custom marker.
-        ctx.expect(customPart).toContain('USER_ADDED_KEY="mine"');
+        ctx.expect(customPart).toContain('user-added-dir/');
       },
     },
     {
@@ -117,7 +157,7 @@ module.exports = {
         ctx.expect(jetpack.exists(path.join(targetDir, 'CHANGELOG.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
         // The non-doc defaults still land.
-        ctx.expect(jetpack.exists(path.join(targetDir, '.env'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, '.gitignore'))).toBeTruthy();
       },
     },
     {

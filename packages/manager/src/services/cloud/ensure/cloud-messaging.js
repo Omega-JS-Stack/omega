@@ -38,7 +38,7 @@ module.exports = async function ensureCloudMessaging(context) {
       console.log(`      ${chalk.green('✓')} FCM API enabled`);
     } catch (error) {
       console.log(`      ${chalk.yellow('⚠')} Failed to enable FCM API${chalk.dim(`: ${error.message}`)}`);
-      return { status: 'warned', output: { cloudMessaging: { error: error.message } } };
+      return { status: 'warned', reason: 'failed to enable the FCM API', output: { cloudMessaging: { error: error.message } } };
     }
   }
 

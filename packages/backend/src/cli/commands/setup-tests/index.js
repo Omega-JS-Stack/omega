@@ -22,7 +22,6 @@ const OmegaConfigTest = require('./omega-config');
 const ProjectIdConsistencyTest = require('./project-id-consistency');
 const ServiceAccountTest = require('./service-account');
 const GitignoreTest = require('./gitignore');
-const EnvFileTest = require('./env-file');
 const EnvRuntimeConfigDeprecatedTest = require('./env-runtime-config-deprecated');
 const FirestoreRulesInJsonTest = require('./firestore-rules-in-json');
 const FirestoreIndexesInJsonTest = require('./firestore-indexes-in-json');
@@ -77,7 +76,6 @@ function getTests(context) {
     new ServiceAccountTest(context),
     new ProjectIdConsistencyTest(context),
     new GitignoreTest(context),
-    new EnvFileTest(context),
     new EnvRuntimeConfigDeprecatedTest(context),
     new FirestoreRulesInJsonTest(context),
     new FirestoreIndexesInJsonTest(context),

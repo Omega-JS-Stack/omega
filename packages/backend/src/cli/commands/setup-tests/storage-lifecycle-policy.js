@@ -10,7 +10,7 @@ class StorageLifecyclePolicyTest extends BaseTest {
 
   getWarning() {
     return [
-      'storage lifecycle policy not applied (--offline) — no `gsutil lifecycle set` ran; re-run `npx omega setup` without --offline to apply it',
+      'storage lifecycle policy not applied (--offline) — no `gsutil lifecycle set` ran; re-run `npx omega test` without --offline to apply it',
     ];
   }
 

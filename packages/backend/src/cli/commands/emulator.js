@@ -537,6 +537,12 @@ class EmulatorCommand extends BaseCommand {
         }
       };
       process.on('SIGINT', onSigint);
+      // A programmatic stop arrives as SIGTERM (`omega dev`'s shutdown, a
+      // supervisor, the journey lane) — without a listener the default kills
+      // THIS process only, and the firebase group (detached above, so a
+      // parent's group signal can never reach it) orphans with its ports
+      // (#690). Same teardown either way.
+      process.on('SIGTERM', onSigint);
 
       // Resolve when the emulator exits (via shutdown or crash)
       await exitPromise;
@@ -552,6 +558,7 @@ class EmulatorCommand extends BaseCommand {
         try { watcherChild.kill('SIGTERM'); } catch (e) { /* already gone */ }
       }
       process.removeListener('SIGINT', onSigint);
+      process.removeListener('SIGTERM', onSigint);
       this.log(chalk.gray('  Emulator stopped.\n'));
       if (sigintCount > 0) {
         process.exit(0);
@@ -991,7 +998,8 @@ class EmulatorCommand extends BaseCommand {
    * Boot emulators and run a single command against them. Sends SIGTERM to the emulator
    * when the command exits (or this process is interrupted) and waits for clean shutdown.
    *
-   * Used by `npx omega emulator` for the keep-alive flow (command is a no-op sleep).
+   * No current caller — `npx omega emulator`'s keep-alive flow boots through
+   * execute() now; kept for programmatic embedding.
    * `npx omega test`'s auto-start path uses startEmulators() directly so it can tee the
    * test command's output to its own log (test.log) separate from emulator.log.
    *
@@ -1009,6 +1017,8 @@ class EmulatorCommand extends BaseCommand {
       shutdown();
     };
     process.on('SIGINT', onSigint);
+    // SIGTERM is the programmatic stop — same teardown (#690, see execute()).
+    process.on('SIGTERM', onSigint);
 
     try {
       // Run the user command; when it exits we tear down the emulator.
@@ -1023,6 +1033,7 @@ class EmulatorCommand extends BaseCommand {
       });
 
       process.removeListener('SIGINT', onSigint);
+      process.removeListener('SIGTERM', onSigint);
       await shutdown();
       await exitPromise;
 
@@ -1031,6 +1042,7 @@ class EmulatorCommand extends BaseCommand {
       }
     } catch (e) {
       process.removeListener('SIGINT', onSigint);
+      process.removeListener('SIGTERM', onSigint);
       await shutdown();
       throw e;
     }

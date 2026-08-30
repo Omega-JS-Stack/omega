@@ -213,6 +213,7 @@ module.exports = async function ensureWorkers(context) {
 
   return {
     status: output.errors.length > 0 ? 'warned' : 'success',
+    ...(output.errors.length > 0 ? { reason: `${output.errors.length} worker(s) failed: ${output.errors.map((e) => e.worker).join(', ')}` } : {}),
     output: { workers: output },
   };
 };

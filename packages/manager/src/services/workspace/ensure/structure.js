@@ -90,7 +90,7 @@ module.exports = async ({ brandRoot, brand, targets }) => {
     for (const finding of findings) {
       console.log(`      ${chalk.yellow('⚠')} ${finding}`);
     }
-    return { status: 'warned', output: { findings } };
+    return { status: 'warned', reason: findings.join('; '), output: { findings } };
   }
 
   return { output: { targets: targets.map((entry) => ({ name: entry.name, target: entry.target })) } };

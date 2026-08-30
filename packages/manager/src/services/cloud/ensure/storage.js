@@ -42,6 +42,6 @@ module.exports = async function ensureStorage(context) {
       console.log(`      ${chalk.dim('→')} Create manually: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/storage`)}`);
     }
 
-    return { status: 'warned', output: { storage: { error: error.message } } };
+    return { status: 'warned', reason: 'could not create the storage bucket', output: { storage: { error: error.message } } };
   }
 };

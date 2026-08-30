@@ -161,4 +161,4 @@ manager.tray.define(({ manager, tray }) => {
 
 ## Default scaffold
 
-`npx omega setup` ships `src/integrations/tray/index.js` calling `tray.useDefaults()` so you start with the same items the framework would supply on its own — plus commented-out examples covering insertAfter, update, remove, hide, enable, and submenus.
+The scaffold every verb runs ships `src/integrations/tray/index.js` calling `tray.useDefaults()` so you start with the same items the framework would supply on its own — plus commented-out examples covering insertAfter, update, remove, hide, enable, and submenus.

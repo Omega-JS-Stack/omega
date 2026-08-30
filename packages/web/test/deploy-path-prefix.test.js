@@ -110,7 +110,7 @@ test('the scaffolded CI workflow derives the same value before its build step', 
   assert.match(workflow, /require\('@omega\.js\/web\/deploy'\)\.targetPathPrefix\(\)/, 'CI calls the ONE derivation, not a copy of the rule');
   assert.match(workflow, /OMEGA_PATH_PREFIX=.*>> "\$GITHUB_ENV"/, 'the derived value becomes the job env for the build');
   assert.ok(
-    workflow.indexOf('OMEGA_PATH_PREFIX') < workflow.indexOf('npx omega setup && npm run build'),
+    workflow.indexOf('OMEGA_PATH_PREFIX') < workflow.indexOf('npm run build'),
     'derived BEFORE the build that consumes it',
   );
   assert.ok(

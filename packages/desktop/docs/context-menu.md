@@ -109,4 +109,4 @@ Without a consumer file, @omega.js/desktop uses a built-in fallback that just ca
 
 ## Default scaffold
 
-`npx omega setup` ships `src/integrations/context-menu/index.js` calling `menu.useDefaults()` plus commented-out examples covering insertAfter, remove, hide, enable, and building from scratch.
+The scaffold every verb runs ships `src/integrations/context-menu/index.js` calling `menu.useDefaults()` plus commented-out examples covering insertAfter, remove, hide, enable, and building from scratch.

@@ -3,7 +3,7 @@
  * layout of an @omega.js/web consumer, and the omega.json5 → site-data
  * pipeline (loadConfig + toSiteGlobal).
  *
- * Consumer layout (scaffolded by `omega setup`):
+ * Consumer layout (scaffolded by every verb's ensureTarget):
  *   src/            - content (pages, _posts, _layouts, ...) — the Eleventy input
  *   src/assets/     - the consumer's asset layer (js/pages, css/pages, images)
  *   dist/           - build output (gitignored)

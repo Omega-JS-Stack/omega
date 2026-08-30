@@ -24,15 +24,16 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const {
-  PROCESSING_RULES, SOCIAL_ICON_CONFIG, TEMPLATE_CONFIG, ICON_PLATFORMS, FAVICON_CONFIG,
+  PROCESSING_RULES, SOCIAL_ICON_CONFIG, TEMPLATE_CONFIG, FAVICON_CONFIG,
 } = require('./assets-config.js');
+const { templateExportFiles, appIconFiles } = require('./derived.js');
 
 const RESET_KINDS = ['logos', 'templates'];
 
 /**
- * The derived paths a kind owns, relative to the out dir. Both lists are
- * derived from assets-config.js so a new rule/template/platform is covered
- * without a second registry to update.
+ * The derived paths a kind owns, relative to the out dir. Both lists come
+ * from the shared name lib (derived.js) so a new rule/template/platform is
+ * covered without a second registry to update.
  *
  * @param {string} kind - A RESET_KINDS entry.
  * @returns {string[]} Relative paths (dirs for whole-output operations,
@@ -41,16 +42,14 @@ const RESET_KINDS = ['logos', 'templates'];
 function kindPaths(kind) {
   if (kind === 'templates') {
     // Files, not dirs: `app/macos` also holds the icons operation's .icns
-    return Object.values(TEMPLATE_CONFIG).flatMap((config) =>
-      (config.exports || [{ suffix: '' }]).map((exp) =>
-        join(config.outputDir, `${config.outputName}${exp.suffix || ''}.png`)));
+    return Object.values(TEMPLATE_CONFIG).flatMap(templateExportFiles);
   }
 
   return [
     ...Object.values(PROCESSING_RULES).map((rule) => rule.outputDir),
     SOCIAL_ICON_CONFIG.outputDir,
     FAVICON_CONFIG.outputDir,
-    ...Object.entries(ICON_PLATFORMS).map(([platform, { format }]) => join('app', platform, `icon.${format}`)),
+    ...appIconFiles().map((entry) => entry.file),
   ];
 }
 

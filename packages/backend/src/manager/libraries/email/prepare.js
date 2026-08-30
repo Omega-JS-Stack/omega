@@ -25,7 +25,8 @@ const mdUntrusted = new MarkdownIt({ html: false, breaks: true, linkify: true })
 const mdTrusted = new MarkdownIt({ html: true, breaks: true, linkify: true });
 
 const {
-  GROUPS,
+  GROUP_KEYS,
+  DEFAULT_GROUP_KEY,
   SENDERS,
   sanitizeImagesForEmail,
   encode,
@@ -61,17 +62,46 @@ function resolveBrand(Manager) {
 }
 
 /**
+ * Resolve an unsubscribe-group KEY to this account's ASM group id.
+ *
+ * The ids belong to the brand's own SendGrid account, so config is their one
+ * home (`marketing.campaigns.providers.sendgrid.groups.<key>`, written back by
+ * the manager's campaigns service). A missing one is a PROGRAMMER error — the
+ * manage walk never ran, or ran before this key existed — so it fails loudly
+ * here instead of attaching another account's group to a real send
+ * ([#649](https://github.com/Omega-JS-Stack/omega/issues/649)).
+ *
+ * @param {string} key - A GROUP_KEYS key
+ * @param {object} Manager
+ * @returns {number} The account's ASM group id
+ */
+function resolveGroupId(key, Manager) {
+  const groupId = Manager?.config?.marketing?.campaigns?.providers?.sendgrid?.groups?.[key];
+
+  if (groupId == null) {
+    throw errorWithCode(
+      `Missing unsubscribe group id for "${key}" — set marketing.campaigns.providers.sendgrid.groups.${key} in config/omega.json5 by running the manage walk (the campaigns service provisions the SendGrid groups and writes their ids)`,
+      400,
+    );
+  }
+
+  return groupId;
+}
+
+/**
  * Resolve sender (from address + ASM group) from a sender category key.
  *
  * @param {object} options
  * @param {string} [options.sender] - Sender category key ('orders', 'hello', 'marketing', etc.)
  * @param {object} [options.from] - Explicit from override
- * @param {number|string} [options.group] - Explicit ASM group override
+ * @param {number|string} [options.group] - Explicit override: a GROUP_KEYS key
+ *   (resolved from config) or a raw ASM group id (used as-is)
  * @param {object} brand - Resolved brand object
  * @param {string} brandDomain - Brand email domain
+ * @param {object} Manager - Carries the account's group ids in config
  * @returns {{ from: object, groupId: number }}
  */
-function resolveSender({ sender, from, group }, brand, brandDomain) {
+function resolveSender({ sender, from, group }, brand, brandDomain, Manager) {
   const senderConfig = SENDERS[sender] || null;
 
   const resolvedFrom = from
@@ -82,8 +112,8 @@ function resolveSender({ sender, from, group }, brand, brandDomain) {
     || { email: brand.contact.email, name: brand.name };
 
   const groupId = group != null
-    ? (GROUPS[group] || group)
-    : (senderConfig ? senderConfig.group : GROUPS['account']);
+    ? (GROUP_KEYS.includes(group) ? resolveGroupId(group, Manager) : group)
+    : resolveGroupId(senderConfig ? senderConfig.group : DEFAULT_GROUP_KEY, Manager);
 
   return { from: resolvedFrom, groupId };
 }

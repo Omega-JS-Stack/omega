@@ -38,7 +38,7 @@ test('exposes the resolved dispatch table as Main.config', () => {
   const Main = createCliRouter({ commandsDir: COMMANDS_DIR, aliases: ALIASES });
   assert.equal(Main.config.commandsDir, COMMANDS_DIR);
   assert.deepEqual(Main.config.aliases, ALIASES);
-  assert.equal(Main.config.defaultCommand, 'setup');
+  assert.equal(Main.config.defaultCommand, 'help', 'the OMEGA default is help — setup is retired (#675)');
 });
 
 test('positional command name runs the matching module', async () => {
@@ -59,10 +59,13 @@ test('flag-style alias resolves to its command', async () => {
   assert.equal(options.__ran, 'version');
 });
 
-test('no positional or flag falls back to the default command (setup)', async () => {
+test('no positional or flag falls back to the default command (help)', async () => {
+  // #675 retired `setup`, so the OMEGA default is help: a bare `omega` prints
+  // the listing instead of silently running a command.
   const options = { _: [] };
-  await makeMain().process(options);
-  assert.equal(options.__ran, 'setup');
+  const { out } = await captured(() => makeMain().process(options));
+  assert.equal(options.__ran, undefined, 'a bare invocation runs no command');
+  assert.match(out, /Usage: omega <command>/);
 });
 
 test('defaultCommand override is honored', async () => {
@@ -110,7 +113,7 @@ test('--help routes to the built-in help, never the default command', async () =
   assert.equal(options.__ran, undefined);
   assert.match(out, /Usage: omega <command>/);
   assert.match(out, /install \(-i, i, --install\)/);
-  assert.match(out, /setup \(-s, --setup\) \[default\]/);
+  assert.match(out, /setup \(-s, --setup\)/);
 });
 
 test('--help beats a positional command — `omega deploy --help` must never RUN deploy', async () => {

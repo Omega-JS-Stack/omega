@@ -28,7 +28,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // SHARED sections — identical spelling in every project type.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, company, type, font, color, contact: { email, phone, person: {…}, carbonCopy: […] }, address: {…}, images: {…} },   // #524: type = the schema.org type the JSON-LD stamps ('Organization' unset), font = the display face the assets service renders the wordmark from. contact.person = the human who signs "personal" email (name, firstName, image, url, urlText); contact.carbonCopy = audit BCCs; images.companyWordmark = parent wordmark in email footers
-  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, apiSubdomain, organizationId, billingAccount, oauthRedirectsConfigured },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design
+  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey }, shared, supportEmail, consentAudience, apiSubdomain, organizationId, billingAccount, oauthRedirectsConfigured },   // ONE cloud home (#23): the app config PLUS the provisioning fields; projectId lives only at cloud.config.projectId. vapidKey: web-push public key (console → Cloud Messaging), public by design
   meta:           { title, description, image, keywords, index, viewport, referrer, twitter_card, og_image_width, og_image_height },   // #607: the site's DEFAULT page meta (@omega.js/web's head). The one section a page may restate BARE in frontmatter (`pageBare: true`); unset title/description fall back to brand.name/brand.description
   repo:           { providers: { github: { enabled, org, repo, shared, private } } },
   edge:           { providers: { cloudflare: { enabled, zone, dns, settings, rules, cacheRules, speedTest, workers } } },
@@ -55,7 +55,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   certificates:   { enabled, providers: { apple: { bundleIdPrefix, capabilities: [], profiles: [], certificates: [] } } },   // Apple signing for desktop/mobile targets. bundleIdPrefix is the brand's own answer ('com.mycompany' + brand.id composes the bundle id); the credentials live in .env (APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID)
   github:         { user, website },             // GitHub identity for the brand (content identity; repo.providers.github is the source-hosting home)
   reviews:        { enabled, sites: [] },
-  marketing:      { campaigns: { enabled, providers: { sendgrid: { listId } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: packages/backend/docs/marketing-campaigns.md § Contact Pruning
+  marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: packages/backend/docs/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
   blog:           { /* AI blog-content settings (Ghostii pipeline) */ },
   devlog:         { enabled, providers: { ghostii: { orgs, lookbackDays, … } } },   // commit-digest devlog (#553): `enabled: true` PUBLISHES AI-written posts to the live site, so it is case 3 — the literal true is the only ON, absence is off, and no default is materialized
   dataRequest:    { /* GDPR/CCPA data-request query definitions */ },
@@ -183,10 +183,12 @@ targets: {
 - **Its verbs are its own package.json scripts**: `start`, `build`, `test`, `deploy`, `clean`.
   The manager runs each through `npm run <verb>` when the script is present and skips it
   loudly when it is absent — nothing is inferred or defaulted.
-- **No framework service reconciles it.** The only two manage ops that see a custom target are
-  env disperse (it has no `@omega.js/config` to walk the cascade with, so the brand `.env` is
-  composed into its own) and the workspace service (structure, agent docs, settings). Full
-  contract: [docs/manager/index.md](../manager/index.md) § Custom targets.
+- **No framework service reconciles it.** The only manage op that sees a custom target is the
+  workspace service (structure, agent docs, settings). Nothing is composed into a `.env` of its
+  own; it INHERITS the brand keys — the manager loads the env chain into `process.env` before it
+  spawns anything, so a custom target started by `omega dev`/`omega deploy` has them. A standalone
+  run inside the target dir does not (there is no `@omega.js/config` in there to walk the cascade).
+  Full contract: [docs/manager/index.md](../manager/index.md) § Custom targets.
 
 ## Backend project type (#584)
 
@@ -241,18 +243,23 @@ company .env ← brand .env ← local .env ← shell env
 - **Empty file values never claim a key (cp95a, friction #20)**: `KEY=` / `KEY=""` in any
   `.env` FILE means "documented here, value supplied by another layer" — a scaffolded local
   file full of placeholders can't shadow the brand root's real values. Only the shell can
-  deliberately set a key to empty. The framework `_.env` templates ship `# KEY=` commented
-  placeholders (the merge protocol keeps set values on their line, converges empties to
-  the placeholder, and disperse uncomments a placeholder in place when composing a value).
+  deliberately set a key to empty. The brand root's `.env` stub ships `# KEY=` commented
+  placeholders, rendered from the env schema (the merge protocol keeps set values on their
+  line, converges empties to the placeholder); no framework scaffolds a target `.env` at all.
 - **Defined at the source, resolved at runtime/build**: a brand-wide `GH_TOKEN` lives once
   in the brand `.env`; every framework CLI/build resolves the chain at boot
   (`loadEnv(process.cwd())` in the web/desktop/extension CLIs + gulp pipelines,
   `loadEnv(functionsDir)` in the @omega.js/backend CLI and runtime). Nothing is copied
   between `.env` files just to be visible.
-- **Backend's local layer is `functions/.env`** — it physically rides the Firebase deploy
-  artifact (the cloud can't walk up), so omega-manager's disperse composes that ONE file
-  from the resolved chain. In the cloud the walk finds no brand/company and behavior is
-  identical to plain dotenv.
+- **The brand root's `.env` is the ONE file humans and the manager edit**
+  ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)). A target's own `.env` is
+  optional and overrides PER KEY, by hand; no machine ever writes one.
+- **Backend's local layer is the target-root `.env`** (`targets/backend/.env`) — the layer a
+  human uses to override one key for that surface. What physically ships is the STAGED
+  `dist/.env`: it rides the Firebase deploy artifact (the cloud can't walk up), so every verb
+  that produces one (`omega build`, `dev`, `test`, `deploy`) composes it from the file layers,
+  filtered by the env schema. In the cloud the walk finds no brand/company and behavior
+  is identical to plain dotenv.
 - **The brand-generated keys are the manager's to mint** — `OMEGA_ADMIN_KEY`,
   `OMEGA_WEBHOOK_KEY`, `OMEGA_NAMESPACE` and `UNSUBSCRIBE_HMAC_KEY` have no dashboard
   behind them, so the onboard stub writes them for a fresh brand and the workspace
@@ -284,6 +291,10 @@ own list derives from it, so a new key is **one entry**, never four edits.
   required:    true,                   // absent = the backend refuses to boot
   devOf:       'STRIPE_SECRET_KEY',    // …or: this key OVERRIDES that one outside production
   liveShape:   /^(sk|rk)_live_/,       // the pattern a LIVE credential matches
+  delivery:    { backend: 'env' },     // per target, HOW the value gets there
+  requiredWhen: 'captcha.providers…',  // non-empty when this config path is truthy
+  publicAtRest: true,                  // sanctions a 'bake' (readable in the artifact)
+  machineLocal: true,                  // this machine's fact — never published to CI
   description: 'What the key drives.',
 }
 ```
@@ -293,21 +304,50 @@ own list derives from it, so a new key is **one entry**, never four edits.
   one missing. Everything else is a credential a human provides.
 - **Only a key OMEGA can produce may be `required`.** Refusing every boot over a secret
   nobody can mint would be a hostage note, not a guard — the config test pins it.
-- **`targets:` is the composition domain.** Disperse composes `targets/backend/.env`
-  (the only target .env that ships with a deploy artifact and so cannot walk up to the
-  brand layer) from the entries naming `backend`. Other targets read brand values
-  through the cascade above, so their `targets` entries are documentation.
-- **Disperse CLEARS what it composes** ([#636](https://github.com/Omega-JS-Stack/omega/issues/636)):
-  a composed key the brand root no longer sets is REMOVED from `targets/backend/.env` on
-  the next run — every occurrence, and only lines carrying a VALUE (a `# KEY=` placeholder
-  or an empty `KEY=""` is the key's documented home and stays). A credential the brand
-  retired stops being served by the target it was composed into. Idempotent; a dry run
-  reports the clear by key name, never by value.
+- **`targets:` is the composition domain.** Every verb composes its target's RUNTIME env
+  (the backend's staged `dist/.env` — the only artifact that ships and so cannot walk up to
+  the brand layer) from the file layers, taking the entries whose `targets` name that
+  target. The schema is the only filter: no hand list, and PATTERN entries
+  (`match:`, e.g. the `OAUTH2_*` family) compose exactly like named ones. A key the schema
+  does not name for a target never reaches it — a desktop signing key stays out of the
+  functions upload. Other targets read brand values through the cascade above at runtime,
+  so nothing is written for them.
+- **`deliverAs:` renames on delivery**: the entry's brand-level name is what the cascade
+  carries (`GOOGLE_ANALYTICS_SECRET_BACKEND`), and the target receives it under the name
+  its own code reads (`GOOGLE_ANALYTICS_SECRET`). One entry, both names.
+- **`delivery:` says HOW a value reaches each target**
+  ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): `'env'` (read from the
+  composed `.env` at runtime — the backend), `'ci'` (the generated workflow injects it
+  into the runner env for the build step), or `'bake'` (the build writes it into the
+  shipped artifact, because the installed app runs with no `.env`). A bake implies the
+  CI injection — the workflow delivers the value the build then bakes. One renderer in
+  `@omega.js/config/env-delivery` derives everything from these declarations: each
+  target's workflow secrets block, its bake list, and its publish-step secret set. No
+  hand-kept `${{ secrets.KEY }}` list survives anywhere.
+- **A baked key is public at rest.** Anyone who unpacks the app can read it, so a
+  `secret: true` entry may only bake when it also declares `publicAtRest: true` — the
+  renderer THROWS otherwise, on every lane, so a real credential can never reach an
+  artifact by accident. The GA Measurement Protocol secrets are the sanctioned baked keys.
+- **`machineLocal: true` marks this machine's own facts** (`OMEGA_FONTAWESOME_ROOT`):
+  composed locally like any key, but filtered out of every rendered block and every
+  published secret set — a laptop path has no business in CI.
+- **`requiredWhen: '<config path>'` is the conditional presence rule**
+  ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): when the resolved config
+  path is truthy, the key must be non-empty. Presence only, never a value-shape check,
+  and one-directional. One checker, `checkEnvRules()` in `@omega.js/config/env-rules`,
+  answers it for every consumer: the backend boot (production refuses, development warns
+  once), the desktop and extension build bakes (build mode throws, development warns),
+  and the manager's manage walk (warns per enabled target, never fails). Violations name
+  the BRAND-level key — the one a human sets in the brand `.env`.
+- **Nothing is CLEARED, because nothing is written into a hand file**
+  ([#636](https://github.com/Omega-JS-Stack/omega/issues/636),
+  [#678](https://github.com/Omega-JS-Stack/omega/issues/678)): the composed artifact is
+  rebuilt from the cascade every verb, so a credential the brand root retires stops being
+  served the moment it is dropped.
 - **`group:` picks the .env section**, and `ENV_GROUPS` owns the file order plus each
   section's comment. A group marked `file: false` (the `runtime` group) never reaches a
-  brand `.env` at all — those keys resolve some other way (from config at boot, from
-  disperse's per-target stream lane, from the developer's own shell), so they are
-  neither rendered as placeholders nor composed.
+  brand `.env` at all — those keys resolve some other way (from config at boot, from the
+  developer's own shell), so they are neither rendered as placeholders nor composed.
 - **Runtime/platform vars are NOT in the schema**: `FIREBASE_CONFIG`,
   `FUNCTIONS_EMULATOR`, `GCLOUD_PROJECT`, the `OMEGA_*_PORT` map, the test-mode
   switches. They are the runtime's facts about itself, not a brand's credentials, and
@@ -330,8 +370,8 @@ The split is a `<KEY>_DEV` twin, declared as a normal schema entry carrying `dev
 | `CHARGEBEE_API_KEY` | `CHARGEBEE_API_KEY_DEV` |
 
 Every twin is optional, secret, owned by `payment`, and in the `payment` group — so it
-renders as a `# KEY=` placeholder in a brand `.env` and composes into
-`targets/backend/.env` like any other backend key, with no hand list anywhere.
+renders as a `# KEY=` placeholder in a brand `.env` and composes into the backend's
+staged `dist/.env` like any other backend key, with no hand list anywhere.
 
 - **Outside production the twin wins**: `env.get('STRIPE_SECRET_KEY')` returns
   `STRIPE_SECRET_KEY_DEV` whenever it is set. Every provider library gets this without
@@ -360,7 +400,7 @@ renders as a `# KEY=` placeholder in a brand `.env` and composes into
   `OMEGA_OPENAI_API_KEY`) existed so one company key could serve every brand; the
   `.env` cascade already does that — put the value in the company `.env` and every
   brand under it resolves it, with a brand `.env` overriding. The prefixed names are
-  gone from the schema, the `_.env` templates and every reader; migration row in
+  gone from the schema and every reader; migration row in
   [breaking-changes.md](breaking-changes.md).
 - **Both are optional and neither gates a run.** The `ai` service declares them
   `gates: false`, so preflight never blocks on them and a brand that calls one
@@ -373,9 +413,12 @@ Who derives from it:
 |---|---|
 | `@omega.js/manager` workspace `env-keys` + the onboard `.env` stub | `generatedEnvKeys()` — name → the function that mints a value |
 | `@omega.js/manager` `lib/env-order.js` (canonical .env order) | `envFileGroups()` + `envKeysByGroup()` — the sections, their comments, their keys |
-| `@omega.js/manager` disperse `write/env.js` | `envKeysForTarget('backend')` — the composition |
+| `@omega.js/config` `composeTargetEnv()` (the delivery composition every verb runs) | `ENV_SCHEMA` + `envFileGroups()` — a brand key rides down when some entry claims it (by `name` or by `match`), its `targets` include the target, and its group renders into a file; `deliverAs` is applied on arrival |
+| `@omega.js/config` `envKeysForTarget(target)` (the rendering lane's list) | `ENV_SCHEMA` + `envFileGroups()` — the NAMED keys a target reads, which placeholders a brand `.env` carries |
 | `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `requiredEnvKeys('backend')` for the boot guard, `devEnvKeyMap()` for the dev/live split ([docs/backend/index.md](../backend/index.md)) |
 | `@omega.js/backend` `cli/utils/stage-functions.js` (the deploy stage) | `devEnvKeys()` — the rows the upload must never carry |
+| `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest` — each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, and all secret publishers send exactly its set |
+| `@omega.js/config` `env-rules.js` (the one presence checker) | `required` + `requiredWhen` — the violations the backend boot, the desktop/extension bakes, and the manager's manage walk act on, each at its own severity |
 
 ## Owner hooks (`config/hooks/`) — cp91
 
@@ -925,7 +968,7 @@ names, and only its output is validated.
 Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
 the same loader and passed as `options.defaults`; `Manager.init()`'s
 `backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
-schema findings, `npx omega setup` is the hard audit. The sandbox brand dogfoods the full
+schema findings, `npx omega test`'s target checks are the hard audit. The sandbox brand dogfoods the full
 hierarchy: shared sections live in `brands/sandbox-brand/config/omega.json5` (brand level),
 the backend target's local file carries only `targets.backend`.
 

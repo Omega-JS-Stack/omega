@@ -147,7 +147,7 @@ function resolveCli(name, fromDir, hint) {
 async function run({ hostName, hostRun }) {
   const target = findTarget(process.cwd());
 
-  // No context — the bootstrap case (`omega setup` in a fresh directory has
+  // No context — the bootstrap case (a verb run in a fresh directory has
   // no framework dep yet, by definition). Run the HOST framework's CLI, exactly
   // like the pre-dispatcher bins did, and say which one so a hoist-winner at a
   // brand root is never a silent mystery.
@@ -161,7 +161,7 @@ async function run({ hostName, hostRun }) {
   if (target.kind === 'brand') {
     const { cliPath } = tryResolveCli(MANAGER, target.dir);
 
-    // Brand-SHAPED is not always a brand: `omega setup` scaffolds
+    // Brand-SHAPED is not always a brand: every verb's ensureTarget scaffolds
     // config/omega.json5 into a standalone project before its framework dep lands
     // in package.json, so the walk classifies a fresh target as a brand root. With
     // no manager installed there is no brand-level CLI to hand over to — fall

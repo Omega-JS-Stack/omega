@@ -22,7 +22,7 @@ module.exports = async function ensurePayPalAccount(context) {
     await api.getAccessToken();
   } catch (error) {
     console.log(`      ${chalk.yellow('⚠')} Could not authenticate with PayPal${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { paypalAccount: { authenticated: false, error: error.message } } };
+    return { status: 'warned', reason: 'could not authenticate with PayPal', output: { paypalAccount: { authenticated: false, error: error.message } } };
   }
 
   const info = api.getAccountInfo();

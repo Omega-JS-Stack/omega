@@ -125,6 +125,55 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
   }
 }
 
+/**
+ * Boot a real Manager with every REQUIRED key seeded (so the #581 guard is
+ * satisfied and the CONDITIONAL one is what fires), the given consumer config
+ * on disk, and the given environment. Restores the process env afterwards.
+ */
+function bootWithConfig({ config, environment }) {
+  const saved = { OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT };
+  for (const name of REQUIRED) {
+    saved[name] = process.env[name];
+    process.env[name] = 'fixture-value';
+  }
+  saved.RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+  delete process.env.RECAPTCHA_SECRET_KEY;
+
+  delete process.env.OMEGA_TEST_MODE;
+  process.env.ENVIRONMENT = environment;
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-env-rules-'));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
+  fs.mkdirSync(path.join(dir, 'config'));
+  fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), JSON.stringify(config));
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+
+  try {
+    const FreshManager = freshManagerModule();
+    new FreshManager().init(null, { cwd: dir, log: false });
+    return { warnings };
+  } finally {
+    console.warn = originalWarn;
+    fs.rmSync(dir, { recursive: true, force: true });
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+// A brand whose config makes RECAPTCHA_SECRET_KEY mandatory: the client mints
+// tokens the moment a site key exists, and the backend can never verify one
+// without the secret half — the #507 403-on-every-protected-POST state.
+const HALF_KEYED_CAPTCHA = {
+  brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
+  captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } },
+  targets: { backend: {} },
+};
+
 module.exports = {
   description: 'The one env reader (#581): declared keys only, and a boot that refuses without the required ones',
   type: 'group',
@@ -301,6 +350,53 @@ module.exports = {
         const guardWarnings = warnings.filter((line) => line.includes('required env'));
         assert.strictEqual(guardWarnings.length, 1, `the fault is still said out loud, got ${guardWarnings.length}`);
         assert.match(guardWarnings[0], /\[@omega\.js\/backend:index\]/);
+      },
+    },
+
+    {
+      name: "assertRules() names the key its own config made mandatory, and the path that did (#626)",
+
+      run() {
+        withEnv({ RECAPTCHA_SECRET_KEY: null }, () => {
+          assert.throws(() => env.assertRules(HALF_KEYED_CAPTCHA), (error) => {
+            assert.strictEqual(error.name, 'MissingConditionalEnvKeysError');
+            assert.deepStrictEqual(error.keys, ['RECAPTCHA_SECRET_KEY']);
+            // The BRAND-level key name, which is what a human sets, and the
+            // config path that made it mandatory
+            assert.ok(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the error names the key');
+            assert.ok(error.message.includes('captcha.providers.recaptcha.siteKey'), 'and the path that requires it');
+            return true;
+          });
+        });
+
+        // The same config with the key present owes nothing…
+        withEnv({ RECAPTCHA_SECRET_KEY: 'fixture-secret' }, () => {
+          assert.strictEqual(env.assertRules(HALF_KEYED_CAPTCHA), undefined);
+        });
+
+        // …and a brand that never set the site key owes nothing either: the
+        // rule is one-directional, and an unkeyed brand is sanctioned (#17)
+        withEnv({ RECAPTCHA_SECRET_KEY: null }, () => {
+          assert.strictEqual(env.assertRules({ brand: { id: 'fixture' } }), undefined);
+        });
+      },
+    },
+
+    {
+      name: 'a production boot REFUSES on a conditional key, development warns and continues (#626)',
+
+      run() {
+        assert.throws(() => bootWithConfig({ config: HALF_KEYED_CAPTCHA, environment: 'production' }), (error) => {
+          assert.strictEqual(error.name, 'MissingConditionalEnvKeysError');
+          assert.ok(error.message.includes('RECAPTCHA_SECRET_KEY'), 'the boot failure names the key');
+          return true;
+        });
+
+        const { warnings } = bootWithConfig({ config: HALF_KEYED_CAPTCHA, environment: 'development' });
+        const ruleWarnings = warnings.filter((line) => line.includes('RECAPTCHA_SECRET_KEY'));
+        assert.strictEqual(ruleWarnings.length, 1, `one warning line, got ${ruleWarnings.length}`);
+        assert.match(ruleWarnings[0], /\[@omega\.js\/backend:index\]/);
+        assert.ok(ruleWarnings[0].includes('captcha.providers.recaptcha.siteKey'), 'the warning names the path too');
       },
     },
   ],

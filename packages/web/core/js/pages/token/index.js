@@ -1,12 +1,21 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('token');
 
 // Module
 export default function () {
+  // Warm the backend before the auth wait below: this page's whole job is the
+  // `/omega/user/token` POST, and it cannot send it until auth settles — so the
+  // ping and the settle run on the same clock instead of end to end. This is
+  // also where a desktop app and an extension sign in, which makes it the
+  // first-launch cold start for those surfaces too
+  // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+  omega.request(WAKEUP_ROUTE, { wakeup: true });
+
   const $status = document.getElementById('token-status');
   const $error = document.getElementById('token-error');
   const $errorMessage = document.getElementById('token-error-message');

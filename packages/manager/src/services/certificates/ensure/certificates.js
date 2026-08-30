@@ -179,6 +179,7 @@ module.exports = catchAgreements(async (context) => {
       state: { certificateMap },
       output: { certificates: { ...summary, manualMissing } },
       status: 'warned',
+      reason: `${manualMissing} manual cert(s) missing — download them from the Apple Developer portal`,
     };
   }
 

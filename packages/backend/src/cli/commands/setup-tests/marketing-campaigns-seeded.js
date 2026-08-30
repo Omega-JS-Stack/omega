@@ -13,12 +13,12 @@ class MarketingCampaignsSeededTest extends BaseTest {
     // the wrong remedy — name the flag that suppressed the write instead.
     if (this.isOffline) {
       return [
-        'live campaign seeding skipped (--offline) — re-run `npx omega setup --seed-campaigns` without --offline to seed/enforce',
+        'live campaign seeding skipped (--offline) — re-run `npx omega test --seed-campaigns` without --offline to seed/enforce',
       ];
     }
 
     return [
-      'live campaign seeding is opt-in — run `npx omega setup --seed-campaigns` to seed/enforce',
+      'live campaign seeding is opt-in — run `npx omega test --seed-campaigns` to seed/enforce',
     ];
   }
 

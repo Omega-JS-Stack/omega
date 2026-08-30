@@ -70,7 +70,7 @@ module.exports = async function (options) {
     logger.log('');
     logger.log('Next steps:');
     logger.log('  1. Review the lint findings above (errors need manual ports)');
-    logger.log('  2. npx omega setup   — scaffold project files + sync scripts');
+    logger.log('  2. npx omega build   — scaffolds project files + syncs scripts, then builds');
     logger.log('  3. npm run build     — verify the site builds');
     logger.log('  4. Remove _site/ and any leftover Jekyll artifacts');
   }

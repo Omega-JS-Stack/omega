@@ -45,7 +45,7 @@ module.exports = async function ensureHosting(context) {
   const zone = cloudflareApi ? await cloudflareApi.getZoneByName(apexDomain) : null;
   if (cloudflareApi && !zone) {
     console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone found for ${chalk.cyan(apexDomain)}`);
-    return { status: 'warned', output: { hosting: { note: 'no Cloudflare zone' } } };
+    return { status: 'warned', reason: 'no Cloudflare zone for the apex domain', output: { hosting: { note: 'no Cloudflare zone' } } };
   }
 
   // API domains to ensure. For subdomain projects (app.brand.com) the DNS
@@ -81,7 +81,7 @@ module.exports = async function ensureHosting(context) {
     } catch (error) {
       if (!error.message?.includes('already exists')) {
         console.log(`      ${chalk.yellow('⚠')} Could not create site${chalk.dim(`: ${error.message}`)}`);
-        return { status: 'warned', output: { hosting: { error: error.message } } };
+        return { status: 'warned', reason: 'could not create the hosting site', output: { hosting: { error: error.message } } };
       }
       console.log(`      ${chalk.green('✓')} Site exists: ${chalk.cyan(projectId)}`);
     }
@@ -93,9 +93,10 @@ module.exports = async function ensureHosting(context) {
     results.push(await ensureApiDomain(context, zone, apiDomain));
   }
 
-  const anyPending = results.some((r) => r.status !== 'verified');
+  const pending = results.filter((r) => r.status !== 'verified');
   return {
-    status: anyPending ? 'warned' : 'success',
+    status: pending.length > 0 ? 'warned' : 'success',
+    ...(pending.length > 0 ? { reason: `${pending.length} API domain(s) not verified yet` } : {}),
     state: { hosting: { siteId: projectId, domains: results } },
   };
 };

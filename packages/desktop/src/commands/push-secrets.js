@@ -1,41 +1,38 @@
-// Push secrets from local .env to GitHub Actions repo secrets.
+// Push the desktop target's composed env to GitHub Actions repo secrets.
 //
-// The local .env's Default section names the framework's secret KEYS; the
-// VALUES push from the composed .env cascade (company ← brand ← local, shell
-// wins — D15), so a key whose value lives at the brand or company level
-// still reaches the repo secrets. Each value is encrypted with the repo's
-// libsodium public key and pushed via Octokit. For env vars whose value is a
-// path to an existing file (e.g. CSC_LINK=config/certs/dev-id.p12 — target-root
-// relative, falling back to the brand root), the secret value is the
-// base64-encoded file contents — the workflow then decodes back to a temp
-// file at job start.
+// The KEY SET is the env schema's desktop delivery set
+// ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)) and the VALUES
+// are the composed target env
+// ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)): company .env ←
+// brand .env ← target .env. The brand root's .env is the ONE file a human
+// keeps; a target .env is an optional per-key override, and no machine writes
+// one. Each value is encrypted with the repo's libsodium public key and
+// pushed via Octokit. For env vars whose value is a path to an existing file
+// (e.g. CSC_LINK=config/certs/dev-id.p12 — target-root relative, falling back
+// to the brand root), the secret value is the base64-encoded file contents —
+// the workflow then decodes back to a temp file at job start.
+//
+// Values are NEVER logged: output names the KEY and the layer it came from.
 //
 // Usage:
-//   npx omega push-secrets                       # push all keys from .env Default section
+//   npx omega push-secrets                       # push every composed desktop key
 //   npx omega push-secrets --only=GH_TOKEN,CSC_LINK
-//   npx omega push-secrets --skip-empty=false    # also push empty values (not recommended)
 
 const path = require('path');
 const fs = require('fs');
-const jetpack = require('fs-jetpack');
 
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('push-secrets');
 const { discoverRepo } = require('../utils/github.js');
-const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../utils/merge-line-files.js');
+const { declaredBrandRepo } = require('@omega.js/devkit/target-secrets');
 
 module.exports = async function (options) {
   options = options || {};
   const projectRoot = process.cwd();
 
-  // 1. Load .env (raw read so we can split into Default/Custom sections).
-  const envPath = path.join(projectRoot, '.env');
-  if (!jetpack.exists(envPath)) {
-    throw new Error(`.env not found at ${envPath}. Create one based on .env.example.`);
-  }
-  // Also resolve the .env cascade into process.env — both for the GH_TOKEN we
-  // push WITH and for the values we push (they may live at the brand or
-  // company level rather than in the local file).
+  // 1. Resolve the .env cascade into process.env for the GH_TOKEN we push
+  //    WITH (the VALUES we push come from the composed target env below,
+  //    which reads files only).
   const { loadEnv, findBrandRoot } = require('@omega.js/config');
   loadEnv(projectRoot);
   const brandRoot = findBrandRoot(projectRoot);
@@ -45,39 +42,25 @@ module.exports = async function (options) {
     throw new Error('GH_TOKEN not set in .env. Generate a PAT with `repo` scope at https://github.com/settings/tokens');
   }
 
-  // 2. Parse the .env into key=value pairs from the Default section
-  //    (the Custom section is the user's domain — don't touch it).
-  const envContent = jetpack.read(envPath);
-  const allEntries = parseEnv(envContent);
-  const defaultEntries = allEntries.filter((e) => e.section === 'default');
-
-  // 3. Filter via --only / --skip
-  let entries = defaultEntries;
-  if (options.only) {
-    const only = String(options.only).split(',').map((s) => s.trim()).filter(Boolean);
-    entries = entries.filter((e) => only.includes(e.key));
-  }
-
-  // D15: overlay the composed cascade — a target-empty key whose value lives in
-  // the brand/company .env is still a secret the workflow needs. Runs BEFORE
-  // the skip-empty filter so cascade-supplied values rescue app-empty keys.
-  entries = entries.map((entry) => ({ ...entry, value: effectiveValue(entry) }));
-
-  const skipEmpty = options.skipEmpty !== false && options['skip-empty'] !== 'false';
-  if (skipEmpty) {
-    entries = entries.filter((e) => e.value && e.value.trim().length > 0);
-  }
-
+  // 2. The secrets to push: the composed target env, narrowed by --only.
+  const entries = collectEntries({ projectRoot, only: options.only });
   if (entries.length === 0) {
-    logger.warn('No secrets to push (after filtering). Did you forget to fill in .env?');
+    logger.warn('No secrets to push (after filtering). Are the desktop keys filled in at the brand root .env?');
     return;
   }
 
-  // 4. Discover owner/repo
+  // 3. Discover owner/repo — and REFUSE unless the brand's own config says
+  //    that is its repo (#627 review, C5).
   const { owner, repo } = await discoverRepo(projectRoot);
-  logger.log(`Pushing ${entries.length} secret(s) to ${owner}/${repo}...`);
+  assertBrandRepo({
+    declared: declaredBrandRepo({ targetDir: projectRoot, target: 'desktop' }),
+    discovered: `${owner}/${repo}`,
+  });
 
-  // 5. Get the repo's public key for libsodium encryption
+  const named = entries.map((e) => `${e.key} (${e.source})`).join(', ');
+  logger.log(`Pushing ${entries.length} secret(s) to ${owner}/${repo}: ${named}`);
+
+  // 4. Get the repo's public key for libsodium encryption
   const { Octokit } = await import('@octokit/rest');
   const octokit = new Octokit({ auth: ghToken });
   const publicKeyRes = await octokit.rest.actions.getRepoPublicKey({ owner, repo });
@@ -86,7 +69,7 @@ module.exports = async function (options) {
   const sodium = require('libsodium-wrappers');
   await sodium.ready;
 
-  // 6. Push each.
+  // 5. Push each.
   let successCount = 0;
   for (const entry of entries) {
     const secretValue = await resolveSecretValue(entry, projectRoot, brandRoot);
@@ -106,7 +89,7 @@ module.exports = async function (options) {
         key_id,
       });
       const tag = entry.isFilePath ? 'file' : 'string';
-      logger.log(logger.format.green(`✓ ${entry.key} (${tag}, ${secretValue.length} bytes encrypted)`));
+      logger.log(logger.format.green(`✓ ${entry.key} (${tag})`));
       successCount += 1;
     } catch (e) {
       logger.error(`✗ ${entry.key}: ${e.message}`);
@@ -116,40 +99,28 @@ module.exports = async function (options) {
   logger.log(logger.format.green(`Pushed ${successCount}/${entries.length} secret(s) to ${owner}/${repo}.`));
 };
 
-// Parse a .env file into entries with section info.
-// Returns: [{ key, value, section: 'default' | 'custom' }, ...]
-function parseEnv(content) {
-  const lines = (content || '').split('\n');
-  const entries = [];
-  let section = 'default';
+// The entries to push: the env schema's desktop DELIVERY set
+// ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)) — the same list
+// the generated workflow block consumes, because a secret CI never reads has no
+// business in the repo — valued from the target's composed env (company ←
+// brand ← target, `deliverAs` applied, so the brand's
+// GOOGLE_ANALYTICS_SECRET_DESKTOP arrives as GOOGLE_ANALYTICS_SECRET), and
+// narrowed by --only. An empty value never claims a key in the composer, so no
+// skip-empty pass is needed here; `machineLocal` keys are already out of the
+// delivery set.
+//
+// Returns: [{ key, value, source: 'company' | 'brand' | 'target' }, ...]
+function collectEntries({ projectRoot, only }) {
+  const { composeTargetEnv } = require('@omega.js/config');
+  const { publishSecretKeys } = require('@omega.js/config/env-delivery');
+  const { values, sources } = composeTargetEnv({ targetDir: projectRoot, target: 'desktop' });
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed === DEFAULT_MARKER) { section = 'default'; continue; }
-    if (trimmed === CUSTOM_MARKER)  { section = 'custom';  continue; }
-    if (!trimmed || trimmed.startsWith('#')) continue;
+  const wanted = only ? String(only).split(',').map((s) => s.trim()).filter(Boolean) : null;
 
-    const eq = trimmed.indexOf('=');
-    if (eq < 0) continue;
-
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    // Strip wrapping quotes
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-
-    entries.push({ key, value, section });
-  }
-  return entries;
-}
-
-// The effective value of a Default-section key: the composed .env cascade
-// (already resolved into process.env by loadEnv — company ← brand ← local,
-// shell wins) when it carries a non-empty value, else the local-file literal.
-function effectiveValue(entry) {
-  const composed = process.env[entry.key];
-  return composed && composed.trim() ? composed : entry.value;
+  return publishSecretKeys('desktop')
+    .filter((key) => values[key])
+    .filter((key) => !wanted || wanted.includes(key))
+    .map((key) => ({ key, value: values[key], source: sources[key] }));
 }
 
 // Determine the secret value to push:
@@ -184,8 +155,34 @@ function encryptSecret(sodium, publicKey, value) {
   return Buffer.from(encryptedBytes).toString('base64');
 }
 
+/**
+ * Refuse to publish anywhere the brand has not CLAIMED as its own repo (#627
+ * review, C5 — web and extension gained this guard first).
+ *
+ * The signing material this command pushes is the most dangerous payload in the
+ * stack, and an inferred git remote is not proof of where it belongs: a target
+ * vendored into a framework/test monorepo, a cloned starter whose origin still
+ * points at the template author, or any fork would arm a stranger's Actions
+ * with this brand's certificates. The only acceptable proof is the brand's own
+ * config (`repo.providers.github`).
+ *
+ * @param {object} input
+ * @param {string|null} input.declared - The brand's declared `owner/name`, or null.
+ * @param {string} input.discovered - The `owner/name` the git remote resolved to.
+ * @throws {Error} when the brand declares no repo, or declares a different one.
+ */
+function assertBrandRepo({ declared, discovered }) {
+  if (!declared) {
+    throw new Error('Refusing to push secrets — this brand names no GitHub repo in config (repo.providers.github). Set it, then re-run `omega push-secrets`.');
+  }
+
+  if (declared.toLowerCase() !== String(discovered).toLowerCase()) {
+    throw new Error(`Refusing to push secrets — the git remote here is ${discovered}, but this brand's repo is ${declared}. Run \`omega push-secrets\` from the brand's own checkout.`);
+  }
+}
+
 // Exported for tests.
-module.exports.parseEnv = parseEnv;
-module.exports.effectiveValue = effectiveValue;
+module.exports.assertBrandRepo = assertBrandRepo;
+module.exports.collectEntries = collectEntries;
 module.exports.resolveSecretValue = resolveSecretValue;
 module.exports.discoverRepo = discoverRepo;

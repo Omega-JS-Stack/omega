@@ -1,18 +1,20 @@
 /**
  * The @omega.js/web CLI dispatcher — devkit's shared router over
- * src/commands/. `omega` with no command runs setup (OMEGA convention).
+ * src/commands/. `omega` with no command prints help: setup is retired and
+ * every verb runs the local scaffold itself ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)).
  */
 const path = require('node:path');
 
 // Resolve the .env cascade from the consumer project before any command runs
-// (shell > local .env > brand .env > company .env)
-require('@omega.js/config').loadEnv(process.cwd());
+// (shell > local .env > brand .env > company .env). The target name delivers
+// the schema's `deliverAs` renames into process.env (#678) — the brand's
+// GOOGLE_ANALYTICS_SECRET_WEB arrives as GOOGLE_ANALYTICS_SECRET.
+require('@omega.js/config').loadEnv(process.cwd(), { target: 'web' });
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
 // Command name → positional/flag aliases (UJM alias table, adapted)
 const ALIASES = {
-  setup: ['-s', '--setup'],
   install: ['-i', 'i', '--install'],
   dev: ['serve', 'start', '--dev'],
   build: ['-b', '--build'],
@@ -33,5 +35,5 @@ const ALIASES = {
 module.exports = createCliRouter({
   commandsDir: path.join(__dirname, 'commands'),
   aliases: ALIASES,
-  defaultCommand: 'setup',
+  defaultCommand: 'help',
 });

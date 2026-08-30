@@ -59,7 +59,7 @@ module.exports = async function ensureStripeAccount(context) {
     account = await api.getAccount();
   } catch (error) {
     console.log(`      ${chalk.yellow('⚠')} Could not read account${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { stripeAccount: { error: error.message } } };
+    return { status: 'warned', reason: 'could not read the Stripe account', output: { stripeAccount: { error: error.message } } };
   }
 
   const desired = buildDesiredAccount(brandConfig);
@@ -88,6 +88,6 @@ module.exports = async function ensureStripeAccount(context) {
   } catch (error) {
     // Account updates may not be supported for this account type
     console.log(`      ${chalk.yellow('⚠')} Could not update account${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { stripeAccount: { error: error.message } } };
+    return { status: 'warned', reason: 'could not update the Stripe account settings', output: { stripeAccount: { error: error.message } } };
   }
 };

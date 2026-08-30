@@ -286,6 +286,7 @@ module.exports = async function ensureEmailRouting(context) {
 
   return {
     status: unverified > 0 ? 'warned' : 'success',
+    ...(unverified > 0 ? { reason: `${unverified} destination address(es) unverified` } : {}),
     output: { emailRouting: { enabled: true, created, updated, skipped, deleted, unverified, ...(planned > 0 && { planned }) } },
   };
 };

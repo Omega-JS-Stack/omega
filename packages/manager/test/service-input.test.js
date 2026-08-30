@@ -413,7 +413,9 @@ function serviceInputKeys() {
     && fileGroups.has(entry.group)            // schema-only groups never reach a .env
     && SERVICE_ORDER.includes(entry.owner)    // owned by a manage service, not the backend runtime
     && !NOT_A_SETUP_GATE[entry.name]
-    && sources.some(([, text]) => text.includes(`process.env.${entry.name}`)
+    // Word-boundary, not substring: `process.env.APPLE_API_KEY_ID` must not
+    // read as a use of APPLE_API_KEY (a derived signing PATH nobody pastes).
+    && sources.some(([, text]) => new RegExp(`process\\.env\\.${entry.name}\\b`).test(text)
       || text.includes(`process.env[${JSON.stringify(entry.name)}]`)));
 }
 

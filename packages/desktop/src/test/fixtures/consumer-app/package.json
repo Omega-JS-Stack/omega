@@ -2,6 +2,12 @@
   "name": "desktop-fixture-consumer",
   "version": "1.0.0",
   "private": true,
-  "description": "Minimal @omega.js/desktop consumer app — boot-layer self-test fixture (built + booted by src/test/runners/boot.js).",
-  "main": "dist/main.bundle.js"
+  "description": "Minimal @omega.js/desktop consumer app — boot-layer self-test fixture (built + booted by src/test/runners/boot.js). The devDependencies mirror a CONVERGED consumer (the framework plus every peer it declares) so ensureTarget installs nothing and its locality check passes: see src/test/suites/build/boot-fixture.test.js.",
+  "main": "dist/main.bundle.js",
+  "devDependencies": {
+    "@omega.js/desktop": "^0.1.0",
+    "electron": ">=42",
+    "electron-builder": ">=26",
+    "gulp": "^5.0.1"
+  }
 }

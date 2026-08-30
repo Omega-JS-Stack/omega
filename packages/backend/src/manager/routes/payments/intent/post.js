@@ -54,13 +54,13 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const uid = user.auth.uid;
   const provider = settings.provider;
   const productId = settings.productId;
-  const frequency = settings.frequency;
   const attribution = settings.attribution;
   const trackingConsent = settings.trackingConsent;
   const discount = settings.discount;
   const supplemental = settings.supplemental;
   const simulate = settings.simulate;
   let trial = settings.trial;
+  let frequency = settings.frequency;
 
   ctx.log(`Intent request: uid=${uid}, provider=${provider}, product=${productId}, frequency=${frequency}, trial=${trial}, simulate=${simulate || 'none'}`);
 
@@ -105,8 +105,13 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       }
     }
   } else {
-    // One-time purchases don't use trial or frequency
+    // One-time purchases don't use trial or frequency. `once` is what a
+    // one-time buy bills on, and it is written here rather than taken from the
+    // caller: a checkout that asked for `annually` on a one-time product put
+    // that word on the intent doc, the provider call and the confirmation URL
+    // alike ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
     trial = false;
+    frequency = 'once';
   }
 
   // Validate discount code (if provided)
@@ -268,6 +273,12 @@ function buildConfirmationUrl(baseUrl, { product, productId, productType, freque
   url.searchParams.set('productName', product.name || productId);
   url.searchParams.set('amount', String(amount));
   url.searchParams.set('currency', 'USD');
+  // What was BOUGHT, said outright rather than inferred from the cadence beside
+  // it: the confirmation page holds nothing else about the product, and a
+  // checkout that sent the wrong frequency left it polling the account for a
+  // plan a one-time purchase never writes
+  // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+  url.searchParams.set('type', productType);
   url.searchParams.set('frequency', frequency || 'once');
   url.searchParams.set('paymentMethod', provider);
   url.searchParams.set('trial', String(!!trial && !!product.trial?.days));

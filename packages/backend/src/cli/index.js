@@ -56,12 +56,19 @@ Main.prototype.process = async function (args) {
   }
 
   // Nothing matched. run.js passes full process.argv, so the real command
-  // tokens start at index 2. Bare invocation mirrors every router framework's
-  // default: the table's default command. Anything else is an unknown command —
-  // the old chain returned undefined and exited 0 in silence.
+  // tokens start at index 2. A bare invocation runs the table's default
+  // command — and since #675 retired `setup` nothing claims that slot, so it
+  // prints the listing. Anything else is an unknown command — the old chain
+  // returned undefined and exited 0 in silence.
   const commandArgs = args.slice(2);
   if (commandArgs.length === 0) {
-    return await defaultCommand().run(self);
+    const fallback = defaultCommand();
+    if (fallback) {
+      return await fallback.run(self);
+    }
+
+    console.log(buildHelpText());
+    return;
   }
 
   console.error(`Unknown command "${commandArgs.join(' ')}".`);
@@ -157,7 +164,7 @@ Main.prototype.test = async function(name, fn, fix, args) {
 // with no reason (which surfaced as an ugly `UnhandledPromiseRejection: undefined`).
 Main.prototype.haltSetup = function() {
   if (this.setupSummary) {
-    this.setupSummary.print({ hint: `Fix the above, then run ${require('chalk').default.bold('npx omega setup')} again.` });
+    this.setupSummary.print({ hint: `Fix the above, then run ${require('chalk').default.bold('npx omega test')} again.` });
   }
 
   process.exit(1);

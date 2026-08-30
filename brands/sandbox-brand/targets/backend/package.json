@@ -12,12 +12,13 @@
     "firebase-functions": "^7.2.5"
   },
   "scripts": {
-    "start": "npx omega setup && npx omega serve",
-    "deploy": "npx omega setup && npx omega deploy",
-    "emulator": "npx omega setup && npx omega emulator",
-    "test": "npx omega setup && npx omega test",
-    "setup": "npx omega setup",
+    "start": "npx omega serve",
+    "deploy": "npx omega deploy",
+    "emulator": "npx omega emulator",
+    "test": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
     "test:offline": "npx omega test framework:",
-    "build": "npx omega build"
+    "build": "npx omega build",
+    "test:static": "npm test",
+    "test:emulator": "npx omega test"
   }
 }

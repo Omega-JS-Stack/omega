@@ -171,7 +171,7 @@ Manager.prototype.init = function (exporter, options) {
     const { config, errors } = loadConfig(self.cwd, 'backend', { defaults: configDefaults });
     self.config = config;
 
-    // Boot warns on schema findings, audit (mgr setup) throws — the two-mode
+    // Boot warns on schema findings, audit (the target checks) throws — the two-mode
     // contract from @omega.js/config. Secrets in the file already threw above.
     if (errors.length) {
       console.warn(`[@omega.js/backend] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
@@ -264,6 +264,19 @@ Manager.prototype.init = function (exporter, options) {
     env.assertRequired('backend');
   } catch (e) {
     if (!env.guardIsAdvisory({ hasConsumerConfig })) { throw e; }
+    console.warn(`[@omega.js/backend:index] ${e.message}`);
+  }
+
+  // The other half of the boot guard (#626): the keys this brand's OWN config
+  // made mandatory (the schema's `requiredWhen` rules — a configured GA4 stream
+  // with no Measurement Protocol secret, a reCAPTCHA site key with no secret
+  // half). A deployed backend REFUSES: those are the runs where the silence is
+  // a customer's. Every other environment says it once and continues, because
+  // a half-configured local loop is a normal step on the way to a full one.
+  try {
+    env.assertRules(self.config, 'backend');
+  } catch (e) {
+    if (env.environment() === 'production') { throw e; }
     console.warn(`[@omega.js/backend:index] ${e.message}`);
   }
 

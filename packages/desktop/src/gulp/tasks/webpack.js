@@ -8,6 +8,8 @@ const glob = require('glob').globSync;
 const webpack = require('webpack');
 const jetpack = require('fs-jetpack');
 const { readSiblingPorts, readSiblingOrigin, envPorts } = require('@omega.js/config');
+const { bakeKeys } = require('@omega.js/config/env-delivery');
+const { checkEnvRules } = require('@omega.js/config/env-rules');
 
 const projectRoot   = Manager.getRootPath('project');
 const frameworkRoot = Manager.getRootPath();
@@ -142,22 +144,21 @@ module.exports = function webpackTask(done) {
 // 2. BannerPlugin prepends a tiny IIFE that assigns the same value to globalThis.OMEGA_BUILD_JSON
 //    (so it's reachable from DevTools and consumer code via window.OMEGA_BUILD_JSON).
 //
-// Also: bake build-time secrets (GOOGLE_ANALYTICS_SECRET) into the bundle as a
-// DefinePlugin replacement of `process.env.GOOGLE_ANALYTICS_SECRET`. Packaged
-// apps don't ship .env, so without this the analytics module would have no
-// secret at runtime in production. Local dev still reads from process.env (the
-// DefinePlugin replacement only fires when the build runs with the secret set;
-// otherwise we leave the reference intact).
+// Also: bake the schema's build-time secrets into the bundle as DefinePlugin
+// replacements of `process.env.<KEY>`. Packaged apps don't ship .env, so
+// without this the analytics module would have no secret at runtime in
+// production. Local dev still reads from process.env (the replacement only
+// fires when the build runs with the key set; otherwise the reference is left
+// intact).
 function buildJsonPlugins(buildJson) {
   const literal = JSON.stringify(buildJson);
   const definitions = {
     OMEGA_BUILD_JSON: literal,
+    // The bake is guarded by the schema's presence rules (#626): the brand's
+    // own resolved config says which keys it owes, and the mode says what a
+    // violation costs.
+    ...bakeDefinitions(process.env, { config: buildJson.config, mode: buildJson.mode }),
   };
-  // Bake build-time analytics secret into bundles when present in the build env.
-  // Mirror @omega.js/backend's env-var name (`GOOGLE_ANALYTICS_SECRET`).
-  if (process.env.GOOGLE_ANALYTICS_SECRET) {
-    definitions['process.env.GOOGLE_ANALYTICS_SECRET'] = JSON.stringify(process.env.GOOGLE_ANALYTICS_SECRET);
-  }
   return [
     new webpack.DefinePlugin(definitions),
     new webpack.BannerPlugin({
@@ -166,6 +167,82 @@ function buildJsonPlugins(buildJson) {
       entryOnly: true,
     }),
   ];
+}
+
+// The keys the env schema says this build writes INTO the shipped artifact
+// ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)) — the hardcoded
+// GOOGLE_ANALYTICS_SECRET read this replaced was one of three hand-kept lists
+// for one concern. A new baked key is one schema entry and nothing here.
+const BAKED_KEYS = bakeKeys('desktop');
+
+/**
+ * The schema's presence rules at the BAKE seam
+ * ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)) — the last
+ * moment a missing key is still fixable.
+ *
+ * A packaged app ships no `.env`, so what the bundle holds is what the app
+ * holds forever: a brand with a GA4 stream id and no Measurement Protocol
+ * secret used to bundle NO replacement at all and ship an app that sends no
+ * events, silently — and a CI build, which has no `.env` on the runner, is
+ * exactly where that happens. A build/publish run refuses; a development build
+ * warns and keeps going, because a half-configured brand is a normal step on
+ * the way to a configured one.
+ *
+ * @param {object} config - The target's resolved omega.json5 config.
+ * @param {object} env - The build env.
+ * @param {object} [options]
+ * @param {object} [options.mode] - The Manager's mode (`{ build, publish, … }`).
+ * @param {object} [options.logger] - Logger with `warn` (default: this task's).
+ * @throws {Error} in build/publish mode, naming every brand-level key and the config path that requires it.
+ */
+function assertBakeRules(config, env, options) {
+  options = options || {};
+  const mode = options.mode || Manager.getMode();
+  const warn = (options.logger || logger).warn.bind(options.logger || logger);
+
+  const violations = checkEnvRules(config, env, { target: 'desktop' })
+    .filter((violation) => violation.rule === 'requiredWhen');
+  if (violations.length === 0) return;
+
+  // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_DESKTOP, not the
+  // GOOGLE_ANALYTICS_SECRET it is delivered as): that is the name a human puts
+  // in the brand .env and in the repo's Actions secrets.
+  const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
+  const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
+    + 'Set it in the brand .env (and as a repo Actions secret for a CI build — `omega push-secrets` sends them), then build again.';
+
+  if (mode.build || mode.publish) {
+    throw new Error(message);
+  }
+
+  warn(message);
+}
+
+/**
+ * The DefinePlugin replacements for the baked keys the build env carries. A key
+ * with no value is left OUT, so the bundle keeps its live `process.env` read —
+ * that is how a local dev run still picks the value up from the cascade.
+ *
+ * The presence guard runs FIRST: a build that would ship an unreplaced
+ * reference over a configured stream refuses here rather than shipping the hole.
+ *
+ * @param {object} [env] - Env map (default: process.env).
+ * @param {object} [options] - `{ config, mode, logger }` — the guard's inputs; without a config there is no rule to answer.
+ * @returns {Object<string, string>} `process.env.KEY` → JSON literal.
+ */
+function bakeDefinitions(env, options) {
+  env = env || process.env;
+
+  if (options && options.config) {
+    assertBakeRules(options.config, env, options);
+  }
+
+  const definitions = {};
+  for (const key of BAKED_KEYS) {
+    if (env[key]) definitions[`process.env.${key}`] = JSON.stringify(env[key]);
+  }
+
+  return definitions;
 }
 
 function makeMainConfig(buildJson, isProd) {
@@ -368,3 +445,6 @@ function formatBytes(bytes) {
 module.exports.makeSharedResolve = makeSharedResolve;
 module.exports.makeStripModule = makeStripModule;
 module.exports.composeBuildConfig = composeBuildConfig;
+// The schema-derived bake set and its reader (#627).
+module.exports.BAKED_KEYS = BAKED_KEYS;
+module.exports.bakeDefinitions = bakeDefinitions;

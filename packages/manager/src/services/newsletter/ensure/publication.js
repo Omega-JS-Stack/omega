@@ -30,7 +30,7 @@ module.exports = async function ensurePublication(context) {
 
     if (!publication) {
       console.log(`      ${chalk.yellow('⚠')} Publication ${chalk.cyan(configuredId)} is not accessible with this API key — fix the id or the key, then rerun`);
-      return { status: 'warned', output: { publication: { publicationId: configuredId, accessible: false } } };
+      return { status: 'warned', reason: 'the configured publication is not accessible with this API key', output: { publication: { publicationId: configuredId, accessible: false } } };
     }
 
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(publication.name)} ${chalk.dim(`(${publication.id})`)}`);
@@ -90,5 +90,5 @@ module.exports = async function ensurePublication(context) {
     }
   }
 
-  return { status: 'warned', output: { publication: { missing: true, suggestedName: brandName } } };
+  return { status: 'warned', reason: 'no publication yet — create one in the beehiiv dashboard', output: { publication: { missing: true, suggestedName: brandName } } };
 };

@@ -29,7 +29,7 @@ const FIREBASE_ONLY_VERBS = {
   test: "the emulator lane needs Cloud Functions — `npm test` runs this target's static suite",
 };
 
-// The files `omega setup` scaffolds ONLY for the Firebase lane: firebase.json
+// The files the scaffold writes ONLY for the Firebase lane: firebase.json
 // (deploy targets + emulator config), and the rules sources firebase.json
 // points at. A custom backend deploys through its host and has no emulator, so
 // scaffolding these leaves a consumer files to delete
@@ -64,7 +64,7 @@ const FIREBASE_ONLY_SETUP_CHECKS = [
  *
  * A missing, unreadable or unparseable config reads 'firebase': that is the
  * default, so it changes nothing, and the config problem itself belongs to the
- * lane that loads it properly (`omega setup`), not to a shape question.
+ * lane that loads it properly (the target checks), not to a shape question.
  *
  * @param {string} targetRoot - The backend target root.
  * @returns {'firebase'|'custom'}

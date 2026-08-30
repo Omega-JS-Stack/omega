@@ -15,6 +15,7 @@ const jetpack = require('fs-jetpack');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/cloud/index.js');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
@@ -229,7 +230,7 @@ function convergedResponses() {
     getGcpProject: { displayName: 'Fixture Brand' },
     listWebApps: [{ appId: 'app-1', displayName: 'Web App' }],
     getWebAppConfig: { ...RAW_SDK },
-    listBrands: [{ name: `projects/${PROJECT_NUMBER}/brands/b1`, applicationTitle: 'Fixture Brand', supportEmail: `support@${DOMAIN}` }],
+    listBrands: [{ name: `projects/${PROJECT_NUMBER}/brands/b1`, applicationTitle: 'Fixture Brand', supportEmail: `support@${DOMAIN}`, orgInternalOnly: false }],
     listServiceAccounts: [{ email: SA_EMAIL }],
     listHostingSites: [{ name: `projects/${PROJECT}/sites/${PROJECT}` }],
     checkDomainStatus: { exists: true, verified: true, ownershipState: 'OWNERSHIP_ACTIVE', hostState: 'HOST_ACTIVE', requiredDnsUpdates: [] },
@@ -930,6 +931,200 @@ test('oauth-consent: config supportEmail (owned Google Group) wins; no email at 
   const result = await ensureOAuthConsent({ firebaseApi: none, brandConfig: brandConfig(), projectId: PROJECT, domain: DOMAIN });
   assert.equal(result.status, 'warned');
   assert.equal(none.callsTo('createBrand').length, 0, 'never sends a doomed value');
+});
+
+// ─── OAuth consent: an Internal audience is a manage-time STOPPER (#667) ─────
+
+const INTERNAL_BRAND = { name: `projects/${PROJECT_NUMBER}/brands/b1`, applicationTitle: 'Fixture Brand', supportEmail: 'owner@example.com', orgInternalOnly: true };
+const AUDIENCE_URL = `https://console.cloud.google.com/auth/audience?project=${PROJECT}`;
+
+// Writeback target for the Disable outcome (the tri-state opt-out lands here)
+const AUDIENCE_CONFIG = `// Fixture Brand — consent audience opt-out target
+{
+  brand: { id: 'fixture-brand' },
+  cloud: { config: { projectId: "fixture-proj" } }, // consentAudience lands beside it
+}
+`;
+
+test('oauth-consent: an External audience is a ✓ — nothing asks, nothing polls (#667)', async () => {
+  const api = fakeFirebase({ listBrands: [{ ...INTERNAL_BRAND, orgInternalOnly: false }] });
+  const tty = openTtyPrompt(); // interactive: a gate or a poll here would hang
+
+  try {
+    const result = await ensureOAuthConsent(handlerContext(brandConfig(), api));
+
+    assert.equal(result.state.oauthConsent.audience, 'External');
+    assert.equal(result.status, undefined, 'already External — a clean run');
+    assert.equal(api.callsTo('listBrands').length, 1, 'one read, no poll');
+    assert.deepEqual(api.mutations(), []);
+  } finally {
+    tty.close();
+  }
+});
+
+test('oauth-consent: Internal + interactive STOPS — ENTER opens the console page and polls until it flips (#667)', async () => {
+  // Google gives no API write for the audience: the human flips it in the
+  // console and the ensure watches the brand read for it
+  let reads = 0;
+  const api = fakeFirebase({
+    listBrands: () => (++reads === 1 ? [INTERNAL_BRAND] : [{ ...INTERNAL_BRAND, orgInternalOnly: false }]),
+  });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = ensureOAuthConsent(handlerContext(brandConfig(), api));
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Press Enter to open the consent audience page', '\r');
+    const result = await run;
+
+    assert.deepEqual(opened, [AUDIENCE_URL]);
+    assert.equal(result.state.oauthConsent.audience, 'External');
+    assert.equal(result.status, undefined, 'the flip landed — nothing to warn about');
+    assert.equal(reads, 2, 'the initial read plus the poll re-read');
+    assert.deepEqual(api.mutations(), [], 'no write exists to attempt');
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('oauth-consent: (s) at the audience poll = later — Internal, warned with the reason (#667)', async () => {
+  const api = fakeFirebase({ listBrands: [INTERNAL_BRAND] }); // never flips
+  setBrowserOpener(async () => true);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = ensureOAuthConsent(handlerContext(brandConfig(), api));
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Press Enter to open the consent audience page', '\r');
+    await tty.answer('(enter)=check now, (s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.match(result.reason, /consent audience is Internal/);
+    assert.equal(result.state.oauthConsent.audience, 'Internal');
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('oauth-consent: Disable lands cloud.consentAudience: false and the next run never asks (#667)', async () => {
+  const api = fakeFirebase({ listBrands: [INTERNAL_BRAND] });
+  const brandRoot = makeBrandRoot(AUDIENCE_CONFIG);
+  const config = brandConfig();
+  const tty = openTtyPrompt();
+
+  try {
+    const run = ensureOAuthConsent(handlerContext(config, api, { brandRoot }));
+    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
+    const result = await run;
+
+    assert.equal(result.status, undefined, 'a deliberate opt-out is not a warning');
+    assert.equal(result.state.oauthConsent.audience, 'Internal');
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes('consentAudience: false'), 'the opt-out lands in omega.json5');
+    assert.ok(!written.includes('enabled: false'), 'the whole cloud service never dies with the audience step');
+    assert.ok(written.includes('// consentAudience lands beside it'), 'the comment-preserving writeback');
+
+    // The next run reads the recorded `false`: no gate, no poll — either
+    // would hang on this still-open TTY
+    const second = await ensureOAuthConsent(handlerContext(config, api, { brandRoot }));
+    assert.equal(second.status, undefined, 'a recorded opt-out is silent forever');
+    assert.equal(second.state.oauthConsent.audience, 'Internal');
+  } finally {
+    tty.close();
+  }
+});
+
+test('oauth-consent: a non-interactive run warns with the console URL and never asks (#667)', async () => {
+  const api = fakeFirebase({ listBrands: [INTERNAL_BRAND] });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await ensureOAuthConsent(handlerContext(brandConfig(), api));
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /consent audience is Internal/);
+  assert.equal(result.state.oauthConsent.audience, 'Internal');
+  assert.ok(lines.join('\n').includes(AUDIENCE_URL), 'the console URL is printed');
+  assert.equal(api.callsTo('listBrands').length, 1, 'no poll without a TTY');
+});
+
+test('oauth-consent: a dry run plans the stopper without asking or writing', async () => {
+  const api = fakeFirebase({ listBrands: [INTERNAL_BRAND] });
+
+  const result = await ensureOAuthConsent(handlerContext(brandConfig(), api, { options: { dryRun: true } }));
+
+  assert.deepEqual(api.mutations(), []);
+  assert.equal(result.status, undefined, 'a dry run plans, it never warns');
+  assert.equal(result.state.oauthConsent.audience, 'Internal');
+});
+
+test('oauth-consent: a CREATED screen is born Internal — the audience goes through the same stopper (#667)', async () => {
+  // Google creates API-made brands Internal, always: the create path reads
+  // the returned brand and stops on it like any other
+  const api = fakeFirebase({
+    listBrands: [],
+    getAuthenticatedEmail: 'owner@example.com',
+    createBrand: (projectId, title, email) => ({ name: 'projects/123/brands/b9', applicationTitle: title, supportEmail: email, orgInternalOnly: true }),
+  });
+
+  const result = await ensureOAuthConsent(handlerContext(brandConfig(), api));
+
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /consent audience is Internal/);
+  assert.equal(result.state.oauthConsent.audience, 'Internal');
+});
+
+test("oauth-consent: an 'already exists' create re-reads the screen and reports it", async () => {
+  // The list lagged (or a concurrent run won): the screen still gets its
+  // audience read and reported, instead of a run that says nothing
+  let listed = 0;
+  const api = fakeFirebase({
+    listBrands: () => (listed++ === 0 ? [] : [{ ...INTERNAL_BRAND, orgInternalOnly: false }]),
+    getAuthenticatedEmail: 'owner@example.com',
+    createBrand: () => { throw new Error('Requested entity already exists'); },
+  });
+
+  const result = await ensureOAuthConsent(handlerContext(brandConfig(), api));
+
+  assert.equal(result.state.oauthConsent.audience, 'External');
+  assert.equal(result.state.oauthConsent.supportEmail, INTERNAL_BRAND.supportEmail);
+});
+
+test('oauth-consent: an org-less project names the cause, never the generic could-not-create line (#667)', async () => {
+  // Brand creation is org-only: an org-less project answers 400 "Project
+  // must belong to an organization"
+  const api = fakeFirebase({
+    listBrands: [],
+    getAuthenticatedEmail: 'owner@example.com',
+    createBrand: () => { throw new Error('Google API Error: Project must belong to an organization.'); },
+  });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await ensureOAuthConsent(handlerContext(brandConfig(), api));
+  } finally {
+    console.log = originalLog;
+  }
+
+  const printed = lines.join('\n');
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /belongs to no organization/);
+  assert.match(printed, /belongs to no organization/);
+  assert.ok(!printed.includes('Could not create OAuth consent screen'), 'a known cause never gets the generic line');
 });
 
 // ─── Interactive project selection/creation (config-landing flow) ────────────

@@ -94,7 +94,10 @@ test('a connect that never settles fails at the deadline, with the transport clo
     readToolsOnce(fake.client, fake.transport),
     new RegExp(`handshake did not finish within ${BUDGET_MS}ms`),
   );
-  assert.ok(Date.now() - started >= BUDGET_MS, 'the deadline, not the fake, answered');
+  // 10ms of slack: Node fires timers up to a few ms before Date.now agrees
+  // (timer rounding vs the clock) — the rejection MESSAGE above is the proof
+  // the deadline answered; this only pins that nothing answered early.
+  assert.ok(Date.now() - started >= BUDGET_MS - 10, 'the deadline, not the fake, answered');
   assert.deepEqual(fake.calls, ['client.connect', 'transport.close']);
 });
 

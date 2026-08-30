@@ -1,7 +1,9 @@
 /**
- * `.env` → Actions secrets (#189): the collection filter (mirrored from UJM's
- * `publishSecrets()`), the cascade precedence that supplies values, the
- * generated workflow env block, and the setup step's loud skips.
+ * `.env` → Actions secrets (#189): the SCHEMA-derived key set every lane now
+ * shares ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)), the
+ * composed target env that supplies its VALUES
+ * ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)), the generated
+ * workflow env block, and the setup step's loud skips.
  *
  * The `gh`/`git` boundaries are injected in every test — the suite never
  * touches a real repo.
@@ -12,23 +14,41 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
+const { publishSecretKeys, WORKFLOW_OWNED_KEYS } = require('@omega.js/config/env-delivery');
+
 const {
   collectEnvSecrets,
-  parseEnvFile,
   renderSecretsBlock,
   publishEnvSecrets,
-  EMPTY_BLOCK,
-  MACHINE_LOCAL_KEYS,
 } = require('../src/github-secrets.js');
 const { scaffoldDefaults } = require('../src/scaffold.js');
 
 const quiet = { log() {}, warn() {}, error() {} };
+
+// The schema's answer for web — the ONE list this suite asserts against, so a
+// new `delivery: { web: 'ci' }` entry never needs an edit here.
+const WEB_KEYS = publishSecretKeys('web');
 
 /** A temp target dir, optionally with a local-level .env. */
 function tmpTarget(env) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-secrets-'));
   if (env !== undefined) fs.writeFileSync(path.join(dir, '.env'), env);
   return dir;
+}
+
+/** A brand root (config/omega.json5) with a target under targets/. */
+function tmpBrand(options) {
+  const { brandEnv, targetEnv } = options || {};
+  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-brand-'));
+  fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{ brand: { id: "b" } }');
+  if (brandEnv !== undefined) fs.writeFileSync(path.join(brand, '.env'), brandEnv);
+
+  const target = path.join(brand, 'targets', 'website');
+  fs.mkdirSync(target, { recursive: true });
+  if (targetEnv !== undefined) fs.writeFileSync(path.join(target, '.env'), targetEnv);
+
+  return { brand, target };
 }
 
 /** Declare the brand's own GitHub repo — the publish precondition. */
@@ -43,126 +63,123 @@ function declareRepo(dir, slug) {
   ].join('\n'));
 }
 
-test('filter: UPPER_SNAKE keys with non-empty values only, quotes stripped (UJM setup.js:419-428)', () => {
-  const parsed = parseEnvFile([
-    '# ========== Default Values ==========',
-    '# GH_TOKEN=',
-    '',
-    'GH_TOKEN=ghp_abc',
-    'OPENAI_API_KEY="sk-quoted"',
-    "SINGLE='sq'",
-    'EMPTY=',
-    'ALSO_EMPTY=""',
-    'lowercase=nope',
-    'Mixed_Case=nope',
-    '1BAD=nope',
-    'NO_EQUALS_SIGN',
-    'WITH_NUMBERS_2=ok',
-  ].join('\n'));
-
-  assert.deepStrictEqual(parsed, {
-    GH_TOKEN: 'ghp_abc',
-    OPENAI_API_KEY: 'sk-quoted',
-    SINGLE: 'sq',
-    WITH_NUMBERS_2: 'ok',
-  });
-});
-
-test('collect: the local .env is the key set; empty values never claim a key', () => {
-  const dir = tmpTarget('A=1\nB=\n# C=3\nD=4\n');
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir, env: {} }), { A: '1', D: '4' });
+test('collect: the SCHEMA names the keys, the composed env supplies the values (#627)', () => {
+  // A key nobody declared for web is not a web secret, however it got into the
+  // cascade — the published set is the schema's `delivery: { web: … }` list.
+  const dir = tmpTarget('OPENAI_API_KEY=sk\nMY_CUSTOM_THING=custom\nlowercase=nope\nRECAPTCHA_SITE_KEY=\n');
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir }), { OPENAI_API_KEY: 'sk' });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('collect: the shell overrides a file value, but a shell-only key is never published', () => {
-  const dir = tmpTarget('GH_TOKEN=from-file\nOPENAI_API_KEY=from-file\n');
-  const secrets = collectEnvSecrets({
-    targetDir: dir,
-    env: { GH_TOKEN: 'from-shell', AWS_SECRET_ACCESS_KEY: 'not-ours', OPENAI_API_KEY: '   ' },
-  });
+test('collect: the composed env is FILES only — the shell is never a source (#678)', () => {
+  const { brand, target } = tmpBrand({ brandEnv: 'GH_TOKEN=brand-token\n' });
 
-  assert.deepStrictEqual(secrets, { GH_TOKEN: 'from-shell', OPENAI_API_KEY: 'from-file' });
-  fs.rmSync(dir, { recursive: true, force: true });
+  process.env.OMEGA_TEST_USER_UID = 'shell-only';
+  try {
+    assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), { GH_TOKEN: 'brand-token' });
+  } finally {
+    delete process.env.OMEGA_TEST_USER_UID;
+  }
+
+  fs.rmSync(brand, { recursive: true, force: true });
 });
 
-test('collect: the brand .env layers under the local .env (cascade precedence)', () => {
-  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-brand-'));
-  fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{ brand: { id: "b" } }');
-  fs.writeFileSync(path.join(brand, '.env'), 'GH_TOKEN=brand-token\nBRAND_ONLY=brand-value\n');
+test('collect: the brand-root .env alone supplies the target — no target .env exists (#678)', () => {
+  const { brand, target } = tmpBrand({ brandEnv: 'GH_TOKEN=brand-token\nOPENAI_API_KEY=brand-openai\n' });
 
-  const app = path.join(brand, 'targets', 'website');
-  fs.mkdirSync(app, { recursive: true });
-  fs.writeFileSync(path.join(app, '.env'), 'GH_TOKEN=local-token\nLOCAL_ONLY=local-value\n');
-
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: app, env: {} }), {
-    GH_TOKEN: 'local-token',
-    BRAND_ONLY: 'brand-value',
-    LOCAL_ONLY: 'local-value',
+  assert.ok(!fs.existsSync(path.join(target, '.env')), 'the target ships no .env of its own');
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+    GH_TOKEN: 'brand-token',
+    OPENAI_API_KEY: 'brand-openai',
   });
 
   fs.rmSync(brand, { recursive: true, force: true });
 });
 
-test('#454: machine-local keys are collected by the parser but never published', () => {
-  // The line filter is UJM's and stays literal — the key IS in the file.
-  assert.deepStrictEqual(
-    parseEnvFile('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n'),
-    { OMEGA_FONTAWESOME_ROOT: '/Users/ian/.omega/fontawesome', STRIPE_KEY: 'sk_live' },
-  );
+test('collect: a target .env overrides the brand root per key (#678)', () => {
+  const { brand, target } = tmpBrand({
+    brandEnv: 'GH_TOKEN=brand-token\nOPENAI_API_KEY=brand-openai\n',
+    targetEnv: 'GH_TOKEN=target-token\nLOCAL_ONLY=local-value\n',
+  });
 
-  // Collection is the publishable set, and a developer-machine path is not one.
-  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n');
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir, env: {} }), { STRIPE_KEY: 'sk_live' });
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+    GH_TOKEN: 'target-token',
+    OPENAI_API_KEY: 'brand-openai',
+  });
 
-  // Not even from the shell, where the fleet convention also sets it.
-  assert.deepStrictEqual(
-    collectEnvSecrets({ targetDir: dir, env: { OMEGA_FONTAWESOME_ROOT: '/somewhere/else' } }),
-    { STRIPE_KEY: 'sk_live' },
-  );
+  fs.rmSync(brand, { recursive: true, force: true });
+});
 
-  assert.ok(MACHINE_LOCAL_KEYS.includes('OMEGA_FONTAWESOME_ROOT'), 'the list names the seeded key');
+test('collect: the env schema decides what rides down — a backend key stays home, GA4 arrives renamed (#678)', () => {
+  const { brand, target } = tmpBrand({
+    brandEnv: [
+      'STRIPE_SECRET_KEY=sk_live_brand',
+      'GOOGLE_ANALYTICS_SECRET_BACKEND=backend-stream',
+      'GOOGLE_ANALYTICS_SECRET_WEB=web-stream',
+      'MY_CUSTOM_THING=custom',
+      '',
+    ].join('\n'),
+  });
+
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+    GOOGLE_ANALYTICS_SECRET: 'web-stream',
+  });
+
+  fs.rmSync(brand, { recursive: true, force: true });
+});
+
+test('#454: machine-local keys never publish, from any layer', () => {
+  // The schema drops them from the delivered set itself, so no lane can carry
+  // a developer-machine path to a runner.
+  assert.ok(require('@omega.js/config/env-schema').isMachineLocal('OMEGA_FONTAWESOME_ROOT'), 'the schema flags the key');
+  assert.ok(!WEB_KEYS.includes('OMEGA_FONTAWESOME_ROOT'), 'and it is not a web delivery');
+
+  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nOPENAI_API_KEY=sk\n');
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir }), { OPENAI_API_KEY: 'sk' });
+
+  // Nor from the brand root, where the cascade otherwise delivers it to web.
+  const { brand, target } = tmpBrand({ brandEnv: 'OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\n' });
+  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {});
+
   fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(brand, { recursive: true, force: true });
 });
 
 test('#454: a machine-local key never reaches the workflow env block either', () => {
-  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nSTRIPE_KEY=sk_live\n');
+  const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\n');
 
   scaffoldDefaults({ outputDir: dir, logger: quiet });
   const workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
 
   assert.ok(!workflow.includes('OMEGA_FONTAWESOME_ROOT'), 'the machine-local path is not injected into CI');
-  assert.ok(workflow.includes('\n  STRIPE_KEY: ${{ secrets.STRIPE_KEY }}'), 'every other key is unaffected');
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('block: one `KEY: ${{ secrets.KEY }}` line per key, sorted, template-owned keys dropped', () => {
-  assert.strictEqual(
-    renderSecretsBlock(['B_KEY', 'A_KEY']),
-    'A_KEY: ${{ secrets.A_KEY }}\n  B_KEY: ${{ secrets.B_KEY }}',
-  );
+test('block: one `KEY: ${{ secrets.KEY }}` line per SCHEMA key, sorted, template-owned keys dropped (#627)', () => {
+  const expected = WEB_KEYS
+    .filter((key) => !WORKFLOW_OWNED_KEYS.includes(key))
+    .map((key) => `${key}: \${{ secrets.${key} }}`)
+    .join('\n  ');
+
+  assert.strictEqual(renderSecretsBlock('web'), expected);
 
   // GH_TOKEN/NODE_* are already in the workflow's env: block — a second
   // mapping key there would be invalid YAML.
-  assert.strictEqual(
-    renderSecretsBlock(['GH_TOKEN', 'NODE_ENV', 'NODE_VERSION', 'X_KEY', 'X_KEY']),
-    'X_KEY: ${{ secrets.X_KEY }}',
-  );
-
-  assert.strictEqual(renderSecretsBlock([]), EMPTY_BLOCK);
-  assert.strictEqual(renderSecretsBlock(['GH_TOKEN']), EMPTY_BLOCK);
+  assert.ok(WEB_KEYS.includes('GH_TOKEN'), 'GH_TOKEN is published…');
+  assert.ok(!renderSecretsBlock('web').includes('GH_TOKEN'), '…and never re-rendered');
 });
 
-test('workflow: the scaffolded block is exactly the .env keys, and regenerates in place', () => {
-  const dir = tmpTarget('CLOUDFLARE_TOKEN=cf\nOPENAI_API_KEY=sk\nGH_TOKEN=ghp\n');
+test('workflow: the scaffolded block is the schema set — the same block for any .env (#627)', () => {
+  const dir = tmpTarget('OPENAI_API_KEY=sk\nGH_TOKEN=ghp\n');
   const workflowPath = path.join(dir, '.github', 'workflows', 'build.yml');
 
   scaffoldDefaults({ outputDir: dir, logger: quiet });
-  let workflow = fs.readFileSync(workflowPath, 'utf8');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
 
-  assert.ok(workflow.includes('\n  CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'), 'CLOUDFLARE_TOKEN injected');
-  assert.ok(workflow.includes('\n  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}'), 'OPENAI_API_KEY injected');
+  for (const key of WEB_KEYS.filter((k) => !WORKFLOW_OWNED_KEYS.includes(k))) {
+    assert.ok(workflow.includes(`\n  ${key}: \${{ secrets.${key} }}`), `${key} injected`);
+  }
   assert.ok(!workflow.includes('{{ githubSecrets }}'), 'the token is consumed');
   assert.strictEqual(
     (workflow.match(/^ {2}GH_TOKEN:/gm) || []).length,
@@ -170,25 +187,21 @@ test('workflow: the scaffolded block is exactly the .env keys, and regenerates i
     'GH_TOKEN stays a single env key (the template already declares it)',
   );
 
-  // Re-run with a CHANGED .env: the block regenerates rather than accreting.
-  fs.writeFileSync(path.join(dir, '.env'), 'STRIPE_KEY=sk_live\n');
+  // A CHANGED .env no longer moves the block: what CI needs is what the schema
+  // declares, not what this machine's files happen to hold.
+  fs.writeFileSync(path.join(dir, '.env'), 'CLOUDFLARE_TOKEN=cf\n');
   const second = scaffoldDefaults({ outputDir: dir, logger: quiet });
-  workflow = fs.readFileSync(workflowPath, 'utf8');
+  const reread = fs.readFileSync(workflowPath, 'utf8');
 
-  assert.ok(workflow.includes('\n  STRIPE_KEY: ${{ secrets.STRIPE_KEY }}'), 'the new key is in');
-  assert.ok(!workflow.includes('OPENAI_API_KEY: ${{'), 'the dropped key is gone — regenerated, not appended');
-  assert.ok(second.written.includes('.github/workflows/build.yml'), 'the workflow rewrote');
-
-  // Same .env twice → byte-identical render, so the engine reports no write.
-  const third = scaffoldDefaults({ outputDir: dir, logger: quiet });
-  assert.ok(!third.written.includes('.github/workflows/build.yml'), 'idempotent: identical block is not a write');
-  assert.strictEqual(fs.readFileSync(workflowPath, 'utf8'), workflow);
+  assert.ok(!reread.includes('\n  CLOUDFLARE_TOKEN:'), 'an undeclared key never enters the generated block');
+  assert.strictEqual(reread, workflow, 'the block is unchanged');
+  assert.ok(!second.written.includes('.github/workflows/build.yml'), 'idempotent: identical block is not a write');
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('setup step: publishes the collected keys to the origin repo, values on stdin', () => {
-  const dir = tmpTarget('GH_TOKEN=ghp_abc\nOPENAI_API_KEY=sk-1\n');
+  const dir = tmpTarget('GH_TOKEN=ghp_abc\nOPENAI_API_KEY=sk-1\nMY_CUSTOM_THING=custom\n');
   declareRepo(dir, 'acme/site');
   const gh = [];
 
@@ -214,7 +227,7 @@ test('setup step: publishes the collected keys to the origin repo, values on std
 test('setup step: no remote, no .env, and CI each skip LOUDLY without touching gh', () => {
   const noGh = () => { throw new Error('gh must not run'); };
 
-  const remoteless = tmpTarget('A=1\n');
+  const remoteless = tmpTarget('GH_TOKEN=ghp\n');
   const warnings = [];
   const loud = { log: (m) => warnings.push(m), warn: (m) => warnings.push(m), error: (m) => warnings.push(m) };
 
@@ -231,13 +244,14 @@ test('setup step: no remote, no .env, and CI each skip LOUDLY without touching g
   assert.match(warnings.join('\n'), /no GitHub remote/);
   fs.rmSync(remoteless, { recursive: true, force: true });
 
-  const empty = tmpTarget('# nothing but comments\nEMPTY=\n');
+  // A cascade that holds nothing the schema delivers to web is nothing to push.
+  const empty = tmpTarget('# nothing but comments\nMY_CUSTOM_THING=custom\nGH_TOKEN=\n');
   warnings.length = 0;
   assert.deepStrictEqual(
     publishEnvSecrets({ targetDir: empty, logger: loud, env: {}, execFn: noGh, gitExecFn: noGh }),
     { skipped: 'no-secrets' },
   );
-  assert.match(warnings.join('\n'), /no \.env values found/);
+  assert.match(warnings.join('\n'), /no keys composed for this target/);
 
   warnings.length = 0;
   assert.deepStrictEqual(
@@ -249,7 +263,7 @@ test('setup step: no remote, no .env, and CI each skip LOUDLY without touching g
 });
 
 test('setup step: no declared brand repo skips loudly — an inferred remote is never trusted', () => {
-  const dir = tmpTarget('A=1\n');
+  const dir = tmpTarget('GH_TOKEN=ghp\n');
   const messages = [];
   const loud = { log: (m) => messages.push(m), warn: (m) => messages.push(m), error: (m) => messages.push(m) };
 
@@ -271,7 +285,7 @@ test('setup step: no declared brand repo skips loudly — an inferred remote is 
 });
 
 test('setup step: a remote that is not the brand\'s own repo skips loudly (never arms a stranger\'s Actions)', () => {
-  const dir = tmpTarget('A=1\n');
+  const dir = tmpTarget('GH_TOKEN=ghp\n');
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), [
     '{',
@@ -305,13 +319,13 @@ test('setup step: a remote that is not the brand\'s own repo skips loudly (never
     gitExecFn: () => 'git@github.com:acme/my-brand.git\n',
     execFn: () => '',
   });
-  assert.deepStrictEqual(published.published, ['A']);
+  assert.deepStrictEqual(published.published, ['GH_TOKEN']);
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('setup step: a missing/signed-out gh throws instructions — never a silent skip', () => {
-  const dir = tmpTarget('A=1\n');
+  const dir = tmpTarget('GH_TOKEN=ghp\n');
   declareRepo(dir, 'acme/site');
 
   assert.throws(

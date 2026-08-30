@@ -11,7 +11,8 @@
 //   1. Positional command (`mgr build`) — matched against command names and
 //      their aliases; unknown names pass through as-is (missing file = error).
 //   2. Flag-style alias (`mgr --build`, `mgr -b`) — first alias-table hit wins.
-//   3. The default command (OMEGA convention: setup).
+//   3. The default command (OMEGA convention: help — `setup` is retired,
+//      #675, and every verb runs its own local scaffold).
 //
 // dotenv loading and any process-env fixups (e.g. EM's ELECTRON_RUN_AS_NODE
 // strip) stay in the framework's cli.js/bin — they're framework concerns, not
@@ -26,7 +27,7 @@ const jetpack = require('fs-jetpack');
  * @param {object} config
  * @param {string} config.commandsDir - Absolute directory of command modules — <name>.js exporting `async (options) => {}`
  * @param {Object<string, string[]>} [config.aliases] - Command name → positional/flag aliases (e.g. `{ install: ['-i', 'i', '--install'] }`)
- * @param {string} [config.defaultCommand='setup'] - Command used when no positional or flag alias matches
+ * @param {string} [config.defaultCommand='help'] - Command used when no positional or flag alias matches
  * @returns {Function} Main class — bins do `new Main(argv)` then `await main.process(argv)`
  */
 function createCliRouter(config) {
@@ -34,7 +35,7 @@ function createCliRouter(config) {
 
   const commandsDir = config.commandsDir;
   const aliases = config.aliases || {};
-  const defaultCommand = config.defaultCommand || 'setup';
+  const defaultCommand = config.defaultCommand || 'help';
 
   if (!commandsDir) {
     throw new Error('[devkit cli-router] commandsDir is required');

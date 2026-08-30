@@ -11,6 +11,7 @@ const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const png2icons = require('png2icons');
 const { FAVICON_CONFIG } = require('../lib/assets-config.js');
+const { faviconImageFiles, WEBMANIFEST_NAME } = require('../lib/derived.js');
 const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeFavicons(context) {
@@ -19,10 +20,7 @@ module.exports = async function writeFavicons(context) {
 
   const outputDir = join(outDir, FAVICON_CONFIG.outputDir);
 
-  const staleImages = [
-    ...FAVICON_CONFIG.files.map((file) => file.name),
-    'favicon.ico',
-  ].filter((name) => isStale(brandmarkPath, join(outputDir, name)));
+  const staleImages = faviconImageFiles().filter((name) => isStale(brandmarkPath, join(outputDir, name)));
 
   const brandName = brandConfig.brand.name;
   const desiredManifest = JSON.stringify({
@@ -37,7 +35,7 @@ module.exports = async function writeFavicons(context) {
     display: 'standalone',
   }, null, 2);
 
-  const manifestPath = join(outputDir, 'site.webmanifest');
+  const manifestPath = join(outputDir, WEBMANIFEST_NAME);
   const manifestStale = jetpack.read(manifestPath) !== desiredManifest;
 
   if (staleImages.length === 0 && !manifestStale) {

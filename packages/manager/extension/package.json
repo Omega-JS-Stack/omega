@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "OMEGA Manager companion extension — bookmark filing + trusted browser automation.",
   "scripts": {
-    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "start": "npx omega clean && npm run gulp --",
     "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/extension/dist/gulp/main.js",
-    "build": "npx omega clean && npx omega setup && OMEGA_BUILD_MODE=true npm run gulp -- build",
+    "build": "npx omega clean && OMEGA_BUILD_MODE=true npm run gulp -- build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
     "test": "npx omega test"

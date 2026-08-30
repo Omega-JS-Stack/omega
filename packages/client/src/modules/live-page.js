@@ -78,6 +78,10 @@ export function swap(host, markup) {
 /**
  * Boot a feed poller over a declared feed table.
  *
+ * The cadence is the poller's own: it stops while the page is hidden (a covered
+ * tab) and resumes on the way back with one immediate read. There is no option
+ * for it.
+ *
  * @param {object} options
  * @param {Object<string, {path: string, every: number, fresh?: string}>} options.feeds -
  *   every feed this page reads: where it lives, how often it is re-read, and
@@ -104,6 +108,11 @@ export function createFeedPoller(options) {
 
   let timers = [];
   let started = false;
+
+  // The hidden-tab rule needs a document to read: a poller running where there
+  // is none (the extension service worker the fetcher seam exists for) has no
+  // tab that can be covered, and just keeps its cadence.
+  const page = typeof document === 'undefined' ? null : document;
 
   // The fetcher throws; a feed result never does. Every way a read can let a
   // page down lands in the same four-key shape, told apart by status and reason.
@@ -151,6 +160,44 @@ export function createFeedPoller(options) {
     .filter(([, result]) => result && (!result.ok || result.stale))
     .map(([name, result]) => ({ name, reason: result.stale || result.reason }));
 
+  const arm = () => {
+    timers = names.map((name) => setInterval(() => { read(name, false); }, feeds[name].every));
+  };
+
+  const disarm = () => {
+    timers.forEach((timer) => clearInterval(timer));
+    timers = [];
+  };
+
+  // A covered TAB reads nothing. Polling a page nobody is looking at spends the
+  // device's battery and the backend's quota on answers that are thrown away,
+  // so the intervals are cleared while the page is hidden and re-armed when it
+  // comes back — with ONE immediate read, because whatever is on screen is as
+  // old as the time the tab spent covered.
+  //
+  // `document.hidden` on purpose, and never focus: a visible-but-unfocused
+  // window is still being WATCHED — a board on a second monitor is the case
+  // this module exists for — and keeps its cadence.
+  const onVisibilityChange = () => {
+    if (!started) {
+      return;
+    }
+
+    if (page.hidden) {
+      disarm();
+      return;
+    }
+
+    // Armed already means this was not a return from hidden (a browser can say
+    // "visible" to a page that never left), and there is nothing to catch up on.
+    if (timers.length) {
+      return;
+    }
+
+    readAll(false);
+    arm();
+  };
+
   const start = async () => {
     if (started) {
       return;
@@ -166,12 +213,21 @@ export function createFeedPoller(options) {
     if (!started) {
       return;
     }
-    timers = names.map((name) => setInterval(() => { read(name, false); }, feeds[name].every));
+
+    page?.addEventListener('visibilitychange', onVisibilityChange);
+
+    // A start in a tab that is ALREADY covered arms nothing: the listener above
+    // is what gives the page its cadence when it comes into view.
+    if (page?.hidden) {
+      return;
+    }
+
+    arm();
   };
 
   const stop = () => {
-    timers.forEach((timer) => clearInterval(timer));
-    timers = [];
+    page?.removeEventListener('visibilitychange', onVisibilityChange);
+    disarm();
     started = false;
   };
 

@@ -24,6 +24,8 @@ function transactionalBuild(settings) {
   const Manager = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
+      // The account's unsubscribe group ids (#649) — every send resolves one from config
+      marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
     },
     project: { websiteUrl: 'https://test.dev' },
     libraries: { admin: {} },

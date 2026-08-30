@@ -102,7 +102,7 @@ function zoneGate(context, key) {
       { status: 'success', output: { [key]: { planned: 'after-zone' } } },
     );
   }
-  return { status: 'warned', output: { [key]: { note: 'no zone available' } } };
+  return { status: 'warned', reason: 'no Cloudflare zone available', output: { [key]: { note: 'no zone available' } } };
 }
 
 module.exports = { fetchRuleset, applyRuleset, getZoneId, zoneGate };

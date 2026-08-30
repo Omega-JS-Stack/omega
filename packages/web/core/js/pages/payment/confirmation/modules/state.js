@@ -1,7 +1,7 @@
 // State management for confirmation page
 // Minimal mutable state -- everything else is derived by buildBindingsState()
 
-import { FREQUENCIES } from '../../checkout/modules/state.js';
+import { FREQUENCIES, ONE_TIME_FREQUENCY } from '../../checkout/modules/state.js';
 
 // Minimal mutable state
 export const state = {
@@ -11,6 +11,10 @@ export const state = {
   productName: '',
   amount: 0,
   currency: 'USD',
+  // What was bought, straight off the redirect the intent route builds
+  // ('subscription' | 'one-time'): the one thing here that does not have to be
+  // inferred from the cadence beside it (#668)
+  type: '',
   frequency: '',
   paymentMethod: '',
   hasFreeTrial: false,
@@ -34,7 +38,7 @@ export function buildBindingsState() {
   // empty, because `once` is not a cadence and the map below has no row for it.
   // The same list decides what verify.js can poll the account for (#232).
   const isSubscription = FREQUENCIES.includes(state.frequency);
-  const isOneTime = state.frequency === 'once';
+  const isOneTime = state.frequency === ONE_TIME_FREQUENCY;
 
   const FREQUENCY_MAP = {
     // `cycle` is the adverb ("charged annually"); `adjective` is the noun

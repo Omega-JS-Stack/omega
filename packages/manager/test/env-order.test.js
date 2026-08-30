@@ -55,8 +55,8 @@ test('env-order: render = header, every group in order, placeholders for absent 
 });
 
 test('env-order: every key the backend composer knows has a stub placeholder (#502)', () => {
-  // The env schema is the ONE inventory of the keys disperse composes into
-  // targets/backend/.env — the stub can never miss one of them
+  // The env schema is the ONE inventory of the keys composeTargetEnv composes
+  // into the backend's dist/.env on every verb — the stub can never miss one
   const content = renderCanonicalEnv({ header: ['# Fixture — brand secrets.'] });
 
   const missing = envKeysForTarget('backend').filter((key) => !new RegExp(`^(# )?${key}=`, 'm').test(content));

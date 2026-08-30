@@ -47,7 +47,7 @@ module.exports = async ({ brand, targets }) => {
     for (const finding of findings) {
       console.log(`      ${chalk.yellow('⚠')} ${finding}`);
     }
-    return { status: 'warned', output: { findings } };
+    return { status: 'warned', reason: findings.join('; '), output: { findings } };
   }
 
   return null;

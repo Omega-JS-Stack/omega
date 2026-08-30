@@ -8,9 +8,8 @@
  *     it declares `type: 'custom'`; a stray unknown key is still an error;
  *   - the manager runs each verb through the target's script IN ORDER, and
  *     skips loudly when a script is absent;
- *   - every framework service op skips custom targets — except env disperse
- *     (the target gets the brand's shared .env) and the workspace service
- *     (which recognizes the dir instead of warning it unmapped);
+ *   - every framework service op skips custom targets — except the workspace
+ *     service (which recognizes the dir instead of warning it unmapped);
  *   - brand-root `omega dev` boots the custom target's `start` in the same
  *     terminal fan-out.
  *
@@ -24,13 +23,11 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { validateConfig } = require('@omega.js/config/validate');
-const { OPERATIONS } = require('../src/config.js');
 const {
   CUSTOM_VERBS, customTargetNames, customTargetDirs, targetScripts, runCustomVerbs,
 } = require('../src/lib/custom-target.js');
 const { discoverTargets } = require('../src/lib/brand.js');
 const { resolveTargetRun } = require('../src/lib/framework-bin.js');
-const disperse = require('../src/services/disperse/index.js');
 const ensureStructure = require('../src/services/workspace/ensure/structure.js');
 const { selectDevTargets } = require('../src/commands/dev.js');
 const { selectDeployTargets } = require('../src/commands/deploy.js');
@@ -202,7 +199,7 @@ test('custom-target: a target with no package.json scripts declares no verbs', (
   }
 });
 
-// ─── service ops: skipped, except disperse + workspace ───────────────────────
+// ─── service ops: skipped, except workspace ──────────────────────────────────
 
 test('custom-target: the workspace structure check recognizes the dir, never warns it unmapped', async () => {
   const root = makeBrand();
@@ -249,56 +246,6 @@ test('custom-target: a declared custom target with no dir is reported like any o
 
     assert.equal(result.status, 'error');
     assert.match(result.error, /targets\/api/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('custom-target: env disperse composes the brand .env into the custom target', async () => {
-  const root = makeBrand();
-  try {
-    jetpack.write(join(root, '.env'), 'API_TOKEN="tok-123"\nDATABASE_URL="postgres://x"\n');
-
-    const result = await disperse.run({
-      brandId: 'b',
-      brandRoot: root,
-      brandConfig: { ...BASE, targets: { web: {}, api: { type: 'custom' } } },
-      brand: { id: 'b', root },
-      targets: discoverTargets(root),
-      operations: OPERATIONS.disperse,
-      options: {},
-    });
-
-    assert.notEqual(result.status, 'error');
-    // A custom target has no @omega.js/config to walk up the cascade with, so
-    // the brand's own keys are composed into its .env verbatim
-    const env = jetpack.read(join(root, 'targets', 'api', '.env')) || '';
-    assert.match(env, /API_TOKEN="tok-123"/);
-    assert.match(env, /DATABASE_URL="postgres:\/\/x"/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('custom-target: a second disperse pass leaves the composed .env byte-identical', async () => {
-  const root = makeBrand();
-  try {
-    jetpack.write(join(root, '.env'), 'API_TOKEN="tok-123"\n');
-    const context = () => ({
-      brandId: 'b',
-      brandRoot: root,
-      brandConfig: { ...BASE, targets: { web: {}, api: { type: 'custom' } } },
-      brand: { id: 'b', root },
-      targets: discoverTargets(root),
-      operations: OPERATIONS.disperse,
-      options: {},
-    });
-
-    await disperse.run(context());
-    const first = jetpack.read(join(root, 'targets', 'api', '.env'));
-    await disperse.run(context());
-
-    assert.equal(jetpack.read(join(root, 'targets', 'api', '.env')), first);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

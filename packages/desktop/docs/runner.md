@@ -200,7 +200,7 @@ Standard mode. Used by the GH Actions workflow.
 
 ## Adding a new org
 
-**Zero Windows interaction.** Just create or get added as admin to a new GH org. Within ~60s the watcher polls, sees the new org, and auto-registers a runner against it. Your next `npx omega setup` on a consumer in that org finds the runner waiting.
+**Zero Windows interaction.** Just create or get added as admin to a new GH org. Within ~60s the watcher polls, sees the new org, and auto-registers a runner against it. Your next `npx omega deploy` on a consumer in that org finds the runner waiting.
 
 You can also force-register manually:
 ```powershell
@@ -223,7 +223,7 @@ These are *physical* / *driver-level* prerequisites @omega.js/desktop can't auto
 ┌──────────────────────────────────┐         ┌────────────────────────────────────┐
 │  YOUR MAC (developer)            │         │  WINDOWS BOX (signing runner)      │
 │                                  │         │                                    │
-│  npx omega setup                   │         │  npx omega runner install            │
+│  npx omega deploy                  │         │  npx omega runner install            │
 │  (per consumer project)          │         │  (idempotent; re-run anytime)      │
 │                                  │         │                                    │
 │  • detects org                   │         │  • downloads actions/runner        │

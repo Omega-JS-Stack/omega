@@ -44,7 +44,11 @@ function buildWith(brand, settings) {
 
   const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
   const Manager = {
-    config: { brand: { id: 'acme', url: 'https://acme.example', images: {}, ...brand } },
+    config: {
+      brand: { id: 'acme', url: 'https://acme.example', images: {}, ...brand },
+      // The account's unsubscribe group ids (#649) — every send resolves one from config
+      marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
+    },
     project: { websiteUrl: 'https://acme.example' },
     libraries: { admin: {} },
     User: () => ({ properties: {} }),

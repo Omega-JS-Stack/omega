@@ -464,6 +464,7 @@ async function runMigration(context, options) {
 
   if (stats.errors > 0 || stats.invalidDocs > 0) {
     result.status = 'warned';
+    result.reason = `${stats.errors} doc(s) errored, ${stats.invalidDocs} invalid`;
   }
 
   return result;

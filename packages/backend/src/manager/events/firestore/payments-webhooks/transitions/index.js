@@ -15,6 +15,17 @@ const path = require('path');
 // own, as its webhook parser reports it).
 const REFUND_EVENTS = ['PAYMENT.SALE.REFUNDED', 'PAYMENT.CAPTURE.REFUNDED', 'charge.refunded', 'payment_refunded'];
 
+// How long a transition claim speaks for. The race it exists to settle is SECONDS
+// wide — two provider events for one checkout, a second apart, both reading a user
+// doc neither has written yet — and the retry that re-runs a failed event is
+// minutes wide. Past that, the same transition name on the same order is a genuinely
+// NEW occurrence, not a duplicate: the order id never changes for the subscription's
+// life, so a second dunning cycle, a re-cancellation after an uncancel, and a second
+// plan change all re-detect a name the order already carries. An unbounded claim
+// suppressed every one of them — no dunning email, no analytics, no marketing sync,
+// forever after the first ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+const CLAIM_WINDOW_MS = 10 * 60 * 1000;
+
 /**
  * Detect what transition occurred based on category and before/after state
  *
@@ -193,6 +204,109 @@ function detectOneTimeTransition(eventType, options) {
 }
 
 /**
+ * Claim a detected transition for one order, so exactly one webhook dispatches it
+ *
+ * Detection is a DIFF: it compares the user's stored subscription against the
+ * unified state this event carries. Two webhooks for the same checkout can be in
+ * flight at once (Stripe sent `customer.subscription.created` and
+ * `invoice.payment_succeeded` a second apart), and both read the user doc before
+ * either one's write landed — so both saw `basic`, both detected
+ * `new-subscription`, and both dispatched it: two order emails, two trial_start
+ * fires ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+ *
+ * The claim is the tiebreaker, keyed on the ORDER rather than the event: the
+ * transaction's read locks the order document, so exactly one of the racing runs
+ * writes `transitions.<name>` and the other is told who beat it. Per order per
+ * transition NAME, so a later renewal, cancellation, or a genuinely second
+ * subscription on its own order all still fire their own transitions.
+ *
+ * A claim carries its OUTCOME, not just its holder — `settleClaim()` below writes
+ * it — so a `failed` claim is retakeable at any age. A winner that threw after
+ * claiming (the webhook doc goes `failed`, and the frequent cron re-runs THAT SAME
+ * event id) was otherwise refused by its own claim forever: no order email, no
+ * analytics, no marketing sync, for a customer who paid
+ * ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+ *
+ * And a claim only speaks for `CLAIM_WINDOW_MS`. Whatever its status, an older one
+ * is retaken: the same transition name reaching the same order ten minutes later is
+ * a new occurrence of it, not the duplicate half of a race (see the constant).
+ *
+ * @param {object} options
+ * @param {object} options.admin - The firebase-admin handle
+ * @param {string} options.orderId - The order the transition belongs to
+ * @param {string} options.transitionName - e.g., 'new-subscription', 'payment-failed'
+ * @param {string} options.eventId - The webhook event making the claim
+ * @param {string} options.now - ISO timestamp of this run
+ * @param {number} options.nowUNIX - UNIX second of this run
+ * @returns {Promise<{ claimed: boolean, eventId: string }>} Whether this event won
+ *   the claim, and the event id that holds it either way
+ */
+async function claim({ admin, orderId, transitionName, eventId, now, nowUNIX }) {
+  const orderRef = admin.firestore().doc(`payments-orders/${orderId}`);
+
+  return admin.firestore().runTransaction(async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+    const existing = orderDoc.data()?.transitions?.[transitionName];
+
+    // A FAILED claim is retaken at any age — that IS the retry path, the same one
+    // the webhook and dispute-alert routes reclaim their own docs from. So is a
+    // claim older than the window, whatever it says: that is a repeat of the
+    // transition, not the duplicate half of a race. Anything else — a claim still
+    // running, or one that finished seconds ago — refuses whoever asks, including
+    // the event that holds it. A claim with no stamp cannot be shown to be fresh.
+    const spent = existing && (nowUNIX - (existing.timestampUNIX || 0)) * 1000 >= CLAIM_WINDOW_MS;
+
+    if (existing && existing.status !== 'failed' && !spent) {
+      return { claimed: false, eventId: existing.eventId || 'unknown' };
+    }
+
+    transaction.set(orderRef, {
+      transitions: {
+        [transitionName]: {
+          eventId: eventId,
+          status: 'claimed',
+          timestamp: now,
+          timestampUNIX: nowUNIX,
+        },
+      },
+    }, { merge: true });
+
+    return { claimed: true, eventId: eventId };
+  });
+}
+
+/**
+ * Record how the run that WON a claim ended, so a retry can tell the two apart
+ *
+ * The claim is taken before anything acts on the transition, and the run holding
+ * it can still throw afterwards. `done` is stamped once the dispatch, the
+ * analytics fire and the marketing sync are away; `failed` is stamped beside the
+ * webhook doc's own failure stamp, and is the only state `claim()` retakes.
+ *
+ * Only the run that took the claim ever calls this — a run that LOST one settles
+ * nothing, and neither does a transition that had no order to claim on.
+ *
+ * @param {object} options
+ * @param {object} options.admin - The firebase-admin handle
+ * @param {object} options.claim - The claim this run won: `{ orderId, transitionName }`
+ * @param {string} options.status - 'done' or 'failed'
+ * @returns {Promise<void>}
+ */
+async function settleClaim({ admin, claim, status }) {
+  if (!claim.orderId || !claim.transitionName) {
+    return;
+  }
+
+  await admin.firestore().doc(`payments-orders/${claim.orderId}`).set({
+    transitions: {
+      [claim.transitionName]: {
+        status: status,
+      },
+    },
+  }, { merge: true });
+}
+
+/**
  * Dispatch a transition handler (fire-and-forget)
  *
  * @param {string} transitionName - e.g., 'new-subscription', 'payment-failed'
@@ -230,7 +344,10 @@ module.exports = {
   detectTransition,
   detectSubscriptionTransition,
   detectOneTimeTransition,
+  claim,
+  settleClaim,
   dispatch,
+  CLAIM_WINDOW_MS,
   // Exported for testing
   REFUND_EVENTS,
   isBasicOrNull,

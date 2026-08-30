@@ -30,7 +30,6 @@ npm start           # omega dev: dev server (Eleventy watch + asset rebuild)
 npm run build       # omega build: production build → dist/
 npm test            # omega test: production build + smoke checks + test/
 npm run deploy      # omega deploy: commit + push, then dispatch the build workflow (CI publishes)
-npx omega setup     # re-scaffold defaults + sync package.json scripts
 npx omega clean     # remove dist/ and .omega/
 ```
 
@@ -46,7 +45,7 @@ npx omega clean     # remove dist/ and .omega/
 ## Rules
 
 - Only work in `src/` and `config/`, never `dist/`, `.omega/`, or `node_modules/`.
-- Framework defaults (this file's Default section, `.gitignore`, `.env`, CI workflow) are re-synced by `omega setup`; customize below the Custom marker only.
+- Framework defaults (this file's Default section, `.gitignore`, `.env`, CI workflow) are re-synced by every omega verb; customize below the Custom marker only.
 
 # ========== Custom Values ==========
 <!-- Add your project-specific notes below this line -->

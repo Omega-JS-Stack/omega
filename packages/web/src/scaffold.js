@@ -15,23 +15,27 @@ const path = require('node:path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
 const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
-const { collectEnvSecrets, renderSecretsBlock } = require('./github-secrets.js');
+const { renderSecretsBlock } = require('./github-secrets.js');
 const { PATHS } = require('./paths.js');
 
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
 const NODE_VERSION = '24';
 
 // minimatch FILE_MAP (last-match-wins). Patterns match the RAW scaffold-tree
-// path (before the `_.` strip), so the mergeLines rules name `_.gitignore`
-// and `_.env`, not their outputs.
+// path (before the `_.` strip), so the mergeLines rules name `_.gitignore`,
+// not its output.
+//
+// The target-root .env is NOT scaffolded ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+// the brand root's .env is the one file humans and the manager edit, a target
+// .env is an optional per-key override a HUMAN writes, and no machine writes a
+// target .env — so the template is gone.
 const FILE_MAP = {
   '**/*': { overwrite: false },
   // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
-  // like .env), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
-  // missing by the `**/*` rule above, never clobbered.
+  // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied
+  // when missing by the `**/*` rule above, never clobbered.
   'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
-  '_.env': { mergeLines: true },
   // JSON5 defaults-merge: consumer values win, new framework keys are added
   'config/omega.json5': { merge: true },
   // Ruby-free CI: regenerated every setup so workflow fixes roll out
@@ -61,14 +65,16 @@ function scaffoldDefaults(options) {
   const fileMap = { ...FILE_MAP };
   const logger = options.logger || console;
 
-  // The CI workflow's secrets env block is GENERATED per brand (#189): the
-  // keys of the target's resolved .env cascade, rendered into the template's
-  // `{{ githubSecrets }}` token. `overwrite: true` means every setup
-  // re-renders it, so the block heals like every other scaffolded default.
+  // The CI workflow's secrets env block is GENERATED (#189, #627): the env
+  // schema's web delivery set, rendered into the template's
+  // `{{ githubSecrets }}` token by @omega.js/config's ONE renderer — the same
+  // list `omega deploy` publishes as repo secrets. `overwrite: true` means
+  // every setup re-renders it, so the block heals like every other scaffolded
+  // default.
   const workflow = FILE_MAP['.github/workflows/build.yml'];
   const workflowTokens = {
     ...workflow.template,
-    githubSecrets: renderSecretsBlock(Object.keys(collectEnvSecrets({ targetDir: options.outputDir }))),
+    githubSecrets: renderSecretsBlock('web'),
   };
   fileMap['.github/workflows/build.yml'] = { ...workflow, template: workflowTokens };
 

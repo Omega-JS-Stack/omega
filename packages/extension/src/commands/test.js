@@ -6,11 +6,21 @@ const logger  = Manager.logger('test');
 const { run } = require('../test/runner.js');
 const attachLogFile = require('../utils/attach-log-file.js');
 const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.js');
+const { ensureTarget } = require('./lib/ensure-target.js');
 
 module.exports = async function (options) {
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
   // EM's test.log and @omega.js/backend's test.log pattern.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target. The gulp verbs get it from the `defaults`
+  // task; test runs no gulp, so it calls it here.
+  await ensureTarget({
+    projectDir: process.cwd(),
+    log: (line) => logger.log(line),
+    warn: (line) => logger.warn(line),
+  });
 
   const layer       = options.layer    || 'all';
   // Positional target: `npx omega test <target>` where target supports source

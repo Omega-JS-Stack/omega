@@ -8,14 +8,17 @@ const path = require('path');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
 // minimatch FILE_MAP (last-match-wins). @omega.js/backend's contract:
-//   - everything copies on first setup only (consumer files are never clobbered)
-//   - AGENTS.md / .gitignore / .env live-sync their Default section on every
-//     setup via the marker-section merge (the Custom section is the
-//     consumer's, preserved verbatim). All three live at the TARGET ROOT — the
-//     .env moved up from functions/ with the src/dist pillar (functions/ is
-//     staged output; the stage step copies the local .env into it).
+//   - everything copies on first scaffold only (consumer files are never clobbered)
+//   - AGENTS.md / .gitignore live-sync their Default section on every run via
+//     the marker-section merge (the Custom section is the consumer's,
+//     preserved verbatim). Both live at the TARGET ROOT.
+//   - the target-root .env is NOT scaffolded ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+//     the brand root's .env is the one file humans and the manager edit, a
+//     target .env is an optional per-key override a HUMAN writes, and the
+//     machine's env file is the composed dist/.env. No machine writes a
+//     target .env, so the template is skipped.
 // Patterns match the RAW defaults-tree path (before the `_.` strip), so the
-// mergeLines rules name `_.gitignore` / `_.env`, not their outputs.
+// mergeLines rules name `_.gitignore`, not its output.
 const FILE_MAP = {
   '**/*': { overwrite: false },
   // The socket-free static test lane (#567). It lands under `_`-prefixed dirs —
@@ -26,11 +29,10 @@ const FILE_MAP = {
   'test/helpers/**': { overwrite: false, path: () => 'test/_helpers' },
   'test/unit/**': { overwrite: false, path: () => 'test/_unit' },
   // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
-  // like .env), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
+  // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
   // missing by the `**/*` rule above, never clobbered.
   'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
-  '_.env': { mergeLines: true },
 };
 
 /**

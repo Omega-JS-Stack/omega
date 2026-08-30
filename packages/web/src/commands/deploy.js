@@ -4,6 +4,11 @@
  * NOTHING), then dispatches the scaffolded build workflow so CI runs the
  * SAME build and publishes to gh-pages.
  *
+ * Every run starts with the local scaffold the retired `omega setup` used to
+ * own (ensureTarget) and, on the dispatch lane, its NETWORK half as a precheck:
+ * the brand's .env keys are published as repo secrets so CI has what the
+ * scaffolded workflow asks for. `--no-secrets` opts out.
+ *
  * Flags: --dry-run (print the exact dispatch, send nothing; skips sync),
  * --local (production build only — no sync, no dispatch),
  * --no-sync (dispatch without committing/pushing first),
@@ -18,6 +23,8 @@ const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+const { ensureTarget } = require('./lib/ensure-target.js');
+const { deployPrecheck } = require('./lib/deploy-precheck.js');
 const { resolvePathPrefix } = require('../path-prefix.js');
 
 const logger = new Logger('omega:deploy');
@@ -335,6 +342,12 @@ async function purgeAfterPublish(config) {
 module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target. Runs before the manifest is read: it is
+  // what writes that manifest on a virgin target.
+  ensureTarget({ projectDir: process.cwd(), log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
+
   const project = require(path.join(process.cwd(), 'package.json'));
 
   // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
@@ -367,6 +380,14 @@ module.exports = async function (options) {
   if (findLocalSpecs({ dir: process.cwd() }).length > 0 || allDeps.includes('file:')) {
     logger.log('Linked local packages detected — deploying via the DIRECT lane (local build, output-only push). CI dispatch resumes after `omega i live`.');
     return deployDirect({ dryRun });
+  }
+
+  // The NETWORK half of the retired setup, as a precheck before the dispatch:
+  // the workflow reads its secrets from the repo, so they are published here
+  // rather than by a command someone had to remember (#675). A dry run sends
+  // nothing, so it publishes nothing either.
+  if (!dryRun) {
+    await deployPrecheck({ projectDir: process.cwd(), options, logger });
   }
 
   if (!dryRun && options.sync !== false) {

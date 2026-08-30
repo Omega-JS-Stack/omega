@@ -259,6 +259,43 @@ test('#386: the classifier reads the product, never the frequency string', async
   );
 });
 
+test('#668: a one-time purchase reports itself as one to every platform', async () => {
+  await bundleOnce();
+
+  const { buildItems } = require(BUNDLE);
+
+  // The live buy (order 5434-3892-3088) reached this file as
+  // `frequency=annually` — checkout resolved a cadence for a product that has
+  // none — so the browser purchase told GA4, Meta and TikTok that a $49.99
+  // one-time buy was a subscription. The redirect now carries what was bought
+  // outright, so even that URL is classified by the TYPE and the cadence beside
+  // it decides nothing.
+  const [stale] = buildItems(purchaseState({
+    productId: 'launch-kit',
+    productName: 'Starter Library',
+    amount: 49.99,
+    type: 'one-time',
+    frequency: 'annually',
+  }));
+
+  assert.strictEqual(stale.item_category, 'one-time', 'the conversion is categorized by what was bought, not by the cadence beside it');
+  assert.strictEqual(stale.item_variant, 'once', 'and a stale link never reports a cadence on a one-time buy');
+  assert.strictEqual(stale.price, 49.99, 'at the price the card was charged');
+
+  // And checkout now sends the word a one-time buy actually bills on, so a
+  // freshly minted link names no cadence the buyer will never be billed on.
+  const [item] = buildItems(purchaseState({
+    productId: 'launch-kit',
+    productName: 'Starter Library',
+    amount: 49.99,
+    type: 'one-time',
+    frequency: 'once',
+  }));
+
+  assert.strictEqual(item.item_category, 'one-time', 'still a one-time purchase');
+  assert.strictEqual(item.item_variant, 'once', 'and its variant is the one-time word, not a cadence');
+});
+
 test('#386: the page really calls the tracker — the commented-out state is gone', () => {
   const source = fs.readFileSync(path.join(CONFIRMATION, 'index.js'), 'utf8');
 

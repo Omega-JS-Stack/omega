@@ -39,6 +39,13 @@
     "./migrate": "./dist/migrate/index.js",
     "./cli": "./dist/cli-run.js"
   },
+  "projectScripts": {
+    "start": "omega dev",
+    "build": "omega build",
+    "test": "omega test",
+    "clean": "omega clean",
+    "deploy": "omega deploy"
+  },
   "scripts": {
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",

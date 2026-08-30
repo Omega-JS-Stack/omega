@@ -27,6 +27,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { resolveSubscription } = require('@omega.js/account');
+const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const PRICING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'pricing', 'index.js');
@@ -183,7 +184,10 @@ async function loadPricingPage(account) {
   // Every analytics call the page makes, as `<network>:<event>` — a switch is
   // not a purchase and must reach none of them with a cart event.
   const tracked = [];
-  globalThis.gtag = (kind, event) => tracked.push(`gtag:${event}`);
+  // The GA4 payloads beside the names, because an event can fire to all three
+  // and still describe the wrong thing (#668).
+  const payloads = [];
+  globalThis.gtag = (kind, event, params) => { tracked.push(`gtag:${event}`); payloads.push({ event, params }); };
   globalThis.fbq = (kind, event) => tracked.push(`fbq:${event}`);
   globalThis.ttq = { track: (event) => tracked.push(`ttq:${event}`) };
 
@@ -201,11 +205,13 @@ async function loadPricingPage(account) {
 
   return {
     tracked,
+    payloads,
     requests,
     button: (planId) => buttons.find((button) => button.dataset.planId === planId),
     /** Click one plan's button and report where the browser was sent. */
     navigate(planId) {
       tracked.length = 0;
+      payloads.length = 0;
       buttons.find((button) => button.dataset.planId === planId).click();
       return globalThis.window.location.href;
     },
@@ -256,6 +262,24 @@ test('pricing CTA: a plan switch is not a purchase — nothing is added to any c
   );
 });
 
+test('#668: a one-time product is added to the cart as `once`, not as a cadence', async () => {
+  // `item_variant` was the billing toggle's cadence for EVERY product, so the
+  // funnel's first event called a one-time buy monthly while begin_checkout,
+  // add_payment_info and purchase all say `once` — the same product counted
+  // two different ways across one funnel.
+  const page = await loadPricingPage(VISITOR);
+
+  page.navigate('credits');
+  const [cart] = page.payloads;
+  assert.strictEqual(cart.event, 'add_to_cart', 'the click is a cart event');
+  assert.strictEqual(cart.params.items[0].item_category, 'one-time', 'categorized by what it is');
+  assert.strictEqual(cart.params.items[0].item_variant, 'once', 'and it names no cadence it will never be billed on');
+
+  // The toggle still names a plan's term.
+  page.navigate('pro');
+  assert.strictEqual(page.payloads[0].params.items[0].item_variant, 'monthly', 'a subscription still carries the cadence the toggle is on');
+});
+
 test('pricing CTA: a cancelling subscriber is offered no switch it cannot make', async () => {
   // While a cancellation is scheduled the backend refuses a plan change and
   // the billing page hides its Change button — so "Switch to This Plan" was a
@@ -299,11 +323,11 @@ test('pricing CTA: a one-time product and a visitor with no subscription still c
 });
 
 test('#637: the pricing page warms the backend on load', async () => {
-  // Every plan button on this page leads to checkout, whose first call is the
-  // intent route — so the wakeup goes out now rather than at the click.
+  // Every plan button on this page leads to checkout, whose first call is a
+  // backend POST — so the wakeup goes out now rather than at the click.
   const { requests } = await loadPricingPage(VISITOR);
 
   const wakeup = requests.find((request) => request.options.wakeup);
   assert.ok(wakeup, 'the page fires the shared client wakeup helper');
-  assert.equal(wakeup.url, '/omega/payments/intent', 'aimed at the route checkout is about to need');
+  assert.equal(wakeup.url, WAKEUP_ROUTE, 'aimed at the one route every wakeup names');
 });

@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# OMEGA manager state (derived data — never committed)
+.omega/
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+
+# Run logs (truncated on every launch — never committed)
+logs/

@@ -56,10 +56,34 @@ Pages built on this runtime follow the **page paint contract** ([docs/web/page-c
 A fire-and-forget GET that warms a cold backend and nothing else. @omega.js/backend's middleware sees `wakeup` in the request data and answers it BEFORE it loads a route or authenticates ([docs/backend/index.md](../backend/index.md)), so any route warms the same function at the same cost and none of them runs. The call mints no ID token, reads no response body, and resolves rather than throwing when the network is down, so a caller can fire it and move on:
 
 ```javascript
-omega.request('/omega/payments/intent', { wakeup: true });
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
+
+omega.request(WAKEUP_ROUTE, { wakeup: true });
 ```
 
-@omega.js/web fires it from `/pricing` on load and again when `/payment/checkout` initializes, so the checkout's intent POST does not pay for a cold start ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
+**One route, every surface.** `WAKEUP_ROUTE` (`/omega/health`) is exported by `modules/request.js` and named by every caller instead of "the route I am about to need": a wakeup never runs a route, so a per-caller route would be a dozen spellings of one warm function — and desktop main and the extension cannot reach a web-side constant anyway ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+
+**Where it fires.** Every entry point whose first user action is a backend call warms it on load, never awaited:
+
+| Surface | Site | The call it is warming for |
+|---|---|---|
+| @omega.js/web | `/pricing` | the checkout the plan buttons lead to |
+| @omega.js/web | `/payment/checkout` | `/omega/payments/intent` |
+| @omega.js/web | `/signup` | `/omega/user/signup` — the 14-second cold start measured live 2026-08-27 |
+| @omega.js/web | `/signin` | `/omega/user/signup` behind a first-time OAuth signin |
+| @omega.js/web | `/account` | the billing portal, plan switch, cancel, refund, API key, data request, delete |
+| @omega.js/web | `/token` | `/omega/user/token` (also where a desktop app and an extension sign in) |
+| @omega.js/web | `/oauth2` | `/omega/user/oauth2` |
+| @omega.js/web | `/feedback` | `/omega/user/feedback` |
+| @omega.js/web | `/portal/email-preferences` | `/omega/marketing/email-preferences` |
+| @omega.js/web | `/download`, only where the notify-me form renders | `/omega/general/email` |
+| @omega.js/web | the `newsletter-cta` band — on first FOCUS, not on load | `/omega/marketing/contact` |
+| @omega.js/desktop | the renderer's auth bridge (`_wireAuthBridge`) | `/omega/user/token`, via main's sync-request |
+| @omega.js/extension | every surface's `syncWithBackground()` | `/omega/user/token`, via background's sync |
+
+The newsletter band is the one that waits for an interaction: it rides most pages, so a load-time ping would warm a function for every passive visitor scrolling past. A focus is the intent.
+
+Deliberately NOT pinging: the payment confirmation page (its check is a Firestore read, not a backend call), the contact form (it posts to Slapform, a third party), and the admin dashboard (internal tooling, whose seven load-time fetches are their own warm-up).
 
 ### Click triggers (`modules/triggers.js`)
 

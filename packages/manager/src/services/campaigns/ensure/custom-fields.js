@@ -66,7 +66,7 @@ module.exports = async function ensureCustomFields(context) {
 
   if (stillMissing.length > 0) {
     console.log(`      ${chalk.yellow('⚠')} ${stillMissing.length} field(s) failed to persist: ${chalk.cyan(stillMissing.map((f) => f.name).join(', '))}`);
-    return { status: 'warned', output: { customFields: { total: SENDGRID_FIELDS.length, failed: stillMissing.map((f) => f.name) } } };
+    return { status: 'warned', reason: `${stillMissing.length} field(s) failed to persist: ${stillMissing.map((f) => f.name).join(', ')}`, output: { customFields: { total: SENDGRID_FIELDS.length, failed: stillMissing.map((f) => f.name) } } };
   }
 
   return {

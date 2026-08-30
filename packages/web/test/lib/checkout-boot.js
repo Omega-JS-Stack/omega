@@ -109,7 +109,8 @@ function makeFormManager(record) {
  * @param {string} [options.search] - the page URL's query string
  * @param {object} [options.product] - the product the catalog sells
  * @returns {Promise<object>} the recorded bindings updates, form traffic,
- *   requests, `emit(event, payload)` for a form listener, and
+ *   requests, analytics events, `emit(event, payload)` for a form listener,
+ *   `pay(paymentMethod)` for the checkout being submitted, and
  *   `answerEligibility(eligible)` for the server finally replying.
  */
 async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTION } = {}) {
@@ -117,6 +118,7 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
 
   const updates = [];
   const requests = [];
+  const tracked = [];
   const form = {};
   let answerEligibility;
   const eligibility = new Promise((resolve) => { answerEligibility = resolve; });
@@ -126,7 +128,10 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
     transports: { browser: {} },
     createConsentGate: () => () => true,
     configure: () => {},
-    event: () => {},
+    // The client module's door, which is where web's `event()` hands off. The
+    // catalog and the pixels are another suite's subject; what this one can see
+    // is the canonical event the PAGE fired, with its params.
+    event: (name, params) => tracked.push({ name, params }),
   };
 
   globalThis.window = {
@@ -162,6 +167,12 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
         return { eligible: await eligibility };
       }
 
+      if (url.includes('payments/intent')) {
+        // The provider's hosted checkout, which is what the page redirects to.
+        // A payload-less answer is what the page treats as a failed intent.
+        return { url: 'https://provider.test/checkout/abc' };
+      }
+
       return {};
     },
   };
@@ -189,12 +200,23 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
   return {
     updates,
     requests,
+    tracked,
     form,
     settle,
     emit: async (event, payload) => {
       for (const handler of form.listeners[event] || []) {
         await handler(payload);
       }
+    },
+    // The pay click, fired WITHOUT being awaited: the real submit handler ends
+    // in a promise that never resolves, because the page is navigating to the
+    // provider by then. The intent POST lands in `requests` before that.
+    pay: async (paymentMethod = 'card') => {
+      for (const handler of form.listeners.submit || []) {
+        handler({ $submitButton: { getAttribute: () => paymentMethod } });
+      }
+
+      await settle();
     },
     answerEligibility: async (eligible) => {
       answerEligibility(eligible);

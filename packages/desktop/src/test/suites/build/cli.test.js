@@ -19,7 +19,11 @@ module.exports = {
         const Main = require(path.join(root, 'dist', 'cli.js'));
         const { commandsDir, aliases, defaultCommand } = Main.config;
 
-        const commands = [...new Set([...Object.keys(aliases), defaultCommand])];
+        // The default command is the router's BUILT-IN help since setup was
+        // retired (#675) — it dispatches without a command file.
+        ctx.expect(defaultCommand).toBe('help');
+
+        const commands = Object.keys(aliases);
         ctx.expect(commands.length).toBeGreaterThan(0);
 
         for (const cmd of commands) {

@@ -1,7 +1,8 @@
 /**
  * SendGrid v3 API client — marketing (lists, custom fields, segments),
- * verified senders, domain authentication, and the account-global Event
- * Webhook. Named-method surface so tests can fake it method-for-method.
+ * unsubscribe groups, verified senders, domain authentication, and the
+ * account-global Event Webhook. Named-method surface so tests can fake it
+ * method-for-method.
  *
  * Auth: SENDGRID_API_KEY in the brand .env.
  */
@@ -155,6 +156,21 @@ class SendGridAPI {
   async deleteSegment(segmentId) {
     await this.makeRequest(`/marketing/segments/2.0/${segmentId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // ========== Unsubscribe groups (ASM) ==========
+
+  /** Every unsubscribe group on the ACCOUNT (ids are account-scoped, not brand-scoped). */
+  async getUnsubscribeGroups() {
+    return this.makeRequest('/asm/groups');
+  }
+
+  /** description is recipient-facing — it renders on the preferences page. */
+  async createUnsubscribeGroup(name, description) {
+    return this.makeRequest('/asm/groups', {
+      method: 'POST',
+      body: JSON.stringify({ name, description, is_default: false }),
     });
   }
 

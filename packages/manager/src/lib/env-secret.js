@@ -20,8 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { generatedEnvKeys } = require('@omega.js/config');
-const { applyEnvOrder } = require('./env-order.js');
-const { envLine } = require('../services/disperse/write/env.js');
+const { applyEnvOrder, envLine } = require('./env-order.js');
 
 /**
  * Write NAME="value" into the brand .env (replace-or-append).
@@ -32,7 +31,7 @@ const { envLine } = require('../services/disperse/write/env.js');
  */
 function writeEnvValue(brandRoot, name, value) {
   const envPath = join(brandRoot, '.env');
-  // envLine escapes \ " and newlines (the disperse .env writer's serializer — the SSOT);
+  // envLine escapes \ " and newlines (env-order.js's serializer — the SSOT);
   // the replacer FUNCTION keeps $& / $1 in a secret from being expanded by String.replace
   const line = envLine(name, value);
   const pattern = new RegExp(`^${name}\\s*=.*$`, 'm');

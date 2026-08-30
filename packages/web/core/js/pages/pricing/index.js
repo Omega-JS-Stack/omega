@@ -1,9 +1,10 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
-import { PAYMENT_WARMUP_ROUTE } from '__main_assets__/js/libs/payment-config.js';
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
+import { ONE_TIME_FREQUENCY } from '../payment/checkout/modules/state.js';
 
 // Module
 export default () => {
@@ -16,10 +17,10 @@ export default () => {
     setupCurrentPlanIndicator();
 
     // Warm the backend the moment the page loads: every plan button leads to
-    // checkout, and checkout's first call is the intent route. Fire-and-forget
+    // checkout, and checkout's first call is a backend POST. Fire-and-forget
     // and unauthenticated — the backend answers a wakeup before it loads a
     // route ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)).
-    omega.request(PAYMENT_WARMUP_ROUTE, { wakeup: true });
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
 
     // Setup promo countdown (wait until mouse is not over nav)
     waitForNavUnhover();
@@ -261,11 +262,18 @@ function trackPricingToggle(billingType) {
 }
 
 function trackAddToCart(planId, planName, price, billingType, planType) {
+  const isSubscription = (planType || 'subscription') === 'subscription';
+
   const items = [{
     item_id: planId,
     item_name: planName,
     item_category: planType || 'subscription',
-    item_variant: billingType,
+    // The cadence toggle says nothing about a one-time product: the checkout
+    // link above already drops the param for one, and `begin_checkout` and
+    // `purchase` both name it `once`, so quoting the toggle's cadence here made
+    // the funnel's FIRST event the only one calling a one-time buy monthly
+    // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+    item_variant: isSubscription ? billingType : ONE_TIME_FREQUENCY,
     price: price,
     quantity: 1
   }];

@@ -155,4 +155,4 @@ manager.menu.getMenu()                         // the underlying Electron Menu i
 
 ## Default scaffold
 
-`npx omega setup` ships `src/integrations/menu/index.js` calling `menu.useDefaults()` plus commented-out examples (show preferences, insertAfter, update, remove, hide, add a Tools menu, appendTo).
+The scaffold every verb runs ships `src/integrations/menu/index.js` calling `menu.useDefaults()` plus commented-out examples (show preferences, insertAfter, update, remove, hide, add a Tools menu, appendTo).

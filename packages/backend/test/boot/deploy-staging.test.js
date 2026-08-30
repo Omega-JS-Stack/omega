@@ -358,10 +358,11 @@ module.exports = {
         jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({ name: 'acme-backend', private: true }));
         jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
 
-        // The .env disperse composes: the live payment secrets AND their dev
-        // twins, which the local emulator reads and no deploy may ever upload
+        // The target .env carries the live payment secrets AND their dev
+        // twins, which the local emulator reads and no deploy may ever upload.
+        // dist/.env is COMPOSED from the cascade by schema (#678): keys only,
+        // no marker comments — a verbatim copy is the OLD contract.
         const authored = [
-          '# ========== Default Values ==========',
           'STRIPE_SECRET_KEY="sk_live_fixture"',
           'STRIPE_SECRET_KEY_DEV="sk_test_fixture"',
           'CHARGEBEE_API_KEY_DEV="test_fixture"',
@@ -370,9 +371,13 @@ module.exports = {
         ].join('\n');
         jetpack.write(path.join(targetRoot, '.env'), authored);
 
-        // A LOCAL stage carries the file verbatim — the emulator needs the twins
+        // A LOCAL stage composes every key, dev twins included — the emulator
+        // needs them
         const local = stageFunctions({ projectDir: targetRoot });
-        assert.equal(jetpack.read(path.join(local.distDir, '.env')), authored, 'a local stage is a verbatim copy');
+        const localStaged = jetpack.read(path.join(local.distDir, '.env'));
+        for (const line of ['STRIPE_SECRET_KEY="sk_live_fixture"', 'STRIPE_SECRET_KEY_DEV="sk_test_fixture"', 'CHARGEBEE_API_KEY_DEV="test_fixture"', 'OMEGA_ADMIN_KEY="fixture-admin-key"']) {
+          assert.equal(localStaged.includes(line), true, `a local stage composes ${line.split('=')[0]}`);
+        }
 
         // The DEPLOY stage drops every dev-only row and nothing else
         const deploy = stageFunctions({ projectDir: targetRoot, deploy: true });
@@ -382,7 +387,6 @@ module.exports = {
         assert.equal(/^CHARGEBEE_API_KEY_DEV=/m.test(staged), false, 'the Chargebee dev twin never rides the artifact');
         assert.equal(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), true, 'the live key still rides it');
         assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(staged), true, 'unrelated keys are untouched');
-        assert.equal(staged.includes('# ========== Default Values =========='), true, 'the section markers survive');
         assert.equal(staged.includes('sk_test_fixture'), false, 'no dev VALUE survives either');
 
         jetpack.remove(tmp);

@@ -18,8 +18,9 @@
  *   - 'dropped'             — ONLY when bounce_classification is 'Invalid Address'.
  *
  * Note: 'group_unsubscribe' is the most common one (matches our ASM-link flow), and since
- * GROUPS.marketing (25928) is account-global across all brands, an unsub from group 25928
- * legitimately removes the user from marketing across the entire SendGrid account.
+ * an unsubscribe group is account-global across every brand sharing the SendGrid account,
+ * an unsub from the marketing group legitimately removes the user from marketing across
+ * the entire account.
  *
  * No idempotency ledger — the revoke + cross-provider remove are idempotent, so a
  * provider retry re-runs safely with the same end state.

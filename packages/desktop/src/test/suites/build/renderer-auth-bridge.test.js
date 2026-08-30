@@ -12,6 +12,8 @@
 
 const path = require('path');
 
+const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
+
 const RENDERER_PATH = path.join(__dirname, '..', '..', '..', 'renderer.js');
 const CLIENT_BRIDGE_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'client-bridge.js');
 
@@ -27,22 +29,33 @@ async function makeClientAuth(user) {
 }
 
 // A renderer Manager with the client already booted and an ipc stub whose invoke
-// answers are supplied by `handle`. Returns the manager plus the recorded invokes.
+// answers are supplied by `handle`. Returns the manager, the recorded invokes,
+// the recorded backend requests, and the `timeline` of both in the order the
+// bridge produced them — the wakeup ping's whole point is that it is FIRST.
 function makeRenderer(auth, handle) {
   const Manager = require(RENDERER_PATH);
   const manager = new Manager();
   const invokes = [];
+  const requests = [];
+  const timeline = [];
 
   manager.ipc = {
     on: () => {},
     invoke: async (channel, payload) => {
       invokes.push({ channel, payload });
+      timeline.push(channel);
       return handle(channel, payload);
     },
   };
-  manager.omega = { auth: () => auth };
+  manager.omega = {
+    auth: () => auth,
+    request: async (url, options = {}) => {
+      requests.push({ url, options });
+      timeline.push(options.wakeup ? 'wakeup' : url);
+    },
+  };
 
-  return { manager, invokes };
+  return { manager, invokes, requests, timeline };
 }
 
 module.exports = {
@@ -57,6 +70,25 @@ module.exports = {
         ctx.expect(typeof auth.getUser).toBe('function');
         ctx.expect(auth.getUser().uid).toBe('uid-abc');
         ctx.expect(auth.user).toBeUndefined();
+      },
+    },
+    {
+      // #644: main answers a sync-request that needs a token by POSTing
+      // /omega/user/token — the app's first backend call, on a function that is
+      // cold at every launch. The ping goes out before the bridge waits on
+      // anything, so the cold start burns down while auth settles.
+      name: 'the bridge warms the backend first, then syncs',
+      run: async (ctx) => {
+        const auth = await makeClientAuth({ uid: 'uid-abc', email: 'a@b.co' });
+        const { manager, requests, timeline } = makeRenderer(auth, () => ({ needsSync: false }));
+
+        await manager._wireAuthBridge();
+
+        ctx.expect(requests.length).toBe(1);
+        ctx.expect(requests[0].url).toBe(WAKEUP_ROUTE);
+        ctx.expect(requests[0].options.wakeup).toBe(true);
+        ctx.expect(timeline[0]).toBe('wakeup');
+        ctx.expect(timeline[1]).toBe('desktop:auth:sync-request');
       },
     },
     {

@@ -18,9 +18,13 @@
     "./flows": "./src/flows.js",
     "./icons": "./src/icons.js",
     "./actions-secrets": "./src/actions-secrets.js",
+    "./target-secrets": "./src/target-secrets.js",
     "./ci-workflows": "./src/ci-workflows.js",
+    "./certs": "./src/certs.js",
     "./defaults-engine": "./src/defaults-engine.js",
     "./framework-deps": "./src/framework-deps.js",
+    "./target-dependencies": "./src/target-dependencies.js",
+    "./deploy-precheck": "./src/deploy-precheck.js",
     "./merge-line-files": "./src/merge-line-files.js",
     "./translate": "./src/translate/index.js",
     "./deploy": "./src/deploy.js",
@@ -59,6 +63,7 @@
     "fs-jetpack": "^5.1.0",
     "json5": "^2.2.3",
     "minimatch": "^10.2.5",
-    "node-powertools": "^3.0.0"
+    "node-powertools": "^3.0.0",
+    "wonderful-version": "^1.3.2"
   }
 }

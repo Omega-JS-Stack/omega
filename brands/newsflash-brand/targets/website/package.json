@@ -6,7 +6,6 @@
     "@omega.js/web": "file:../../../../packages/web"
   },
   "scripts": {
-    "setup": "omega setup",
     "start": "omega dev",
     "build": "omega build",
     "test": "omega test",

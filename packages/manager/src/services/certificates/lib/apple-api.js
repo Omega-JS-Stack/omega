@@ -47,6 +47,7 @@ function catchAgreements(operation) {
     printAgreementsNotice();
     return {
       status: 'warned',
+      reason: 'Apple Developer agreements need acceptance',
       output: {
         agreements: 'pending',
         warning: `Apple Developer agreements need acceptance — visit ${APPLE_AGREEMENTS_URL} (Paid Apps / Free Apps / Program License), then re-run`,

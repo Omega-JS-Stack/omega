@@ -32,7 +32,7 @@ module.exports = async function ensureDsn(context) {
 
     if (!active) {
       console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(slug)} has no active client key — create one in Sentry, then rerun`);
-      return { status: 'warned', output: { dsn: { missingKey: slug } } };
+      return { status: 'warned', reason: `${slug} has no active client key — create one in Sentry`, output: { dsn: { missingKey: slug } } };
     }
 
     const dsn = active.dsn.public;

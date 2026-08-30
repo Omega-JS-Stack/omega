@@ -11,8 +11,32 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// ─── The delivery lane's boundary (#678) ─────────────────────────────────────
+// The lane deploy runs before it fans out is manage's own runner, stubbed HERE
+// (dev.test.js's pattern) so the ORDER — lane first, then the targets — is
+// observable in the same call log the fake framework bins write to, and no
+// service walk ever touches a fixture brand.
+const managePath = require.resolve('../src/manage.js');
+const manageCalls = [];
+let manageReport = { hasErrors: false, results: {}, brand: {} };
+
+require.cache[managePath] = {
+  id: managePath,
+  filename: managePath,
+  path: path.dirname(managePath),
+  loaded: true,
+  exports: {
+    runManage: async (startDir, options) => {
+      manageCalls.push({ startDir, options });
+      fs.appendFileSync(path.join(startDir, 'calls.log'), `${JSON.stringify({ name: 'delivery-lane', cwd: startDir, argv: [] })}\n`);
+      return manageReport;
+    },
+  },
+};
+
 const deployCommand = require('../src/commands/deploy.js');
 const { selectDeployTargets, buildForwardedFlags } = deployCommand;
+const { BOOT_SERVICES } = require('../src/config.js');
 
 // ─── Fixture staging (test-command.test.js pattern) ──────────────────────────
 
@@ -78,14 +102,21 @@ function stageBrand() {
   return { scratch, brand };
 }
 
-function readCalls(brand) {
+/**
+ * The TARGET spawns from the brand's call log. The delivery lane records
+ * itself there too — it must run before the first spawn (#678) — so
+ * `{ all: true }` is how the ordering assertion sees both.
+ */
+function readCalls(brand, { all = false } = {}) {
   const logPath = path.join(brand, 'calls.log');
   if (!fs.existsSync(logPath)) return [];
-  return fs.readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const entries = fs.readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  return all ? entries : entries.filter((entry) => entry.name !== 'delivery-lane');
 }
 
 /** Run the command from `cwd` with parsed options, restoring cwd + exitCode. */
 async function runDeployCommand(cwd, options = {}) {
+  manageCalls.length = 0;
   const cwd0 = process.cwd();
   process.chdir(cwd);
   try {
@@ -188,6 +219,50 @@ test('cli routes `deploy` through ALIASES to the command file', () => {
   const Main = require('../src/cli.js');
   assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'deploy'));
   assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'deploy.js')));
+});
+
+// ─── The delivery lane (#678) ────────────────────────────────────────────────
+
+test('the delivery lane runs ONCE, before the first target — brand inputs land before anything publishes', async () => {
+  const { brand } = stageBrand();
+  await runDeployCommand(brand);
+
+  assert.deepEqual(readCalls(brand, { all: true }).map((c) => c.name), ['delivery-lane', 'backend', 'web']);
+  assert.equal(manageCalls.length, 1, 'one lane pass for the whole fan-out, not one per target');
+  assert.equal(manageCalls[0].startDir, brand);
+});
+
+test('the lane deploy runs IS the boot lane — one constant, two triggers', async () => {
+  const { brand } = stageBrand();
+  await runDeployCommand(brand);
+
+  // The lane is asked for BY NAME, so its service list can never be a second
+  // copy of BOOT_SERVICES: manage resolves 'boot' to that constant
+  // (manage.test.js pins the resolution), and deploy hand-picks nothing.
+  assert.equal(manageCalls[0].options.lane, 'boot');
+  assert.equal(manageCalls[0].options.service, undefined);
+  assert.ok(BOOT_SERVICES.includes('disperse'), 'the delivery services are the boot lane\'s');
+});
+
+test('--dry-run reaches the lane too — a planned deploy plans its delivery', async () => {
+  const { brand } = stageBrand();
+  await runDeployCommand(brand, { 'dry-run': true, dryRun: true });
+
+  assert.equal(manageCalls[0].options.dryRun, true);
+});
+
+test('a delivery lane with errors stops the deploy — nothing publishes on broken inputs', async () => {
+  const { brand } = stageBrand();
+  manageReport = { hasErrors: true, results: {}, brand: {} };
+
+  try {
+    const code = await runDeployCommand(brand);
+
+    assert.equal(code, 1);
+    assert.deepEqual(readCalls(brand), [], 'no target was spawned');
+  } finally {
+    manageReport = { hasErrors: false, results: {}, brand: {} };
+  }
 });
 
 // ─── Units ───────────────────────────────────────────────────────────────────

@@ -180,6 +180,34 @@ module.exports = {
     },
 
     {
+      name: 'order template names the PRODUCT on a one-time receipt',
+      async run({ assert }) {
+        // A one-time row was labelled `Order #<id>` — the id the header already
+        // prints above it — so the receipt for a $49.99 purchase named the
+        // product nowhere at all
+        // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+        const result = await render('order', {
+          content: {
+            event: 'confirmation',
+            id: 'ORD-ONETIME',
+            type: 'one-time',
+            unified: {
+              product: { id: 'launch-kit', name: 'Starter Library' },
+              payment: { price: 49.99 },
+            },
+            _computed: { totalToday: '49.99' },
+          },
+        });
+
+        assert.ok(result.html.includes('Starter Library'), 'order: a one-time receipt names what was bought');
+        assert.ok(result.html.includes('One-time purchase'), 'order: and says nothing renews, where a subscription names its cadence');
+        assert.ok(!result.html.includes('Billed'), 'order: a one-time buy is billed on no cadence');
+        assert.ok(result.html.includes('49.99'), 'order: the price still renders');
+        assert.ok(result.html.includes('ORD-ONETIME'), 'order: and the order id still rides the header');
+      },
+    },
+
+    {
       name: 'order template renders a percent promo line',
       async run({ assert }) {
         const result = await render('order', {

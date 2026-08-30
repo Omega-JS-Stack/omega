@@ -93,7 +93,7 @@ module.exports = async function ensureSegments(context) {
 
   if (stillMissing.length > 0) {
     console.log(`      ${chalk.yellow('⚠')} ${stillMissing.length} segment(s) failed to persist: ${chalk.cyan(stillMissing.map((s) => s.display).join(', '))}`);
-    return { status: 'warned', output: { segments: { total: SENDGRID_SEGMENTS.length, failed: stillMissing.map((s) => s.name) } } };
+    return { status: 'warned', reason: `${stillMissing.length} segment(s) failed to persist: ${stillMissing.map((s) => s.name).join(', ')}`, output: { segments: { total: SENDGRID_SEGMENTS.length, failed: stillMissing.map((s) => s.name) } } };
   }
 
   return {

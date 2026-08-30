@@ -12,6 +12,7 @@ const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
 const { refuseWhenCustom } = require('../utils/project-type');
+const { runTargetChecks } = require('../utils/target-checks');
 
 // The Firebase emulator hub — fixed, not part of the N7-allocated map.
 const HUB_PORT = 4400;
@@ -166,6 +167,15 @@ class TestCommand extends BaseCommand {
     // (no firebase.json in cwd), boot the bundled fixture project under
     // src/test/fixtures/firebase-project. Mirrors BXM/UJM *_TEST_BOOT_PROJECT.
     const isSelfTest = this.setupSelfTest();
+
+    // The AUDIT half of the retired `omega setup` (#675): the target checks
+    // run before anything boots, healing what they can and halting on what
+    // they cannot. Skipped on the framework self-test — the bundled fixture is
+    // not a consumer target to heal, and the checks would rewrite it.
+    if (!isSelfTest) {
+      this.ui.section('Target checks');
+      await runTargetChecks(self);
+    }
 
     // functions/ is staged output (src/dist pillar): stage fresh so the run
     // reads current src + composed config. The auto-start emulator path stages
@@ -590,7 +600,7 @@ class TestCommand extends BaseCommand {
   }
 
   /**
-   * Seed the fixture's BRAND rules source — the same seed `omega setup` ships
+   * Seed the fixture's BRAND rules source — the same seed the scaffold ships
    * to a consumer. The framework half is no longer
    * copied anywhere: the stage below compiles it in
    * ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)), so the rules

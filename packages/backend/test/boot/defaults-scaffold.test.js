@@ -36,10 +36,11 @@ module.exports = {
         const tmp = makeTmp();
         const result = scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        // `_.gitignore` → .gitignore, `_.env` → .env — BOTH at the target root
-        // (src/dist pillar: functions/ is staged output, never scaffolded).
+        // `_.gitignore` → .gitignore at the target root (src/dist pillar:
+        // functions/ is staged output, never scaffolded). No `.env` scaffolds:
+        // a target .env is a human-only override; keys live in the brand root
+        // .env and every verb composes dist/.env from the cascade (#678).
         const expected = [
-          '.env',
           '.gitignore',
           'AGENTS.md',
           'CHANGELOG.md',
@@ -64,8 +65,8 @@ module.exports = {
         assert.equal(jetpack.read(path.join(tmp, 'CLAUDE.md')).trim(), '@AGENTS.md');
 
         // Marker files ship with the protocol sections intact.
-        const env = jetpack.read(path.join(tmp, '.env'));
-        assert.ok(env.includes(DEFAULT_MARKER) && env.includes(CUSTOM_MARKER), '.env should carry both section markers');
+        const gi = jetpack.read(path.join(tmp, '.gitignore'));
+        assert.ok(gi.includes(DEFAULT_MARKER) && gi.includes(CUSTOM_MARKER), '.gitignore should carry both section markers');
       },
     },
     {
@@ -122,46 +123,13 @@ module.exports = {
         const tmp = makeTmp();
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        // Consumer fills a default key (uncommenting its `# KEY=` placeholder)
-        // and adds their own custom key + gitignore line.
-        const envPath = path.join(tmp, '.env');
-        jetpack.write(envPath, jetpack.read(envPath)
-          .replace('# GH_TOKEN=', 'GH_TOKEN="ghp_mine"')
-          .replace('# ...', 'MY_CUSTOM="kept"\n# ...'));
+        // Consumer adds their own gitignore line.
         const giPath = path.join(tmp, '.gitignore');
         jetpack.write(giPath, jetpack.read(giPath).replace('# ...', 'my-secret-dir/\n# ...'));
 
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        const env = jetpack.read(envPath);
-        assert.ok(env.includes('GH_TOKEN="ghp_mine"'), 'filled default key should survive re-merge');
-        assert.ok(env.includes('MY_CUSTOM="kept"'), 'custom .env key should survive re-merge');
         assert.ok(jetpack.read(giPath).includes('my-secret-dir/'), 'custom .gitignore line should survive re-merge');
-      },
-    },
-    {
-      name: 'custom-key-newly-owned-by-framework-promotes-into-default',
-      async run({ assert }) {
-        const tmp = makeTmp();
-
-        // Legacy consumer .env: markers present, but a key the CURRENT template
-        // owns (OPENAI_API_KEY) sits in their Custom section with a value.
-        jetpack.write(path.join(tmp, '.env'), [
-          DEFAULT_MARKER,
-          'GH_TOKEN=""',
-          '',
-          CUSTOM_MARKER,
-          'OPENAI_API_KEY="sk-mine"',
-          '',
-        ].join('\n'));
-
-        scaffoldDefaults({ outputDir: tmp, logger: quiet });
-
-        const env = jetpack.read(path.join(tmp, '.env'));
-        const defaultPart = env.slice(0, env.indexOf(CUSTOM_MARKER));
-        const customPart = env.slice(env.indexOf(CUSTOM_MARKER));
-        assert.ok(defaultPart.includes('OPENAI_API_KEY="sk-mine"'), 'value should be promoted UP into the Default section');
-        assert.ok(!customPart.includes('OPENAI_API_KEY'), 'promoted key should be dropped from the Custom section');
       },
     },
     {
@@ -180,7 +148,7 @@ module.exports = {
           assert.equal(jetpack.exists(path.join(targetDir, file)), false, `${file} must not scaffold in brand context`);
         }
         // The non-doc defaults still land.
-        for (const file of ['.env', '.gitignore', 'test/_init.js']) {
+        for (const file of ['.gitignore', 'test/_init.js']) {
           assert.equal(jetpack.exists(path.join(targetDir, file)), 'file', `${file} should still scaffold`);
         }
         assert.equal(result.removed.length, 0, 'nothing to sweep on a fresh app');

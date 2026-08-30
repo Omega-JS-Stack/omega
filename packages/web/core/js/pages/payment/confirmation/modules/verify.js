@@ -21,8 +21,19 @@ export const POLL_TIMEOUT_MS = 30000;
  * Only the billing cadences checkout sells (`FREQUENCIES`) write account
  * state to wait for. A one-time purchase arrives as `frequency=once` and
  * writes nothing to the account doc — the receipt is the whole answer there.
+ *
+ * The product TYPE the redirect carries is the second guard, and it outranks
+ * the cadence: a checkout that sent the wrong frequency (`type=one-time,
+ * frequency=annually`, [#668](https://github.com/Omega-JS-Stack/omega/issues/668))
+ * had this page polling for a plan the purchase never writes, all the way to
+ * the timeout, on a payment that had completed cleanly. A redirect old enough
+ * to carry no type at all still answers on the cadence alone.
  */
 export function isVerifiable(state) {
+  if (state?.type && state.type !== 'subscription') {
+    return false;
+  }
+
   return FREQUENCIES.includes(state?.frequency);
 }
 

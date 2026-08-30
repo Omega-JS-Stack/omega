@@ -162,3 +162,76 @@ test('the real machine is measured, not assumed', () => {
   assert.ok(loadFactor() >= 1 && loadFactor() <= MAX_LOAD_FACTOR, 'the live factor is inside its own bounds');
   assert.ok(rebuildDeadlineMs() >= BASE_REBUILD_DEADLINE_MS, 'and never buys less than the solo floor');
 });
+
+// ─── The first-edit nudge (#688) ─────────────────────────────────────────────
+// A freshly created watch root's FSEvents stream can still be initializing
+// when the first edit lands — the one save falls before the stream's start
+// and is never replayed, so the wait times out with "1 started, 1 finished".
+// The nudge re-fires the SAME save until the watcher shows life, and stops
+// the moment a build starts: a rebuild that woke but served stale content
+// still fails, which is the staleness regression (#49) these suites exist for.
+
+test('a lost first edit is re-fired until the watcher wakes, then the nudging stops', async () => {
+  const clock = virtualClock();
+  const builds = buildRecorder();
+  let nudges = 0;
+  let content = 'BEFORE';
+
+  await waitForRebuild({
+    read: () => content,
+    pattern: /AFTER/,
+    message: 'the re-fired edit lands',
+    builds,
+    nudge: () => {
+      nudges += 1;
+      // The second re-save is finally heard: the watcher wakes and rebuilds
+      if (nudges === 2) {
+        builds.onStart();
+        builds.onFinish();
+        content = 'AFTER';
+      }
+    },
+    nudgeMs: 2000,
+    load: 0,
+    cpus: 8,
+    env: {},
+    now: clock.now,
+    sleep: clock.sleep,
+  });
+
+  assert.equal(nudges, 2, 'the edit was re-fired until delivery, never after');
+});
+
+test('a rebuild that woke but served stale content is never nudged — it fails as the staleness it is', async () => {
+  const clock = virtualClock();
+  const builds = buildRecorder();
+  let nudges = 0;
+  let woken = false;
+
+  await assert.rejects(
+    () => waitForRebuild({
+      read: () => 'BEFORE',
+      pattern: /AFTER/,
+      message: 'a stale rebuild must fail',
+      builds,
+      nudge: () => { nudges += 1; },
+      nudgeMs: 2000,
+      load: 0,
+      cpus: 8,
+      env: {},
+      now: clock.now,
+      sleep: async (ms) => {
+        // The watcher woke on its own right away — and served stale bytes
+        if (!woken) {
+          woken = true;
+          builds.onStart();
+          builds.onFinish();
+        }
+        await clock.sleep(ms);
+      },
+    }),
+    /a stale rebuild must fail/,
+  );
+
+  assert.equal(nudges, 0, 'a woken watcher is never re-nudged — the failure stays a staleness failure');
+});

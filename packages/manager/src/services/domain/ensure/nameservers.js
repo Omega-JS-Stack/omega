@@ -13,7 +13,13 @@
  */
 const chalk = require('chalk').default;
 const psl = require('psl');
-const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+
+// A freshly created zone gets its nameservers within seconds; a zone still
+// bare after this many reads is not going to fill in while we watch (#662).
+const ZONE_NS_READS = 6;
+const ZONE_NS_INTERVAL_MS = 5000;
 
 module.exports = async function ensureNameservers(context) {
   const { cloudflareApi, namecheapApi, domain, provider, options = {} } = context;
@@ -27,18 +33,25 @@ module.exports = async function ensureNameservers(context) {
   }
 
   // === READ: Cloudflare's assigned nameservers ===
-  const zone = await cloudflareApi.getZoneByName(zoneName);
+  let zone = await cloudflareApi.getZoneByName(zoneName);
 
   if (!zone) {
     console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone found for ${chalk.cyan(zoneName)} — rerun once the cloudflare service creates it`);
-    return { status: 'warned', output: { nameservers: { note: 'no Cloudflare zone found' } } };
+    return { status: 'warned', reason: 'no Cloudflare zone found for the zone', output: { nameservers: { note: 'no Cloudflare zone found' } } };
+  }
+
+  // A zone created earlier in THIS walk (the edge service) may still be
+  // initializing — wait for its nameservers instead of leaving the registrar
+  // to a second run (#662). Bounded: the poll gives up on its own.
+  if ((zone.name_servers || []).length === 0 && canPrompt(options)) {
+    zone = await waitForAssignedNameservers(cloudflareApi, zoneName, zone);
   }
 
   const required = [...(zone.name_servers || [])].sort();
 
   if (required.length === 0) {
     console.log(`      ${chalk.yellow('⚠')} Zone exists but has no assigned nameservers yet (still initializing) — rerun`);
-    return { status: 'warned', output: { nameservers: { note: 'zone has no assigned nameservers yet' } } };
+    return { status: 'warned', reason: 'the zone has no assigned nameservers yet', output: { nameservers: { note: 'zone has no assigned nameservers yet' } } };
   }
 
   console.log(`      ${chalk.dim('→')} Cloudflare nameservers: ${required.map((ns) => chalk.cyan(ns)).join(', ')}`);
@@ -60,8 +73,37 @@ module.exports = async function ensureNameservers(context) {
     console.log(`        ${chalk.cyan(ns)}`);
   }
 
-  return { status: 'warned', output: { nameservers: { manual: true, provider, required } } };
+  return { status: 'warned', reason: `${provider} requires manual nameserver configuration`, output: { nameservers: { manual: true, provider, required } } };
 };
+
+/**
+ * Re-read the zone until Cloudflare has assigned its nameservers, bounded to
+ * ZONE_NS_READS attempts (ENTER checks now, `s` skips).
+ *
+ * @returns {Promise<object>} - The zone: the assigned one, or the bare zone
+ *   handed in when the wait ran out or was skipped.
+ */
+async function waitForAssignedNameservers(api, zoneName, zone) {
+  let reads = 0;
+  let assigned = null;
+
+  const result = await pollWithSpinner({
+    check: async () => {
+      reads += 1;
+      const fresh = await api.getZoneByName(zoneName);
+      if ((fresh?.name_servers || []).length > 0) {
+        assigned = fresh;
+        return { done: true };
+      }
+      return reads >= ZONE_NS_READS ? { done: true, error: 'still initializing' } : { done: false };
+    },
+    intervalMs: ZONE_NS_INTERVAL_MS,
+    message: `Waiting for Cloudflare to assign nameservers for ${zoneName}`,
+    indent: '      ',
+  });
+
+  return result.success && assigned ? assigned : zone;
+}
 
 async function ensureNamecheap(domain, required, api, options) {
   const { sld, tld } = psl.parse(domain);
@@ -75,7 +117,7 @@ async function ensureNamecheap(domain, required, api, options) {
   } catch (error) {
     console.log(`      ${chalk.yellow('⚠')} Could not read nameservers at Namecheap${chalk.dim(`: ${error.message}`)}`);
     console.log(`      ${chalk.dim('→')} Domain not in your Namecheap account yet (not purchased?). Rerun after purchase.`);
-    return { status: 'warned', output: { nameservers: { error: error.message } } };
+    return { status: 'warned', reason: 'could not read the nameservers at Namecheap', output: { nameservers: { error: error.message } } };
   }
 
   const currentNs = [...current.nameservers].sort();

@@ -62,13 +62,6 @@ module.exports = function audit(done) {
     warnings.push('platforms.mac.mas.enabled is true but Mac App Store distribution is not yet implemented in @omega.js/desktop (the config keys are reserved for a future release). The standard mac DMG/zip targets will still build normally — the MAS variant is silently skipped.');
   }
 
-  // Snap publishing — warn if enabled but the SNAPCRAFT_STORE_CREDENTIALS secret
-  // hasn't been set up. The build will still succeed locally, but `electron-builder publish`
-  // will fail at upload time without that credential. Catch it early.
-  if (config.platforms?.linux?.snap?.enabled === true && Manager.isPublishMode() && !process.env.SNAPCRAFT_STORE_CREDENTIALS) {
-    warnings.push('platforms.linux.snap.enabled is true but SNAPCRAFT_STORE_CREDENTIALS is not set in env — snap publish will fail. Run `snapcraft export-login -` locally to mint, paste into .env, then `mgr push-secrets`.');
-  }
-
   // Report.
   for (const w of warnings) {
     logger.warn(w);

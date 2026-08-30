@@ -4,7 +4,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 ## How hooks work
 
-1. @omega.js/desktop scaffolds empty hook files into `<consumer>/hooks/**/*.js` on `npx omega setup`.
+1. @omega.js/desktop scaffolds empty hook files into `<consumer>/hooks/**/*.js` on every verb (`ensureTarget()`).
 2. At each lifecycle point, @omega.js/desktop checks for the file. If it exists, @omega.js/desktop loads + invokes it. If not, no-op.
 3. The hook signature is `async (ctx) => { ... }`. Whatever it returns is awaited but ignored.
 4. **Failure semantics:**

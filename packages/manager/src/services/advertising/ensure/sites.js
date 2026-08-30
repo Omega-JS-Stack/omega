@@ -59,7 +59,7 @@ module.exports = async function ensureSites(context) {
 
   console.log(`      ${chalk.dim('→')} Add the site at: ${chalk.cyan(sitesUrl)}`);
   console.log(`      ${chalk.dim('→')} (rerun converges once it appears)`);
-  return { status: 'warned', output: { sites: { domain, state: null, addUrl: sitesUrl } } };
+  return { status: 'warned', reason: 'site not added yet — add it in the AdSense console', output: { sites: { domain, state: null, addUrl: sitesUrl } } };
 };
 
 /**
@@ -88,6 +88,7 @@ function reportSite(site, sitesUrl, domain) {
 
   return {
     status: display.status,
+    ...(display.status === 'warned' ? { reason: display.label } : {}),
     output: {
       sites: {
         domain: site.domain,

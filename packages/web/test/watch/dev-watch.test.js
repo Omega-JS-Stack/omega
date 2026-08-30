@@ -207,8 +207,8 @@ async function startWatch(t, fixture) {
   return {
     page,
     configRuns,
-    pageBecomes(pattern, message, file) {
-      return waitForRebuild({ read: () => page(file), pattern, message, builds });
+    pageBecomes(pattern, message, file, nudge) {
+      return waitForRebuild({ read: () => page(file), pattern, message, builds, nudge });
     },
   };
 }
@@ -260,8 +260,13 @@ test('a watched packaged-layer _layouts edit is served by the very next rebuild'
 
   assert.match(watch.page('core-page.html'), /data-core-layout="BEFORE"/, 'the first build renders the core layer\'s layout');
 
-  fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AFTER">{{ content }}</main>');
-  await watch.pageBecomes(/data-core-layout="AFTER"/, 'the rebuild serves the packaged-layer edit — the node_modules ignore does not swallow it', 'core-page.html');
+  // The first packaged edit gets the re-save nudge (#688): the fresh packaged
+  // dir's FSEvents stream can still be initializing when this save lands, and
+  // a save that predates the stream is never replayed. The nudge stops on the
+  // first build event, so a woken-but-stale rebuild still fails (#49).
+  const editPackaged = () => fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AFTER">{{ content }}</main>');
+  editPackaged();
+  await watch.pageBecomes(/data-core-layout="AFTER"/, 'the rebuild serves the packaged-layer edit — the node_modules ignore does not swallow it', 'core-page.html', editPackaged);
 
   fixture.writePackaged('core/_layouts/core-toy.html', '<main data-core-layout="AGAIN">{{ content }}</main>');
   await watch.pageBecomes(/data-core-layout="AGAIN"/, 'every later edit lands too', 'core-page.html');

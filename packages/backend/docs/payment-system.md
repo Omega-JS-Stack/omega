@@ -246,6 +246,22 @@ Handlers are skipped during tests unless `TEST_EXTENDED_MODE` is set.
 
 The `transitions/index.js` module compares the **before** state (current `users/{uid}.subscription`) with the **after** state (new unified subscription) to detect what changed.
 
+**A detected transition is CLAIMED before anything acts on it** ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)): a transaction writes `payments-orders/{orderId}.transitions.<name>` = `{ eventId, status, timestamp, timestampUNIX }`, and an event that finds the field already there acts on nothing. Detection is a diff, so two webhooks for one checkout in flight together (Stripe's `customer.subscription.created` and `invoice.payment_succeeded`, one second apart) both read `basic` and both detect `new-subscription` — the claim is what makes only one of them act on it. One claim per order per transition NAME, so the order's later transitions still fire.
+
+**A claim carries its outcome, and a `failed` one is retakeable.** `status` is `claimed` while the run holds it, `done` once that run got through all three effects below, and `failed` beside the webhook doc's own failure stamp. A winner can throw AFTER claiming — the batch that writes the subscription, the order and the intent comes after the dispatch — and the frequent cron then re-runs that same event id ([below](#payments-webhooks-retry-state)). Against a claim with no outcome on it, the retry was refused by its own claim forever: no order email, no analytics, no marketing sync, and no subscription, for a customer who paid. `failed` is the one reclaimable state here for the same reason it is the one reclaimable state on the webhook doc and on a dispute alert; a `claimed` or `done` record refuses whoever asks, including the event holding it.
+
+**And a claim only speaks for ten minutes** (`CLAIM_WINDOW_MS`, exported by `transitions/index.js`). The race it settles is SECONDS wide and the retry that re-runs a failed event is minutes wide, while the order id is stable for the subscription's whole life — so every transition that can happen twice re-detects a name the order already carries: a second dunning cycle's `payment-failed`, a `cancellation-requested` after an uncancel, a second `plan-changed`. Unbounded, the first claim swallowed all of them for as long as the subscription lasted. A claim older than the window is retaken whatever its status; a fresher one from another event still refuses, which is what makes the concurrent pair above resolve to one.
+
+The claim gates all THREE effects a transition drives, because the live sighting duplicated all three:
+
+| Effect | Suppressed with |
+|---|---|
+| The handler dispatch (the customer's order email) | `Transition suppressed (claimed by <eventId>)` |
+| The analytics fire (`trial_start`, `purchase`) | `Payment analytics suppressed (claimed by <eventId>)` |
+| The marketing sync (`email.sync`) | `Marketing sync suppressed (claimed by <eventId>)` |
+
+The analytics fire is dropped WHOLE rather than re-resolved without its transition: `resolvePaymentEvent()` has `!transitionName` branches, so a nulled transition would make the duplicate resolve as a RENEWAL and fire `subscription_payment` — worse than firing nothing. A run with no transition detected at all is untouched by any of this; a renewal still tracks and still syncs.
+
 ### Subscription Transitions
 
 | Transition | Before → After | File | Email event |
@@ -702,6 +718,8 @@ Both doors enforce that: the intent side throws inside `intent/providers/test.js
 Only the FIRST charge moves. Every code is `duration: 'once'`, so `users/{uid}.subscription.payment.price` keeps the full renewal price from config; the discount itself is recorded on the order (`order.discount`), which is what analytics reads.
 
 **The confirmation URL's `amount` is the ROUTE's job, not a provider's** ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)). `buildConfirmationUrl()` in `routes/payments/intent/post.js` applies the validated discount, so the number is right on every provider. That placement is load-bearing: a real provider applies its coupon on its own hosted page and never revisits this URL, so doing the math provider-side left a discounted Stripe checkout landing on the confirmation page quoting the LIST price — and the client's tracking modules read that param straight into GA4/pixel revenue. A trial quotes `$0` and a coupon takes its cut off nothing.
+
+**The confirmation URL names the product TYPE** ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)). `buildConfirmationUrl()` sets `type=subscription|one-time` beside `frequency`, because the confirmation page holds nothing else about what was bought: it decides whether to WAIT for the webhook by asking whether the purchase writes account state at all, and a checkout that sent the wrong `frequency` (a one-time buy asking for `annually`) left it polling for a plan a one-time purchase never writes until it timed out, on a payment that had completed cleanly. The route also NORMALIZES what a one-time checkout bills on — `frequency` is written `once` beside `trial = false`, next to the guards, rather than taken from the caller — so the intent doc, the provider call and the confirmation URL cannot record a cadence the buyer will never be billed on. The one-time receipt names the PRODUCT in its summary row (`templates/order.js`), where it used to repeat the order id the header already prints.
 
 The test provider's remaining share is the **payload it fabricates**, carrying the coupon the way Stripe reports it: a Stripe-shaped `discount` on the subscription, `amount_total` + `total_details.amount_discount` on a one-time session, and the discounted `amount_due` on a declined checkout's failed first invoice.
 

@@ -26,8 +26,10 @@ const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys
 const { chosenProvider } = require('./providers.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
-const { loadEnv, resolveEnvChain, loadEnvChain } = require('./env.js');
-const { ENV_SCHEMA, ENV_GROUPS, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, devEnvKeys, devEnvKeyMap, envKeysByGroup } = require('./env-schema.js');
+const { loadEnv, resolveEnvChain, loadEnvChain, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
+const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, devEnvKeys, devEnvKeyMap, envKeysByGroup } = require('./env-schema.js');
+const { WORKFLOW_OWNED_KEYS, workflowSecretKeys, bakeKeys, publishSecretKeys, renderSecretsBlock } = require('./env-delivery.js');
+const { checkEnvRules } = require('./env-rules.js');
 const { readCompanyRoot, COMPANY_MARKER } = require('./company.js');
 const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('./edit.js');
 const { schemaDefaults, missingDefaults, defaultComments } = require('./defaults.js');
@@ -59,11 +61,24 @@ module.exports = {
   resolveEnvChain,
   loadEnvChain,
 
+  // The schema's `deliverAs` rename (#678) — the ONE place a brand-level name
+  // becomes the name a target's runtime reads
+  applyDeliverAs,
+
+  // The dist/.env composition (#678) — FILES only (company ← brand ← target),
+  // schema-filtered per target, written by every verb that stages an artifact
+  composeTargetEnv,
+
+  // The .env serializer SSOT — every writeback renders through these
+  envLine,
+  serializeEnv,
+
   // The env schema (#581) — the ONE inventory of the keys OMEGA needs: the
-  // manager's mint/order/disperse lanes and the backend's env reader all
-  // derive from it, so a new key is one entry, not four edits
+  // manager's mint and order lanes, every verb's target delivery, and the
+  // backend's env reader all derive from it, so a new key is one entry
   ENV_SCHEMA,
   ENV_GROUPS,
+  DELIVERY_MODES,
   envFileGroups,
   envSchemaEntry,
   envKeysForTarget,
@@ -72,6 +87,20 @@ module.exports = {
   devEnvKeys,
   devEnvKeyMap,
   envKeysByGroup,
+
+  // The delivery renderer (#627) — the ONE derivation of how a declared key
+  // reaches each target: the generated workflow's secrets block, the build's
+  // bake list, and the set a push-secrets publisher sends. No framework keeps
+  // a hand-written list, and a secret can never bake into an artifact
+  WORKFLOW_OWNED_KEYS,
+  workflowSecretKeys,
+  bakeKeys,
+  publishSecretKeys,
+  renderSecretsBlock,
+
+  // The env presence checker (#626) — the ONE evaluator of `required` and
+  // `requiredWhen`; every consumer calls it, none keeps its own if
+  checkEnvRules,
 
   // Company layer discovery (the .omega/company.json stamp) — shared by the
   // config chain, the .env chain, and owner hooks

@@ -1,12 +1,13 @@
 // Payment Checkout Page
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getProviders, getProductById, PAYMENT_WARMUP_ROUTE } from '__main_assets__/js/libs/payment-config.js';
+import { getProviders, getProductById } from '__main_assets__/js/libs/payment-config.js';
 import { fetchTrialEligibility, createPaymentIntent } from './modules/api.js';
-import { state, buildBindingsState, resolveProvider, FREQUENCIES, getAvailableFrequencies, TRIAL_ELIGIBILITY_UNKNOWN } from './modules/state.js';
+import { state, buildBindingsState, resolveProvider, resolveFrequency, TRIAL_ELIGIBILITY_UNKNOWN } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -134,14 +135,9 @@ async function initializeCheckout() {
     }
     state.product = product;
 
-    // Resolve frequency: URL param if valid, otherwise longest available term
-    const available = getAvailableFrequencies(product);
-    if (frequencyParam && FREQUENCIES.includes(frequencyParam) && available.includes(frequencyParam)) {
-      state.frequency = frequencyParam;
-    } else {
-      // Pick longest term (last in FREQUENCIES order: daily < weekly < monthly < annually)
-      state.frequency = available[available.length - 1] || 'annually';
-    }
+    // Resolve frequency: `once` for a one-time buy, otherwise the URL param if
+    // valid and the longest available term if not (#668)
+    state.frequency = resolveFrequency(product, frequencyParam);
 
     // Check payment methods are available
     const hasPaymentMethods = !!(
@@ -169,19 +165,21 @@ async function initializeCheckout() {
     // Fire-and-forget server warmup. No auth: the backend's middleware answers
     // a wakeup before it authenticates, so this costs nothing on either end
     // (docs/client/index.md § the wakeup ping).
-    omega.request(PAYMENT_WARMUP_ROUTE, { wakeup: true });
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
 
     // reCAPTCHA loads on its own clock; the page never waits on it
     initializeRecaptcha(omega.config?.captcha?.providers?.recaptcha?.siteKey)
       .catch((error) => console.warn('reCAPTCHA initialization failed:', error))
       .then(() => formManager.resolveGate('recaptcha'));
 
-    // The money line. A subscription must ask the server whether this visitor
-    // may trial, which is the ONE thing here that still waits for auth (the
-    // route is asked about a specific user). A one-time buy has no trial to be
-    // eligible for, so there is no question, no request, and no wait: its total
-    // is build config like everything else and it paints now (#637).
-    const answered = product.type === 'subscription'
+    // The money line. A subscription that SELLS a trial must ask the server
+    // whether this visitor may take it, which is the ONE thing here that still
+    // waits for auth (the route is asked about a specific user). Everything
+    // else — a one-time buy, and a plan whose `trial.days` is missing or 0 —
+    // has no trial to be eligible for, so there is no question, no request and
+    // no wait: its total is build config like everything else and it paints now
+    // (#637, [#666](https://github.com/Omega-JS-Stack/omega/issues/666)).
+    const answered = product.type === 'subscription' && product.trial?.days > 0
       ? resolveTrialEligibility(urlParams, product)
       : noTrialToAsk();
 

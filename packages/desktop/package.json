@@ -96,7 +96,7 @@
     "test": "node ./bin/omega-desktop test"
   },
   "projectScripts": {
-    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "start": "npx omega clean && npm run gulp --",
     "gulp": "gulp",
     "build": "npx omega build",
     "package": "npx omega package",

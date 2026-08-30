@@ -30,10 +30,9 @@ modern Firebase Cloud Functions backends. A single `Manager.init(exports, {...})
 All commands run from the **target root** (this directory). `dist/` is staged build output; never edit it.
 
 ```bash
-npx omega setup             # validate config + scaffold defaults + stage dist/ + run checks
 npx omega build             # stage src/ → dist/ (the tree firebase.json points at)
 npx omega emulator          # start Firebase emulators (auth/firestore/functions/database/storage)
-npx omega test              # run YOUR project's test suites (bare runs are project-only; mgr:/backend: → framework, full: → both)
+npx omega test              # target checks, then YOUR project's test suites (bare runs are project-only; mgr:/backend: → framework, full: → both)
 npx omega test --extended   # opt into REAL external APIs (shorthand for the shared TEST_EXTENDED_MODE; default: skipped)
 npx omega watch             # auto-reload functions on file change
 npx omega deploy            # deploy to Firebase
@@ -57,9 +56,9 @@ npx omega install live      # restore the published @omega.js/backend from npm
 - `src/hooks/<area>/<event>.js`: auth/cron hooks.
 - `src/public/`: OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
 - `config/omega.json5`: STANDALONE projects only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this target's settings) and this target carries NO config file.
-- `.env`: secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored; staged into `dist/` for the deploy artifact.
+- `.env`: OPTIONAL per-key overrides you write by hand. The brand root's `.env` is the one file to edit; every verb composes `dist/.env` from the cascade (company ← brand ← this file), filtered to the keys the env schema names for `backend`. Gitignored; no machine writes this file.
 - `service-account.json`: Firebase Admin credentials (STANDALONE projects; brand targets keep it in the brand's `.omega/secrets/`). Gitignored.
-- `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
+- `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by the verbs' scaffold.
 - `.firebaserc`: Firebase project ID alias.
 - `firestore.rules`: YOUR security rules — the whole file, no managed block. `omega build` compiles it with @omega.js/backend's framework half into `dist/firestore.rules`, which the emulator and `firebase deploy` read (never edit that).
   - Your rules may call any framework helper: `is*` asks a question (`isUser`, `isOwner`, `isAdmin`, `isWritingAny`), `get*` hands back a value (`getAuthUid`, `getExistingData`).
@@ -117,10 +116,10 @@ Skip a surface only when the feature genuinely doesn't have one; "the handler te
 not excuse the route round-trip. See `test/README.md` and
 `node_modules/@omega.js/backend/docs/test-framework.md`.
 
-<!-- Everything above this marker is owned by the framework and rewritten on every `npx omega setup`. Add your project-specific notes below — they are preserved across setups. -->
+<!-- Everything above this marker is owned by the framework and rewritten by every OMEGA verb. Add your project-specific notes below — they are preserved. -->
 
 # ========== Custom Values ==========
 
 ## Project-specific notes
 
-Add anything specific to THIS project here. Edits below this line are preserved across `npx omega setup` runs.
+Add anything specific to THIS project here. Edits below this line are preserved across runs.

@@ -84,7 +84,7 @@ function getOperationHandler(serviceDir, operationName, type) {
  *   - { state: {...} }                              → carry only (this run's serviceData, never a file)
  *   - { output: {...} }                             → transient only (lands in .omega/runs/{ts}.json)
  *   - { state, output }                             → both
- *   - { status, error?, state?, output? }           → status/error are metadata, allowed alongside state/output
+ *   - { status, error?, reason?, state?, output? }  → status/error/reason are metadata, allowed alongside state/output
  *
  * Any other top-level key throws. This prevents accidental data leakage into
  * the carry via an "everything dumps to serviceData" pattern.
@@ -96,7 +96,7 @@ function getOperationHandler(serviceDir, operationName, type) {
  * in the brand .env via lib/env-secret.js when it is secret-shaped. Anything
  * else (counts, success/fail flags, "what happened this run") goes to `output`.
  */
-const ALLOWED_KEYS = new Set(['state', 'output', 'status', 'error']);
+const ALLOWED_KEYS = new Set(['state', 'output', 'status', 'error', 'reason']);
 
 function splitReturn(result, operationName = 'unknown') {
   if (result === undefined || result === null) {
@@ -105,7 +105,7 @@ function splitReturn(result, operationName = 'unknown') {
   if (typeof result !== 'object' || Array.isArray(result)) {
     throw new Error(
       `Handler "${operationName}" returned ${Array.isArray(result) ? 'an array' : typeof result}. `
-      + `Returns must be undefined or an object with shape { state?, output?, status?, error? }.`,
+      + `Returns must be undefined or an object with shape { state?, output?, status?, error?, reason? }.`,
     );
   }
 
@@ -114,7 +114,7 @@ function splitReturn(result, operationName = 'unknown') {
   if (invalidKeys.length > 0) {
     throw new Error(
       `Handler "${operationName}" returned invalid top-level key(s): ${invalidKeys.join(', ')}. `
-      + `Allowed keys: state, output, status, error. `
+      + `Allowed keys: state, output, status, error, reason. `
       + `Wrap durable IDs in { state: {...} } and transient flags/counts in { output: {...} }.`,
     );
   }
@@ -146,14 +146,14 @@ async function runEnsure(serviceDir, operation, context, accumulators) {
 
     // Status check on the raw handler return
     if (result?.status === 'error') return { status: 'error', error: result.error };
-    if (result?.status === 'warned') return { status: 'warned' };
+    if (result?.status === 'warned') return { status: 'warned', reason: result.reason };
 
     return { status: 'continue' };
   } catch (error) {
     const pending = pendingGate(error, operation.name);
     if (pending) {
       Object.assign(accumulators.output, pending.output);
-      return { status: 'warned' };
+      return { status: 'warned', reason: pending.reason };
     }
 
     console.error(`      ${chalk.red('❌')} Ensure failed${chalk.dim(`: ${error.message}`)}`);
@@ -185,7 +185,7 @@ async function runRead(serviceDir, operation, context, serviceData) {
     const pending = pendingGate(error, operation.name);
     if (pending) {
       // No accumulators here — the caller merges the marker
-      return { data: null, status: 'warned', output: pending.output };
+      return { data: null, status: 'warned', output: pending.output, reason: pending.reason };
     }
 
     console.error(`      ${chalk.red('❌')} Read failed${chalk.dim(`: ${error.message}`)}`);
@@ -216,7 +216,7 @@ async function runTransform(serviceDir, operation, context, serviceData, readDat
   } catch (error) {
     const pending = pendingGate(error, operation.name);
     if (pending) {
-      return { data: null, status: 'warned', output: pending.output };
+      return { data: null, status: 'warned', output: pending.output, reason: pending.reason };
     }
 
     console.error(`      ${chalk.red('❌')} Transform failed${chalk.dim(`: ${error.message}`)}`);
@@ -249,14 +249,14 @@ async function runWrite(serviceDir, operation, context, accumulators, data) {
     if (output) Object.assign(accumulators.output, output);
 
     if (result?.status === 'error') return { status: 'error', error: result.error };
-    if (result?.status === 'warned') return { status: 'warned' };
+    if (result?.status === 'warned') return { status: 'warned', reason: result.reason };
 
     return { status: 'continue' };
   } catch (error) {
     const pending = pendingGate(error, operation.name);
     if (pending) {
       Object.assign(accumulators.output, pending.output);
-      return { status: 'warned' };
+      return { status: 'warned', reason: pending.reason };
     }
 
     console.error(`      ${chalk.red('❌')} Write failed${chalk.dim(`: ${error.message}`)}`);
@@ -330,6 +330,15 @@ function createServiceRunner(options = {}) {
     let overallStatus = 'success';
     let firstError = null;
 
+    // What warned/failed, by NAME (#643): the run summary's breakdown reads
+    // these instead of collapsing every operation into "some operations had
+    // issues". `reason` is the operation's own one-liner (never secret
+    // values); null when it gave none, and the summary prints the name alone.
+    const warned = [];
+    const failed = [];
+    const recordWarned = (operation, reason) => warned.push({ operation, reason: reason || null });
+    const recordFailed = (operation, reason) => failed.push({ operation, reason: reason || null });
+
     // Process operations in order
     for (const operation of operations) {
       if (logOperations) {
@@ -343,9 +352,11 @@ function createServiceRunner(options = {}) {
         if (result.status === 'error') {
           overallStatus = 'error';
           firstError = firstError || result.error || `${operation.name} failed`;
+          recordFailed(operation.name, result.error);
           if (stopOnError) break;
-        } else if (result.status === 'warned' && overallStatus !== 'error') {
-          overallStatus = 'warned';
+        } else if (result.status === 'warned') {
+          recordWarned(operation.name, result.reason);
+          if (overallStatus !== 'error') overallStatus = 'warned';
         }
 
         continue;
@@ -364,6 +375,7 @@ function createServiceRunner(options = {}) {
           if (readResult.status === 'error') {
             overallStatus = 'error';
             firstError = firstError || `${operation.name} read failed`;
+            recordFailed(operation.name, 'read failed');
             if (stopOnError) break;
           }
 
@@ -372,6 +384,7 @@ function createServiceRunner(options = {}) {
           // read
           if (readResult.status === 'warned') {
             Object.assign(accumulators.output, readResult.output);
+            recordWarned(operation.name, readResult.reason);
             if (overallStatus !== 'error') overallStatus = 'warned';
             continue;
           }
@@ -392,11 +405,13 @@ function createServiceRunner(options = {}) {
           if (transformResult.status === 'error') {
             overallStatus = 'error';
             firstError = firstError || `${operation.name} transform failed`;
+            recordFailed(operation.name, 'transform failed');
             if (stopOnError) break;
           }
 
           if (transformResult.status === 'warned') {
             Object.assign(accumulators.output, transformResult.output);
+            recordWarned(operation.name, transformResult.reason);
             if (overallStatus !== 'error') overallStatus = 'warned';
             continue;
           }
@@ -412,9 +427,11 @@ function createServiceRunner(options = {}) {
           if (writeResult.status === 'error') {
             overallStatus = 'error';
             firstError = firstError || writeResult.error || `${operation.name} write failed`;
+            recordFailed(operation.name, writeResult.error || 'write failed');
             if (stopOnError) break;
-          } else if (writeResult.status === 'warned' && overallStatus !== 'error') {
-            overallStatus = 'warned';
+          } else if (writeResult.status === 'warned') {
+            recordWarned(operation.name, writeResult.reason);
+            if (overallStatus !== 'error') overallStatus = 'warned';
           }
         } else if (operation.write && !operation.read) {
           // Write-only operation (no read phase)
@@ -425,9 +442,11 @@ function createServiceRunner(options = {}) {
           if (writeResult.status === 'error') {
             overallStatus = 'error';
             firstError = firstError || writeResult.error || `${operation.name} write failed`;
+            recordFailed(operation.name, writeResult.error || 'write failed');
             if (stopOnError) break;
-          } else if (writeResult.status === 'warned' && overallStatus !== 'error') {
-            overallStatus = 'warned';
+          } else if (writeResult.status === 'warned') {
+            recordWarned(operation.name, writeResult.reason);
+            if (overallStatus !== 'error') overallStatus = 'warned';
           }
         }
       }
@@ -438,6 +457,8 @@ function createServiceRunner(options = {}) {
       error: firstError,
       state: Object.keys(accumulators.state).length > 0 ? accumulators.state : null,
       output: Object.keys(accumulators.output).length > 0 ? accumulators.output : null,
+      ...(warned.length > 0 ? { warned } : {}),
+      ...(failed.length > 0 ? { failed } : {}),
     };
   };
 }

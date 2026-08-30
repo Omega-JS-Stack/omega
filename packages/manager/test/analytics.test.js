@@ -527,6 +527,73 @@ test('analytics: a link on the wrong property is moved to the configured one', a
   assert.equal(result.output.firebaseLink.linked, true);
 });
 
+// #662: the delete and the create are ONE walk's work. GA holds a
+// just-deleted link for a moment and answers the create with a precondition
+// failure — the run waits that out (skip allowed) instead of owing a rerun.
+test('analytics: the create waits out GA\'s hold on the just-deleted link and links in the SAME walk (#662)', async () => {
+  let attempts = 0;
+  const api = fakeAnalytics({
+    ...convergedResponses(),
+    listDataStreams: [WEB_STREAM, FIREBASE_STREAM],
+    listFirebaseLinks: (propertyId) => (propertyId === '777'
+      ? [{ name: 'properties/777/firebaseLinks/fl9', project: `projects/${PROJECT_NUMBER}` }]
+      : []),
+    listAccounts: [{ name: `accounts/${ACCOUNT}`, displayName: 'Fixture Account' }],
+    listProperties: [{ name: 'properties/777', displayName: 'Wrong Property' }],
+    deleteFirebaseLink: { deleted: true },
+    createFirebaseLink: () => {
+      attempts += 1;
+      if (attempts < 3) {
+        throw new Error('HTTP 400: Precondition check failed.');
+      }
+      return { name: `properties/${PROPERTY}/firebaseLinks/fl2` };
+    },
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ targets: { web: {} }, metaDisabled: true }), { analytics: api });
+
+    await tty.answer('(enter)=check now, (s)=skip', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success', 'the link landed in this walk — nothing owed to a rerun');
+    assert.equal(result.output.firebaseLink.linked, true);
+    assert.equal(api.callsTo('createFirebaseLink').length, 3, 'the create was retried on a later tick, not abandoned');
+  } finally {
+    tty.close();
+  }
+});
+
+test('analytics: skipping the link wait warns with the reason the summary prints (#662)', async () => {
+  const api = fakeAnalytics({
+    ...convergedResponses(),
+    listDataStreams: [WEB_STREAM, FIREBASE_STREAM],
+    listFirebaseLinks: (propertyId) => (propertyId === '777'
+      ? [{ name: 'properties/777/firebaseLinks/fl9', project: `projects/${PROJECT_NUMBER}` }]
+      : []),
+    listAccounts: [{ name: `accounts/${ACCOUNT}`, displayName: 'Fixture Account' }],
+    listProperties: [{ name: 'properties/777', displayName: 'Wrong Property' }],
+    deleteFirebaseLink: { deleted: true },
+    createFirebaseLink: () => {
+      throw new Error('HTTP 400: Precondition check failed.');
+    },
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ targets: { web: {} }, metaDisabled: true }), { analytics: api });
+
+    await tty.answer('(enter)=check now, (s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.deepEqual(result.warned, [{ operation: 'google-firebase-link', reason: 'the Firebase link is not ready yet — rerun in a minute' }]);
+  } finally {
+    tty.close();
+  }
+});
+
 test('analytics: a property linked to a DIFFERENT firebase project warns (not ours to break)', async () => {
   const api = fakeAnalytics({
     ...convergedResponses(),

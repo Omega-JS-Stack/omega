@@ -18,7 +18,7 @@
  * Idempotency: the API exposes no way to read a secret's current value back,
  * so "skip if unchanged" is not detectable. Publishing is therefore
  * unconditional — setting the same value twice is harmless (GitHub replaces
- * the sealed box), so a re-run of `omega setup` costs one API call per key and
+ * the sealed box), so a re-run of `omega deploy` costs one API call per key and
  * changes nothing.
  */
 const { execFileSync } = require('node:child_process');
@@ -27,7 +27,7 @@ const GH_INSTRUCTIONS = [
   'The GitHub CLI is required to publish Actions secrets.',
   '  install: https://cli.github.com  (macOS: brew install gh)',
   '  sign in: gh auth login',
-  '  or skip: run setup with --no-secrets',
+  '  or skip: run deploy with --no-secrets',
 ].join('\n');
 
 /** Default exec boundary — execFileSync, injectable everywhere below (tests). */

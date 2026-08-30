@@ -11,12 +11,21 @@ import * as dataRequestSection from './sections/data-request.js';
 import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
+    // Warm the backend the moment the page loads: every section here acts
+    // through it — the billing portal, a plan switch, a cancel, a refund, an
+    // API key, a data request, the delete — and each of those is one click on a
+    // function that may be cold. Fire-and-forget and unauthenticated: the
+    // backend answers a wakeup before it loads a route or authenticates
+    // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
+
     // Initialize when DOM is ready
     await omega.dom().ready();
 

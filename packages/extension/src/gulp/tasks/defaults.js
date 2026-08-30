@@ -8,6 +8,7 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
@@ -22,7 +23,7 @@ const cleanVersions = { versions: { ...package.engines, node: package.omega.node
 
 // File MAP — rule vocabulary is the devkit defaults engine's (minimatch patterns,
 // last-match-wins). Engine built-ins cover what used to be explicit rules here:
-// `_.` renames (`_.env` → `.env`), `.gitkeep` dir creation, `.DS_Store` skips,
+// `_.` renames (`_.gitignore` → `.gitignore`), `.gitkeep` dir creation, `.DS_Store` skips,
 // and write-only-if-changed.
 const FILE_MAP = {
   // Files to skip overwrite
@@ -56,16 +57,17 @@ const FILE_MAP = {
     },
   },
 
-  // Marker-section merges (framework owns Default, consumer owns Custom)
+  // Marker-section merges (framework owns Default, consumer owns Custom).
+  // The target-root .env is NOT scaffolded ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+  // the brand root's .env is the one file humans and the manager edit, a target
+  // .env is an optional per-key override a HUMAN writes, and no machine writes a
+  // target .env — so the template is gone.
   '_.gitignore': {
-    mergeLines: true,
-  },
-  '_.env': {
     mergeLines: true,
   },
 
   // The agent-docs chain (#63): AGENTS.md carries the content and uses the same
-  // marker-based merge as .env/.gitignore; CLAUDE.md is the one-line `@AGENTS.md`
+  // marker-based merge as .gitignore; CLAUDE.md is the one-line `@AGENTS.md`
   // pointer, left to the `**/*.md` rule above (copied when missing, never clobbered).
   // Must come AFTER `**/*.md` (which sets overwrite: false) — last-match-wins,
   // so this rule's `mergeLines: true` activates the merge path even though the
@@ -154,6 +156,12 @@ function siteTokenTransform(contents, item) {
         name: escapeSingleQuoted((config.brand?.name || '').trim()),
         description: escapeSingleQuoted(resolveAppDescription()),
       },
+      // The publish workflow's env block is GENERATED from the env schema
+      // ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)) — one
+      // `KEY: ${{ secrets.KEY }}` line per key the schema delivers to the
+      // extension, at the token's two-space indent. The workflow scaffolds with
+      // overwrite: true, so every verb re-renders it from the current schema.
+      githubSecrets: renderSecretsBlock('extension', { indent: '  ' }),
     }, {
       brackets: ['[', ']'],
     });
@@ -217,13 +225,27 @@ function scaffoldDefaults(options) {
   return result;
 }
 
-// Main task
-function defaults(complete, changedFile) {
+// Main task — the LOCAL half of the retired `omega setup` on the gulp lane
+// ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)). A full pass runs
+// ensureTarget (scripts, node check, peer deps, this scaffold, locality), so
+// `npm start` and every gulp build heal the consumer tree on the way past. The
+// watcher's single-file passes re-scaffold that ONE file and nothing else.
+async function defaults(complete, changedFile) {
   // Log
   logger.log('Starting...');
 
-  // Use changedFile if provided, otherwise process the whole defaults tree
-  scaffoldDefaults({ files: changedFile ? [changedFile] : null });
+  if (changedFile) {
+    scaffoldDefaults({ files: [changedFile] });
+  } else {
+    // Required lazily: ensure-target requires this module back for
+    // scaffoldDefaults, and only one of the two can win at load time.
+    const { ensureTarget } = require('../../commands/lib/ensure-target.js');
+    await ensureTarget({
+      projectDir: Manager.getRootPath('project'),
+      log: (line) => logger.log(line),
+      warn: (line) => logger.warn(line),
+    });
+  }
 
   // Log
   logger.log('Finished!');

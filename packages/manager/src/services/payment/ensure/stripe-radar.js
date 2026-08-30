@@ -68,6 +68,7 @@ module.exports = async function ensureStripeRadar(context) {
 
   return {
     status: 'warned',
+    reason: 'Radar rules not confirmed — add them in the Stripe Dashboard',
     output: { stripeRadar: { rules: desiredRules.length, radarUrl } },
   };
 };

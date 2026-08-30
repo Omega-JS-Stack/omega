@@ -58,7 +58,7 @@ module.exports = async function ensureProjects(context) {
     } else {
       console.log(`      ${chalk.yellow('⚠')} The token sees ${orgs.length} orgs — set monitoring.providers.sentry.org in omega.json5 to pick one`);
     }
-    return { status: 'warned', output: { projects: { orgUnresolved: true } } };
+    return { status: 'warned', reason: 'no Sentry org resolved — set monitoring.providers.sentry.org', output: { projects: { orgUnresolved: true } } };
   }
 
   // Multi-region SaaS: all org-scoped calls go to the org's home region

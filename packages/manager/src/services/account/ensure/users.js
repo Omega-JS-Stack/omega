@@ -118,7 +118,7 @@ module.exports = async function ensureUsers(context) {
     return { output, status: 'error', error: `Unauthorized admin accounts found: ${unauthorized.join(', ')}` };
   }
   if (warnings > 0) {
-    return { output, status: 'warned' };
+    return { output, status: 'warned', reason: `${warnings} account(s) had a signup or marketing warning` };
   }
   return { output };
 };

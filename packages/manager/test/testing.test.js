@@ -569,3 +569,25 @@ test('testing: missing build output → honest error naming the update service',
     { name: 'website: build output', error: 'dist/index.html missing — run the update service' },
   ]);
 });
+
+// ─── Recorded reason ────────────────────────────────────────────────────────
+
+test('testing: the recorded reason carries every warned check\'s name AND its warning', async () => {
+  const root = stageBrand();
+  const targets = [stageWebTarget(root, { declared: '^1.0.0', installed: '1.0.0' })];
+  const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
+  const exec = fakeExec({
+    'npm view @omega.js/web version': '1.2.0\n',
+    [GIT_CMD]: ' M src/a.js\n?? notes.txt\n',
+  });
+
+  const report = await runService(brandConfig(), { root, targets, fetch, exec });
+
+  assert.equal(report.status, 'warned');
+  assert.deepEqual(report.warned, [
+    {
+      operation: 'target-checks',
+      reason: 'website: @omega.js/web: outdated (1.0.0 → 1.2.0); working tree: 2 uncommitted files',
+    },
+  ]);
+});

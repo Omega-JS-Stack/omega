@@ -7,6 +7,13 @@ import omega from '@omega.js/client';
 // All supported billing frequencies
 export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];
 
+// What a one-time buy bills on, which is nothing: `once` is not a cadence and
+// is deliberately not in FREQUENCIES. It is still the word every reader
+// downstream keys on — the intent payload, the intent doc, the confirmation
+// URL, the receipt copy, the purchase pixel's `item_category` — so it is
+// spelled here once ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+export const ONE_TIME_FREQUENCY = 'once';
+
 // The third answer a trial-eligibility check can produce, and it is NOT the
 // same as "not eligible": the check timed out or failed, so nobody knows. The
 // DISPLAY reads it conservatively (no trial quoted, the full amount due today
@@ -81,6 +88,38 @@ function resolvePrice(product, frequency) {
 export function getAvailableFrequencies(product) {
   if (!product?.prices) return [];
   return FREQUENCIES.filter(f => resolvePrice(product, f) > 0);
+}
+
+/**
+ * What this checkout bills on — the ONE place the answer is decided, for the
+ * product being bought and for every product it is ever switched to.
+ *
+ * A one-time buy has no cadence to choose, so it is `once` OUTRIGHT: the URL
+ * param and the price list only ever decide a SUBSCRIPTION's term. Falling
+ * through to the cadence lane sent `frequency=annually` on a one-time checkout
+ * — a product with no annual price, so the fallback picked the default — and
+ * that word rode the intent payload all the way to the confirmation URL, where
+ * the page polled the account for a plan a one-time purchase never writes and
+ * sat on "still processing" until it timed out
+ * ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+ *
+ * @param {object|null} product - the catalog product being bought
+ * @param {string|null} frequencyParam - the URL's `frequency`, if any
+ * @returns {string} the frequency this checkout runs on
+ */
+export function resolveFrequency(product, frequencyParam) {
+  if (product?.type !== 'subscription') {
+    return ONE_TIME_FREQUENCY;
+  }
+
+  const available = getAvailableFrequencies(product);
+
+  if (frequencyParam && FREQUENCIES.includes(frequencyParam) && available.includes(frequencyParam)) {
+    return frequencyParam;
+  }
+
+  // Longest term (last in FREQUENCIES order: daily < weekly < monthly < annually)
+  return available[available.length - 1] || 'annually';
 }
 
 // Build the complete bindings state from minimal state

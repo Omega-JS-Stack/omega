@@ -48,7 +48,7 @@ module.exports = catchAgreements(async (context) => {
 
   if (!prefix) {
     console.log(`      ${chalk.yellow('⚠')} No ${chalk.cyan('certificates.providers.apple.bundleIdPrefix')} — the bundle ID is <prefix>.<brand.id with dashes as dots>`);
-    return { status: 'warned', output: { bundleIds: { skipped: 'no bundleIdPrefix' } } };
+    return { status: 'warned', reason: 'no certificates.providers.apple.bundleIdPrefix', output: { bundleIds: { skipped: 'no bundleIdPrefix' } } };
   }
 
   const bundleIdentifier = composeBundleId(prefix, brandId);

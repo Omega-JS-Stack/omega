@@ -15,8 +15,10 @@ const package = Manager.getPackage('main');
 const project = Manager.getPackage('project');
 const projectRoot = Manager.getRootPath('project');
 
-// Resolve the .env cascade from the project root (shell > app > brand > company)
-require('@omega.js/config').loadEnv(projectRoot);
+// Resolve the .env cascade from the project root (shell > app > brand > company).
+// `target` delivers the schema's `deliverAs` renames into process.env (#678);
+// gulp can be invoked outside the CLI (`npx gulp build`), so it asks here too.
+require('@omega.js/config').loadEnv(projectRoot, { target: 'desktop' });
 
 // Empty-string signing placeholders (CSC_LINK="" etc. from the .env template)
 // must read as UNSET — app-builder-lib only null-checks and would resolve ''
@@ -48,6 +50,16 @@ if (signingCert.source === 'certificates') {
   process.env.CSC_LINK = signingCert.cscLink;
 }
 logger.log(`Signing certificate: ${signingCert.source} (${signingCert.reason})`);
+
+// The signing paths the DELIVERED artifacts imply (#678): the manager's
+// disperse service used to stamp CSC_LINK / APPLE_API_KEY into the target's
+// .env; no machine writes a target .env any more, so an unset key whose file
+// sits in config/certs/ is derived here instead. Runs last: an explicit
+// answer, and the lookup above, always win. See utils/derive-signing-env.js.
+const derivedSigningKeys = require('../utils/derive-signing-env.js')({ env: process.env, projectDir: projectRoot });
+if (derivedSigningKeys.length) {
+  logger.log(`Derived signing env from the certs dir: ${derivedSigningKeys.map((entry) => `${entry.key}=${entry.value}`).join(', ')}`);
+}
 
 logger.log('Starting...', argv);
 

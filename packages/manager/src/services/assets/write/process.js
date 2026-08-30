@@ -9,6 +9,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const { PROCESSING_RULES } = require('../lib/assets-config.js');
+const { logoVariantFiles } = require('../lib/derived.js');
 const { convertSvgToBlack } = require('../lib/svg-to-black.js');
 const { isStale } = require('../../../lib/stale.js');
 
@@ -37,15 +38,13 @@ module.exports = async function writeProcess(context) {
     let svgContent = null;
     let ruleGenerated = 0;
     const variants = [
-      { name: 'color', svgName: 'color-x.svg', svg: () => svgContent },
-      { name: 'black', svgName: 'black-x.svg', svg: () => convertSvgToBlack(svgContent) },
+      { name: 'color', svg: () => svgContent },
+      { name: 'black', svg: () => convertSvgToBlack(svgContent) },
     ];
 
     for (const variant of variants) {
-      const targets = [
-        variant.svgName,
-        ...rule.sizes.map((size) => `${variant.name}-${size}.png`),
-      ].filter((name) => isStale(sourcePath, join(outputDir, name)));
+      const targets = logoVariantFiles(rule, variant.name)
+        .filter((name) => isStale(sourcePath, join(outputDir, name)));
 
       if (targets.length === 0) {
         fresh += 1 + rule.sizes.length;

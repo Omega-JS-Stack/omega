@@ -130,35 +130,54 @@ test('captcha: skips without brand.url', async () => {
 
 // A setup-time throw is how a service fails the walk: manage.js's runService
 // catches it into { status: 'error', error } for the run summary
-test('captcha: the secret without the config site key fails the service', async () => {
+test('captcha: the secret without the config site key WARNS — the orphan half nothing else sees', async () => {
   // The playground's live-checkout 403 state: the backend enforces token
-  // verification, the client has no key to mint a token with
-  await assert.rejects(
-    () => runService(brandConfig({ siteKey: null }), { recaptcha: fakeRecaptcha() }),
-    (error) => {
-      assert.match(error.message, /captcha\.providers\.recaptcha\.siteKey is missing from config/);
-      assert.match(error.message, /https:\/\/www\.google\.com\/recaptcha\/admin/);
-      return true;
-    },
-  );
+  // verification, the client has no key to mint a token with. The reverse
+  // direction (secret required by the site key) is the schema's rule; THIS
+  // direction is config-side, so this service — the one place that sees both
+  // halves — is still the one that says it.
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await runService(brandConfig({ siteKey: null }), { recaptcha: fakeRecaptcha() });
+  } finally {
+    console.log = originalLog;
+  }
+
+  const said = lines.join('\n');
+  assert.match(said, /RECAPTCHA_SECRET_KEY is set but captcha\.providers\.recaptcha\.siteKey is missing/);
+  assert.match(said, /https:\/\/www\.google\.com\/recaptcha\/admin/);
+  // A warning, not a failure: the service still proves the secret it has.
+  assert.equal(result.status, 'success');
 });
 
-test('captcha: the config site key without the secret fails, deep-linking the key page', async () => {
+test('captcha: the config site key without the secret is the SHARED rule now — this service skips (#626)', async () => {
+  // The secret-required-when-siteKey direction is the env schema's
+  // `requiredWhen` rule, warned brand-wide by the workspace env-rules op. This
+  // service just has no secret to prove, so it skips with the missing key named
+  // — one rule, one home, one message.
   const config = brandConfig();
   config.cloud = { provider: 'firebase', config: { projectId: 'fixture-brand-cloud' } };
 
-  await assert.rejects(
-    () => runService(config, { recaptcha: fakeRecaptcha(), env: false }),
-    (error) => {
-      assert.match(error.message, /RECAPTCHA_SECRET_KEY is missing from the brand \.env/);
-      // The #444 deep-link pattern, reused verbatim
-      assert.match(
-        error.message,
-        new RegExp(`https://console\\.cloud\\.google\\.com/security/recaptcha/${SITE_KEY}/overview\\?from=keysList&project=fixture-brand-cloud`),
-      );
-      return true;
-    },
-  );
+  process.env.RECAPTCHA_SITE_KEY = SITE_KEY;
+  delete process.env.RECAPTCHA_SECRET_KEY;
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot: '/tmp/omega-manager-recaptcha-unused',
+    brandConfig: config,
+    targets: [],
+    operations: OPERATIONS.captcha,
+    options: {},
+    serviceData: {},
+    recaptchaApi: fakeRecaptcha(),
+  });
+
+  assert.equal(result.status, 'skipped');
+  assert.deepEqual(result.missingEnv, ['RECAPTCHA_SECRET_KEY']);
 });
 
 test('captcha: neither half is the sanctioned unkeyed brand — it skips, never fails (#17)', async () => {

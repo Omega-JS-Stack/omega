@@ -5,7 +5,7 @@
 //
 // Since #117 the build-mode env flags are set in-process by the CLI verbs, so
 // the scripts invoke nothing but `npx omega` — cross-env is gone from the
-// scaffold, from desktop's own deps, and from the setup dependency map.
+// scaffold, from desktop's own deps, and from the peer-dependency map.
 
 const path = require('path');
 const fs = require('fs');
@@ -65,16 +65,16 @@ module.exports = {
       },
     },
     {
-      name: 'setup no longer scaffolds cross-env into the consumer',
+      name: 'ensure-target no longer scaffolds cross-env into the consumer',
       run: (ctx) => {
-        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'setup.js'), 'utf8');
+        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'ensure-target.js'), 'utf8');
         ctx.expect(source.includes('cross-env')).toBe(false);
       },
     },
     {
-      name: 'setup syncs projectScripts unconditionally — consumers heal on the next run',
+      name: 'ensure-target syncs projectScripts unconditionally — consumers heal on the next verb',
       run: (ctx) => {
-        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'setup.js'), 'utf8');
+        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'ensure-target.js'), 'utf8');
         ctx.expect(/project\.scripts\[key\] = package\.projectScripts\[key\]/.test(source)).toBe(true);
       },
     },

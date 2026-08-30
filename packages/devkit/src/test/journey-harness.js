@@ -8,7 +8,6 @@
  *   link    → `omega i local` from the website target (tree-wide file: flip +
  *             ONE brand-root install; also links @omega.js/manager at the
  *             brand root so brand-level verbs exist at all)
- *   setup   → every scaffolded target's framework setup, headless
  *   boot    → `omega dev` at the brand root (web + backend emulator, N7
  *             ports), probe the rendered homepage over the announced URL
  *   manage  → headless creds-scrubbed manage; scorecard from the run file
@@ -19,7 +18,7 @@
  * Spec-driven ({ id, url, targets, expect }) so a corpus of brand shapes
  * can reuse it. Heavy by design — real registry installs, real builds —
  * so preconditions (network, java) SKIP the run cleanly when unmet unless
- * { strict }. Install-machinery legs (onboard/link/setup) inherit the
+ * { strict }. Install-machinery legs (onboard/link) inherit the
  * machine env; runtime legs (dev boot, manage) run with credential-shaped
  * vars scrubbed — the journey must never reach a real cloud.
  *
@@ -40,13 +39,12 @@ const { createStepsLog } = require('./steps-log.js');
 const TIMEOUTS = {
   onboard: 120000,
   link: 1800000,
-  setup: 1200000,
   bootReady: 420000,
   probe: 120000,
   manage: 2400000,
 };
 
-// Setup/boot ordering preference (cosmetic — matches the rehearsal); targets
+// Boot ordering preference (cosmetic — matches the rehearsal); targets
 // themselves come from the scaffold output on disk, never from a map here.
 const TARGET_ORDER = ['website', 'backend', 'desktop', 'extension', 'mobile'];
 
@@ -327,6 +325,24 @@ async function stopGroup(child, graceMs = 20000) {
 }
 
 /**
+ * Emulator processes already orphaned onto pid 1 — the #690 leak signature.
+ * Read before boot and again after shutdown: only NEW pids indict this run
+ * (another session's leftovers are not this journey's verdict). Returns null
+ * where `ps` is unavailable, and the caller skips the check.
+ */
+function emulatorOrphans() {
+  const ps = spawnSync('ps', ['ax', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' });
+  if (ps.error || ps.status !== 0) return null;
+  return ps.stdout.split('\n').reduce((orphans, line) => {
+    const match = line.match(/^\s*(\d+)\s+1\s+(.*)$/);
+    if (match && /firebase emulators:start|cloud-firestore-emulator|pubsub-emulator/.test(match[2])) {
+      orphans.push({ pid: Number(match[1]), command: match[2] });
+    }
+    return orphans;
+  }, []);
+}
+
+/**
  * Run the full wizard journey for one brand spec.
  *
  * @param {Object} options
@@ -421,22 +437,11 @@ async function runJourney(options) {
       return `${targets.length} targets + brand root`;
     });
 
-    // ── Setups — each target's framework, headless, via the consumer bin ──
-    for (const targetDir of targets) {
-      const targetName = path.basename(targetDir);
-      await run.step(`${targetName} setup`, async () => {
-        await run.runToExit(`setup-${targetName}`, run.dispatcherBin(targetDir), ['setup'], {
-          cwd: targetDir,
-          env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }),
-          timeout: TIMEOUTS.setup,
-        });
-      });
-    }
-
     // ── Boot — `omega dev` at the brand root, probe the homepage ──────────
     const bootsWeb = targets.some((dir) => path.basename(dir) === 'website');
     const bootsBackend = targets.some((dir) => path.basename(dir) === 'backend');
     if (bootsWeb || bootsBackend) {
+      const orphansAtBoot = emulatorOrphans();
       await run.step(`\`omega dev\` boots${bootsWeb ? ' web' : ''}${bootsBackend ? ' + backend emulator' : ''}`, async () => {
         const readyPatterns = {};
         if (bootsWeb) readyPatterns.web = DEV_SERVER_URL;
@@ -502,9 +507,24 @@ async function runJourney(options) {
         });
       }
 
-      await run.step('dev stack shuts down cleanly', async () => {
+      await run.step('dev stack shuts down cleanly, leaving no orphaned emulator', async () => {
         await run.devStack.stop();
         run.devStack = null;
+        // The #690 proof: a shutdown that killed npm but not the emulator
+        // leaves NEW pid-1 processes holding the ports. The tail of the
+        // backend's own sweep can lag the stop by a beat — poll briefly.
+        const before = new Set((orphansAtBoot || []).map((proc) => proc.pid));
+        const deadline = Date.now() + 5000;
+        let leaked = [];
+        for (;;) {
+          leaked = (emulatorOrphans() || []).filter((proc) => !before.has(proc.pid));
+          if (leaked.length === 0 || Date.now() > deadline) break;
+          await sleep(250);
+        }
+        if (leaked.length > 0) {
+          throw new Error(`emulator leaked onto pid 1 (#690): ${leaked.map((proc) => `${proc.pid} ${proc.command}`).join('; ')}`);
+        }
+        return orphansAtBoot === null ? 'stopped (no ps — orphan check skipped)' : 'no orphaned emulator left behind';
       });
     }
 

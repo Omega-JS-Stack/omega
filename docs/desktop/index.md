@@ -26,10 +26,10 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 ### For Consuming Projects
 
 1. `npm install @omega.js/desktop --save-dev`
-2. `npx omega setup` — scaffolds the project (writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
+2. There is no setup step ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)). The project scaffolds itself on the first verb below — `ensureTarget()` writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`, idempotently and silently once the target is converged.
 3. `npm start` — dev (gulp → webpack → electron .)
 4. `npm run build` — local production build (compiles bundles only, no installer)
-5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally. Quick mode runs end-to-end (#117): clean keeps an existing `dist/` and `release/` (the gulp build still rebuilds every bundle fresh) and setup takes its quick path — run a full `npm run package` to clear old `release/` artifacts.
+5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally. Quick mode runs end-to-end (#117): clean keeps an existing `dist/` and `release/` (the gulp build still rebuilds every bundle fresh) — run a full `npm run package` to clear old `release/` artifacts.
 6. `npm run package` — full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux). ~3min on mac.
 7. `npm run release` — signed + published release (requires certs)
 8. `npx omega test` — runs the project's test suites (bare consumer runs never include the framework corpus)
@@ -114,6 +114,12 @@ Convention-only. Drop PNGs at `config/icons/<platform>/<slot>.png` (platform-spe
 
 prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from @omega.js/desktop defaults + consumer config. Strategy-pluggable Windows signing (`platforms.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](../../packages/desktop/docs/build-system.md), [docs/installer-options.md](../../packages/desktop/docs/installer-options.md), [docs/signing.md](../../packages/desktop/docs/signing.md).
 
+### Signing artifacts — delivered on every verb ([#678](https://github.com/Omega-JS-Stack/omega/issues/678))
+
+The Apple artifacts land in the target's `config/certs/` from the signing tree (`<companyRoot||brandRoot>/.omega/certificates/apple/`, the company workspace's when the brand carries the `.omega/company.json` stamp) at the start of `build`, `package`, `publish` and `deploy` — not only on a manager `manage` run. The copy rules and the byte-compare are `@omega.js/devkit/certs`'s `deliverCerts()`, the same ONE delivery the manager's disperse writer rides; desktop's framing is [src/utils/deliver-certs.js](../../packages/desktop/src/utils/deliver-certs.js). A target outside a brand, or a brand whose tree was never produced, is a silent no-op.
+
+`CSC_LINK` and `APPLE_API_KEY` used to be stamped into the target's `.env` by disperse. No machine writes a target `.env` any more, so the gulp entry DERIVES them ([src/utils/derive-signing-env.js](../../packages/desktop/src/utils/derive-signing-env.js)): an unset key whose delivered file exists gets the target-relative path (`config/certs/developer-id-application.p12`, `config/certs/AuthKey_<APPLE_API_KEY_ID>.p8`). An already-set value always wins, and an absent file sets nothing — electron-builder's own skip/auto-discovery logic then applies, exactly as when [sanitize-signing-env.js](../../packages/desktop/src/utils/sanitize-signing-env.js) deletes an empty placeholder.
+
 All three webpack targets strip `@dev-only` blocks in production builds — code between `/* @dev-only:start */` and `/* @dev-only:end */` is cut from the bundle, so dev warnings and simulation hooks (@omega.js/client's and the vendored themes' included) never ship. Dev builds keep them. The markers and the cut are one home, `@omega.js/devkit/strip-dev-blocks`, shared with @omega.js/web's esbuild plugin and @omega.js/extension's loader.
 
 ### Config flow
@@ -148,24 +154,23 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 
 ## CLI
 
-`npx omega <command>`:
+`npx omega <command>` (bare `omega` prints the listing). Every verb runs `ensureTarget()` first — the local scaffold the retired `omega setup` used to own ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)): scripts, `.nvmrc` seed, Node check, peer deps, the defaults tree, the locality warning. It writes no `.env` ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)): the brand root's `.env` is the one file humans and the manager edit, and a target `.env` is an optional per-key override you author yourself. The gulp verbs get it from the `defaults` task; `test` and `deploy` call it themselves:
 
 | Command | Description |
 |---|---|
-| `setup` | scaffold consumer, ensure peer deps, write projectScripts into `package.json` (npm's trailing newline kept, written only when the content changed — [#590](https://github.com/Omega-JS-Stack/omega/issues/590)) |
 | `clean` | remove `dist/`, `release/`, `.cache/` |
 | `install` | install peer deps |
 | `version` | print versions |
 | `test` | run the project's test suites (`framework:` / `full:` reach the framework suite) |
 | `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
-| `deploy` | delegate to the release flow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |
+| `deploy` | delegate to the release flow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo). Runs the NETWORK prechecks first — framework freshness, `validate-certs`, repo provisioning, `push-secrets` — each soft; `--no-secrets` skips them all |
 | `logs` | read the app's log files (alias `log`) |
 | `help` | command listing (router built-in; also `-h`/`--help`) |
-| `build` | clean + setup + `gulp build`, with `OMEGA_BUILD_MODE=true` set in-process |
-| `package` | clean + setup + the electron-builder package (`--quick` for host platform/arch only) |
-| `publish` | full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`); `--local` cleans + re-scaffolds first |
-| `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs at end of `setup` |
-| `push-secrets` | encrypt `.env` Default section via libsodium → GH Actions secrets. Auto-runs at end of `setup` when `GH_TOKEN` is set |
+| `build` | clean + certs delivery + `gulp build`, with `OMEGA_BUILD_MODE=true` set in-process |
+| `package` | clean + certs delivery + the electron-builder package (`--quick` for host platform/arch only) |
+| `publish` | certs delivery + full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`); `--local` cleans first |
+| `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs as an `omega deploy` precheck |
+| `push-secrets` | encrypt the schema's delivered set for desktop (values from the composed env, file-path secrets base64'd) via libsodium → GH Actions secrets, refusing when the discovered remote is not the brand's declared repo. Auto-runs as an `omega deploy` precheck when `GH_TOKEN` is set |
 | `sign-windows` | strategy-aware EV/cloud/local signer; emits JSONL events for `runner monitor` |
 | `runner monitor` | tails `omega-signing.log` and pretty-prints signing events |
 | `launch` | launch a packaged app with clean env (strips `ELECTRON_RUN_AS_NODE`); auto-discovers `release/<platform>-<arch>/<App>.app`. Aliases: `mgr open` |
@@ -190,12 +195,12 @@ See [docs/releasing.md](../../packages/desktop/docs/releasing.md) for the end-to
 
 ## Supply-Chain Security
 
-All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`, `npx omega runner`) route through the `safeInstall()` helper (`src/utils/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm ci`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
+All `npm install` calls in CLI commands (`npx omega i`, `npx omega runner`, the peer-dependency step of every verb's `ensureTarget()`) route through the `safeInstall()` helper (`src/utils/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm ci`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
 
 ## File Conventions
 
 - **CommonJS** (`require()`) throughout. Node 24 runs ESM deps natively via `require()` — no need for dynamic `import()` unless a package is genuinely ESM-only. For ESM-only deps in code that webpack bundles, use a STATIC-specifier `await import(/* webpackMode: "eager" */ 'pkg')` — webpack inlines the module into the consumer's bundle so packaged apps need nothing installed (e.g. `electron-store@11` in `lib/storage.js`). NEVER `webpackIgnore` a dep import: it leaves a runtime resolution that fails in packaged consumers (@omega.js/desktop is a devDependency — it never ships in the asar).
-- **Node version auto-synced from Electron.** `npx omega setup` queries `releases.electronjs.org` and writes the consumer's `.nvmrc` to match.
+- **Node version auto-synced from Electron.** The consumer's `postinstall` (`scripts/sync-nvmrc.js`) queries `releases.electronjs.org` and writes `.nvmrc` to match — the ONE reader of that feed. `ensureTarget()` only SEEDS `.nvmrc` from the framework's pinned `omega.nodeRuntime` when the file is missing, so the two never fight, and warns when the running Node major is not the pin.
 - One `module.exports = ...` per file.
 - Logical operators at the **start** of continuation lines.
 - Short-circuit early returns rather than nested ifs.

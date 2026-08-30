@@ -230,7 +230,7 @@
         tagline: "best for daily writers",
         popular: true,
         limits: { requests: 10000 },
-        trial: { days: 14 },
+        trial: { days: 1 }, // one-day trial so the playground converts fast (Ian 2026-08-28)
         prices: { monthly: 9.99, annually: 99.99 },
         features: [
           { id: "requests", name: "Saves", icon: "feather" },
@@ -335,11 +335,24 @@
       duration: "once",
     },
   },
+
+  oauth2: {
+    google: { enabled: true },
+  },
   marketing: {
     campaigns: {
       providers: {
         sendgrid: {
           listId: "daae211b-bc50-4d57-ae5e-8e86f6abb734",
+          groups: {
+            orders: 16223,
+            hello: 35092,
+            account: 25927,
+            marketing: 25928,
+            security: 35093,
+            newsletter: 28096,
+            internal: 35094,
+          },
         },
       },
       // Role-level switch for email marketing (default true). false skips the

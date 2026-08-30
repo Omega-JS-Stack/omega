@@ -85,6 +85,7 @@ module.exports = async function ensureDomainAuth(context) {
   console.log(`      ${chalk.yellow('⚠')} Validation pending — DNS is likely still propagating, rerun in a few minutes`);
   return {
     status: 'warned',
+    reason: 'domain validation pending — DNS is still propagating',
     output: { domainAuth: { id: domainAuth.id, valid: false, ...(synced ? {} : { manualRecords: records.map(({ record }) => ({ type: record.type.toUpperCase(), name: record.host, content: record.data })) }) } },
   };
 };

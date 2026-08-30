@@ -31,7 +31,7 @@ Both transactional and marketing paths share the same preparation layer:
 | Function | Purpose |
 |---|---|
 | `resolveBrand(Manager)` | Clones brand config, sanitizes images (SVG→PNG via CDN naming) |
-| `resolveSender({ sender, from, group }, brand, brandDomain)` | Resolves sender from/display-name/ASM group by category key |
+| `resolveSender({ sender, from, group }, brand, brandDomain, Manager)` | Resolves sender from/display-name by category key, and the ASM group id from config (`marketing.campaigns.providers.sendgrid.groups.<key>`) — see [Unsubscribe groups](#unsubscribe-groups) |
 | `renderContent({ content, html, trusted }, utmOptions)` | Markdown→HTML via markdown-it, applies UTM link tagging. Raw HTML in `content` is DISABLED unless `trusted` is set — see [Content trust](#content-trust) |
 | `resolvePerson(brand)` | The `brand.contact.person` identity for personal email. Throws 400 when unconfigured — see [Identity is config, or it is an error](#identity-is-config-or-it-is-an-error) |
 | `resolveSignoff(signoff, brand)` | Fills personal signoff details (name, headshot, URL) from `brand.contact.person` when `type: 'personal'` |
@@ -348,17 +348,34 @@ Names are resolved during recipient normalization in the transactional pipeline 
 
 ## Sender Categories
 
-Defined in `constants.js` → `SENDERS`. Each category auto-resolves a from address, display name, and ASM unsubscribe group:
+Defined in `constants.js` → `SENDERS`. Each category auto-resolves a from address, display name, and unsubscribe-group KEY:
 
-| Category | From | Display Name | ASM Group |
+| Category | From | Display Name | Group key |
 |---|---|---|---|
-| `orders` | `orders@{domain}` | Orders at {Brand} | orders (16223) |
-| `hello` | `hello@{domain}` | {Brand} | hello (35092) |
-| `account` | `account@{domain}` | {Brand} Account | account (25927) |
-| `marketing` | `marketing@{domain}` | {Brand} | marketing (25928) |
-| `security` | `security@{domain}` | {Brand} Security | security (35093) |
-| `newsletter` | `newsletter@{domain}` | {Brand} Newsletter | newsletter (28096) |
-| `internal` | `alerts@{domain}` | {Brand} Alerts | internal (35094) |
+| `orders` | `orders@{domain}` | Orders at {Brand} | `orders` |
+| `hello` | `hello@{domain}` | {Brand} | `hello` |
+| `account` | `account@{domain}` | {Brand} Account | `account` |
+| `marketing` | `marketing@{domain}` | {Brand} | `marketing` |
+| `security` | `security@{domain}` | {Brand} Security | `security` |
+| `newsletter` | `newsletter@{domain}` | {Brand} Newsletter | `newsletter` |
+| `internal` | `alerts@{domain}` | {Brand} Alerts | `internal` |
+
+## Unsubscribe groups
+
+A SendGrid unsubscribe (ASM) group id belongs to the SendGrid ACCOUNT that created
+it, so ids are never code. `constants.js` carries `GROUP_KEYS` — the seven keys
+above — and nothing else; the id of each lives in the brand's own config at
+`marketing.campaigns.providers.sendgrid.groups.<key>`
+([#649](https://github.com/Omega-JS-Stack/omega/issues/649)).
+
+- The manager's campaigns service provisions the groups (matched by NAME, so
+  sibling brands on one account converge on the same ids) and writes each id back
+  into `config/omega.json5`. Nothing here creates them.
+- `prepare.resolveSender()` reads the id at build time. A missing one throws a
+  coded-400 naming the config path: it means the manage walk never ran, and
+  sending anyway would attach a group from somebody else's account.
+- A caller may pass `group:` explicitly — a KEY resolves through config, a raw
+  numeric id is used as-is.
 
 ## Testing
 
@@ -381,10 +398,11 @@ All email tests live under `test/email/`, mirroring the source at `src/manager/l
 | `validation-cases.js` | Address corpus for the free checks + NeverBounce parsing (69 tests) | No |
 | `sanitize-images.js` | Brand-image absolutization (5 tests) | No |
 | `marketing/consent-gate.js` | The marketing consent gate (21 tests) | No |
+| `unsubscribe-groups.js` | [Unsubscribe groups](#unsubscribe-groups) resolve from config, and a missing id fails loudly (7 tests) | No |
 
 Extended tests (`TEST_EXTENDED_MODE`) send real emails to `_test-*@{domain}` addresses. See [test-framework.md](test-framework.md) for the full test framework reference.
 
-The last five are pure plain-node units — no emulator, no providers, no network — but they run in the discovered suite like everything else (`npx omega test framework:email`).
+The last six are pure plain-node units — no emulator, no providers, no network — but they run in the discovered suite like everything else (`npx omega test framework:email`).
 
 ### Test recipient convention
 

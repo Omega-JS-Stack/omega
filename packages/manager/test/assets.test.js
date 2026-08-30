@@ -97,10 +97,11 @@ function stageFont(root) {
 
 // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('assets: registered after directory with the six operations in dependency order', () => {
+test('assets: registered after directory with the seven operations in dependency order', () => {
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('directory') + 1], 'assets');
-  // templates before icons — icons prefers the composited icon.png it makes
-  assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons']);
+  // templates before icons — icons prefers the composited icon.png it makes;
+  // reconcile last, so everything this walk generated is already derived
+  assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons', 'reconcile']);
 });
 
 test('assets: defaults are enabled-only', () => {
@@ -757,6 +758,108 @@ test('assets: a dry run reports the reset and deletes nothing', async () => {
   assert.equal(result.status, 'success');
   assert.deepEqual(derivedFiles(root), files);
   assert.deepEqual(mtimes(root, files), before);
+});
+
+// ─── Reconcile: writes delete what the sources no longer derive (#636) ───────
+
+test('reconcile: a stray inside an output dir goes, the derived set stays', async () => {
+  const root = stageBrand();
+  await runService(root, brandConfig());
+  const files = derivedFiles(root);
+
+  // Leftovers of an older shape, inside two operations' own output dirs
+  fs.writeFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-64.webp'), 'stray');
+  fs.writeFileSync(path.join(root, '.omega', 'assets', 'favicon', 'favicon-64x64.png'), 'stray');
+
+  const result = await runService(root, brandConfig());
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.reconcile.removed, 2);
+  assert.deepEqual(derivedFiles(root), files);
+});
+
+test('reconcile: only the operations\' own output dirs are swept', async () => {
+  const root = stageBrand();
+  await runService(root, brandConfig());
+
+  // Inside .omega/assets/ but outside every output dir — out of boundary
+  const outside = path.join(root, '.omega', 'assets', 'notes.txt');
+  fs.writeFileSync(outside, 'not the assets service\'s');
+
+  const result = await runService(root, brandConfig());
+
+  assert.equal(result.output.reconcile.removed, 0);
+  assert.ok(fs.existsSync(outside));
+});
+
+test('reconcile: dropping a logo source removes everything it derived, and only that', async () => {
+  const root = stageBrand();
+  stageFont(root);
+  await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+  assert.ok(derivedFiles(root).some((file) => file.startsWith('logo/wordmark/')));
+
+  // The brand drops the wordmark source; no brand.font, so logo-gen (missing-only)
+  // has nothing to regenerate it from
+  fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
+
+  const result = await runService(root, brandConfig());
+
+  assert.equal(result.status, 'success');
+  // 2 SVGs + 5 sizes × 2 variants
+  assert.equal(result.output.reconcile.removed, 12);
+  const files = derivedFiles(root);
+  assert.ok(!files.some((file) => file.startsWith('logo/wordmark/')));
+  assert.ok(files.some((file) => file.startsWith('logo/combomark/')));
+  assert.ok(files.includes('logo/brandmark/color-x.svg'));
+});
+
+test('reconcile: a removed PSD takes its exports with it, the app icon stays', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+  await runService(root, brandConfig());
+  assert.ok(derivedFiles(root).includes('app/macos/icon.png'));
+
+  // Drop the brand's PSD and the company stamp that would re-seed it
+  fs.rmSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd'));
+  fs.rmSync(path.join(root, '.omega', 'company.json'));
+
+  const result = await runService(root, brandConfig());
+
+  assert.equal(result.output.reconcile.removed, 1);
+  const files = derivedFiles(root);
+  assert.ok(!files.includes('app/macos/icon.png'));
+  assert.ok(files.includes('app/macos/icon.icns'));
+});
+
+test('reconcile: set → unset → rerun converges once and stays converged', async () => {
+  const root = stageBrand();
+  stageFont(root);
+  await runService(root, brandConfig({ font: 'TestFont-Regular' }));
+
+  fs.rmSync(path.join(root, 'assets', 'logo', 'wordmark.svg'));
+  const unset = await runService(root, brandConfig());
+  assert.equal(unset.output.reconcile.removed, 12);
+
+  const files = derivedFiles(root);
+  const before = mtimes(root, files);
+  const rerun = await runService(root, brandConfig());
+
+  assert.equal(rerun.output.reconcile.removed, 0);
+  assert.deepEqual(derivedFiles(root), files);
+  assert.deepEqual(mtimes(root, files), before);
+});
+
+test('reconcile: a dry run names the leftovers and deletes nothing', async () => {
+  const root = stageBrand();
+  await runService(root, brandConfig());
+
+  const stray = path.join(root, '.omega', 'assets', 'favicon', 'legacy-touch-icon.png');
+  fs.writeFileSync(stray, 'stray');
+
+  const result = await runService(root, brandConfig(), { options: { dryRun: true } });
+
+  assert.equal(result.output.reconcile.planned, 1);
+  assert.ok(fs.existsSync(stray));
 });
 
 test('brandmark: operator SA ensures the brand\'s own product user and generates with ITS api key', async () => {

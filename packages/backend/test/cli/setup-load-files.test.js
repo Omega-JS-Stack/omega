@@ -1,9 +1,9 @@
 /**
- * Test: setup's loadFiles() reads remoteconfig.template.json from the TARGET ROOT
- * ([#280](https://github.com/Omega-JS-Stack/omega/issues/280)).
+ * Test: the target checks' loadFiles() reads remoteconfig.template.json from
+ * the TARGET ROOT ([#280](https://github.com/Omega-JS-Stack/omega/issues/280)).
  *
  * The read pointed at `${projectPath}/functions/`, a pre-src/dist layout path
- * where nothing lives anymore, while the setup test that WRITES the file
+ * where nothing lives anymore, while the check that WRITES the file
  * (setup-tests/remoteconfig-template-file.js) puts it at the target root — so
  * `self.remoteconfigJSON` came back `{}` no matter what the file said.
  *
@@ -14,7 +14,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const SetupCommand = require('../../src/cli/commands/setup.js');
+const { loadFiles: loadTargetFiles } = require('../../src/cli/utils/target-checks.js');
 
 const REMOTECONFIG = {
   conditions: [],
@@ -35,15 +35,11 @@ function seedTarget() {
 }
 
 function loadFiles(targetPath) {
-  const main = { firebaseProjectPath: targetPath, argv: {}, options: {} };
-
-  new SetupCommand(main).loadFiles();
-
-  return main;
+  return loadTargetFiles({ firebaseProjectPath: targetPath, argv: {}, options: {} });
 }
 
 module.exports = {
-  description: 'setup loadFiles() reads the target-root remoteconfig template',
+  description: 'target checks: loadFiles() reads the target-root remoteconfig template',
   type: 'group',
   timeout: 10000,
 

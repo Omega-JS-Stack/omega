@@ -201,7 +201,7 @@ module.exports = async function ensureSync(context) {
 
     const timeout = setTimeout(() => {
       console.log(`      ${chalk.yellow('⚠')} Extension not connected (timeout) — install/enable it from ${chalk.cyan('extension/')} (chrome://extensions → Load unpacked → extension/dist)`);
-      cleanup({ status: 'warned', output: { sync: { reason: 'extension not connected' } } });
+      cleanup({ status: 'warned', reason: 'extension not connected', output: { sync: { reason: 'extension not connected' } } });
     }, connectTimeout);
 
     wss.on('error', (error) => {
@@ -210,7 +210,7 @@ module.exports = async function ensureSync(context) {
         ? `port ${port} already in use (another manager run or the extension MCP server?)`
         : error.message;
       console.log(`      ${chalk.yellow('⚠')} WebSocket server failed: ${reason}`);
-      cleanup({ status: 'warned', output: { sync: { reason } } });
+      cleanup({ status: 'warned', reason, output: { sync: { reason } } });
     });
 
     wss.on('connection', (ws) => {
@@ -230,7 +230,7 @@ module.exports = async function ensureSync(context) {
 
         if (response && response.success === false) {
           console.log(`      ${chalk.yellow('⚠')} Sync failed${chalk.dim(`: ${response.error}`)}`);
-          cleanup({ status: 'warned', output: { sync: { reason: response.error || 'extension reported failure' } } });
+          cleanup({ status: 'warned', reason: 'extension reported a sync failure', output: { sync: { reason: response.error || 'extension reported failure' } } });
           return;
         }
 

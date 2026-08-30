@@ -107,7 +107,7 @@ module.exports = async ({ brandRoot, targets, options = {}, runCommand: run = ru
   // targets returned
   const withFindings = (result) => (findings.length === 0
     ? result
-    : { ...result, status: 'warned', output: { ...result?.output, findings } });
+    : { ...result, status: 'warned', reason: result?.reason || findings.join('; '), output: { ...result?.output, findings } });
 
   if (drifted.length === 0) {
     if (findings.length === 0) console.log(`      ${chalk.green('✓')} Translation SDK converged`);
@@ -138,7 +138,7 @@ module.exports = async ({ brandRoot, targets, options = {}, runCommand: run = ru
 
   if (!result.success) {
     console.log(`      ${chalk.yellow('⚠')} npm install failed (${result.error}); the dep is declared, so install it by hand`);
-    return withFindings({ status: 'warned', output: { translationSdk: { added, installed: false, error: result.error } } });
+    return withFindings({ status: 'warned', reason: 'npm install failed — install the SDK by hand', output: { translationSdk: { added, installed: false, error: result.error } } });
   }
 
   return withFindings({ output: { translationSdk: { added, installed: true } } });

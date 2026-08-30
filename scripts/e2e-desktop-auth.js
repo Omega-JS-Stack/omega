@@ -186,6 +186,10 @@ function stageApp({ projectId, apiKey, ports }) {
     private: true,
     description: 'Staged @omega.js/desktop consumer for scripts/e2e-desktop-auth.js — generated, never committed.',
     main: 'dist/main.bundle.js',
+    // A real consumer always declares its framework — ensureTarget's locality
+    // check (#675) refuses a target without it. `file:` is the linked-brand
+    // shape; from APP_DIR that path is packages/desktop itself.
+    devDependencies: { '@omega.js/desktop': 'file:../../..' },
   }, null, 2)}\n`);
 
   // JSON is valid JSON5 — the config loader reads this the same way it reads a

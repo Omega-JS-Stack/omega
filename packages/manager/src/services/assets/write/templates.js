@@ -28,6 +28,7 @@ const sharp = require('sharp');
 const { readPsd, writePsdBuffer, initializeCanvas } = require('ag-psd');
 const canvasModule = require('canvas');
 const { TEMPLATE_CONFIG } = require('../lib/assets-config.js');
+const { templateExportFiles } = require('../lib/derived.js');
 const { convertSvgToBlack } = require('../lib/svg-to-black.js');
 const { readCompanyMarker } = require('../../../lib/company.js');
 const { isStale } = require('../../../lib/stale.js');
@@ -270,7 +271,7 @@ module.exports = async function writeTemplates(context) {
 
     // Staleness: every export must be newer than the PSD AND the brandmark
     const exportSpecs = config.exports || [{ suffix: '' }];
-    const outPaths = exportSpecs.map((exp) => join(outDir, config.outputDir, `${config.outputName}${exp.suffix || ''}.png`));
+    const outPaths = templateExportFiles(config).map((relative) => join(outDir, relative));
     const stalePsd = needsSeed ? companyPsdPath : psdPath;
     const stale = needsSeed || outPaths.some((p) => isStale(stalePsd, p) || isStale(brandmarkPath, p));
 

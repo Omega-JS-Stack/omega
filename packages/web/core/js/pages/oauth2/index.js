@@ -1,10 +1,17 @@
 // Libraries
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
+    // Warm the backend before the auth wait below: the visitor is standing on a
+    // spinner while this page tokenizes their authorization code against
+    // `/omega/user/oauth2`, and that POST cannot go out until auth settles
+    // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
+
     await omega.dom().ready();
 
     // Wait for auth state before handling callback

@@ -67,6 +67,7 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 
 | Brand | Who it is | Cloud |
 |---|---|---|
+| `brands/naked-brand` | "Naked Brand" — the bare fixture: the minimum a brand can declare, so a walkthrough sees every prompt fire from zero; a QA walk may reset it | Offline, `demo-*` only |
 | `brands/sandbox-brand` | Synthetic fixture for the automated corpus/e2e; test runs may mangle and reset it | Offline, `demo-*` only |
 | `brands/omega-playground` | "OMEGA Playground" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
 | `brands/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
@@ -94,7 +95,7 @@ The in-repo brands and the playground project are test-only forever; nothing in 
 Every framework AND `@omega.js/manager` ship `omega` + `omg` + `mgr` — all are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`).
 
 - The nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct.
-- No target context (fresh dir) → falls back to the HOST package's CLI with a stderr note, which keeps `omega setup` bootstrap working — and with the manager as host, keeps `npx omega onboard` working in a fresh brand-template clone ([#276](https://github.com/Omega-JS-Stack/omega/issues/276)).
+- No target context (fresh dir) → falls back to the HOST package's CLI with a stderr note, which keeps a verb run in a fresh directory on the host CLI — and with the manager as host, keeps `npx omega onboard` working in a fresh brand-template clone ([#276](https://github.com/Omega-JS-Stack/omega/issues/276)).
 - `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 
 ## Config: omega.json5

@@ -1,9 +1,10 @@
 /**
- * SendGrid service tests — all 6 operations against method-level recording
+ * SendGrid service tests — all 7 operations against method-level recording
  * fakes (SendGrid + Cloudflare). Proves skip semantics, the converged
  * zero-mutation no-op, the one-pass domain-auth flow (create → DNS diff-sync
  * → validate once), sender recreation + the de-ITW'd address requirement,
- * list resolution through config/state/name/create, SSOT-driven field and
+ * list resolution through config/state/name/create, unsubscribe groups
+ * matched by name with their ids written to config, SSOT-driven field and
  * segment reconciliation (type recreate, stale PATCH + fallback, __temp_
  * sweep), the min-diff event webhook, and the dry-run zero-mutation
  * guarantee.
@@ -12,9 +13,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
-const { fieldsFor, segmentsFor } = require('../src/lib/backend-marketing.js');
+const { fieldsFor, segmentsFor, BEM_GROUP_KEYS } = require('../src/lib/backend-marketing.js');
 const { buildQueryDsl } = require('../src/services/campaigns/lib/segment-query.js');
 const service = require('../src/services/campaigns/index.js');
+const { GROUP_DEFINITIONS } = require('../src/services/campaigns/ensure/unsubscribe-groups.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 const DOWN = '\x1B[B';
@@ -32,6 +34,12 @@ const WEBHOOK_URL = `https://api.${DOMAIN}/omega/marketing/webhook/forward?provi
 
 const SENDGRID_FIELDS = fieldsFor('sendgrid');
 const SENDGRID_SEGMENTS = segmentsFor('sendgrid');
+const GROUP_KEYS = Object.keys(GROUP_DEFINITIONS);
+
+// The account's ASM groups as SendGrid answers them — id 100 + index, so an
+// assertion names a real id instead of a magic number.
+const GROUP_IDS = Object.fromEntries(GROUP_KEYS.map((key, i) => [key, 100 + i]));
+const accountGroups = (keys = GROUP_KEYS) => keys.map((key) => ({ id: GROUP_IDS[key], name: GROUP_DEFINITIONS[key].name, description: GROUP_DEFINITIONS[key].description }));
 const TYPE_MAP = { text: 'Text', number: 'Number', date: 'Date' };
 
 const ADDRESS = { line1: '123 Fixture St', line2: 'Unit 4', city: 'Testville', region: 'CA', postalCode: '00000', country: 'USA' };
@@ -47,7 +55,7 @@ const VALIDATION_PENDING = { validation_results: { mail_cname: { valid: false },
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADDRESS, listId = null, campaigns = {} } = {}) {
+function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADDRESS, listId = null, groups = null, campaigns = {} } = {}) {
   return {
     brand: {
       id: 'fixture-brand',
@@ -60,7 +68,7 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
     marketing: {
       campaigns: {
         ...structuredClone(DEFAULTS.marketing.campaigns),
-        providers: { sendgrid: { listId } },
+        providers: { sendgrid: { listId, ...(groups ? { groups } : {}) } },
         ...campaigns,
       },
     },
@@ -70,11 +78,12 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
 
 const READ_METHODS = [
   'getAuthenticatedDomains', 'getVerifiedSenders', 'getLists', 'getListByName',
-  'getList', 'getCustomFields', 'getSegments', 'getSegment', 'getEventWebhookSettings',
+  'getList', 'getUnsubscribeGroups', 'getCustomFields', 'getSegments', 'getSegment',
+  'getEventWebhookSettings',
 ];
 const MUTATING_METHODS = [
   'authenticateDomain', 'validateDomain', 'createVerifiedSender', 'deleteVerifiedSender',
-  'createList', 'createCustomField', 'deleteCustomField',
+  'createList', 'createUnsubscribeGroup', 'createCustomField', 'deleteCustomField',
   'createSegment', 'updateSegment', 'deleteSegment', 'updateEventWebhookSettings',
 ];
 
@@ -127,6 +136,7 @@ function convergedResponses() {
     getVerifiedSenders: [{ id: 222, from_email: FROM_EMAIL, verified: true }],
     getList: { id: 'lst_1', name: BRAND_NAME },
     getListByName: { id: 'lst_1', name: BRAND_NAME },
+    getUnsubscribeGroups: accountGroups(),
     getCustomFields: SENDGRID_FIELDS.map((f, i) => ({ id: `f${i}`, name: f.name, field_type: TYPE_MAP[f.type] })),
     getSegments: SENDGRID_SEGMENTS.map((s, i) => ({ id: `seg${i}`, name: s.name })),
     getSegment: (id) => {
@@ -153,6 +163,29 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
   marketing: {
     campaigns: {
       enabled: true,
+    },
+  },
+}
+`;
+
+// The same file once the ids already landed — a converged rerun must leave it
+// byte-identical.
+const GROUPS_WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
+{
+  brand: {
+    id: 'fixture-brand', // stays single-quoted
+    name: "Fixture Brand",
+  },
+  marketing: {
+    campaigns: {
+      enabled: true,
+      providers: {
+        sendgrid: {
+          groups: {
+${GROUP_KEYS.map((key) => `            ${key}: ${GROUP_IDS[key]},`).join('\n')}
+          },
+        },
+      },
     },
   },
 }
@@ -473,16 +506,109 @@ test('campaigns: no list anywhere → created and stored in state', async () => 
 });
 
 test('campaigns: config-known id writes nothing; a state-known id is promoted into omega.json5', async () => {
-  // Config already carries the id — the file stays byte-identical
-  const configuredRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  // Config already carries the id — the file stays byte-identical (the group
+  // ids are in the file too, or the unsubscribe-groups op would land them)
+  const configuredRoot = makeBrandRoot(GROUPS_WRITEBACK_CONFIG);
   const before = readConfigSource(configuredRoot);
-  await runService(brandConfig({ listId: 'lst_1' }), { sendgrid: fakeSendgrid(convergedResponses()), brandRoot: configuredRoot });
+  await runService(brandConfig({ listId: 'lst_1', groups: GROUP_IDS }), { sendgrid: fakeSendgrid(convergedResponses()), brandRoot: configuredRoot });
   assert.equal(readConfigSource(configuredRoot), before);
 
   // The same id known only from state — promoted into the file
   const stateRoot = makeBrandRoot(WRITEBACK_CONFIG);
   await runService(brandConfig(), { sendgrid: fakeSendgrid(convergedResponses()), serviceData: { listId: 'lst_1' }, brandRoot: stateRoot });
   assert.ok(readConfigSource(stateRoot).includes('listId: "lst_1",'));
+});
+
+// ─── unsubscribe-groups ──────────────────────────────────────────────────────
+
+test('campaigns: the group table covers every key @omega.js/backend sends through', () => {
+  // The keys are @omega.js/backend's SSOT; the names/descriptions are this
+  // service's. A key with no row would send through a group nothing provisions.
+  assert.deepEqual(GROUP_KEYS, BEM_GROUP_KEYS);
+  for (const key of BEM_GROUP_KEYS) {
+    assert.ok(GROUP_DEFINITIONS[key].name, `${key} has a group name`);
+    assert.ok(GROUP_DEFINITIONS[key].description, `${key} has a recipient-facing description`);
+  }
+  // Brand-neutral names: sibling brands on ONE account must match the same groups
+  const names = BEM_GROUP_KEYS.map((key) => GROUP_DEFINITIONS[key].name);
+  assert.equal(new Set(names).size, names.length, 'group names are unique');
+  assert.ok(!names.some((name) => name.includes(BRAND_NAME)), 'no brand name in a group name');
+});
+
+test('campaigns: an account with no groups gets all seven created, ids written to omega.json5', async () => {
+  const created = [];
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getUnsubscribeGroups: [],
+    createUnsubscribeGroup: (name, description) => {
+      created.push({ name, description });
+      const key = GROUP_KEYS.find((k) => GROUP_DEFINITIONS[k].name === name);
+      return { id: GROUP_IDS[key], name, description };
+    },
+  });
+
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, brandRoot });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(created, GROUP_KEYS.map((key) => ({ name: GROUP_DEFINITIONS[key].name, description: GROUP_DEFINITIONS[key].description })));
+  assert.equal(result.output.unsubscribeGroups.created, GROUP_KEYS.length);
+
+  const written = readConfigSource(brandRoot);
+  for (const key of GROUP_KEYS) {
+    assert.ok(written.includes(`${key}: ${GROUP_IDS[key]},`), `${key} id landed in omega.json5`);
+  }
+  assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
+});
+
+test('campaigns: groups already on the account are matched by NAME, never recreated', async () => {
+  // The sibling-brand case: another brand on this SendGrid account made them,
+  // so this brand adopts the SAME ids instead of creating duplicates
+  const api = fakeSendgrid(convergedResponses());
+
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, brandRoot });
+
+  assert.equal(api.callsTo('createUnsubscribeGroup').length, 0);
+  assert.equal(result.output.unsubscribeGroups.created, 0);
+
+  const written = readConfigSource(brandRoot);
+  for (const key of GROUP_KEYS) {
+    assert.ok(written.includes(`${key}: ${GROUP_IDS[key]},`), `${key} id landed in omega.json5`);
+  }
+});
+
+test('campaigns: only the groups missing from the account are created', async () => {
+  const present = GROUP_KEYS.filter((key) => key !== 'security' && key !== 'internal');
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getUnsubscribeGroups: accountGroups(present),
+    createUnsubscribeGroup: (name, description) => {
+      const key = GROUP_KEYS.find((k) => GROUP_DEFINITIONS[k].name === name);
+      return { id: GROUP_IDS[key], name, description };
+    },
+  });
+
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, brandRoot: makeBrandRoot(WRITEBACK_CONFIG) });
+
+  assert.deepEqual(
+    api.callsTo('createUnsubscribeGroup').map((c) => c.args[0]),
+    [GROUP_DEFINITIONS.security.name, GROUP_DEFINITIONS.internal.name],
+  );
+  assert.equal(result.output.unsubscribeGroups.created, 2);
+});
+
+test('campaigns: a brand whose config already carries the ids writes nothing', async () => {
+  const configuredRoot = makeBrandRoot(GROUPS_WRITEBACK_CONFIG);
+  const before = readConfigSource(configuredRoot);
+
+  const result = await runService(
+    brandConfig({ listId: 'lst_1', groups: GROUP_IDS }),
+    { sendgrid: fakeSendgrid(convergedResponses()), brandRoot: configuredRoot },
+  );
+
+  assert.equal(result.output.unsubscribeGroups.written, 0);
+  assert.equal(readConfigSource(configuredRoot), before);
 });
 
 // ─── custom-fields ───────────────────────────────────────────────────────────
@@ -612,6 +738,7 @@ test('campaigns: dry-run on a fully drifted brand performs zero mutations', asyn
     getAuthenticatedDomains: [],
     getVerifiedSenders: [],
     getListByName: () => undefined,
+    getUnsubscribeGroups: [],
     getCustomFields: [],
     getSegments: [{ id: 'tmp1', name: '__temp_leak' }],
     getEventWebhookSettings: { enabled: false, url: '', bounce: false, dropped: false, spam_report: false, unsubscribe: false, group_unsubscribe: false },
@@ -625,6 +752,7 @@ test('campaigns: dry-run on a fully drifted brand performs zero mutations', asyn
   assert.deepEqual(result.output.domainAuth.planned, ['authenticate-domain', 'dns-records', 'validate']);
   assert.equal(result.output.senderIdentity.planned, 'create-sender');
   assert.equal(result.output.list.planned, 'create');
+  assert.deepEqual(result.output.unsubscribeGroups.planned.create, GROUP_KEYS.map((key) => GROUP_DEFINITIONS[key].name));
   assert.equal(result.output.customFields.planned.create.length, SENDGRID_FIELDS.length);
   assert.equal(result.output.segments.planned.create.length, SENDGRID_SEGMENTS.length);
   assert.equal(result.output.segments.planned.sweepOrphans, 1);

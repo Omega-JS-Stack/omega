@@ -304,6 +304,26 @@ test('#232: a one-time purchase has no account state to wait for', async () => {
   assert.strictEqual(modules.isVerifiable({ frequency: 'annually' }), true, 'a real cadence is');
 });
 
+test('#668: the product TYPE outranks the cadence — a one-time buy never polls', async () => {
+  const modules = await loadModules();
+
+  // The live failure (order 5434-3892-3088): checkout sent `frequency=annually`
+  // on a one-time product, so the redirect said `type=one-time,
+  // frequency=annually` and the page polled for a plan the purchase never
+  // writes — 30 seconds of "still processing" on a payment that had completed.
+  const stranded = { productId: 'launch-kit', type: 'one-time', frequency: 'annually' };
+  const { outcome, reads } = await runPoll(modules, [BASIC], stranded);
+
+  assert.strictEqual(outcome, 'confirmed', 'the receipt opens answered, whatever cadence rode along with it');
+  assert.strictEqual(reads.length, 0, 'and the account is never asked about a plan this purchase has nothing to do with');
+  assert.strictEqual(modules.initialStatus(stranded), 'confirmed', 'so the page opens confirmed rather than processing');
+
+  // The type is a second guard, never a replacement: the cadence still answers
+  // a redirect old enough to carry no type at all.
+  assert.strictEqual(modules.isVerifiable({ type: 'subscription', frequency: 'annually' }), true, 'a subscription still waits for its webhook');
+  assert.strictEqual(modules.isVerifiable({ frequency: 'annually' }), true, 'and so does a redirect with no type on it');
+});
+
 test('#232: the receipt renders processing, then success — never success first', async () => {
   const modules = await loadModules();
 
@@ -533,4 +553,21 @@ test('#232 QA: the confirmation spinner parks under reduced motion, leaving a la
   const reduced = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/gs)].map((block) => block[1]).join('\n');
   assert.match(reduced, /\.spinner-border/, 'the page parks the spinner it renders');
   assert.match(reduced, /animation: none/, "and the park stops the loop outright, rather than slowing it");
+});
+
+test('#668: a one-time redirect renders its receipt without a single account read', async () => {
+  // End to end through the REAL page, from the URL the intent route now builds.
+  const { events, listens, reads } = await runPage({
+    search: '?orderId=ORD-668&productId=launch-kit&productName=Starter%20Library&amount=49.99&currency=USD&type=one-time&frequency=annually&paymentMethod=stripe&trial=false',
+    accounts: [BASIC],
+  });
+
+  assert.strictEqual(reads, 0, 'nothing is polled');
+  assert.strictEqual(listens, 0, 'and nothing waits on auth to poll with');
+
+  const binds = events.filter((event) => event.bind);
+  assert.strictEqual(binds.length, 1, 'the receipt is written once, on the first paint');
+  assert.strictEqual(binds[0].bind.verification.confirmed, true, 'and it opens confirmed');
+  assert.strictEqual(binds[0].bind.verification.processing, false, 'never on the processing chrome the live buy was stuck behind');
+  assert.ok(events.includes('celebration'), 'a purchase that landed still gets its confetti');
 });

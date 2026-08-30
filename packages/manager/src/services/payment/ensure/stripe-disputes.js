@@ -50,6 +50,7 @@ module.exports = async function ensureStripeDisputes(context) {
 
   return {
     status: 'warned',
+    reason: 'Enhanced Dispute Protection not confirmed — activate it in the Stripe Dashboard',
     output: { stripeDisputes: { disputesUrl } },
   };
 };

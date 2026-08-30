@@ -328,6 +328,21 @@ Manager.prototype._wireAuthBridge = async function () {
   const self = this;
   if (!self.ipc) return;
 
+  // Warm the backend before any of the waits below. This bridge ends in a
+  // sync-request, and main answers it by POSTing `/omega/user/token` — the
+  // app's first backend call, on a function that is cold every time the app
+  // launches. Fire-and-forget and unauthenticated: the backend answers a wakeup
+  // before it loads a route or authenticates
+  // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+  // The route is required where it is used, the way client-bridge requires the
+  // request layer it shares with this bridge.
+  try {
+    const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
+    self.omega?.request?.(WAKEUP_ROUTE, { wakeup: true });
+  } catch (e) {
+    self.logger.warn('wakeup ping failed (non-fatal):', e?.message);
+  }
+
   const auth = self.omega?.auth?.();
   const getCurrentUid = () => {
     try { return auth ? (auth.getUser()?.uid || null) : null; }

@@ -77,7 +77,11 @@ async function runService(serviceName, brand, options = {}) {
     // summary's ⚑ list instead of stopping the cycle (and any dev boot on it)
     if (error?.code === CONSENT_REQUIRED) {
       console.log(`  ${chalk.yellow('⚑')} ${serviceName}: ${error.message}`);
-      return { status: 'warned', output: { auth: { needsInteractive: error.message } } };
+      return {
+        status: 'warned',
+        warned: [{ operation: 'auth', reason: 'needs an interactive run' }],
+        output: { auth: { needsInteractive: error.message } },
+      };
     }
 
     console.error(`  Error in ${serviceName}: ${error.message}`);

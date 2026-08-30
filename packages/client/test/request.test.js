@@ -6,6 +6,7 @@ const { assert } = require('./helpers.js');
 // the root `npm run test:auth` lane.
 let createRequest;
 let mergeUsageIntoBindings;
+let WAKEUP_ROUTE;
 
 // Minimal fetch stand-in: the only seam is the network itself (stubbing the
 // transport boundary, not our own modules). Each call records the request and
@@ -35,6 +36,7 @@ describe('Request Module', () => {
     const mod = await import('../src/modules/request.js');
     createRequest = mod.createRequest;
     mergeUsageIntoBindings = mod.mergeUsageIntoBindings;
+    WAKEUP_ROUTE = mod.WAKEUP_ROUTE;
   });
 
   afterEach(() => {
@@ -122,6 +124,26 @@ describe('Request Module', () => {
     assert.strictEqual(calls[0].options.method, 'GET', 'a wakeup is a GET');
     assert.strictEqual(tokenAsked, false, 'the middleware answers a wakeup before it authenticates, so no token is minted for it');
     assert.strictEqual(answer, undefined, 'nothing is read back — the caller is not waiting on an answer');
+  });
+
+  it('wakeup: the ONE route every surface pings is exported here, route-relative', async () => {
+    // Web pages, the desktop renderer's auth bridge and the extension's
+    // surfaces all name this constant rather than a route of their own: a
+    // wakeup never runs a route, so there is nothing to name per caller
+    // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)). It stays
+    // route-relative so each surface resolves it through its own getApiUrl —
+    // an absolute url here would ping ONE brand's backend from every install.
+    const calls = fetchStub([{ text: 'ok' }]);
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => null,
+    });
+
+    assert.strictEqual(WAKEUP_ROUTE.startsWith('/'), true, 'route-relative, never a host');
+
+    await request(WAKEUP_ROUTE, { wakeup: true });
+
+    assert.strictEqual(calls[0].url, `https://api.example.com${WAKEUP_ROUTE}?wakeup=true`, 'it resolves through the caller\'s own api url');
   });
 
   it('wakeup: an existing query string keeps its params', async () => {

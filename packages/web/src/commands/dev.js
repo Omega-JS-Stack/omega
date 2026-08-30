@@ -41,6 +41,7 @@ const {
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { ensureTarget } = require('./lib/ensure-target.js');
 const { emitLanguageFlags } = require('../language-flags.js');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
@@ -71,6 +72,10 @@ module.exports = async function (options) {
   // Tee the whole run to <targetRoot>/logs/dev.log — first statement of the verb
   // so a crash on the way up is already in the file (#197).
   attachLogFile(path.join(consumerPaths().root, 'logs', 'dev.log'));
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target.
+  ensureTarget({ projectDir: consumerPaths().root, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
   if (options.local) {
     await linkBrandToMonorepo();

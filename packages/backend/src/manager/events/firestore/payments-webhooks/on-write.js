@@ -53,6 +53,13 @@ module.exports = async ({ ctx, change, context }) => {
   // ([#535](https://github.com/Omega-JS-Stack/omega/issues/535)).
   let refused = false;
 
+  // The transition claim this run WON, once it has one — hoisted because the claim
+  // outlives the block that took it. It is settled at the end of the run: 'done'
+  // when the pipeline got all the way through, 'failed' beside the webhook doc's
+  // own failure stamp, so the cron's retry of this same event id can retake it
+  // ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+  const claimTicket = { orderId: null, transitionName: null };
+
   try {
     const provider = dataAfter.provider;
     // What the event's own payload claimed about whose subscription this is. It
@@ -266,7 +273,7 @@ module.exports = async ({ ctx, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails });
+    const { transition, refusal } = await processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails, claimTicket });
 
     // Mark webhook as completed (include transition name + any refusal for auditing/testing).
     // Both are written on EVERY pass, so a reprocess that now finds its order clears
@@ -286,6 +293,10 @@ module.exports = async ({ ctx, change, context }) => {
     }, { merge: true });
 
     ctx.log(`Webhook ${eventId} completed`);
+
+    // The transition is finished: its handler, its analytics fire and its marketing
+    // sync are all away. Last, so a throw anywhere above still settles as `failed`.
+    await transitions.settleClaim({ admin, claim: claimTicket, status: 'done' });
   } catch (e) {
     ctx.error(`Webhook ${eventId} failed: ${e.message}`, e);
 
@@ -307,6 +318,10 @@ module.exports = async ({ ctx, change, context }) => {
       retryCount: (dataAfter.retryCount || 0) + 1,
       ...(e.permanent ? { deadLetter: true } : {}),
     }, { merge: true });
+
+    // And release the claim the same way: the sweep re-runs this event id, and a
+    // claim left standing would refuse the retry that is meant to finish the job.
+    await transitions.settleClaim({ admin, claim: claimTicket, status: 'failed' });
 
     if (e.permanent) {
       ctx.error(`PERMANENT FAILURE: webhook ${eventId} (provider=${dataAfter.provider}, event=${dataAfter.event?.type || 'unknown'}) cannot be processed by any retry — dead-lettered on its first attempt: ${e.message}`);
@@ -525,7 +540,7 @@ function resolveOrderIdAfterFailure({ dataAfter, library, ctx }) {
  *   caller stamps back on the event doc: the transition detected, and the refusal
  *   when the pipeline declined to act on the event at all.
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails }) {
+async function processPaymentEvent({ category, library, resource, resourceType, uid, provider, eventType, eventId, resourceId, chargeId, orderId, now, nowUNIX, webhookReceivedUNIX, previouslyCompleted, ctx, isRefund, refundDetails, claimTicket }) {
   const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
@@ -690,15 +705,41 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     ctx.log(`Transition suppressed (idempotency): webhook ${eventId} already completed once, so its refund email was already sent`);
   }
 
+  // The event that LOST the claim below, once there is one. Everything the
+  // transition drives reads it: the handler, the analytics fire, and the marketing
+  // sync were all three duplicated by the racing pair, so all three are gated on it
+  // ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+  let suppressedBy = null;
+
   if (transitionName) {
     ctx.log(`Transition detected: ${category}/${transitionName} (before.status=${before?.status || 'null'}, after.status=${unified.status})`);
 
-    if (shouldRunHandlers) {
-      transitions.dispatch(transitionName, category, {
-        before, after: unified, order, uid, userDoc: userData, ctx, refundDetails,
-      });
+    // Claim it before anything is dispatched. Detection is a diff against the
+    // user doc, so two webhooks for the same checkout in flight at once BOTH
+    // detect the same transition — the claim is what makes only one of them act
+    // on it ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)). Without
+    // an order there is nothing to claim on, exactly as the staleness guard above
+    // has nothing to compare against, and the dispatch goes out unguarded.
+    const claim = orderId
+      ? await transitions.claim({ admin, orderId, transitionName, eventId, now, nowUNIX })
+      : { claimed: true, eventId: eventId };
+
+    if (!claim.claimed) {
+      suppressedBy = claim.eventId;
+      ctx.log(`Transition suppressed (claimed by ${suppressedBy}): ${category}/${transitionName} on payments-orders/${orderId}`);
     } else {
-      ctx.log(`Transition handler skipped (testing mode): ${category}/${transitionName}`);
+      // Hand the claim to the trigger, which settles it once the run ends. Only the
+      // run that TOOK a claim may settle it, so a loser hands over nothing.
+      claimTicket.orderId = orderId;
+      claimTicket.transitionName = transitionName;
+
+      if (shouldRunHandlers) {
+        transitions.dispatch(transitionName, category, {
+          before, after: unified, order, uid, userDoc: userData, ctx, refundDetails,
+        });
+      } else {
+        ctx.log(`Transition handler skipped (testing mode): ${category}/${transitionName}`);
+      }
     }
   }
 
@@ -707,8 +748,19 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // `before` rides along for the same reason the transition detector reads it: a plan change
   // needs the plan it came from, and a trial's outcome is only legible against the prior term
   // ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
-  if (shouldRunHandlers) {
+  //
+  // A run that lost the claim tracks NOTHING. The resolver is keyed on the
+  // transition, so the duplicate fired the same conversion twice — GA4 counted two
+  // `trial_start`s, deduplicating neither a custom event nor a second id
+  // ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)). Nulling the
+  // transition instead would be worse than doing nothing: the resolver's `!transitionName`
+  // branches would read the duplicate as a RENEWAL and fire `subscription_payment`.
+  if (suppressedBy) {
+    ctx.log(`Payment analytics suppressed (claimed by ${suppressedBy}): ${category}/${transitionName} was already tracked`);
+  } else if (shouldRunHandlers) {
     trackPayment({ category, transitionName, eventType, unified, order, userDoc: userData, refundDetails, before, uid, provider, chargeId, ctx });
+  } else {
+    ctx.log(`Payment analytics skipped (testing mode): ${category}/${transitionName || 'no transition'}`);
   }
 
   // A persisted discount belongs to the subscription it was applied to, and to
@@ -760,13 +812,20 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     const orderRef = admin.firestore().doc(`payments-orders/${orderId}`);
     const orderSnap = await orderRef.get();
 
-    if (!orderSnap.exists) {
-      // Initialize requests on first creation only (avoid overwriting cancel/refund data set by endpoints)
+    // Initialize requests on first creation only (avoid overwriting cancel/refund
+    // data set by endpoints). Keyed on the field rather than the document: the
+    // transition claim above writes `transitions` onto this same order first, so on
+    // a brand-new order the document now EXISTS by the time the writes are built —
+    // and a plain existence test would have left every new order without its
+    // requests node ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+    if (!orderSnap.data()?.requests) {
       order.requests = {
         cancellation: null,
         refund: null,
       };
-    } else {
+    }
+
+    if (orderSnap.exists) {
       // Preserve original created timestamp on subsequent webhook events
       order.metadata.created = orderSnap.data().metadata?.created || order.metadata.created;
     }
@@ -791,13 +850,20 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   if (isSubscription) {
     ctx.log(`Updated users/${uid}.subscription: status=${unified.status}, product=${unified.product.id}`);
 
-    // Sync marketing contact with updated subscription data (non-blocking)
-    if (shouldRunHandlers) {
+    // Sync marketing contact with updated subscription data (non-blocking).
+    // Suppressed on a lost claim for the same reason the analytics fire is: the
+    // winner syncs this exact subscription state, so the duplicate only re-sent the
+    // same contact ([#665](https://github.com/Omega-JS-Stack/omega/issues/665)).
+    if (suppressedBy) {
+      ctx.log(`Marketing sync suppressed (claimed by ${suppressedBy}): the subscription was already synced`);
+    } else if (shouldRunHandlers) {
       const email = Manager.Email(ctx);
       const updatedUserDoc = { ...userData, subscription: unified };
       email.sync(updatedUserDoc)
         .then((r) => ctx.log('Marketing sync after payment:', r))
         .catch((e) => ctx.error('Marketing sync after payment failed:', e));
+    } else {
+      ctx.log('Marketing sync skipped (testing mode)');
     }
   }
 

@@ -9,15 +9,20 @@
  * (cloud.config.messagingSenderId IS the project number) — no second API
  * client needed.
  *
- * omega-manager retried "link still propagating" failures with sleeps and a
- * Firebase-API fallback; the port reports warned and lets the rerun converge
- * (consistent with every other service).
+ * omega-manager retried "link still propagating" failures with blind sleeps and
+ * a Firebase-API fallback; this one WAITS on the condition instead — an
+ * interactive run polls the create until GA releases the link it just deleted
+ * (skip allowed), and only a skipped or headless run reports warned (#662).
  *
  * Also normalizes the stream Firebase auto-creates when linking ("Web App",
  * often with no URI) to the naming convention — diff-gated.
  */
 const chalk = require('chalk').default;
-const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+
+// GA holds a just-deleted link for a moment before the property is free
+const LINK_RELEASE_INTERVAL_MS = 5000;
 
 module.exports = async function ensureGoogleFirebaseLink(context) {
   const { analyticsApi: api, propertyId, brandConfig, options = {} } = context;
@@ -56,7 +61,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
     // The property belongs to another project — that's not ours to break
     console.log(`      ${chalk.yellow('⚠')} GA property ${chalk.cyan(propertyId)} is linked to a DIFFERENT Firebase project: ${chalk.cyan(linkedProject)}`);
     console.log(`      ${chalk.dim('→')} Unlink it in GA Admin (or fix analytics.providers.google.propertyId), then rerun`);
-    return { status: 'warned', output: { firebaseLink: { error: `property linked to different project: ${linkedProject}` } } };
+    return { status: 'warned', reason: `the GA property is linked to a different Firebase project (${linkedProject})`, output: { firebaseLink: { error: `property linked to different project: ${linkedProject}` } } };
   }
 
   // === No link on our property — find where (if anywhere) our project is linked ===
@@ -77,17 +82,24 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
   }
 
   // === WRITE: create the link (a just-deleted link can take a moment to
-  // release — GA answers with a precondition failure; the rerun converges) ===
+  // release — GA answers with a precondition failure; the create is retried
+  // in THIS walk rather than left to a rerun, #662) ===
   console.log(`      ${chalk.dim('→')} Linking GA property ${chalk.cyan(propertyId)} to Firebase project ${chalk.cyan(projectId)}...`);
   let link;
   try {
     link = await api.createFirebaseLink(propertyId, projectId);
   } catch (error) {
-    if (error.message.includes('Precondition') || error.message.includes('already linked')) {
-      console.log(`      ${chalk.yellow('⚠')} Link not ready yet${chalk.dim(`: ${error.message}`)} — rerun in a minute`);
-      return { status: 'warned', output: { firebaseLink: { error: error.message } } };
+    if (!isLinkNotReady(error)) {
+      throw error;
     }
-    throw error;
+
+    console.log(`      ${chalk.yellow('⚠')} Link not ready yet${chalk.dim(`: ${error.message}`)}`);
+    link = canPrompt(options) ? await waitForLink(api, propertyId, projectId) : null;
+
+    if (!link) {
+      console.log(`      ${chalk.dim('→')} Still not ready — rerun in a minute`);
+      return { status: 'warned', reason: 'the Firebase link is not ready yet — rerun in a minute', output: { firebaseLink: { error: error.message } } };
+    }
   }
 
   console.log(`      ${chalk.green('✓')} Created Firebase link`);
@@ -96,6 +108,46 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
 
   return { output: { firebaseLink: { propertyId, linked: true, linkName: link.name || null, streamUpdated: streamResult } } };
 };
+
+/** GA's answer while a just-deleted link still holds the property. */
+function isLinkNotReady(error) {
+  return error.message.includes('Precondition') || error.message.includes('already linked');
+}
+
+/**
+ * Retry the create until GA releases the deleted link (ENTER checks now, `s`
+ * skips). Any OTHER error is the caller's to throw — a poll must not turn a
+ * real failure into a wait.
+ *
+ * @returns {Promise<object|null>} - The created link, or null when the wait
+ *   was skipped.
+ */
+async function waitForLink(api, propertyId, projectId) {
+  let fatal = null;
+
+  const result = await pollWithSpinner({
+    check: async () => {
+      try {
+        return { done: true, result: await api.createFirebaseLink(propertyId, projectId) };
+      } catch (error) {
+        if (isLinkNotReady(error)) {
+          return { done: false };
+        }
+        fatal = error;
+        return { done: true, error: error.message };
+      }
+    },
+    intervalMs: LINK_RELEASE_INTERVAL_MS,
+    message: 'Waiting for GA to release the previous Firebase link',
+    indent: '      ',
+  });
+
+  if (fatal) {
+    throw fatal;
+  }
+
+  return result.success ? result.result : null;
+}
 
 /**
  * Search every accessible account/property for a FirebaseLink pointing at

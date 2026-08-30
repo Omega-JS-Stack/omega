@@ -368,7 +368,15 @@ class FirebaseAPI {
     }
   }
 
-  /** supportEmail must be the caller's email or a Google Group they own */
+  /**
+   * supportEmail must be the caller's email or a Google Group they own.
+   *
+   * The AUDIENCE cannot be asked for (#667, proven live): `orgInternalOnly`
+   * is output-only, an API-made brand is born Internal whatever the body
+   * says, and the create itself is org-only (an org-less project answers
+   * 400 "Project must belong to an organization"). The caller takes the
+   * returned brand through the audience stopper.
+   */
   async createBrand(projectId, applicationTitle, supportEmail) {
     return this.request(`https://iap.googleapis.com/v1/projects/${projectId}/brands`, {
       method: 'POST',

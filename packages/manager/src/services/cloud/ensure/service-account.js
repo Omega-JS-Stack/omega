@@ -107,7 +107,7 @@ module.exports = async function ensureServiceAccount(context) {
     } catch (error) {
       if (!error.message?.includes('already exists')) {
         console.log(`      ${chalk.yellow('⚠')} Could not create service account${chalk.dim(`: ${error.message}`)}`);
-        return { status: 'warned', output: { serviceAccount: { error: error.message } } };
+        return { status: 'warned', reason: 'could not create the service account', output: { serviceAccount: { error: error.message } } };
       }
     }
   }
@@ -144,6 +144,7 @@ module.exports = async function ensureServiceAccount(context) {
     }
     return {
       status: 'warned',
+      reason: 'could not create the service account key',
       state: { serviceAccount: { email: serviceAccountEmail } },
       output: { serviceAccount: { error: error.message } },
     };

@@ -134,11 +134,21 @@ function buildRecorder() {
  * `now`/`sleep` are injectable so the deadline's OWN suite can drive a virtual
  * clock: a test about load-sensitivity must not itself be load-sensitive.
  *
+ * The optional `nudge` re-fires the SAME edit while the watcher shows no sign
+ * of life (#688): a freshly created watch root's FSEvents stream can still be
+ * initializing when the first edit lands, so the one save falls before the
+ * stream's start and is never replayed — a human just saves again. Nudging
+ * stops the moment a build starts after the wait began: a rebuild that woke
+ * but served stale bytes still fails, which is the staleness regression (#49)
+ * these suites exist to catch.
+ *
  * @param {object} options
  * @param {function} options.read - reads the built artifact (a string)
  * @param {RegExp} options.pattern - what the rebuild must produce
  * @param {string} options.message - what this wait is proving
  * @param {object} [options.builds] - a buildRecorder()
+ * @param {function} [options.nudge] - re-fires the edit (needs `builds`)
+ * @param {number} [options.nudgeMs] - gap between re-fires
  * @param {number} [options.pollMs] - gap between reads
  * @param {object} [options.env] - environment to read the lane knob from
  * @param {number} [options.load] - 1-minute load average (defaults to the real one)
@@ -153,6 +163,8 @@ async function waitForRebuild(options) {
     pattern,
     message,
     builds = null,
+    nudge = null,
+    nudgeMs = 2000,
     pollMs = POLL_MS,
     env,
     load,
@@ -163,10 +175,16 @@ async function waitForRebuild(options) {
 
   const deadlineMs = rebuildDeadlineMs({ env, load, cpus });
   const startedAt = now();
+  const startedBuilds = builds ? builds.state.started : 0;
+  let lastNudgeAt = startedAt;
   let rendered = read();
 
   while (!pattern.test(rendered) && now() - startedAt < deadlineMs) {
     await sleep(pollMs);
+    if (nudge && builds && builds.state.started === startedBuilds && now() - lastNudgeAt >= nudgeMs) {
+      nudge();
+      lastNudgeAt = now();
+    }
     rendered = read();
   }
 

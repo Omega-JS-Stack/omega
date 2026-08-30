@@ -60,6 +60,7 @@ module.exports = async function ensureBilling(context) {
     console.log(`      ${chalk.dim('→')} Rerun once Google auth succeeds: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/usage/details`)}`);
     return {
       status: 'warned',
+      reason: 'could not check the billing plan',
       output: { billing: { error: 'billing plan unknown: could not check (the billing API read failed)' } },
     };
   }
@@ -111,6 +112,7 @@ module.exports = async function ensureBilling(context) {
     console.log(`      ${chalk.yellow('⚠')} Could not upgrade${chalk.dim(`: ${error.message}`)}`);
     return {
       status: 'warned',
+      reason: 'could not upgrade the billing plan',
       state: { billing: { enabled: false } },
       output: { billing: { error: error.message } },
     };

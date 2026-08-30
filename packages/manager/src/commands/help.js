@@ -37,7 +37,7 @@ module.exports = async () => {
   console.log('');
   console.log(chalk.bold('New here?'));
   console.log(`  ${chalk.dim('1.')} ${chalk.cyan('npx omega onboard')}  ${chalk.dim('— scaffold a brand (skip if you already have one)')}`);
-  console.log(`  ${chalk.dim('2.')} ${chalk.cyan('npm install')}        ${chalk.dim('— then `cd targets/<dir> && npx omega setup` per target')}`);
+  console.log(`  ${chalk.dim('2.')} ${chalk.cyan('npm install')}        ${chalk.dim('— every target gets its framework; the verbs scaffold on first run')}`);
   console.log(`  ${chalk.dim('3.')} ${chalk.cyan('npm run manage')}     ${chalk.dim('— reconcile everything; it says what it still needs')}`);
   console.log(`  ${chalk.dim('4.')} ${chalk.cyan('npm start')}          ${chalk.dim('— boot the local stack and build')}`);
   console.log('');

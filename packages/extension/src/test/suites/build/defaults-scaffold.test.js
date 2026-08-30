@@ -60,7 +60,10 @@ module.exports = {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         scaffoldDefaults({ outputDir: tmp });
 
-        ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
+        // No `.env` scaffolds ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+        // a target .env is a human-only override; keys live in the brand root
+        // .env and every verb delivers them.
+        ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
         // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
         // the one-line `@AGENTS.md` pointer.
@@ -171,7 +174,7 @@ module.exports = {
         ctx.expect(jetpack.exists(path.join(targetDir, 'CHANGELOG.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(targetDir, 'docs'))).toBe(false);
         // The non-doc defaults still land.
-        ctx.expect(jetpack.exists(path.join(targetDir, '.env'))).toBeTruthy();
+        ctx.expect(jetpack.exists(path.join(targetDir, '.gitignore'))).toBeTruthy();
       },
     },
     {

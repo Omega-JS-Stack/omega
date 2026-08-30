@@ -53,5 +53,5 @@ module.exports = async function ensureGaLink(context) {
     console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
   }
 
-  return { status: 'warned', output: { gaLink: { associationsUrl } } };
+  return { status: 'warned', reason: 'GA association not confirmed — link it on the associations page', output: { gaLink: { associationsUrl } } };
 };

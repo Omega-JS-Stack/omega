@@ -33,11 +33,10 @@
 
 ## 🚀 Getting started
 
-1. `npm i @omega.js/extension` in your project (or start from an empty directory — `npx omega setup` scaffolds everything).
+1. `npm i @omega.js/extension` in your project (or start from an empty directory — the first verb scaffolds everything).
 2. Set up + run:
    ```bash
    npm install
-   npx omega setup
    npm start
    ```
 3. Open Chrome and navigate to `chrome://extensions`.
@@ -47,7 +46,7 @@
 
 ## 📦 Sync with the template
 
-Run `npx omega setup` again to pull the latest framework defaults. Files you've edited are preserved; only missing or framework-owned files update.
+Every verb (`npm start`, `npx omega build`, `npx omega test`, `npx omega deploy`) refreshes the framework defaults first. Files you've edited are preserved; only missing or framework-owned files update.
 
 ## 🧪 Testing
 
@@ -180,7 +179,7 @@ Full guide: [docs/auth.md](docs/auth.md).
 
 ## 🔒 Supply-chain security
 
-All `npm install` calls in @omega.js/extension CLI commands (`npx omega setup`, `npx omega install`) route through [Socket Firewall](https://socket.dev/) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm install`.
+All `npm install` calls in @omega.js/extension CLI commands (the peer-dependency step every verb runs, `npx omega install`) route through [Socket Firewall](https://socket.dev/) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm install`.
 
 ## 📚 Documentation
 

@@ -958,8 +958,3 @@ const manager = new Manager();
 export default manager;
 export { Manager };
 
-// For non-ES6 environments
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = manager;
-}
-

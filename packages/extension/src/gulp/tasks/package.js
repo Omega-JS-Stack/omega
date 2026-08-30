@@ -9,6 +9,8 @@ const { series, parallel, watch } = require('gulp');
 const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
 const { readSiblingPorts, envPorts, CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
+const { bakeKeys } = require('@omega.js/config/env-delivery');
+const { checkEnvRules } = require('@omega.js/config/env-rules');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -57,7 +59,7 @@ async function generateBuildJs(outputDir) {
 
     // The Measurement Protocol secret (.env — secrets never live in omega.json5).
     const googleAnalyticsId = config.analytics?.providers?.google?.id || '';
-    const googleAnalyticsSecret = process.env.GOOGLE_ANALYTICS_SECRET || '';
+    const googleAnalyticsSecret = readBakedEnv(process.env, { config }).GOOGLE_ANALYTICS_SECRET;
 
     // Build config object matching @omega.js/client's expected structure
     const buildConfig = {
@@ -183,6 +185,73 @@ async function generateBuildJs(outputDir) {
     logger.error(`Error generating build.js`, e);
     throw e;
   }
+}
+
+// The keys the env schema says this build writes INTO the shipped artifact
+// ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): a packaged
+// extension runs with no `.env`, so a `delivery: { extension: 'bake' }` key is
+// read from the build env here and baked into build.json / build.js. The list
+// is the schema's — the hardcoded GOOGLE_ANALYTICS_SECRET read this replaced
+// was one of three hand-kept lists for one concern.
+const BAKED_KEYS = bakeKeys('extension');
+
+/**
+ * The schema's presence rules at the BAKE seam
+ * ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)) — the last
+ * moment a missing key is still fixable.
+ *
+ * A packaged extension runs with no `.env`, so what the bake holds is what the
+ * artifact holds forever: a brand with a GA4 stream id and no Measurement
+ * Protocol secret used to bake an empty string and ship an extension that sends
+ * no events, silently — #582's failure mode, and the CI publish that has no
+ * `.env` at all is exactly where it happens. A BUILD refuses; development
+ * warns and keeps going, because a half-configured brand is a normal step on
+ * the way to a configured one.
+ *
+ * @param {object} config - The target's resolved omega.json5 config.
+ * @param {object} env - The build env.
+ * @param {object} [options]
+ * @param {boolean} [options.build] - Build/publish mode (default: the Manager's).
+ * @param {object} [options.logger] - Logger with `warn` (default: this task's).
+ * @throws {Error} in build mode, naming every brand-level key and the config path that requires it.
+ */
+function assertBakeRules(config, env, options) {
+  options = options || {};
+  const build = options.build === undefined ? Manager.isBuildMode() : options.build;
+  const warn = (options.logger || logger).warn.bind(options.logger || logger);
+
+  const violations = checkEnvRules(config, env, { target: 'extension' })
+    .filter((violation) => violation.rule === 'requiredWhen');
+  if (violations.length === 0) return;
+
+  // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_EXTENSION, not the
+  // GOOGLE_ANALYTICS_SECRET it is delivered as): that is the name a human puts
+  // in the brand .env and in the repo's Actions secrets.
+  const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
+  const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
+    + 'Set it in the brand .env (and as a repo Actions secret for a CI publish — `omega deploy` pushes them), then build again.';
+
+  if (build) {
+    throw new Error(message);
+  }
+
+  warn(message);
+}
+
+// The baked keys' values from the build env. Absent reads as the empty string,
+// never undefined: the snapshot is JSON, and a missing key would read to the
+// client as "no analytics configured" rather than "configured, no secret".
+//
+// The presence guard runs FIRST: a build that would bake an empty secret over a
+// configured stream refuses here rather than shipping the hole.
+function readBakedEnv(env, options) {
+  env = env || process.env;
+
+  if (options && options.config) {
+    assertBakeRules(options.config, env, options);
+  }
+
+  return Object.fromEntries(BAKED_KEYS.map((key) => [key, env[key] || '']));
 }
 
 // Get git info
@@ -866,6 +935,9 @@ module.exports.hook = hook;
 // The browser targets the package lane builds — the one list the CI workflow's
 // artifact upload is checked against (it ships packaged/<target>/extension.zip).
 module.exports.TARGETS = TARGETS;
+// The schema-derived bake set and its reader (#627).
+module.exports.BAKED_KEYS = BAKED_KEYS;
+module.exports.readBakedEnv = readBakedEnv;
 
 // Run hooks
 async function hook(file) {

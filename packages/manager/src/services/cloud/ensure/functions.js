@@ -38,6 +38,7 @@ module.exports = async function ensureFunctions(context) {
 
   return {
     status: allEnabled ? 'success' : 'warned',
+    ...(allEnabled ? {} : { reason: 'some Cloud Functions APIs are not enabled' }),
     state: {
       functions: {
         ready: allEnabled,

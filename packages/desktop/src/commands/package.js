@@ -15,7 +15,7 @@ function plan(options) {
     env: { OMEGA_BUILD_MODE: 'true' },
     steps: [
       { type: 'clean' },
-      { type: 'setup' },
+      { type: 'certs' },
       { type: 'gulp', task: quick ? 'packageQuick' : 'packageBuild' },
     ],
   };

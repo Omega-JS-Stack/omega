@@ -83,6 +83,12 @@ module.exports = async (context) => {
   return {
     status,
     ...(failed.length > 0 ? { error: failed.map((f) => f.name).join(', ') } : {}),
+    // The reason carries each warned check's own text, not just its name —
+    // the summary line is all a run prints for a warned service, so
+    // `outdated (1.0.0 → 1.2.0)` has to survive the rollup.
+    ...(status === 'warned'
+      ? { reason: warned.map((w) => (w.warning ? `${w.name}: ${w.warning}` : w.name)).join('; ') }
+      : {}),
     output: {
       results: { passed, warned, failed },
       counts: recorder.counts(),

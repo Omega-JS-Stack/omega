@@ -15,6 +15,7 @@ const assert = require('node:assert');
 const { test } = require('node:test');
 
 const { bootCheckout } = require('./lib/checkout-boot.js');
+const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
 
 test('#637: prices, plans and pay buttons paint before eligibility answers', async () => {
   const { updates, answerEligibility } = await bootCheckout();
@@ -127,7 +128,33 @@ test('#637: the warmup ping goes out as a wakeup, before auth settles', async ()
 
   const wakeup = requests.find((request) => request.options.wakeup);
   assert.ok(wakeup, 'the page warms the backend through the shared client helper');
-  assert.strictEqual(wakeup.url, '/omega/payments/intent', 'aimed at the route checkout is about to need');
+  assert.strictEqual(wakeup.url, WAKEUP_ROUTE, 'aimed at the one route every wakeup names');
 
   await answerEligibility(false);
+});
+
+test('#666: a subscription that sells no trial asks nothing and prices itself at once', async () => {
+  // The bug this pins: the eligibility route was asked for EVERY subscription,
+  // and the answer thrown away whenever `trial.days` was missing or 0 — one
+  // authed round trip, plus the skeleton wait behind it, for a question the
+  // page had already decided. A trial-less plan is a one-time buy's twin here:
+  // there is no trial to be eligible for, so `noTrialToAsk()` answers it.
+  const { updates, requests, form, settle } = await bootCheckout({
+    product: { id: 'premium', name: 'Premium', type: 'subscription', prices: { monthly: 10, annually: 100 } },
+  });
+
+  // Auth settles on its own turn, and the eligibility question waits for it —
+  // so the question this test says is never asked gets every chance to be.
+  await settle();
+
+  assert.ok(
+    !requests.some((request) => request.url.includes('trial-eligibility')),
+    'no eligibility question goes out for a plan that sells no trial',
+  );
+
+  const orderPaints = updates.filter((update) => update.order);
+  assert.strictEqual(orderPaints.length, 1, 'the money line is written once, on the same clock as the rest of the page');
+  assert.strictEqual(orderPaints[0].order.total, '$100.00', 'and it quotes the full amount due today');
+  assert.strictEqual(orderPaints[0].order.trial.show, false, 'with no trial note');
+  assert.deepStrictEqual([...form.resolved].sort(), ['eligibility', 'recaptcha'], 'the pay buttons arm with no wait');
 });

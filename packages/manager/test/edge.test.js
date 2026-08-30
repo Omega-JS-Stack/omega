@@ -815,3 +815,72 @@ test('email-routing: interactive run opens the dashboard and retries the write o
     setBrowserOpener(null);
   }
 });
+
+// #662: the flip belongs to THIS walk. SendGrid validates the branded link a
+// few minutes after the CNAME lands, so an interactive run waits for that
+// answer and proxies the record in the same pass; skipping keeps it grey.
+test('dns-records: the run waits for SendGrid\'s validation and proxies emailurl in the SAME walk (#662)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+  const config = brandConfig();
+  config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
+
+  let reads = 0;
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/dns_records': [],
+      'POST /zones/zone-1/dns_records': { id: 'new' },
+    },
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = ensureDns(handlerContext(config, api, {
+      sendgridApi: {
+        getBrandedLinks: async () => {
+          reads += 1;
+          return [{ domain: DOMAIN, subdomain: 'emailurl', valid: reads >= 3 }];
+        },
+      },
+    }));
+
+    await tty.answer('(enter)=check now, (s)=skip', '\r');
+    const result = await run;
+
+    const created = api.calls.find((c) => c.method === 'POST' && c.body.name === `emailurl.${DOMAIN}`);
+    assert.equal(created.body.proxied, true, 'validation landed mid-run — the record is written proxied, not on a rerun');
+    assert.equal(result.status, 'success', 'nothing is owed to a second run');
+    assert.ok(reads >= 3, 'SendGrid was re-asked on a later tick');
+  } finally {
+    tty.close();
+  }
+});
+
+test('dns-records: skipping the branded-link wait warns with the reason the summary prints (#662)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+  const config = brandConfig();
+  config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/dns_records': [],
+      'POST /zones/zone-1/dns_records': { id: 'new' },
+    },
+  });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = ensureDns(handlerContext(config, api, {
+      sendgridApi: { getBrandedLinks: async () => [{ domain: DOMAIN, subdomain: 'emailurl', valid: false }] },
+    }));
+
+    await tty.answer('(enter)=check now, (s)=skip', 's');
+    const result = await run;
+
+    const created = api.calls.find((c) => c.method === 'POST' && c.body.name === `emailurl.${DOMAIN}`);
+    assert.equal(created.body.proxied, false, 'still unvalidated — a proxied record would answer with Cloudflare IPs');
+    assert.equal(result.status, 'warned');
+    assert.match(result.reason, /has not validated the branded link/);
+  } finally {
+    tty.close();
+  }
+});

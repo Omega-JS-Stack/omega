@@ -11,7 +11,7 @@ class FirestoreIndexesSyncedTest extends BaseTest {
 
   getWarning() {
     return [
-      'live index deploy skipped (--offline) — the drift above is reported only; re-run `npx omega setup` without --offline to deploy',
+      'live index deploy skipped (--offline) — the drift above is reported only; re-run `npx omega test` without --offline to deploy',
     ];
   }
 

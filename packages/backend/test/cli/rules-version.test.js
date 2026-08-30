@@ -18,15 +18,15 @@
 const fs = require('fs');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const SetupCommand = require('../../src/cli/commands/setup.js');
-const { RULES_VERSION } = SetupCommand;
+const targetChecks = require('../../src/cli/utils/target-checks.js');
+const { RULES_VERSION } = targetChecks;
 const { BRAND_RULES_SEED, compileRules } = require('../../src/cli/utils/compile-rules.js');
 
-const SETUP_SOURCE = path.join(__dirname, '..', '..', 'src', 'cli', 'commands', 'setup.js');
+const SETUP_SOURCE = path.join(__dirname, '..', '..', 'src', 'cli', 'utils', 'target-checks.js');
 const COMPILER_SOURCE = path.join(__dirname, '..', '..', 'src', 'cli', 'utils', 'compile-rules.js');
 
-// The generator (SetupCommand#getRulesFile) only touches `main.default`, so a
-// bare main is enough to run it: no project, no config, no emulator.
+// The generator (target-checks' getRulesFile) only touches `main.default`, so
+// a bare main is enough to run it: no project, no config, no emulator.
 // `default.version` is the package-version channel, so a sentinel there proves
 // the stamp does not read it.
 const PACKAGE_VERSION_SENTINEL = '9.9.9-sentinel';
@@ -39,7 +39,7 @@ function generateRules() {
     default: { version: PACKAGE_VERSION_SENTINEL },
   };
 
-  new SetupCommand(main).getRulesFile();
+  targetChecks.getRulesFile(main);
 
   return main.default;
 }
@@ -84,19 +84,19 @@ module.exports = {
     },
 
     {
-      name: 'the-setup-version-check-expects-the-same-stamp',
+      name: 'the-target-check-expects-the-same-stamp',
       async run({ assert }) {
-        // Source-level: the check lives inside runSetup(), which needs a real
-        // project to execute. If it drifts back to the package version it
-        // never matches what the generator writes, and setup rewrites
+        // Source-level: the check lives inside runTargetChecks(), which needs a
+        // real project to execute. If it drifts back to the package version it
+        // never matches what the generator writes, and the checks rewrite
         // database.rules.json on every single boot, the exact churn this pins.
         const source = fs.readFileSync(SETUP_SOURCE, 'utf8');
         const line = source.split('\n').find((l) => l.includes('rulesVersionRegex ='));
 
-        assert.equal(!!line, true, 'the rulesVersionRegex assignment must exist in setup.js');
+        assert.equal(!!line, true, 'the rulesVersionRegex assignment must exist in target-checks.js');
         assert.equal(line.includes('RULES_VERSION'), true, 'the version check must build its regex from RULES_VERSION');
         assert.equal(line.includes('self.default.version'), false, 'the version check must not read the package version');
-        assert.equal(/RULES_VERSION.*require\('\.\.\/utils\/compile-rules'\)/.test(source), true, 'RULES_VERSION must come from the compiler, not a second copy');
+        assert.equal(/RULES_VERSION.*require\('\.\/compile-rules'\)/.test(source), true, 'RULES_VERSION must come from the compiler, not a second copy');
       },
     },
   ],

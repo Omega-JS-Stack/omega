@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/domain/index.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.CLOUDFLARE_TOKEN;
@@ -33,13 +34,19 @@ function brandConfig({ url = `https://${DOMAIN}`, provider = 'namecheap' } = {})
   return config;
 }
 
-/** Fake CloudflareAPI — only the zone lookup the domain service uses. */
+/**
+ * Fake CloudflareAPI — only the zone lookup the domain service uses. Pass an
+ * ARRAY to answer a sequence of lookups (the last entry repeats), which is how
+ * a zone that fills in its nameservers mid-wait is fixtured.
+ */
 function fakeCloudflare(zone) {
+  const answers = Array.isArray(zone) ? zone : null;
   const api = {
     lookups: [],
     getZoneByName: async (name) => {
       api.lookups.push(name);
-      return zone || null;
+      const answer = answers ? answers[Math.min(api.lookups.length - 1, answers.length - 1)] : zone;
+      return answer || null;
     },
   };
   return api;
@@ -261,6 +268,50 @@ test('domain: no Cloudflare zone yet warns and touches nothing', async () => {
   assert.equal(result.status, 'warned');
   assert.match(result.output.nameservers.note, /no Cloudflare zone/);
   assert.equal(namecheap.calls.length, 0);
+});
+
+// #662: the edge service creates the zone earlier in the SAME walk, so a bare
+// zone here is seconds-old — the registrar write waits for Cloudflare to
+// assign the nameservers instead of leaving it to a second run.
+test('domain: a zone still assigning nameservers is waited out and set in the SAME walk (#662)', async () => {
+  const bare = { id: 'zone-1', name: DOMAIN, status: 'initializing', name_servers: [] };
+  const assigned = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  const cloudflare = fakeCloudflare([bare, bare, assigned]);
+  const namecheap = fakeNamecheap({ current: ['dns1.registrar-servers.com'] });
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig(), { cloudflare, namecheap });
+
+    await tty.answer('(enter)=check now, (s)=skip', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success', 'the walk finished the registrar write — no rerun owed');
+    assert.ok(cloudflare.lookups.length >= 3, 'the zone was re-read on a later tick');
+    assert.deepEqual(namecheap.mutations()[0].nameservers, CF_NS_SORTED);
+  } finally {
+    tty.close();
+  }
+});
+
+test('domain: skipping the nameserver wait warns with the reason the summary prints (#662)', async () => {
+  const bare = { id: 'zone-1', name: DOMAIN, status: 'initializing', name_servers: [] };
+  const cloudflare = fakeCloudflare(bare);
+  const namecheap = fakeNamecheap();
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig(), { cloudflare, namecheap });
+
+    await tty.answer('(enter)=check now, (s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.deepEqual(result.warned, [{ operation: 'nameservers', reason: 'the zone has no assigned nameservers yet' }]);
+    assert.equal(namecheap.calls.length, 0);
+  } finally {
+    tty.close();
+  }
 });
 
 test('domain: zone without assigned nameservers warns and touches nothing', async () => {

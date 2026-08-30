@@ -14,8 +14,8 @@
  * and is never asked again. Both keys are OPTIONAL in the registry
  * (`gates: false`), so preflight never gates a run on them.
  *
- * It runs before disperse: the keys must be in the brand .env before disperse
- * composes the backend target's own .env from it.
+ * It runs before the delivery lane: the keys must be in the brand .env before
+ * a target's runtime env composes from it.
  */
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');

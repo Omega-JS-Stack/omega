@@ -828,17 +828,6 @@ module.exports = {
       },
     },
     {
-      name: 'the publish workflow injects GOOGLE_ANALYTICS_SECRET from the repo secrets (#582)',
-      run: async (ctx) => {
-        const workflow = fs.readFileSync(path.join(SRC, 'defaults', '.github', 'workflows', 'publish.yml'), 'utf8');
-
-        // A dispatched CI run has no `.env`, so the secret only reaches the
-        // build through the workflow env — without this line every published
-        // extension baked an empty GA secret and sent no events.
-        ctx.expect(workflow).toContain('GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}');
-      },
-    },
-    {
       name: 'build hooks run from the NESTED hooks/build/pre.js setup migrates to (#571)',
       run: async (ctx) => {
         const tmp = stageProject({

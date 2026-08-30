@@ -473,7 +473,7 @@ module.exports = {
         assert.equal(jetpack.exists(path.join(targetPath, COMPILED_RULES_FILE)), false, 'an unmigrated source must leave no artifact behind');
         assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
         assert.match(warnings[0], /legacy OMEGA Rules marker block/, 'the refusal must name what it found');
-        assert.match(warnings[0], /npx omega setup/, 'the refusal must name the migration');
+        assert.match(warnings[0], /npx omega (test|migrate:rules)/, 'the refusal must name the command that moves the tree forward');
 
         // The pure compile refuses at the break point too, so no other caller
         // can talk it into the duplicate-function artifact.
@@ -485,7 +485,7 @@ module.exports = {
         }
 
         assert.ok(threw, 'compiling an unmigrated source must throw');
-        assert.match(threw.message, /npx omega setup/, 'the error must name the migration');
+        assert.match(threw.message, /npx omega migrate:rules/, 'the error must name the run-alone migration verb');
 
         // The STAGE only reports it, because setup stages before its checks
         // run — a throw here would kill the very run that migrates the file.

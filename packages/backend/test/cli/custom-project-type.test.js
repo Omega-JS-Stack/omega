@@ -42,7 +42,8 @@ const BuildCommand = require('../../src/cli/commands/build.js');
 const DeployCommand = require('../../src/cli/commands/deploy.js');
 const EmulatorCommand = require('../../src/cli/commands/emulator.js');
 const ServeCommand = require('../../src/cli/commands/serve.js');
-const SetupCommand = require('../../src/cli/commands/setup.js');
+const { ensureTarget } = require('../../src/cli/utils/ensure-target.js');
+const { stageFunctions } = require('../../src/cli/utils/stage-functions.js');
 const TestCommand = require('../../src/cli/commands/test.js');
 const { getTests } = require('../../src/cli/commands/setup-tests/index.js');
 
@@ -107,31 +108,22 @@ async function runCommand(CommandClass, dir, argv) {
 }
 
 /**
- * The SCAFFOLD pass of `omega setup` — the same calls runSetup() makes before
- * it reaches the checks (load, scaffold the config artifacts, stage src/ →
- * dist/), with console captured. The checks themselves need a Firebase CLI and
- * a network; which of them a custom target even RUNS is its own case below.
+ * The SCAFFOLD pass every verb runs (#675): ensureTarget() writes the config
+ * artifacts, then the stage builds dist/ — the same pair `ensureStaged()`
+ * makes. The CHECKS need a Firebase CLI and a network; which of them a custom
+ * target even RUNS is its own case below.
  */
 function runSetupScaffold(dir) {
   const lines = [];
-  const originalLog = console.log;
+  const log = (message) => lines.push(String(message));
 
-  console.log = (...args) => lines.push(args.map(String).join(' '));
+  ensureTarget({ projectDir: dir, log });
+  stageFunctions({ projectDir: dir, log });
 
-  try {
-    const command = new SetupCommand(fakeMain(dir));
-
-    command.loadFiles();
-    command.scaffoldConfigs();
-    command.ensureStaged();
-
-    return { output: lines.join('\n') };
-  } finally {
-    console.log = originalLog;
-  }
+  return { output: lines.join('\n') };
 }
 
-/** The setup checks a target actually runs, by class name, in order. */
+/** The target checks a target actually runs, by class name, in order. */
 function setupCheckNames(dir) {
   return getTests({ main: { firebaseProjectPath: dir } }).map((test) => test.constructor.name);
 }
@@ -286,7 +278,7 @@ module.exports = {
     },
 
     {
-      name: 'omega setup scaffolds no Firebase-only file on a custom backend',
+      name: 'the verbs scaffold no Firebase-only file on a custom backend',
 
       async run() {
         const dir = targetDir({ projectType: 'custom' });
@@ -295,7 +287,7 @@ module.exports = {
           const run = runSetupScaffold(dir);
 
           for (const file of FIREBASE_ONLY_SCAFFOLD) {
-            assert.strictEqual(fs.existsSync(path.join(dir, file)), false, `a custom backend has no Firebase lane — setup must not write ${file}: ${run.output}`);
+            assert.strictEqual(fs.existsSync(path.join(dir, file)), false, `a custom backend has no Firebase lane — the scaffold must not write ${file}: ${run.output}`);
           }
           assert.strictEqual(fs.existsSync(path.join(dir, 'dist', 'firestore.rules')), false, 'and no compiled rules artifact either — nothing deploys it');
 
@@ -330,7 +322,7 @@ module.exports = {
     },
 
     {
-      name: 'setup never rewrites what a custom project authored itself',
+      name: 'the scaffold never rewrites what a custom project authored itself',
 
       async run() {
         const dir = targetDir({ projectType: 'custom' });
@@ -355,7 +347,7 @@ module.exports = {
     },
 
     {
-      name: 'the Firebase-only setup checks are dropped in custom mode, and only those',
+      name: 'the Firebase-only target checks are dropped in custom mode, and only those',
 
       async run() {
         const custom = targetDir({ projectType: 'custom' });
@@ -378,7 +370,7 @@ module.exports = {
           assert.strictEqual(kept.includes('EmulatorConfigTest'), false, 'there is no emulator to configure');
 
           // Everything else is identical in both modes — that is the mode.
-          for (const check of ['OmegaConfigTest', 'EnvFileTest', 'ServiceAccountTest', 'ProjectDirectoriesTest']) {
+          for (const check of ['OmegaConfigTest', 'GitignoreTest', 'ServiceAccountTest', 'ProjectDirectoriesTest']) {
             assert.strictEqual(kept.includes(check), true, `${check} is not a Firebase-lane check`);
           }
         } finally {

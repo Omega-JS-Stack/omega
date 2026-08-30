@@ -748,7 +748,7 @@ test('the in-repo brands carry no undeclared paths', () => {
   const path = require('node:path');
   const { loadConfig } = require('../src/load.js');
 
-  for (const brand of ['sandbox-brand', 'omega-playground', 'newsflash-brand']) {
+  for (const brand of ['naked-brand', 'sandbox-brand', 'omega-playground', 'newsflash-brand']) {
     const { warnings } = loadConfig(path.join(__dirname, '..', '..', '..', 'brands', brand));
 
     assert.deepStrictEqual(warnings, [], `${brand}: ${warnings.join(' | ')}`);

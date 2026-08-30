@@ -29,11 +29,10 @@
 
 ## Quick start (consumer)
 
-@omega.js/desktop auto-syncs your system Node version to match whatever Node Electron's bundled runtime ships with. `npx omega setup` queries the official Electron releases feed using your installed Electron version, then writes the corresponding Node major to `.nvmrc`. Run `nvm use` afterward to switch your shell.
+@omega.js/desktop auto-syncs your system Node version to match whatever Node Electron's bundled runtime ships with. The postinstall `sync-nvmrc` step queries the official Electron releases feed using your installed Electron version, then writes the corresponding Node major to `.nvmrc`; every verb seeds a missing `.nvmrc` the same way. Run `nvm use` afterward to switch your shell.
 
 ```bash
 npm install @omega.js/desktop --save-dev
-npx omega setup            # scaffolds project; auto-resolves & writes correct .nvmrc from electron version
 nvm use                  # switch to the Node version Electron uses (one-time per shell)
 npm start                # dev: gulp → webpack → electron .
 OMEGA_CDP_PORT=9222 npm start  # dev + expose Chrome DevTools Protocol for Claude/MCP debugging

@@ -194,7 +194,7 @@ test('findTarget: the walk stops at the nearest .git — a context outside the r
 
 // ─── run() dispatch ──────────────────────────────────────────────────────────
 
-test('run(): no target context falls back to the HOST CLI (bootstrap case, e.g. `omega setup` in a fresh dir)', async () => {
+test('run(): no target context falls back to the HOST CLI (bootstrap case, e.g. a verb in a fresh dir)', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-boot-'));
   const cwd0 = process.cwd();
   let ran = 0;
@@ -255,8 +255,8 @@ test('run(): cross-framework dispatch resolves the target\'s ./cli and calls run
 });
 
 test('run(): a brand-SHAPED dir with no manager installed falls back to the HOST CLI with a note (#194)', async () => {
-  // `omega setup` scaffolds config/omega.json5 into a STANDALONE project before the
-  // framework dep lands in its package.json — brand-shaped, but no manager to
+  // A verb's ensureTarget scaffolds config/omega.json5 into a STANDALONE project before
+  // the framework dep lands in its package.json — brand-shaped, but no manager to
   // dispatch to. The dispatcher must not dead-end there.
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-nomgr-'));
   const targetDir = path.join(scratch, 'fresh-target');

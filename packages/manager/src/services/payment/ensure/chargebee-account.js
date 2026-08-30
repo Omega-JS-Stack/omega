@@ -19,7 +19,7 @@ module.exports = async function ensureChargebeeAccount(context) {
     await api.makeRequest('GET', '/item_families', { limit: 1 });
   } catch (error) {
     console.log(`      ${chalk.yellow('⚠')} Could not connect to Chargebee${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { chargebeeAccount: { connected: false, error: error.message } } };
+    return { status: 'warned', reason: 'could not connect to Chargebee', output: { chargebeeAccount: { connected: false, error: error.message } } };
   }
 
   console.log(`      site: ${chalk.cyan(api.site)}`);

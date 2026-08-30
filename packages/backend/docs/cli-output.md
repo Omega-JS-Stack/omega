@@ -75,28 +75,27 @@ const summary = new ui.Summary().start();
 summary.pass();                        // record a pass
 summary.warn('check name', detailsArr);// record a warning (non-blocking)
 summary.fail('check name', detailsArr);// record a fail with pre-formatted detail lines
-summary.print({ hint: 'Fix the above, then run npx omega setup again.' });
+summary.print({ hint: 'Fix the above, then run npx omega test again.' });
 ```
 
 Results line: `36 passed, 1 warned, 0 failed` (the warned segment only appears
 when > 0). Warnings are listed before failures in the summary block — yellow `⚠`
 lines with their detail arrays indented beneath.
 
-## How `setup` uses it
+## How the target checks use it
 
-[`src/cli/commands/setup.js`](../src/cli/commands/setup.js) builds the whole run
-from these helpers:
+The AUDIT half of the retired `omega setup` — [`src/cli/utils/target-checks.js`](../src/cli/utils/target-checks.js),
+the lane `omega test` runs before it boots anything — builds its whole run from
+these helpers:
 
-1. `ui.banner(...)` → `ui.header(brand, { subtitle: consoleUrl })` → `ui.field('Project'/'API', ...)`.
-2. `ui.section('Defaults')` then `ui.status('add'|'change', ...)` per scaffolded file.
-3. `ui.section('Checks')` then the per-check status lines (printed by the test
-   runner — see below), with `✓ fixed` / `✗ Could not fix` sub-lines.
-4. `ui.section('Stats')` then a pass/skip/warn line.
-5. `self.setupSummary.print()` on success.
+1. `ui.section('Target checks')` (printed by the test command) opens the lane.
+2. the per-check status lines (printed by the check runner — see below), with
+   `✓ fixed` / `✗ Could not fix` sub-lines.
+3. `main.setupSummary.print()` when the lane finishes.
 
 ### Test runner (`Main.prototype.test` in `src/cli/index.js`)
 
-Each setup check prints `    [N] <symbol> <name>`. A check's `run()` can return:
+Each target check prints `    [N] <symbol> <name>`. A check's `run()` can return:
 
 | Return value | Behavior |
 |---|---|
@@ -107,7 +106,7 @@ Each setup check prints `    [N] <symbol> <name>`. A check's `run()` can return:
 
 **`'warn'` return type:** When `run()` returns `'warn'`, the runner prints the
 check as `⚠`, calls `getWarning()` on the test instance for detail lines (array
-of strings), and records it via `setupSummary.warn()`. Setup continues. The
+of strings), and records it via `setupSummary.warn()`. The lane continues. The
 summary shows `36 passed, 1 warned, 0 failed` with the warning details listed
 at the bottom. Use this for environment prerequisites that don't block dev/deploy
 (e.g. Java, optional CLIs). `BaseTest` provides a default `getWarning()` returning

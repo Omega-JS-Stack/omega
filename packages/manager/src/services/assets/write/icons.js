@@ -10,7 +10,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const png2icons = require('png2icons');
-const { ICON_PLATFORMS } = require('../lib/assets-config.js');
+const { appIconFiles } = require('../lib/derived.js');
 const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeIcons(context) {
@@ -21,11 +21,10 @@ module.exports = async function writeIcons(context) {
   let fresh = 0;
   const planned = [];
 
-  for (const [platform, { format }] of Object.entries(ICON_PLATFORMS)) {
-    const platformDir = join(outDir, 'app', platform);
-    const compositedPath = join(platformDir, 'icon.png');
+  for (const { platform, format, file } of appIconFiles()) {
+    const compositedPath = join(outDir, 'app', platform, 'icon.png');
     const sourcePath = jetpack.exists(compositedPath) ? compositedPath : brandmarkPath;
-    const iconPath = join(platformDir, `icon.${format}`);
+    const iconPath = join(outDir, file);
 
     if (!isStale(sourcePath, iconPath)) {
       fresh++;

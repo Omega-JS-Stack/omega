@@ -9,7 +9,7 @@
  * and value lines by index; an off-by-one there is what historically scrambled
  * consumers' `.env` files. That duplicate is gone — this module now just
  * re-exports the canonical impl and adds the marker-name aliases the setup tests
- * (`env-file.js`, `gitignore.js`) consume.
+ * (`gitignore.js`) consume.
  */
 
 const {

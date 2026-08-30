@@ -6,6 +6,7 @@
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
+import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 /* @dev-only:start */
@@ -378,6 +379,14 @@ function setupAutoDownload() {
 // address is the same address whichever store lands first)
 function setupMobileEmailForms() {
   const $forms = document.querySelectorAll('.mobile-email-form');
+
+  // Warm the backend where the form actually renders: this submit is a POST to
+  // `/omega/general/email`, and a visitor looking at the form is one click from
+  // it. A page showing no form pings nothing
+  // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
+  if ($forms.length) {
+    omega.request(WAKEUP_ROUTE, { wakeup: true });
+  }
 
   $forms.forEach($form => {
     const formManager = new FormManager(`#${$form.id}`, {

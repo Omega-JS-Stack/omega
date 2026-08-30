@@ -1,0 +1,29 @@
+// Naked Brand — the BARE fixture (#687): the LEAST a brand monorepo can
+// declare and still be walked. brand.id, brand.name, one enabled web target,
+// and a demo-* project id. Everything else — theme, analytics, payment,
+// monitoring, oauth2, marketing, repo, domain — is deliberately ABSENT so a
+// walkthrough sees every ask/skip/disable prompt fire from zero. Secrets
+// NEVER live here (the loader hard-fails secret-shaped keys), and this brand
+// stays offline forever: nothing in it provisions real cloud resources.
+{
+  brand: {
+    id: "naked-brand",
+    name: "Naked Brand",
+  },
+
+  // The ONE cloud value, and it is a GUARDRAIL rather than a configuration:
+  // demo-* is Firebase's emulator-only convention, so every cloud-touching
+  // service short-circuits on it instead of aiming real Google APIs at a
+  // project that does not exist and never will.
+  cloud: {
+    provider: "firebase",
+    config: {
+      projectId: "demo-naked-brand",
+    },
+  },
+
+  // Key presence = target enabled. One target, zero per-target settings.
+  targets: {
+    web: {},
+  },
+}

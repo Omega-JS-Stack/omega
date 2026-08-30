@@ -165,7 +165,7 @@ module.exports = [
 
 ## Hosting Rewrites
 
-The `npx omega setup` command automatically adds required Firebase Hosting rewrites for MCP OAuth:
+The target checks `npx omega test` runs automatically add the required Firebase Hosting rewrites for MCP OAuth:
 
 ```json
 {

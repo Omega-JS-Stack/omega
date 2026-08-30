@@ -22,8 +22,9 @@
  * override every framework reads through the merge chain, the same shape the
  * monitoring service uses for its per-target DSNs (#417). Each stream's
  * Measurement Protocol secret goes to the brand .env, under
- * `GOOGLE_ANALYTICS_SECRET_{TARGET}` (#434) — disperse composes it into each
- * target's own .env as GOOGLE_ANALYTICS_SECRET, so the pair travels together.
+ * `GOOGLE_ANALYTICS_SECRET_{TARGET}` (#434) — the delivery step composes it
+ * into each target's runtime env as GOOGLE_ANALYTICS_SECRET, so the pair
+ * travels together.
  */
 const chalk = require('chalk').default;
 const { pressEnterToOpen } = require('@omega.js/devkit/prompt');
@@ -62,7 +63,7 @@ module.exports = async function ensureGoogleStreams(context) {
   const property = await api.getProperty(propertyId);
   if (!property) {
     console.log(`      ${chalk.yellow('⚠')} GA property ${chalk.cyan(propertyId)} not found (deleted, or the authed account has no access)`);
-    return { status: 'warned', output: { streams: { error: `property ${propertyId} not found` } } };
+    return { status: 'warned', reason: `GA property ${propertyId} not found`, output: { streams: { error: `property ${propertyId} not found` } } };
   }
 
   const existing = await api.listDataStreams(propertyId);
@@ -71,7 +72,8 @@ module.exports = async function ensureGoogleStreams(context) {
   const enhancedMeasurement = brandConfig.analytics?.providers?.google?.enhancedMeasurement || {};
 
   const streams = {};
-  let warned = false;
+  // What warned, by name (#643) — joined into the operation's reason
+  const warnings = [];
   const planned = [];
   const configEdits = {};
 
@@ -145,7 +147,7 @@ module.exports = async function ensureGoogleStreams(context) {
           console.log(`        ${chalk.green('✓')} API secret created`);
         } else {
           console.log(`        ${chalk.yellow('⚠')} Could not generate a clean secret in ${MAX_SECRET_ATTEMPTS} attempts`);
-          warned = true;
+          warnings.push('could not generate a clean API secret');
         }
       }
     } catch (error) {
@@ -180,15 +182,15 @@ module.exports = async function ensureGoogleStreams(context) {
             console.log(`        ${chalk.green('✓')} API secret created`);
           } else {
             console.log(`        ${chalk.dim('→')} Still gated${poll.error ? chalk.dim(` (${poll.error})`) : ''} — rerun converges once acknowledged`);
-            warned = true;
+            warnings.push('API secret still gated — acknowledge it in the GA console');
           }
         } else {
           console.log(`        ${chalk.dim('→')} Acknowledge at: ${chalk.cyan(settingsUrl)} — then rerun`);
-          warned = true;
+          warnings.push('API secret still gated — acknowledge it in the GA console');
         }
       } else {
         console.log(`        ${chalk.yellow('⚠')} API secret${chalk.dim(`: ${error.message}`)}`);
-        warned = true;
+        warnings.push('could not read or create the API secret');
       }
     }
 
@@ -227,7 +229,7 @@ module.exports = async function ensureGoogleStreams(context) {
     if (!covered) {
       console.log(`      ${chalk.yellow('⚠')} Firebase SDK measures via ${chalk.cyan(firebaseMeasurementId)}, but property ${chalk.cyan(propertyId)} has no stream with that ID`);
       console.log(`      ${chalk.dim('→')} Firebase is likely linked to a different GA property — unlink in Firebase Console and rerun`);
-      warned = true;
+      warnings.push('the Firebase measurement ID has no stream on this property');
     }
   }
 
@@ -235,8 +237,9 @@ module.exports = async function ensureGoogleStreams(context) {
   if (planned.length > 0) {
     result.output.streams.planned = planned;
   }
-  if (warned) {
+  if (warnings.length > 0) {
     result.status = 'warned';
+    result.reason = warnings.join('; ');
   }
   return result;
 };

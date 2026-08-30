@@ -27,6 +27,10 @@ const nonInteractiveAt = { manage: [], spawn: [], spawnEnv: [] };
 // downstream reads this switch instead of a TTY.
 const forceColorAt = [];
 
+// Whether each leg was spawned into its OWN process group (#690) — shutdown
+// signals the group, so a same-group leg would leak its grandchild.
+const spawnDetached = [];
+
 // What each boot cycle asks runManage for — the lane lives here (#228)
 const manageOptions = [];
 
@@ -41,6 +45,7 @@ childProcess.spawn = (command, args, options) => {
     nonInteractiveAt.spawn.push(process.env.OMEGA_NON_INTERACTIVE);
     nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
     forceColorAt.push(options.env.FORCE_COLOR);
+    spawnDetached.push(options.detached);
   }
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
@@ -730,4 +735,30 @@ test('boot tees the brand-level fan-out to <brandRoot>/logs/dev.log, ANSI stripp
   assert.ok(!contents.includes('\x1B['), 'the file is ANSI-free');
   assert.ok(!fs.existsSync(path.join(root, 'logs', 'manage.log')),
     'manage.log stays the service walk\'s record — a boot never truncates it (#231)');
+});
+
+// ─── Shutdown signals the whole chain (#690) ─────────────────────────────────
+
+test('legs spawn detached — each leg owns its process group, so shutdown can reach the grandchild (#690)', async () => {
+  boot.length = 0;
+  spawnDetached.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  await bootDev(root, { only: 'web' });
+
+  assert.deepStrictEqual(spawnDetached, [true],
+    'a leg is a chain (npm → the real server); a same-group leg leaks the grandchild on a programmatic stop');
+});
+
+test('stopChild signals the process GROUP, and falls back to the direct child when the group is gone (#690)', () => {
+  const calls = [];
+  const child = { pid: 4242, kill: (signal) => calls.push(`direct:${signal}`) };
+
+  devCommand.stopChild(child, (pid, signal) => calls.push(`group:${pid}:${signal}`));
+  assert.deepStrictEqual(calls, ['group:-4242:SIGTERM'], 'the group signal reaches npm AND the emulator behind it');
+
+  calls.length = 0;
+  devCommand.stopChild(child, () => { throw new Error('ESRCH'); });
+  assert.deepStrictEqual(calls, ['direct:SIGTERM'], 'a dead group still gets the direct kill');
 });

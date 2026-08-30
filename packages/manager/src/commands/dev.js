@@ -65,6 +65,25 @@ function devLegFor(entry) {
   return DEV_LEGS[entry.target] || CUSTOM_DEV_LEG;
 }
 
+/**
+ * Stop one dev leg. A leg is a CHAIN (npm run <leg> → the real server), so the
+ * SIGTERM goes to the leg's process group — signaling only the direct npm
+ * child leaves the grandchild (a firebase emulator) orphaned on pid 1, still
+ * holding its ports (#690). The direct kill is the fallback for a leg whose
+ * group is already gone.
+ */
+const stopChild = (child, killGroup = (pid, signal) => process.kill(pid, signal)) => {
+  try {
+    killGroup(-child.pid, 'SIGTERM');
+  } catch {
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      // already gone
+    }
+  }
+};
+
 // Booted without flags — the local web loop
 const DEFAULT_TARGETS = ['web', 'backend'];
 
@@ -326,6 +345,10 @@ module.exports = async (options = {}) => {
       // Legs pipe their output — keep chalk colors when the parent's terminal
       // has them (the log tee strips ANSI either way)
       env: { ...process.env, ...nodeEnvFor(node), FORCE_COLOR: process.stdout.isTTY ? '1' : process.env.FORCE_COLOR || '0' },
+      // Own process group per leg (#690): a leg is a chain (npm run <leg> →
+      // the real server), and shutdown signals the GROUP — a same-group leg
+      // would get only npm killed, orphaning the emulator on its ports.
+      detached: true,
     });
     forward(child.stdout, console.log, target);
     forward(child.stderr, console.error, target);
@@ -336,18 +359,32 @@ module.exports = async (options = {}) => {
     children.push(child);
   }
 
-  const shutdown = () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    console.log(chalk.dim('\n⏹ omega dev: stopping all targets…'));
+  // The legs are detached (their own process groups), so the terminal's own
+  // Ctrl-C never reaches them — every escalation is this process' to deliver.
+  const forceKill = () => {
     children.forEach((child) => {
-      try {
-        child.kill('SIGTERM');
-      } catch {
-        // already gone
-      }
+      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     });
-    setTimeout(() => process.exit(0), 500);
+    process.exit(0);
+  };
+  const shutdown = () => {
+    if (shuttingDown) return forceKill(); // second Ctrl-C = force kill
+    shuttingDown = true;
+    console.log(chalk.dim('\n⏹ omega dev: stopping all targets… (Ctrl-C again to force kill)'));
+    children.forEach((child) => stopChild(child));
+    // Exit only when every leg is GONE: the backend leg's own teardown (the
+    // emulator group-kill + orphan sweep, seconds of work) logs through this
+    // process' pipes, and exiting under it cuts the sweep off mid-run (#690).
+    // The cap matches the 20s the journey/e2e harnesses allow that teardown,
+    // and expiry escalates so a wedged leg cannot keep its ports.
+    const cap = setTimeout(forceKill, 20000);
+    Promise.all(children.map((child) => new Promise((resolve) => {
+      if (child.exitCode !== null || child.signalCode) return resolve();
+      child.once('close', resolve);
+    }))).then(() => {
+      clearTimeout(cap);
+      process.exit(0);
+    });
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
@@ -359,5 +396,6 @@ module.exports = async (options = {}) => {
 module.exports.selectDevTargets = selectDevTargets;
 module.exports.devLegFor = devLegFor;
 module.exports.createLineDeduper = createLineDeduper;
+module.exports.stopChild = stopChild;
 module.exports.DEV_LEGS = DEV_LEGS;
 module.exports.DEFAULT_TARGETS = DEFAULT_TARGETS;

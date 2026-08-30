@@ -17,8 +17,8 @@ const {
  * A brand whose firebase.json still names its own `firestore.rules` deploys the
  * brand half alone. Adopting the compiled artifact adds the framework half and
  * modernizes the source, which CHANGES what the live project enforces — so it
- * is this verb's job, run alone and deliberately, never something `omega setup`
- * heals on the way to a deploy (the setup checks defer instead).
+ * is this verb's job, run alone and deliberately, never something another
+ * verb heals on the way to a deploy (the target checks defer instead).
  *
  * Idempotent: a brand already on `dist/firestore.rules` is reported and left
  * alone.

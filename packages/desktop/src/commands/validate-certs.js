@@ -1,6 +1,6 @@
 // Validate code-signing prerequisites (certs, profiles, env vars).
 //
-// Runs as part of `npx omega setup` (non-fatal — warns and continues so scaffolding
+// Runs as an `omega deploy` precheck (non-fatal — warns and continues so the deploy
 // finishes even if certs aren't ready yet) and standalone via `npx omega validate-certs`.
 //
 // Exit codes:

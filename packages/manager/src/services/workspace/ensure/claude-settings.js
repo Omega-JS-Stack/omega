@@ -20,7 +20,7 @@ module.exports = async ({ brandRoot }) => {
 
   if (result === 'invalid') {
     console.log(`      ${chalk.yellow('⚠')} ${SETTINGS_FILE} is not valid JSON — fix it so the omega plugin (${PLUGIN_ID}) can be registered`);
-    return { status: 'warned', output: { claudeSettings: result } };
+    return { status: 'warned', reason: `${SETTINGS_FILE} is not valid JSON`, output: { claudeSettings: result } };
   }
 
   const label = {

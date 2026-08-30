@@ -32,7 +32,6 @@
  */
 const _ = require('lodash');
 
-const { GROUPS } = require('../constants.js');
 const { tagLinks } = require('../utm.js');
 const { validate } = require('../validation.js');
 const prepare = require('../prepare.js');
@@ -498,6 +497,7 @@ async function _sendCampaignSendGrid(Manager, settings, contentHtml) {
     { sender: settings.sender || 'marketing', from: settings.from, group: settings.group },
     brand,
     brandDomain,
+    Manager,
   );
   const categories = prepare.buildCategories('marketing', brand.id, settings.categories);
   const signoff = prepare.resolveSignoff(settings.signoff, brand);

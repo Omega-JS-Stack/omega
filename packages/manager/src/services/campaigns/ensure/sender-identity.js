@@ -102,7 +102,7 @@ module.exports = async function ensureSenderIdentity(context) {
   if (!complete(address)) {
     console.log(`      ${chalk.yellow('⚠')} No sender ${chalk.cyan(fromEmail)} yet, and CAN-SPAM requires a physical mailing address`);
     console.log(`      ${chalk.dim('→')} Set brand.address (line1, city, region, postalCode, country) in omega.json5, then rerun`);
-    return { status: 'warned', output: { senderIdentity: { fromEmail, missingAddress: true } } };
+    return { status: 'warned', reason: 'no sender yet — brand.address is required by CAN-SPAM', output: { senderIdentity: { fromEmail, missingAddress: true } } };
   }
 
   if (options.dryRun) {
@@ -123,7 +123,7 @@ module.exports = async function ensureSenderIdentity(context) {
       console.log(`      ${chalk.yellow('↻')} Deleted stale unverified sender ${chalk.cyan(stale.from_email)} — the contact domain changed`);
     } else {
       console.log(`      ${chalk.yellow('⚠')} Verified sender ${chalk.cyan(stale.from_email)} already uses the nickname ${chalk.cyan(brandName)} — delete it in SendGrid or align brand.contact.email, then rerun`);
-      return { status: 'warned', output: { senderIdentity: { fromEmail, staleNickname: stale.from_email } } };
+      return { status: 'warned', reason: 'a verified sender already uses the brand nickname', output: { senderIdentity: { fromEmail, staleNickname: stale.from_email } } };
     }
   }
 
@@ -145,7 +145,7 @@ module.exports = async function ensureSenderIdentity(context) {
 
   if (sender.verified === false) {
     console.log(`      ${chalk.yellow('⚠')} Created sender ${chalk.cyan(fromEmail)} but it did not auto-verify — ensure domain authentication is valid, then rerun`);
-    return { status: 'warned', output: { senderIdentity: { id: sender.id, fromEmail, verified: false } } };
+    return { status: 'warned', reason: 'the created sender did not auto-verify', output: { senderIdentity: { id: sender.id, fromEmail, verified: false } } };
   }
 
   console.log(`      ${chalk.green('✓')} Created verified sender ${chalk.cyan(fromEmail)} ${chalk.dim(`(id: ${sender.id})`)}`);

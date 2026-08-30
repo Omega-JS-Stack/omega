@@ -82,6 +82,7 @@ function parseUrlParams() {
   state.productName = urlParams.get('productName') || '';
   state.amount = parseFloat(urlParams.get('amount') || 0);
   state.currency = urlParams.get('currency') || 'USD';
+  state.type = urlParams.get('type') || '';
   state.frequency = urlParams.get('frequency') || '';
   state.paymentMethod = urlParams.get('paymentMethod') || '';
   state.hasFreeTrial = urlParams.get('trial') === 'true';

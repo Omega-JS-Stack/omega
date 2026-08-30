@@ -97,3 +97,64 @@ test('run-summary: retry command is the blessed npm run manage form, never npx',
   assert.ok(text.includes('npm run manage'));
   assert.ok(!text.includes('npx omega-manager'));
 });
+
+test('run-summary: the warned breakdown names every recorded operation and its reason (#643)', () => {
+  const summary = new RunSummary();
+  summary.add('brand-a', 'Brand A', 'search', {
+    status: 'warned',
+    warned: [
+      { operation: 'property', reason: 'no Cloudflare zone yet' },
+      { operation: 'gaLink', reason: 'link the property in the Analytics console' },
+    ],
+  });
+
+  const text = captureSummary(summary);
+
+  assert.ok(text.includes('property'));
+  assert.ok(text.includes('no Cloudflare zone yet'));
+  assert.ok(text.includes('gaLink'));
+  assert.ok(text.includes('link the property in the Analytics console'));
+  assert.ok(!text.includes('some operations had issues'));
+});
+
+test('run-summary: a warned operation with no reason still names the operation (#643)', () => {
+  const summary = new RunSummary();
+  summary.add('brand-a', 'Brand A', 'edge', {
+    status: 'warned',
+    warned: [{ operation: 'rulesets', reason: null }],
+  });
+
+  const text = captureSummary(summary);
+
+  assert.ok(text.includes('rulesets'));
+  assert.ok(!text.includes('some operations had issues'));
+});
+
+test('run-summary: the error breakdown names every recorded failed operation and its reason (#643)', () => {
+  const summary = new RunSummary();
+  summary.add('brand-a', 'Brand A', 'edge', {
+    status: 'error',
+    failed: [
+      { operation: 'x', reason: 'kaput' },
+      { operation: 'zzop', reason: null },
+    ],
+  });
+
+  const text = captureSummary(summary);
+
+  assert.ok(text.includes('x'));
+  assert.ok(text.includes('kaput'));
+  assert.ok(text.includes('zzop'));
+});
+
+test('run-summary: an error with no failed[] still renders the generic service line (#643)', () => {
+  const summary = new RunSummary();
+  summary.add('brand-a', 'Brand A', 'edge', {
+    status: 'error',
+    error: 'the zone request was refused',
+  });
+
+  const text = captureSummary(summary);
+
+  assert.ok(text.includes('edge: the zone request was refused'));
+});

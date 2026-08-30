@@ -108,7 +108,7 @@ module.exports = [
         template: { type: 'string', description: 'SendGrid template ID or name' },
         data: { type: 'object', description: 'Template variables / dynamic data' },
         sender: { type: 'string', description: 'Sender preset name (e.g. "marketing", "support")' },
-        group: { description: 'Unsubscribe group ID (number or string)' },
+        group: { description: 'Unsubscribe group: a group key ("orders", "security", …, resolved from config) or a raw ASM group id' },
         categories: { type: 'array', items: { type: 'string' }, description: 'Email categories for tracking' },
       },
       required: ['to'],

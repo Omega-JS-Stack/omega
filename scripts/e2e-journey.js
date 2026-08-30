@@ -4,7 +4,7 @@
  * it gets regular coverage).
  *
  * Births a four-target brand OUTSIDE the monorepo through the real onboard
- * wizard, links it, runs every setup, boots web + backend, probes the
+ * wizard, links it, boots web + backend, probes the
  * homepage, and finishes with a headless creds-scrubbed manage — the cp194
  * rehearsal as a repeatable lane. Mechanics: @omega.js/devkit/test/journey-harness.
  *

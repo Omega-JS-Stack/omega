@@ -64,6 +64,7 @@ module.exports = async function ensureSitemaps(context) {
   const result = { output: { sitemaps: { submitted: submitted.length, existing: wanted.length - missing.length, errors } } };
   if (errors.length > 0) {
     result.status = 'warned';
+    result.reason = `${errors.length} sitemap(s) failed to submit: ${errors.map((e) => e.url).join(', ')}`;
   }
   return result;
 };

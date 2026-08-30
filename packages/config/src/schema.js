@@ -385,6 +385,12 @@ const SHARED_SCHEMA = [
     description: "true = the Google OAuth client's authorized origins + redirect URIs are configured by hand. The ONE reconcile flag config keeps (#434) — that surface has no API to re-check, so the cloud service asks once, writes the answer back here, and every later run trusts it. Never set it without doing the work: the confirm is the only proof there is.",
   },
   {
+    path:        'cloud.consentAudience',
+    type:        'boolean',
+    required:    false,
+    description: "false = stop asking about the OAuth consent screen's audience. Tri-state opt-out (#667): Google gives NO API write for the audience, so an Internal screen (Error 403: org_internal for every non-org account) is a manage-time stopper that opens the console page and polls — `false` records the deliberate choice to live with an org-only sign-in, and only the cloud service's audience step goes quiet.",
+  },
+  {
     path:        'cloud.apiSubdomain',
     type:        'boolean',
     required:    false,
@@ -1030,6 +1036,48 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: "SendGrid Marketing list UUID the brand's contacts land in. Written back by the campaigns service; unset means contacts reach All Contacts only.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.orders',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for order and billing email (receipts, renewals, refunds, plan changes). Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.hello',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for onboarding email (welcome, checkup, feedback request). Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.account',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for account-action email (deletion, data requests) — also the fallback for any send naming no group. Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.marketing',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for promotional email (offers, win-back, abandoned cart) and every marketing Single Send. Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.security',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for security email (password reset, 2FA, sign-in alerts). Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.newsletter',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for newsletter email (announcements, industry news). Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+  },
+  {
+    path:        'marketing.campaigns.providers.sendgrid.groups.internal',
+    type:        'integer',
+    required:    false,
+    description: "SendGrid unsubscribe (ASM) group id for internal alert email (dispute alerts, system notifications to the brand contact). Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
   },
   {
     path:        'marketing.newsletter.enabled',

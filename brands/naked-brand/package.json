@@ -1,0 +1,16 @@
+{
+  "name": "naked-brand",
+  "private": true,
+  "description": "Naked Brand — the bare in-repo fixture: the minimum a brand monorepo can declare, so a walkthrough sees every ask/skip/disable prompt fire from zero. Test infrastructure, never production.",
+  "workspaces": [
+    "targets/*"
+  ],
+  "scripts": {
+    "start": "omega dev",
+    "dev": "omega dev",
+    "manage": "omega manage"
+  },
+  "devDependencies": {
+    "@omega.js/manager": "file:../../packages/manager"
+  }
+}

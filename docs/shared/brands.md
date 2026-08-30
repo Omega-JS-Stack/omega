@@ -2,7 +2,13 @@
 
 > The SSOT for who the brands are, why each exists, and the local-era dependency contract. Settled with Ian 2026-07-11; real brand born 2026-07-18. AGENTS.md carries only the summary table and points here.
 
-## The four brands
+## The five brands
+
+### `brands/naked-brand` — "Naked Brand", the bare fixture
+
+Added with Ian 2026-08-29 ([#687](https://github.com/Omega-JS-Stack/omega/issues/687), agreed on [#608](https://github.com/Omega-JS-Stack/omega/issues/608)'s QA question): the standing brands are too COMPLETE to QA from-zero behavior, because a brand that already answered every question shows no prompt. This one is the minimum a brand monorepo can declare and still be walked — id `naked-brand`, one enabled web target, and nothing else. No theme, no analytics/payment/monitoring/oauth2/marketing sections, no agent-docs chain, no `.env`, no second target, no page content: every one of those is something `npx omega manage` is supposed to OFFER, and the walk's ask/skip/disable ladder is the thing under test.
+
+Test-only forever, offline forever: project id `demo-naked-brand` (Firebase's emulator-only convention) is a guardrail rather than a configuration — every cloud-touching service short-circuits on `demo-*` instead of aiming real Google APIs at a project that does not exist, so nothing here provisions real cloud resources. A QA walkthrough may leave it in any state and reset it (`git clean` + `git checkout` on the folder); nothing outside it reads what a run wrote. The automated lanes do not run against it — it is a hand-walk fixture, and the corpus/e2e fixture is still the sandbox.
 
 ### `brands/sandbox-brand` — the synthetic fixture
 

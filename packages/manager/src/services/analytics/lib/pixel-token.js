@@ -13,8 +13,8 @@
  * page that mints one, then a masked paste saved to the brand .env), skip
  * this run, or disable the provider for good (`analytics.providers.
  * {provider}: false`). Non-interactive runs never prompt and keep the warned
- * guidance. The disperse service composes the saved token into the backend's
- * app .env; the stage step carries it into dist/.
+ * guidance. The backend's stage step composes the saved token out of the
+ * brand .env into its dist/.env.
  *
  * A provider whose token is MINTED rather than pasted names its own acquire
  * on the spec (TikTok's portal exchange, #448) — the outcomes are identical.
@@ -75,7 +75,7 @@ async function ensurePixelToken(context, spec) {
 
   const alreadySet = Boolean(process.env[spec.envVar]);
   if (!await acquirePixelToken(context, spec)) {
-    return { status: 'warned', output: { [spec.key]: { pixelId, tokenConfigured: false } } };
+    return { status: 'warned', reason: `no ${spec.envVar} — the access token is not configured`, output: { [spec.key]: { pixelId, tokenConfigured: false } } };
   }
 
   if (alreadySet) {

@@ -13,6 +13,8 @@
     "./load": "./src/load.js",
     "./env": "./src/env.js",
     "./env-schema": "./src/env-schema.js",
+    "./env-delivery": "./src/env-delivery.js",
+    "./env-rules": "./src/env-rules.js",
     "./site-global": "./src/site-global.js",
     "./winback": "./src/winback.js"
   },

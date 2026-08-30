@@ -5,6 +5,10 @@
  * uploads to the stores when credentials are present, and attaches the
  * package zip to a GitHub release (the durable artifact channel).
  *
+ * Every run starts with the local scaffold the retired `omega setup` used to
+ * own (ensureTarget, #675) and then runs setup's NETWORK half as a precheck
+ * before the dispatch. `--no-secrets` skips that precheck.
+ *
  * Flags: --dry-run (print the exact dispatch, send nothing; skips sync),
  * --no-sync (dispatch without committing/pushing first).
  */
@@ -14,10 +18,23 @@ const logger = Manager.logger('deploy');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
+const { ensureTarget } = require('./lib/ensure-target.js');
+const { deployPrecheck } = require('./lib/deploy-precheck.js');
 
 module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
+  const projectDir = process.cwd();
+
+  // The local half of the retired `omega setup` (#675) — idempotent, offline,
+  // and quiet on a converged target.
+  await ensureTarget({ projectDir, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
+
+  // The NETWORK half, as a precheck: a deploy is the verb that needs the
+  // remote side right. A dry run sends nothing, so it prechecks nothing.
+  if (!dryRun) {
+    await deployPrecheck({ projectDir, options, logger });
+  }
 
   // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
   // dir under a per-target name (#265) — dispatch what setup actually composed.

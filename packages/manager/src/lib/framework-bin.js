@@ -34,6 +34,22 @@ const FIREBASE_ONLY_VERBS = new Set(['deploy', 'test']);
  * @returns {string|null} - Absolute bin path, or null when not installed
  */
 function resolveFrameworkBin(fromDir, name) {
+  const resolved = resolveFrameworkPackage(fromDir, name);
+  if (!resolved) return null;
+
+  const bin = typeof resolved.pkg.bin === 'string' ? resolved.pkg.bin : (resolved.pkg.bin || {}).omega;
+  return bin ? path.join(resolved.dir, bin) : null;
+}
+
+/**
+ * The framework package itself, via the same climb — for readers of its
+ * manifest declarations (`projectScripts`, the workspace target heal).
+ *
+ * @param {string} fromDir - Directory to climb from (where the dep is declared)
+ * @param {string} name - Framework package name ('@omega.js/web', …)
+ * @returns {{ dir: string, pkg: object }|null} - null when not installed
+ */
+function resolveFrameworkPackage(fromDir, name) {
   let dir = path.resolve(fromDir);
 
   while (true) {
@@ -41,9 +57,7 @@ function resolveFrameworkBin(fromDir, name) {
     const pkgPath = path.join(pkgDir, 'package.json');
 
     if (fs.existsSync(pkgPath)) {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      const bin = typeof pkg.bin === 'string' ? pkg.bin : (pkg.bin || {}).omega;
-      return bin ? path.join(pkgDir, bin) : null;
+      return { dir: pkgDir, pkg: JSON.parse(fs.readFileSync(pkgPath, 'utf8')) };
     }
 
     const parent = path.dirname(dir);
@@ -100,4 +114,4 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
   };
 }
 
-module.exports = { resolveFrameworkBin, resolveTargetRun };
+module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun };

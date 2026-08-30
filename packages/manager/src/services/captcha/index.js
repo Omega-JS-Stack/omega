@@ -10,13 +10,15 @@
  * console link + domains for the manual half. Interactive runs open the
  * console and confirm the domain list once, stamping config (#434).
  *
- * It also owns the HALF-KEY guard (#507): the secret in .env without
- * `captcha.providers.recaptcha.siteKey` in config (or the reverse) fails the
- * service — see the guard below.
+ * It also owns the ORPHAN-SECRET warning (#507): the secret in .env without
+ * `captcha.providers.recaptcha.siteKey` in config — see the guard below. The
+ * reverse direction is the env schema's shared `requiredWhen` rule (#626).
  *
  * Auth: RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY in the brand .env.
  * Missing keys → interactive runs ask; non-interactive runs skip with guidance.
  */
+const chalk = require('chalk').default;
+
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
@@ -32,21 +34,23 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'captcha.providers.recaptcha.enabled = false' };
     }
 
-    // A half-keyed brand is a broken brand (#507). The backend enforces token
-    // verification the moment RECAPTCHA_SECRET_KEY exists, and the client can
-    // only mint a token when captcha.providers.recaptcha.siteKey is in config
-    // — either half alone is a silent 403 on every protected POST (the
-    // playground's live checkout, 2026-08-22). This service is the ONE place
-    // that sees both halves, so it fails loudly instead of proving the secret
-    // and calling a broken brand green. Neither half = the sanctioned unkeyed
-    // brand (#17), which stays green and skips below.
+    // The ORPHAN SECRET half (#507): RECAPTCHA_SECRET_KEY set with no
+    // captcha.providers.recaptcha.siteKey in config is a silent 403 on every
+    // protected POST — the backend enforces verification the moment the secret
+    // exists, and the client has no key to mint a token with (the playground's
+    // live checkout, 2026-08-22). This service is the ONE place that sees both
+    // halves, so it still says this direction out loud.
+    //
+    // The REVERSE direction — a site key requiring its secret — is the env
+    // schema's `requiredWhen` rule now
+    // ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): warned
+    // brand-wide by the workspace env-rules op, and refused by a production
+    // backend boot. Neither half = the sanctioned unkeyed brand (#17), which
+    // stays green and skips below.
     const configuredSiteKey = recaptchaConfig.siteKey || null;
     const configuredSecret = process.env.RECAPTCHA_SECRET_KEY || null;
-    if (Boolean(configuredSiteKey) !== Boolean(configuredSecret)) {
-      const consoleUrl = recaptchaConsoleUrl(context.brandConfig, configuredSiteKey);
-      throw new Error(configuredSecret
-        ? `RECAPTCHA_SECRET_KEY is set but captcha.providers.recaptcha.siteKey is missing from config — the client sends an empty token and every protected POST 403s. Paste the site key into config/omega.json5: ${consoleUrl}`
-        : `captcha.providers.recaptcha.siteKey is set but RECAPTCHA_SECRET_KEY is missing from the brand .env — the backend can never verify a token. Copy the secret half into the .env: ${consoleUrl}`);
+    if (configuredSecret && !configuredSiteKey) {
+      console.log(`      ${chalk.yellow('⚠')} RECAPTCHA_SECRET_KEY is set but captcha.providers.recaptcha.siteKey is missing from config — the client sends an empty token and every protected POST 403s. Paste the site key into config/omega.json5: ${recaptchaConsoleUrl(context.brandConfig, configuredSiteKey)}`);
     }
 
     const url = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '');

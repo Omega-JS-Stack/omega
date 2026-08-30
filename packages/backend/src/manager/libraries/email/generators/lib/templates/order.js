@@ -141,9 +141,13 @@ function _summary(event, order, data, theme) {
   const rows = [];
 
   if (product.name) {
-    const label = isSubscription
-      ? `<strong>${escape(brandName)} ${escape(product.name)}</strong><br/><span style="color: #888; font-size: 13px;">Billed ${escape(payment.frequency || '')}</span>`
-      : `<strong>Order #${escape(order.id || '')}</strong>`;
+    // Both kinds name WHAT WAS BOUGHT, and differ only in the line under it.
+    // A one-time receipt used to label its single row `Order #<id>` — the id
+    // the header already prints two lines above — so the one thing a receipt
+    // exists to state, the product, appeared nowhere in the email
+    // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)).
+    const sublabel = isSubscription ? `Billed ${escape(payment.frequency || '')}` : 'One-time purchase';
+    const label = `<strong>${escape(brandName)} ${escape(product.name)}</strong><br/><span style="color: #888; font-size: 13px;">${sublabel}</span>`;
     const price = payment.price != null ? `<strong>$${payment.price}</strong>` : '';
     rows.push(_row(label, price));
   }

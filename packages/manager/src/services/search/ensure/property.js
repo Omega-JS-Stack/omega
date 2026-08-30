@@ -51,13 +51,13 @@ module.exports = async function ensureProperty(context) {
   if (!cloudflareApi) {
     console.log(`      ${chalk.yellow('⚠')} No CLOUDFLARE_TOKEN — add this TXT record manually, then rerun:`);
     console.log(`        ${chalk.cyan(recordFqdn)}  TXT  ${chalk.cyan(`"${token}"`)}`);
-    return { status: 'warned', output: { property: { manualRecord: { name: recordFqdn, type: 'TXT', content: token } } } };
+    return { status: 'warned', reason: 'no CLOUDFLARE_TOKEN — add the verification TXT record by hand', output: { property: { manualRecord: { name: recordFqdn, type: 'TXT', content: token } } } };
   }
 
   const zone = await cloudflareApi.getZoneByName(apexDomain);
   if (!zone) {
     console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone for ${chalk.cyan(apexDomain)} — rerun once the cloudflare service creates it`);
-    return { status: 'warned', output: { property: { note: 'no Cloudflare zone yet' } } };
+    return { status: 'warned', reason: 'no Cloudflare zone yet', output: { property: { note: 'no Cloudflare zone yet' } } };
   }
 
   const records = await cloudflareApi.makeRequest(`/zones/${zone.id}/dns_records?type=TXT&per_page=100`, { method: 'GET' });
@@ -118,7 +118,7 @@ module.exports = async function ensureProperty(context) {
 
   if (!verified) {
     console.log(`      ${chalk.yellow('⚠')} Verification pending${lastError ? chalk.dim(` (${lastError})`) : ''} — DNS is likely still propagating, rerun in a few minutes`);
-    return { status: 'warned', output: { property: { pendingVerification: true } } };
+    return { status: 'warned', reason: 'domain verification pending — DNS is still propagating', output: { property: { pendingVerification: true } } };
   }
   console.log(`      ${chalk.green('✓')} Domain verified`);
 

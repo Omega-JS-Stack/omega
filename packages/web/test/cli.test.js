@@ -25,7 +25,7 @@ function tmpConsumer() {
 
 test('dispatch table: every aliased command has a command file', () => {
   const { commandsDir, aliases, defaultCommand } = Main.config;
-  assert.strictEqual(defaultCommand, 'setup', 'OMEGA convention: bare `omega` runs setup');
+  assert.strictEqual(defaultCommand, 'help', 'OMEGA convention: bare `omega` prints help (#675)');
 
   for (const name of Object.keys(aliases)) {
     assert.ok(fs.existsSync(path.join(commandsDir, `${name}.js`)), `commands/${name}.js exists`);
@@ -33,7 +33,7 @@ test('dispatch table: every aliased command has a command file', () => {
 
   // The full B3 surface is present (+ install — the `mgr i local` parity
   // gap the wizard rehearsal caught, cp194)
-  for (const name of ['setup', 'install', 'dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
+  for (const name of ['install', 'dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
     assert.ok(aliases[name], `${name} is routed`);
   }
 
@@ -48,9 +48,14 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   const result = scaffoldDefaults({ outputDir: root, logger: quiet });
 
   // `_.` renames + templating
-  for (const file of ['.gitignore', '.env', 'AGENTS.md', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
+  for (const file of ['.gitignore', 'AGENTS.md', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
     assert.ok(fs.existsSync(path.join(root, file)), `${file} scaffolded`);
   }
+
+  // No `.env` scaffolds ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
+  // the brand root's .env is the one file humans and the manager edit, a target
+  // .env is an optional per-key override a HUMAN writes, and no machine writes one.
+  assert.ok(!fs.existsSync(path.join(root, '.env')), 'no target .env is scaffolded');
 
   // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is the
   // one-line `@AGENTS.md` pointer.
@@ -71,7 +76,8 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   assert.ok(!/setup-ruby|bundle install|gem install|RUBY_VERSION|BUNDLER_VERSION/.test(workflow), 'CI workflow has no Ruby steps');
   assert.ok(workflow.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'CI workflow node version templated');
   assert.ok(workflow.includes('${{ secrets.GH_TOKEN }}'), 'GitHub secret syntax survived templating');
-  assert.ok(workflow.includes('npx omega setup && npm run build'), 'CI builds through the omega CLI');
+  assert.ok(workflow.includes('npm run build'), 'CI builds through the omega CLI (the build verb scaffolds itself — #675)');
+  assert.ok(!workflow.includes('omega setup'), 'the retired setup command is gone from CI');
   assert.ok(workflow.includes('publish_dir: ./dist'), 'CI publishes dist/');
 
   assert.ok(result.written.length >= 6, `first run writes the tree (${result.written.length})`);
@@ -93,19 +99,20 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   const root = tmpConsumer();
   scaffoldDefaults({ outputDir: root, logger: quiet });
 
-  // Consumer customizes below the markers
-  fs.appendFileSync(path.join(root, '.env'), 'MY_CUSTOM_KEY="hello"\n');
+  // Consumer customizes below the markers, and hand-writes a target .env — the
+  // optional per-key override that is the only way a target .env exists (#678).
+  fs.writeFileSync(path.join(root, '.env'), 'MY_CUSTOM_KEY="hello"\n');
   fs.appendFileSync(path.join(root, '.gitignore'), '/my-custom-dir\n');
 
   const second = scaffoldDefaults({ outputDir: root, logger: quiet });
-  assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), '.env custom preserved');
+  assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), 'the hand-written .env is never touched');
   assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('/my-custom-dir'), '.gitignore custom preserved');
-  // The appended .env key regenerates the CI secrets block (#189) — that is
-  // the ONLY thing a rerun may rewrite.
-  assert.deepStrictEqual(second.written, ['.github/workflows/build.yml'], 'only the regenerated CI secrets block rewrote');
+  // The CI secrets block is the SCHEMA's set (#627), not this machine's .env:
+  // a hand-written key changes nothing, so the rerun rewrites nothing.
+  assert.deepStrictEqual(second.written, [], 'a .env key is not a workflow change');
   assert.ok(
-    fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('MY_CUSTOM_KEY: ${{ secrets.MY_CUSTOM_KEY }}'),
-    'the new .env key reached the workflow env block',
+    !fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('MY_CUSTOM_KEY'),
+    'an undeclared .env key never reaches the workflow env block',
   );
 
   // omega.json5 stabilizes after one merge cycle: run three, expect the third clean
@@ -256,7 +263,7 @@ test('scaffold: a brand target scaffolds NO per-target .github/ — its CI compo
 
   // The scaffold's own token pass still ran: node version + the .env secrets block.
   assert.ok(composed.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'the node version templated');
-  assert.ok(composed.includes('CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'), 'the local .env reached the composed env block');
+  assert.ok(composed.includes('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}'), "the schema's web delivery set reached the composed env block");
   assert.ok(!composed.includes('{{ githubSecrets }}'), 'no unrendered token survives');
 
   // Idempotent: a setup rerun rewrites that one file and never adds another.
@@ -267,13 +274,12 @@ test('scaffold: a brand target scaffolds NO per-target .github/ — its CI compo
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('bin: `omega setup` end-to-end in a fresh consumer (real process, real bin)', () => {
+test('bin: a bare `omega` prints help and scaffolds nothing (real process, real bin — #675)', () => {
   const root = tmpConsumer();
-  execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega'), 'setup'], { cwd: root, stdio: 'pipe' });
+  const out = execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega')], { cwd: root, encoding: 'utf8' });
 
-  assert.ok(fs.existsSync(path.join(root, 'config', 'omega.json5')), 'config seeded');
-  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.scripts.build, 'omega build', 'scripts synced');
-  assert.strictEqual(pkg.scripts.start, 'omega dev', 'start → omega dev');
+  assert.match(out, /Usage: omega <command>/, 'a bare invocation prints help');
+  assert.ok(!/^ {2}setup\b/m.test(out), 'setup is not in the command list');
+  assert.ok(!fs.existsSync(path.join(root, 'config', 'omega.json5')), 'help is inert — nothing is scaffolded');
   fs.rmSync(root, { recursive: true, force: true });
 });

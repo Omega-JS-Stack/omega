@@ -240,3 +240,53 @@ test('runner: write-only operation routes through the write handler', async () =
   assert.equal(result.status, 'success');
   assert.equal(result.state.pushedId, 'w-1');
 });
+
+// ─── Warned/failed operations are named, with their reason (#643) ────────────
+
+test('runner: records each warned operation with the reason it returned', async () => {
+  const serviceDir = stageService({
+    'ensure/zone.js': `module.exports = async () => ({ status: 'warned', reason: 'no zone available' });`,
+    'ensure/bare.js': `module.exports = async () => ({ status: 'warned' });`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'zone', ensure: true }, { name: 'bare', ensure: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'warned');
+  assert.deepEqual(result.warned, [
+    { operation: 'zone', reason: 'no zone available' },
+    { operation: 'bare', reason: null },
+  ]);
+});
+
+test('runner: records the failed operation with its error as the reason', async () => {
+  const serviceDir = stageService({
+    'ensure/boom.js': `module.exports = async () => { throw new Error('kaput'); };`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'boom', ensure: true }],
+    serviceData: {},
+  });
+
+  assert.equal(result.status, 'error');
+  assert.deepEqual(result.failed, [{ operation: 'boom', reason: 'kaput' }]);
+});
+
+test('runner: a warned write operation is recorded under its operation name', async () => {
+  const serviceDir = stageService({
+    'write/push.js': `module.exports = async () => ({ status: 'warned', reason: 'API declined the update' });`,
+  });
+
+  const run = createServiceRunner({ serviceDir, logOperations: false });
+  const result = await run({
+    operations: [{ name: 'push', write: true }],
+    serviceData: {},
+  });
+
+  assert.deepEqual(result.warned, [{ operation: 'push', reason: 'API declined the update' }]);
+});

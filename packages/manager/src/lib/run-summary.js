@@ -300,12 +300,28 @@ class RunSummary {
       return details;
     }
 
-    // Testing service: show per-check failures
+    // Testing service: show per-check failures. Stays ahead of the generic
+    // failed renderer below — the per-check messages live here, while the
+    // runner-level entry for the same run is names-only.
     if (result.output?.results?.failed?.length) {
       details.push(`${chalk.red(serviceName)}:`);
       for (const { name, error } of result.output.results.failed) {
         const msg = error ? chalk.dim(`: ${error}`) : '';
         details.push(`  ${chalk.bold(name)}${msg}`);
+      }
+
+      return details;
+    }
+
+    // Every recorded failed operation, by name (#643): the service runner
+    // records `{ operation, reason }` on `result.failed`, so a service that
+    // ran past its first failure names each one instead of collapsing into a
+    // single message.
+    if (result.failed?.length) {
+      details.push(`${chalk.red(serviceName)}:`);
+      for (const { operation, reason } of result.failed) {
+        const msg = reason ? chalk.dim(`: ${reason}`) : '';
+        details.push(`  ${chalk.bold(operation)}${msg}`);
       }
 
       return details;
@@ -318,26 +334,20 @@ class RunSummary {
 
   /**
    * Get human-readable warning details for a service result
+   *
+   * ONE generic renderer (#643): the service runner records every warned
+   * operation as `{ operation, reason }` on `result.warned`, so the breakdown
+   * names what warned and why — no per-service special cases, and no service
+   * left saying "some operations had issues".
    */
   _getWarningDetails(serviceName, result) {
     const details = [];
 
-    // Testing service: show per-test warnings from output.results.warned
-    if (result.output?.results?.warned?.length) {
+    if (result.warned?.length) {
       details.push(`${chalk.yellow(serviceName)}:`);
-      for (const { name, warning } of result.output.results.warned) {
-        const msg = warning ? chalk.dim(`: ${warning}`) : '';
-        details.push(`  ${chalk.bold(name)}${msg}`);
-      }
-
-      return details;
-    }
-
-    // Workspace service: show config/structure findings
-    if (result.output?.findings?.length) {
-      details.push(`${chalk.yellow(serviceName)}:`);
-      for (const finding of result.output.findings) {
-        details.push(`  ${finding}`);
+      for (const { operation, reason } of result.warned) {
+        const msg = reason ? chalk.dim(`: ${reason}`) : '';
+        details.push(`  ${chalk.bold(operation)}${msg}`);
       }
 
       return details;

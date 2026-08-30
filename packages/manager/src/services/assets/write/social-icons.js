@@ -9,6 +9,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const { SOCIAL_ICON_CONFIG } = require('../lib/assets-config.js');
+const { socialIconFiles } = require('../lib/derived.js');
 const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeSocialIcons(context) {
@@ -18,10 +19,7 @@ module.exports = async function writeSocialIcons(context) {
   const { outputDir: subDir, sizes, padding, background } = SOCIAL_ICON_CONFIG;
   const outputDir = join(outDir, subDir);
 
-  const targets = [
-    'color-x.svg',
-    ...sizes.map((size) => `color-${size}.png`),
-  ].filter((name) => isStale(brandmarkPath, join(outputDir, name)));
+  const targets = socialIconFiles().filter((name) => isStale(brandmarkPath, join(outputDir, name)));
 
   if (targets.length === 0) {
     console.log(`      ${chalk.green('✓')} Social icons in sync ${chalk.dim(`(${1 + sizes.length} files fresh)`)}`);

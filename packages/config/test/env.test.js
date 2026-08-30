@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot } = require('../src/index.js');
+const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, composeTargetEnv, serializeEnv } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -249,4 +249,257 @@ test('empty local-layer values (KEY= / KEY="") never shadow the brand layer; she
   assert.strictEqual(process.env.ENVT9_B, 'brand-real', 'quoted-empty local line must not shadow the brand value');
   assert.strictEqual(process.env.ENVT9_S, '', 'a deliberately empty SHELL var still beats every file');
   assert.strictEqual(process.env.ENVT9_ONLY, undefined, 'empty in every layer = key stays unset');
+});
+
+// ─── composeTargetEnv: the dist/.env composition (#678) ───
+
+test('composeTargetEnv: the schema filters the company + brand layers by target', (t) => {
+  const root = makeFixture('env-compose-filter', {
+    'company/.env': 'ANTHROPIC_API_KEY=company-anthropic\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GH_TOKEN=brand-gh\nRECAPTCHA_SITE_KEY=brand-site-key\nANTHROPIC_API_KEY=brand-anthropic\n',
+  });
+  cleanup(t, root);
+
+  const brandRoot = path.join(root, 'brand');
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(brandRoot, 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.GH_TOKEN, 'brand-gh', 'a key the schema names for backend is delivered');
+  assert.strictEqual(sources.GH_TOKEN, 'brand');
+  assert.strictEqual(values.ANTHROPIC_API_KEY, 'brand-anthropic', 'the brand layer beats the company layer');
+  assert.strictEqual(sources.ANTHROPIC_API_KEY, 'brand');
+  assert.strictEqual(values.RECAPTCHA_SITE_KEY, undefined, 'a key the schema names for web only never reaches the backend');
+});
+
+test('composeTargetEnv: the company layer fills the gaps the brand layer leaves', (t) => {
+  const root = makeFixture('env-compose-company', {
+    'company/.env': 'ANTHROPIC_API_KEY=company-anthropic\nRECAPTCHA_SITE_KEY=company-site-key\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GH_TOKEN=brand-gh\n',
+  });
+  cleanup(t, root);
+
+  const brandRoot = path.join(root, 'brand');
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(brandRoot, 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.ANTHROPIC_API_KEY, 'company-anthropic');
+  assert.strictEqual(sources.ANTHROPIC_API_KEY, 'company');
+  assert.strictEqual(values.RECAPTCHA_SITE_KEY, undefined, 'the company layer is filtered by the same schema');
+});
+
+test('composeTargetEnv: the target layer wins per key, and an empty value never claims one', (t) => {
+  const root = makeFixture('env-compose-override', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GH_TOKEN=brand-gh\nOPENAI_API_KEY=brand-openai\n',
+    'brand/targets/backend/.env': 'GH_TOKEN=target-gh\nOPENAI_API_KEY=""\n',
+  });
+  cleanup(t, root);
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.GH_TOKEN, 'target-gh', "the target's own .env is the per-key override");
+  assert.strictEqual(sources.GH_TOKEN, 'target');
+  assert.strictEqual(values.OPENAI_API_KEY, 'brand-openai', 'an empty target value never claims the key');
+  assert.strictEqual(sources.OPENAI_API_KEY, 'brand');
+});
+
+test('composeTargetEnv: the target layer passes through unfiltered — placement IS the targeting', (t) => {
+  const root = makeFixture('env-compose-passthrough', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'SOME_BESPOKE_KEY=brand-value\n',
+    'brand/targets/backend/.env': 'SOME_BESPOKE_KEY=target-value\nRECAPTCHA_SITE_KEY=target-site-key\n',
+  });
+  cleanup(t, root);
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.SOME_BESPOKE_KEY, 'target-value', 'a key the schema does not know still passes through');
+  assert.strictEqual(sources.SOME_BESPOKE_KEY, 'target');
+  assert.strictEqual(values.RECAPTCHA_SITE_KEY, 'target-site-key', 'a web-named key placed in the backend .env by hand is delivered');
+});
+
+test('composeTargetEnv: a pattern entry composes (OAUTH2_<PROVIDER>_CLIENT_*)', (t) => {
+  const root = makeFixture('env-compose-pattern', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'OAUTH2_GOOGLE_CLIENT_ID=brand-client-id\nOAUTH2_GOOGLE_CLIENT_SECRET=brand-client-secret\n',
+  });
+  cleanup(t, root);
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.OAUTH2_GOOGLE_CLIENT_ID, 'brand-client-id');
+  assert.strictEqual(values.OAUTH2_GOOGLE_CLIENT_SECRET, 'brand-client-secret');
+  assert.strictEqual(sources.OAUTH2_GOOGLE_CLIENT_ID, 'brand');
+});
+
+test('composeTargetEnv: deliverAs renames the per-target GA4 secret on delivery', (t) => {
+  const root = makeFixture('env-compose-deliver-as', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GOOGLE_ANALYTICS_SECRET_BACKEND=backend-stream\nGOOGLE_ANALYTICS_SECRET_WEB=web-stream\n',
+  });
+  cleanup(t, root);
+
+  const backend = composeTargetEnv({ targetDir: path.join(root, 'brand', 'targets', 'backend'), target: 'backend' });
+
+  assert.strictEqual(backend.values.GOOGLE_ANALYTICS_SECRET, 'backend-stream', "the backend's stream secret arrives under the runtime name");
+  assert.strictEqual(backend.sources.GOOGLE_ANALYTICS_SECRET, 'brand');
+  assert.strictEqual(backend.values.GOOGLE_ANALYTICS_SECRET_BACKEND, undefined, 'the brand-level name never ships');
+  assert.strictEqual(backend.values.GOOGLE_ANALYTICS_SECRET_WEB, undefined, "another target's stream secret never ships");
+
+  const web = composeTargetEnv({ targetDir: path.join(root, 'brand', 'targets', 'website'), target: 'web' });
+  assert.strictEqual(web.values.GOOGLE_ANALYTICS_SECRET, 'web-stream', 'each target gets its own stream secret');
+});
+
+test('composeTargetEnv: a runtime-group key in the brand root never composes', (t) => {
+  const root = makeFixture('env-compose-runtime', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'CLAUDE_CODE_OAUTH_TOKEN=brand-token\nGOOGLE_ANALYTICS_SECRET=brand-secret\n',
+  });
+  cleanup(t, root);
+
+  const { values } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.CLAUDE_CODE_OAUTH_TOKEN, undefined, 'the runtime group is resolved some other way, never composed');
+  assert.strictEqual(values.GOOGLE_ANALYTICS_SECRET, undefined, 'the runtime name is delivered by deliverAs, never from a brand key of the same name');
+});
+
+test('composeTargetEnv: no .env anywhere composes nothing and never throws', (t) => {
+  const root = makeFixture('env-compose-empty', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+  });
+  cleanup(t, root);
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.deepStrictEqual(values, {});
+  assert.deepStrictEqual(sources, {});
+});
+
+// ─── deliverAs delivery (#678) ───
+
+// The GA4 stream secrets are the schema's only `deliverAs` family: a brand
+// holds one per stream (GOOGLE_ANALYTICS_SECRET_<TARGET>), a target only ever
+// reads GOOGLE_ANALYTICS_SECRET. The backend gets the rename through
+// composeTargetEnv's dist/.env; every other target gets it through loadEnv.
+
+const GA_KEYS = ['GOOGLE_ANALYTICS_SECRET', 'GOOGLE_ANALYTICS_SECRET_EXTENSION', 'GOOGLE_ANALYTICS_SECRET_BACKEND'];
+
+function clearGaKeys() {
+  GA_KEYS.forEach((key) => delete process.env[key]);
+}
+
+test('loadEnv with a target: the brand-level GA4 secret lands under the runtime name', (t) => {
+  const root = makeFixture('env-deliver-load', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GOOGLE_ANALYTICS_SECRET_EXTENSION=ext-stream\n',
+  });
+  cleanup(t, root, GA_KEYS);
+  clearGaKeys();
+
+  loadEnv(path.join(root, 'brand', 'targets', 'extension'), { target: 'extension' });
+
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'ext-stream', 'the extension reads the one runtime name');
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET_EXTENSION, undefined, 'the brand-level name is consumed by the rename');
+});
+
+test('loadEnv with a target: a value already under the delivered name wins', (t) => {
+  const root = makeFixture('env-deliver-explicit', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GOOGLE_ANALYTICS_SECRET_EXTENSION=ext-stream\n',
+  });
+  cleanup(t, root, GA_KEYS);
+  clearGaKeys();
+
+  process.env.GOOGLE_ANALYTICS_SECRET = 'shell-secret';
+  loadEnv(path.join(root, 'brand', 'targets', 'extension'), { target: 'extension' });
+
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'shell-secret', 'an explicit answer is never overridden');
+});
+
+test('loadEnv without a target: nothing is renamed', (t) => {
+  const root = makeFixture('env-deliver-none', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GOOGLE_ANALYTICS_SECRET_EXTENSION=ext-stream\n',
+  });
+  cleanup(t, root, GA_KEYS);
+  clearGaKeys();
+
+  loadEnv(path.join(root, 'brand', 'targets', 'extension'));
+
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET_EXTENSION, 'ext-stream', 'the cascade still loads the brand-level name');
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, undefined, 'no target, no rename');
+});
+
+test('composeTargetEnv: the target layer renames too, and overrides the brand', (t) => {
+  const root = makeFixture('env-deliver-target-layer', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'GOOGLE_ANALYTICS_SECRET_BACKEND=brand-stream\n',
+    'brand/targets/backend/.env': 'GOOGLE_ANALYTICS_SECRET_BACKEND=target-stream\n',
+  });
+  cleanup(t, root);
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+  });
+
+  assert.strictEqual(values.GOOGLE_ANALYTICS_SECRET, 'target-stream', "the target's own answer wins");
+  assert.strictEqual(sources.GOOGLE_ANALYTICS_SECRET, 'target');
+  assert.strictEqual(values.GOOGLE_ANALYTICS_SECRET_BACKEND, undefined, 'one key ships, under the delivered name');
+});
+
+// ─── serializeEnv ───
+
+test('serializeEnv: every value double-quoted, backslashes/quotes/newlines escaped', () => {
+  const content = serializeEnv({
+    PLAIN: 'value',
+    QUOTED: 'say "hi"',
+    SLASHED: 'C:\\keys\\file',
+    MULTILINE: 'line1\nline2',
+    EMPTY: '',
+  });
+
+  assert.deepStrictEqual(content.split('\n'), [
+    'PLAIN="value"',
+    'QUOTED="say \\"hi\\""',
+    'SLASHED="C:\\\\keys\\\\file"',
+    'MULTILINE="line1\\nline2"',
+    'EMPTY=""',
+    '',
+  ]);
+
+  // dotenv expands `\n` on read, so a multi-line blob survives the round trip
+  // as itself — the quote/backslash escapes are there to keep the FILE
+  // line-safe (one key per line, quotes balanced), which dotenv leaves as-is.
+  const parsed = require('dotenv').parse(content);
+  assert.strictEqual(parsed.MULTILINE, 'line1\nline2');
+  assert.strictEqual(parsed.PLAIN, 'value');
+  assert.strictEqual(parsed.EMPTY, '');
 });

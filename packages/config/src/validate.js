@@ -37,6 +37,14 @@ const { isDemoProject } = require('./demo.js');
 // Firebase's own default authDomain shape: a third-party host by definition
 const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
 
+/**
+ * Read a dotted path out of a config object — the path resolver the schema
+ * walk and the env presence checker (env-rules.js) share.
+ *
+ * @param {object} obj - The (resolved) config object.
+ * @param {string} dottedPath - e.g. 'analytics.providers.google.id'.
+ * @returns {*} The value, or undefined when any segment is missing.
+ */
 function getPath(obj, dottedPath) {
   if (!obj) return undefined;
   const parts = String(dottedPath).split('.');
@@ -377,4 +385,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, runSchema, formatErrors };
+module.exports = { validateConfig, runSchema, formatErrors, getPath };

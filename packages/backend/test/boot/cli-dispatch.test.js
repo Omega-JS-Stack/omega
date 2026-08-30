@@ -3,8 +3,8 @@
  * had no terminal branch: bare `omega` and any unknown command returned
  * undefined and exited 0 in silence. Pins: help never falls through to a
  * command, the unknown path names the command and sets a failing exit code,
- * bare invocation defaults to setup (mirroring the router frameworks), and
- * `clean` is accepted bare alongside `clean:npm`.
+ * bare invocation prints the listing (since #675 retired `setup` no entry
+ * claims the default slot), and `clean` is accepted bare alongside `clean:npm`.
  *
  * Plus the issue #20 pin: help is GENERATED from the command table both halves
  * read, so a command can never dispatch without appearing in the listing.
@@ -42,7 +42,7 @@ module.exports = {
       async run({ assert }) {
         const { out, exitCode } = await captured(() => new Main().process(['node', 'script', '--help']));
         assert.ok(out.includes('Usage: omega <command>'), 'help prints the usage banner');
-        assert.ok(out.includes('setup'), 'help lists the setup command');
+        assert.ok(!out.includes('setup'), 'help does not list the retired setup command');
         assert.notEqual(exitCode, 1, 'help is not an error');
       },
     },
@@ -56,16 +56,21 @@ module.exports = {
       },
     },
     {
-      name: 'bare-invocation-defaults-to-setup-and-clean-is-accepted-bare',
+      name: 'bare-invocation-prints-help-and-clean-is-accepted-bare',
       async run({ assert }) {
-        // The terminal branch runs whatever the table marks default — no second
-        // place to keep "bare omega means setup" in sync.
-        assert.equal(table.defaultCommand().name, 'setup', 'bare invocation defaults to setup');
+        // The terminal branch runs whatever the table marks default. #675
+        // retired `setup`, so nothing claims the slot and a bare `omega` prints
+        // the listing instead of silently running a command.
+        assert.equal(table.defaultCommand(), undefined, 'no command claims the default slot');
         assert.equal(
           table.COMMANDS.filter((command) => command.default).length,
-          1,
-          'exactly one command is the default',
+          0,
+          'no command is marked default',
         );
+
+        const { out, exitCode } = await captured(() => new Main().process(['node', 'script']));
+        assert.ok(out.includes('Usage: omega <command>'), 'a bare invocation prints the listing');
+        assert.notEqual(exitCode, 1, 'a bare invocation is not an error');
 
         const clean = table.COMMANDS.find((command) => command.name === 'clean');
         assert.ok(clean, 'bare `clean` is a dispatchable command');

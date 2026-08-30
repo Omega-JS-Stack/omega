@@ -73,10 +73,10 @@ module.exports = function (ctx) {
 };
 ```
 
-Run the setup command:
+Run any verb; the first one scaffolds the project:
 
 ```bash
-npx omega setup
+npx omega test
 ```
 
 ## Initialization Options
@@ -105,7 +105,7 @@ const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 
 ## Configuration File
 
-Create `config/omega.json5` in your functions directory (`npx omega setup` scaffolds it from the template). Shared sections (`brand`, `cloud`, `analytics`, `payment`, `monitoring`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
+Create `config/omega.json5` in your functions directory (the first verb scaffolds it from the template). Shared sections (`brand`, `cloud`, `analytics`, `payment`, `monitoring`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
 
 ```json5
 {

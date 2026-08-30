@@ -55,7 +55,7 @@ module.exports = async function ensureFirestore(context) {
     }
 
     console.log(`      ${chalk.yellow('⚠')} Could not create Firestore${chalk.dim(`: ${error.message}`)}`);
-    return { status: 'warned', output: { firestore: { error: error.message } } };
+    return { status: 'warned', reason: 'could not create the Firestore database', output: { firestore: { error: error.message } } };
   }
 };
 

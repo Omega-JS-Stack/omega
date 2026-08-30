@@ -46,16 +46,18 @@ function dryRunPlan(message, result) {
 /**
  * The standard warned return for a step that needs a TTY (#32): `action`
  * states what an interactive run would do — the run summary collects it
- * into the ⚑ "needs an interactive run" section.
+ * into the ⚑ "needs an interactive run" section, and the `reason` names the
+ * step-aside in the summary's warned breakdown (#643).
  *
  * @param {string} key - The operation's output key (e.g. 'cloudMessaging').
  * @param {string} action - What an interactive run would do.
  * @param {string} [note] - Optional per-operation output note.
- * @returns {object} A `{ status: 'warned', output }` handler return.
+ * @returns {object} A `{ status: 'warned', reason, output }` handler return.
  */
 function needsInteractiveSkip(key, action, note) {
   return {
     status: 'warned',
+    reason: 'needs an interactive run',
     output: {
       [key]: {
         ...(note ? { note } : {}),

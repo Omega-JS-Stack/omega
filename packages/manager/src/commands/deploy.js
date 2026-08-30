@@ -11,8 +11,10 @@
  *   omega deploy --except web          → everything minus
  *   omega deploy --dry-run             → forwarded — each target prints its plan
  *
- * ORDER: backend deploys FIRST, then web, then the rest — the API must be
- * live before the site that points at it. Every flag except --only/--except
+ * ORDER: the DELIVERY lane first (#678) — the same `BOOT_SERVICES` walk an
+ * `omega dev` boot runs, so config, assets and certs reach the targets before
+ * anything publishes them — then backend, then web, then the rest: the API
+ * must be live before the site that points at it. Every flag except --only/--except
  * forwards verbatim to each target's framework deploy (--dry-run, --no-sync,
  * --direct, --platforms, …); targets run sequentially with streamed output. A
  * failing target STOPS the run (a broken API is no base for the site) unless
@@ -23,6 +25,7 @@
 const path = require('node:path');
 const chalk = require('chalk').default;
 
+const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveTargetRun } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
@@ -120,6 +123,20 @@ module.exports = async (options = {}) => {
   const dryRun = !!(options['dry-run'] || options.dryRun);
 
   console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target || entry.name).join(' → ')})`)}`));
+
+  // ─── Delivery lane, once, before the fan-out ───────────────────────────────
+  // Brand inputs (config, assets, certs) reach a target through ONE step
+  // (#678), and a deploy is one of its two triggers: the lane `omega dev`
+  // boots is asked for BY NAME here, so the service list can only ever be
+  // config.js's BOOT_SERVICES — never a second copy that drifts from it. A
+  // publish must not ship inputs a manage run happened to be current on.
+  console.log(chalk.cyan(`\n─── delivery lane ${chalk.dim('(brand inputs → targets)')} ───`));
+  const delivery = await runManage(brandRoot, { lane: 'boot', dryRun });
+  if (delivery.hasErrors) {
+    console.error(chalk.red('\n✗ The delivery lane reported errors — nothing deployed (fix them above, then deploy again).'));
+    process.exitCode = 1;
+    return;
+  }
 
   // ─── Execute in order, streaming each target's output ──────────────────────
   const summary = [];

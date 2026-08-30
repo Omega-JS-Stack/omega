@@ -21,7 +21,7 @@ translation: {
 ```
 
 Shared section (typically brand-level; `SHARED_SECTIONS` includes it, so
-disperse copies it and every target inherits through the cascade). Language codes
+every target inherits it through the merge chain). Language codes
 validate against the SSOT in `@omega.js/devkit/translate` (`LANGUAGE_NAMES`,
 ~32 codes) — an unknown code is a hard config error naming the supported set.
 The same SSOT carries `LANGUAGE_LOCALES` + `ogLocale(code)`, the one code →

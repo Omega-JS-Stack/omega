@@ -1,54 +1,33 @@
 /**
- * Disperse service tests — the two remnant operations against real temp
- * brand monorepos on disk. certs: signing artifacts copied from
- * .omega/certificates/apple/ into desktop/mobile targets (byte-compared
- * idempotency, optional-vs-required miss semantics, the self-protecting
- * certs .gitignore, dry-run zero-write). env: composition of the .env files
- * that must PHYSICALLY exist (D15 — everything else rides the runtime
- * cascade), against the REAL framework templates (packages/desktop +
- * packages/backend _.env) — backend's full deploy-artifact pass-through,
- * the per-surface stream secret, exists-gated signing paths, the
- * no-brand-values-copied pins, Default-section appends, Custom-section
- * preservation, multi-line escaping, and converged no-rewrite runs.
+ * Disperse service tests — the ONE remnant operation against real temp brand
+ * monorepos on disk: signing artifacts copied from .omega/certificates/apple/
+ * into desktop/mobile targets. The COPY itself is devkit's
+ * (packages/devkit/test/certs.test.js pins byte-compare idempotency, the
+ * self-protecting .gitignore, placeholder resolution and the mobile paths);
+ * what these hold is the manage-lane framing this service owns — the signing
+ * root it resolves (company tree over brand tree), the certificates config
+ * gate, the optional-vs-required miss classification, and the dry run.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, statSync } = require('node:fs');
+const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/disperse/index.js');
-const { envKeysForTarget, devEnvKeys } = require('@omega.js/config');
-const { ENV_MAP, updateEnvContent } = require('../src/services/disperse/write/env.js');
-
-// Tests must never see real credentials from the shell environment — every
-// env name the composition can read gets scrubbed, and non-skip tests set
-// fixture values explicitly.
-const MANAGED_ENV = [...new Set(
-  Object.entries(ENV_MAP).flatMap(([target, spec]) => [
-    ...(spec.composeEnv ? envKeysForTarget(target) : []),
-    ...(spec.streamSecret ? [spec.streamSecret] : []),
-    ...Object.keys(spec.certPaths || {}),
-  ]),
-)];
-
-function setEnv(vars = {}) {
-  for (const name of MANAGED_ENV) {
-    delete process.env[name];
-  }
-  Object.assign(process.env, vars);
-}
-
-setEnv();
 
 const BRAND_ID = 'fixture-brand';
 const KEY_ID = 'FIXKEY123';
 
-const DESKTOP_TEMPLATE = jetpack.read(join(__dirname, '../../desktop/src/defaults/_.env'));
-const BACKEND_TEMPLATE = jetpack.read(join(__dirname, '../../backend/src/defaults/_.env'));
-assert.ok(DESKTOP_TEMPLATE && BACKEND_TEMPLATE, 'framework .env templates must exist (cross-package contract)');
+/** The one env name the cert rules read — never inherited from the shell. */
+function setEnv({ keyId = null } = {}) {
+  if (keyId === null) delete process.env.APPLE_API_KEY_ID;
+  else process.env.APPLE_API_KEY_ID = keyId;
+}
+
+setEnv();
 
 // Full desktop signing set under .omega/certificates/apple/
 const APPLE_FIXTURES = {
@@ -60,19 +39,13 @@ const APPLE_FIXTURES = {
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-/**
- * Stage a temp brand monorepo: target dirs (with optional .env seed content)
- * and .omega/certificates/apple/ artifacts.
- */
+/** Stage a temp brand monorepo: target dirs and .omega/certificates/apple/ artifacts. */
 function stageBrand({ targets = { desktop: {} }, apple = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'omega-disperse-'));
 
-  const targetList = Object.entries(targets).map(([target, { envFile, name = target } ]) => {
+  const targetList = Object.entries(targets).map(([target, { name = target }]) => {
     const targetPath = join(root, 'targets', name);
     jetpack.dir(targetPath);
-    if (envFile !== undefined) {
-      jetpack.write(join(targetPath, ENV_MAP[target]?.file || '.env'), envFile);
-    }
     return { name, dir: `targets/${name}`, path: targetPath, target, declaredTargets: null };
   });
 
@@ -93,21 +66,7 @@ function brandConfig({ targets = { desktop: {} }, certificates } = {}) {
   };
 }
 
-/**
- * `streamSecrets` = { target: secret }. Each target's GA4 Measurement
- * Protocol secret lives in the brand .env under
- * GOOGLE_ANALYTICS_SECRET_{TARGET} (#434), which manage.js has loaded into
- * process.env by the time disperse runs — so that is where the fixture puts
- * it too.
- */
-function runService({ root, targets }, { config = brandConfig(), streamSecrets = {}, options = {}, companyRoot = null } = {}) {
-  for (const target of ['web', 'backend', 'desktop', 'extension', 'mobile']) {
-    delete process.env[`GOOGLE_ANALYTICS_SECRET_${target.toUpperCase()}`];
-  }
-  for (const [target, secret] of Object.entries(streamSecrets)) {
-    process.env[`GOOGLE_ANALYTICS_SECRET_${target.toUpperCase()}`] = secret;
-  }
-
+function runService({ root, targets }, { config = brandConfig(), options = {}, companyRoot = null } = {}) {
   return service.run({
     brandId: BRAND_ID,
     brandRoot: root,
@@ -135,8 +94,23 @@ test('disperse: skips without target-mapped dirs', async () => {
 
 // ─── certs ───────────────────────────────────────────────────────────────────
 
+test('certs: the writer delivers the desktop signing set through devkit', async () => {
+  setEnv({ keyId: KEY_ID });
+  const brand = stageBrand({ apple: APPLE_FIXTURES });
+
+  const result = await runService(brand);
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.certs.copied, 4);
+  assert.equal(result.output.certs.warned, 0);
+  assert.equal(jetpack.read(certsPath(brand, 'developer-id-application.p12')), 'dev-id-application-p12-bytes');
+  assert.equal(jetpack.read(certsPath(brand, `AuthKey_${KEY_ID}.p8`)), 'authkey-p8-bytes');
+  assert.equal(jetpack.read(certsPath(brand, `${BRAND_ID}.provisionprofile`)), 'macos-profile-bytes');
+  assert.equal(jetpack.read(certsPath(brand, '.gitignore')), '*\n!.gitignore\n');
+});
+
 test('certs: a company-managed brand disperses from the COMPANY signing tree', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  setEnv({ keyId: KEY_ID });
   const brand = stageBrand(); // no brand-local artifacts at all
   const companyRoot = mkdtempSync(join(tmpdir(), 'omega-disperse-company-'));
   for (const [rel, contents] of Object.entries(APPLE_FIXTURES)) {
@@ -150,37 +124,8 @@ test('certs: a company-managed brand disperses from the COMPANY signing tree', a
   assert.equal(jetpack.read(certsPath(brand, 'developer-id-application.p12')), 'dev-id-application-p12-bytes');
 });
 
-test('certs: the desktop target receives the full signing set + a self-protecting .gitignore', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
-  const brand = stageBrand({ apple: APPLE_FIXTURES });
-
-  const result = await runService(brand);
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.certs.copied, 4);
-  assert.equal(result.output.certs.warned, 0);
-  assert.equal(jetpack.read(certsPath(brand, 'developer-id-application.p12')), 'dev-id-application-p12-bytes');
-  assert.equal(jetpack.read(certsPath(brand, 'developer-id-installer.p12')), 'dev-id-installer-p12-bytes');
-  assert.equal(jetpack.read(certsPath(brand, `AuthKey_${KEY_ID}.p8`)), 'authkey-p8-bytes');
-  assert.equal(jetpack.read(certsPath(brand, `${BRAND_ID}.provisionprofile`)), 'macos-profile-bytes');
-  assert.equal(jetpack.read(certsPath(brand, '.gitignore')), '*\n!.gitignore\n');
-});
-
-test('certs: a converged second run copies nothing', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
-  const brand = stageBrand({ apple: APPLE_FIXTURES });
-
-  await runService(brand);
-  const before = statSync(certsPath(brand, 'developer-id-application.p12')).mtimeMs;
-  const result = await runService(brand);
-
-  assert.equal(result.output.certs.copied, 0);
-  assert.equal(result.output.certs.current, 4);
-  assert.equal(statSync(certsPath(brand, 'developer-id-application.p12')).mtimeMs, before);
-});
-
 test('certs: missing required source warns, missing optional skips', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  setEnv({ keyId: KEY_ID });
   // Only the AuthKey exists — the required .p12 is missing, both optionals too
   const brand = stageBrand({ apple: { [`AuthKey_${KEY_ID}.p8`]: 'authkey-p8-bytes' } });
 
@@ -190,20 +135,6 @@ test('certs: missing required source warns, missing optional skips', async () =>
   assert.equal(result.output.certs.copied, 1);   // the AuthKey
   assert.equal(result.output.certs.warned, 1);   // developer-id-application.p12
   assert.equal(result.output.certs.skipped, 2);  // installer + provisioning profile
-});
-
-test('certs: an unset env placeholder warns instead of resolving to AuthKey_.p8', async () => {
-  setEnv(); // no APPLE_API_KEY_ID
-  const brand = stageBrand({
-    apple: { 'certificates/DEVELOPER_ID_APPLICATION_G2.p12': 'dev-id-application-p12-bytes' },
-  });
-
-  const result = await runService(brand);
-
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.certs.copied, 1);   // the .p12
-  assert.equal(result.output.certs.warned, 1);   // the AuthKey rule (placeholder unset)
-  assert.equal(jetpack.exists(certsPath(brand, 'AuthKey_.p8')), false);
 });
 
 test('certs: no artifacts at all is a quiet note, not a warning', async () => {
@@ -217,7 +148,7 @@ test('certs: no artifacts at all is a quiet note, not a warning', async () => {
 });
 
 test('certs: certificates disabled in config skips the copy', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  setEnv({ keyId: KEY_ID });
   const brand = stageBrand({ apple: APPLE_FIXTURES });
 
   const result = await runService(brand, { config: brandConfig({ certificates: false }) });
@@ -227,29 +158,8 @@ test('certs: certificates disabled in config skips the copy', async () => {
   assert.equal(jetpack.exists(certsPath(brand, 'developer-id-application.p12')), false);
 });
 
-test('certs: the mobile target uses build/certs/ paths', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
-  const brand = stageBrand({
-    targets: { mobile: {} },
-    apple: {
-      'certificates/IOS_DISTRIBUTION.p12': 'ios-distribution-p12-bytes',
-      [`AuthKey_${KEY_ID}.p8`]: 'authkey-p8-bytes',
-      [`profiles/${BRAND_ID}/IOS_DISTRIBUTION/IOS.mobileprovision`]: 'ios-profile-bytes',
-    },
-  });
-
-  const result = await runService(brand, { config: brandConfig({ targets: { mobile: {} } }) });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.certs.copied, 3);
-  const mobileCerts = join(brand.root, 'targets', 'mobile', 'build', 'certs');
-  assert.equal(jetpack.read(join(mobileCerts, 'ios-distribution.p12')), 'ios-distribution-p12-bytes');
-  assert.equal(jetpack.read(join(mobileCerts, `AuthKey_${KEY_ID}.p8`)), 'authkey-p8-bytes');
-  assert.equal(jetpack.read(join(mobileCerts, `${BRAND_ID}.mobileprovision`)), 'ios-profile-bytes');
-});
-
 test('certs: dry-run plans the copies without writing', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  setEnv({ keyId: KEY_ID });
   const brand = stageBrand({ apple: APPLE_FIXTURES });
 
   const result = await runService(brand, { options: { dryRun: true } });
@@ -258,288 +168,4 @@ test('certs: dry-run plans the copies without writing', async () => {
   assert.equal(result.output.certs.planned, 4);
   assert.equal(result.output.certs.copied, 0);
   assert.equal(jetpack.exists(join(brand.root, 'targets', 'desktop', 'config')), false);
-});
-
-// ─── env ─────────────────────────────────────────────────────────────────────
-
-test('env: desktop .env composes only target-owned values against the real framework template', async () => {
-  setEnv({
-    APPLE_API_KEY_ID: KEY_ID,
-    GH_TOKEN: 'fixture-gh-token',
-    OMEGA_ADMIN_KEY: 'fixture-bm-key',
-    CSC_KEY_PASSWORD: 'fixture-csc-password',
-    APPLE_API_ISSUER: 'fixture-issuer',
-    APPLE_TEAM_ID: 'FIXTEAM99',
-  });
-  const brand = stageBrand({
-    targets: { desktop: { envFile: DESKTOP_TEMPLATE } },
-    apple: APPLE_FIXTURES,
-  });
-
-  const result = await runService(brand, {
-    streamSecrets: { desktop: 'ga-desktop-secret' },
-  });
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.env.updated, 1);
-
-  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
-  assert.match(env, /^CSC_LINK="config\/certs\/developer-id-application\.p12"$/m);
-  assert.match(env, new RegExp(`^APPLE_API_KEY="config/certs/AuthKey_${KEY_ID}\\.p8"$`, 'm'));
-  assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
-  // Brand-level values are NOT copied (the runtime cascade serves them) —
-  // template placeholders stay commented even though GH_TOKEN is set above
-  assert.match(env, /^# GH_TOKEN=$/m);
-  assert.match(env, /^# WIN_EV_TOKEN_PATH=$/m);
-  // Unmanaged template keys and the Custom section survive verbatim
-  assert.match(env, /^OMEGA_TEST_USER_UID="desktop-test-user"$/m);
-  assert.match(env, /Custom Values/);
-});
-
-test('env: signing paths are not stamped when the cert files are absent', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID, GH_TOKEN: 'fixture-gh-token' });
-  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } } }); // no apple artifacts
-
-  await runService(brand);
-
-  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
-  assert.match(env, /^# CSC_LINK=$/m);
-  assert.match(env, /^# APPLE_API_KEY=$/m);
-});
-
-test('env: a missing .env is created with the section markers', async () => {
-  setEnv();
-  const brand = stageBrand(); // desktop target without any .env
-
-  const result = await runService(brand, {
-    streamSecrets: { desktop: 'ga-desktop-secret' },
-  });
-
-  assert.equal(result.status, 'success');
-  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
-  const defaultAt = env.indexOf('Default Values');
-  const keyAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
-  const customAt = env.indexOf('Custom Values');
-  assert.ok(defaultAt >= 0 && keyAt > defaultAt && customAt > keyAt, 'keys sit between the section markers');
-});
-
-test('env: appended keys land in the Default section, above the Custom marker', async () => {
-  setEnv({ GH_TOKEN: 'fixture-gh-token' });
-  const seed = [
-    '# ========== Default Values ==========',
-    'UNRELATED="stays"',
-    '',
-    '# ========== Custom Values ==========',
-    'MY_CUSTOM="keep"',
-    '',
-  ].join('\n');
-  const brand = stageBrand({ targets: { desktop: { envFile: seed } } });
-
-  await runService(brand, {
-    streamSecrets: { desktop: 'ga-desktop-secret' },
-  });
-
-  const env = jetpack.read(join(brand.root, 'targets', 'desktop', '.env'));
-  const customAt = env.indexOf('Custom Values');
-  const gaAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
-  assert.ok(gaAt >= 0 && gaAt < customAt, 'appended key sits above the Custom marker');
-  assert.ok(!env.includes('GH_TOKEN'), 'brand-level values are not appended (the cascade serves them)');
-  assert.match(env, /^UNRELATED="stays"$/m);
-  assert.match(env, /^MY_CUSTOM="keep"$/m);
-});
-
-test('env: the backend target composes its target-root .env with its own stream secret', async () => {
-  setEnv({ GH_TOKEN: 'fixture-gh-token', STRIPE_SECRET_KEY: 'sk_fixture', SENDGRID_API_KEY: 'SG.fixture' });
-  const brand = stageBrand({
-    targets: { backend: { envFile: BACKEND_TEMPLATE } },
-  });
-
-  const result = await runService(brand, {
-    config: brandConfig({ targets: { backend: {} } }),
-    streamSecrets: { backend: 'ga-backend-secret' },
-  });
-
-  assert.equal(result.status, 'success');
-  // Target-root .env (src/dist pillar) — `omega build` stages it into functions/
-  const env = jetpack.read(join(brand.root, 'targets', 'backend', '.env'));
-  assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-backend-secret"$/m);
-  // Backend keeps the FULL pass-through — its .env rides the deploy artifact
-  assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
-  assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m);
-  assert.match(env, /^SENDGRID_API_KEY="SG\.fixture"$/m);
-  // Developer tooling credentials are deliberately not composed
-  assert.match(env, /^# CLAUDE_CODE_OAUTH_TOKEN=$/m);
-  // Composed values UNCOMMENT their placeholder in place — no duplicate lines
-  assert.doesNotMatch(env, /^# GH_TOKEN=$/m);
-});
-
-test('env: the dev-suffixed payment secrets reach the backend target .env (#586)', async () => {
-  // The brand layer carries both halves: the live secret for the deploy and
-  // the _DEV twin the local emulator must use instead
-  setEnv({
-    STRIPE_SECRET_KEY: 'sk_live_fixture',
-    STRIPE_SECRET_KEY_DEV: 'sk_test_fixture',
-    PAYPAL_CLIENT_SECRET_DEV: 'pp-sandbox-fixture',
-    CHARGEBEE_API_KEY_DEV: 'test_fixture',
-  });
-  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
-
-  const result = await runService(brand, { config: brandConfig({ targets: { backend: {} } }) });
-
-  assert.equal(result.status, 'success');
-  const env = jetpack.read(join(brand.root, 'targets', 'backend', '.env'));
-
-  // Derived from the env schema — a new twin is one entry, never an edit here
-  for (const name of devEnvKeys()) {
-    assert.ok(envKeysForTarget('backend').includes(name), `${name} is part of the backend composition`);
-  }
-  assert.match(env, /^STRIPE_SECRET_KEY_DEV="sk_test_fixture"$/m);
-  assert.match(env, /^PAYPAL_CLIENT_SECRET_DEV="pp-sandbox-fixture"$/m);
-  assert.match(env, /^CHARGEBEE_API_KEY_DEV="test_fixture"$/m);
-  // The live half still travels — the deploy stage is what drops the twins
-  assert.match(env, /^STRIPE_SECRET_KEY="sk_live_fixture"$/m);
-});
-
-test('env: a converged second run rewrites nothing', async () => {
-  setEnv({ APPLE_API_KEY_ID: KEY_ID });
-  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } }, apple: APPLE_FIXTURES });
-  const streamSecrets = { desktop: 'ga-desktop-secret' };
-
-  await runService(brand, { streamSecrets });
-  const envPath = join(brand.root, 'targets', 'desktop', '.env');
-  assert.match(jetpack.read(envPath), /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
-
-  const before = statSync(envPath).mtimeMs;
-  const result = await runService(brand, { streamSecrets });
-
-  assert.equal(result.output.env.updated, 0);
-  assert.equal(result.output.env.current, 1);
-  assert.equal(statSync(envPath).mtimeMs, before);
-});
-
-test('env: dry-run reports the plan without touching the file', async () => {
-  setEnv();
-  const brand = stageBrand({ targets: { desktop: { envFile: DESKTOP_TEMPLATE } } });
-
-  const result = await runService(brand, {
-    streamSecrets: { desktop: 'ga-desktop-secret' },
-    options: { dryRun: true },
-  });
-
-  assert.equal(result.output.env.updated, 0);
-  assert.deepEqual(result.output.env.files['targets/desktop/.env'].planned, ['GOOGLE_ANALYTICS_SECRET']);
-  assert.equal(jetpack.read(join(brand.root, 'targets', 'desktop', '.env')), DESKTOP_TEMPLATE);
-});
-
-// ─── clearing (#636) ─────────────────────────────────────────────────────────
-
-// The writer only ever wrote the keys that HAD a value, and never cleared one,
-// so a key the brand root un-set stayed live in the target it had been composed
-// into (seen live: TIKTOK_ACCESS_TOKEN commented out at the root, still valued
-// in targets/backend/.env). Composing a file means owning what it carries.
-test('env: a schema key the brand root un-sets is CLEARED from the target it composed into', async () => {
-  setEnv({ TIKTOK_ACCESS_TOKEN: 'tt-token', STRIPE_SECRET_KEY: 'sk_fixture' });
-  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
-  const config = brandConfig({ targets: { backend: {} } });
-  const envPath = join(brand.root, 'targets', 'backend', '.env');
-
-  await runService(brand, { config });
-  assert.match(jetpack.read(envPath), /^TIKTOK_ACCESS_TOKEN="tt-token"$/m);
-
-  // The root drops the key — the target must stop serving the value
-  setEnv({ STRIPE_SECRET_KEY: 'sk_fixture' });
-  const cleared = await runService(brand, { config });
-
-  const env = jetpack.read(envPath);
-  assert.doesNotMatch(env, /^TIKTOK_ACCESS_TOKEN=/m, `the key is gone from the file: ${env}`);
-  assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m, 'the keys the root still sets are untouched');
-  assert.deepEqual(cleared.output.env.files['targets/backend/.env'].cleared, ['TIKTOK_ACCESS_TOKEN'], 'the run reports the key it cleared, by name');
-
-  // Idempotent: nothing left to clear, nothing rewritten
-  const before = statSync(envPath).mtimeMs;
-  const again = await runService(brand, { config });
-  assert.equal(again.output.env.updated, 0);
-  assert.equal(again.output.env.current, 1);
-  assert.equal(statSync(envPath).mtimeMs, before);
-});
-
-test('env: dry-run reports the clear without touching the file', async () => {
-  setEnv({ TIKTOK_ACCESS_TOKEN: 'tt-token' });
-  const brand = stageBrand({ targets: { backend: { envFile: BACKEND_TEMPLATE } } });
-  const config = brandConfig({ targets: { backend: {} } });
-  const envPath = join(brand.root, 'targets', 'backend', '.env');
-
-  await runService(brand, { config });
-  const composed = jetpack.read(envPath);
-
-  setEnv();
-  const result = await runService(brand, { config, options: { dryRun: true } });
-
-  assert.equal(result.output.env.updated, 0);
-  assert.deepEqual(result.output.env.files['targets/backend/.env'].cleared, ['TIKTOK_ACCESS_TOKEN']);
-  assert.equal(jetpack.read(envPath), composed, 'a dry run writes nothing');
-});
-
-test('updateEnvContent: a cleared key drops every occurrence, placeholders and other keys stay', () => {
-  const content = [
-    '# ========== Default Values ==========',
-    '# TIKTOK_ACCESS_TOKEN=',
-    'GH_TOKEN="stale"',
-    'KEEP="mine"',
-    'EMPTY=""',
-    'GH_TOKEN="stale-two"',
-  ].join('\n');
-
-  const result = updateEnvContent(content, {}, ['GH_TOKEN', 'TIKTOK_ACCESS_TOKEN', 'EMPTY', 'NEVER_THERE']);
-
-  assert.deepEqual(result.removed, ['GH_TOKEN'], 'only a key the file carries WITH a value is cleared');
-  assert.equal(result.content, [
-    '# ========== Default Values ==========',
-    '# TIKTOK_ACCESS_TOKEN=',
-    'KEEP="mine"',
-    'EMPTY=""',
-  ].join('\n'), 'the commented placeholder and the empty line are the key\'s documented home, not drift');
-});
-
-test('updateEnvContent: a key being written is never cleared in the same pass', () => {
-  const result = updateEnvContent('GH_TOKEN="stale"', { GH_TOKEN: 'fresh' }, ['GH_TOKEN']);
-
-  assert.deepEqual(result.removed, []);
-  assert.equal(result.content, 'GH_TOKEN="fresh"');
-});
-
-// ─── updateEnvContent unit — the multi-line replacement hazard ───────────────
-
-test('updateEnvContent: replacing a multi-line quoted value leaves no orphan tail', () => {
-  const content = [
-    'BEFORE="ok"',
-    'SNAPCRAFT_STORE_CREDENTIALS="old line one',
-    'old line two"',
-    'AFTER="also ok"',
-  ].join('\n');
-
-  const result = updateEnvContent(content, { SNAPCRAFT_STORE_CREDENTIALS: 'new blob' });
-
-  assert.deepEqual(result.written, ['SNAPCRAFT_STORE_CREDENTIALS']);
-  assert.equal(result.content, [
-    'BEFORE="ok"',
-    'SNAPCRAFT_STORE_CREDENTIALS="new blob"',
-    'AFTER="also ok"',
-  ].join('\n'));
-});
-
-test('updateEnvContent: multi-line values serialize to one \\n-escaped line', () => {
-  const result = updateEnvContent('EXISTING="ok"', { SNAPCRAFT_STORE_CREDENTIALS: 'line one\nline two' });
-
-  assert.deepEqual(result.appended, ['SNAPCRAFT_STORE_CREDENTIALS']);
-  assert.match(result.content, /^SNAPCRAFT_STORE_CREDENTIALS="line one\\nline two"$/m);
-});
-
-test('updateEnvContent: every duplicate occurrence is replaced (dotenv lets the last win)', () => {
-  const content = ['GH_TOKEN="stale-one"', 'COMMENT_GAP=""', 'GH_TOKEN="stale-two"'].join('\n');
-
-  const result = updateEnvContent(content, { GH_TOKEN: 'fresh' });
-
-  assert.deepEqual(result.written, ['GH_TOKEN']);
-  assert.equal(result.content, ['GH_TOKEN="fresh"', 'COMMENT_GAP=""', 'GH_TOKEN="fresh"'].join('\n'));
 });

@@ -161,24 +161,22 @@ If no signing runner is available, CI uploads the unsigned `.exe` and a develope
 
 ## Pushing secrets to GitHub Actions
 
-@omega.js/desktop ships a command that reads your local `.env` and pushes everything to the repo's GitHub Actions secrets, encrypted with the repo's libsodium public key. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
+@omega.js/desktop ships a command that pushes the target's **composed env** to the repo's GitHub Actions secrets, encrypted with the repo's libsodium public key. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
 
 ```bash
-# Make sure .env has GH_TOKEN (a PAT with `repo` scope) plus all your signing creds
+# Make sure the brand root's .env has GH_TOKEN (a PAT with `repo` scope) plus all your signing creds
 npx omega push-secrets
 
 # Push only specific keys
 npx omega push-secrets --only=CSC_LINK,CSC_KEY_PASSWORD
-
-# Push everything including empty values (default skips empties)
-npx omega push-secrets --skip-empty=false
 ```
 
 Behavior:
-- Reads `.env` Default section only (Custom is yours; not pushed).
+- The source is `composeTargetEnv({ targetDir, target: 'desktop' })`: company `.env` ← brand `.env` ← target `.env`, the brand-side layers filtered by the env schema to the keys the desktop target reads. The brand root's `.env` is the one file you keep; a target `.env` is an optional per-key override.
+- Files only — the shell is never a source — and an empty value never claims a key, so unset keys simply don't publish.
 - Auto-detects "is this a path?" — relative or absolute paths ending in `.p12`/`.pem`/`.cer`/`.p8`/`.provisionprofile`/`.crt`/`.key`/`.json` that exist on disk get base64-encoded.
 - Discovers `owner/repo` from `package.json`'s `repository.url` or git remote.
-- Skips empty values by default (you'll get warnings on push for any unset key).
+- Logs key NAMES and the layer each came from; never a value.
 
 The corresponding decode step in CI looks like:
 

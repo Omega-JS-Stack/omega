@@ -93,9 +93,9 @@
     ]
   },
   "projectScripts": {
-    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "start": "npx omega clean && npm run gulp --",
     "gulp": "gulp",
-    "build": "npx omega clean && npx omega setup && OMEGA_BUILD_MODE=true npm run gulp -- build",
+    "build": "npx omega clean && OMEGA_BUILD_MODE=true npm run gulp -- build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
     "test": "npx omega test"

@@ -21,4 +21,4 @@ config/certs/
 
 # ========== Custom Values ==========
 
-# Add your own ignores below. This section is preserved across `npx omega setup` runs.
+# Add your own ignores below. This section is preserved across framework re-syncs.

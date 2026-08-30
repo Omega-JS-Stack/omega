@@ -37,7 +37,7 @@ module.exports = async function ensureSdkConfig(context) {
 
     if (!appId) {
       console.log(`      ${chalk.yellow('⚠')} Could not get or create a web app`);
-      return { status: 'warned', output: { sdkConfig: { error: 'no web app' } } };
+      return { status: 'warned', reason: 'could not get or create a web app', output: { sdkConfig: { error: 'no web app' } } };
     }
   }
 
@@ -82,6 +82,7 @@ module.exports = async function ensureSdkConfig(context) {
     console.log(chalk.cyan(`      cloud: { provider: 'firebase', config: ${JSON.stringify(sdkConfig, null, 2).replace(/\n/g, '\n      ')} },`));
     return {
       status: 'warned',
+      reason: 'dry run — the SDK config in config/omega.json5 is out of date',
       state: { sdkConfig },
       output: { sdkConfig: { drifted } },
     };

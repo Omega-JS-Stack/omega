@@ -1,7 +1,10 @@
 // Build-layer tests for the canonical build verbs (build / package / publish).
 // The synced projectScripts are thin `npx omega <verb>` aliases, so each verb must
-// run the pipeline ITSELF — clean, setup, gulp task — and never shell back to
+// run the pipeline ITSELF — clean, certs, gulp task — and never shell back to
 // `npm run build` / `npm run publish` (that would recurse forever).
+//
+// There is no `setup` step (#675): the local scaffold runs inside the gulp
+// `defaults` task. `certs` delivers the Apple signing artifacts (#678).
 
 const path = require('path');
 const fs   = require('fs');
@@ -22,7 +25,7 @@ function recorder(log) {
   const record = (type) => (options, step) => { log.push(step.task ? `${type}:${step.task}` : type); };
   return {
     clean: record('clean'),
-    setup: record('setup'),
+    certs: record('certs'),
     'validate-certs': record('validate-certs'),
     gulp: record('gulp'),
   };
@@ -47,21 +50,21 @@ module.exports = {
   description: 'build verbs — the CLI owns the pipeline and its env flags',
   tests: [
     {
-      name: 'build: OMEGA_BUILD_MODE + clean → setup → gulp build',
+      name: 'build: OMEGA_BUILD_MODE + clean → certs → gulp build',
       run: (ctx) => {
         const plan = build.plan({});
         ctx.expect(plan.env.OMEGA_BUILD_MODE).toBe('true');
         ctx.expect(plan.steps.map((s) => (s.task ? `${s.type}:${s.task}` : s.type)))
-          .toEqual(['clean', 'setup', 'gulp:build']);
+          .toEqual(['clean', 'certs', 'gulp:build']);
       },
     },
     {
-      name: 'package: OMEGA_BUILD_MODE + clean → setup → gulp packageBuild',
+      name: 'package: OMEGA_BUILD_MODE + clean → certs → gulp packageBuild',
       run: (ctx) => {
         const plan = pkg.plan({});
         ctx.expect(plan.env.OMEGA_BUILD_MODE).toBe('true');
         ctx.expect(plan.steps.map((s) => (s.task ? `${s.type}:${s.task}` : s.type)))
-          .toEqual(['clean', 'setup', 'gulp:packageBuild']);
+          .toEqual(['clean', 'certs', 'gulp:packageBuild']);
       },
     },
     {
@@ -69,26 +72,26 @@ module.exports = {
       run: (ctx) => {
         const plan = pkg.plan({ quick: true });
         ctx.expect(plan.steps.map((s) => (s.task ? `${s.type}:${s.task}` : s.type)))
-          .toEqual(['clean', 'setup', 'gulp:packageQuick']);
+          .toEqual(['clean', 'certs', 'gulp:packageQuick']);
         ctx.expect(pkg.plan({ q: true }).steps[2].task).toBe('packageQuick');
       },
     },
     {
-      name: 'publish: both flags + validate-certs → gulp publish (no clean/setup)',
+      name: 'publish: both flags + certs → validate-certs → gulp publish (no clean)',
       run: (ctx) => {
         const plan = publish.plan({});
         ctx.expect(plan.env.OMEGA_BUILD_MODE).toBe('true');
         ctx.expect(plan.env.OMEGA_IS_PUBLISH).toBe('true');
         ctx.expect(plan.steps.map((s) => (s.task ? `${s.type}:${s.task}` : s.type)))
-          .toEqual(['validate-certs', 'gulp:publish']);
+          .toEqual(['certs', 'validate-certs', 'gulp:publish']);
       },
     },
     {
-      name: 'publish --local: clean → setup → validate-certs → gulp publish',
+      name: 'publish --local: clean → certs → validate-certs → gulp publish',
       run: (ctx) => {
         const plan = publish.plan({ local: true });
         ctx.expect(plan.steps.map((s) => (s.task ? `${s.type}:${s.task}` : s.type)))
-          .toEqual(['clean', 'setup', 'validate-certs', 'gulp:publish']);
+          .toEqual(['clean', 'certs', 'validate-certs', 'gulp:publish']);
       },
     },
     {
@@ -100,7 +103,7 @@ module.exports = {
           ctx.expect(process.env.OMEGA_BUILD_MODE).toBe('true');
           ctx.expect(process.env.OMEGA_IS_PUBLISH).toBe('true');
         });
-        ctx.expect(log).toEqual(['clean', 'setup', 'validate-certs', 'gulp:publish']);
+        ctx.expect(log).toEqual(['clean', 'certs', 'validate-certs', 'gulp:publish']);
       },
     },
     {

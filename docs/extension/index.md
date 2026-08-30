@@ -26,7 +26,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 ### For Consuming Projects
 
 1. `npm install @omega.js/extension --save-dev`
-2. `npx omega setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.)
+2. There is no setup step ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)). The project scaffolds itself on the first verb below — `ensureTarget()` copies `src/defaults/` into the project (`src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.), syncs the project scripts, and checks Node + peer deps, idempotently and silently once the target is converged.
 3. `npm start` — dev (gulp → webpack → serve with live reload)
 4. `npm run build` — production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`)
 5. `OMEGA_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/shared/publishing.md](../../packages/extension/docs/publishing.md))
@@ -130,7 +130,7 @@ Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and 
 
 ### Defaults system
 
-`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so setup composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every setup, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
+`src/defaults/` is the starter template — copied to consumer projects by every verb's `ensureTarget()`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so the scaffold composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every verb, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
 
 The workflow's `env:` carries `GOOGLE_ANALYTICS_SECRET` beside the ten store credentials: a dispatched run has no `.env`, so the Measurement Protocol secret the build bakes into `build.js` only reaches it from the repo secrets, and without it every CI-published extension shipped an empty secret and sent no events. A build-mode build of a brand with `analytics.providers.google.id` set now FAILS when the secret is empty ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)).
 
@@ -146,7 +146,7 @@ Two lifecycle hooks let consumers run custom logic during packaging:
 - `hooks/build/pre.js` — after `dist/` is built but before `packaged/` is assembled
 - `hooks/build/post.js` — after packaging (and after store publishing if `OMEGA_IS_PUBLISH=true`)
 
-The NESTED path is the one the defaults scaffold writes and setup's migration moves flat files to; the package task resolves it first and falls back to the flat pre-migration `hooks/build:pre.js` during the transition. It used to resolve ONLY the flat path, so every migrated consumer's hooks were dead and the miss printed an untagged `console.warn` ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
+The NESTED path is the one the defaults scaffold writes and `npx omega migrate` moves flat files to; the package task resolves it first and falls back to the flat pre-migration `hooks/build:pre.js` during the transition. It used to resolve ONLY the flat path, so every migrated consumer's hooks were dead and the miss printed an untagged `console.warn` ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
 
 Both receive the ONE hook-argument shape every OMEGA framework passes — `{ manager, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)) — and everything else comes off `manager` (`getManifest()`, `getConfig()`, `getPackage('project')`). The package task used to pass its internal watch counter while both docs described an `index` build-info object nothing ever built, so a hook written from the docs read `undefined` at its first property ([#591](https://github.com/Omega-JS-Stack/omega/issues/591)). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
 
@@ -190,14 +190,14 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ## CLI
 
-`npx omega <command>` (bins `omega`, `omg`, `mgr`, `omega-extension`):
+`npx omega <command>` (bins `omega`, `omg`, `mgr`, `omega-extension`; bare `omega` prints the listing). Every verb runs `ensureTarget()` first — the local scaffold the retired `omega setup` used to own ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)): scripts, Node check, peer deps, the defaults tree, the locality warning. It writes no `.env` ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)): the brand root's `.env` is the one file humans and the manager edit, and a target `.env` is an optional per-key override you author yourself. The gulp lane gets it from the `defaults` task; `test` and `deploy` call it themselves:
 
 | Command | Description |
 |---|---|
-| `setup` | scaffold consumer, copy `src/defaults/`, ensure peer deps, write the project scripts into `package.json` (npm's trailing newline kept, written only when the content changed — [#572](https://github.com/Omega-JS-Stack/omega/issues/572)). Default when no command given. |
+| `migrate` | the one-time, version-gated upgrade moves (today: flat `hooks/*.js` → the nested layout). It used to run on every setup; a MOVE is a deliberate verb, not idempotent healing (aliases `-m`, `--migrate`, `migration`) |
 | `clean` | remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | install peer deps |
-| `deploy` | dispatch the CI publish workflow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |
+| `deploy` | dispatch the CI publish workflow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo). Runs the NETWORK prechecks first — framework freshness, then `push-secrets` ([#680](https://github.com/Omega-JS-Stack/omega/issues/680)): the store credentials and GA secret the schema delivers to extension, published as repo Actions secrets through the shared devkit publisher; `--no-secrets` skips them (the same opt-out name on web and desktop) |
 | `version` | print versions |
 | `help` | command listing (router built-in; also `-h`/`--help`) |
 | `test` | run the project's test suites (`framework:` / `full:` reach the framework suite) |
@@ -222,7 +222,7 @@ See [docs/cli.md](../../packages/extension/docs/cli.md).
 
 ## Supply-Chain Security
 
-All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`) route through the `safeInstall()` helper (`src/lib/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm install`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
+All `npm install` calls in CLI commands (`npx omega i`, the peer-dependency step of every verb's `ensureTarget()`) route through the `safeInstall()` helper (`src/lib/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm install`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
 
 ## File Conventions
 

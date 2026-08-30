@@ -7,30 +7,34 @@
  *
  *   certs — signing artifacts (binary, never mergeable) copied from the
  *           certificates service's .omega/certificates/apple/ tree into
- *           each desktop/mobile target's certs dir.
- *   env   — per-target .env composition (secrets hard-fail in omega.json5 by
- *           design): brand-level env values, per-surface analytics stream
- *           secrets, and target-relative signing paths land in each target's
- *           gitignored .env so the target's own tooling (builds, `npx omega
- *           push-secrets`) works without the manager in front.
+ *           each desktop/mobile target's certs dir. The copy itself is
+ *           devkit's (`@omega.js/devkit/certs`), so a desktop build reaches
+ *           the same artifacts through the same rules (#678).
+ *
+ * The .env composition is GONE (#678): the brand-root .env is the one file
+ * humans and the manager edit, and every verb composes its target's runtime
+ * env from the cascade by schema — no machine writes a target .env. A CUSTOM
+ * target has no @omega.js/config to walk the cascade for it, so it inherits
+ * instead: manage.js loads the env chain into process.env before it spawns
+ * anything, and a custom target started by `omega dev`/`omega deploy` gets the
+ * brand keys that way. A standalone run inside the target dir does not.
  *
  * De-ITW'd from omega-manager: the company-wide .output/_shared/ cert tree
  * and .brands/{id}/.env override layer are gone — artifacts are brand-local
  * (.omega/certificates/apple/) and manage.js already layers shell env >
  * brand .env > company .env before any service runs.
  *
- * Runs after certificates (the artifacts must exist) and before update
- * (builds read the composed .env + cert files).
+ * Runs on the DELIVERY lane (config.js BOOT_SERVICES): every `omega dev`
+ * boot, every brand-root `omega deploy`, and the full manage walk — after
+ * certificates (the artifacts must exist) and before update (builds read the
+ * cert files).
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: (context) => {
-    // Custom targets (#603) ride along: they are one of the two ops that see
-    // them at all, because a non-OMEGA target has no @omega.js/config to walk
-    // the brand cascade with and needs its .env composed for it.
-    const mappedTargets = (context.targets || []).filter((entry) => entry.target || entry.custom);
+    const mappedTargets = (context.targets || []).filter((entry) => entry.target);
 
     if (mappedTargets.length === 0) {
       return { skip: true, reason: 'no target-mapped dirs' };

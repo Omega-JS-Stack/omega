@@ -6,7 +6,6 @@
 
 | Command | Aliases | Purpose |
 |---|---|---|
-| `setup` | `-s`, `--setup` | Scaffold a consumer project (copy `src/defaults/`, install peer deps, write projectScripts). Default when no command given. The `package.json` write carries npm's own trailing newline and happens only when the content changed ([#572](https://github.com/Omega-JS-Stack/omega/issues/572)). |
 | `clean` | `-c`, `--clean` | Remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `deploy` | `-d`, `--deploy` | Dispatch the extension's CI publish workflow — `publish.yml` standalone, the composed `<target>-publish.yml` inside a brand monorepo ([defaults.md](defaults.md#brand-monorepos); see docs/shared/deploys.md in the Omega repo) |
@@ -28,11 +27,11 @@
    ```js
    aliases: {
      clean:   ['-c', '--clean'],
-     setup:   ['-s', '--setup'],
+     deploy:  ['-d', '--deploy'],
      <name>:  ['-x', '--<name>'],
    },
    ```
-3. Optionally add to `projectScripts` in [package.json](../package.json) so consumers get a wrapper npm script on `npx omega setup`.
+3. Optionally add to `projectScripts` in [package.json](../package.json) so consumers get a wrapper npm script from the scaffold every verb runs.
 4. Document under this page.
 
 ## Command options
@@ -70,4 +69,4 @@ Commands read BXM-prefixed env vars for behavior switches (one exception: `TEST_
 
 - [build-system.md](build-system.md) — `gulp` is what most CLI commands ultimately invoke
 - [test-framework.md](test-framework.md) — `npx omega test` command surface
-- [defaults.md](defaults.md) — `npx omega setup` invokes the defaults task
+- [defaults.md](defaults.md) — every verb's `ensureTarget()` invokes the defaults task
