@@ -69,6 +69,15 @@ function subscriptionAfterTrial() {
   return { ...subscriptionInTrial(), expires: { timestampUNIX: NEXT_TERM_UNIX } };
 }
 
+// The STORED subscription once its conversion has been recorded — `trial.outcome`,
+// the one stored conversion signal, stamped by whichever path saw the trial end
+// ([#697](https://github.com/Omega-JS-Stack/omega/issues/697)). No provider payload
+// ever carries it: the unified transforms produce `claimed` + `expires` only, so this
+// shape is a `before`, never an `after`.
+function subscriptionConverted() {
+  return { ...subscriptionAfterTrial(), trial: { ...subscriptionInTrial().trial, outcome: 'converted' } };
+}
+
 // Chargebee's in-trial payload names no `current_term_end` at all — only
 // `trial_end` and `next_billing_at` (test/fixtures/chargebee/subscription-in-trial.json)
 // — so `expires` folds to the epoch while `trial.expires` is real. Every trial
@@ -456,16 +465,72 @@ module.exports = {
     },
 
     {
-      name: 'the-renewal-behind-a-conversion-is-a-renewal-again',
+      // [#697](https://github.com/Omega-JS-Stack/omega/issues/697): live evidence
+      // (playground order 2315-1401-3544) had Stripe deliver
+      // `customer.subscription.updated` — trial over, term pushed out — a full hour
+      // BEFORE `invoice.payment_succeeded`. The stored doc had already left the
+      // trial by charge time, so the conversion booked as a month-two renewal. The
+      // two webhooks race in real time, so an arbitrary share of conversions
+      // mislabeled. Arrival order is no longer the signal.
+      name: 'a-conversion-is-a-conversion-whichever-webhook-lands-first',
       async run({ assert }) {
-        // Month two: same trial.claimed, same payment event — only the prior
-        // term differs, and it is already paid past the trial's end.
+        // The prior state the racing `customer.subscription.updated` left behind: out
+        // of the trial already, on the very term this charge is paying for.
         const resolved = analytics.resolvePaymentEvent(
           'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionAfterTrial()
         );
 
+        assert.ok(resolved, 'the conversion charge should still resolve to a trackable event');
+        assert.equal(resolved.event, 'trial_convert', 'a claimed trial with no recorded outcome has not had its first paid charge yet');
+        assert.equal(resolved.isRecurring, false, 'the FIRST payment is not recurring revenue, whatever order it arrived in');
+      },
+    },
+
+    {
+      name: 'the-renewal-behind-a-conversion-is-a-renewal-again',
+      async run({ assert }) {
+        // Month two: same trial.claimed, same payment event, same term on both
+        // sides — the racing conversion above is INDISTINGUISHABLE from this on
+        // dates alone, which is why the stored outcome is what tells them apart.
+        // The payload never carries the stamp; only the doc it arrives at does.
+        const resolved = analytics.resolvePaymentEvent(
+          'subscription', null, 'invoice.payment_succeeded', subscriptionAfterTrial(), {}, null, subscriptionConverted()
+        );
+
         assert.equal(resolved.event, 'subscription_renew', 'every charge after the conversion is an ordinary renewal');
         assert.equal(resolved.isRecurring, true);
+      },
+    },
+
+    {
+      // The resolver decides the label and the pipeline decides the WRITE that makes
+      // the next charge a renewal, so both read one predicate rather than keeping a
+      // copy each ([#697]) — the same arrangement `isInsideTrial` has with the
+      // trial-lapse sweep.
+      name: 'the-conversion-the-pipeline-stamps-is-the-conversion-the-resolver-books',
+      async run({ assert }) {
+        const charge = { transitionName: null, eventType: 'invoice.payment_succeeded' };
+
+        assert.equal(
+          analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionAfterTrial() }),
+          true,
+          'the charge that converts is the one the pipeline stamps trial.outcome on',
+        );
+        assert.equal(
+          analytics.isTrialConversion({ ...charge, unified: subscriptionAfterTrial(), before: subscriptionConverted() }),
+          false,
+          'and it is stamped once — a second paid charge converts nothing',
+        );
+        assert.equal(
+          analytics.isTrialConversion({ ...charge, unified: subscriptionInTrial(), before: subscriptionInTrial() }),
+          false,
+          'nor does the $0 invoice a trial STARTS with',
+        );
+        assert.equal(
+          analytics.isTrialConversion({ ...charge, unified: renewedSubscription(), before: renewedSubscription() }),
+          false,
+          'nor a renewal on a subscription that never claimed a trial at all',
+        );
       },
     },
 
@@ -555,7 +620,7 @@ module.exports = {
       name: 'a-renewal-on-a-degraded-payload-still-books-its-revenue',
       async run({ assert }) {
         const resolved = analytics.resolvePaymentEvent(
-          'subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, subscriptionAfterTrial()
+          'subscription', null, 'subscription_renewed', degradedPaidSubscription(), {}, null, subscriptionConverted()
         );
 
         assert.ok(resolved, 'a renewal must never go unreported because its payload arrived thin');

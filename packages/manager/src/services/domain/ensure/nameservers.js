@@ -15,11 +15,31 @@ const chalk = require('chalk').default;
 const psl = require('psl');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+const { isWhitelistError } = require('../lib/namecheap-api.js');
+const { walkWhitelist } = require('../lib/whitelist-walkthrough.js');
 
 // A freshly created zone gets its nameservers within seconds; a zone still
 // bare after this many reads is not going to fill in while we watch (#662).
 const ZONE_NS_READS = 6;
 const ZONE_NS_INTERVAL_MS = 5000;
+
+/** The unreadable-nameservers warn — the registrar side steps aside for a run. */
+const warnedRead = (message) => ({
+  status: 'warned',
+  reason: 'could not read the nameservers at Namecheap',
+  output: { nameservers: { error: message } },
+});
+
+/**
+ * The read failed for something the whitelist walk cannot fix — name it, point
+ * at the likeliest cause, and step aside. The walk's own recheck failure lands
+ * here too, so the hint stays reachable on that branch (#698).
+ */
+function warnUnreadable(message) {
+  console.log(`      ${chalk.yellow('⚠')} Could not read nameservers at Namecheap${chalk.dim(`: ${message}`)}`);
+  console.log(`      ${chalk.dim('→')} Domain not in your Namecheap account yet (not purchased?). Rerun after purchase.`);
+  return warnedRead(message);
+}
 
 module.exports = async function ensureNameservers(context) {
   const { cloudflareApi, namecheapApi, domain, provider, options = {} } = context;
@@ -115,9 +135,22 @@ async function ensureNamecheap(domain, required, api, options) {
   try {
     current = await api.getDns(sld, tld);
   } catch (error) {
-    console.log(`      ${chalk.yellow('⚠')} Could not read nameservers at Namecheap${chalk.dim(`: ${error.message}`)}`);
-    console.log(`      ${chalk.dim('→')} Domain not in your Namecheap account yet (not purchased?). Rerun after purchase.`);
-    return { status: 'warned', reason: 'could not read the nameservers at Namecheap', output: { nameservers: { error: error.message } } };
+    // The IP-whitelist rejection is the ONE read failure this walk can fix in
+    // place (#698): open the API access page, then recheck the refused read.
+    if (!isWhitelistError(error)) {
+      return warnUnreadable(error.message);
+    }
+
+    const recovered = await walkWhitelist(error, () => api.getDns(sld, tld), options);
+    if (recovered.error) {
+      // The recheck cleared the whitelist and failed for its own reason — that
+      // error is the one to report; the pre-walk rejection is stale (#698).
+      return warnUnreadable(recovered.error);
+    }
+    if (!recovered.success) {
+      return warnedRead(error.message);
+    }
+    current = recovered.result;
   }
 
   const currentNs = [...current.nameservers].sort();

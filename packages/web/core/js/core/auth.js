@@ -5,12 +5,6 @@ import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth');
 
-// Enforce page-load consent guard. When true, any authenticated user whose doc has
-// consent.legal.status !== 'granted' is silently signed out. Keep FALSE until the
-// legacy user migration runs (sets all existing docs to status='granted',
-// source='imported'). Otherwise every existing user gets locked out on signin.
-const ENFORCE_CONSENT_GUARD = true;
-
 // Auth Module
 export default function () {
   // Get auth policy
@@ -102,38 +96,29 @@ export default function () {
       if (user) {
         // User is authenticated
 
-        // Send user signup metadata if account is new.
-        // MUST run BEFORE the consent guard — on a brand-new signup the user doc
-        // exists with consent.legal.status: 'revoked' (the schema default written
-        // by the on-create auth event). sendUserSignupMetadata is what flips it
-        // to 'granted' with the captured consent payload. If we gate first, every
-        // fresh signup would be signed out before consent ever lands.
-        await sendUserSignupMetadata(state.account);
-
-        // Consent guard: if the user is authenticated but their account doc shows
-        // no legal consent on record, they're an orphan from a reversed Google signup
-        // that failed to delete cleanly. Sign them out and surface a toast so the
-        // user knows what happened.
-        //
-        // Gated by ENFORCE_CONSENT_GUARD (off until the legacy-user migration runs).
-        // Only fires once signup has been processed — sendUserSignupMetadata above is what
-        // writes consent, and it runs whenever flags.signupProcessed is false. If signup
-        // hasn't been processed yet (or just failed and will retry next load), we must NOT
-        // sign the user out; a processed doc with no legal consent is a genuine orphan
-        // (e.g. a reversed Google signup that failed to delete cleanly).
-        if (ENFORCE_CONSENT_GUARD) {
-          const signupProcessed = state.account?.flags?.signupProcessed === true;
-          const legalStatus = state.account?.consent?.legal?.status;
-          if (signupProcessed && legalStatus && legalStatus !== 'granted') {
-            logger.warn('Signing out user with no legal consent on record');
-            await omega.auth().signOut();
-            omega.utilities().showNotification(
-              `This account hasn't completed setup. Please sign up first.`,
-              { type: 'danger', timeout: 8000 }
-            );
-            return;
-          }
+        // Rules refused the account read: a REAL failure, and nothing on this
+        // page can trust the account, so sign the user out and say so. It fires
+        // on the explicit denied signal from @omega.js/client and on nothing
+        // else — the deleted consent guard's defect was collapsing "the doc is
+        // not written yet" (the normal state for the seconds after a signup)
+        // into this one ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)).
+        if (state.accountDenied) {
+          logger.warn('Signing out user whose account read was denied');
+          await omega.auth().signOut();
+          omega.utilities().showNotification(
+            `Couldn't load your account. Please sign in again.`,
+            { type: 'danger', timeout: 8000 }
+          );
+          return;
         }
+
+        // Send user signup metadata if account is new. Fire and forget: the
+        // redirect below must not sit behind a server round trip, and an
+        // unwritten doc is the normal state here, not something to wait for
+        // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). It never
+        // throws — it catches internally — and its in-flight marker is the
+        // failure path: a post that never landed retries on the next page load.
+        sendUserSignupMetadata(state.account);
 
         // Prompt for push notification subscription (fire-and-forget)
         omega.notifications().subscribe().catch((e) => {
@@ -317,7 +302,8 @@ export async function sendUserSignupMetadata(account) {
   let markerKey = null;
 
   try {
-    // Skip on auth pages to avoid blocking redirect (metadata will be sent on destination page)
+    // Skip on auth pages — the redirect off them fires immediately and would
+    // abort this fire-and-forget request; the destination page sends it instead.
     const pagePath = document.documentElement.getAttribute('data-page-path');
     const authPages = ['/signin', '/signup', '/reset'];
     if (authPages.includes(pagePath)) {

@@ -13,6 +13,7 @@
 const chalk = require('chalk').default;
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
+const { syncDnsRecords, manualRecordList } = require('../lib/dns-sync.js');
 
 const SUBDOMAIN = 'emailauth';
 
@@ -86,66 +87,6 @@ module.exports = async function ensureDomainAuth(context) {
   return {
     status: 'warned',
     reason: 'domain validation pending — DNS is still propagating',
-    output: { domainAuth: { id: domainAuth.id, valid: false, ...(synced ? {} : { manualRecords: records.map(({ record }) => ({ type: record.type.toUpperCase(), name: record.host, content: record.data })) }) } },
+    output: { domainAuth: { id: domainAuth.id, valid: false, ...(synced ? {} : { manualRecords: manualRecordList(records) }) } },
   };
 };
-
-/**
- * Diff-sync the SendGrid CNAMEs into the Cloudflare apex zone.
- *
- * @returns {boolean} - true when records were written via Cloudflare, false
- *   when they were printed for manual addition
- */
-async function syncDnsRecords(cloudflareApi, apexDomain, records) {
-  if (!cloudflareApi) {
-    console.log(`      ${chalk.yellow('⚠')} No CLOUDFLARE_TOKEN — add these records manually, then rerun:`);
-    logManualRecords(records);
-    return false;
-  }
-
-  const zone = await cloudflareApi.getZoneByName(apexDomain);
-  if (!zone) {
-    console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone for ${chalk.cyan(apexDomain)} — add these records manually (or rerun once the cloudflare service creates the zone):`);
-    logManualRecords(records);
-    return false;
-  }
-
-  const existing = await cloudflareApi.makeRequest(`/zones/${zone.id}/dns_records?type=CNAME&per_page=100`, { method: 'GET' });
-  const existingRecords = existing.result || [];
-
-  for (const { key, record } of records) {
-    const type = record.type.toUpperCase();
-    const name = record.host;
-    const content = record.data;
-
-    const match = existingRecords.find((r) => r.type === type && r.name === name);
-
-    if (match && match.content === content) {
-      console.log(`      ${chalk.dim('→')} ${chalk.dim(key)}: ${chalk.cyan(name)} already in place`);
-      continue;
-    }
-
-    if (match) {
-      await cloudflareApi.makeRequest(`/zones/${zone.id}/dns_records/${match.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ type, name, content, ttl: 1, proxied: false }),
-      });
-      console.log(`      ${chalk.yellow('↻')} ${chalk.dim(key)}: updated ${chalk.cyan(name)}`);
-      continue;
-    }
-
-    await cloudflareApi.makeRequest(`/zones/${zone.id}/dns_records`, {
-      method: 'POST',
-      body: JSON.stringify({ type, name, content, ttl: 1, proxied: false, comment: `SendGrid ${key}` }),
-    });
-    console.log(`      ${chalk.green('✓')} ${chalk.dim(key)}: created ${chalk.cyan(name)}`);
-  }
-
-  return true;
-}
-
-function logManualRecords(records) {
-  for (const { record } of records) {
-    console.log(`        ${chalk.cyan(record.type.toUpperCase())} ${record.host} → ${record.data}`);
-  }
-}

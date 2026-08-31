@@ -244,6 +244,25 @@ class SendGridAPI {
     return this.makeRequest('/whitelabel/links');
   }
 
+  /** Creates the branded link record set (two CNAMEs under `<subdomain>.`). */
+  async createBrandedLink(domain, subdomain = 'emailurl') {
+    return this.makeRequest('/whitelabel/links', {
+      method: 'POST',
+      body: JSON.stringify({
+        domain,
+        subdomain,
+        default: false,
+      }),
+    });
+  }
+
+  /** Asks SendGrid to check the DNS records for a branded link. */
+  async validateBrandedLink(linkId) {
+    return this.makeRequest(`/whitelabel/links/${linkId}/validate`, {
+      method: 'POST',
+    });
+  }
+
   /** Asks SendGrid to check the DNS records for a domain authentication. */
   async validateDomain(domainId) {
     return this.makeRequest(`/whitelabel/domains/${domainId}/validate`, {

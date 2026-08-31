@@ -1,14 +1,16 @@
 /**
  * Ensure DNS records match `edge.providers.cloudflare.dns` plus the platform record set
- * (GitHub Pages, www, email-provider MX/SPF, DMARC; BIMI/SendGrid only when
+ * (GitHub Pages, www, email-provider MX/SPF, DMARC; BIMI only when
  * configured — see lib/dns-records-helpers.js).
  *
  * Subdomain projects only touch records belonging to the subdomain (apex
  * records are owned by the parent brand).
  *
- * One record's desired shape is not config at all: `emailurl.<domain>` is
- * proxied only once SendGrid has VALIDATED the branded link, so this handler
- * asks SendGrid before it diffs ([#646]).
+ * The whole SendGrid set is not config at all — this handler asks SendGrid
+ * before it diffs: `GET /v3/whitelabel/domains` for the `u<id>.<whitelabel>`
+ * host the domain-auth records are built from ([#692]), and
+ * `GET /v3/whitelabel/links` for whether `emailurl.<domain>` may be proxied
+ * yet ([#646]).
  */
 const chalk = require('chalk').default;
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
@@ -33,8 +35,11 @@ module.exports = async function ensureDnsRecords(context) {
   cacheRead(brandRoot, 'dns-records', { count: records.length, records });
 
   // === DIFF ===
-  const { valid: linkBrandingValid, pending: linkBrandingPending } = await resolveLinkBranding(context);
-  const diff = diffRecords({ records, brandConfig, domain, isSubdomainProject, linkBrandingValid });
+  // Tests inject a fake client via context.sendgridApi
+  const sendgridApi = context.sendgridApi || (process.env.SENDGRID_API_KEY ? new SendGridAPI() : null);
+  const sendgrid = await resolveDomainAuth(context, sendgridApi);
+  const { valid: linkBrandingValid, pending: linkBrandingPending } = await resolveLinkBranding(context, sendgridApi, sendgrid);
+  const diff = diffRecords({ records, brandConfig, domain, isSubdomainProject, sendgrid, linkBrandingValid });
   if (!diff) {
     console.log(`      ${chalk.dim('⊘ No changes needed')}`);
     if (linkBrandingPending) {
@@ -44,7 +49,11 @@ module.exports = async function ensureDnsRecords(context) {
   }
 
   if (options.dryRun) {
-    dryRunPlan(`create ${diff.toCreate.length}, update ${diff.toUpdate.length}, delete ${diff.toDelete.length}`);
+    // The SendGrid host is READ, never written, so a dry run reads it too and
+    // names what it found — the plan covers the same records a real run does
+    // ([#692](https://github.com/Omega-JS-Stack/omega/issues/692)).
+    const sendgridPlan = sendgrid ? ` (SendGrid domain auth read live: u${sendgrid.id}.${sendgrid.whitelabel}.sendgrid.net)` : '';
+    dryRunPlan(`create ${diff.toCreate.length}, update ${diff.toUpdate.length}, delete ${diff.toDelete.length}${sendgridPlan}`);
     return {
       status: 'success',
       output: { dns: { planned: { create: diff.toCreate.length, update: diff.toUpdate.length, delete: diff.toDelete.length } } },
@@ -134,6 +143,61 @@ module.exports = async function ensureDnsRecords(context) {
 };
 
 /**
+ * The `u<id>.<whitelabel>` host every SendGrid domain-auth record is built
+ * from, read LIVE off the account.
+ *
+ * These are SendGrid's OWN observed facts about the domain, not choices a
+ * brand makes, so they are referenced at the source instead of copied into
+ * config — a `dns.sendgrid` block drifts the moment the account
+ * re-authenticates the domain, and nothing ever wrote it back
+ * ([#692](https://github.com/Omega-JS-Stack/omega/issues/692)).
+ * `GET /v3/whitelabel/domains` answers with the authentication's own record
+ * set, whose `mail_cname` points at exactly the host the record builder
+ * rebuilds (`u<id>.<whitelabel>.sendgrid.net`).
+ *
+ * Every no-answer SKIPS the SendGrid records and says why: no key, no
+ * authentication for this domain (the campaigns service creates it), an
+ * unreachable API, or a host shape this parser does not know. A subdomain
+ * project has no SendGrid records to build at all — the apex record set
+ * belongs to the parent brand — so it never asks.
+ *
+ * @param {object} context - The service context
+ * @param {object|null} api - The SendGrid client (null without an API key)
+ * @returns {Promise<{ id: string, whitelabel: string }|null>}
+ */
+async function resolveDomainAuth({ domain, isSubdomainProject }, api) {
+  if (isSubdomainProject) return null;
+
+  if (!api) {
+    console.log(`      ${chalk.yellow('⚠')} SendGrid records skipped — no ${chalk.cyan('SENDGRID_API_KEY')} to read the domain authentication with`);
+    return null;
+  }
+
+  let domains;
+  try {
+    domains = await api.getAuthenticatedDomains();
+  } catch (error) {
+    console.log(`      ${chalk.yellow('⚠')} SendGrid records skipped — could not read the domain authentication${chalk.dim(`: ${error.message}`)}`);
+    return null;
+  }
+
+  const auth = (domains || []).find((entry) => (entry.domain || '').toLowerCase() === domain.toLowerCase());
+  if (!auth) {
+    console.log(`      ${chalk.yellow('⚠')} SendGrid records skipped — no authenticated domain for ${chalk.cyan(domain)} in SendGrid (the campaigns service creates it)`);
+    return null;
+  }
+
+  const host = auth.dns?.mail_cname?.data;
+  const parsed = /^u([^.]+)\.([^.]+)\.sendgrid\.net$/i.exec(host || '');
+  if (!parsed) {
+    console.log(`      ${chalk.yellow('⚠')} SendGrid records skipped — domain-auth host ${chalk.cyan(host || '(none)')} is not ${chalk.dim('u<id>.<whitelabel>.sendgrid.net')}`);
+    return null;
+  }
+
+  return { id: parsed[1], whitelabel: parsed[2] };
+}
+
+/**
  * Has SendGrid VALIDATED the branded link host for this brand's domain?
  *
  * SendGrid validates `emailurl.<domain>` by resolving it as a CNAME to
@@ -150,36 +214,55 @@ module.exports = async function ensureDnsRecords(context) {
  * diff below proxies the CNAME in this same walk. Skipping the wait (or a
  * non-interactive run) keeps the record grey and the rerun message.
  *
- * No API key, no entry, or an unreachable SendGrid all answer NO: the
- * unproxied record is the safe half of the pair (a plain-HTTP hop, which is
- * where every brand already is), while a wrong YES is unrecoverable without a
- * hand edit.
+ * An unreachable SendGrid answers NO: the unproxied record is the safe half of
+ * the pair (a plain-HTTP hop, which is where every brand already is), while a
+ * wrong YES is unrecoverable without a hand edit. No API key never reaches
+ * here — the domain-auth read skipped the whole set first.
  *
- * @param {object} context - The service context (tests inject `sendgridApi`)
+ * NO ENTRY is the one NO that is not pending: the campaigns service creates
+ * the branding later in this same walk
+ * ([#693](https://github.com/Omega-JS-Stack/omega/issues/693)), so waiting on
+ * it here would never end. That case says so and moves on.
+ *
+ * @param {object} context - The service context
+ * @param {object|null} api - The SendGrid client (null without an API key)
+ * @param {object|null} sendgrid - The live domain-auth values, when there are
+ *   SendGrid records to gate at all
  * @returns {Promise<{ valid: boolean, pending: boolean }>} - `pending` is a
- *   configured branding that did not validate: the warned reason's condition.
+ *   live branding that did not validate: the warned reason's condition.
  */
-async function resolveLinkBranding(context) {
-  const { brandConfig, domain, isSubdomainProject, options = {} } = context;
-  const sendgrid = brandConfig?.edge?.providers?.cloudflare?.dns?.sendgrid;
+async function resolveLinkBranding(context, api, sendgrid) {
+  const { domain, options = {} } = context;
 
-  // No SendGrid records to gate: none configured, or a subdomain project, whose
-  // record set stops at the GitHub Pages pair (the apex belongs to the parent).
-  if (isSubdomainProject || !sendgrid?.id || !sendgrid?.whitelabel) {
+  // No SendGrid records to gate: the domain-auth read found none (and already
+  // said why), or a subdomain project, whose record set stops at the GitHub
+  // Pages pair (the apex belongs to the parent).
+  if (!sendgrid) {
     return { valid: false, pending: false };
   }
 
-  const api = context.sendgridApi || (process.env.SENDGRID_API_KEY ? new SendGridAPI() : null);
   const host = `emailurl.${domain}`;
 
-  let valid = api ? await isBrandedLinkValid(api, host, true) : false;
+  const branding = await readBrandedLink(api, host, true);
+
+  // Nothing to WAIT for HERE: the account has no link branding for this host
+  // yet, and the campaigns service creates it LATER IN THIS SAME WALK
+  // ([#693](https://github.com/Omega-JS-Stack/omega/issues/693)) — waiting on
+  // it before that would never end. The record still lands (grey), which is
+  // exactly the state SendGrid validates against.
+  if (branding === null) {
+    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(`CNAME ${host}`)} stays unproxied — SendGrid has no link branding for that host yet. The campaigns service creates and validates it later in this run (when campaigns is enabled for this brand), then flips ${chalk.cyan(`CNAME ${host}`)} to proxied.`);
+    return { valid: false, pending: false };
+  }
+
+  let valid = branding?.valid === true;
 
   // Wait it out: SendGrid validates minutes after the CNAME lands, and the
   // proxy flip belongs to THIS walk (#662). Ticks stay quiet — the first read
   // already reported an unreachable API.
-  if (!valid && api && canPrompt(options)) {
+  if (!valid && canPrompt(options)) {
     const result = await pollWithSpinner({
-      check: async () => (await isBrandedLinkValid(api, host) ? { done: true } : { done: false }),
+      check: async () => ((await readBrandedLink(api, host))?.valid === true ? { done: true } : { done: false }),
       intervalMs: 10000,
       message: `Waiting for SendGrid to validate ${host}`,
       indent: '      ',
@@ -188,29 +271,34 @@ async function resolveLinkBranding(context) {
   }
 
   if (!valid) {
-    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(`CNAME ${host}`)} stays unproxied — SendGrid has not validated the branded link${api ? '' : ' (no SENDGRID_API_KEY)'}. Rerun ${chalk.cyan('omega manage')} once it has, and the record flips to proxied so emailed links land on HTTPS.`);
+    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(`CNAME ${host}`)} stays unproxied — SendGrid has not validated the branded link. Rerun ${chalk.cyan('omega manage')} once it has, and the record flips to proxied so emailed links land on HTTPS.`);
   }
 
   return { valid, pending: !valid };
 }
 
 /**
- * One read of SendGrid's branded-link list: is `host` validated?
+ * One read of SendGrid's branded-link list: this host's entry.
+ *
+ * The caller needs all three answers apart, because only ONE of them is worth
+ * waiting on: an entry that exists and is not valid yet is minutes away, while
+ * a missing entry arrives from the campaigns service later in the walk, not
+ * from any wait here.
  *
  * @param {object} api - The SendGrid client
  * @param {string} host - The branded link host (`emailurl.<domain>`)
  * @param {boolean} [logError] - Report an unreachable API (the first read only)
- * @returns {Promise<boolean>}
+ * @returns {Promise<object|null|undefined>} The branding entry; `null` when the
+ *   account has none for this host; `undefined` when the read itself failed.
  */
-async function isBrandedLinkValid(api, host, logError = false) {
+async function readBrandedLink(api, host, logError = false) {
   try {
     const links = await api.getBrandedLinks();
-    const branding = (links || []).find((link) => `${link.subdomain}.${link.domain}`.toLowerCase() === host.toLowerCase());
-    return branding?.valid === true;
+    return (links || []).find((link) => `${link.subdomain}.${link.domain}`.toLowerCase() === host.toLowerCase()) || null;
   } catch (error) {
     if (logError) {
       console.log(`      ${chalk.yellow('⚠')} Could not read SendGrid link branding${chalk.dim(`: ${error.message}`)}`);
     }
-    return false;
+    return undefined;
   }
 }

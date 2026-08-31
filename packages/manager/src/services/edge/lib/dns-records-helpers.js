@@ -7,12 +7,13 @@
  *   dns.spfIncludes    — SPF include list (manager default: google + sendgrid)
  *   dns.dmarcReports   — { rua: [...], ruf: [...] } report addresses (no default)
  *   dns.bimiLogo       — BIMI logo URL (no default; record only emitted when set)
- *   dns.sendgrid       — { id, whitelabel } domain-auth CNAMEs (no default;
- *                        the campaigns service (SendGrid) owns these values),
- *                        plus `linkBrandingValid` — NOT config, the live answer
- *                        the ensure handler reads off SendGrid and folds in
- *                        ([#646](https://github.com/Omega-JS-Stack/omega/issues/646))
  *   dns.records        — custom records (verification TXTs like Ahrefs go here)
+ *
+ * One block in the dns object is NOT config: `sendgrid` — { id, whitelabel },
+ * plus `linkBrandingValid` — is what the ensure handler read off SendGrid
+ * live and folded in, so the builder below stays pure
+ * ([#692](https://github.com/Omega-JS-Stack/omega/issues/692),
+ * [#646](https://github.com/Omega-JS-Stack/omega/issues/646)).
  */
 const chalk = require('chalk').default;
 const { resolveEmailProvider } = require('../../domain/lib/registrars.js');
@@ -115,7 +116,8 @@ function buildRequiredRecords(domain, dnsConfig, isSubdomainProject = false, ema
     });
   }
 
-  // SendGrid domain auth — only when the account values are configured
+  // SendGrid domain auth — only when the live read answered with the account's
+  // values for this domain (#692)
   const sendgrid = dnsConfig?.sendgrid;
   if (sendgrid?.id && sendgrid?.whitelabel) {
     const sgHost = `u${sendgrid.id}.${sendgrid.whitelabel}.sendgrid.net`;
@@ -374,18 +376,23 @@ function txtKind(content = '') {
 // DIFF RECORDS - main entry point used by ensure handler
 // =============================================================================
 
-function diffRecords({ records, brandConfig, domain, isSubdomainProject, linkBrandingValid = false }) {
+function diffRecords({ records, brandConfig, domain, isSubdomainProject, sendgrid = null, linkBrandingValid = false }) {
   let dnsConfig = brandConfig?.edge?.providers?.cloudflare?.dns;
 
   if (!dnsConfig && !isSubdomainProject) {
     return null;
   }
 
-  // SendGrid's live word on the branded link rides IN on the sendgrid block —
-  // the same shape `{ id, whitelabel }` arrive in, so the record builder reads
-  // one object and stays pure ([#646]).
-  if (dnsConfig?.sendgrid) {
-    dnsConfig = { ...dnsConfig, sendgrid: { ...dnsConfig.sendgrid, linkBrandingValid } };
+  // SendGrid's OWN facts ride in beside the config, never copied into it: the
+  // domain-auth values `{ id, whitelabel }` the ensure handler read off
+  // `GET /v3/whitelabel/domains` ([#692]) plus its word on the branded link
+  // ([#646]), as one block the record builder reads and stays pure.
+  //
+  // The key is REPLACED, never merged: a `sendgrid` block left behind in any
+  // config layer must never build the records the live read just declined to
+  // — that silent fallback is the whole bug #692 closes.
+  if (dnsConfig) {
+    dnsConfig = { ...dnsConfig, sendgrid: sendgrid ? { ...sendgrid, linkBrandingValid } : undefined };
   }
 
   // For subdomain projects, filter records to only those belonging to this subdomain

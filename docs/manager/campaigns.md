@@ -1,8 +1,8 @@
 # The campaigns service — the brand's email marketing (SendGrid)
 
 The `campaigns` service reconciles the brand's email-marketing infrastructure on SendGrid:
-domain authentication, a verified sender for Single Sends, the brand's marketing list, the
-unsubscribe groups the backend sends through, `@omega.js/backend`'s custom fields and
+domain authentication, link branding, a verified sender for Single Sends, the brand's marketing
+list, the unsubscribe groups the backend sends through, `@omega.js/backend`'s custom fields and
 segments, and the account-global Event Webhook. It runs after `edge`, because the DKIM records
 are written into the Cloudflare zone.
 
@@ -15,6 +15,7 @@ share the account.
 | Operation | What it does |
 |---|---|
 | `domain-auth` | SendGrid domain authentication for `brand.url`'s domain. Missing → authenticate (`automatic_security` returns three CNAMEs under `emailauth.`), diff-sync those records into the Cloudflare apex zone, then validate — an interactive run polls until DNS propagates and SendGrid confirms. |
+| `link-branding` | SendGrid link branding for `brand.url`'s domain — the `emailurl.` host every transactional link is rewritten through. Missing → brand the links (`POST /v3/whitelabel/links` with subdomain `emailurl`), diff-sync both returned CNAMEs into the Cloudflare apex zone UNPROXIED, then validate — an interactive run polls until SendGrid confirms. On valid, the `emailurl` CNAME is PATCHed to proxied ([#693](https://github.com/Omega-JS-Stack/omega/issues/693)). Skipped on a subdomain project: the apex records belong to the parent brand's walk. |
 | `sender-identity` | The verified sender Single Sends require: `offers@{contact domain}` with the brand's name. It auto-verifies because `domain-auth` ran first. |
 | `list` | The brand's marketing list, resolved config id → exact-name lookup → create, with the id written back to `marketing.campaigns.providers.sendgrid.listId`. |
 | `unsubscribe-groups` | The account's ASM groups (below). |
@@ -62,8 +63,6 @@ send time. A dry run names the groups it would create and writes nothing.
   and warns only when nobody can be asked.
 - `parent` — whose backend the Event Webhook points at (`'self'` when this brand IS the
   parent; `false` is a deliberate opt-out).
-- `edge.providers.cloudflare.dns.sendgrid.{id,whitelabel}` — the domain-auth CNAME values the
-  edge service's record set reads.
 
 **Credentials**: `SENDGRID_API_KEY` in the brand `.env`. `OMEGA_WEBHOOK_KEY` is OMEGA's own
 and is MINTED by the setup contract rather than asked for
@@ -77,7 +76,16 @@ read it even when this service runs before the workspace one did.
   Only the consent toggles are managed — tracking toggles (open/click/delivered) are not ours
   to touch.
 - **No Cloudflare token is survivable.** `domain-auth` prints the records to add by hand and
-  still attempts validation, so a manual fix converges on the next run.
+  still attempts validation, so a manual fix converges on the next run; `link-branding` prints
+  the one-line manual flip (orange-cloud the `emailurl` CNAME) and warns.
+- **`link-branding` writes its own CNAMEs, because on run 1 nobody else has.** The `edge`
+  service builds the SendGrid record set from a LIVE domain-auth read, and a brand new brand has
+  no authenticated domain until `domain-auth` creates one minutes later in the same walk — so
+  edge wrote none of those records, and a branding with no CNAME behind it can never validate.
+  This operation diff-syncs both link CNAMEs itself (unproxied, the only state SendGrid can
+  validate) through the same writer `domain-auth` uses. Edge still stays the RECONCILER: its
+  next live read sees `valid: true` and desires the record proxied, so both services agree
+  ([#693](https://github.com/Omega-JS-Stack/omega/issues/693)).
 - **The sender's identity needs human input** where config has none: the address prompt is a
   genuine ask, not a wait, so a headless run legitimately warns.
 - **Changing the query builder re-syncs every segment.** The generated SQL is compared against

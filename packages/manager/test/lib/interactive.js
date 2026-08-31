@@ -31,20 +31,30 @@ function openTtyPrompt() {
 
   setPromptStreams({ input, output });
 
+  /**
+   * Wait until `match` has rendered — answer()'s assertion half, on its own
+   * for text that is shown but not prompted at (throws on timeout).
+   */
+  async function waitFor(match, timeoutMs = 2000) {
+    const start = Date.now();
+    while (!rendered.includes(match)) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(`Timed out waiting for a prompt containing ${JSON.stringify(match)}. Rendered: ${JSON.stringify(rendered)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
   return {
+    waitFor,
+
     /**
      * Wait until `match` has rendered, then type `keys` (include '\r' to
      * submit). Rendered output accumulates, so sequential prompts are
      * answered by matching each prompt's unique text in order.
      */
     async answer(match, keys, timeoutMs = 2000) {
-      const start = Date.now();
-      while (!rendered.includes(match)) {
-        if (Date.now() - start > timeoutMs) {
-          throw new Error(`Timed out waiting for a prompt containing ${JSON.stringify(match)}. Rendered: ${JSON.stringify(rendered)}`);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
+      await waitFor(match, timeoutMs);
       input.write(keys);
     },
 

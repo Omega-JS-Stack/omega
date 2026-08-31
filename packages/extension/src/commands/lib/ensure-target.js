@@ -28,6 +28,7 @@ const jetpack = require('fs-jetpack');
 const version = require('wonderful-version');
 const Manager = new (require('../../build.js'));
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
+const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const logger = Manager.logger('ensure-target');
 const package = Manager.getPackage('main');
@@ -118,6 +119,10 @@ async function ensureTarget(options) {
   if (readProject(projectDir).name === package.name) {
     return result;
   }
+
+  // A workspace ROOT is not a target either — and unlike the case above, landing
+  // there is an accident (a verb run from the wrong cwd), so it fails LOUD (#699).
+  assertScaffoldable(projectDir);
 
   setupScripts(projectDir, result);
   ensureNodeVersion(log);

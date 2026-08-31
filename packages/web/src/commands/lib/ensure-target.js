@@ -22,6 +22,7 @@
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const { scaffoldDefaults, NODE_VERSION } = require('../../scaffold.js');
+const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const frameworkPackage = require('../../../package.json');
 
@@ -82,6 +83,10 @@ function ensureTarget(options) {
   if (jetpack.read(path.join(projectDir, 'package.json'), 'json')?.name === frameworkPackage.name) {
     return result;
   }
+
+  // A workspace ROOT is not a target either — and unlike the case above, landing
+  // there is an accident (a verb run from the wrong cwd), so it fails LOUD (#699).
+  assertScaffoldable(projectDir);
 
   // ---- Node version check (warn only — the .nvmrc scaffolded below is the pin)
   const nodeMajor = Number(process.versions.node.split('.')[0]);

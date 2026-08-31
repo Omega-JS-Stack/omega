@@ -132,6 +132,12 @@ ARE our bundles. The corollary: a deliberate capture must pass an Error CONSTRUC
 code — hand it a frameless one (a bare cross-browser `fetch` TypeError, say, which some engines
 raise with no usable stack) and the filter drops it, by design.
 
+What survives the filter is scrubbed of credential-bearing auth params: `browser.scrubAuthParams()`
+strips `?authPrivateKey` and `?authCustomToken` from every navigation breadcrumb (`data.from`/`data.to`,
+which the SDK records around `history.replaceState` — including the strip that removes the key) and
+from `event.request.url` (which `httpContext` attaches at capture time). A module constant, not
+config: a page never opts its own credentials back into an event ([#661](https://github.com/Omega-JS-Stack/omega/issues/661)).
+
 ## How the config reaches a browser
 
 The client reads a `sentry: { enabled, config }` namespace on its init blob, and every framework

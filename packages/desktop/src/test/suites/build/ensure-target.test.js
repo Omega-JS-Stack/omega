@@ -66,6 +66,40 @@ module.exports = {
       },
     },
     {
+      name: 'refuses a workspace root, loudly, without writing a single file (#699)',
+      run: async (ctx) => {
+        // The accident: `omega deploy` at a workspace root scaffolded a whole
+        // desktop target into it — gulpfile, src/, hooks/, workflows, rewritten
+        // root scripts — before failing anyway.
+        const tmp = stageConsumer();
+        const manifestPath = path.join(tmp, 'package.json');
+        const manifest = jetpack.read(manifestPath, 'json');
+        manifest.workspaces = ['packages/*'];
+        jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+        const before = jetpack.read(manifestPath);
+
+        try {
+          let refusal = null;
+          try {
+            await ensureTarget({ projectDir: tmp });
+          } catch (e) {
+            refusal = e;
+          }
+
+          ctx.expect(refusal).toBeTruthy();
+          ctx.expect(refusal.message).toMatch(/refusing to scaffold into/);
+          ctx.expect(refusal.message).toMatch(/declares "workspaces"/);
+          ctx.expect(refusal.message.includes(tmp)).toBe(true);
+
+          // Nothing scaffolded, and the manifest is byte-identical.
+          ctx.expect(jetpack.list(tmp)).toEqual(['package.json']);
+          ctx.expect(jetpack.read(manifestPath)).toBe(before);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'deploy precheck: --no-secrets skips every step, bare deploy runs them in order',
       run: async (ctx) => {
         const quiet = { log() {}, warn() {}, error() {} };

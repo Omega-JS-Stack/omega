@@ -22,6 +22,7 @@
     "./ci-workflows": "./src/ci-workflows.js",
     "./certs": "./src/certs.js",
     "./defaults-engine": "./src/defaults-engine.js",
+    "./scaffold-guard": "./src/scaffold-guard.js",
     "./framework-deps": "./src/framework-deps.js",
     "./target-dependencies": "./src/target-dependencies.js",
     "./deploy-precheck": "./src/deploy-precheck.js",

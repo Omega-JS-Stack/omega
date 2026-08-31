@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTarget, isBrandRoot, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, verbOf, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
@@ -344,6 +344,73 @@ test('run(): an unresolvable CROSS-FRAMEWORK target still hard-fails (never fall
   assert.equal(out.status, 1);
   assert.equal(out.stdout.includes('HOST-RAN'), false);
   assert.match(out.stderr, /could not resolve '@omega\.js\/web\/cli'/);
+});
+
+// ─── Contextless-verb guard (#699) ───────────────────────────────────────────
+
+/**
+ * A targetless cwd with the dispatcher wired to a host that only ANNOUNCES
+ * itself — a real run in a child process, since the refusal exits the process.
+ * @returns {{ workDir: string, invoke: (args: string[]) => object }}
+ */
+function stageTargetless() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-guard-'));
+  const workDir = path.join(scratch, 'work');
+  fs.mkdirSync(workDir);
+  const runner = path.join(scratch, 'runner.js'); // outside workDir — it must stay empty
+  fs.writeFileSync(
+    runner,
+    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
+      + `.run({ hostName: '@omega.js/desktop', hostRun: () => console.log('HOST-RAN') });`
+  );
+
+  return {
+    workDir,
+    invoke: (args) => require('child_process').spawnSync(
+      process.execPath, [runner, ...args], { cwd: workDir, encoding: 'utf8' }
+    ),
+  };
+}
+
+test('run(): a MUTATING verb with no target context is REFUSED, and writes nothing (#699)', () => {
+  // The accident: `omega deploy --yes` outside any target fell back to the
+  // hoist-winner CLI, whose deploy scaffolded a whole target into the cwd.
+  const { workDir, invoke } = stageTargetless();
+  const out = invoke(['deploy', '--yes']);
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the host CLI must never start');
+  assert.match(out.stderr, /refusing to run "deploy"/);
+  assert.ok(out.stderr.includes(workDir), `the refusal names the cwd: ${out.stderr}`);
+  assert.match(out.stderr, /Nothing was scaffolded/);
+  assert.deepEqual(fs.readdirSync(workDir), [], 'the cwd is untouched');
+});
+
+test('run(): every mutating verb spelling is refused — positional and flag-style alias (#699)', () => {
+  const { invoke } = stageTargetless();
+  for (const args of [['build'], ['package'], ['test'], ['install', 'local'], ['--deploy'], ['-b'], ['update']]) {
+    const out = invoke(args);
+    assert.equal(out.status, 1, `${args.join(' ')} must be refused: ${out.stderr}`);
+    assert.equal(out.stdout.includes('HOST-RAN'), false);
+  }
+});
+
+test('run(): the bootstrap and read-only verbs still dispatch with no target context (#276)', () => {
+  const { invoke } = stageTargetless();
+  for (const args of [[], ['onboard'], ['new'], ['help'], ['--help'], ['deploy', '--help'], ['version'], ['-v'], ['cwd'], ['logs']]) {
+    const out = invoke(args);
+    assert.equal(out.status, 0, `${args.join(' ') || '(bare)'} must still run: ${out.stderr}`);
+    assert.ok(out.stdout.includes('HOST-RAN'), `${args.join(' ') || '(bare)'} reaches the host CLI`);
+  }
+});
+
+test('verbOf: --help wins over a positional, then the positional, then a flag alias', () => {
+  assert.equal(verbOf([]), null);
+  assert.equal(verbOf(['deploy', '--yes']), 'deploy');
+  assert.equal(verbOf(['--yes', 'deploy']), 'deploy');
+  assert.equal(verbOf(['deploy', '--help']), 'help');
+  assert.equal(verbOf(['-h']), 'help');
+  assert.equal(verbOf(['--deploy']), '--deploy');
 });
 
 test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {

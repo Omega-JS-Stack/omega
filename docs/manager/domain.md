@@ -44,7 +44,12 @@ with no TTY — reports warned with the rerun message.
 
 - **Namecheap's API is IP-whitelisted.** The client detects its own public IP via
   `api.ipify.org`; that address must be whitelisted in the Namecheap dashboard or every call
-  is refused. There is no JSON variant of the API — it is the XML query API.
+  is refused. Since [#698](https://github.com/Omega-JS-Stack/omega/issues/698) a refusal is
+  walked rather than warned: an interactive run names the IP to add, gates on Enter to open
+  the [API access page](https://ap.www.namecheap.com/settings/tools/apiaccess/) (enable, key
+  reset and whitelist all live there), and rechecks the refused call until it passes — ENTER
+  checks now, `s` steps aside. Non-interactive and dry runs warn and continue as before.
+  There is no JSON variant of the API — it is the XML query API.
 - **Nameservers live at the REGISTRABLE domain.** For a subdomain project
   (`playground.omegajs.dev`) that is the parent (`omegajs.dev`) — the zone the edge service
   manages and the domain the registrar actually holds. The split uses the public suffix list,

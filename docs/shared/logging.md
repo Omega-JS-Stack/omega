@@ -42,7 +42,10 @@ used to ride `ctx.log` on every OAuth2 link
 ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)) — a line names the provider,
 the uid and whether the exchange succeeded, and nothing else. The same rule reaches an
 HTTP helper's own switches: `wonderful-fetch`'s `log: true` prints its whole configuration,
-headers included, so it never rides a request whose `authorization` header is the token.
+headers included, so it never rides a request carrying ANY credential header — an
+`authorization` token, or the `omega-admin-key` an internal call authenticates with
+([#702](https://github.com/Omega-JS-Stack/omega/issues/702)). Backend's
+`test/security/fetch-log-secrets.test.js` scans the source and fails that pairing.
 
 ### The two surfaces
 

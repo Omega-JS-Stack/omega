@@ -1,7 +1,7 @@
 const path = require('path');
 const powertools = require('node-powertools');
 const transitions = require('./transitions/index.js');
-const { trackPayment } = require('./analytics.js');
+const { trackPayment, isTrialConversion } = require('./analytics.js');
 const loadProvider = require('../../../libraries/load-provider.js');
 const { hasAuthUser } = require('../../../libraries/auth-user.js');
 const User = require('../../../helpers/user.js');
@@ -802,9 +802,29 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   const batch = admin.firestore().batch();
 
   // Write unified subscription to user doc (subscriptions only)
+  //
+  // A charge that CONVERTED the trial stamps the outcome on its way past. The
+  // provider payloads carry `trial.claimed` — "this subscription HAD a trial", true
+  // for its whole life — and nothing else says the first paid charge happened, so
+  // without the stamp the next renewal reads exactly like the conversion did
+  // ([#697](https://github.com/Omega-JS-Stack/omega/issues/697)). It is STATE, not
+  // reporting: it is written whether or not the analytics fire ran, and it is the
+  // same field and the same value the trial-lapse sweep stamps when no webhook ever
+  // announces the outcome, so the two paths cannot disagree about a trial's fate.
   if (isSubscription) {
+    const subscriptionWrite = { ...unified };
+
+    if (discountWrite) {
+      subscriptionWrite.discount = discountWrite;
+    }
+
+    if (isTrialConversion({ transitionName, eventType, unified, before })) {
+      subscriptionWrite.trial = { ...unified.trial, outcome: 'converted' };
+      ctx.log(`Trial converted: stamping users/${uid}.subscription.trial.outcome=converted (the first paid charge on ${unified.payment?.resourceId})`);
+    }
+
     batch.set(admin.firestore().doc(`users/${uid}`), {
-      subscription: discountWrite ? { ...unified, discount: discountWrite } : unified,
+      subscription: subscriptionWrite,
     }, { merge: true });
   }
 

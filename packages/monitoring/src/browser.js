@@ -40,6 +40,60 @@ function isAutomatedBrowser() {
 }
 
 /**
+ * The url params that ARE a credential (#661): `?authPrivateKey` is a durable
+ * key and `?authCustomToken` signs in whoever holds it. A module constant, not
+ * config — a page cannot be allowed to opt its own credentials back into an
+ * event. Not exhaustive by design: only params the framework's own auth lanes
+ * put in an address bar.
+ */
+const SENSITIVE_AUTH_PARAMS = ['authPrivateKey', 'authCustomToken'];
+
+// Any absolute url parses against a base too, so ONE parse serves both shapes;
+// the host below only ever names it back out of a relative input.
+const SCRUB_BASE = 'https://scrub.invalid';
+
+/**
+ * Drop the credential params from a url string. The SDK reads the address bar
+ * in two places we cannot reach from a catch block — the navigation breadcrumb
+ * it records around `history.replaceState`, and the request url `httpContext`
+ * attaches at capture time — so the scrub belongs on this seam, once, rather
+ * than in every lane that handles a key.
+ *
+ * A url carrying none of them comes back untouched (never re-serialized), and a
+ * same-origin breadcrumb url stays relative, the way the SDK recorded it.
+ *
+ * @param {string} url - an absolute or root-relative url
+ * @returns {string} the url without the credential params
+ */
+function scrubAuthParams(url) {
+  if (typeof url !== 'string' || !SENSITIVE_AUTH_PARAMS.some((param) => url.includes(param))) {
+    return url;
+  }
+
+  let parsed;
+  let relative = false;
+
+  try {
+    parsed = new URL(url);
+  } catch (e) {
+    relative = true;
+  }
+
+  if (relative) {
+    try {
+      parsed = new URL(url, SCRUB_BASE);
+    } catch (e) {
+      // Not a url at all — better a param name in a breadcrumb than a mangled one.
+      return url;
+    }
+  }
+
+  SENSITIVE_AUTH_PARAMS.forEach((param) => parsed.searchParams.delete(param));
+
+  return relative ? `${parsed.pathname}${parsed.search}${parsed.hash}` : parsed.toString();
+}
+
+/**
  * Build the @sentry/browser init options: integrations plus the one beforeSend
  * that decides what leaves the page.
  *
@@ -84,6 +138,21 @@ function buildInitOptions(params) {
     ...(options.replaysOnErrorSampleRate > 0 ? { replaysOnErrorSampleRate: options.replaysOnErrorSampleRate } : {}),
     integrations,
 
+    beforeBreadcrumb(breadcrumb) {
+      // The SDK patches history.replaceState, so the very call that STRIPS a key
+      // from the address bar records the pre-strip url as `data.from` — and the
+      // breadcrumb then rides with every later event on that page load (#661).
+      if (breadcrumb && breadcrumb.category === 'navigation' && breadcrumb.data) {
+        ['from', 'to'].forEach((key) => {
+          if (typeof breadcrumb.data[key] === 'string') {
+            breadcrumb.data[key] = scrubAuthParams(breadcrumb.data[key]);
+          }
+        });
+      }
+
+      return breadcrumb;
+    },
+
     beforeSend(event, hint) {
       // The console line lands FIRST, before any gate: a dropped event is still
       // an error the developer wants to see in devtools.
@@ -117,6 +186,12 @@ function buildInitOptions(params) {
         ...(getTags ? getTags() : {}),
       };
 
+      // The other half of the #661 scrub: httpContext attaches the address bar
+      // as the request url when the event is CAPTURED, key and all.
+      if (typeof event.request?.url === 'string') {
+        event.request.url = scrubAuthParams(event.request.url);
+      }
+
       // PII: the uid is the join key to the account and rides; the email is
       // scrubbed unless `monitoring.providers.sentry.scrubEmail: false` opts in.
       const user = normalizeUser(getUser ? getUser() : null, options);
@@ -129,4 +204,4 @@ function buildInitOptions(params) {
   };
 }
 
-module.exports = { buildInitOptions, isLighthouse, isAutomatedBrowser };
+module.exports = { buildInitOptions, isLighthouse, isAutomatedBrowser, scrubAuthParams };

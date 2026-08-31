@@ -1,9 +1,5 @@
 // Firebase Auth error translation — pure helpers shared by the email and
 // OAuth flows. No DOM, no form state.
-import { createLogger } from '__main_assets__/js/libs/logger.js';
-
-const logger = createLogger('auth:errors');
-
 
 /**
  * Firebase password-related auth error codes — these belong on the password
@@ -81,20 +77,6 @@ export function isUserError(errorCode) {
  * Returns just the inner message string, or null if nothing useful was found.
  */
 export function extractBlockingFunctionMessage(error) {
-  // Diagnostic: dump the full shape of every error that lands here so we can
-  // see exactly what Firebase delivers when @omega.js/backend's beforeCreate
-  // throws. The 503 path (Identity Toolkit returns 503 with code -47, no
-  // BLOCKING_FUNCTION wrapper) needs different handling than the 400 path.
-  logger.warn('extractBlockingFunctionMessage: error shape', {
-    code: error?.code,
-    message: error?.message,
-    name: error?.name,
-    hasCustomData: !!error?.customData,
-    hasServerResponse: !!error?.customData?.serverResponse,
-    serverResponse: error?.customData?.serverResponse,
-    fullError: error,
-  });
-
   // The OAuth redirect path (signInWithIdp → 503) delivers the rejection as
   // `auth/error-code:-47` with NO `customData.serverResponse` blob — Firebase
   // strips the @omega.js/backend-side message before it reaches the client.

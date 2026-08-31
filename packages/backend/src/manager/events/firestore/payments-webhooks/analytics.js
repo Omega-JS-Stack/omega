@@ -419,12 +419,7 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
     // The first REAL charge after a trial. It arrives exactly like a renewal — no
     // transition, a payment event — so before [#407] it was reported as one, and
     // the funnel's most valuable step was indistinguishable from month two.
-    //
-    // The trial has to be LEFT for this to be the conversion, which is also what
-    // declines the $0 trial-START invoice: that one carries no transition either,
-    // but the subscription is inside its trial on both sides of it, so nothing was
-    // converted and nothing was charged.
-    if (!transitionName && isPaymentEvent(eventType) && price > 0 && isInsideTrial(before) && !isInsideTrial(unified, before)) {
+    if (isTrialConversion({ transitionName, eventType, unified, before })) {
       return {
         ...base,
         event: 'trial_convert',
@@ -463,6 +458,54 @@ function resolvePaymentEvent(category, transitionName, eventType, unified, order
   }
 
   return null;
+}
+
+/**
+ * Is this charge the trial's CONVERSION — the first real money on a subscription
+ * that ever claimed one?
+ *
+ * TWO DURABLE FACTS DECIDE IT, and neither is the order the provider delivered in:
+ * the subscription EVER claimed a trial, and its trial has no outcome on record yet.
+ * Whichever webhook lands first, both facts read the same.
+ *
+ * The doc's in-trial-ness at charge time used to be the signal, and it is not one:
+ * Stripe delivered `customer.subscription.updated` (trial over, term pushed out) a
+ * full hour before `invoice.payment_succeeded`, so by charge time the stored doc had
+ * already left the trial and the conversion booked as a month-two renewal
+ * ([#697](https://github.com/Omega-JS-Stack/omega/issues/697)). The two webhooks race
+ * in real time, so an arbitrary share of conversions mislabeled — revenue stayed
+ * right (both ride the same charge-keyed purchase), the funnel's most valuable step
+ * did not.
+ *
+ * `trial.claimed` says only that a trial HAPPENED — it stays true for the life of the
+ * subscription — so `trial.outcome` is what says the first paid charge is behind us
+ * (the schema's own "one stored conversion signal"). It is written by whichever path
+ * sees the trial end: this pipeline stamps `converted` on the very charge this
+ * function claims, and the trial-lapse sweep stamps whatever the provider confirms
+ * when no webhook ever comes. Month two reads the stamp and books an ordinary
+ * renewal. THE LIMIT: a subscription that converted before the stamp existed carries
+ * none, so its next renewal books one conversion — once, and only for trials already
+ * converted on the day this shipped.
+ *
+ * The trial still has to be OVER, which is what declines the $0 invoice a trial
+ * STARTS with: that one carries no transition either, but the subscription is inside
+ * its trial on both sides of it, so nothing converted and nothing was charged.
+ *
+ * @param {object} options
+ * @param {string|null} options.transitionName - The detected transition (a conversion has none)
+ * @param {string} options.eventType - The provider's webhook event name
+ * @param {object} options.unified - The subscription the provider just delivered
+ * @param {object|null} [options.before] - The stored subscription this event arrived at
+ * @returns {boolean}
+ */
+function isTrialConversion({ transitionName, eventType, unified, before }) {
+  if (transitionName || !isPaymentEvent(eventType) || parseFloat(unified?.payment?.price || 0) <= 0) {
+    return false;
+  }
+
+  const claimedATrial = unified?.trial?.claimed === true || before?.trial?.claimed === true;
+
+  return !!(claimedATrial && !before?.trial?.outcome && !isInsideTrial(unified, before));
 }
 
 /**
@@ -631,6 +674,10 @@ module.exports = {
   // The trial-lapse sweep reports the outcomes no webhook ever announces, and both
   // paths have to agree on what "still inside the trial" means ([#407]).
   isInsideTrial,
+  // The pipeline stamps `trial.outcome` on the charge this books as the conversion,
+  // and that stamp is what makes the NEXT charge a renewal — so the write and the
+  // label read one predicate rather than a copy each ([#697]).
+  isTrialConversion,
   // Exported for testing
   resolvePaymentEvent,
   isPaymentEvent,

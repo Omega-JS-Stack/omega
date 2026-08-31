@@ -318,7 +318,7 @@ Existing users created BEFORE the consent system has no `consent` field. They ne
 
 **Idempotency guard:** skip docs where `consent.legal.grantedAt.source` already has a non-null value (those went through the new signup flow or a prior migration run).
 
-Run the migration BEFORE enabling the frontend's page-load consent guard (see UJM `ENFORCE_CONSENT_GUARD` flag in `src/assets/js/core/auth.js`). Otherwise legacy users without `consent.legal.status === 'granted'` get signed out on every page load.
+There is no frontend gate to sequence this against: OMEGA's web auth listener carries no page-load consent guard — UJM's `ENFORCE_CONSENT_GUARD` was deleted rather than ported, so a doc without `consent.legal.status === 'granted'` never signs anybody out ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)).
 
 After the migration: optionally run a re-opt-in drip campaign to legally recover marketing consent for the users you bulk-revoked.
 

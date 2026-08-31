@@ -1,19 +1,104 @@
-# OMEGA Monorepo
+# ========== Default Values ==========
+# OMEGA Desktop (@omega.js/desktop) consumer project
 
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md) with the same sections in the same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
+
+## Framework
+
+This project consumes **OMEGA Desktop** (@omega.js/desktop), a comprehensive framework for building modern Electron desktop apps. @omega.js/desktop provides one-line-import bootstrap per Electron process, a modular feature library with file-based extensibility, a multi-platform build/release pipeline (DMG / NSIS / deb / AppImage), and a built-in four-layer test framework.
+
+## 🚨 READ THE FRAMEWORK DOCS FIRST
+
+**Before doing ANY work on this codebase, the agent MUST read the framework documentation: that is where the architecture, conventions, APIs, and gotchas live. Skipping these will result in solutions that conflict with framework patterns.**
+
+**Required reading:**
+- **`node_modules/@omega.js/AGENTS.md`**: the OMEGA map, the one agent entry into the framework docs; follow it to `docs/desktop/index.md` (the @omega.js/desktop guide: identity, architecture, conventions)
+- **`node_modules/@omega.js/desktop/docs/`**: subsystem deep references (read the relevant ones for the task at hand)
+
+## 🚨 READ @omega.js/client TOO
+
+**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process.** It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
+
+**Required reading:**
+- **`node_modules/@omega.js/AGENTS.md`** → `docs/client/index.md`, the @omega.js/client guide: identity, module list, conventions
+- **`node_modules/@omega.js/client/docs/`**: module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+
+## Quick start
+
+```bash
+npm start           # dev with auto-reload (gulp → webpack → electron .)
+npm run build       # local production build (compiles bundles only, no installer)
+npm run package     # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
+npm run package:quick   # fast packaged build for the host platform/arch only (~20-30s)
+npm run release     # signed + published release (requires certs)
+npx omega test        # run YOUR project's test suites (bare runs never include the framework corpus)
+npx omega test build/config         # run project tests by path (relative to test/; full:<path> for both sources)
+npx omega test project:             # run ONLY your project tests (all of them)
+npx omega test project:custom-test  # run only consumer project tests matching a path
+npx omega test mgr:                 # run ONLY framework tests (universal alias; desktop:/framework: are equivalent)
+npx omega test desktop:build/config      # run only framework tests matching a path
+npx omega test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent, a shared name across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop)
+# (output is teed to logs/: dev.log on `npm start`, build.log on `npm run build`, test.log on `npx omega test`; cat instead of scrolling scrollback)
+npx omega install dev  # use LOCAL @omega.js/desktop source (to test framework edits)
+npx omega install live # restore the published @omega.js/desktop from npm
+```
+
+> Editing the @omega.js/desktop framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/desktop`). Run `npx omega install live` to switch back.
+
+## Where things live
+
+- `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, analytics, payment, cloud, monitoring, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, downloads, remoteConfig, restartManager) under `targets.desktop`.
+- Packaging config: fully generated. @omega.js/desktop produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + @omega.js/desktop's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
+- `hooks/notarize/post.js`: optional post-notarize extension hook (@omega.js/desktop owns the actual `afterSign` notarize step).
+- `src/main.js`: main-process entry. One-line bootstrap of `@omega.js/desktop/main`.
+- `src/preload.js`: preload entry. Exposes `window.desktop` via contextBridge.
+- `src/integrations/tray/index.js`: tray definition. Edit this; it's yours.
+- `src/integrations/menu/index.js`: application menu definition.
+- `src/integrations/context-menu/index.js`: right-click menu definition (called per-event with `params`).
+- `src/views/<window>/index.html`: per-window HTML.
+- `src/assets/js/components/<window>/index.js`: renderer entry per window.
+- `src/assets/scss/main.scss`: shared SCSS.
+- `config/icons/<platform>/<slot>.png`: optional icon overrides (`macos/icon.png`, `macos/tray.png`, `macos/dmg.png`, `windows/icon.png`, etc.). Ship ONE file per slot at the native (retina) size; @omega.js/desktop auto-downscales @1x variants. macOS tray must be 32×32 (@omega.js/desktop renames to `trayTemplate.png` in dist for the OS dark-mode magic). Missing slots fall back to @omega.js/desktop bundled defaults; Linux falls back to Windows resolution.
+- `test/**/*.js`: your project test suites (framework auto-runs them alongside its own).
+
+## Per-context imports
+
+```js
+// src/main.js
+new (require('@omega.js/desktop/main'))().initialize();   // auto-loads JSON5 config
+
+// src/preload.js
+new (require('@omega.js/desktop/preload'))().initialize();
+
+// src/assets/js/components/main/index.js
+new (require('@omega.js/desktop/renderer'))().initialize();
+```
+
+## Available APIs at runtime
+
+In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
+
+In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `OMEGA_BUILD_JSON.config`.
+
+## Dependency resolution
+
+- **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `@omega.js/client`, etc.). @omega.js/desktop's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omega.js/desktop's webpack config, not your `package.json`.
+- **@omega.js/client owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge).
+- **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime for unbundled code (gulp tasks, test fixtures).
+
+## Testing
+
+Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/`: real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test. Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live). See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
+
+<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
+
+# ========== Custom Values ==========
 > The entry point. Read this top to bottom (it is short), then follow the map. This file is a MAP, not a manual: the knowledge lives in `docs/` (segregated by framework), and the omega Claude plugin's hooks load it into a session deterministically, by where the work is happening. Keep this file under 250 lines.
-
-## What this is
-
 The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for independent versioning. Remote: [github.com/Omega-JS-Stack/omega](https://github.com/Omega-JS-Stack/omega) (npm org `omega.js`, GH org `Omega-JS-Stack` — both Ian's, names final).
-
 **Lineage** (the migration story, kept short): OMEGA consolidates the legacy manager ecosystem. The legacy repos keep serving production and are read-only reference (HARD RULE 1).
-
 - backend-manager (BEM) became `@omega.js/backend`; electron-manager (EM) became `@omega.js/desktop`; browser-extension-manager (BXM) became `@omega.js/extension`.
 - ultimate-jekyll-manager (UJM) was replaced by `@omega.js/web` (rebuilt on Eleventy 3, not ported); jekyll-uj-powertools became `@omega.js/template-kit`.
 - web-manager (WM) was absorbed into `@omega.js/client` — WM no longer exists as a concept; omega-manager's brains became `@omega.js/manager`.
-
-## HARD RULES
-
 1. 🚫 **The legacy repos are READ-ONLY.** Never modify `omega-manager`, `backend-manager`, `ultimate-jekyll-manager`, `browser-extension-manager`, `electron-manager`, `mobile-app-manager`, `web-manager`, `jekyll-uj-powertools`, or any consumer brand repo. They are reference/history and keep serving production. All work happens HERE.
 2. **Every package here is `@omega.js/*`-named; zero npm publishes until Ian finalizes versions.** Old-name releases ship from the LEGACY repos; the monorepo's `pre-*-rename` tags are the backup lane.
 3. **Publish policy — internal by default**: private shared packages (`account`, `analytics`, `config`, `devkit`, `monitoring`, `template-kit`) are vendored into published frameworks at prepare time and never publish.
@@ -22,9 +107,6 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
 4. **MAM is parked.** No `packages/mobile`, no mobile work — slot reserved only.
 5. **Preserve semantics, replace plumbing.** Blueprints/default-pages, FILE_MAP scaffolding semantics, `mgr i local`, prepare-watch, the frontend↔backend contract, and the disperse model must keep working exactly as consumers expect.
 6. **Every extraction/normalization step is gated**: golden-master where applicable, package test suites, cross-stack e2e, canary consumer.
-
-## How knowledge loads (the doctrine)
-
 - **`docs/` is the SSOT.** Cross-framework contracts live in `docs/shared/`; each framework's guide is `docs/<framework>/index.md` with its deep docs beside it. No line budget applies inside `docs/`.
 - **This file is the ONE agent entry — packages carry no agent docs.** Agents work at this level; the parent walk hands every session this map, and the map plus the plugin's hooks route to `docs/`. Knowledge lives in `docs/`, never in any AGENTS.md.
   - No `packages/<pkg>/AGENTS.md` or `CLAUDE.md` exists, none — the one lookalike is `packages/manager/docs/AGENTS.md`, a gitignored GENERATED copy of this map the prepare lane vendors for published installs ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)); never read or edit it here.
@@ -34,19 +116,12 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
   - Brand-root knowledge (the target table, the verbs, the brand hard rules, upstream-first) lives in [docs/manager/brand.md](docs/manager/brand.md). Contract: [docs/shared/agent-docs.md](docs/shared/agent-docs.md).
 - **Consumers get version-matched knowledge.** In the local era, `node_modules/@omega.js/*` symlinks into this monorepo, so the pointers resolve as-is.
   - Published packages carry their docs inside the package — prepare vendors each guide as `docs/index.md` plus `docs/shared/` ([docs/shared/agent-docs.md](docs/shared/agent-docs.md)) — so the plugin reads knowledge that matches the installed version, never a global copy.
-
-## The Claude plugin
-
 The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the repo-root marketplace manifest `.claude-plugin/marketplace.json`). It serves both audiences: developing this monorepo, and every consumer working on a brand built from these frameworks.
-
 - It is the ONLY home of the `omega:*` skills — folders and frontmatter names stay plain (`web`, `backend`, …); Claude Code namespaces them `omega:<skill>` automatically from the plugin manifest's `"name": "omega"`; the old global copies are deleted — plus the hooks that do the deterministic loading above.
 - Install is AUTOMATIC (Ian 2026-07-27): the repo's committed `.claude/settings.json` registers the marketplace and enables the plugin — Claude Code asks one trust question on first open, then it loads every session.
 - Consumer brands get the same deal: the plugin is vendored into `@omega.js/manager` at prepare time and the workspace service writes the brand's `.claude/settings.json` to enable it from `./node_modules/@omega.js/manager` ([docs/shared/agent-docs.md](docs/shared/agent-docs.md)).
 - It declares exactly ONE MCP server, in `agent-plugins/claude/.mcp.json`: the `@omega.js/mcp-router` endpoint that lazily proxies the browser, electron, and extension upstreams ([docs/mcp-router/index.md](docs/mcp-router/index.md)) — no other native MCP declarations, anywhere.
 - A directory-source marketplace is read LIVE from its path, so an enabled plugin serves the CURRENT files — `/reload-plugins` picks up edits mid-session, and `claude --plugin-dir ./agent-plugins/claude` is only for same-session iteration and edge cases, not for freshness. The contract: [docs/shared/agent-docs.md](docs/shared/agent-docs.md).
-
-## The map — packages
-
 | Package | What it is | The guide |
 |---|---|---|
 | `@omega.js/web` | Web framework (UJM successor): Eleventy 3 + LiquidJS, sections/themes, asset lanes, translation | [docs/web/index.md](docs/web/index.md) |
@@ -62,9 +137,6 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 | `@omega.js/analytics` | Internal: the ONE analytics contract — event catalog, per-provider adapters (GA4/Meta/TikTok), guarded browser transport, consent seam | [docs/shared/analytics.md](docs/shared/analytics.md) |
 | `@omega.js/monitoring` | Internal: the ONE error-reporting contract — config resolution, release tags, PII scrub, the client-side @omega.js-bundle filter, per-platform SDK entries | [docs/shared/monitoring.md](docs/shared/monitoring.md) |
 | `@omega.js/template-kit` | Internal: the `omega_*` template filters/tags as engine-neutral JS | [docs/web/template-kit.md](docs/web/template-kit.md) |
-
-## The map — brands
-
 | Brand | Who it is | Cloud |
 |---|---|---|
 | `brands/naked-brand` | "Naked Brand" — the bare fixture: the minimum a brand can declare, so a walkthrough sees every prompt fire from zero; a QA walk may reset it | Offline, `demo-*` only |
@@ -72,14 +144,9 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 | `brands/omega-playground` | "OMEGA Playground" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
 | `brands/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
 | `../omega-brand` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
-
 The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand.
-
 - Full topology, history, the local-era `file:` dependency contract, and the remaining launch gates: [docs/shared/brands.md](docs/shared/brands.md).
 - **Working inside a consumer brand right now?** Read [docs/manager/brand.md](docs/manager/brand.md) first — the brand-root anatomy, the verbs, and the brand hard rules.
-
-## Getting started (the dev loop)
-
 - Root `npm start` watches every dist-building package concurrently (single-instance lock).
 - Re-preparing EVERY package (pre-ship, or after touching a vendored internal like analytics) is ONE root command: `npm run prepare --workspaces --if-present`. Bare `npm run prepare` fails (no root script); never loop per-package.
 - In a brand's website target, `omega dev --local` links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per target.
@@ -89,27 +156,15 @@ The in-repo brands and the playground project are test-only forever; nothing in 
   - A consumer session asks first: it surfaces the proposed framework change and waits for Ian's go (or files an issue), never editing the monorepo unprompted.
   - The rule (and its "within reason" line) lives in [docs/shared/local-dev.md](docs/shared/local-dev.md) and ships to brand sessions via the brand guide.
 - Tests run in lanes: `npm run test:packages` (unit), then corpus/e2e/verts/auth/journey — the full pipeline and when each lane gates is in [docs/shared/testing.md](docs/shared/testing.md).
-
-## CLI bins
-
 Every framework AND `@omega.js/manager` ship `omega` + `omg` + `mgr` — all are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`).
-
 - The nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct.
 - No target context (fresh dir) → falls back to the HOST package's CLI with a stderr note, which keeps a verb run in a fresh directory on the host CLI — and with the manager as host, keeps `npx omega onboard` working in a fresh brand-template clone ([#276](https://github.com/Omega-JS-Stack/omega/issues/276)).
 - `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
-
-## Config: omega.json5
-
 Single config format everywhere: shared sections (brand, cloud, analytics, payment, sentry, oauth2, theme) + a `targets` object (key presence = target enabled; any shared key inside a target entry overrides it). Owned by `@omega.js/config`.
-
 - Merge chain: `defaults ← company ← brand shared ← brand targets.<type> ← local shared ← local targets.<type>`.
 - Secrets stay in `.env` — the validator hard-fails secret-shaped keys in config.
 - **No dual-read (Ian's call, 2026-07-06)**: frameworks flip to omega.json5 outright; legacy brands convert once via the mapping tables. Full reference: [docs/shared/config.md](docs/shared/config.md).
-
-## Docs index
-
 `docs/shared/` — cross-framework contracts:
-
 - [config.md](docs/shared/config.md) — the omega.json5 schema, merge chain, legacy mapping tables
 - [local-dev.md](docs/shared/local-dev.md) — local linking + watch mechanics
 - [testing.md](docs/shared/testing.md) — the tiered verification pipeline (unit → corpus → e2e → verts → journey)
@@ -126,12 +181,7 @@ Single config format everywhere: shared sections (brand, cloud, analytics, payme
 - [breaking-changes.md](docs/shared/breaking-changes.md) — the legacy→OMEGA breaking-changes register: what changed shape, and the by-hand migration step for each
 - [brands.md](docs/shared/brands.md) — brand topology, history, the local era
 - [rulings.md](docs/shared/rulings.md) — standing rulings from the retired board era
-
 `docs/<framework>/` — each framework's guide (`index.md`) plus its deep docs. Web carries the extra set:
-
 - [sections.md](docs/web/sections.md) (the sections & components contract), [omega-sections-spec.md](docs/web/omega-sections-spec.md) (the ratified architecture spec), [template-kit.md](docs/web/template-kit.md)
 - [libs.md](docs/web/libs.md) (the `core/js/libs/` inventory and the `__main_assets__` import idiom), [classy-v2/DIRECTION.md](docs/web/classy-v2/DIRECTION.md) (the locked visual spec), [ads-system.md](docs/web/ads-system.md) (the ratified vert/ads architecture)
-
-## Project state
-
 Live work is GitHub issues (project-state spec v4): the queue is a query (`gh issue list`), status labels carry state, and a spec is the `## Spec` section of its issue — never a file. The retired board era's plan files are history in `_attic/plans/` (on disk, out of git); its durable rulings live in [docs/shared/rulings.md](docs/shared/rulings.md).

@@ -43,6 +43,25 @@ const MANAGER = '@omega.js/manager';
 // the canonical list ([#307](https://github.com/Omega-JS-Stack/omega/issues/307)).
 const TARGET_SUBDIRS = ['functions', 'dist'];
 
+// The only verbs allowed to run with NO target context. The fallback exists for
+// the bootstrap case (`npx omega onboard` in a fresh clone, #276) and for verbs
+// that only READ; every other verb runs its target scaffold first (#675), so a
+// run in a directory that owns no target WRITES one there — that is how a stray
+// `omega deploy` at a workspace root scaffolded a whole desktop target into it
+// ([#699](https://github.com/Omega-JS-Stack/omega/issues/699)).
+//
+// Tokens, not command names: a flag-style alias (`omega --deploy`, `omega -v`)
+// selects a verb too, so every spelling of an allowed verb is listed —
+// onboard/help/version across the router frameworks and the manager, plus
+// backend's `cwd` and desktop's `logs`, the two read-only reporters.
+const CONTEXTLESS_VERBS = new Set([
+  'onboard', 'create', 'new', '-o', '--onboard',
+  'help', 'h', '-h', '--help',
+  'version', 'v', '-v', '--version',
+  'cwd',
+  'logs', 'log', '--logs', 'logs:read', 'logs:tail', 'logs:stream',
+]);
+
 function readPackage(dir) {
   try {
     return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
@@ -144,7 +163,22 @@ function resolveCli(name, fromDir, hint) {
   return cliPath;
 }
 
-async function run({ hostName, hostRun }) {
+/**
+ * The verb an invocation resolves to, as far as the dispatcher can see it: the
+ * frameworks' own resolution rules minus their per-framework alias tables.
+ * `--help`/`-h` wins outright (cli-router routes it ahead of positionals, so
+ * `omega deploy --help` prints help), then the first positional token, then the
+ * first flag-style alias. A bare `omega` has no verb — every CLI defaults to help.
+ *
+ * @param {string[]} argv - Arguments after the bin name.
+ * @returns {string|null} The selecting token, or null for a bare invocation.
+ */
+function verbOf(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) return 'help';
+  return argv.find((arg) => !arg.startsWith('-')) || argv[0] || null;
+}
+
+async function run({ hostName, hostRun, argv = process.argv.slice(2) }) {
   const target = findTarget(process.cwd());
 
   // No context — the bootstrap case (a verb run in a fresh directory has
@@ -152,6 +186,17 @@ async function run({ hostName, hostRun }) {
   // like the pre-dispatcher bins did, and say which one so a hoist-winner at a
   // brand root is never a silent mystery.
   if (!target) {
+    // …but ONLY for a verb that cannot write. The fallback hands a mutating verb
+    // to whichever framework won npm's bin link, and that verb scaffolds its own
+    // target into the cwd — a directory that owns no target is never where that
+    // should land (#699). Twin of ensure-target's refusal (devkit scaffold-guard.js).
+    const verb = verbOf(argv);
+    if (verb && !CONTEXTLESS_VERBS.has(verb)) {
+      console.error(`omega: refusing to run "${verb}" — ${process.cwd()} is not inside an OMEGA target (no framework dependency and no config/omega.json5 above it). Nothing was scaffolded.`);
+      console.error('Run it from a target directory, or `npx omega onboard` to create one here. Without a target, only onboard, help, version, cwd and logs run.');
+      process.exit(1);
+    }
+
     console.error(`omega: no target context found from ${process.cwd()} — running ${hostName}`);
     return hostRun();
   }
@@ -193,4 +238,4 @@ async function run({ hostName, hostRun }) {
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, TARGET_SUBDIRS, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, isBrandRoot, verbOf, TARGET_SUBDIRS, CONTEXTLESS_VERBS, FRAMEWORKS, MANAGER };

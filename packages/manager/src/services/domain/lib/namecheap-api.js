@@ -8,6 +8,32 @@
 
 const API_BASE = 'https://api.namecheap.com/xml.response';
 
+/**
+ * The Namecheap API access page — enabling the API, resetting the key and the
+ * IP whitelist all live on this ONE page, which is why every rejection in that
+ * family opens the root and never a deep link (#698, Ian 2026-08-30).
+ */
+const API_ACCESS_URL = 'https://ap.www.namecheap.com/settings/tools/apiaccess/';
+
+// Namecheap refuses a caller whose IP is not whitelisted with the API-access
+// error family — the same numbers a disabled API or a stale key answer with,
+// and all three are fixed on the page above.
+const API_ACCESS_ERROR_CODES = new Set(['1011102', '1011150']);
+const API_ACCESS_ERROR_TEXT = /whitelist|api access has not been enabled|invalid request ip/i;
+
+/**
+ * Whether a thrown API error is the IP-whitelist rejection — the walkthrough's
+ * trigger. Reads the error Number the client parses off the <Error> element,
+ * with the message as the second signal.
+ *
+ * @param {Error} error - An error thrown by makeRequest
+ * @returns {boolean}
+ */
+function isWhitelistError(error) {
+  return API_ACCESS_ERROR_CODES.has(error?.namecheapCode)
+    || API_ACCESS_ERROR_TEXT.test(error?.message || '');
+}
+
 class NamecheapAPI {
   constructor(options = {}) {
     this.username = options.username || process.env.NAMECHEAP_USERNAME;
@@ -46,8 +72,17 @@ class NamecheapAPI {
 
     const status = xml.match(/Status="(\w+)"/)?.[1];
     if (status !== 'OK') {
-      const errorMsg = xml.match(/<Error[^>]*>(.*?)<\/Error>/)?.[1] || 'Unknown error';
-      throw new Error(`Namecheap API error: ${errorMsg}`);
+      // Namecheap nests the elements (<Errors><Error Number="…">msg</Error>),
+      // so the attribute group must be optional-but-space-led — otherwise the
+      // wrapper matches first and the message carries the inner tag with it.
+      const failure = xml.match(/<Error(\s[^>]*)?>(.*?)<\/Error>/);
+      const error = new Error(`Namecheap API error: ${failure?.[2] || 'Unknown error'}`);
+      // The whitelist walkthrough (#698) needs both: WHICH rejection this is,
+      // and the IP to add — the XML never echoes it, so the client that sent
+      // it is the only source.
+      error.namecheapCode = failure?.[1]?.match(/Number="(\d+)"/)?.[1] || null;
+      error.clientIp = clientIp;
+      throw error;
     }
 
     return xml;
@@ -129,4 +164,4 @@ class NamecheapAPI {
   }
 }
 
-module.exports = { NamecheapAPI };
+module.exports = { NamecheapAPI, API_ACCESS_URL, isWhitelistError };

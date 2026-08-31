@@ -1,8 +1,9 @@
 /**
- * SendGrid service tests — all 7 operations against method-level recording
+ * SendGrid service tests — all 8 operations against method-level recording
  * fakes (SendGrid + Cloudflare). Proves skip semantics, the converged
  * zero-mutation no-op, the one-pass domain-auth flow (create → DNS diff-sync
- * → validate once), sender recreation + the de-ITW'd address requirement,
+ * → validate once), the link-branding flow (create → write both link CNAMEs →
+ * validate → flip the emailurl CNAME proxied), sender recreation + the de-ITW'd address requirement,
  * list resolution through config/state/name/create, unsubscribe groups
  * matched by name with their ids written to config, SSOT-driven field and
  * segment reconciliation (type recreate, stale PATCH + fallback, __temp_
@@ -50,6 +51,22 @@ const DNS_FIXTURE = {
   dkim2: { type: 'cname', host: `s2._domainkey.${DOMAIN}`, data: 's2.domainkey.u123.wl001.sendgrid.net' },
 };
 
+// Link branding (#693): the `emailurl.<domain>` host, and SendGrid's validate
+// answer for it — a top-level `valid`, the same field the list read reports.
+const LINK_SUBDOMAIN = 'emailurl';
+const LINK_HOST = `${LINK_SUBDOMAIN}.${DOMAIN}`;
+const LINK_OWNER_HOST = `123.${DOMAIN}`;
+const LINK_DNS_FIXTURE = {
+  domain_cname: { host: LINK_HOST, data: 'sendgrid.net', type: 'cname' },
+  owner_cname: { host: LINK_OWNER_HOST, data: 'sendgrid.net', type: 'cname' },
+};
+const LINK_VALIDATION_OK = { id: 333, valid: true };
+const LINK_VALIDATION_PENDING = { id: 333, valid: false, validation_results: { domain_cname: { valid: false } } };
+
+// The unproxied emailurl CNAME the edge service already wrote this run — the
+// record the flip patches.
+const EMAILURL_RECORD = { id: 'rec-url', type: 'CNAME', name: LINK_HOST, content: 'sendgrid.net', proxied: false, comment: 'SendGrid URL tracking' };
+
 const VALIDATION_OK = { validation_results: { mail_cname: { valid: true }, dkim1: { valid: true }, dkim2: { valid: true } } };
 const VALIDATION_PENDING = { validation_results: { mail_cname: { valid: false }, dkim1: { valid: true }, dkim2: { valid: true } } };
 
@@ -77,12 +94,13 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
 }
 
 const READ_METHODS = [
-  'getAuthenticatedDomains', 'getVerifiedSenders', 'getLists', 'getListByName',
+  'getAuthenticatedDomains', 'getBrandedLinks', 'getVerifiedSenders', 'getLists', 'getListByName',
   'getList', 'getUnsubscribeGroups', 'getCustomFields', 'getSegments', 'getSegment',
   'getEventWebhookSettings',
 ];
 const MUTATING_METHODS = [
-  'authenticateDomain', 'validateDomain', 'createVerifiedSender', 'deleteVerifiedSender',
+  'authenticateDomain', 'validateDomain', 'createBrandedLink', 'validateBrandedLink',
+  'createVerifiedSender', 'deleteVerifiedSender',
   'createList', 'createUnsubscribeGroup', 'createCustomField', 'deleteCustomField',
   'createSegment', 'updateSegment', 'deleteSegment', 'updateEventWebhookSettings',
 ];
@@ -107,9 +125,17 @@ function fakeSendgrid(responses = {}) {
   return api;
 }
 
-/** Recording fake Cloudflare client (zone lookup + raw DNS record requests). */
+/**
+ * Recording fake Cloudflare client (zone lookup + raw DNS record requests).
+ *
+ * The zone is STATEFUL: a created record is visible to the next read, which is
+ * what the link-branding flow depends on — it writes the branded-link CNAMEs
+ * and then has to find one of them again to flip it proxied (#693).
+ */
 function fakeCf({ zone = { id: 'zone-1', name: DOMAIN }, records = [] } = {}) {
   const api = { requests: [] };
+  const zoneRecords = structuredClone(records);
+  let nextId = 1;
 
   api.getZoneByName = async (name) => {
     api.requests.push({ method: 'getZoneByName', name });
@@ -118,10 +144,21 @@ function fakeCf({ zone = { id: 'zone-1', name: DOMAIN }, records = [] } = {}) {
 
   api.makeRequest = async (path, options = {}) => {
     const method = options.method || 'GET';
-    api.requests.push({ method, path, body: options.body ? JSON.parse(options.body) : undefined });
+    const body = options.body ? JSON.parse(options.body) : undefined;
+    api.requests.push({ method, path, body });
+
     if (method === 'GET') {
-      return { result: structuredClone(records) };
+      return { result: structuredClone(zoneRecords) };
     }
+
+    if (method === 'POST') {
+      zoneRecords.push({ id: `new-${nextId++}`, ...body });
+    } else if (method === 'PATCH') {
+      const id = path.split('/').pop();
+      const existing = zoneRecords.find((r) => r.id === id);
+      if (existing) Object.assign(existing, body);
+    }
+
     return { result: {} };
   };
 
@@ -133,6 +170,7 @@ function fakeCf({ zone = { id: 'zone-1', name: DOMAIN }, records = [] } = {}) {
 function convergedResponses() {
   return {
     getAuthenticatedDomains: [{ id: 111, domain: DOMAIN, valid: true }],
+    getBrandedLinks: [{ id: 333, domain: DOMAIN, subdomain: LINK_SUBDOMAIN, valid: true }],
     getVerifiedSenders: [{ id: 222, from_email: FROM_EMAIL, verified: true }],
     getList: { id: 'lst_1', name: BRAND_NAME },
     getListByName: { id: 'lst_1', name: BRAND_NAME },
@@ -330,6 +368,154 @@ test('campaigns: no Cloudflare token → manual records + validation still attem
   assert.equal(api.callsTo('validateDomain').length, 1);
   assert.equal(result.output.domainAuth.manualRecords.length, 3);
   assert.equal(result.output.domainAuth.manualRecords[0].name, `emailauth.${DOMAIN}`);
+});
+
+// ─── link-branding (#693) ────────────────────────────────────────────────────
+
+// Run 1 on a fresh brand: the edge service wrote NO SendGrid records (its live
+// domain-auth read found nothing yet), so this operation owns both link CNAMEs
+// — and they must land BEFORE SendGrid is asked to validate them.
+test('campaigns: a fresh brand gets both link CNAMEs written, then validated, then proxied', async () => {
+  const cf = fakeCf(); // empty zone — nothing wrote the emailurl record yet
+  let writesAtValidation = null;
+
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getBrandedLinks: [],
+    createBrandedLink: { id: 333, domain: DOMAIN, subdomain: LINK_SUBDOMAIN, valid: false, dns: LINK_DNS_FIXTURE },
+    validateBrandedLink: () => {
+      writesAtValidation = cf.writes().length;
+      return structuredClone(LINK_VALIDATION_OK);
+    },
+  });
+
+  const result = await runService(brandConfig(), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(api.callsTo('createBrandedLink')[0].args, [DOMAIN, LINK_SUBDOMAIN]);
+  assert.equal(writesAtValidation, 2, 'both CNAMEs land BEFORE SendGrid is asked to validate');
+
+  const writes = cf.writes();
+  assert.equal(writes.length, 3);
+  assert.deepEqual(writes[0], {
+    method: 'POST',
+    path: '/zones/zone-1/dns_records',
+    body: { type: 'CNAME', name: LINK_HOST, content: 'sendgrid.net', ttl: 1, proxied: false, comment: 'SendGrid domain_cname' },
+  });
+  assert.deepEqual(writes[1].body, { type: 'CNAME', name: LINK_OWNER_HOST, content: 'sendgrid.net', ttl: 1, proxied: false, comment: 'SendGrid owner_cname' });
+  assert.equal(writes[2].method, 'PATCH', 'and only then does the record ride the proxy');
+  assert.equal(writes[2].body.name, LINK_HOST);
+  assert.equal(writes[2].body.proxied, true);
+  assert.deepEqual(result.output.linkBranding, { id: 333, valid: true, proxied: true });
+});
+
+test('campaigns: missing link branding is created and validated once — pending warns', async () => {
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getBrandedLinks: [],
+    createBrandedLink: { id: 333, domain: DOMAIN, subdomain: LINK_SUBDOMAIN, valid: false, dns: LINK_DNS_FIXTURE },
+    validateBrandedLink: LINK_VALIDATION_PENDING,
+  });
+  // The emailurl CNAME the edge service already wrote this run, grey
+  const cf = fakeCf({ records: [EMAILURL_RECORD] });
+
+  const result = await runService(brandConfig(), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'warned');
+  assert.deepEqual(api.callsTo('createBrandedLink')[0].args, [DOMAIN, LINK_SUBDOMAIN]);
+  assert.equal(api.callsTo('validateBrandedLink').length, 1); // ONCE — no poll loop
+  assert.equal(result.output.linkBranding.valid, false);
+
+  const writes = cf.writes();
+  assert.equal(writes.length, 1, 'the matching emailurl record is left alone; only the owner CNAME is missing');
+  assert.equal(writes[0].body.name, LINK_OWNER_HOST);
+  assert.ok(!writes.some((w) => w.method === 'PATCH'), 'nothing is proxied until SendGrid validates');
+});
+
+test('campaigns: link branding that already validated is a read-only converge that still flips a grey record', async () => {
+  const api = fakeSendgrid(convergedResponses());
+  const cf = fakeCf({ records: [EMAILURL_RECORD] });
+
+  const result = await runService(brandConfig(), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.equal(api.callsTo('createBrandedLink').length, 0);
+  assert.equal(api.callsTo('validateBrandedLink').length, 0);
+  assert.deepEqual(result.output.linkBranding, { id: 333, valid: true });
+
+  // A validated branding whose record is still grey costs no extra walk
+  assert.deepEqual(cf.writes(), [{
+    method: 'PATCH',
+    path: '/zones/zone-1/dns_records/rec-url',
+    body: { type: 'CNAME', name: LINK_HOST, content: 'sendgrid.net', ttl: 1, proxied: true, comment: 'SendGrid URL tracking' },
+  }]);
+});
+
+test('campaigns: an interactive run waits for validation, then flips the emailurl CNAME proxied', async () => {
+  let validations = 0;
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getBrandedLinks: [{ id: 333, domain: DOMAIN, subdomain: LINK_SUBDOMAIN, valid: false, dns: LINK_DNS_FIXTURE }],
+    validateBrandedLink: () => {
+      validations++;
+      return structuredClone(validations === 1 ? LINK_VALIDATION_PENDING : LINK_VALIDATION_OK);
+    },
+  });
+  const cf = fakeCf({ records: [EMAILURL_RECORD] });
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await runService(brandConfig(), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+    assert.equal(result.status, 'success');
+    assert.equal(api.callsTo('createBrandedLink').length, 0); // reused, not recreated
+    assert.equal(validations, 2); // initial attempt + the poll's first re-check
+    assert.deepEqual(result.output.linkBranding, { id: 333, valid: true, proxied: true });
+
+    const writes = cf.writes();
+    assert.equal(writes[0].body.name, LINK_OWNER_HOST); // the missing half of the record set
+    assert.deepEqual(writes[1], {
+      method: 'PATCH',
+      path: '/zones/zone-1/dns_records/rec-url',
+      body: { type: 'CNAME', name: LINK_HOST, content: 'sendgrid.net', ttl: 1, proxied: true, comment: 'SendGrid URL tracking' },
+    });
+  } finally {
+    tty.close();
+  }
+});
+
+test('campaigns: no Cloudflare token → the validated branding warns with the manual flip', async () => {
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getBrandedLinks: [{ id: 333, domain: DOMAIN, subdomain: LINK_SUBDOMAIN, valid: false, dns: LINK_DNS_FIXTURE }],
+    validateBrandedLink: LINK_VALIDATION_OK,
+  });
+
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'warned');
+  assert.deepEqual(result.output.linkBranding, { id: 333, valid: true, proxied: false });
+});
+
+// A subdomain brand's apex records belong to the PARENT brand's walk — the
+// same line the edge service draws — so a branding created here would wait on
+// CNAMEs this brand never writes.
+test('campaigns: a subdomain project leaves link branding to the parent brand', async () => {
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getAuthenticatedDomains: [],
+    authenticateDomain: { id: 112, domain: `app.${DOMAIN}`, dns: DNS_FIXTURE },
+    validateDomain: VALIDATION_OK,
+  });
+  const cf = fakeCf();
+
+  // parent: null keeps the run to the operations under test — the webhook op
+  // has nothing to point at, exactly as its own test pins.
+  const result = await runService(brandConfig({ url: `https://app.${DOMAIN}`, parent: null }), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.equal(api.callsTo('getBrandedLinks').length, 0, 'the operation steps aside before it reads');
+  assert.equal(result.output.linkBranding, undefined);
 });
 
 // ─── sender-identity ─────────────────────────────────────────────────────────
@@ -736,6 +922,7 @@ test('campaigns: dry-run on a fully drifted brand performs zero mutations', asyn
   const api = fakeSendgrid({
     ...convergedResponses(),
     getAuthenticatedDomains: [],
+    getBrandedLinks: [],
     getVerifiedSenders: [],
     getListByName: () => undefined,
     getUnsubscribeGroups: [],
@@ -750,6 +937,7 @@ test('campaigns: dry-run on a fully drifted brand performs zero mutations', asyn
   assert.deepEqual(api.mutations(), []);
   assert.deepEqual(cf.writes(), []);
   assert.deepEqual(result.output.domainAuth.planned, ['authenticate-domain', 'dns-records', 'validate']);
+  assert.deepEqual(result.output.linkBranding.planned, ['brand-links', 'dns-records', 'validate', 'proxy-record']);
   assert.equal(result.output.senderIdentity.planned, 'create-sender');
   assert.equal(result.output.list.planned, 'create');
   assert.deepEqual(result.output.unsubscribeGroups.planned.create, GROUP_KEYS.map((key) => GROUP_DEFINITIONS[key].name));

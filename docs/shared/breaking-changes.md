@@ -296,9 +296,14 @@ sendgrid.net, and a proxied record answers with Cloudflare's addresses instead
 — so proxying first locks a NEW domain's branding out of ever validating. Every
 run the edge service reads `GET /v3/whitelabel/links` and only writes
 `proxied: true` when SendGrid reports that host `valid: true`; until then the
-record stays grey-clouded and the run warns, naming the record and saying to
-rerun `omega manage` once SendGrid has validated. Nothing to sequence by hand:
-validate the link in SendGrid, rerun, and the record flips.
+record stays grey-clouded and the run warns, naming the record. Nothing to
+sequence by hand: since
+[#693](https://github.com/Omega-JS-Stack/omega/issues/693) the campaigns
+service CREATES the branding when the account has none, writes both of its
+CNAMEs, waits for the validation later in the same walk, and flips that record
+to proxied itself —
+the edge service's next read agrees, because a valid branding desires a proxied
+record.
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|

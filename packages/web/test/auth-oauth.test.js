@@ -10,8 +10,9 @@
  * no result after a redirect we started is LOUD, not a silent empty form.
  *
  * Same harness convention as auth-policy.test.js: the REAL module through
- * esbuild behind the two bundler aliases, with the client and @firebase/auth
- * stubbed and window hand-rolled to the minimum the module touches.
+ * esbuild behind the two bundler aliases, with the client stubbed here, the
+ * @firebase/auth stub shared with that suite (test/lib/firebase-auth-stub.js),
+ * and window hand-rolled to the minimum the module touches.
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
@@ -19,11 +20,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { firebaseAuthStub } = require('./lib/firebase-auth-stub.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const OAUTH_ENTRY = path.join(CORE_DIR, 'js', 'libs', 'auth', 'oauth.js');
 
 const BUNDLE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-auth-oauth-')), 'oauth.cjs');
+
+const FIREBASE_AUTH_STUB = firebaseAuthStub();
 
 let building = null;
 
@@ -46,11 +50,11 @@ function bundleOnce() {
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
           return { contents: 'export default globalThis.__omegaClient;' };
         });
-        build.onResolve({ filter: /^@firebase\/auth$/ }, () => {
+        build.onResolve({ filter: FIREBASE_AUTH_STUB.filter }, () => {
           return { path: 'firebase-auth', namespace: 'firebase-auth-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'firebase-auth-stub' }, () => {
-          return { contents: 'export default globalThis.__firebaseAuth; export const getAuth = (...a) => globalThis.__firebaseAuth.getAuth(...a); export const getRedirectResult = (...a) => globalThis.__firebaseAuth.getRedirectResult(...a); export const getAdditionalUserInfo = (...a) => globalThis.__firebaseAuth.getAdditionalUserInfo(...a); export const signInWithPopup = (...a) => globalThis.__firebaseAuth.signInWithPopup(...a); export const signInWithRedirect = (...a) => globalThis.__firebaseAuth.signInWithRedirect(...a); export const signOut = (...a) => globalThis.__firebaseAuth.signOut(...a); export const GoogleAuthProvider = class {}; export const FacebookAuthProvider = class {}; export const TwitterAuthProvider = class {}; export const GithubAuthProvider = class {};' };
+          return { contents: FIREBASE_AUTH_STUB.contents };
         });
       },
     }],

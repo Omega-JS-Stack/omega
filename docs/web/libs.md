@@ -206,10 +206,11 @@ modules beside it. `auth/index.js` builds a shared context object
 needs it.
 
 The boot order is the orchestrator's whole job, and it runs inside
-`omega.dom().ready()`: handle `?authSignout`, then `?authCustomToken` (return if
-it took over, the page is navigating), then build the page's form from the
-`data-page-path` suffix, disable the fields while checking for a returning OAuth
-redirect (return if one was handled), then check the subdomain policy, call
+`omega.dom().ready()`: handle `?authSignout`, then `?authCustomToken`, then
+`?authPrivateKey` (return if either sign-in took over, the page is navigating),
+then build the page's form from the `data-page-path` suffix, disable the fields
+while checking for a returning OAuth redirect (return if one was handled), then
+check the subdomain policy, call
 `formManager.ready()`, and propagate `authReturnUrl` into the page's auth links.
 
 | Module | What it is | Key exports |
@@ -218,7 +219,7 @@ redirect (return if one was handled), then check the subdomain policy, call
 | `auth/forms.js` | FormManager wiring for the three forms (built with `autoReady: false`, since the boot sequence calls `ready()` itself), the shared validation that only checks email and password when the pressed button's `data-provider` is `email`, the provider-aware submit handler, and the signup consent UI: both checkboxes are outlined as one unit, and consent is stashed to `omega.storage()` BEFORE any Firebase call so it survives the post-signup redirect for the backend's signup route | `initializeSigninForm`, `initializeSignupForm`, `initializeResetForm` |
 | `auth/email.js` | Email and password flows. Signup falls back to signing the user in when the address is already in use; reset reports success even for an unknown address, to avoid email enumeration; and each error lands on the field it belongs to (Firebase collapses wrong-email and wrong-password into one code, so both fields get the shared message) | `handleEmailSignin`, `handleEmailSignup`, `handlePasswordReset` |
 | `auth/oauth.js` | Provider flows: redirect by default, popup only inside an iframe or with `?authPopup=true`, with a popup-to-redirect fallback on blockers. Also the returning-redirect provider (a one-shot sessionStorage marker makes a redirect that came home empty loud instead of silent) and the accidental-signup reversal: Google auto-creates an account during a signin attempt, so the reversal deletes it, signs out, and shows an inline error | `shouldUseAuthPopup`, `handleRedirectResult`, `signInWithProvider`, `reverseAccidentalSignup` |
-| `auth/session-params.js` | The URL-parameter session behaviors: `?authSignout=true` (sign out, then strip the param so reloads do not loop), `?authCustomToken=…` (admin impersonation and custom-token sign-in, which owns its own post-signin navigation), `authReturnUrl` propagation into every auth link on the page, and the apex-domain bounce when `auth.config.allowSubdomainAuth` is false | `handleAuthSignout`, `handleCustomTokenSignin`, `updateAuthReturnUrl`, `checkSubdomainAuth` |
+| `auth/session-params.js` | The URL-parameter session behaviors: `?authSignout=true` (sign out, then strip the param so reloads do not loop), `?authCustomToken=…` (admin impersonation and custom-token sign-in, which owns its own post-signin navigation), `?authPrivateKey=…` (the durable-URL lane for an OBS dock, a kiosk, or a bookmark: a custom token expires in an hour, so the key buys a fresh one at `POST /omega/user/token` on every load, is stripped from the address bar BEFORE the page moves, and is never logged, notified, or captured), `authReturnUrl` propagation into every auth link on the page, and the apex-domain bounce when `auth.config.allowSubdomainAuth` is false | `handleAuthSignout`, `handleCustomTokenSignin`, `handlePrivateKeySignin`, `updateAuthReturnUrl`, `checkSubdomainAuth` |
 | `auth/errors.js` | Pure Firebase error translation, no DOM and no form state: which codes belong on the password field, the short message for each, which codes are user-caused and therefore never worth a Sentry capture, and pulling a `@omega.js/backend` blocking-function message (rate limit, disposable email) back out of the opaque `auth/internal-error` blob | `isPasswordError`, `passwordErrorMessage`, `isUserError`, `extractBlockingFunctionMessage` |
 | `auth/tracking.js` | GA4, Facebook Pixel, and TikTok Pixel events for the three auth outcomes | `trackLogin`, `trackSignup`, `trackPasswordReset` |
 | `auth/password-toggle.js` | The password eye, registered once as the `password-toggle` click trigger on `@omega.js/client`'s shared trigger registry ([#16](https://github.com/Omega-JS-Stack/omega/issues/16)). `core/js/main.js` calls it, so it is armed on every page before any page module runs, and delegation covers input groups rendered after boot | `setupPasswordToggle` |

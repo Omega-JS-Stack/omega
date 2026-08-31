@@ -164,7 +164,7 @@ subscription: {
   trial: {
     claimed: false,                // has user EVER used a trial
     expires: { timestamp, timestampUNIX },
-    outcome: null,                 // 'converted' | 'lapsed' | null — stamped by the trial-lapse sweep, NOT by the unified transform
+    outcome: null,                 // 'converted' | 'lapsed' | null — stamped by whichever path sees the trial end, NOT by the unified transform
   },
   cancellation: {
     pending: false,                // true = cancel at period end
@@ -185,7 +185,7 @@ subscription: {
 }
 ```
 
-`trial.claimed` says only that a trial **happened** — a converted trial and a lapsed one carry identical dates — so `trial.outcome` is the one stored conversion signal. It is additive: the provider libraries never produce it (the unified transform's `trial` carries `claimed` + `expires` only, and the user-doc write is a merge), the trial-lapse sweep stamps it once the provider confirms which it was ([Payment Cron Jobs](#payment-cron-jobs)), and it is mirrored in the `@omega.js/account` user schema.
+`trial.claimed` says only that a trial **happened** — a converted trial and a lapsed one carry identical dates — so `trial.outcome` is the one stored conversion signal. It is additive: the provider libraries never produce it (the unified transform's `trial` carries `claimed` + `expires` only, and the user-doc write is a merge), and it is mirrored in the `@omega.js/account` user schema. Whichever path sees the trial end stamps it: the webhook pipeline writes `converted` on the charge it books as the conversion ([Subscription Transitions](#subscription-transitions)), and the trial-lapse sweep stamps whatever the provider confirms when no webhook ever comes ([Payment Cron Jobs](#payment-cron-jobs)).
 
 ## Access Check Patterns
 
@@ -295,6 +295,8 @@ Two transitions are deliberately log-only:
 **The cancelled payload's own evidence overrules the record on file.** The prior state is a stored delivery like any other, so a degraded one carries no term and reads as a long-past trial; a cancellation whose payload names a term reaching past the trial's end is a subscriber who paid, whatever the record lost. Neither the lapse nor the silence above applies then. Both rules read `before` from the user doc, so a cancellation with no prior subscription at all books plain churn.
 
 Which leaves `subscription_cancel` for the cancellations a trial does not explain: a subscriber who left their trial behind, and one who never had a trial at all. It is no longer where a never-paid trialist lands.
+
+**A conversion does not depend on which webhook arrives first** ([#697](https://github.com/Omega-JS-Stack/omega/issues/697)). The first real charge after a trial has no transition at all — it is a payment event, exactly like a renewal — and what tells the two apart used to be the stored doc's in-trial-ness at charge time. That is not a signal: Stripe delivered `customer.subscription.updated` (trial over, term pushed out) a full hour before `invoice.payment_succeeded`, so the doc had already left the trial by charge time and the conversion booked as month two. The two webhooks race in real time, so an arbitrary share of conversions mislabeled — revenue stayed right (both ride the same charge-keyed purchase), the funnel's most valuable step did not. So the label reads two DURABLE facts instead, and both read the same whichever webhook lands first: the subscription ever claimed a trial (`trial.claimed`, true for its whole life), and its trial has no `trial.outcome` on record yet. The charge that converts stamps `converted` in the same batch that writes the subscription, which is what makes the next charge an ordinary renewal — state, not reporting, so it is written whether or not the analytics fire ran, and `isTrialConversion()` is the one predicate the label and the write both read. Its limit: a subscription that converted before the stamp existed carries none, so its next renewal books one conversion.
 
 `subscription-winback` sends the customer the same order confirmation a first subscription does — same template, same computed totals — by calling `new-subscription.js` rather than keeping a second copy of it. Analytics fires a **purchase** (`reason: 'winback-purchase'`, non-recurring, at what the customer actually paid) instead of the renewal the payment event would otherwise have been read as.
 
@@ -687,7 +689,7 @@ No email is sent from here — the sweep is state correction.
 
 **Why the sweep reports at all.** For PayPal this is the ONLY place a trial's outcome is ever known: PayPal fires no trial-end event, so the webhook pipeline is never told and the trial funnel had no signal whatsoever ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)).
 
-**And why it cannot double-count.** The guard is the term: a conversion the payment webhook already saw moved `expires` out past the trial's end, and a lapse it saw left the subscription suspended or cancelled, which this sweep's `status == active` query never selects. So a candidate still inside its trial is exactly one no webhook resolved, and it is the only one the sweep reports — the outcome is still STAMPED either way, because that is state correction. Both paths key the event id on the subscription (`trial_convert.<resourceId>`), which collapses a genuine race on the two platforms that key on an event id; the term guard is what keeps GA4 honest, since GA4 deduplicates a `purchase` on `transaction_id` and the two paths cannot name the same one — the webhook has the invoice, this sweep has only the subscription ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
+**And why it cannot double-count.** The guard is the term: a conversion the payment webhook already saw moved `expires` out past the trial's end — and stamps `trial.outcome` besides, which the sweep skips outright one step before the term guard ([#697](https://github.com/Omega-JS-Stack/omega/issues/697)) — while a lapse it saw left the subscription suspended or cancelled, which this sweep's `status == active` query never selects. So a candidate still inside its trial is exactly one no webhook resolved, and it is the only one the sweep reports — the outcome is still STAMPED either way, because that is state correction. Both paths key the event id on the subscription (`trial_convert.<resourceId>`), which collapses a genuine race on the two platforms that key on an event id; the term guard is what keeps GA4 honest, since GA4 deduplicates a `purchase` on `transaction_id` and the two paths cannot name the same one — the webhook has the invoice, this sweep has only the subscription ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
 
 The candidate query needs a composite index on `users`, registered in `src/cli/commands/setup-tests/helpers/required-indexes.js` (the SSOT for required indexes).
 

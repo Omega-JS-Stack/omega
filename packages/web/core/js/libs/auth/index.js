@@ -5,7 +5,7 @@
 //   forms.js           FormManager wiring, validation, consent UI
 //   email.js           email/password signin, signup, reset
 //   oauth.js           provider popup/redirect flows + accidental-signup reversal
-//   session-params.js  ?authSignout / ?authCustomToken / authReturnUrl / subdomain policy
+//   session-params.js  ?authSignout / ?authCustomToken / ?authPrivateKey / authReturnUrl / subdomain policy
 //   errors.js          Firebase error translation (pure)
 //   tracking.js        GA4/FB/TikTok auth events
 //
@@ -16,7 +16,7 @@
 import omega from '@omega.js/client';
 import { initializeSigninForm, initializeSignupForm, initializeResetForm } from '__main_assets__/js/libs/auth/forms.js';
 import { handleRedirectResult, shouldUseAuthPopup } from '__main_assets__/js/libs/auth/oauth.js';
-import { handleAuthSignout, handleCustomTokenSignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
+import { handleAuthSignout, handleCustomTokenSignin, handlePrivateKeySignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 /* @dev-only:start */
@@ -61,6 +61,12 @@ export default function () {
     // Check for authCustomToken parameter (admin impersonation / custom token sign-in)
     const customTokenHandled = await handleCustomTokenSignin();
     if (customTokenHandled) {
+      return;
+    }
+
+    // Check for authPrivateKey parameter (durable-url sign-in: OBS docks, kiosks)
+    const privateKeyHandled = await handlePrivateKeySignin();
+    if (privateKeyHandled) {
       return;
     }
 

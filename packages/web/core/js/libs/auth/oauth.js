@@ -152,16 +152,21 @@ export async function handleRedirectResult(ctx) {
   }
   /* @dev-only:end */
 
-  if (!simulateRedirect) {
-    const { getAuth, getRedirectResult, getAdditionalUserInfo } = await import('@firebase/auth');
-    const auth = getAuth();
-    result = await getRedirectResult(auth);
-    if (result?.user) {
-      additionalUserInfo = getAdditionalUserInfo(result);
-    }
-  }
-
   try {
+    // INSIDE the try: getRedirectResult is the call that rejects when the
+    // server refused the signup (a blocking-function rate limit comes back as
+    // a 503 / `auth/error-code:-47`). Resolved outside, that rejection escaped
+    // past the caller's un-caught await and the person was left with a form
+    // disabled behind spinners and no message at all (#701).
+    if (!simulateRedirect) {
+      const { getAuth, getRedirectResult, getAdditionalUserInfo } = await import('@firebase/auth');
+      const auth = getAuth();
+      result = await getRedirectResult(auth);
+      if (result?.user) {
+        additionalUserInfo = getAdditionalUserInfo(result);
+      }
+    }
+
     /* @dev-only:start */
     if (simulateRedirect === 'error') {
       const fakeError = new Error('Simulated: An account already exists with different credentials');

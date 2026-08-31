@@ -90,6 +90,43 @@ function runService(config, api, options = {}) {
   });
 }
 
+/**
+ * SendGrid's live answer for `GET /v3/whitelabel/domains`: the domain-auth
+ * record set, whose `mail_cname` data is the `u<id>.<whitelabel>` host every
+ * SendGrid record is built from (#692).
+ */
+const SENDGRID_DOMAINS = [{
+  id: 7,
+  domain: DOMAIN,
+  valid: true,
+  dns: {
+    mail_cname: { host: `emailauth.${DOMAIN}`, data: 'u123.wl001.sendgrid.net', type: 'cname', valid: true },
+    dkim1: { host: `s1._domainkey.${DOMAIN}`, data: 's1.domainkey.u123.wl001.sendgrid.net' },
+    dkim2: { host: `s2._domainkey.${DOMAIN}`, data: 's2.domainkey.u123.wl001.sendgrid.net' },
+  },
+}];
+
+/** Fake SendGrid client — the two reads dns-records makes. */
+function fakeSendgrid({ domains = SENDGRID_DOMAINS, links = [] } = {}) {
+  return {
+    getAuthenticatedDomains: async () => (typeof domains === 'function' ? domains() : domains),
+    getBrandedLinks: async () => (typeof links === 'function' ? links() : links),
+  };
+}
+
+/** Run fn with console.log captured; returns the joined lines. */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines.join('\n');
+}
+
 // Direct-handler context (bypasses setup — for focused per-operation tests)
 function handlerContext(config, api, extra = {}) {
   return {
@@ -360,8 +397,8 @@ test('zone: a zone created this run is visible to later operations via serviceDa
 
 // ─── DNS records ─────────────────────────────────────────────────────────────
 
-test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC reports) are config-gated', () => {
-  // Default config: no BIMI, no SendGrid, DMARC without report addresses
+test('dns helpers: platform records only — company extras (BIMI/DMARC reports) are config-gated', () => {
+  // Default config: no BIMI, no SendGrid block, DMARC without report addresses
   const defaults = buildRequiredRecords(DOMAIN, brandConfig().edge.providers.cloudflare.dns, false, null);
   const names = defaults.map((r) => r.name);
   assert.ok(!names.some((n) => n.includes('_bimi')));
@@ -376,6 +413,8 @@ test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC
     spfIncludes: ['_spf.google.com'],
     dmarcReports: { rua: ['dmarc@corp.test'], ruf: ['forensics@corp.test'] },
     bimiLogo: 'https://cdn.corp.test/logo.svg',
+    // NOT config (#692): diffRecords folds this block in from the live
+    // `GET /v3/whitelabel/domains` read before calling the builder
     sendgrid: { id: '123', whitelabel: 'wl001' },
     records: [{ type: 'TXT', name: '@', content: '"ahrefs-x"', comment: 'Ahrefs domain verification' }],
   }, false, 'privateemail');
@@ -391,7 +430,7 @@ test('dns helpers: platform records only — company extras (BIMI/SendGrid/DMARC
   // #646: the branded LINK host is the one SendGrid record that rides the proxy
   // — and only once SendGrid says the branding is VALID (the flip's own test
   // below). Unvalidated, it stays grey-clouded like every other SendGrid record.
-  assert.equal(byName(`emailurl.${DOMAIN}`).proxied, false, 'no validity in the config block, no proxy');
+  assert.equal(byName(`emailurl.${DOMAIN}`).proxied, false, 'no validity in the block, no proxy');
   assert.equal(byName(`emailauth.${DOMAIN}`).proxied, false);
   assert.equal(byName(`123.${DOMAIN}`).proxied, false);
   assert.equal(byName(`s1._domainkey.${DOMAIN}`).proxied, false);
@@ -426,18 +465,13 @@ test('dns-records: the emailurl record follows SendGrid\'s link-branding validit
   const ensureDns = require('../src/services/edge/ensure/dns-records.js');
 
   const run = async (links) => {
-    const config = brandConfig();
-    config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
-
     const api = fakeApi({
       responses: {
         'GET /zones/zone-1/dns_records': [],
         'POST /zones/zone-1/dns_records': { id: 'new' },
       },
     });
-    await ensureDns(handlerContext(config, api, {
-      sendgridApi: { getBrandedLinks: async () => links },
-    }));
+    await ensureDns(handlerContext(brandConfig(), api, { sendgridApi: fakeSendgrid({ links }) }));
 
     return api.calls.find((c) => c.method === 'POST' && c.body.name === `emailurl.${DOMAIN}`);
   };
@@ -450,6 +484,147 @@ test('dns-records: the emailurl record follows SendGrid\'s link-branding validit
 
   const absent = await run([{ domain: 'other-brand.test', subdomain: 'emailurl', valid: true }]);
   assert.equal(absent.body.proxied, false, 'another brand\'s branding says nothing about this one');
+});
+
+// #692: the SendGrid record set is SendGrid's own observed fact about the
+// domain — read live per run, never a config copy. omega-brand proved the copy
+// wrong on 2026-08-30: domain auth passed, no `dns.sendgrid` existed, and the
+// walk silently desired NO SendGrid records at all.
+test('dns-records: the SendGrid records are built from the live domain-auth read (#692)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/dns_records': [],
+      'POST /zones/zone-1/dns_records': { id: 'new' },
+    },
+  });
+  await ensureDns(handlerContext(brandConfig(), api, {
+    sendgridApi: fakeSendgrid({ links: [{ domain: DOMAIN, subdomain: 'emailurl', valid: true }] }),
+  }));
+
+  const created = (name) => api.calls.find((c) => c.method === 'POST' && c.body.name === name);
+  // Every record derives from mail_cname's u<id>.<whitelabel> host
+  assert.equal(created(`emailauth.${DOMAIN}`).body.content, 'u123.wl001.sendgrid.net');
+  assert.equal(created(`123.${DOMAIN}`).body.content, 'sendgrid.net', 'the owner CNAME is named for the id');
+  assert.equal(created(`s1._domainkey.${DOMAIN}`).body.content, 's1.domainkey.u123.wl001.sendgrid.net');
+  assert.equal(created(`s2._domainkey.${DOMAIN}`).body.content, 's2.domainkey.u123.wl001.sendgrid.net');
+  assert.equal(created(`emailurl.${DOMAIN}`).body.proxied, true, 'links reported valid — the branded link rides the proxy');
+});
+
+// #692: no answer is a LOUD skip. Silence was the bug — `emailurl.<domain>`
+// never existed, so the #646 proxy-once-valid flip could never engage.
+test('dns-records: an unanswered SendGrid read skips the SendGrid records and says why (#692)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+
+  const run = async (extra) => {
+    const api = fakeApi({
+      responses: {
+        'GET /zones/zone-1/dns_records': [],
+        'POST /zones/zone-1/dns_records': { id: 'new' },
+      },
+    });
+    const logs = await captureLogAsync(() => ensureDns(handlerContext(brandConfig(), api, extra)));
+    const sendgridRecords = api.calls.filter((c) =>
+      c.method === 'POST' && /^(emailauth|emailurl|123|s[12]\._domainkey)\./.test(c.body.name),
+    );
+    return { logs, sendgridRecords, api };
+  };
+
+  // No SENDGRID_API_KEY (deleted for this file) and no injected client
+  const noKey = await run({});
+  assert.equal(noKey.sendgridRecords.length, 0, 'nothing to build the host from');
+  assert.match(noKey.logs, /SendGrid records skipped — no /);
+  assert.match(noKey.logs, /SENDGRID_API_KEY/);
+  assert.ok(noKey.api.calls.some((c) => c.method === 'POST' && c.body.name === DOMAIN), 'the platform records still land');
+
+  // The account authenticates other domains, but not this brand's
+  const noDomain = await run({
+    sendgridApi: fakeSendgrid({ domains: [{ domain: 'other-brand.test', dns: { mail_cname: { data: 'u9.wl9.sendgrid.net' } } }] }),
+  });
+  assert.equal(noDomain.sendgridRecords.length, 0);
+  assert.match(noDomain.logs, /no authenticated domain for /);
+  assert.match(noDomain.logs, new RegExp(DOMAIN.replace('.', '\\.')));
+
+  // A mail_cname that is not the u<id>.<whitelabel> shape — the warning names it
+  const malformed = await run({
+    sendgridApi: fakeSendgrid({ domains: [{ domain: DOMAIN, dns: { mail_cname: { data: 'em1234.fixture-brand.test' } } }] }),
+  });
+  assert.equal(malformed.sendgridRecords.length, 0, 'a guessed host would poison every SendGrid record');
+  assert.match(malformed.logs, /domain-auth host /);
+  assert.match(malformed.logs, /em1234\.fixture-brand\.test/);
+
+  // An unreachable SendGrid is survivable — the zone still reconciles
+  const unreachable = await run({
+    sendgridApi: { getAuthenticatedDomains: async () => { throw new Error('SendGrid API error (503): Service Unavailable'); } },
+  });
+  assert.equal(unreachable.sendgridRecords.length, 0);
+  assert.match(unreachable.logs, /could not read the domain authentication/);
+  assert.match(unreachable.logs, /503/);
+});
+
+// #692: config is not a fallback for the live read. A brand that still carries
+// the deleted `dns.sendgrid` block must build NOTHING from it — the stale copy
+// is exactly what pointed omega-brand's records at the wrong host.
+test('dns-records: a leftover dns.sendgrid config block never builds records (#692)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+  const config = brandConfig();
+  config.edge.providers.cloudflare.dns.sendgrid = { id: '999', whitelabel: 'stale' };
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/dns_records': [],
+      'POST /zones/zone-1/dns_records': { id: 'new' },
+    },
+  });
+
+  // Live read answers NOTHING (no key, no client injected)
+  await ensureDns(handlerContext(config, api, {}));
+
+  const created = api.calls.filter((c) => c.method === 'POST').map((c) => c.body.name);
+  assert.ok(!created.some((n) => /^(emailauth|emailurl|999|s[12]\._domainkey)\./.test(n)), 'the stale copy desired nothing');
+  assert.ok(created.includes(DOMAIN), 'the platform records still land');
+});
+
+// #662 + #692: the wait is for a branding that EXISTS and has not validated
+// yet. A host with no branding at all gets one from the campaigns service
+// later in the same walk (#693), so waiting on it HERE would never end.
+test('dns-records: no link branding at all skips the wait and points at the campaigns service (#693)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/dns_records': [],
+      'POST /zones/zone-1/dns_records': { id: 'new' },
+    },
+  });
+
+  // A TTY is available: an entry that EXISTS holds the walk here (#662), so a
+  // handler that finishes inside the beat is one that never started waiting.
+  const tty = openTtyPrompt();
+  let result;
+  const logs = await captureLogAsync(async () => {
+    try {
+      const run = ensureDns(handlerContext(brandConfig(), api, {
+        sendgridApi: fakeSendgrid({ links: [{ domain: 'other-brand.test', subdomain: 'emailurl', valid: true }] }),
+      }));
+      const raced = await Promise.race([run, new Promise((resolve) => setTimeout(() => resolve('WAITED'), 750))]);
+      if (raced === 'WAITED') {
+        await tty.answer('(enter)=check now, (s)=skip', 's'); // release it, then fail
+        await run;
+      }
+      result = raced;
+    } finally {
+      tty.close();
+    }
+  });
+
+  assert.notEqual(result, 'WAITED', 'the branding arrives from the campaigns service — a wait on it here would never end');
+  const created = api.calls.find((c) => c.method === 'POST' && c.body.name === `emailurl.${DOMAIN}`);
+  assert.equal(created.body.proxied, false, 'branding that does not exist never rides the proxy');
+  assert.equal(result.status, 'success', 'nothing is PENDING — there is no branding to validate');
+  assert.match(logs, /SendGrid has no link branding for that host yet/);
+  assert.match(logs, /campaigns service creates and validates it later in this run/, 'the line names who creates it');
 });
 
 test('dns-records: drift creates missing, updates SPF enforcement, deletes obsolete MX + wrong A', async () => {
@@ -504,6 +679,28 @@ test('dns-records: dry-run reports planned counts with zero mutations', async ()
   assert.deepEqual(api.mutations(), []);
   // A, AAAA, www, SPF, DMARC (no email provider → no MX)
   assert.equal(result.output.dns.planned.create, 5);
+});
+
+// #692: the domain-auth read is a READ, so a dry run does it too and plans the
+// records it found — the old config-gated path planned nothing at all here.
+test('dns-records: dry-run reads SendGrid live and names the host in the plan (#692)', async () => {
+  const ensureDns = require('../src/services/edge/ensure/dns-records.js');
+  const api = fakeApi({
+    responses: { 'GET /zones/zone-1/dns_records': [] },
+  });
+
+  let result;
+  const logs = await captureLogAsync(async () => {
+    result = await ensureDns(handlerContext(brandConfig(), api, {
+      options: { dryRun: true },
+      sendgridApi: fakeSendgrid({ links: [{ domain: DOMAIN, subdomain: 'emailurl', valid: true }] }),
+    }));
+  });
+
+  assert.deepEqual(api.mutations(), []);
+  // The 5 platform records + emailauth, the owner CNAME, emailurl, 2 DKIM keys
+  assert.equal(result.output.dns.planned.create, 10);
+  assert.match(logs, /SendGrid domain auth read live: u123\.wl001\.sendgrid\.net/);
 });
 
 // ─── Zone settings ───────────────────────────────────────────────────────────
@@ -822,7 +1019,6 @@ test('email-routing: interactive run opens the dashboard and retries the write o
 test('dns-records: the run waits for SendGrid\'s validation and proxies emailurl in the SAME walk (#662)', async () => {
   const ensureDns = require('../src/services/edge/ensure/dns-records.js');
   const config = brandConfig();
-  config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
 
   let reads = 0;
   const api = fakeApi({
@@ -835,12 +1031,12 @@ test('dns-records: the run waits for SendGrid\'s validation and proxies emailurl
   const tty = openTtyPrompt();
   try {
     const run = ensureDns(handlerContext(config, api, {
-      sendgridApi: {
-        getBrandedLinks: async () => {
+      sendgridApi: fakeSendgrid({
+        links: () => {
           reads += 1;
           return [{ domain: DOMAIN, subdomain: 'emailurl', valid: reads >= 3 }];
         },
-      },
+      }),
     }));
 
     await tty.answer('(enter)=check now, (s)=skip', '\r');
@@ -858,7 +1054,6 @@ test('dns-records: the run waits for SendGrid\'s validation and proxies emailurl
 test('dns-records: skipping the branded-link wait warns with the reason the summary prints (#662)', async () => {
   const ensureDns = require('../src/services/edge/ensure/dns-records.js');
   const config = brandConfig();
-  config.edge.providers.cloudflare.dns.sendgrid = { id: '123', whitelabel: 'wl001' };
 
   const api = fakeApi({
     responses: {
@@ -870,7 +1065,7 @@ test('dns-records: skipping the branded-link wait warns with the reason the summ
   const tty = openTtyPrompt();
   try {
     const run = ensureDns(handlerContext(config, api, {
-      sendgridApi: { getBrandedLinks: async () => [{ domain: DOMAIN, subdomain: 'emailurl', valid: false }] },
+      sendgridApi: fakeSendgrid({ links: [{ domain: DOMAIN, subdomain: 'emailurl', valid: false }] }),
     }));
 
     await tty.answer('(enter)=check now, (s)=skip', 's');

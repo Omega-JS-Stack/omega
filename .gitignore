@@ -1,28 +1,31 @@
-# Dependencies
-node_modules/
+# ========== Default Values ==========
 
-# Environment & secrets
-.env
-.env.*
-
-# Logs
-logs/
-*.log
-
-# OS
 .DS_Store
+node_modules/
+/dist/
+/release/
+/.cache/
+/.omega/
+/.claude/
+.env
+*.log
+/logs/
 
-# Build/runtime scratch
-# (packages/*/dist is NOT tracked — each package's own .gitignore ignores it, matching
-# framework-repo convention; prepare-package regenerates dist on install/pack/publish)
+# Apple signing artifacts — never commit these
+config/certs/
+*.p12
+*.cer
+*.mobileprovision
+*.p8
+*.pem
+
+# ========== Custom Values ==========
+.env.*
+logs/
 .temp/
 .cache/
 .omega/
-# Per-run port-bumped emulator config (N7 auto-allocation)
 firebase.resolved.json
-
 _attic/
-
-# Workflow state (workflow spec) — only settings.json is committed
 .workkit/*
 !.workkit/settings.json

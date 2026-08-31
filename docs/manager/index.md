@@ -74,7 +74,7 @@ below is `config.js`'s `SERVICE_ORDER` — the dependency order every walk runs 
 | [search](search.md) | The Search Console domain property, its verification and sitemaps |
 | [advertising](advertising.md) | The domain's presence and approval state in AdSense (read-only) |
 | [monitoring](monitoring.md) | One Sentry project per target, DSNs written back per target |
-| [campaigns](campaigns.md) | SendGrid: domain auth, sender, list, unsubscribe groups, fields, segments, webhook |
+| [campaigns](campaigns.md) | SendGrid: domain auth, link branding, sender, list, unsubscribe groups, fields, segments, webhook |
 | [newsletter](newsletter.md) | Beehiiv: publication access, fields, segments, webhook |
 | [payment](payment.md) | Stripe/PayPal/Chargebee products, prices and webhooks |
 | [forms](forms.md) | The brand's Slapform contact form and its owner account (operator only) |

@@ -43,6 +43,7 @@
 // here so every existing manager import keeps working.
 const { DIR_TARGETS, TARGET_DIRS, isDemoProject, chosenProvider, schemaDefaults, deepMerge } = require('@omega.js/config');
 const { resolveRegistrar } = require('./services/domain/lib/registrars.js');
+const { API_ACCESS_URL: NAMECHEAP_API_ACCESS_URL } = require('./services/domain/lib/namecheap-api.js');
 
 // Framework package per target — used by the testing service to compare each
 // target's installed framework against the npm latest. Names flip to their
@@ -441,11 +442,13 @@ const MANAGER_DEFAULTS = {
   },
 
   // Cloudflare settings — the engine defaults are PLATFORM defaults only.
-  // Company-specific records (DMARC report addresses, BIMI logo, SendGrid
-  // domain-auth CNAMEs, verification TXTs, extra CSP hosts) belong in company/
-  // brand config, NOT here — omega-manager hardcoded them; the port moved them
-  // to config: dns.dmarcReports { rua, ruf }, dns.bimiLogo, dns.sendgrid
-  // { id, whitelabel }, dns.records [...], and the responseHeaders rules.
+  // Company-specific records (DMARC report addresses, BIMI logo, verification
+  // TXTs, extra CSP hosts) belong in company/brand config, NOT here —
+  // omega-manager hardcoded them; the port moved them to config:
+  // dns.dmarcReports { rua, ruf }, dns.bimiLogo, dns.records [...], and the
+  // responseHeaders rules. The SendGrid domain-auth CNAMEs are NOT config in
+  // any layer: they are SendGrid's own observed facts, read live per run
+  // ([#692](https://github.com/Omega-JS-Stack/omega/issues/692)).
   edge: {
     providers: {
       cloudflare: {
@@ -739,6 +742,7 @@ const OPERATIONS = {
 
   campaigns: [
     { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
+    { name: 'link-branding', ensure: true },   // Link branding for emailurl.<domain> (create + validate, then the CNAME flips proxied)
     { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
     { name: 'list', ensure: true },            // The brand's marketing list (id written back to omega.json5)
     { name: 'unsubscribe-groups', ensure: true }, // The account's ASM groups, matched by name (ids written back to omega.json5)
@@ -927,7 +931,7 @@ const REQUIRES = {
     env: [
       { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
       { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
-      { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
+      { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: NAMECHEAP_API_ACCESS_URL, prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
     ],
     scopes: [],
   },
@@ -1046,7 +1050,7 @@ const REQUIRES = {
   },
 
   campaigns: {
-    why: 'reconciles domain auth, the sender, the list, unsubscribe groups, fields, segments, and the event webhook via the SendGrid API',
+    why: 'reconciles domain auth, link branding, the sender, the list, unsubscribe groups, fields, segments, and the event webhook via the SendGrid API',
     label: 'SendGrid',
     disablePath: 'marketing.campaigns.enabled',
     when: (config) => config.marketing?.campaigns?.enabled !== false

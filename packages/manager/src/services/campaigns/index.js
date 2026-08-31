@@ -1,6 +1,7 @@
 /**
  * Campaigns service (SendGrid provider) — the brand's email-marketing infrastructure: domain
- * authentication (DKIM/SPF CNAMEs written via Cloudflare), a verified sender
+ * authentication (DKIM/SPF CNAMEs written via Cloudflare), link branding for
+ * the emailurl host (validated, then the CNAME flips proxied), a verified sender
  * for Single Sends, the brand's marketing list, the unsubscribe groups
  * @omega.js/backend sends through, @omega.js/backend's custom fields and
  * segments (from @omega.js/backend's SSOT), and the account-global Event
@@ -60,14 +61,19 @@ module.exports.run = createServiceRunner({
     if (webhookKeyGate) return webhookKeyGate;
 
     // Tests inject fake clients via context.sendgridApi / context.cloudflareApi.
-    // Cloudflare is only needed while the domain still has to be DNS-verified;
-    // without a token the domain-auth operation prints the records to add manually.
+    // Cloudflare is only needed while the domain still has to be DNS-verified
+    // (and for the link-branding proxy flip); without a token the domain-auth
+    // operation prints the records to add manually and link-branding prints the
+    // manual flip.
     return {
       sendgridApi: context.sendgridApi || new SendGridAPI(),
       cloudflareApi: context.cloudflareApi
         || (process.env.CLOUDFLARE_TOKEN ? new CloudflareAPI() : null),
       domain,
       apexDomain: getApexDomain(domain),
+      // A subdomain project's apex records belong to the PARENT brand's walk
+      // (the same line the edge service draws) — link-branding skips on it.
+      isSubdomainProject: domain !== getApexDomain(domain),
     };
   },
 });

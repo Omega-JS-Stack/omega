@@ -106,6 +106,10 @@ module.exports = async ({ ctx, user, settings, libraries }) => {
   await processAffiliate(ctx, uid, email, settings);
 
   // 7. Send emails + marketing (awaited so the function stays alive)
+  // They send INLINE in this request, and that costs the user nothing: NOTHING
+  // client-side awaits this route — the web auth listener fires the POST and
+  // moves straight on to the redirect
+  // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)).
   // Gate marketing sync on explicit consent — never add a user to marketing lists without it
   if (userRecord.consent?.marketing?.status === 'granted') {
     await syncMarketingContact(ctx, uid, email);

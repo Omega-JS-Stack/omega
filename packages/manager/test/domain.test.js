@@ -2,14 +2,16 @@
  * Domain service tests — registrar nameserver reconciliation against
  * recording fakes for both APIs (Cloudflare zone lookup + Namecheap DNS).
  * Proves skip semantics, the converged zero-mutation no-op, drift updates,
- * the psl SLD/TLD split (multi-part TLDs), manual-registrar handling, and
- * the dry-run guarantee.
+ * the psl SLD/TLD split (multi-part TLDs), manual-registrar handling, the
+ * IP-whitelist walkthrough (#698), and the dry-run guarantee.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/domain/index.js');
+const { NamecheapAPI, API_ACCESS_URL, isWhitelistError } = require('../src/services/domain/lib/namecheap-api.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
@@ -21,6 +23,8 @@ const DOMAIN = 'fixture-brand.test';
 // Cloudflare returns these unsorted — handlers must sort before comparing
 const CF_NS = ['rita.ns.cloudflare.com', 'abe.ns.cloudflare.com'];
 const CF_NS_SORTED = [...CF_NS].sort();
+// The caller IP Namecheap refuses until it is whitelisted (TEST-NET-3)
+const CLIENT_IP = '203.0.113.7';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -53,14 +57,32 @@ function fakeCloudflare(zone) {
 }
 
 /**
- * Recording fake NamecheapAPI. Records every call; getDns can be made to
- * throw (domain not in the account).
+ * The rejection the client throws for a caller IP that is not on Namecheap's
+ * API whitelist — shaped exactly as makeRequest builds it (code off the
+ * <Error> element, plus the IP only the client knows).
  */
-function fakeNamecheap({ current = [], getDnsError = null } = {}) {
+function whitelistRejection() {
+  const error = new Error('Namecheap API error: API Key is invalid or API access has not been enabled');
+  error.namecheapCode = '1011102';
+  error.clientIp = CLIENT_IP;
+  return error;
+}
+
+/**
+ * Recording fake NamecheapAPI. Records every call; getDns can be made to
+ * throw (domain not in the account), or to refuse the first `rejections`
+ * reads with the IP-whitelist rejection (#698).
+ */
+function fakeNamecheap({ current = [], getDnsError = null, rejections = 0 } = {}) {
   const api = { calls: [] };
+  let refused = 0;
 
   api.getDns = async (sld, tld) => {
     api.calls.push({ method: 'getDns', sld, tld });
+    if (refused < rejections) {
+      refused += 1;
+      throw whitelistRejection();
+    }
     if (getDnsError) {
       throw new Error(getDnsError);
     }
@@ -73,6 +95,19 @@ function fakeNamecheap({ current = [], getDnsError = null } = {}) {
 
   api.mutations = () => api.calls.filter((c) => c.method === 'setCustomNameservers');
   return api;
+}
+
+/** Run fn with console.log captured; returns the joined lines. */
+async function captureLogAsync(fn) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.log = original;
+  }
+  return lines.join('\n');
 }
 
 function runService(config, { cloudflare, namecheap, options = {} } = {}) {
@@ -211,6 +246,145 @@ test('domain: domain not in the Namecheap account warns instead of failing', asy
   assert.equal(result.status, 'warned');
   assert.match(result.output.nameservers.error, /not found/);
   assert.equal(namecheap.mutations().length, 0);
+});
+
+// ─── The IP-whitelist walkthrough (#698) ─────────────────────────────────────
+
+test('domain: the client tags a whitelist rejection with its code and the caller IP (#698)', async () => {
+  const realFetch = global.fetch;
+  global.fetch = async (url) => (String(url).includes('ipify')
+    ? { json: async () => ({ ip: CLIENT_IP }) }
+    : { text: async () => '<?xml version="1.0" encoding="utf-8"?><ApiResponse Status="ERROR"><Errors><Error Number="1011102">API Key is invalid or API access has not been enabled</Error></Errors></ApiResponse>' });
+
+  try {
+    const api = new NamecheapAPI({ username: 'fixture-user', apiKey: 'fixture-key' });
+    const error = await api.getDns('fixture-brand', 'test').then(() => null, (e) => e);
+
+    assert.ok(error, 'a Status="ERROR" response throws');
+    assert.equal(error.namecheapCode, '1011102');
+    assert.equal(error.clientIp, CLIENT_IP, 'the walkthrough gets the IP to whitelist off the error');
+    assert.equal(isWhitelistError(error), true);
+    // Every other API failure stays on the plain warn path
+    assert.equal(isWhitelistError(new Error('Namecheap API error: Domain not found')), false);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('domain: a whitelist rejection opens the API access page with the IP and rechecks until it passes (#698)', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  // Refused twice: the first read AND the walkthrough's first recheck, so the
+  // loop has to run a second recheck before it passes
+  const namecheap = fakeNamecheap({ current: ['dns1.registrar-servers.com'], rejections: 2 });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { cloudflare: fakeCloudflare(zone), namecheap });
+
+    await tty.waitFor(`Add ${CLIENT_IP} under "Whitelisted IPs"`);
+    await tty.answer('Press Enter to open the Namecheap API access page', '\r');
+    await tty.answer('(enter)=check now, (s)=skip', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success', 'the recheck passed, so the walk finished the registrar write');
+    assert.deepEqual(opened, [API_ACCESS_URL], 'the apiaccess ROOT page, never a deep link');
+    assert.ok(namecheap.calls.filter((c) => c.method === 'getDns').length >= 3, 'the refused read was rechecked in a loop');
+    assert.deepEqual(namecheap.mutations()[0].nameservers, CF_NS_SORTED);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('domain: a recheck that fails for a NEW reason reports THAT error, not the stale whitelist one (#698)', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  // The whitelist stops the first read; by the recheck the IP is on the list
+  // and Namecheap answers with the real problem — the domain isn't in the account
+  const namecheap = fakeNamecheap({ rejections: 1, getDnsError: 'Namecheap API error: Domain not found' });
+  setBrowserOpener(async () => true);
+  const tty = openTtyPrompt();
+  let result;
+
+  try {
+    const printed = await captureLogAsync(async () => {
+      const run = runService(brandConfig(), { cloudflare: fakeCloudflare(zone), namecheap });
+
+      await tty.answer('Press Enter to open the Namecheap API access page', '\r');
+      result = await run;
+    });
+
+    assert.match(printed, /Domain not found/, 'the recheck error is printed, never swallowed');
+    assert.match(printed, /not purchased\?/, 'the non-whitelist hint is reachable on this branch');
+    assert.equal(result.status, 'warned');
+    assert.match(result.output.nameservers.error, /Domain not found/);
+    assert.doesNotMatch(result.output.nameservers.error, /API access has not been enabled/, 'the pre-walk whitelist message is stale here');
+    assert.equal(namecheap.mutations().length, 0);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('domain: declining the whitelist walkthrough warns and continues (#698)', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  const namecheap = fakeNamecheap({ rejections: Infinity });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { cloudflare: fakeCloudflare(zone), namecheap });
+
+    await tty.answer('Press Enter to open the Namecheap API access page', '\r');
+    await tty.answer('(enter)=check now, (s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.match(result.output.nameservers.error, /API access has not been enabled/);
+    assert.equal(namecheap.mutations().length, 0);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('domain: a whitelist rejection on a non-interactive run warns and continues, never prompting (#698)', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  const namecheap = fakeNamecheap({ rejections: Infinity });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+
+  try {
+    const result = await runService(brandConfig(), { cloudflare: fakeCloudflare(zone), namecheap });
+
+    assert.equal(result.status, 'warned');
+    assert.deepEqual(result.warned, [{ operation: 'nameservers', reason: 'could not read the nameservers at Namecheap' }]);
+    assert.match(result.output.nameservers.error, /API access has not been enabled/);
+    assert.deepEqual(opened, [], 'no browser, no poll — today\'s warn-and-continue');
+    assert.equal(namecheap.calls.length, 1, 'the refused read is never retried without a TTY');
+  } finally {
+    setBrowserOpener(null);
+  }
+});
+
+test('domain: an accepted API call never opens the whitelist walkthrough (#698)', async () => {
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'active', name_servers: CF_NS };
+  const namecheap = fakeNamecheap({ current: [...CF_NS] });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await runService(brandConfig(), { cloudflare: fakeCloudflare(zone), namecheap });
+
+    assert.equal(result.status, 'success');
+    assert.deepEqual(opened, []);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
 });
 
 test('domain: dry-run reports the planned update with zero mutations', async () => {

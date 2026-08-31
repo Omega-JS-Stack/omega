@@ -1,5 +1,5 @@
 // URL-parameter session behaviors: ?authSignout=true, ?authCustomToken=…,
-// and authReturnUrl propagation into the page's auth links.
+// ?authPrivateKey=…, and authReturnUrl propagation into the page's auth links.
 
 // Libraries
 import omega from '@omega.js/client';
@@ -106,6 +106,91 @@ export async function handleCustomTokenSignin() {
     );
     return false;
   }
+}
+
+/**
+ * ?authPrivateKey=… — sign-in from a DURABLE url (an OBS dock, a kiosk, a
+ * bookmark). The custom tokens above expire in an hour; an `api.privateKey`
+ * does not, so this lane trades the key for a fresh custom token at
+ * `POST /omega/user/token` on every load.
+ * Returns true when a key was handled (the page is navigating away).
+ */
+export async function handlePrivateKeySignin() {
+  const url = new URL(window.location.href);
+  const privateKey = url.searchParams.get('authPrivateKey');
+
+  if (!privateKey) {
+    return false;
+  }
+
+  try {
+    // Never the key itself: it is a credential sitting in a url somebody saved,
+    // and a console line is the easiest place for it to leak from.
+    logger.log('Signing in with private key');
+
+    // Same deal as the custom-token lane above, and the SAME flag: what this
+    // handler ends up doing IS a custom-token sign-in, and the core/auth.js
+    // listener must not race it with its authenticated-default redirect.
+    window.__OMEGA_CUSTOM_TOKEN_SIGNIN = true;
+
+    // `auth: false` because the key IS the credential — the default lane would
+    // overwrite this header with the (absent) signed-in user's ID token.
+    const response = await omega.request('/omega/user/token', {
+      method: 'POST',
+      auth: false,
+      headers: { Authorization: `Bearer ${privateKey}` },
+    });
+
+    const customToken = response?.token;
+
+    if (!customToken) {
+      throw new Error('No token received from server');
+    }
+
+    const { getAuth, signInWithCustomToken } = await import('@firebase/auth');
+    const auth = getAuth();
+
+    const userCredential = await signInWithCustomToken(auth, customToken);
+    logger.log('Private key sign-in successful:', userCredential.user.email || userCredential.user.uid);
+
+    trackLogin('private-key', userCredential.user);
+
+    // Stripped BEFORE the navigation, unlike the custom-token lane: this url is
+    // durable by design, so the key must not ride along into history or a referer.
+    stripPrivateKey();
+
+    const authReturnUrl = url.searchParams.get('authReturnUrl');
+    const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
+      ? authReturnUrl
+      : siteUrl('/dashboard/account');
+
+    window.location.href = redirectTo;
+    return true;
+  } catch (error) {
+    // FIRST, before anything that reports: Sentry's httpContext integration
+    // reads window.location.href at capture time, so a key still in the address
+    // bar when captureException runs is a key inside the event (#661).
+    stripPrivateKey();
+
+    // Failed sign-in: hand navigation control back to the core listener
+    window.__OMEGA_CUSTOM_TOKEN_SIGNIN = false;
+
+    omega.sentry().captureException(new Error('Private key sign-in error', { cause: error }));
+    logger.error('Private key sign-in failed:', error);
+
+    omega.utilities().showNotification(
+      `Private key sign-in failed: ${error.message || 'Invalid or expired key'}`,
+      { type: 'danger', timeout: 8000 }
+    );
+    return false;
+  }
+}
+
+/** Drop ?authPrivateKey from the address bar, without navigating. */
+function stripPrivateKey() {
+  const cleanUrl = new URL(window.location.href);
+  cleanUrl.searchParams.delete('authPrivateKey');
+  window.history.replaceState({}, document.title, cleanUrl.toString());
 }
 
 /**

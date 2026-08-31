@@ -1,4 +1,5 @@
 const { describe, it, before } = require('node:test');
+const { registerHooks } = require('node:module');
 const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Auth Module', () => {
@@ -231,5 +232,141 @@ describe('Auth Module — auth state emission ordering (#196)', () => {
 
     assert.strictEqual(states.length, 1, 'the once listener must still fire');
     assert.strictEqual(states[0].user, null, 'and with the NEWEST state, not the stale one');
+  });
+});
+
+// #700: a doc that is not written yet is the NORMAL state for the seconds after
+// a signup, and a rules permission-denied on the account read is a real
+// failure. Consumers branch on the SIGNAL (`state.accountDenied`), never on the
+// account being empty — the web listener's deleted consent guard collapsed the
+// two and signed fresh signups out.
+describe('Auth Module — pending vs denied account reads (#700)', () => {
+
+  let Auth;
+
+  const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
+
+  // `_getAccountData` imports firebase/firestore lazily, so the seam is the
+  // module resolution itself: a synchronous hook swaps that ONE specifier for a
+  // stub reading `globalThis.__omegaFirestore`. Scoped to this file — node's
+  // runner gives each test file its own process, and nothing else here imports
+  // firestore (the suite runs with firebase disabled).
+  const FIRESTORE_STUB_URL = 'omega-test-stub:firebase-firestore';
+
+  const stubFirestoreModule = () => registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (specifier === 'firebase/firestore') {
+        return { url: FIRESTORE_STUB_URL, shortCircuit: true };
+      }
+
+      return nextResolve(specifier, context);
+    },
+    load(url, context, nextLoad) {
+      if (url === FIRESTORE_STUB_URL) {
+        return {
+          format: 'module',
+          shortCircuit: true,
+          source: `export const doc = (...args) => globalThis.__omegaFirestore.doc(...args);
+                   export const getDoc = (...args) => globalThis.__omegaFirestore.getDoc(...args);`,
+        };
+      }
+
+      return nextLoad(url, context);
+    },
+  });
+
+  /** Point the stubbed firestore at one outcome for the next read. */
+  function firestoreReturns(getDoc) {
+    globalThis.__omegaFirestore = {
+      doc: (db, collection, uid) => ({ collection, uid }),
+      getDoc,
+    };
+  }
+
+  // Minimal Manager stand-in, same shape as the ordering suite above plus the
+  // sentry seam _getAccountData's catch reaches for.
+  function createHarness() {
+    const captured = [];
+    const manager = {
+      config: {},
+      firebaseAuth: { currentUser: null },
+      firebaseFirestore: {},
+      _firebaseAuthInitialized: false,
+      _authReady: Promise.resolve(),
+      _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
+      bindings: () => ({ update: () => {} }),
+      storage: () => ({ set: () => {}, get: () => ({}) }),
+      sentry: () => ({ captureException: (error) => captured.push(error) }),
+    };
+
+    return { auth: new Auth(manager), manager, captured };
+  }
+
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  const denied = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+
+  before(async () => {
+    Auth = (await import('../src/modules/auth.js')).default;
+    // Registered here, not at load: hooks route every later require through the
+    // ESM loader, and the shared Manager import above pulls in CJS that will not
+    // survive the trip.
+    stubFirestoreModule();
+  });
+
+  it('should resolve an empty account when the doc is not written yet', async () => {
+    const { auth } = createHarness();
+
+    firestoreReturns(async () => ({ exists: () => false }));
+
+    const account = await auth._getAccountData('user-1');
+
+    assert(account, 'a missing doc is pending, not a failure — it resolves to the empty shape');
+    assert.strictEqual(account.auth.uid, 'user-1');
+    assert.strictEqual(account.subscription.product.id, 'basic');
+  });
+
+  it('should rethrow a permission-denied read so the caller can tell it from pending', async () => {
+    const { auth, captured } = createHarness();
+
+    firestoreReturns(async () => { throw denied(); });
+
+    await assert.rejects(auth._getAccountData('user-1'), { code: 'permission-denied' });
+    assert.strictEqual(captured.length, 1, 'and it still reaches monitoring');
+  });
+
+  it('should deliver accountDenied on a permission-denied read, with the account still resolved', async () => {
+    const { auth, manager } = createHarness();
+    const states = [];
+
+    firestoreReturns(async () => { throw denied(); });
+
+    auth.listen((state) => states.push(state));
+
+    manager.firebaseAuth.currentUser = USER;
+    auth._handleAuthStateChange(USER);
+    await flush();
+
+    assert.strictEqual(states.length, 1);
+    assert.strictEqual(states[0].accountDenied, true);
+    assert.strictEqual(states[0].account.auth.uid, 'user-1', 'the empty shape still lands — nothing downstream null-checks');
+  });
+
+  it('should degrade a non-permission failure to the empty account with NO accountDenied', async () => {
+    const { auth, manager, captured } = createHarness();
+    const states = [];
+
+    firestoreReturns(async () => { throw new Error('network request failed'); });
+
+    auth.listen((state) => states.push(state));
+
+    manager.firebaseAuth.currentUser = USER;
+    auth._handleAuthStateChange(USER);
+    await flush();
+
+    assert.strictEqual(states.length, 1);
+    assert.strictEqual(states[0].accountDenied, undefined, 'a transient failure is not a denial');
+    assert.strictEqual(states[0].account.auth.uid, 'user-1');
+    assert.strictEqual(captured.length, 1);
   });
 });

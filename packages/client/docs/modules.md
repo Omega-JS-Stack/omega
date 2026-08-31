@@ -12,6 +12,7 @@
 - **Class**: `Auth`
 - **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `resolveSubscription(account?)`
 - **Bindings**: Updates `auth` and `usage` context on auth settle
+- **Listener state**: `callback({ user, account, resolved, accountDenied? })` — `account` resolves to the empty schema shape when the doc is not written yet (a NORMAL pending state); `accountDenied: true` rides along only when Firestore rules refused the read, the one REAL failure ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)); web signs out on it
 - **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omega.js/backend, UJM, and @omega.js/desktop) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
 
 ### resolveSubscription(account?)

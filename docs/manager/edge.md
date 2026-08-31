@@ -31,8 +31,9 @@ Everything sits under `edge.providers.cloudflare`:
 - `enabled: false` — the tri-state opt-out; the whole service skips.
 - `zone` — the resolved zone id, written back by the `zone` operation.
 - `dns` — `spf` (`'strict'`/`'soft'`), `dmarcPolicy`, `spfIncludes`, `dmarcReports.{rua,ruf}`,
-  `bimiLogo`, `sendgrid.{id,whitelabel}` (the campaigns service owns those values), and
-  `records[]` for custom entries such as verification TXTs.
+  `bimiLogo`, and `records[]` for custom entries such as verification TXTs. The SendGrid
+  domain-auth values are NOT here — they are read live off SendGrid every run
+  ([#692](https://github.com/Omega-JS-Stack/omega/issues/692), below).
 - `settings` — the zone-settings map, keyed by Cloudflare's setting IDs exactly.
 - `cacheRules[]`, `rules.{managedTransforms,redirect,configuration,responseHeaders,security}`,
   `speedTest.{frequency,region}`, `workers[]`.
@@ -76,9 +77,24 @@ nothing is missing, the name is simply outside the certificate.
   `*.<zone>`; no Total TLS or deeper cert pack on this zone — CNAME stays DNS-only, Firebase
   serves the certificate".
 
+## The SendGrid records come from SendGrid, not from config
+
+`emailauth.<domain>`, the `<id>.<domain>` owner CNAME, `emailurl.<domain>` and both DKIM keys
+are all built from one host, `u<id>.<whitelabel>.sendgrid.net`. Those values are SendGrid's own
+observed facts about the domain, so `dns-records` READS them per run
+(`GET /v3/whitelabel/domains`, the same client the campaigns service uses, `SENDGRID_API_KEY`
+from the brand `.env`) instead of carrying a config copy that nothing ever wrote back
+([#692](https://github.com/Omega-JS-Stack/omega/issues/692)).
+
+Every no-answer skips the whole SendGrid set and prints the reason: no `SENDGRID_API_KEY`, no
+authenticated domain for this brand's domain (the campaigns service creates it), an unreachable
+SendGrid, or a `mail_cname` that is not the `u<id>.<whitelabel>.sendgrid.net` shape — that last
+one names the host it got. A dry run does the same read and names the host in its plan; a
+subdomain project never asks, because the apex record set belongs to the parent brand.
+
 ## Gotcha: the branded-link CNAME is grey until SendGrid validates it
 
-`emailurl.<domain>` is the one record whose desired shape is not config at all. SendGrid
+`emailurl.<domain>` is the one SendGrid record that rides Cloudflare's proxy. SendGrid
 validates a branded link by resolving that host as a CNAME to `sendgrid.net`, and a
 Cloudflare-PROXIED record answers with the edge's own addresses instead — so proxying it
 before validation locks the branding out of ever validating and every emailed link stays
@@ -91,8 +107,19 @@ answer instead of leaving the flip to a later run: `pollWithSpinner` re-asks Sen
 10s (ENTER checks now, `s` skips) and the same pass proxies the CNAME. A skipped wait, or a
 run with no TTY, keeps the record grey and returns **warned** with the reason — "SendGrid has
 not validated the branded link — the emailurl CNAME stays unproxied" — so the run summary
-names what is still owed. No API key, no branding entry, an unreachable SendGrid, or a
-subdomain project all answer NO: the unproxied record is the safe half of the pair.
+names what is still owed. An unreachable SendGrid or a subdomain project answer NO the same
+way: the unproxied record is the safe half of the pair (with no key or no authenticated
+domain, the SendGrid records are skipped outright).
+
+A host with NO link-branding entry is the one NO that never waits — the `campaigns` service
+creates and validates the branding LATER IN THE SAME WALK, when campaigns is enabled for the
+brand ([#693](https://github.com/Omega-JS-Stack/omega/issues/693)), so waiting on it here would
+never end. The line says so, the record lands grey (exactly the state SendGrid validates
+against), and the step is not **warned**: there is nothing pending for this service to finish.
+When the campaigns service's validation passes, it flips that same record to proxied itself;
+this handler's next live read agrees, because a valid branding desires a proxied record. On a
+brand's FIRST walk this handler writes no SendGrid records at all — the live domain-auth read
+finds nothing yet — so the campaigns service writes both link CNAMEs itself.
 
 ## Other gotchas
 

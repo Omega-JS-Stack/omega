@@ -31,6 +31,8 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const omegaConfig = require('@omega.js/config');
 
+const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+
 const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
 const { isCustomProject, FIREBASE_ONLY_SCAFFOLD } = require('./project-type');
 
@@ -262,6 +264,10 @@ function ensureTarget(options) {
   if (loadJSON(path.join(projectDir, 'package.json')).name === frameworkPackage.name) {
     return result;
   }
+
+  // A workspace ROOT is not a target either — and unlike the case above, landing
+  // there is an accident (a verb run from the wrong cwd), so it fails LOUD (#699).
+  assertScaffoldable(projectDir);
 
   scaffoldConfigs(projectDir, result);
   scaffoldPackageJson(projectDir, result);

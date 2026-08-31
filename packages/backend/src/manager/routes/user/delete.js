@@ -52,7 +52,9 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     timeout: 60000,
     response: 'json',
     tries: 2,
-    log: true,
+    // NO `log: true`: wonderful-fetch prints its whole configuration, headers
+    // included, and this request's omega-admin-key header IS the live admin key
+    // ([#702](https://github.com/Omega-JS-Stack/omega/issues/702)).
     headers: {
       'omega-admin-key': env.get('OMEGA_ADMIN_KEY'),
     },

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildInitOptions } = require('../src/browser.js');
+const { buildInitOptions, scrubAuthParams } = require('../src/browser.js');
 
 const DSN = 'https://key@o1.ingest.sentry.io/1';
 
@@ -109,6 +109,73 @@ test('an explicit opt-in is what it takes to send an email', () => {
 
   const sent = quiet(() => options.beforeSend(frameworkEvent(), {}));
   assert.deepEqual(sent.user, { id: 'abc123', email: 'user@example.com' });
+});
+
+test('the auth params that ARE credentials never survive a url (#661)', () => {
+  assert.strictEqual(
+    scrubAuthParams('https://brand.test/signin?authPrivateKey=pk-test-abc'),
+    'https://brand.test/signin',
+    'the only param goes, and the empty query with it'
+  );
+  assert.strictEqual(
+    scrubAuthParams('https://brand.test/signin?authReturnUrl=%2Fdashboard&authPrivateKey=pk-test-abc&utm_source=dock'),
+    'https://brand.test/signin?authReturnUrl=%2Fdashboard&utm_source=dock',
+    'its neighbours stay put'
+  );
+  assert.strictEqual(
+    scrubAuthParams('https://brand.test/signin?authCustomToken=tok-test-abc'),
+    'https://brand.test/signin',
+    'the custom-token lane has the identical exposure'
+  );
+  assert.strictEqual(
+    scrubAuthParams('https://brand.test/signin?authPrivateKey=pk-test-abc&authCustomToken=tok-test-abc'),
+    'https://brand.test/signin',
+    'both names, one pass'
+  );
+  assert.strictEqual(
+    scrubAuthParams('https://brand.test/dashboard/account?tab=billing'),
+    'https://brand.test/dashboard/account?tab=billing',
+    'a url carrying neither comes back byte-identical'
+  );
+  // Sentry's history breadcrumbs record same-origin urls RELATIVE.
+  assert.strictEqual(
+    scrubAuthParams('/signin?authPrivateKey=pk-test-abc&authReturnUrl=%2Fdashboard'),
+    '/signin?authReturnUrl=%2Fdashboard',
+    'a relative url is scrubbed and stays relative'
+  );
+});
+
+test('a navigation breadcrumb carries no key — not even the strip that removed it (#661)', () => {
+  const options = buildInitOptions({ Sentry: FakeSentry, config: { dsn: DSN } });
+
+  // What the SDK records when session-params.js calls history.replaceState to
+  // drop the key: `from` is the PRE-strip url, query included.
+  const crumb = options.beforeBreadcrumb({
+    category: 'navigation',
+    data: { from: '/signin?authPrivateKey=pk-test-abc', to: '/signin' },
+  }, {});
+
+  assert.deepEqual(crumb.data, { from: '/signin', to: '/signin' });
+
+  const other = options.beforeBreadcrumb({ category: 'console', message: 'Signing in with private key' }, {});
+  assert.deepEqual(other, { category: 'console', message: 'Signing in with private key' }, 'nothing else is touched');
+});
+
+test('the request url an event ships carries no key either (#661)', () => {
+  const options = buildInitOptions({
+    Sentry: FakeSentry,
+    config: { dsn: DSN },
+    isDevelopment: () => false,
+    getUser: () => ({ uid: 'abc123', email: 'user@example.com' }),
+  });
+
+  const event = frameworkEvent();
+  event.request = { url: 'https://brand.test/signin?authPrivateKey=pk-test-abc', headers: { Referer: 'https://brand.test/' } };
+
+  const sent = quiet(() => options.beforeSend(event, {}));
+
+  assert.strictEqual(sent.request.url, 'https://brand.test/signin', 'httpContext attaches the address bar at capture time');
+  assert.deepEqual(sent.user, { id: 'abc123' }, 'and the email scrub still holds');
 });
 
 test('a host can add its own tags per event', () => {

@@ -102,9 +102,21 @@ class Auth {
       const state = { user: this.getUser() };
 
       // Fetch account data if the user is logged in and Firestore is available
-      // (failures are captured inside _getAccountData and degrade to null)
+      // (every failure but a denied read is captured inside _getAccountData and
+      // degrades to null)
       if (user && this.manager.firebaseFirestore) {
-        state.account = await this._getAccountData(user.uid);
+        try {
+          state.account = await this._getAccountData(user.uid);
+        } catch (error) {
+          // The one failure _getAccountData rethrows: rules denied the read.
+          // Consumers branch on THIS flag and never on an empty account — a doc
+          // that is not written yet is the normal state right after signup
+          // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). The
+          // account still resolves to the empty shape below, so nothing
+          // downstream has to null-check.
+          logger.warn('Account read denied — flagging the state as denied:', error.message);
+          state.accountDenied = true;
+        }
       }
 
       // A newer auth state change owns the truth now — delivering this one
@@ -319,11 +331,21 @@ class Auth {
       // If no account exists, return resolved empty object for consistent structure
       return resolveAccount({}, { user: firebaseUser });
     } catch (error) {
-      // Capture here — this catch is the only one that ever sees the failure
-      // (returning null means callers' catches can't fire), and a permission
-      // or network error during account resolution must reach monitoring.
+      // Capture here — every failure passes through this catch, so monitoring
+      // sees them all: the degrade-to-null path below never surfaces to callers,
+      // and the permission-denied rethrow is captured before it throws.
       console.error('Get account data error:', error);
       this.manager.sentry().captureException(new Error('Failed to get account data', { cause: error }));
+
+      // Rules refused the read: a REAL failure, and the caller has to be able to
+      // tell it apart from a doc that simply is not written yet — that one
+      // resolves to an empty account above and is normal
+      // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). Every
+      // other failure keeps degrading to null.
+      if (error?.code === 'permission-denied') {
+        throw error;
+      }
+
       return null;
     }
   }
