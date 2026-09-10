@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- [#25](../../issues/25) — The seven publishables are on the npm registry at 0.1.0: client, backend, mcp-router, extension, desktop, web and manager, each declaring `publishConfig.access: public` so no publish depends on a flag. A fresh install resolves them with no overrides.
+- [#25](../../issues/25) — The seven publishables are on the npm registry at 0.50.0, the monorepo's own number: client, backend, mcp-router, extension, desktop, web and manager, each declaring `publishConfig.access: public`. A fresh install resolves them with no overrides; the first cut, 0.1.0, is deprecated.
 - [#467](../../issues/467) — `omega audit` reports each page's LCP, CLS and the form factor the run emulated beside the four scores, and `--max-lcp=<ms>` gates on it: any page whose LCP is over the bar fails loudly and exits 1. Run `npx omega audit --max-lcp=1300` before a deploy.
 - [#709](../../issues/709) — Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value — an explicit `data-omega-copy-value`/property, a selector, else the sibling input — copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) — `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
