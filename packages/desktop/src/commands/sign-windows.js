@@ -33,6 +33,8 @@ runnerEnv.loadRunnerEnv();
 const attachLogFile = require('../utils/attach-log-file.js');
 
 const { startAutoUnlock } = require('../lib/sign-helpers/auto-unlock.js');
+const { assertConsoleUnlocked } = require('../lib/sign-helpers/console-lock.js');
+const { execWithLimit } = require('../lib/sign-helpers/exec-with-limit.js');
 const { writeUpdateInfo } = require('../lib/sign-helpers/update-info.js');
 const signEvents = require('../lib/sign-helpers/sign-events.js');
 
@@ -261,9 +263,17 @@ function buildVerifyCommand({ signtool, outPath }) {
 const SIGN_ATTEMPTS       = 3;
 const SIGN_RETRY_DELAY_MS = 5000;
 
-// node-powertools' `execute` with `log: false` — what this file passes — rejects
-// with `new Error(stderr || 'Command failed with exit code N')`, and the sign
-// command ends in `2>&1` (it runs through a shell), so BOTH of signtool's
+// A healthy sign takes ~18s (the timestamp round trip is most of it). One that
+// is still running minutes later is waiting on something that will never come:
+// a PIN typed at a locked console, a dialog nobody can see. Every attempt gets
+// this hard limit, after which the signtool process tree is terminated and the
+// attempt fails with a message that says so, instead of holding the job until
+// GitHub's six-hour default cancels it ([#864](https://github.com/Omega-JS-Stack/omega/issues/864)).
+const SIGN_TIME_LIMIT_MS  = 3 * 60 * 1000;
+
+// node-powertools' `execute` with `log: false` — what execWithLimit passes —
+// rejects with `new Error(stderr || 'Command failed with exit code N')`, and the
+// sign command ends in `2>&1` (it runs through a shell), so BOTH of signtool's
 // streams reach `e.message` and this is classifying on signtool's own words.
 //
 // Failures signtool NAMES as permanent. Retrying a wrong PIN walks the EV token
@@ -298,7 +308,7 @@ async function signWithRetry(cmd, options) {
     file,
     attempts    = SIGN_ATTEMPTS,
     delayMs     = SIGN_RETRY_DELAY_MS,
-    exec        = (c) => execute(c, { log: false }),
+    exec        = (c) => execWithLimit(c, { limitMs: SIGN_TIME_LIMIT_MS, label: 'signtool' }),
     sleep       = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     emit        = signEvents.emit,
     startUnlock = () => ({ stop: () => {} }),
@@ -342,6 +352,11 @@ async function signWithSigntool(targets, inDir, outDir) {
   // for them after the signing loop. .msi targets use Windows Installer's own
   // update mechanism (not electron-updater) and don't need a yml.
   const signedExes = [];
+
+  // The PIN is typed into the Token Logon dialog on the interactive desktop.
+  // Behind a lock screen it never arrives and signtool waits forever, so a
+  // locked console is refused before the first call (console-lock.js).
+  if (useThumbprint && password) await assertConsoleUnlocked();
 
   for (const target of targets) {
     const rel = path.relative(inDir, target);
@@ -554,6 +569,7 @@ module.exports.signWithRetry          = signWithRetry;
 module.exports.isTransientSignFailure = isTransientSignFailure;
 module.exports.SIGN_ATTEMPTS          = SIGN_ATTEMPTS;
 module.exports.SIGN_RETRY_DELAY_MS    = SIGN_RETRY_DELAY_MS;
+module.exports.SIGN_TIME_LIMIT_MS     = SIGN_TIME_LIMIT_MS;
 
 // Exports for the Windows-gated end-to-end suite — the halves that shell out to
 // signtool for real. They only run where signtool and the EV token are

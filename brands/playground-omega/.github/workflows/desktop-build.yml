@@ -254,6 +254,10 @@ jobs:
     #   local                 — skip this job; sign locally via `npx omega sign-windows`
     if: needs.setup.outputs.windows == 'true' && needs.windows-strategy.outputs.strategy != 'local'
     runs-on: ${{ needs.windows-strategy.outputs.strategy == 'cloud' && fromJSON('["windows-latest"]') || fromJSON('["self-hosted","windows","ev-token"]') }}
+    # Signing is ~20s per installer. A job still running much later is waiting on
+    # something that never comes (a PIN at a locked console); end it instead of
+    # holding the self-hosted runner for GitHub's six-hour default.
+    timeout-minutes: 30
     # Use cmd.exe (not PowerShell) on Windows. Self-hosted runners often have PowerShell
     # ExecutionPolicy set to Restricted, which blocks the Actions-generated wrapper .ps1
     # scripts that GH spits out for every `run:` step. cmd.exe has no such restriction

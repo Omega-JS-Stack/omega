@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#609](../../issues/609) — The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
 ### Fixed
+- [#864](../../issues/864) — A Windows sign at a locked console no longer hangs six hours: `sign-windows` refuses a locked console up front, each `signtool` attempt has a three-minute limit, the PIN watcher reports a dialog it could not reach, and the sign job carries `timeout-minutes`.
 - [#769](../../issues/769) — Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#467](../../issues/467) — The head warms the analytics and Firebase origins a page really uses, each gated on the config its loader reads; the theme's italic latin faces preload too, ending the 0.02 shift the hero accent caused; and every page whose opening band is a masthead paints as a first-paint band.
 - [#212](../../issues/212) — The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.

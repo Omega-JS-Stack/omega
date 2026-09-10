@@ -309,5 +309,32 @@ module.exports = defineCases({
         ctx.expect(signWindows.isTransientSignFailure(new Error('The specified network password is not correct'))).toBe(false);
       },
     },
+    {
+      name: 'a terminated attempt reads as transient, so the next one gets a fresh PIN watcher',
+      run: async (ctx) => {
+        // The wording is execWithLimit's (exec-with-limit.test.js proves the
+        // mechanism); here it only matters that nothing classifies it as final.
+        const limitError = new Error('signtool produced no verdict within 180s and was terminated');
+        ctx.expect(signWindows.isTransientSignFailure(limitError)).toBe(true);
+        ctx.expect(signWindows.SIGN_TIME_LIMIT_MS).toBe(3 * 60 * 1000);
+
+        let watchers = 0;
+        let calls = 0;
+        let threw;
+        try {
+          await signWindows.signWithRetry('signtool sign ...', {
+            file:  'App.exe',
+            exec:  () => { calls += 1; throw limitError; },
+            sleep: () => Promise.resolve(),
+            emit:  () => {},
+            startUnlock: () => { watchers += 1; return { stop: () => {} }; },
+          });
+        } catch (e) { threw = e; }
+
+        ctx.expect(calls).toBe(3);
+        ctx.expect(watchers).toBe(3);
+        ctx.expect(threw.message).toMatch(/no verdict within 180s/);
+      },
+    },
   ],
 });

@@ -142,8 +142,8 @@ The signing strategy itself is config, not env: `platforms.win.signing.strategy`
 1. The mac/linux legs of the brand's `build.yml` package and publish as usual; the Windows leg packages **unsigned** and uploads a `windows-unsigned` artifact.
 2. The `windows-sign` job picks up on your box (labels `self-hosted, windows, ev-token`), downloads that artifact, and runs `npx omega sign-windows --in release --out release/signed`.
 3. For each `.exe` / `.msi`: copy to the output dir, then `signtool sign` with the resolved cert args, `/tr <timestamp url> /td sha256 /fd sha256`.
-4. In thumbprint mode a helper starts alongside the sign call and types the PIN into SafeNet's "Token Logon" dialog if it appears.
-5. **The sign call gets three attempts** with a short backoff. The timestamp server is a third party and a timeout or a 502 from it fixes itself; a failure signtool names as permanent (no matching certificate, wrong password, locked token, malformed file) stops on the first attempt instead of walking the token toward a lockout. Every attempt and every retry lands in the event log.
+4. In thumbprint mode a helper starts alongside the sign call and types the PIN into SafeNet's "Token Logon" dialog if it appears, then watches the dialog for ten seconds: one still open after typing is reported as "the keystrokes did not reach it". Before the first call, a locked console (`LogonUI.exe` running) is refused outright, naming the fix, because the dialog renders behind the lock screen and the PIN lands on the lock screen instead (§ A locked console).
+5. **The sign call gets three attempts** with a short backoff, and **each attempt has a three-minute limit**: a healthy sign takes about twenty seconds, so one still running minutes later is waiting on something that never comes, and its process tree is terminated with a message naming the limit (the attempt reads as transient, so the next one gets a fresh PIN watcher). The `windows-sign` job carries a thirty-minute `timeout-minutes` for the same reason. The timestamp server is a third party and a timeout or a 502 from it fixes itself; a failure signtool names as permanent (no matching certificate, wrong password, locked token, malformed file) stops on the first attempt instead of walking the token toward a lockout. Every attempt and every retry lands in the event log.
 6. `signtool verify /pa` runs once against the signed file. No retry — it is a local check.
 7. `latest.yml` and per-installer `.blockmap` files are written for the signed NSIS `.exe`s, because Windows is split into a post-build sign job and electron-updater has no other way to discover the release.
 8. `npx omega finalize-release --signed-dir release/signed` uploads the signed assets to the release the mac/linux legs created.
@@ -201,6 +201,10 @@ An EV certificate on a SafeNet/eToken lives in **your user's** `CurrentUser\My` 
 The Startup folder is the fix: Explorer launches its contents in the interactive session at logon, as you, with your certificate store and your desktop.
 
 `npx omega runner status` prints the session id of every live listener and warns loudly on `session=0`, and so does `start` when it meets one. If you see one, it is a leftover from an older install: `npx omega runner restart` replaces it.
+
+### A locked console
+
+Session 1 is not enough on its own: the desktop has to be UNLOCKED. Behind the lock screen the Token Logon dialog still exists (the watcher enumerates it) but every keystroke lands on the lock screen, so the PIN never arrives and `signtool` waits for it forever ([#864](https://github.com/Omega-JS-Stack/omega/issues/864): a Windows Update restart at the end of active hours auto-signed the box in, locked, and the sign job hung six hours). `sign-windows` now refuses a locked console before the first call, naming `LogonUI.exe` and the fix: unlock the box and re-run. Keeping the box unlocked across an update restart is the box's own setting, not the framework's: a classic auto-logon (Sysinternals Autologon) signs in without locking, where Windows' own "finish setting up after an update" always locks.
 
 On a dedicated build box, enable Windows auto-logon so a reboot brings the session (and therefore the runner) back without a human.
 
