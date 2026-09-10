@@ -39,9 +39,9 @@ Brand work happens in one of four places — resolve which before touching files
 | Brand | What it is |
 |---|---|
 | `brands/sandbox-brand` | Synthetic fixture; test runs mangle and reset it |
-| `brands/omega-playground` | "OMEGA Playground" — the standing live test brand, classy theme |
+| `brands/playground-omega` | "OMEGA Playground" — the standing live test brand, classy theme |
 | `brands/newsflash-brand` | "The Daily Build" — the second-skin brand, newsflash theme |
-| `../omega-brand` | The REAL brand, omegajs.dev — a sibling repo, LIVE |
+| `../omega-omega` | The REAL brand, omegajs.dev — a sibling repo, LIVE |
 
 Nothing in this monorepo is ever the production brand. Topology, history, and the local-era `file:` dependency contract: `docs/shared/brands.md`. Linking a brand against the local frameworks: `docs/shared/local-dev.md`.
 

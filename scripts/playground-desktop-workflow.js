@@ -4,7 +4,7 @@
  *
  * GitHub executes workflows from a repo ROOT only, and the playground brand is a
  * directory inside this monorepo, so the file its desktop target composes at
- * `brands/omega-playground/.github/workflows/desktop-build.yml` is a file GitHub
+ * `brands/playground-omega/.github/workflows/desktop-build.yml` is a file GitHub
  * never sees. The release run (hosted build, the self-hosted EV-token Windows
  * signer registered to the Omega-JS-Stack org, finalize) therefore has no repo to
  * run in. Ian (2026-09-07): it runs from a snapshot of this tree in the brand's
@@ -19,7 +19,7 @@
  *      render context (`{{ versions.node }}` from the pinned Electron runtime,
  *      `{{ githubSecrets }}` from the env schema's delivery declarations)
  *   2. `@omega.js/devkit/ci-workflows`' `composeWorkflow`, target path
- *      `brands/omega-playground/targets/desktop`, so every post-checkout step
+ *      `brands/playground-omega/targets/desktop`, so every post-checkout step
  *      runs in the target exactly as it does at a brand root
  *   3. the two monorepo-only edits below, applied AFTER composition because a
  *      brand needs neither: the local-era root install, and `npm ci` becoming
@@ -47,7 +47,7 @@ const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const ROOT = path.join(__dirname, '..');
 const TEMPLATE = path.join(ROOT, 'packages', 'desktop', 'src', 'defaults', '.github', 'workflows', 'build.yml');
 const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'playground-desktop.yml');
-const TARGET_PATH = 'brands/omega-playground/targets/desktop';
+const TARGET_PATH = 'brands/playground-omega/targets/desktop';
 const TARGET_NAME = 'desktop';
 const WORKFLOW_NAME = 'Playground desktop release run (test-only)';
 

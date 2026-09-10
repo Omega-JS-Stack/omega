@@ -82,7 +82,7 @@ test('parseArgs: defaults + every flag form', () => {
   assert.throws(() => parseArgs(['--nope']), /Unknown argument/);
 
   const defaults = parseArgs([]);
-  assert.equal(defaults.brand, 'brands/omega-playground');
+  assert.equal(defaults.brand, 'brands/playground-omega');
   assert.match(defaults.source, /omega-manager\/\.env$/);
 });
 

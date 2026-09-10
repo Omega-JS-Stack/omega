@@ -58,8 +58,8 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
-const EXTENSION_APP = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'extension');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
+const EXTENSION_APP = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'extension');
 const PACKAGED_DIR = path.join(EXTENSION_APP, 'packaged', 'chromium', 'raw');
 const LOG_DIR = path.join(ROOT, '.temp', 'extension-auth-e2e');
 const EXTENSION_DIR = path.join(LOG_DIR, 'extension');

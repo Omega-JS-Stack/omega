@@ -47,7 +47,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
 const NEWSFLASH_WEBSITE = path.join(ROOT, 'brands', 'newsflash-brand', 'targets', 'website');
 const CLIENT_SRC = path.join(ROOT, 'packages', 'client', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'verts-e2e');
@@ -74,7 +74,7 @@ const VERTS = [
     title: 'The OMEGA Playground Kit',
     description: 'Everything the demo stack is built on, in one box.',
     button: 'Browse the kit',
-    link: 'https://kit.omega-playground.example/kit',
+    link: 'https://kit.playground.example/kit',
     image: '',
     footer: 'Sponsored by OMEGA Playground',
     weight: 5,

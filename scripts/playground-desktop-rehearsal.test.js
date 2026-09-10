@@ -36,7 +36,7 @@ const RUN_URL = (id) => `https://github.com/${REPO}/actions/runs/${id}`;
 
 // The secrets go to the private REHEARSAL repo, named here rather than read back
 // from the script: publishing this brand's keys anywhere else is the whole risk.
-const REHEARSAL_REPO = 'Omega-JS-Stack/omega-playground-rehearsal';
+const REHEARSAL_REPO = 'Omega-JS-Stack/playground-rehearsal';
 const GH_AUTH = ['gh', 'auth', 'status'];
 const GH_SECRET_SET = (key) => ['gh', 'secret', 'set', key, '--repo', REHEARSAL_REPO];
 
@@ -101,7 +101,7 @@ function scratchRepo(t) {
   jetpack.write(path.join(root, 'tracked.txt'), 'two\n');
   jetpack.write(path.join(root, 'new.txt'), 'added\n');
   jetpack.write(path.join(root, WORKFLOW_PATH), 'name: rendered per rehearsal\n');
-  jetpack.write(path.join(root, 'brands', 'omega-playground', 'package-lock.json'), '{}\n');
+  jetpack.write(path.join(root, 'brands', 'playground-omega', 'package-lock.json'), '{}\n');
 
   return {
     root,
@@ -178,7 +178,7 @@ test('a HEAD that moves under an identical tree is a new commit on the new HEAD'
 
   // Commit that same working tree onto main, minus the excluded lockfile, so the
   // tree the next snapshot writes is identical and ONLY the parent has moved.
-  git(root, 'add', '-A', '--', '.', ':!brands/omega-playground/package-lock.json');
+  git(root, 'add', '-A', '--', '.', ':!brands/playground-omega/package-lock.json');
   git(root, 'commit', '-qm', 'second');
   const head = git(root, 'rev-parse', 'HEAD').trim();
 

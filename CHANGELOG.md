@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#212](../../issues/212) — `POST /payments/intent` takes `simulate: 'abandon'` — the session is created and no webhook is fired, which is what an abandoned checkout IS. Test-provider only, never persisted.
 
 ### Changed
+
+- [#808](../../issues/808) — The playground is id `playground` in `brands/playground-omega`; the real brand's repo and folder are `omega-omega`. One repo rule, applied everywhere.
 - [#467](../../issues/467) — Every visible lockup (nav, footer, sidebar, auth, app, checkout, portal, extension, download) renders a brand's minted `brandmark.svg` when it exists, else the configured raster; `brand.images.brandmark` stays raster for payment and social cards.
 - [#743](../../issues/743) — An extension's build snapshot rides INSIDE every bundle: `OMEGA_BUILD_JSON` is baked in at bundle time, so the service worker and every page context read it with no file to load. The `build.js` JSONP and its `build.json` sidecar are no longer written; delete any `importScripts('/build.js')` you added.
 - [#609](../../issues/609) — The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).

@@ -11,7 +11,7 @@
  * hero card number, a timeline year, a shell command, a terminal transcript
  * line, a code-panel token, a price-card catalog value — is TEXT and gets
  * escaped. Prose args (headline, description, label, title, quote) stay raw:
- * brands author inline `<em>` in them today (omega-playground's pages do), and
+ * brands author inline `<em>` in them today (the playground's pages do), and
  * the `html` schema type / slot blocks are the finished-markup lane by design.
  *
  * `escape_once` and not `escape`: a brand that worked around this by authoring

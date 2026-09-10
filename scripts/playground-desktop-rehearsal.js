@@ -27,7 +27,7 @@
  *   2. ensure the rehearsal repo exists, creating it PRIVATE the first time
  *   3. publish the playground desktop target's COMPOSED secrets to it, the set
  *      `omega push-secrets` composes for a brand: push-secrets publishes to the
- *      brand's DECLARED repo (omega-playground) and skips a snapshot repo on the
+ *      brand's DECLARED repo (playground-omega) and skips a snapshot repo on the
  *      remote mismatch, so the run's build had no keys at all
  *   4. snapshot the WORKING TREE (tracked edits and untracked-not-ignored files
  *      alike, plus the ignored workflow file) into a LOCAL ref outside
@@ -69,7 +69,7 @@ const ROOT = path.join(__dirname, '..');
 // `<brand.id>-rehearsal`, the third role of the brand repo rule
 // ([#808](https://github.com/Omega-JS-Stack/omega/issues/808)); it is renamed
 // there with the brand.
-const REPO = 'Omega-JS-Stack/omega-playground-rehearsal';
+const REPO = 'Omega-JS-Stack/playground-rehearsal';
 const REPO_DESCRIPTION = 'Playground desktop rehearsal snapshot (throwaway)';
 const REMOTE = `https://github.com/${REPO}.git`;
 const BRANCH = 'main';
@@ -81,7 +81,7 @@ const WORKFLOW_FILE = path.basename(WORKFLOW);
 // the tree it dispatches from.
 const WORKFLOW_PATH = path.relative(ROOT, WORKFLOW);
 const TARGET = 'desktop';
-const TARGET_DIR = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'desktop');
+const TARGET_DIR = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'desktop');
 const STEPS = 6;
 
 // Every detail line sits under its step's `[X/Y]` heading, the publisher's own
@@ -95,11 +95,11 @@ const stepLogger = {
 // The snapshot commit says what it is: a throwaway, rewritten by the next run.
 const SNAPSHOT_MESSAGE = 'chore(rehearsal): snapshot the working tree for the playground desktop run';
 
-// `brands/omega-playground/package-lock.json` is untracked ON PURPOSE (a brand's
+// `brands/playground-omega/package-lock.json` is untracked ON PURPOSE (a brand's
 // lockfile never ships, which is why the workflow's target install is
 // `npm install`), so the snapshot leaves it behind. Everything else that is
 // untracked-but-not-ignored rides along, exactly like the ship's own `git add`.
-const EXCLUDED_PATHS = [':!brands/omega-playground/package-lock.json'];
+const EXCLUDED_PATHS = [':!brands/playground-omega/package-lock.json'];
 
 // `%(parent)` is empty for a root commit, which simply misses the reuse check.
 const REF_FORMAT = '%(objectname) %(tree) %(parent)';

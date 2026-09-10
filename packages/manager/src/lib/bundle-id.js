@@ -6,8 +6,8 @@
  *
  *   deriveBundleIdPrefix('https://itwcreativeworks.com')   → 'com.itwcreativeworks'
  *   deriveBundleIdPrefix('https://playground.omegajs.dev') → 'dev.omegajs.playground'
- *   composeBundleId('com.itwcreativeworks', 'omega-playground')
- *     → 'com.itwcreativeworks.omega.playground'
+ *   composeBundleId('com.itwcreativeworks', 'daily-build')
+ *     → 'com.itwcreativeworks.daily.build'
  *
  * Sanitization keeps ids legal on BOTH stores: Apple allows hyphens but
  * Android package segments don't, so domain labels drop non-alphanumerics
@@ -43,7 +43,7 @@ function deriveBundleIdPrefix(url) {
  * Full bundle identifier: prefix + the brand id with hyphens as dots.
  *
  * @param {string} prefix - reverse-DNS prefix (config or derived)
- * @param {string} brandId - brand.id ('omega-playground')
+ * @param {string} brandId - brand.id ('daily-build')
  * @returns {string}
  */
 function composeBundleId(prefix, brandId) {

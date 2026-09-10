@@ -67,7 +67,7 @@ async function runOp(config, { env = {} } = {}) {
   }
 }
 
-// The CANONICAL brand shape (brands/omega-playground): the GA4 stream id is
+// The CANONICAL brand shape (brands/playground-omega): the GA4 stream id is
 // PER TARGET and the shared slot is null — one stream per surface is what the
 // analytics service provisions.
 const CANONICAL = {
@@ -147,7 +147,7 @@ test('env-rules op: a target-less entry is judged against the brand config', asy
 test('env-rules op: a target-less entry sees the PER-TARGET value too (#683)', async () => {
   // The canonical Sentry shape: the monitoring service provisions one project
   // per surface and writes the DSN to targets.<t>.monitoring.providers.sentry.dsn,
-  // leaving the shared slot null (brands/omega-playground is exactly this). A
+  // leaving the shared slot null (brands/playground-omega is exactly this). A
   // brand-ROOT read of monitoring.providers.sentry.dsn therefore saw nothing,
   // so SENTRY_AUTH_TOKEN — the key the service needs to have provisioned any
   // of it — was never owed on the shape brands actually carry.

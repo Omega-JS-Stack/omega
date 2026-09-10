@@ -89,4 +89,4 @@ Ink on paper. Glassy nav (transparent until scroll → blur + hairline; ink CTA)
 3. Auth/account/payment surfaces + dashboard/admin remake (this doc's App DNA).
 4. Showcase pass; FOUC critical-CSS/font QA rides this arc.
 5. C4 cross-target sharing (tokens → desktop/extension).
-6. Arc close: template repo cut OUTSIDE the monorepo; playground source → `Omega-JS-Stack/omega-playground` main + CI (`omega deploy` dispatch replaces direct gh-pages push); omegajs.dev wiring.
+6. Arc close: template repo cut OUTSIDE the monorepo; playground source → `Omega-JS-Stack/playground-omega` main + CI (`omega deploy` dispatch replaces direct gh-pages push); omegajs.dev wiring.

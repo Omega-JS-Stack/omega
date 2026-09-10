@@ -27,7 +27,7 @@ module.exports = {
       run: (ctx) => {
         const config = Manager.getConfig();
 
-        ctx.expect(config.brand.id).toBe('omega-playground');
+        ctx.expect(config.brand.id).toBe('playground');
         // Not declared under targets.desktop.app, so derived from brand.name.
         ctx.expect(config.app.productName).toBe('OMEGA Playground');
       },
@@ -53,13 +53,12 @@ module.exports = {
 
         // Nothing declares a releases repo, so the `<brand.id>-releases` default
         // under the brand repo's owner is the address every release verb uses.
-        ctx.expect(releasesRepo(config).name).toBe('omega-playground-releases');
-        ctx.expect(releasesRepo(config).repo).toBe('Omega-JS-Stack/omega-playground-releases');
+        ctx.expect(releasesRepo(config).name).toBe('playground-releases');
+        ctx.expect(releasesRepo(config).repo).toBe('Omega-JS-Stack/playground-releases');
 
-        // The brand repo is a TYPED override (repo.providers.github.repo), not the
-        // `<brand.id>-omega` default: #808 renames this brand to `playground`,
-        // after which the override goes and the default resolves it.
-        ctx.expect(brandRepo(config).repo).toBe('Omega-JS-Stack/omega-playground');
+        // Nothing declares a brand repo either, so the `<brand.id>-omega` default
+        // of the `<brand.id>-<role>` rule resolves the source repo.
+        ctx.expect(brandRepo(config).repo).toBe('Omega-JS-Stack/playground-omega');
       },
     },
   ],

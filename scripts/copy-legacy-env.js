@@ -31,7 +31,7 @@ const path = require('node:path');
 // Defaults
 const REPO_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_SOURCE = '/Users/ian/Developer/Repositories/ITW-Creative-Works/omega-manager/.env';
-const DEFAULT_BRAND = 'brands/omega-playground';
+const DEFAULT_BRAND = 'brands/playground-omega';
 
 // One authoritative list per group — key names only, never values.
 const KEY_GROUPS = {

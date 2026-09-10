@@ -1,5 +1,5 @@
 {
-  "name": "omega-playground",
+  "name": "playground-omega",
   "private": true,
   "description": "OMEGA Playground — the in-monorepo rehearsal brand: one brand config, every target (web, backend, desktop, browser extension). Test infrastructure, never production.",
   "workspaces": [

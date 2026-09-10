@@ -163,7 +163,7 @@ circumventing license-key functionality and removing notices.
 3. **Verify from the outside**: in an empty temp dir, `npm install @omega.js/web`
    (and one more, e.g. manager) — install + `require.resolve` must succeed with no
    overrides. That is the moment the untested-lane risk is retired.
-4. **Flip omega-brand to registry specs**: from any TARGET root (`targets/website`;
+4. **Flip the real brand (omega-omega) to registry specs**: from any TARGET root (`targets/website`;
    the manager has no `i` verb), `npx omega i live` — tree-wide `file:` → the EXACT
    family pin + one registry install (`restoreRegistrySpecs` writes the linked copy's version with no
    caret, because the family is lockstep; `omega i local` is the way back for

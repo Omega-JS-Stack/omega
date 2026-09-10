@@ -382,7 +382,7 @@ const MANAGER_DEFAULTS = {
       apple: {
         // Full bundle ID = composeBundleId(prefix, brand.id) — the brand id's
         // dashes become dots (Android-safe segments), e.g.
-        // com.itwcreativeworks + omega-playground → com.itwcreativeworks.omega.playground
+        // com.itwcreativeworks + daily-build → com.itwcreativeworks.daily.build
         bundleIdPrefix: null,
         // Capabilities enabled on the brand's bundle ID
         capabilities: ['APPLE_ID_AUTH'],

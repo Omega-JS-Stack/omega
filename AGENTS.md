@@ -151,9 +151,9 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 |---|---|---|
 | `brands/naked-brand` | "Naked Brand" — the bare fixture: the minimum a brand can declare, so a walkthrough sees every prompt fire from zero; a QA walk may reset it | Offline, `demo-*` only |
 | `brands/sandbox-brand` | Synthetic fixture for the automated corpus/e2e; test runs may mangle and reset it | Offline, `demo-*` only |
-| `brands/omega-playground` | "OMEGA Playground" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
+| `brands/playground-omega` | "OMEGA Playground" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
 | `brands/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
-| `../omega-brand` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
+| `../omega-omega` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
 The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand.
 - Full topology, history, the local-era `file:` dependency contract, and the remaining launch gates: [docs/shared/brands.md](docs/shared/brands.md).
 - **Working inside a consumer brand right now?** Read [docs/manager/brand.md](docs/manager/brand.md) first — the brand-root anatomy, the verbs, and the brand hard rules.

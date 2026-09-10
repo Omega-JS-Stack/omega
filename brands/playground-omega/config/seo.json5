@@ -1,6 +1,6 @@
 // SEO sidecar (seo service) — parasite-SEO GitHub repos for this brand.
 // Playground-scoped: ONE demo repo proving the leg end to end; the name is
-// deliberately distinct from the site repo (Omega-JS-Stack/omega-playground)
+// deliberately distinct from the site repo (Omega-JS-Stack/playground-omega)
 // because seo repos are created as {org}/{name}. Repos land PUBLIC — the
 // service run itself stays gated behind Ian's go (standing rule).
 {

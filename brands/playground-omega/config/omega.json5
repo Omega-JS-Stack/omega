@@ -1,4 +1,4 @@
-// OMEGA Playground (brand id omega-playground) — brand-level omega.json5: the
+// OMEGA Playground (brand id playground) — brand-level omega.json5: the
 // shared config layer every target under targets/ inherits. Local files override any
 // key per-surface; key presence under `targets` = this brand supports that
 // target. Secrets NEVER live here — they go in the gitignored .env (the
@@ -8,7 +8,7 @@
 // analytics consoles). The doctrine now: this is the OMEGA test surface —
 // we mess around here, nothing live actually matters, and every account,
 // order, and page is throwaway. Infrastructure identity is UNCHANGED: id
-// omega-playground, subdomain playground.omegajs.dev, Firebase project
+// playground, subdomain playground.omegajs.dev, Firebase project
 // omegajs-playground — only the NAME and the VOICE moved.
 {
 
@@ -20,7 +20,7 @@
   // The real OMEGA brand sets 'self' on its OWN SendGrid account at launch.
   parent: false,
   brand: {
-    id: "omega-playground",
+    id: "playground",
     name: "OMEGA Playground",
     company: "ITW Creative Works",
     description: "The live demo surface for the OMEGA stack: every framework, every integration, running for real on data nobody has to keep.",
@@ -83,7 +83,7 @@
 
   // Brand repo (github service: repo + Pages; the admin/post CMS routes
   // commit to the same repo). No `repo` slug — the derivation defaults
-  // resolve it: name = brand.id (omega-playground), owner = org. The repo
+  // resolve it: name = `<brand.id>-omega` (playground-omega), owner = org. The repo
   // exists (gh-pages holds built output); the SOURCE lands on main at arc
   // close (Ian 2026-07-12) — until then CMS creates fail at the branch
   // lookup. shared: the org profile belongs to the OMEGA project, not this
@@ -93,10 +93,6 @@
     providers: {
       github: {
         org: "Omega-JS-Stack",
-        // Explicit until #808 renames this brand to `playground` (the rule is
-        // `<brand.id>-<role>`, so the derived default would be
-        // `omega-playground-omega`).
-        repo: "omega-playground",
         shared: true,
         private: false,
         // false = the repo service skips entirely — no org profile, no repo
@@ -126,7 +122,7 @@
   // REAL playground project (created 2026-07-11; console:
   // https://console.firebase.google.com/project/omegajs-playground). Values
   // are the web-app config verbatim — public by design. To run offline-only,
-  // temporarily set projectId back to the demo-* convention (demo-omega-playground).
+  // temporarily set projectId back to the demo-* convention (demo-playground).
   cloud: {
     provider: "firebase",
     // Platform-level resources the manage cycle's project ensures consume

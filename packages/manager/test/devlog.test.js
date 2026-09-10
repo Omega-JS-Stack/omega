@@ -158,8 +158,8 @@ test('devlog: project map derives repo identity like the github service (a typed
 });
 
 test('devlog: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
-  // ../omega-brand's real shape: org Omega-JS-Stack, repo
-  // "itw-creative-works/omega-brand". An owner read off `org` scans a repo that
+  // ../omega-omega's real shape: org Omega-JS-Stack, repo
+  // "itw-creative-works/omega-omega". An owner read off `org` scans a repo that
   // does not exist.
   const brands = [fakeBrand('acme', { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' })];
 

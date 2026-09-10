@@ -59,7 +59,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
 const DESKTOP = path.join(ROOT, 'packages', 'desktop');
 const DESKTOP_DIST = path.join(DESKTOP, 'dist');
 const FIXTURE = path.join(DESKTOP, 'src', 'test', 'fixtures', 'consumer-app');

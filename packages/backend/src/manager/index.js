@@ -491,7 +491,7 @@ Manager.prototype.init = function (exporter, options) {
       // A cert for the wrong project authenticates every Firestore call with the wrong
       // identity — gRPC UNAUTHENTICATED at request time, far from the cause. Refuse to boot.
       // Compare project id to project id, EXACTLY: a brand id is not a project id (brand
-      // `omega-playground` runs on project `omegajs-playground`), so matching against the
+      // `playground` runs on project `omegajs-playground`), so matching against the
       // brand — by substring or otherwise — both false-negatives and false-positives.
       // When the expected project is unknown (no FIREBASE_CONFIG), there is nothing to
       // verify against, so boot proceeds rather than guessing.

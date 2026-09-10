@@ -3,7 +3,7 @@
 // under `targets` = target enabled). This is the SECOND-SKIN brand (Ian
 // 2026-07-17): a fictional dev-news publication wearing the newsflash theme
 // permanently, so classy (playground) and newsflash both stay alive. Born by
-// COPY of omega-playground — offline-only: demo-* Firebase, no real cloud,
+// COPY of playground-omega — offline-only: demo-* Firebase, no real cloud,
 // no real external services, never production. Secrets NEVER live here —
 // the loader hard-fails secret-shaped keys.
 {

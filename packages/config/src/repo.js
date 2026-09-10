@@ -6,7 +6,7 @@
  *
  * One optional key: `repo.providers.github.repo` (or, on a backend load, the
  * target-overlaid `targets.backend.github.repo`, which wins) — either a bare name
- * ("omega-brand") or an "owner/name" slug ("itw-creative-works/omega-brand").
+ * ("omega-omega") or an "owner/name" slug ("itw-creative-works/omega-omega").
  * Defaults: name falls to `<brand.id>-omega`, owner falls to `repo.providers.github.org`.
  * That name is the `<brand.id>-<role>` repo rule (Ian 2026-09-07,
  * [#809](https://github.com/Omega-JS-Stack/omega/issues/809)): every repo a brand
@@ -28,7 +28,7 @@
 /**
  * Parse a `repo.providers.github.repo` value: "owner/name" slug or bare "name".
  *
- * @param {string} value - e.g. "itw-creative-works/omega-brand" or "omega-brand"
+ * @param {string} value - e.g. "itw-creative-works/omega-omega" or "omega-omega"
  * @returns {{ owner: string, name: string }} owner is '' for bare names.
  */
 function parseRepoSlug(value) {

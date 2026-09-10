@@ -7,7 +7,7 @@ target, and a `demo-*` project id; every other section is deliberately absent
 so a walkthrough sees the full ask/skip/disable ladder fire **from zero**
 rather than from a brand that already answered every question.
 
-The standing brands are too complete for that: `brands/omega-playground` and
+The standing brands are too complete for that: `brands/playground-omega` and
 `brands/newsflash-brand` are finished consumers, and `brands/sandbox-brand` is
 already wired for the automated corpus. This one starts naked on purpose.
 

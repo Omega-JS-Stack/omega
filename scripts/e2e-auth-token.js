@@ -43,7 +43,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
+const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
 const DESKTOP_SRC = path.join(ROOT, 'packages', 'desktop', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'auth-token-e2e');
 
@@ -215,7 +215,7 @@ async function main() {
       modeHelpers.attachTo(HarnessManager);
       urlHelpers.attachTo(HarnessManager);
 
-      bridge._manager = new HarnessManager({ brand: { id: 'omega-playground' } });
+      bridge._manager = new HarnessManager({ brand: { id: 'playground' } });
 
       customToken = await bridge._fetchCustomToken(user);
       assert.equal(typeof customToken, 'string', 'custom token should be a string');

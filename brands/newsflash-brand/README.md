@@ -5,7 +5,7 @@ The dev-news daily: ship logs, release radar, and the state of the toolchain
 
 This is the monorepo's **second-skin brand**: a fictional editorial
 publication wearing the **newsflash** theme permanently, so both first-party
-skins stay alive in real consumers (classy on `brands/omega-playground`,
+skins stay alive in real consumers (classy on `brands/playground-omega`,
 newsflash here). Born by copy of the playground (Ian 2026-07-17); the wizard
 rehearsal is a separate exercise. **Offline-only test infrastructure**:
 demo-* Firebase project, no real cloud, no real external services, never

@@ -489,7 +489,7 @@ test('testing: an owner/name slug carries its OWN owner into the gh command', as
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
-  // ../omega-brand's real shape: the repo sits under the paid company org while
+  // ../omega-omega's real shape: the repo sits under the paid company org while
   // `org` still names the brand's own org.
   const cmd = 'gh run list --repo itw-creative-works/acme-app --limit 1 --json status,conclusion,name';
   const exec = fakeExec({

@@ -13,7 +13,7 @@ stays hand-made — PayPal retired the sandbox-accounts API (see below).
   "test facilitator's Test Store", PayPal's default; rename in the developer
   dashboard if the checkout header matters). Creds: `PAYPAL_CLIENT_ID` +
   `PAYPAL_CLIENT_SECRET` in the playground backend's `.env`
-  (`brands/omega-playground/targets/backend/.env`). The manager wants the client id in
+  (`brands/playground-omega/targets/backend/.env`). The manager wants the client id in
   config (`payment.providers.paypal.clientId`) and only the secret in `.env`;
   the backend wants both as env vars.
 - **Webhook** — registered by the manager payment walk, pointing at the deployed
@@ -21,7 +21,7 @@ stays hand-made — PayPal retired the sandbox-accounts API (see below).
   Deliveries arrive with real signature headers; the deployed backend is the
   verification surface (a local emulator receives nothing — no forwarding path).
 - **QA product** — `proof-press` ("Proof Press", $5 monthly, NO trial)
-  in `brands/omega-playground/config/omega.json5`. Trial-free ON PURPOSE: every public
+  in `brands/playground-omega/config/omega.json5`. Trial-free ON PURPOSE: every public
   tier carries a 14-day trial, which defers a subscription's first sale two weeks.
   It lists on the playground /pricing page on purpose (Ian 2026-08-19, #348) so
   real checkouts can be run against it by hand; the `hidden: true` mechanism

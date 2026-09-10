@@ -93,8 +93,8 @@ test('bookmark: groups with unmet inputs are absent', () => {
 });
 
 test('bookmark: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
-  // The real shape this protects: ../omega-brand declares org Omega-JS-Stack and
-  // repo "itw-creative-works/omega-brand", so an owner read off `org` links to a
+  // The real shape this protects: ../omega-omega declares org Omega-JS-Stack and
+  // repo "itw-creative-works/omega-omega", so an owner read off `org` links to a
   // repo that does not exist.
   const links = generateLinks(
     { brand: { id: 'acme', url: 'https://acme.example' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' } } } },

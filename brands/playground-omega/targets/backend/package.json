@@ -1,5 +1,5 @@
 {
-  "name": "omega-playground-backend",
+  "name": "playground-backend",
   "version": "0.0.1",
   "description": "OMEGA Playground backend (rehearsal brand Cloud Functions)",
   "private": true,
