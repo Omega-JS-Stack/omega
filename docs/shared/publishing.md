@@ -1,9 +1,9 @@
 # Publishing — the runbook
 
-> The publish-proving checkpoint's script. Nothing here runs without Ian's explicit GO
-> (standing rule: zero npm publishes / GitHub releases until then). The latch is
-> mechanical: all seven publishables carry `private: true` — npm itself refuses until
-> the unlatch step below.
+> The publish-proving checkpoint's script, run for real on 2026-09-09: the seven
+> publishables are on the registry at 0.1.0 ([#25](https://github.com/Omega-JS-Stack/omega/issues/25)),
+> each with `publishConfig.access: public`, and published is the new normal. The unlatch
+> step below is history; versions move by changesets from here.
 
 ## What publishes, what never does
 
@@ -161,9 +161,9 @@ circumventing license-key functionality and removing notices.
 3. **Verify from the outside**: in an empty temp dir, `npm install @omega.js/web`
    (and one more, e.g. manager) — install + `require.resolve` must succeed with no
    overrides. That is the moment the untested-lane risk is retired.
-4. **Flip omega-brand to registry specs**: from the brand root,
-   `npx omega i live` — tree-wide `file:` → the EXACT `0.1.0` pin + one registry
-   install (`restoreRegistrySpecs` writes the linked copy's version with no
+4. **Flip omega-brand to registry specs**: from any TARGET root (`targets/website`;
+   the manager has no `i` verb), `npx omega i live` — tree-wide `file:` → the EXACT
+   `0.1.0` pin + one registry install (`restoreRegistrySpecs` writes the linked copy's version with no
    caret, because the family is lockstep; `omega i local` is the way back for
    local-era work). Commit the brand's manifest+lock change.
 5. **Brand proof**: brand `npm run manage` (manage cycle) + a website build — the brand
