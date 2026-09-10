@@ -1,7 +1,9 @@
 # Publishing — the runbook
 
 > The publish-proving checkpoint's script, run for real on 2026-09-09: the seven
-> publishables are on the registry at 0.1.0 ([#25](https://github.com/Omega-JS-Stack/omega/issues/25)),
+> publishables are on the registry ([#25](https://github.com/Omega-JS-Stack/omega/issues/25)) at 0.50.0, the
+> monorepo's own number (0.1.0 went out first that night and is deprecated: the family
+> carries ONE version, the root package.json's, by ruling 2026-09-10),
 > each with `publishConfig.access: public`, and published is the new normal. The unlatch
 > step below is history; versions move by changesets from here.
 
@@ -22,8 +24,9 @@ installable beside it — a real dependency, never vendored. It ships no docs tr
 plugin's launcher can deep-resolve `@omega.js/mcp-router/bin/mcp-router.js`.
 
 Registry-real internal ranges (everything else is workspace `*`): `@omega.js/client`
-`0.1.0` in backend/web/desktop/extension; `@omega.js/backend` and `@omega.js/mcp-router`
-`0.1.0` in manager — EXACT, not carets, because the family is lockstep (below).
+in backend/web/desktop/extension; `@omega.js/backend` and `@omega.js/mcp-router` in
+manager — the EXACT family version (0.50.0 today), not carets, because the family is
+lockstep (below).
 
 ## Lockstep — the family ships ONE version ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
 
@@ -151,19 +154,18 @@ circumventing license-key functionality and removing notices.
    `VENDORABLE_PACKAGES` in [packages/devkit/tools/vendor.js](../../packages/devkit/tools/vendor.js)
    names them, so the list is never re-typed here).
 2. **Publish** each (changesets is configured lockstep + `access: public`, so the
-   seven go out at ONE number; for the FIRST 0.1.0 the direct form per package is
-   equally fine):
+   seven go out at ONE number; the direct form per package is equally fine):
    `npm publish --workspace=packages/<name>` — order matters only where a dependent
    waits on a dependency: **client and backend before their dependents**
    (web/desktop/extension need client on the registry; manager needs backend and
    mcp-router). Safe order: client → backend → mcp-router → extension → desktop →
-   web → manager. 2FA/OTP prompts surface here on first publish.
+   web → manager.
 3. **Verify from the outside**: in an empty temp dir, `npm install @omega.js/web`
    (and one more, e.g. manager) — install + `require.resolve` must succeed with no
    overrides. That is the moment the untested-lane risk is retired.
 4. **Flip omega-brand to registry specs**: from any TARGET root (`targets/website`;
    the manager has no `i` verb), `npx omega i live` — tree-wide `file:` → the EXACT
-   `0.1.0` pin + one registry install (`restoreRegistrySpecs` writes the linked copy's version with no
+   family pin + one registry install (`restoreRegistrySpecs` writes the linked copy's version with no
    caret, because the family is lockstep; `omega i local` is the way back for
    local-era work). Commit the brand's manifest+lock change.
 5. **Brand proof**: brand `npm run manage` (manage cycle) + a website build — the brand
@@ -178,6 +180,8 @@ circumventing license-key functionality and removing notices.
   changes bump minor and consumers move deliberately. A BRAND floats nothing: the
   manager pins every target exactly, so `omega update` is the one thing that moves
   a brand, and it moves the whole family ([updates.md](updates.md)).
-- 1.0.0 is a later, deliberate graduation (Ian's call), not an accumulation.
+- **1.0.0 is NEVER published without Ian's explicit word** (ruling 2026-09-10): it is the
+  official release, and it waits until OMEGA has survived on its own with Ian's brands.
+  Every number below it is free to publish whenever he wants.
 - The publish is also the brand-CI-build unlock: no tarball vendoring exists by
   design — the registry is the lane CI installs from.

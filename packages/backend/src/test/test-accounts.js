@@ -550,6 +550,11 @@ const SESSION_PATH = 'sessions/app';
  * @param {object} accounts - Every account definition, keyed (referrals name real personas)
  * @returns {Array|null} The persona's `affiliate.referrals`, or null when it referred nobody
  */
+// One derivation per assembled table: the inbound half (buildInboundReferral)
+// reads the SAME records the referrer carries, so both halves wear one stamp.
+// A second build would call Date.now() again and disagree by a millisecond.
+const REFERRAL_FIXTURES = new WeakMap();
+
 function buildReferralFixtures(key, accounts) {
   const referred = PERSONA_REFERRALS[key];
 
@@ -557,7 +562,18 @@ function buildReferralFixtures(key, accounts) {
     return null;
   }
 
-  return referred.map((referredKey, index) => {
+  let perTable = REFERRAL_FIXTURES.get(accounts);
+
+  if (!perTable) {
+    perTable = new Map();
+    REFERRAL_FIXTURES.set(accounts, perTable);
+  }
+
+  if (perTable.has(key)) {
+    return perTable.get(key);
+  }
+
+  const referrals = referred.map((referredKey, index) => {
     const account = accounts[referredKey];
 
     // A referral pointing at nobody is a uid the emulator cannot resolve — the
@@ -571,6 +587,10 @@ function buildReferralFixtures(key, accounts) {
       timestamp: getDaysAgo(REFERRAL_DAYS_AGO[index % REFERRAL_DAYS_AGO.length]).timestamp,
     };
   });
+
+  perTable.set(key, referrals);
+
+  return referrals;
 }
 
 /**

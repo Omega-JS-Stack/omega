@@ -31,8 +31,8 @@ Only rows needing attention print; a fully-current tree reports one line. Rows s
 ## The @omega.js family is pinned, and `omega update` is its ONE mover ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
 
 Every `@omega.js/*` spec the manager writes into a brand is an EXACT pin, never a
-caret: `"@omega.js/manager": "0.1.0"` at the brand root, `"@omega.js/<framework>":
-"0.1.0"` in each target, all at the manager's own version (the family ships
+caret: `"@omega.js/manager": "0.50.0"` at the brand root, `"@omega.js/<framework>":
+"0.50.0"` in each target, all at the manager's own version (the family ships
 lockstep — [publishing.md](publishing.md)). A caret would let one target float
 ahead alone on somebody's `npm update`, which is how a brand ends up serving two
 copies of `@omega.js/client` and validating one omega.json5 with two validators.
