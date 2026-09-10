@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "OMEGA extension framework — build, test, and package Chrome/Firefox extensions (MV3)",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "OMEGA backend framework — build, test, and deploy Firebase Cloud Functions backends",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/manager/index.js",
   "files": [
     "bin/",

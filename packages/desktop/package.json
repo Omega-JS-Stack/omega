@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "OMEGA desktop framework — build, test, and package Electron apps for macOS, Windows, and Linux",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
